@@ -16,6 +16,7 @@ class ObjectRenderer {
         mesh: Mesh,
         shader: Shader,
         texture: Texture,
+        depthTexture: Texture,
         camera: Camera,
         modelMatrix: FloatArray,
         state: MuralState
@@ -38,6 +39,13 @@ class ObjectRenderer {
 
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, texture.getTextureId())
+        val textureLocation = GLES30.glGetUniformLocation(shader.getProgramId(), "u_Texture")
+        GLES30.glUniform1i(textureLocation, 0)
+
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE1)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, depthTexture.getTextureId())
+        val depthTextureLocation = GLES30.glGetUniformLocation(shader.getProgramId(), "u_DepthTexture")
+        GLES30.glUniform1i(depthTextureLocation, 1)
 
         GLES30.glBindVertexArray(mesh.getVertexArrayId())
         GLES30.glDrawElements(GLES30.GL_TRIANGLES, mesh.indexBuffer.getSize(), GLES30.GL_UNSIGNED_SHORT, 0)

@@ -31,7 +31,9 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private lateinit var muralObject: ObjectRenderer
     private lateinit var muralShader: Shader
     private lateinit var muralTexture: Texture
+    private lateinit var depthTexture: Texture
     private lateinit var muralMesh: Mesh
+    private lateinit var depthTexCoordBuffer: VertexBuffer
 
     private var session: Session? = null
     private val trackedImages = mutableMapOf<Int, AugmentedImage>()
@@ -46,6 +48,7 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         muralObject = ObjectRenderer()
         muralShader = Shader(assets, "shaders/mural_object.vert", "shaders/mural_object.frag", null)
         muralTexture = Texture()
+        depthTexture = Texture()
         muralMesh = createMuralMesh()
     }
 
@@ -53,11 +56,13 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val quadCoords = floatArrayOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f)
         val quadTexCoords = floatArrayOf(0f, 1f, 1f, 1f, 0f, 0f, 1f, 0f)
         val quadIndices = shortArrayOf(0, 1, 2, 1, 3, 2)
+        val quadDepthTexCoords = floatArrayOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f)
 
         val vertexBuffer = VertexBuffer(GpuBuffer(GLES30.GL_ARRAY_BUFFER, quadCoords.size * 4, floatArrayToByteArray(quadCoords)), 3)
         val texCoordBuffer = VertexBuffer(GpuBuffer(GLES30.GL_ARRAY_BUFFER, quadTexCoords.size * 4, floatArrayToByteArray(quadTexCoords)), 2)
+        depthTexCoordBuffer = VertexBuffer(GpuBuffer(GLES30.GL_ARRAY_BUFFER, quadDepthTexCoords.size * 4, floatArrayToByteArray(quadDepthTexCoords)), 2)
         val indexBuffer = IndexBuffer(GpuBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, quadIndices.size * 2, shortArrayToByteArray(quadIndices)))
-        return Mesh(vertexBuffer, indexBuffer)
+        return Mesh(vertexBuffer, indexBuffer, texCoordBuffer, depthTexCoordBuffer)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -90,13 +95,26 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             }
 
             if (markersChanged) {
-                recalculateMuralQuad()
+                recalculateMuralQuad(frame)
             }
 
             if (camera.trackingState == TrackingState.TRACKING && trackedImages.isNotEmpty()) {
+                try {
+                    frame.acquireDepthImage16Bits().use { depthImage ->
+                        val plane = depthImage.planes[0]
+                        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, depthTexture.getTextureId())
+                        GLES30.glTexImage2D(
+                            GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RG8, depthImage.width, depthImage.height, 0,
+                            GLES30.GL_RG, GLES30.GL_UNSIGNED_BYTE, plane.buffer
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Depth not available yet.
+                }
+
                 val modelMatrix = FloatArray(16)
                 Matrix.setIdentityM(modelMatrix, 0)
-                muralObject.draw(muralMesh, muralShader, muralTexture, camera, modelMatrix, currentState)
+                muralObject.draw(muralMesh, muralShader, muralTexture, depthTexture, camera, modelMatrix, currentState)
             }
         }
     }
@@ -109,9 +127,10 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         return result
     }
 
-    private fun recalculateMuralQuad() {
+    private fun recalculateMuralQuad(frame: Frame) {
         if (trackedImages.size < 2) return
 
+        val camera = frame.camera
         val referenceImage = trackedImages.values.first()
         val referenceTransform = FloatArray(16)
         referenceImage.centerPose.toMatrix(referenceTransform, 0)
@@ -158,6 +177,41 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         )
 
         muralMesh.vertexBuffer.set(vertices)
+
+        val viewMatrix = FloatArray(16)
+        val projMatrix = FloatArray(16)
+        camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100f)
+        camera.getViewMatrix(viewMatrix, 0)
+
+        val vpMatrix = FloatArray(16)
+        Matrix.multiplyMM(vpMatrix, 0, projMatrix, 0, viewMatrix, 0)
+
+        val ndcCoords = FloatArray(8)
+        for (i in 0 until 4) {
+            val worldPoint = floatArrayOf(vertices[i*3], vertices[i*3+1], vertices[i*3+2], 1f)
+            val ndcPoint = FloatArray(4)
+            Matrix.multiplyMV(ndcPoint, 0, vpMatrix, 0, worldPoint, 0)
+            ndcCoords[i*2] = ndcPoint[0] / ndcPoint[3]
+            ndcCoords[i*2+1] = ndcPoint[1] / ndcPoint[3]
+        }
+
+        val ndcBuffer = ByteBuffer.allocateDirect(ndcCoords.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+        ndcBuffer.put(ndcCoords)
+        ndcBuffer.position(0)
+
+        val depthUvBuffer = ByteBuffer.allocateDirect(ndcCoords.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+
+        frame.transformCoordinates2d(
+            Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+            ndcBuffer,
+            Coordinates2d.TEXTURE_NORMALIZED,
+            depthUvBuffer
+        )
+
+        val depthUvCoords = FloatArray(depthUvBuffer.capacity())
+        depthUvBuffer.get(depthUvCoords)
+
+        depthTexCoordBuffer.set(depthUvCoords)
     }
 
     fun setSession(session: Session) {
@@ -176,6 +230,11 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             }
             val config = Config(session)
             config.augmentedImageDatabase = augmentedImageDatabase
+
+            if (session?.isDepthModeSupported(Config.DepthMode.AUTOMATIC) == true) {
+                config.depthMode = Config.DepthMode.AUTOMATIC
+            }
+
             session?.configure(config)
         }
 
