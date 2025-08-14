@@ -114,7 +114,7 @@ fun CameraView(imageUri: Uri?, onSelectImage: () -> Unit) {
                 painter = rememberAsyncImagePainter(it),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 alpha = opacity,
                 colorFilter = run {
                     val saturationMatrix = AndroidColorMatrix().apply { setSaturation(saturation) }
