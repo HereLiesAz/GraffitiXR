@@ -1,9 +1,6 @@
-# Gradle files
+# Gradle
 .gradle/
 build/
-
-# App-specific build folders
-app/build/
 
 # Local configuration
 local.properties
@@ -18,16 +15,12 @@ local.properties
 *.jks
 *.keystore
 
-# NDK files
-.cxx/
-*.so
-*.o
-*.a
+# APK files
+*.apk
+*.aab
 
 # Log files
 *.log
 
-# Misc
-.DS_Store
-captures/
-output/
+# Outputs
+/app/build

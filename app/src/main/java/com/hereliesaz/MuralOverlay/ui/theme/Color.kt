@@ -1,4 +1,4 @@
-package com.example.muraloverlay.ui.theme
+package com.hereliesaz.MuralOverlay.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
