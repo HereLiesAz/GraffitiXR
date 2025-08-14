@@ -1,0 +1,40 @@
+package com.hereliesaz.MuralOverlay.rendering
+
+import android.opengl.GLES30
+import java.io.Closeable
+
+class VertexBuffer(buffer: GpuBuffer?, val numberOfEntries: Int) : Closeable {
+    private val buffer: GpuBuffer?
+    private var entries: Int
+
+    init {
+        require(buffer != null) { "buffer must not be null" }
+        require(buffer.capacity() % (numberOfEntries * 4) == 0) { "buffer capacity must be a multiple of the entry size" }
+        this.buffer = buffer
+        entries = buffer.capacity() / (numberOfEntries * 4)
+    }
+
+    fun set(data: FloatArray?) {
+        require(data != null) { "data must not be null" }
+        val bytes = ByteArray(data.size * 4)
+        val floatBuffer = java.nio.ByteBuffer.wrap(bytes).asFloatBuffer()
+        floatBuffer.put(data)
+        buffer?.set(bytes)
+    }
+
+    fun getNumberOfEntries(): Int {
+        return numberOfEntries
+    }
+
+    fun getNumberOfVertices(): Int {
+        return entries
+    }
+
+    override fun close() {
+        buffer?.free()
+    }
+
+    fun bind() {
+        buffer?.bind()
+    }
+}
