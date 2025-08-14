@@ -44,12 +44,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+import kotlinx.coroutines.delay
+
 @Composable
 fun MuralRoot(muralViewModel: MuralViewModel = viewModel()) {
     val state by muralViewModel.state.collectAsState()
     var hasCameraPermission by remember { mutableStateOf(false) }
+    var muralGLSurfaceView by remember { mutableStateOf<MuralGLSurfaceView?>(null) }
 
-    // Launcher for camera permission
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted ->
@@ -57,7 +59,6 @@ fun MuralRoot(muralViewModel: MuralViewModel = viewModel()) {
         }
     )
 
-    // Launcher for image selection
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
@@ -65,8 +66,33 @@ fun MuralRoot(muralViewModel: MuralViewModel = viewModel()) {
         }
     )
 
+    val markerCaptureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview(),
+        onResult = { bitmap ->
+            if (bitmap != null) {
+                muralViewModel.onMarkerAdded(bitmap)
+            }
+        }
+    )
+
     LaunchedEffect(key1 = true) {
         permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    LaunchedEffect(muralGLSurfaceView) {
+        muralGLSurfaceView?.let { view ->
+            while (true) {
+                val count = view.getTrackedImageCount()
+                muralViewModel.updateDetectedMarkersCount(count)
+
+                val stoppedIndices = view.renderer.getStoppedMarkerIndices()
+                for (index in stoppedIndices) {
+                    muralViewModel.onMarkerCovered(index)
+                }
+
+                delay(250)
+            }
+        }
     }
 
     Surface(
@@ -75,18 +101,37 @@ fun MuralRoot(muralViewModel: MuralViewModel = viewModel()) {
     ) {
         if (hasCameraPermission) {
             Box(modifier = Modifier.fillMaxSize()) {
-                ARView(
+                AndroidView(
                     modifier = Modifier.fillMaxSize(),
-                    state = state
+                    factory = { context ->
+                        MuralGLSurfaceView(context).also {
+                            muralGLSurfaceView = it
+                            val renderer = MuralRenderer(context)
+                            it.setRenderer(renderer)
+                            it.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                            renderer.setSession(it.session)
+                        }
+                    },
+                    update = { glSurfaceView ->
+                        val muralRenderer = glSurfaceView.renderer as MuralRenderer
+                        muralRenderer.updateState(state)
+                    }
                 )
 
-                Controls(
-                    state = state,
-                    onImageSelect = { imagePickerLauncher.launch("image/*") },
-                    onOpacityChange = muralViewModel::onOpacityChanged,
-                    onContrastChange = muralViewModel::onContrastChanged,
-                    onSaturationChange = muralViewModel::onSaturationChanged
-                )
+                when (val appState = state.appState) {
+                    is AppState.Initial -> InitialInstructions(onMarkerAdd = { markerCaptureLauncher.launch(null) })
+                    is AppState.MarkerCapture -> MarkerCaptureInstructions(
+                        detectedMarkersCount = appState.detectedMarkersCount,
+                        onMarkerAdd = { markerCaptureLauncher.launch(null) },
+                        onImageSelect = { imagePickerLauncher.launch("image/*") }
+                    )
+                    is AppState.MuralPlacement -> MuralPlacementControls(
+                        state = state,
+                        onOpacityChange = muralViewModel::onOpacityChanged,
+                        onContrastChange = muralViewModel::onContrastChanged,
+                        onSaturationChange = muralViewModel::onSaturationChanged
+                    )
+                }
             }
         } else {
             Box(
@@ -100,9 +145,60 @@ fun MuralRoot(muralViewModel: MuralViewModel = viewModel()) {
 }
 
 @Composable
-fun Controls(
+fun InitialInstructions(onMarkerAdd: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Bottom,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Draw high-contrast 'X's on the corners of your mural area, then press 'Add Marker' to capture each one.",
+            color = Color.White,
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onMarkerAdd) {
+            Text("Add Marker")
+        }
+    }
+}
+
+@Composable
+fun MarkerCaptureInstructions(
+    detectedMarkersCount: Int,
+    onMarkerAdd: () -> Unit,
+    onImageSelect: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Bottom,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Markers detected: $detectedMarkersCount",
+            color = Color.White,
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Row {
+            Button(onClick = onMarkerAdd) {
+                Text("Add Marker")
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = onImageSelect, enabled = detectedMarkersCount >= 2) {
+                Text("Select Image")
+            }
+        }
+    }
+}
+
+@Composable
+fun MuralPlacementControls(
     state: MuralState,
-    onImageSelect: () -> Unit,
     onOpacityChange: (Float) -> Unit,
     onContrastChange: (Float) -> Unit,
     onSaturationChange: (Float) -> Unit
@@ -114,10 +210,6 @@ fun Controls(
             .align(Alignment.BottomCenter),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Button(onClick = onImageSelect) {
-            Text("Select Image")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
         ControlSlider(
             label = "Opacity",
             value = state.opacity,
