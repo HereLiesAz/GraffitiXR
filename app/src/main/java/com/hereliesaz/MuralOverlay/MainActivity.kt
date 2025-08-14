@@ -150,7 +150,7 @@ fun CameraView(imageUri: Uri?, onSelectImage: () -> Unit) {
 @Composable
 fun SliderRow(label: String, value: Float, onValueChange: (Float) -> Unit, valueRange: ClosedFloatingPointRange<Float> = 0f..1f) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text(label, color = Color.White)
+        Text(label, color = MaterialTheme.colorScheme.onSurface)
         Spacer(modifier = Modifier.width(16.dp))
         Slider(
             value = value,
