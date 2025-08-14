@@ -119,9 +119,9 @@ fun CameraView(imageUri: Uri?, onSelectImage: () -> Unit) {
                 colorFilter = run {
                     val saturationMatrix = AndroidColorMatrix().apply { setSaturation(saturation) }
                     val contrastMatrix = AndroidColorMatrix(floatArrayOf(
-                        contrast, 0f, 0f, 0f, 0f,
-                        0f, contrast, 0f, 0f, 0f,
-                        0f, 0f, contrast, 0f, 0f,
+                        contrast, 0f, 0f, 0f, (1f - contrast) * 128f,
+                        0f, contrast, 0f, 0f, (1f - contrast) * 128f,
+                        0f, 0f, contrast, 0f, (1f - contrast) * 128f,
                         0f, 0f, 0f, 1f, 0f
                     ))
                     saturationMatrix.postConcat(contrastMatrix)
