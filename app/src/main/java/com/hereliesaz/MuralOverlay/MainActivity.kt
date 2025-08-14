@@ -239,7 +239,7 @@ fun ControlSlider(
     valueRange: ClosedFloatingPointRange<Float>
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = "$label: ${String.format("%.2f", value)}", color = Color.White)
+        Text(text = "$label: ${String.format("%.2f", value)}", color = MaterialTheme.colorScheme.onSurface)
         Slider(
             value = value,
             onValueChange = onValueChange,
