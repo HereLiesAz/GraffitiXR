@@ -102,7 +102,7 @@ fun CameraView(imageUri: Uri?, onSelectImage: () -> Unit) {
             cameraProvider.unbindAll()
             cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageCapture)
         } catch (exc: Exception) {
-            // Handle exceptions
+            android.util.Log.e("CameraView", "Use case binding failed", exc)
         }
     }
 
