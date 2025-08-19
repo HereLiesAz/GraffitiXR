@@ -10,14 +10,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModelProvider
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
@@ -28,7 +24,6 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var glSurfaceView: GLSurfaceView
     private lateinit var renderer: MuralRenderer
-    private lateinit var viewModel: MuralViewModel
     private var session: Session? = null
     private var userRequestedInstall = true
 
@@ -45,30 +40,28 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        viewModel = ViewModelProvider(this)[MuralViewModel::class.java]
         renderer = MuralRenderer(this)
-
-        glSurfaceView = GLSurfaceView(this).apply {
-            setEGLContextClientVersion(3)
-            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-            setRenderer(renderer)
-            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-        }
 
         setContent {
             MuralOverlayTheme {
-                val state by viewModel.state.collectAsState()
-                renderer.updateState(state)
-
-                Box(modifier = Modifier.fillMaxSize()) {
-                    AndroidView(factory = { glSurfaceView }, modifier = Modifier.fillMaxSize())
-                    // Simple text overlay for now to show state
-                    Text(
-                        text = "AppState: ${state.appState::class.java.simpleName}, Markers: ${renderer.getTrackedImageCount()}",
-                        color = Color.White
-                    )
-                }
+                SurfaceView()
             }
+        }
+    }
+
+    @Composable
+    fun SurfaceView() {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AndroidView(factory = { context ->
+                GLSurfaceView(context).apply {
+                    setEGLContextClientVersion(3)
+                    setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                    setRenderer(renderer)
+                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                }.also {
+                    glSurfaceView = it
+                }
+            }, modifier = Modifier.fillMaxSize())
         }
     }
 
@@ -126,21 +119,18 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            val installStatus = if (userRequestedInstall) {
-                ArCoreApk.getInstance().requestInstall(this, true)
-            } else {
-                ArCoreApk.getInstance().requestInstall(this, false)
+            val installStatus = ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)
+            if (installStatus == ArCoreApk.InstallStatus.INSTALL_REQUESTED) {
+                userRequestedInstall = false
+                return
             }
 
-            when (installStatus) {
-                ArCoreApk.InstallStatus.INSTALLED -> {
-                    session = Session(this)
-                    renderer.setSession(session!!)
-                }
-                ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
-                    userRequestedInstall = false
-                    return
-                }
+            if (ArCoreApk.getInstance().checkAvailability(this).isSupported) {
+                session = Session(this)
+                renderer.setSession(session!!)
+            } else {
+                Toast.makeText(this, "ARCore not supported on this device", Toast.LENGTH_LONG).show()
+                finish()
             }
         } catch (e: UnavailableUserDeclinedInstallationException) {
             Toast.makeText(this, "Please install ARCore", Toast.LENGTH_LONG).show()
