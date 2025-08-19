@@ -4,8 +4,8 @@ import android.opengl.GLES30
 import java.io.Closeable
 
 class IndexBuffer(buffer: GpuBuffer?) : Closeable {
-    private val buffer: GpuBuffer?
-    private var size = 0
+    internal val buffer: GpuBuffer?
+    var size = 0
 
     init {
         require(buffer != null) { "buffer must not be null" }
@@ -20,10 +20,6 @@ class IndexBuffer(buffer: GpuBuffer?) : Closeable {
         val shortBuffer = java.nio.ByteBuffer.wrap(bytes).asShortBuffer()
         shortBuffer.put(data)
         buffer?.set(bytes)
-    }
-
-    fun getSize(): Int {
-        return size
     }
 
     override fun close() {

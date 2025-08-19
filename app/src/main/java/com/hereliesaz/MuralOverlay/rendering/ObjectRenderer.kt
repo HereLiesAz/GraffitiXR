@@ -6,6 +6,7 @@ import android.opengl.GLES30
 import android.opengl.GLUtils
 import com.google.ar.core.Anchor
 import com.google.ar.core.Camera
+import com.hereliesaz.MuralOverlay.MuralState
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -30,8 +31,12 @@ class ObjectRenderer {
         val contrastLocation = GLES30.glGetUniformLocation(shader.getProgramId(), "u_Contrast")
         val saturationLocation = GLES30.glGetUniformLocation(shader.getProgramId(), "u_Saturation")
 
-        GLES30.glUniformMatrix4fv(projectionMatrixLocation, 1, false, camera.projectionMatrix, 0)
-        GLES30.glUniformMatrix4fv(viewMatrixLocation, 1, false, camera.viewMatrix, 0)
+        val projectionMatrix = FloatArray(16)
+        camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100f)
+        val viewMatrix = FloatArray(16)
+        camera.getViewMatrix(viewMatrix, 0)
+        GLES30.glUniformMatrix4fv(projectionMatrixLocation, 1, false, projectionMatrix, 0)
+        GLES30.glUniformMatrix4fv(viewMatrixLocation, 1, false, viewMatrix, 0)
         GLES30.glUniformMatrix4fv(modelMatrixLocation, 1, false, modelMatrix, 0)
         GLES30.glUniform1f(opacityLocation, state.opacity)
         GLES30.glUniform1f(contrastLocation, state.contrast)
@@ -48,7 +53,7 @@ class ObjectRenderer {
         GLES30.glUniform1i(depthTextureLocation, 1)
 
         GLES30.glBindVertexArray(mesh.getVertexArrayId())
-        GLES30.glDrawElements(GLES30.GL_TRIANGLES, mesh.indexBuffer.getSize(), GLES30.GL_UNSIGNED_SHORT, 0)
+        GLES30.glDrawElements(GLES30.GL_TRIANGLES, mesh.indexBuffer.size, GLES30.GL_UNSIGNED_SHORT, 0)
         GLES30.glBindVertexArray(0)
     }
 
