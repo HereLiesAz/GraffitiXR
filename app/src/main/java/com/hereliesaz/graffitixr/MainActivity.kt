@@ -8,11 +8,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -22,19 +23,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.xr.compose.platform.TrackedPlane
+import androidx.xr.compose.material3.Material
+import androidx.xr.compose.material3.Model
 import androidx.xr.compose.platform.XrScene
 import androidx.xr.compose.spatial.SpatialImage
-import androidx.xr.arcore.rememberTrackedPlanes
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
+import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Pose
 
 @OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
@@ -44,16 +50,16 @@ class MainActivity : ComponentActivity() {
             GraffitiXRTheme {
                 val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
                 if (cameraPermissionState.status.isGranted) {
-                    XrScene(
-                        modifier = Modifier.fillMaxSize(),
-                        activity = this,
-                    ) {
-                        MainScreen()
+                    val arAvailability = ArCoreApk.getInstance().checkAvailability(this)
+                    if (arAvailability.isSupported) {
+                        ArScreen()
+                    } else {
+                        NonArScreen()
                     }
                 } else {
                     Column {
                         Text("Camera permission is required to use this app.")
-                        Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
+                        androidx.compose.material3.Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
                             Text("Request permission")
                         }
                     }
@@ -64,12 +70,17 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen() {
+fun ArScreen() {
+    var placementMode by remember { mutableStateOf(true) }
+    var lockedPose by remember { mutableStateOf<Pose?>(null) }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraPose by remember { mutableStateOf<Pose?>(null) }
+    var activeSlider by remember { mutableStateOf<SliderType?>(null) }
+
     var opacity by remember { mutableStateOf(1f) }
     var contrast by remember { mutableStateOf(1f) }
     var saturation by remember { mutableStateOf(1f) }
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var placedMural by remember { mutableStateOf<TrackedPlane?>(null) }
+    var brightness by remember { mutableStateOf(0f) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -77,15 +88,63 @@ fun MainScreen() {
         imageUri = uri
     }
 
-    val planes = rememberTrackedPlanes()
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background.copy(alpha = 0f)
-    ) {
+    Row {
+        AppNavRail(
+            onSelectImage = { launcher.launch("image/*") },
+            onClearMarkers = { /* Markers are now automatic */ },
+            onLockMural = {
+                cameraPose?.let {
+                    // Place the mural 2 meters in front of the camera
+                    val translation = floatArrayOf(0f, 0f, -2f)
+                    val rotation = floatArrayOf(0f, 0f, 0f, 1f)
+                    lockedPose = it.compose(Pose(translation, rotation))
+                    placementMode = false
+                }
+            },
+            onResetMural = {
+                placementMode = true
+                lockedPose = null
+            },
+            onSliderSelected = { activeSlider = it }
+        )
         Box(modifier = Modifier.fillMaxSize()) {
+            XrScene(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                cameraPose = session.camera.pose
+                if (!placementMode && lockedPose != null) {
+                    imageUri?.let {
+                        val painter = rememberAsyncImagePainter(it)
+                        SpatialImage(
+                            painter = painter,
+                            contentDescription = "Mural",
+                            initialPose = lockedPose!!,
+                            width = 1f,
+                            height = 1f,
+                            alpha = opacity,
+                            colorFilter = getColorFilter(saturation, brightness, contrast)
+                        )
+                    }
+                    // Place markers at the corners of the 1x1 spatial image
+                    val markerPoses = listOf(
+                        Pose(floatArrayOf(-0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)), // Top-left
+                        Pose(floatArrayOf(0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)), // Top-right
+                        Pose(floatArrayOf(-0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)), // Bottom-left
+                        Pose(floatArrayOf(0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)) // Bottom-right
+                    )
+                    markerPoses.forEach { markerPose ->
+                        Model(
+                            "models/sphere.obj",
+                            initialPose = lockedPose!!.compose(markerPose),
+                            scale = floatArrayOf(0.05f, 0.05f, 0.05f)
+                        ) {
+                            Material(color = Color.Red)
+                        }
+                    }
+                }
+            }
 
-            if (placedMural == null) {
+            if (placementMode) {
                 imageUri?.let {
                     val painter = rememberAsyncImagePainter(it)
                     Image(
@@ -94,64 +153,145 @@ fun MainScreen() {
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit,
                         alpha = opacity,
-                        colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(
-                            ColorMatrix().apply {
-                                setToSaturation(saturation)
-                                postConcat(
-                                    ColorMatrix(floatArrayOf(
-                                    contrast, 0f, 0f, 0f, 0f,
-                                    0f, contrast, 0f, 0f, 0f,
-                                    0f, 0f, contrast, 0f, 0f,
-                                    0f, 0f, 0f, 1f, 0f
-                                ))
-                                )
-                            }
-                        )
-                    )
-                }
-            } else {
-                imageUri?.let {
-                    val painter = rememberAsyncImagePainter(it)
-                    SpatialImage(
-                        painter = painter,
-                        contentDescription = "Placed Mural",
-                        initialPose = placedMural!!.centerPose,
-                        modifier = Modifier.fillMaxSize(),
-                        alpha = opacity,
-                        colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(
-                            ColorMatrix().apply {
-                                setToSaturation(saturation)
-                                postConcat(
-                                    ColorMatrix(floatArrayOf(
-                                    contrast, 0f, 0f, 0f, 0f,
-                                    0f, contrast, 0f, 0f, 0f,
-                                    0f, 0f, contrast, 0f, 0f,
-                                    0f, 0f, 0f, 1f, 0f
-                                ))
-                                )
-                            }
-                        )
+                        colorFilter = getColorFilter(saturation, brightness, contrast)
                     )
                 }
             }
 
-
-            Column(modifier = Modifier.padding(16.dp)) {
-                Button(onClick = { launcher.launch("image/*") }) {
-                    Text("Select Image")
-                }
-                Button(onClick = {
-                    placedMural = planes.firstOrNull { it.alignment == TrackedPlane.Alignment.HORIZONTAL }
-                }) {
-                    Text("Place Mural")
-                }
-                Text("Opacity")
-                Slider(value = opacity, onValueChange = { opacity = it })
-                Text("Contrast")
-                Slider(value = contrast, onValueChange = { contrast = it }, valueRange = 0f..10f)
-                Text("Saturation")
-                Slider(value = saturation, onValueChange = { saturation = it }, valueRange = 0f..10f)
+            activeSlider?.let {
+                SliderPopup(
+                    sliderType = it,
+                    opacity = opacity,
+                    contrast = contrast,
+                    saturation = saturation,
+                    brightness = brightness,
+                    onOpacityChange = { opacity = it },
+                    onContrastChange = { contrast = it },
+                    onSaturationChange = { saturation = it },
+                    onBrightnessChange = { brightness = it },
+                    onDismiss = { activeSlider = null }
+                )
             }
         }
     }
+}
+
+@Composable
+fun NonArScreen() {
+    var activeSlider by remember { mutableStateOf<SliderType?>(null) }
+    var opacity by remember { mutableStateOf(1f) }
+    var contrast by remember { mutableStateOf(1f) }
+    var saturation by remember { mutableStateOf(1f) }
+    var brightness by remember { mutableStateOf(0f) }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        imageUri = uri
+    }
+
+    Row {
+        AppNavRail(
+            onSelectImage = { launcher.launch("image/*") },
+            onClearMarkers = {},
+            onLockMural = {},
+            onResetMural = {},
+            onSliderSelected = { activeSlider = it }
+        )
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                CameraPreview(modifier = Modifier.fillMaxSize())
+
+                imageUri?.let {
+                    val painter = rememberAsyncImagePainter(it)
+                    Image(
+                        painter = painter,
+                        contentDescription = "Selected Image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        alpha = opacity,
+                        colorFilter = getColorFilter(saturation, brightness, contrast)
+                    )
+                }
+
+                activeSlider?.let {
+                    SliderPopup(
+                        sliderType = it,
+                        opacity = opacity,
+                        contrast = contrast,
+                        saturation = saturation,
+                        brightness = brightness,
+                        onOpacityChange = { opacity = it },
+                        onContrastChange = { contrast = it },
+                        onSaturationChange = { saturation = it },
+                        onBrightnessChange = { brightness = it },
+                        onDismiss = { activeSlider = null }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SliderPopup(
+    sliderType: SliderType,
+    opacity: Float,
+    contrast: Float,
+    saturation: Float,
+    brightness: Float,
+    onOpacityChange: (Float) -> Unit,
+    onContrastChange: (Float) -> Unit,
+    onSaturationChange: (Float) -> Unit,
+    onBrightnessChange: (Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.padding(32.dp),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(text = sliderType.name, style = MaterialTheme.typography.headlineSmall)
+                when (sliderType) {
+                    SliderType.Opacity -> Slider(value = opacity, onValueChange = onOpacityChange)
+                    SliderType.Contrast -> Slider(value = contrast, onValueChange = onContrastChange, valueRange = 0f..10f)
+                    SliderType.Saturation -> Slider(value = saturation, onValueChange = onSaturationChange, valueRange = 0f..10f)
+                    SliderType.Brightness -> Slider(value = brightness, onValueChange = onBrightnessChange, valueRange = -1f..1f)
+                }
+                androidx.compose.material3.Button(onClick = onDismiss) {
+                    Text("Close")
+                }
+            }
+        }
+    }
+}
+
+fun getColorFilter(saturation: Float, brightness: Float, contrast: Float): ColorFilter {
+    val matrix = ColorMatrix()
+    matrix.setToSaturation(saturation)
+    val brightnessMatrix = ColorMatrix(floatArrayOf(
+        1f, 0f, 0f, 0f, brightness * 255,
+        0f, 1f, 0f, 0f, brightness * 255,
+        0f, 0f, 1f, 0f, brightness * 255,
+        0f, 0f, 0f, 1f, 0f
+    ))
+    val contrastMatrix = ColorMatrix(floatArrayOf(
+        contrast, 0f, 0f, 0f, 0f,
+        0f, contrast, 0f, 0f, 0f,
+        0f, 0f, contrast, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    ))
+    matrix.postConcat(brightnessMatrix)
+    matrix.postConcat(contrastMatrix)
+    return ColorFilter.colorMatrix(matrix)
 }

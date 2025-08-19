@@ -13,6 +13,7 @@ accompanist = "0.37.3"
 material3 = "1.3.2"
 camerax = "1.4.2"
 xr = "1.0.0-alpha01"
+azNavRail = "1.8"
 compose-compiler = "1.5.8"
 
 
@@ -67,6 +68,9 @@ coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 
 # Accompanist
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist" }
+
+# AzNavRail
+az-nav-rail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref = "azNavRail" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
