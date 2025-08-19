@@ -1,4 +1,4 @@
-package com.hereliesaz.MuralOverlay
+package com.hereliesaz.graffitixr
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel

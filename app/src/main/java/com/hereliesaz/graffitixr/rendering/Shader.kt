@@ -1,4 +1,4 @@
-package com.hereliesaz.MuralOverlay.rendering
+package com.hereliesaz.graffitixr.rendering
 
 import android.content.res.AssetManager
 import android.opengl.GLES30

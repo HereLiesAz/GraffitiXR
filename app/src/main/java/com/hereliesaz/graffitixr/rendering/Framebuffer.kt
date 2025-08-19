@@ -1,4 +1,4 @@
-package com.hereliesaz.MuralOverlay.rendering
+package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES30
 import java.io.Closeable

@@ -1,17 +1,14 @@
-package com.hereliesaz.MuralOverlay
+package com.hereliesaz.graffitixr
 
 import android.content.res.AssetManager
 import android.graphics.BitmapFactory
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.view.MotionEvent
-import com.google.ar.core.Anchor
 import com.google.ar.core.Frame
-import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
-import com.hereliesaz.MuralOverlay.rendering.BackgroundRenderer
-import com.hereliesaz.MuralOverlay.rendering.ObjectRenderer
+import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
+import com.hereliesaz.graffitixr.rendering.ObjectRenderer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -21,14 +18,15 @@ import com.google.ar.core.AugmentedImage
 import com.google.ar.core.AugmentedImageDatabase
 import android.opengl.Matrix
 import com.google.ar.core.Config
-import com.hereliesaz.MuralOverlay.rendering.GpuBuffer
-import com.hereliesaz.MuralOverlay.rendering.IndexBuffer
-import com.hereliesaz.MuralOverlay.rendering.Mesh
-import com.hereliesaz.MuralOverlay.rendering.Shader
-import com.hereliesaz.MuralOverlay.rendering.Texture
-import com.hereliesaz.MuralOverlay.rendering.VertexBuffer
-import com.hereliesaz.MuralOverlay.rendering.floatArrayToByteArray
-import com.hereliesaz.MuralOverlay.rendering.shortArrayToByteArray
+import com.google.ar.core.Coordinates2d
+import com.hereliesaz.graffitixr.rendering.GpuBuffer
+import com.hereliesaz.graffitixr.rendering.IndexBuffer
+import com.hereliesaz.graffitixr.rendering.Mesh
+import com.hereliesaz.graffitixr.rendering.Shader
+import com.hereliesaz.graffitixr.rendering.Texture
+import com.hereliesaz.graffitixr.rendering.VertexBuffer
+import com.hereliesaz.graffitixr.rendering.floatArrayToByteArray
+import com.hereliesaz.graffitixr.rendering.shortArrayToByteArray
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -83,6 +81,7 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         session?.let {
+            it.setCameraTextureName(backgroundRenderer.getTextureId())
             val frame = it.update()
             backgroundRenderer.draw(frame)
             val camera = frame.camera
@@ -210,9 +209,9 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val depthUvBuffer = ByteBuffer.allocateDirect(ndcCoords.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
 
         frame.transformCoordinates2d(
-            com.google.ar.core.Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+            Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
             ndcBuffer,
-            com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
+            Coordinates2d.TEXTURE_NORMALIZED,
             depthUvBuffer
         )
 

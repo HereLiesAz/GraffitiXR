@@ -1,4 +1,4 @@
-package com.hereliesaz.MuralOverlay.ui.theme
+package com.hereliesaz.graffitixr.ui.theme
 
 import android.app.Activity
 import android.os.Build

@@ -1,4 +1,4 @@
-package com.hereliesaz.MuralOverlay.rendering
+package com.hereliesaz.graffitixr.rendering
 
 import android.content.res.AssetManager
 import android.opengl.GLES30
@@ -25,8 +25,8 @@ class BackgroundRenderer() : Closeable {
         1.0f, 0.0f,
     )
 
-    private val quadCoords: FloatBuffer = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(QUAD_COORDS).also { it.rewind() }
-    private val quadTexCoords: FloatBuffer = ByteBuffer.allocateDirect(QUAD_TEXCOORDS.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(QUAD_TEXCOORDS).also { it.rewind() }
+    private val quadCoords: FloatBuffer = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(QUAD_COORDS)
+    private val quadTexCoords: FloatBuffer = ByteBuffer.allocateDirect(QUAD_TEXCOORDS.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
 
     private var backgroundTexture: Texture? = null
     private var backgroundShader: Shader? = null
@@ -74,6 +74,10 @@ class BackgroundRenderer() : Closeable {
 
         GLES30.glDepthMask(true)
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+    }
+
+    fun getTextureId(): Int {
+        return backgroundTexture?.getTextureId() ?: 0
     }
 
     override fun close() {

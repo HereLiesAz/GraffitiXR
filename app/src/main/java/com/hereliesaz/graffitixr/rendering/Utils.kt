@@ -1,4 +1,4 @@
-package com.hereliesaz.MuralOverlay.rendering
+package com.hereliesaz.graffitixr.rendering
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

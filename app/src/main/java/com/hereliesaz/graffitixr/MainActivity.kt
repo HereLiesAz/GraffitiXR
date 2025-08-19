@@ -1,4 +1,4 @@
-package com.hereliesaz.MuralOverlay
+package com.hereliesaz.graffitixr
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -22,7 +22,7 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
-import com.hereliesaz.MuralOverlay.ui.theme.MuralOverlayTheme
+import com.hereliesaz.graffitixr.ui.theme.MuralOverlayTheme
 
 class MainActivity : ComponentActivity() {
 

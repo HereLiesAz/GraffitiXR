@@ -1,15 +1,10 @@
-package com.hereliesaz.MuralOverlay.rendering
+package com.hereliesaz.graffitixr.rendering
 
-import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.opengl.GLES30
 import android.opengl.GLUtils
-import com.google.ar.core.Anchor
 import com.google.ar.core.Camera
-import com.hereliesaz.MuralOverlay.MuralState
-import java.io.Closeable
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.hereliesaz.graffitixr.MuralState
 
 class ObjectRenderer {
 

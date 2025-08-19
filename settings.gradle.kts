@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MuralOverlay"
+rootProject.name = "Graffiti XR"
 include(":app")
