@@ -1,6 +1,8 @@
 # Gradle
 .gradle/
 build/
+.kotlin/
+.idea/
 
 # Local configuration
 local.properties
