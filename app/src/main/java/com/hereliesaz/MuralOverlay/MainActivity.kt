@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
             }
             shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
                  Toast.makeText(this, "Camera permission is needed for AR", Toast.LENGTH_LONG).show()
-                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+                 finish()
             }
             else -> {
                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)

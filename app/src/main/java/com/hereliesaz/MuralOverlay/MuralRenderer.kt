@@ -233,8 +233,8 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     fun updateState(state: MuralState) {
         if (currentState.markers.size != state.markers.size) {
             augmentedImageDatabase = AugmentedImageDatabase(session)
-            state.markers.forEachIndexed { index, marker ->
-                augmentedImageDatabase.addImage("marker_$index", marker)
+            for (marker in state.markers) {
+                augmentedImageDatabase.addImage("marker", marker)
             }
             val config = Config(session)
             config.augmentedImageDatabase = augmentedImageDatabase
