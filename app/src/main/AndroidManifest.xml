@@ -15,10 +15,10 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true">
-        <meta-data android:name="com.google.ar.core" android:value="required" />
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/Theme.GraffitiXR">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

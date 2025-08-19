@@ -51,8 +51,6 @@ composeCompiler {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(libs.material)
-    implementation(libs.arcore)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
@@ -60,5 +58,16 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // AndroidX XR Libraries
+    implementation(libs.androidx.xr.runtime)
+    implementation(libs.androidx.xr.scenecore)
+    implementation(libs.androidx.xr.compose.platform)
+    implementation(libs.androidx.xr.compose.material3)
+    implementation(libs.androidx.xr.compose.spatial)
+    implementation(libs.androidx.xr.compose.subspace)
+    implementation(libs.androidx.xr.arcore)
+
+
     debugImplementation(libs.androidx.ui.tooling)
 }
