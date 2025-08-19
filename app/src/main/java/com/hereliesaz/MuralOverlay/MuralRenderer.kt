@@ -20,9 +20,17 @@ import android.content.Context
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.AugmentedImageDatabase
 import android.opengl.Matrix
-import com.google.ar.core.AugmentedImage
-import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
+import com.hereliesaz.MuralOverlay.rendering.GpuBuffer
+import com.hereliesaz.MuralOverlay.rendering.IndexBuffer
+import com.hereliesaz.MuralOverlay.rendering.Mesh
+import com.hereliesaz.MuralOverlay.rendering.Shader
+import com.hereliesaz.MuralOverlay.rendering.Texture
+import com.hereliesaz.MuralOverlay.rendering.VertexBuffer
+import com.hereliesaz.MuralOverlay.rendering.floatArrayToByteArray
+import com.hereliesaz.MuralOverlay.rendering.shortArrayToByteArray
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
@@ -37,10 +45,12 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private var session: Session? = null
     private val trackedImages = mutableMapOf<Int, AugmentedImage>()
+    private val stoppedMarkers = mutableListOf<Int>()
     private var currentState = MuralState()
-    private var augmentedImageDatabase: AugmentedImageDatabase? = null
+    private lateinit var augmentedImageDatabase: AugmentedImageDatabase
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        augmentedImageDatabase = AugmentedImageDatabase(session)
         GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer = BackgroundRenderer()
         backgroundRenderer.createOnGlThread(assets)
@@ -118,8 +128,6 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             }
         }
     }
-
-    private val stoppedMarkers = mutableListOf<Int>()
 
     fun getStoppedMarkerIndices(): List<Int> {
         val result = stoppedMarkers.toList()
@@ -202,9 +210,9 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val depthUvBuffer = ByteBuffer.allocateDirect(ndcCoords.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
 
         frame.transformCoordinates2d(
-            Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+            com.google.ar.core.Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
             ndcBuffer,
-            Coordinates2d.TEXTURE_NORMALIZED,
+            com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
             depthUvBuffer
         )
 
@@ -229,7 +237,9 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 augmentedImageDatabase?.addImage("marker", marker)
             }
             val config = Config(session)
-            config.augmentedImageDatabase = augmentedImageDatabase
+            if (augmentedImageDatabase != null) {
+                config.augmentedImageDatabase = augmentedImageDatabase
+            }
 
             if (session?.isDepthModeSupported(Config.DepthMode.AUTOMATIC) == true) {
                 config.depthMode = Config.DepthMode.AUTOMATIC

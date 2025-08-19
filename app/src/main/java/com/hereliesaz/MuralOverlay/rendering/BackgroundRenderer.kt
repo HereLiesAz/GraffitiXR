@@ -33,7 +33,7 @@ class BackgroundRenderer() : Closeable {
     private var transformedTexCoords: FloatBuffer? = null
 
     fun createOnGlThread(assets: AssetManager) {
-        backgroundTexture = Texture(GLES30.GL_TEXTURE_EXTERNAL_OES, GLES30.GL_CLAMP_TO_EDGE, GLES30.GL_NEAREST, GLES30.GL_NEAREST)
+        backgroundTexture = Texture(android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES30.GL_CLAMP_TO_EDGE, GLES30.GL_NEAREST, GLES30.GL_NEAREST)
         backgroundShader = Shader(assets, "shaders/background_show_camera.vert", "shaders/background_show_camera.frag", null)
     }
 
@@ -56,7 +56,7 @@ class BackgroundRenderer() : Closeable {
         GLES30.glDepthMask(false)
 
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_EXTERNAL_OES, backgroundTexture!!.getTextureId())
+        GLES30.glBindTexture(android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES, backgroundTexture!!.getTextureId())
 
         val positionAttribute = GLES30.glGetAttribLocation(backgroundShader!!.getProgramId(), "a_Position")
         val texCoordAttribute = GLES30.glGetAttribLocation(backgroundShader!!.getProgramId(), "a_TexCoord")

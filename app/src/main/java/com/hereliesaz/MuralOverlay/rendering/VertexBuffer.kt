@@ -4,8 +4,8 @@ import android.opengl.GLES30
 import java.io.Closeable
 
 class VertexBuffer(buffer: GpuBuffer?, val numberOfEntries: Int) : Closeable {
-    private val buffer: GpuBuffer?
-    private var entries: Int
+    internal val buffer: GpuBuffer?
+    var entries: Int
 
     init {
         require(buffer != null) { "buffer must not be null" }
@@ -20,10 +20,6 @@ class VertexBuffer(buffer: GpuBuffer?, val numberOfEntries: Int) : Closeable {
         val floatBuffer = java.nio.ByteBuffer.wrap(bytes).asFloatBuffer()
         floatBuffer.put(data)
         buffer?.set(bytes)
-    }
-
-    fun getNumberOfEntries(): Int {
-        return numberOfEntries
     }
 
     fun getNumberOfVertices(): Int {
