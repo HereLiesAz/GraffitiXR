@@ -1,3 +1,4 @@
+#version 300 es
 precision mediump float;
 
 uniform sampler2D u_Texture;
@@ -7,16 +8,18 @@ uniform float u_Opacity;
 uniform float u_Contrast;
 uniform float u_Saturation;
 
-varying vec2 v_TexCoord;
-varying vec2 v_DepthTexCoord;
-varying vec4 v_ViewPosition;
+in vec2 v_TexCoord;
+in vec2 v_DepthTexCoord;
+in vec4 v_ViewPosition;
+
+out vec4 outColor;
 
 float InverseLerp(float value, float min_value, float max_value) {
     return clamp((value - min_value) / (max_value - min_value), 0.0, 1.0);
 }
 
 float DepthGetMillimeters(in sampler2D depth_texture, in vec2 depth_uv) {
-    vec3 packedDepthAndVisibility = texture2D(depth_texture, depth_uv).xyz;
+    vec3 packedDepthAndVisibility = texture(depth_texture, depth_uv).xyz;
     return dot(packedDepthAndVisibility.xy, vec2(255.0, 256.0 * 255.0));
 }
 
@@ -32,7 +35,7 @@ float DepthGetVisibility(in sampler2D depth_texture, in vec2 depth_uv, in float 
 }
 
 void main() {
-    vec4 textureColor = texture2D(u_Texture, v_TexCoord);
+    vec4 textureColor = texture(u_Texture, v_TexCoord);
 
     // Contrast
     textureColor.rgb = (textureColor.rgb - 0.5) * u_Contrast + 0.5;
@@ -51,5 +54,5 @@ void main() {
     // Opacity
     textureColor.a *= u_Opacity;
 
-    gl_FragColor = textureColor;
+    outColor = textureColor;
 }
