@@ -39,6 +39,7 @@ class BackgroundRenderer() : Closeable {
 
     fun draw(frame: Frame) {
         if (frame.hasDisplayGeometryChanged()) {
+            quadCoords.position(0)
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadCoords,
@@ -59,7 +60,7 @@ class BackgroundRenderer() : Closeable {
         GLES30.glBindTexture(android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES, backgroundTexture!!.getTextureId())
 
         val positionAttribute = GLES30.glGetAttribLocation(backgroundShader!!.getProgramId(), "a_Position")
-        val texCoordAttribute = GLES30.glGetAttribLocation(backgroundShader!!.getProgramId(), "a_TexCoord")
+        val texCoordAttribute = GLES30.glGetAttribLocation(backgroundShader!!.getProgramId(), "a_CameraTexCoord")
 
         GLES30.glVertexAttribPointer(positionAttribute, 2, GLES30.GL_FLOAT, false, 0, quadCoords)
         GLES30.glVertexAttribPointer(texCoordAttribute, 2, GLES30.GL_FLOAT, false, 0, quadTexCoords)

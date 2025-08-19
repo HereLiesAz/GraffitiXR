@@ -48,7 +48,6 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private lateinit var augmentedImageDatabase: AugmentedImageDatabase
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        augmentedImageDatabase = AugmentedImageDatabase(session)
         GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer = BackgroundRenderer()
         backgroundRenderer.createOnGlThread(assets)
@@ -223,6 +222,9 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     fun setSession(session: Session) {
         this.session = session
+        val config = Config(session)
+        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+        session.configure(config)
     }
 
     fun getTrackedImageCount(): Int {

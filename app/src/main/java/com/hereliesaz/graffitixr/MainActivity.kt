@@ -18,7 +18,7 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
-import com.hereliesaz.graffitixr.ui.theme.MuralOverlayTheme
+import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -30,7 +30,20 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
-                setupArSession()
+                // Ensure GLSurfaceView is resumed as its lifecycle might be desynced
+                // if the permission dialog was an overlay.
+                if (::glSurfaceView.isInitialized) {
+                    glSurfaceView.onResume()
+                }
+                setupArSession() // Creates and configures the session
+                // Now, also resume the newly created session
+                try {
+                    session?.resume()
+                } catch (e: CameraNotAvailableException) {
+                    Toast.makeText(this, "Camera not available after granting permission.", Toast.LENGTH_LONG).show()
+                    session = null // Invalidate session
+                    finish()
+                }
             } else {
                 Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
                 finish()
@@ -43,7 +56,7 @@ class MainActivity : ComponentActivity() {
         renderer = MuralRenderer(this)
 
         setContent {
-            MuralOverlayTheme {
+            GraffitiXRTheme {
                 SurfaceView()
             }
         }
@@ -67,16 +80,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (session == null) {
-            checkAndRequestPermissions()
+
+        // Resume GLSurfaceView first
+        if (::glSurfaceView.isInitialized) {
+            glSurfaceView.onResume()
         }
 
+        if (session == null) {
+            checkAndRequestPermissions() // This attempts to create the session if needed
+        }
+
+        // Attempt to resume the session (either existing or newly created by checkAndRequestPermissions sync path)
         try {
             session?.resume()
-            glSurfaceView.onResume()
         } catch (e: CameraNotAvailableException) {
             Toast.makeText(this, "Camera not available. Please restart the application", Toast.LENGTH_LONG).show()
-            session = null
+            session = null // Invalidate session
             finish()
         }
     }
@@ -84,7 +103,9 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         if (session != null) {
-            glSurfaceView.onPause()
+            if (::glSurfaceView.isInitialized) {
+                glSurfaceView.onPause()
+            }
             session!!.pause()
         }
     }

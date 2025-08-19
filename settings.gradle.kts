@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Graffiti XR"
+rootProject.name = "GraffitiXR"
 include(":app")

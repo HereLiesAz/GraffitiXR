@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
   <!-- Base application theme. -->
-  <style name="Theme.MuralOverlay" parent="Theme.Material3.DayNight.NoActionBar">
+  <style name="Theme.GraffitiXR" parent="Theme.Material3.DayNight.NoActionBar">
     <!-- Customize your theme here. -->
   </style>
 </resources>

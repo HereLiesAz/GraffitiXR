@@ -9,7 +9,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.hereliesaz.muraloverlay"
+        applicationId = "com.hereliesaz.graffitixr"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
