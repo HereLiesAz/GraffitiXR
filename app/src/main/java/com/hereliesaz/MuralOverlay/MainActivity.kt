@@ -48,23 +48,20 @@ class MainActivity : ComponentActivity() {
         viewModel = ViewModelProvider(this)[MuralViewModel::class.java]
         renderer = MuralRenderer(this)
 
+        glSurfaceView = GLSurfaceView(this).apply {
+            setEGLContextClientVersion(3)
+            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            setRenderer(renderer)
+            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        }
+
         setContent {
             MuralOverlayTheme {
                 val state by viewModel.state.collectAsState()
                 renderer.updateState(state)
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    AndroidView(
-                        factory = {
-                            GLSurfaceView(it).apply {
-                                setEGLContextClientVersion(3)
-                                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                                setRenderer(renderer)
-                                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                            }.also { view -> glSurfaceView = view }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    AndroidView(factory = { glSurfaceView }, modifier = Modifier.fillMaxSize())
                     // Simple text overlay for now to show state
                     Text(
                         text = "AppState: ${state.appState::class.java.simpleName}, Markers: ${renderer.getTrackedImageCount()}",
@@ -115,7 +112,7 @@ class MainActivity : ComponentActivity() {
             }
             shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
                  Toast.makeText(this, "Camera permission is needed for AR", Toast.LENGTH_LONG).show()
-                 finish()
+                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
             else -> {
                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -139,8 +136,6 @@ class MainActivity : ComponentActivity() {
                 ArCoreApk.InstallStatus.INSTALLED -> {
                     session = Session(this)
                     renderer.setSession(session!!)
-                    // Must be called after session is created
-                    glSurfaceView.onResume()
                 }
                 ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
                     userRequestedInstall = false
