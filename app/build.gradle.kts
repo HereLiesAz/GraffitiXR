@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.androidx.xr.compose.spatial)
     implementation(libs.androidx.xr.compose.subspace)
     implementation(libs.androidx.xr.arcore)
+    implementation(libs.az.nav.rail)
 
 
     debugImplementation(libs.androidx.ui.tooling)
