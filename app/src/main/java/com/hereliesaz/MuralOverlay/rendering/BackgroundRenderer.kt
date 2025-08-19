@@ -25,8 +25,8 @@ class BackgroundRenderer() : Closeable {
         1.0f, 0.0f,
     )
 
-    private val quadCoords: FloatBuffer = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(QUAD_COORDS)
-    private val quadTexCoords: FloatBuffer = ByteBuffer.allocateDirect(QUAD_TEXCOORDS.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+    private val quadCoords: FloatBuffer = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(QUAD_COORDS).also { it.rewind() }
+    private val quadTexCoords: FloatBuffer = ByteBuffer.allocateDirect(QUAD_TEXCOORDS.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(QUAD_TEXCOORDS).also { it.rewind() }
 
     private var backgroundTexture: Texture? = null
     private var backgroundShader: Shader? = null
