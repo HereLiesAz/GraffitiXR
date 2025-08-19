@@ -52,6 +52,7 @@ composeCompiler {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
+    implementation(libs.arcore)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
@@ -60,14 +61,4 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     debugImplementation(libs.androidx.ui.tooling)
-
-    // Jetpack XR
-    implementation(libs.androidx.xr.runtime)
-    implementation(libs.androidx.xr.scenecore)
-    implementation(libs.androidx.xr.compose)
-    implementation(libs.androidx.xr.compose.material3)
-    implementation(libs.androidx.xr.arcore)
-    implementation(libs.guava)
-    implementation(libs.kotlinx.coroutines.guava)
-    compileOnly(libs.extensions.xr)
 }
