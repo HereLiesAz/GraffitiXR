@@ -234,12 +234,10 @@ class MuralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         if (currentState.markers.size != state.markers.size) {
             augmentedImageDatabase = AugmentedImageDatabase(session)
             for (marker in state.markers) {
-                augmentedImageDatabase?.addImage("marker", marker)
+                augmentedImageDatabase.addImage("marker", marker)
             }
             val config = Config(session)
-            if (augmentedImageDatabase != null) {
-                config.augmentedImageDatabase = augmentedImageDatabase
-            }
+            config.augmentedImageDatabase = augmentedImageDatabase
 
             if (session?.isDepthModeSupported(Config.DepthMode.AUTOMATIC) == true) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
