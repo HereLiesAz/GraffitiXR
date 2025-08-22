@@ -79,7 +79,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 @Composable
 fun ArScreen() {
     val imageSettings = rememberImageSettingsState()
@@ -90,13 +89,19 @@ fun ArScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         imageSettings.imageUri = uri
     }
-
+}
+@Composable
+fun ArScreen() {
+    var placementMode by remember { mutableStateOf(true) }
+    var lockedPose by remember { mutableStateOf<Pose?>(null) }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraPose by remember { mutableStateOf<Pose?>(null) }
+    var activeSlider by remember { mutableStateOf<SliderType?>(null) }
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->

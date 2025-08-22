@@ -30,7 +30,6 @@ suspend fun removeBackground(context: Context, imageUri: Uri): Result<Uri> {
         foregroundBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
         fOut.flush()
         fOut.close()
-
         Result.success(file.toUri())
     } catch (e: Exception) {
         e.printStackTrace()
