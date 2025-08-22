@@ -1,165 +1,290 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
-import android.content.pm.PackageManager
-import android.opengl.GLSurfaceView
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import com.google.ar.core.ArCoreApk
-import com.google.ar.core.Session
-import com.google.ar.core.exceptions.CameraNotAvailableException
-import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.xr.compose.material3.Material
+import androidx.xr.compose.material3.Model
+import androidx.xr.compose.platform.XrScene
+import androidx.xr.compose.spatial.SpatialImage
+import coil.compose.rememberAsyncImagePainter
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
+import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Pose
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
+@OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
-
-    private lateinit var glSurfaceView: GLSurfaceView
-    private lateinit var renderer: MuralRenderer
-    private var session: Session? = null
-    private var userRequestedInstall = true
-
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                // Ensure GLSurfaceView is resumed as its lifecycle might be desynced
-                // if the permission dialog was an overlay.
-                if (::glSurfaceView.isInitialized) {
-                    glSurfaceView.onResume()
-                }
-                setupArSession() // Creates and configures the session
-                // Now, also resume the newly created session
-                try {
-                    session?.resume()
-                } catch (e: CameraNotAvailableException) {
-                    Toast.makeText(this, "Camera not available after granting permission.", Toast.LENGTH_LONG).show()
-                    session = null // Invalidate session
-                    finish()
-                }
-            } else {
-                Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
-                finish()
-            }
-        }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        renderer = MuralRenderer(this)
-
         setContent {
             GraffitiXRTheme {
-                SurfaceView()
-            }
-        }
-    }
-
-    @Composable
-    fun SurfaceView() {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AndroidView(factory = { context ->
-                GLSurfaceView(context).apply {
-                    setEGLContextClientVersion(3)
-                    setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                    setRenderer(renderer)
-                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                }.also {
-                    glSurfaceView = it
+                val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
+                if (cameraPermissionState.status.isGranted) {
+                    val arAvailability = ArCoreApk.getInstance().checkAvailability(this)
+                    if (arAvailability.isSupported) {
+                        ArScreen()
+                    } else {
+                        NonArScreen()
+                    }
+                } else {
+                    Column {
+                        Text("Camera permission is required to use this app.")
+                        androidx.compose.material3.Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
+                            Text("Request permission")
+                        }
+                    }
                 }
-            }, modifier = Modifier.fillMaxSize())
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-
-        // Resume GLSurfaceView first
-        if (::glSurfaceView.isInitialized) {
-            glSurfaceView.onResume()
-        }
-
-        if (session == null) {
-            checkAndRequestPermissions() // This attempts to create the session if needed
-        }
-
-        // Attempt to resume the session (either existing or newly created by checkAndRequestPermissions sync path)
-        try {
-            session?.resume()
-        } catch (e: CameraNotAvailableException) {
-            Toast.makeText(this, "Camera not available. Please restart the application", Toast.LENGTH_LONG).show()
-            session = null // Invalidate session
-            finish()
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (session != null) {
-            if (::glSurfaceView.isInitialized) {
-                glSurfaceView.onPause()
-            }
-            session!!.pause()
-        }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        session?.close()
-        session = null
-    }
-
-    private fun checkAndRequestPermissions() {
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                setupArSession()
-            }
-            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
-                 Toast.makeText(this, "Camera permission is needed for AR", Toast.LENGTH_LONG).show()
-                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
-            else -> {
-                requestPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
         }
     }
+}
 
-    private fun setupArSession() {
-        if (session != null) {
-            return
-        }
+@Composable
+fun ArScreen() {
+    val imageSettings = rememberImageSettingsState()
+    var placementMode by remember { mutableStateOf(true) }
+    var lockedPose by remember { mutableStateOf<Pose?>(null) }
+    var cameraPose by remember { mutableStateOf<Pose?>(null) }
 
-        try {
-            val installStatus = ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)
-            if (installStatus == ArCoreApk.InstallStatus.INSTALL_REQUESTED) {
-                userRequestedInstall = false
-                return
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        imageSettings.imageUri = uri
+    }
+
+    Row {
+        AppNavRail(
+            onSelectImage = { launcher.launch("image/*") },
+            onRemoveBg = {
+                imageSettings.imageUri?.let { uri ->
+                    scope.launch {
+                        val newUri = removeBackground(context, uri)
+                        if (newUri != null) {
+                            imageSettings.imageUri = newUri
+                        }
+                    }
+                }
+            },
+            onClearMarkers = { /* Markers are now automatic */ },
+            onLockMural = {
+                cameraPose?.let {
+                    val translation = floatArrayOf(0f, 0f, -2f)
+                    val rotation = floatArrayOf(0f, 0f, 0f, 1f)
+                    lockedPose = it.compose(Pose(translation, rotation))
+                    placementMode = false
+                }
+            },
+            onResetMural = {
+                placementMode = true
+                lockedPose = null
+            },
+            onSliderSelected = { imageSettings.activeSlider = it }
+        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            XrScene(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                cameraPose = session.camera.pose
+                if (!placementMode && lockedPose != null) {
+                    imageSettings.imageUri?.let {
+                        val painter = rememberAsyncImagePainter(it)
+                        SpatialImage(
+                            painter = painter,
+                            contentDescription = "Mural",
+                            initialPose = lockedPose!!,
+                            width = 1f,
+                            height = 1f,
+                            alpha = imageSettings.opacity,
+                            colorFilter = getColorFilter(imageSettings.saturation, imageSettings.brightness, imageSettings.contrast)
+                        )
+                    }
+                    val markerPoses = listOf(
+                        Pose(floatArrayOf(-0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
+                        Pose(floatArrayOf(0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
+                        Pose(floatArrayOf(-0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
+                        Pose(floatArrayOf(0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
+                    )
+                    markerPoses.forEach { markerPose ->
+                        Model(
+                            "models/sphere.obj",
+                            initialPose = lockedPose!!.compose(markerPose),
+                            scale = floatArrayOf(0.05f, 0.05f, 0.05f)
+                        ) {
+                            Material(color = Color.Red)
+                        }
+                    }
+                }
             }
 
-            if (ArCoreApk.getInstance().checkAvailability(this).isSupported) {
-                session = Session(this)
-                renderer.setSession(session!!)
-            } else {
-                Toast.makeText(this, "ARCore not supported on this device", Toast.LENGTH_LONG).show()
-                finish()
+            if (placementMode) {
+                imageSettings.imageUri?.let {
+                    val painter = rememberAsyncImagePainter(it)
+                    Image(
+                        painter = painter,
+                        contentDescription = "Selected Image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        alpha = imageSettings.opacity,
+                        colorFilter = getColorFilter(imageSettings.saturation, imageSettings.brightness, imageSettings.contrast)
+                    )
+                }
             }
-        } catch (e: UnavailableUserDeclinedInstallationException) {
-            Toast.makeText(this, "Please install ARCore", Toast.LENGTH_LONG).show()
-            finish()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Failed to create AR session: ${e.message}", Toast.LENGTH_LONG).show()
-            e.printStackTrace()
-            finish()
+
+            imageSettings.activeSlider?.let {
+                SliderPopup(
+                    sliderType = it,
+                    settings = imageSettings,
+                    onDismiss = { imageSettings.activeSlider = null }
+                )
+            }
         }
     }
+}
+
+@Composable
+fun NonArScreen() {
+    val imageSettings = rememberImageSettingsState()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        imageSettings.imageUri = uri
+    }
+
+    Row {
+        AppNavRail(
+            onSelectImage = { launcher.launch("image/*") },
+            onRemoveBg = {
+                imageSettings.imageUri?.let { uri ->
+                    scope.launch {
+                        val newUri = removeBackground(context, uri)
+                        if (newUri != null) {
+                            imageSettings.imageUri = newUri
+                        }
+                    }
+                }
+            },
+            onClearMarkers = {},
+            onLockMural = {},
+            onResetMural = {},
+            onSliderSelected = { imageSettings.activeSlider = it }
+        )
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                CameraPreview(modifier = Modifier.fillMaxSize())
+
+                imageSettings.imageUri?.let {
+                    val painter = rememberAsyncImagePainter(it)
+                    Image(
+                        painter = painter,
+                        contentDescription = "Selected Image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        alpha = imageSettings.opacity,
+                        colorFilter = getColorFilter(imageSettings.saturation, imageSettings.brightness, imageSettings.contrast)
+                    )
+                }
+
+                imageSettings.activeSlider?.let {
+                    SliderPopup(
+                        sliderType = it,
+                        settings = imageSettings,
+                        onDismiss = { imageSettings.activeSlider = null }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SliderPopup(
+    sliderType: SliderType,
+    settings: ImageSettingsState,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.padding(32.dp),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(text = sliderType.name, style = MaterialTheme.typography.headlineSmall)
+                when (sliderType) {
+                    SliderType.Opacity -> Slider(value = settings.opacity, onValueChange = { settings.opacity = it })
+                    SliderType.Contrast -> Slider(value = settings.contrast, onValueChange = { settings.contrast = it }, valueRange = 0f..10f)
+                    SliderType.Saturation -> Slider(value = settings.saturation, onValueChange = { settings.saturation = it }, valueRange = 0f..10f)
+                    SliderType.Brightness -> Slider(value = settings.brightness, onValueChange = { settings.brightness = it }, valueRange = -1f..1f)
+                }
+                androidx.compose.material3.Button(onClick = onDismiss) {
+                    Text("Close")
+                }
+            }
+        }
+    }
+}
+
+fun getColorFilter(saturation: Float, brightness: Float, contrast: Float): ColorFilter {
+    val matrix = ColorMatrix()
+    matrix.setToSaturation(saturation)
+    val brightnessMatrix = ColorMatrix(floatArrayOf(
+        1f, 0f, 0f, 0f, brightness * 255,
+        0f, 1f, 0f, 0f, brightness * 255,
+        0f, 0f, 1f, 0f, brightness * 255,
+        0f, 0f, 0f, 1f, 0f
+    ))
+    val contrastMatrix = ColorMatrix(floatArrayOf(
+        contrast, 0f, 0f, 0f, 0f,
+        0f, contrast, 0f, 0f, 0f,
+        0f, 0f, contrast, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    ))
+    matrix.postConcat(brightnessMatrix)
+    matrix.postConcat(contrastMatrix)
+    return ColorFilter.colorMatrix(matrix)
 }
