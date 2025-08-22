@@ -26,7 +26,7 @@ suspend fun removeBackground(context: Context, imageUri: Uri): Uri? {
 
         val foregroundBitmap = result.foregroundBitmap
 
-        val file = File(context.cacheDir, "bg_removed_image.png")
+        val file = File.createTempFile("bg_removed_image_", ".png", context.cacheDir)
         FileOutputStream(file).use { fOut ->
             foregroundBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
             fOut.flush()
