@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.xr.compose.material3.Material
 import androidx.xr.compose.material3.Model
@@ -41,6 +43,8 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Pose
+import kotlinx.coroutines.launch
+
 
 @OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
@@ -68,7 +72,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 @Composable
 fun ArScreen() {
     var placementMode by remember { mutableStateOf(true) }
@@ -82,6 +85,9 @@ fun ArScreen() {
     var saturation by remember { mutableStateOf(1f) }
     var brightness by remember { mutableStateOf(0f) }
 
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -91,6 +97,16 @@ fun ArScreen() {
     Row {
         AppNavRail(
             onSelectImage = { launcher.launch("image/*") },
+            onRemoveBg = {
+                imageUri?.let { uri ->
+                    scope.launch {
+                        val newUri = removeBackground(context, uri)
+                        if (newUri != null) {
+                            imageUri = newUri
+                        }
+                    }
+                }
+            },
             onClearMarkers = { /* Markers are now automatic */ },
             onLockMural = {
                 cameraPose?.let {
@@ -157,7 +173,6 @@ fun ArScreen() {
                     )
                 }
             }
-
             activeSlider?.let {
                 SliderPopup(
                     sliderType = it,
@@ -184,7 +199,8 @@ fun NonArScreen() {
     var saturation by remember { mutableStateOf(1f) }
     var brightness by remember { mutableStateOf(0f) }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -194,6 +210,16 @@ fun NonArScreen() {
     Row {
         AppNavRail(
             onSelectImage = { launcher.launch("image/*") },
+            onRemoveBg = {
+                imageUri?.let { uri ->
+                    scope.launch {
+                        val newUri = removeBackground(context, uri)
+                        if (newUri != null) {
+                            imageUri = newUri
+                        }
+                    }
+                }
+            },
             onClearMarkers = {},
             onLockMural = {},
             onResetMural = {},

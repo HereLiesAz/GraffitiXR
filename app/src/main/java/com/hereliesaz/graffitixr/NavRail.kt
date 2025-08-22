@@ -16,6 +16,7 @@ enum class SliderType {
 @Composable
 fun AppNavRail(
     onSelectImage: () -> Unit,
+    onRemoveBg: () -> Unit,
     onClearMarkers: () -> Unit,
     onLockMural: () -> Unit,
     onResetMural: () -> Unit,
@@ -32,7 +33,7 @@ fun AppNavRail(
                     ),
                     NavItem(
                         text = "Remove BG",
-                        data = NavItemData.Action(onClick = { /* TODO */ })
+                        data = NavItemData.Action(onClick = onRemoveBg)
                     )
                 )
             ),

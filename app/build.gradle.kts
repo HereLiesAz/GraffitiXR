@@ -68,6 +68,9 @@ dependencies {
     implementation(libs.androidx.xr.compose.subspace)
     implementation(libs.androidx.xr.arcore)
     implementation(libs.az.nav.rail)
+    implementation(libs.mlkit.subject.segmentation)
+    implementation(libs.kotlinx.coroutines.play.services)
+
 
 
     debugImplementation(libs.androidx.ui.tooling)

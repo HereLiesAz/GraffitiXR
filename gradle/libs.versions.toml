@@ -14,6 +14,8 @@ material3 = "1.3.2"
 camerax = "1.4.2"
 xr = "1.0.0-alpha01"
 azNavRail = "1.8"
+mlkitSubjectSegmentation = "16.0.0-beta1"
+coroutinesPlayServices = "1.9.0"
 compose-compiler = "1.5.8"
 
 
@@ -71,6 +73,11 @@ accompanist-permissions = { module = "com.google.accompanist:accompanist-permiss
 
 # AzNavRail
 az-nav-rail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref = "azNavRail" }
+
+# ML Kit
+mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
