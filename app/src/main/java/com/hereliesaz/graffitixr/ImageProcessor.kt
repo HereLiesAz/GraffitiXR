@@ -10,9 +10,8 @@ import com.google.mlkit.vision.subjectsegmentation.SubjectSegmenterOptions
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 
-suspend fun removeBackground(context: Context, imageUri: Uri): Uri? {
+suspend fun removeBackground(context: Context, imageUri: Uri): Result<Uri> {
     return try {
         val inputImage = InputImage.fromFilePath(context, imageUri)
 
@@ -26,18 +25,14 @@ suspend fun removeBackground(context: Context, imageUri: Uri): Uri? {
 
         val foregroundBitmap = result.foregroundBitmap
 
-        val file = File.createTempFile("bg_removed_image_", ".png", context.cacheDir)
-        FileOutputStream(file).use { fOut ->
-            foregroundBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
-            fOut.flush()
-        }
-
-        file.toUri()
-    } catch (e: IOException) {
-        e.printStackTrace()
-        null
+        val file = File(context.cacheDir, "bg_removed_image.png")
+        val fOut = FileOutputStream(file)
+        foregroundBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+        fOut.flush()
+        fOut.close()
+        Result.success(file.toUri())
     } catch (e: Exception) {
         e.printStackTrace()
-        null
+        Result.failure(e)
     }
 }
