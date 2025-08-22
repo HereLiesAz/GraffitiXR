@@ -45,6 +45,7 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Pose
 import kotlinx.coroutines.launch
 
+
 @OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +72,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 @Composable
 fun ArScreen() {
     var placementMode by remember { mutableStateOf(true) }
@@ -173,7 +173,6 @@ fun ArScreen() {
                     )
                 }
             }
-
             activeSlider?.let {
                 SliderPopup(
                     sliderType = it,
@@ -200,10 +199,8 @@ fun NonArScreen() {
     var saturation by remember { mutableStateOf(1f) }
     var brightness by remember { mutableStateOf(0f) }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
