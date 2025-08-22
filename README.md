@@ -1,4 +1,4 @@
-# Graffiti XR
+# GraffitiXR
 
 ## Overview
 
