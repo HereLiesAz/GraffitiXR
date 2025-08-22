@@ -70,5 +70,9 @@ dependencies {
     implementation(libs.az.nav.rail)
     implementation(libs.mlkit.subject.segmentation)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.apache.commons.math)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+
     debugImplementation(libs.androidx.ui.tooling)
 }

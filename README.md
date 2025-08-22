@@ -1,4 +1,4 @@
-# GraffitiXR
+# Mural Overlay AR App
 
 ## Overview
 
