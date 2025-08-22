@@ -10,9 +10,8 @@ import com.google.mlkit.vision.subjectsegmentation.SubjectSegmenterOptions
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 
-suspend fun removeBackground(context: Context, imageUri: Uri): Uri? {
+suspend fun removeBackground(context: Context, imageUri: Uri): Result<Uri> {
     return try {
         val inputImage = InputImage.fromFilePath(context, imageUri)
 
@@ -32,12 +31,9 @@ suspend fun removeBackground(context: Context, imageUri: Uri): Uri? {
         fOut.flush()
         fOut.close()
 
-        file.toUri()
-    } catch (e: IOException) {
-        e.printStackTrace()
-        null
+        Result.success(file.toUri())
     } catch (e: Exception) {
         e.printStackTrace()
-        null
+        Result.failure(e)
     }
 }

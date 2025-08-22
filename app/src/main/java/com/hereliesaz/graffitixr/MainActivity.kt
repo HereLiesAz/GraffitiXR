@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -43,6 +44,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.xr.arcore.rememberTrackedPlanes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
@@ -77,7 +86,8 @@ fun ArScreen() {
     var placementMode by remember { mutableStateOf(true) }
     var lockedPose by remember { mutableStateOf<Pose?>(null) }
     var cameraPose by remember { mutableStateOf<Pose?>(null) }
-
+    var isProcessing by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -87,142 +97,111 @@ fun ArScreen() {
         imageSettings.imageUri = uri
     }
 
-    Row {
-        AppNavRail(
-            onSelectImage = { launcher.launch("image/*") },
-            onRemoveBg = {
-                imageSettings.imageUri?.let { uri ->
-                    scope.launch {
-                        val newUri = removeBackground(context, uri)
-                        if (newUri != null) {
-                            imageSettings.imageUri = newUri
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { padding ->
+        Row(modifier = Modifier.padding(padding)) {
+            AppNavRail(
+                onSelectImage = { launcher.launch("image/*") },
+                onRemoveBg = {
+                    imageSettings.imageUri?.let { uri ->
+                        scope.launch {
+                            isProcessing = true
+                            val result = withContext(Dispatchers.IO) {
+                                removeBackground(context, uri)
+                            }
+                            result.onSuccess { newUri ->
+                                imageSettings.imageUri = newUri
+                            }.onFailure {
+                                snackbarHostState.showSnackbar("Background removal failed.")
+                            }
+                            isProcessing = false
+                        }
+                    }
+                },
+                onClearMarkers = { /* Markers are now automatic */ },
+                onLockMural = {
+                    cameraPose?.let {
+                        val translation = floatArrayOf(0f, 0f, -2f)
+                        val rotation = floatArrayOf(0f, 0f, 0f, 1f)
+                        lockedPose = it.compose(Pose(translation, rotation))
+                        placementMode = false
+                    }
+                },
+                onResetMural = {
+                    placementMode = true
+                    lockedPose = null
+                },
+                onSliderSelected = { imageSettings.activeSlider = it }
+            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                val planes = rememberTrackedPlanes()
+
+                LaunchedEffect(Unit) {
+                    delay(5000) // 5 seconds
+                    if (planes.isEmpty()) {
+                        snackbarHostState.showSnackbar("Move your phone around to detect surfaces.")
+                    }
+                }
+
+                XrScene(
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    cameraPose = session.camera.pose
+                    if (!placementMode && lockedPose != null) {
+                        imageSettings.imageUri?.let {
+                            val painter = rememberAsyncImagePainter(it)
+                            SpatialImage(
+                                painter = painter,
+                                contentDescription = "Mural",
+                                initialPose = lockedPose!!,
+                                width = 1f,
+                                height = 1f,
+                                alpha = imageSettings.opacity,
+                                colorFilter = getColorFilter(imageSettings.saturation, imageSettings.brightness, imageSettings.contrast)
+                            )
+                        }
+                        val markerPoses = listOf(
+                            Pose(floatArrayOf(-0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
+                            Pose(floatArrayOf(0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
+                            Pose(floatArrayOf(-0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
+                            Pose(floatArrayOf(0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
+                        )
+                        markerPoses.forEach { markerPose ->
+                            Model(
+                                "models/sphere.obj",
+                                initialPose = lockedPose!!.compose(markerPose),
+                                scale = floatArrayOf(0.05f, 0.05f, 0.05f)
+                            ) {
+                                Material(color = Color.Red)
+                            }
                         }
                     }
                 }
-            },
-            onClearMarkers = { /* Markers are now automatic */ },
-            onLockMural = {
-                cameraPose?.let {
-                    val translation = floatArrayOf(0f, 0f, -2f)
-                    val rotation = floatArrayOf(0f, 0f, 0f, 1f)
-                    lockedPose = it.compose(Pose(translation, rotation))
-                    placementMode = false
-                }
-            },
-            onResetMural = {
-                placementMode = true
-                lockedPose = null
-            },
-            onSliderSelected = { imageSettings.activeSlider = it }
-        )
-        Box(modifier = Modifier.fillMaxSize()) {
-            XrScene(
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                cameraPose = session.camera.pose
-                if (!placementMode && lockedPose != null) {
+
+                if (placementMode) {
                     imageSettings.imageUri?.let {
                         val painter = rememberAsyncImagePainter(it)
-                        SpatialImage(
+                        Image(
                             painter = painter,
-                            contentDescription = "Mural",
-                            initialPose = lockedPose!!,
-                            width = 1f,
-                            height = 1f,
+                            contentDescription = "Selected Image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
                             alpha = imageSettings.opacity,
                             colorFilter = getColorFilter(imageSettings.saturation, imageSettings.brightness, imageSettings.contrast)
                         )
                     }
-                    val markerPoses = listOf(
-                        Pose(floatArrayOf(-0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
-                        Pose(floatArrayOf(0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
-                        Pose(floatArrayOf(-0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
-                        Pose(floatArrayOf(0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
-                    )
-                    markerPoses.forEach { markerPose ->
-                        Model(
-                            "models/sphere.obj",
-                            initialPose = lockedPose!!.compose(markerPose),
-                            scale = floatArrayOf(0.05f, 0.05f, 0.05f)
-                        ) {
-                            Material(color = Color.Red)
-                        }
+                }
+
+                if (isProcessing) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
-                }
-            }
-
-            if (placementMode) {
-                imageSettings.imageUri?.let {
-                    val painter = rememberAsyncImagePainter(it)
-                    Image(
-                        painter = painter,
-                        contentDescription = "Selected Image",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                        alpha = imageSettings.opacity,
-                        colorFilter = getColorFilter(imageSettings.saturation, imageSettings.brightness, imageSettings.contrast)
-                    )
-                }
-            }
-
-            imageSettings.activeSlider?.let {
-                SliderPopup(
-                    sliderType = it,
-                    settings = imageSettings,
-                    onDismiss = { imageSettings.activeSlider = null }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun NonArScreen() {
-    val imageSettings = rememberImageSettingsState()
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        imageSettings.imageUri = uri
-    }
-
-    Row {
-        AppNavRail(
-            onSelectImage = { launcher.launch("image/*") },
-            onRemoveBg = {
-                imageSettings.imageUri?.let { uri ->
-                    scope.launch {
-                        val newUri = removeBackground(context, uri)
-                        if (newUri != null) {
-                            imageSettings.imageUri = newUri
-                        }
-                    }
-                }
-            },
-            onClearMarkers = {},
-            onLockMural = {},
-            onResetMural = {},
-            onSliderSelected = { imageSettings.activeSlider = it }
-        )
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                CameraPreview(modifier = Modifier.fillMaxSize())
-
-                imageSettings.imageUri?.let {
-                    val painter = rememberAsyncImagePainter(it)
-                    Image(
-                        painter = painter,
-                        contentDescription = "Selected Image",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                        alpha = imageSettings.opacity,
-                        colorFilter = getColorFilter(imageSettings.saturation, imageSettings.brightness, imageSettings.contrast)
-                    )
                 }
 
                 imageSettings.activeSlider?.let {
@@ -231,6 +210,90 @@ fun NonArScreen() {
                         settings = imageSettings,
                         onDismiss = { imageSettings.activeSlider = null }
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NonArScreen() {
+    val imageSettings = rememberImageSettingsState()
+    var isProcessing by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        imageSettings.imageUri = uri
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { padding ->
+        Row(modifier = Modifier.padding(padding)) {
+            AppNavRail(
+                onSelectImage = { launcher.launch("image/*") },
+                onRemoveBg = {
+                    imageSettings.imageUri?.let { uri ->
+                        scope.launch {
+                            isProcessing = true
+                            val result = withContext(Dispatchers.IO) {
+                                removeBackground(context, uri)
+                            }
+                            result.onSuccess { newUri ->
+                                imageSettings.imageUri = newUri
+                            }.onFailure {
+                                snackbarHostState.showSnackbar("Background removal failed.")
+                            }
+                            isProcessing = false
+                        }
+                    }
+                },
+                onClearMarkers = {},
+                onLockMural = {},
+                onResetMural = {},
+                onSliderSelected = { imageSettings.activeSlider = it }
+            )
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    CameraPreview(modifier = Modifier.fillMaxSize())
+
+                    imageSettings.imageUri?.let {
+                        val painter = rememberAsyncImagePainter(it)
+                        Image(
+                            painter = painter,
+                            contentDescription = "Selected Image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                            alpha = imageSettings.opacity,
+                            colorFilter = getColorFilter(imageSettings.saturation, imageSettings.brightness, imageSettings.contrast)
+                        )
+                    }
+
+                    if (isProcessing) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+
+                    imageSettings.activeSlider?.let {
+                        SliderPopup(
+                            sliderType = it,
+                            settings = imageSettings,
+                            onDismiss = { imageSettings.activeSlider = null }
+                        )
+                    }
                 }
             }
         }
