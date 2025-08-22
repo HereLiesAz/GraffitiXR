@@ -16,6 +16,8 @@ xr = "1.0.0-alpha01"
 azNavRail = "1.8"
 mlkitSubjectSegmentation = "16.0.0-beta1"
 coroutinesPlayServices = "1.9.0"
+apacheCommonsMath = "3.6.1"
+lifecycleViewModelCompose = "2.9.2"
 compose-compiler = "1.5.8"
 
 
@@ -29,6 +31,7 @@ androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "a
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-lifecycle-viewmodelKtx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleViewModelCompose" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
@@ -78,6 +81,8 @@ az-nav-rail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref
 mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 
+# Apache Commons Math
+apache-commons-math = { group = "org.apache.commons", name = "commons-math3", version.ref = "apacheCommonsMath" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

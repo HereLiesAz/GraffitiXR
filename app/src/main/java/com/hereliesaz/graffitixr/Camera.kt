@@ -47,8 +47,10 @@ fun CameraPreview(
                     cameraSelector,
                     preview
                 )
-            } catch (exc: Exception) {
-                // Handle exceptions
+            } catch (e: IllegalStateException) {
+                android.util.Log.e("Camera", "IllegalStateException during camera binding", e)
+            } catch (e: IllegalArgumentException) {
+                android.util.Log.e("Camera", "IllegalArgumentException during camera binding", e)
             }
 
             previewView
