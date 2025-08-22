@@ -27,10 +27,10 @@ suspend fun removeBackground(context: Context, imageUri: Uri): Uri? {
         val foregroundBitmap = result.foregroundBitmap
 
         val file = File(context.cacheDir, "bg_removed_image.png")
-        val fOut = FileOutputStream(file)
-        foregroundBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
-        fOut.flush()
-        fOut.close()
+        FileOutputStream(file).use { fOut ->
+            foregroundBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+            fOut.flush()
+        }
 
         file.toUri()
     } catch (e: IOException) {
