@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.androidx.xr.runtime)
     implementation(libs.androidx.xr.scenecore)
     implementation(libs.androidx.xr.compose.platform)
+    implementation(libs.androidx.xr.compose)
     implementation(libs.androidx.xr.compose.material3)
     implementation(libs.androidx.xr.compose.spatial)
     implementation(libs.androidx.xr.compose.subspace)

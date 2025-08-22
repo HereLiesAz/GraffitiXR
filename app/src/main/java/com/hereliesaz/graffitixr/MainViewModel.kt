@@ -12,19 +12,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-data class UiState(
-    val imageUri: Uri? = null,
-    val opacity: Float = 1f,
-    val contrast: Float = 1f,
-    val saturation: Float = 1f,
-    val brightness: Float = 0f,
-    val activeSlider: SliderType? = null,
-    val placementMode: Boolean = true,
-    val lockedPose: Pose? = null,
-    val cameraPose: Pose? = null,
-    val isProcessing: Boolean = false,
-    val snackbarMessage: String? = null
-)
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
