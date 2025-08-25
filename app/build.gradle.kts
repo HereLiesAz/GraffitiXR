@@ -1,17 +1,16 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.compose.compiler)
 }
 
 android {
     namespace = "com.hereliesaz.graffitixr"
-    compileSdk = 36
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
-        minSdk = 24
-        targetSdk = 36
+        minSdk = 26
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -24,18 +23,24 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "1.8"
     }
     buildFeatures {
         compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
     packaging {
         resources {
@@ -44,36 +49,38 @@ android {
     }
 }
 
-composeCompiler {
-    reportsDestination = layout.buildDirectory.dir("compose_compiler")
-    stabilityConfigurationFile = rootProject.layout.projectDirectory.file("stability_config.conf")
-}
-
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-
-    // AndroidX XR Libraries
-    implementation(libs.androidx.xr.runtime)
-    implementation(libs.androidx.xr.scenecore)
-    implementation(libs.androidx.xr.compose.platform)
-    implementation(libs.androidx.xr.compose)
-    implementation(libs.androidx.xr.compose.material3)
-    implementation(libs.androidx.xr.compose.spatial)
-    implementation(libs.androidx.xr.compose.subspace)
-    implementation(libs.androidx.xr.arcore)
-    implementation(libs.az.nav.rail)
-    implementation(libs.mlkit.subject.segmentation)
-    implementation(libs.kotlinx.coroutines.play.services)
-    implementation(libs.apache.commons.math)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material3)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.coil.compose)
+    implementation(libs.accompanist.permissions)
+    implementation(libs.guava)
+
+    // CameraX
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // AR
+    implementation(libs.arcore.client)
+    implementation(libs.androidx.xr.compose)
+    implementation(libs.androidx.xr.arcore)
+
+    // ML Kit
+    implementation(libs.mlkit.segmentation.selfie)
+
+    // Material
+    implementation(libs.google.android.material)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.apache.commons.math)
+    implementation(libs.kotlinx.coroutines.play.services)
 
 
-    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.compose.ui.tooling)
 }

@@ -14,8 +14,8 @@ import androidx.core.content.ContextCompat
 
 @Composable
 fun CameraPreview(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     AndroidView(
