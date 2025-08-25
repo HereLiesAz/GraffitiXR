@@ -26,8 +26,8 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.xr.compose.material3.Material
-import androidx.xr.compose.material3.Model
+import androidx.xr.compose.material.Material
+import androidx.xr.compose.model.Model
 import androidx.xr.compose.platform.XrScene
 import androidx.xr.compose.spatial.SpatialImage
 import coil.compose.rememberAsyncImagePainter
@@ -247,21 +247,25 @@ fun SliderPopup(
 }
 
 fun getColorFilter(saturation: Float, brightness: Float, contrast: Float): ColorFilter {
-    val matrix = ColorMatrix()
-    matrix.setToSaturation(saturation)
-    val brightnessMatrix = ColorMatrix(floatArrayOf(
+    val androidColorMatrix = android.graphics.ColorMatrix()
+    androidColorMatrix.setSaturation(saturation)
+
+    val brightnessMatrix = android.graphics.ColorMatrix(floatArrayOf(
         1f, 0f, 0f, 0f, brightness * 255,
         0f, 1f, 0f, 0f, brightness * 255,
         0f, 0f, 1f, 0f, brightness * 255,
         0f, 0f, 0f, 1f, 0f
     ))
-    val contrastMatrix = ColorMatrix(floatArrayOf(
+
+    val contrastMatrix = android.graphics.ColorMatrix(floatArrayOf(
         contrast, 0f, 0f, 0f, 0f,
         0f, contrast, 0f, 0f, 0f,
         0f, 0f, contrast, 0f, 0f,
         0f, 0f, 0f, 1f, 0f
     ))
-    matrix.postConcat(brightnessMatrix)
-    matrix.postConcat(contrastMatrix)
-    return ColorFilter.colorMatrix(matrix)
+
+    androidColorMatrix.postConcat(brightnessMatrix)
+    androidColorMatrix.postConcat(contrastMatrix)
+
+    return ColorFilter.colorMatrix(ColorMatrix(androidColorMatrix.array))
 }

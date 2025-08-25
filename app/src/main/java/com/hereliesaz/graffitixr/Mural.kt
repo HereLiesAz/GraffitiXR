@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.painter.Painter
@@ -28,11 +29,11 @@ fun Mural(
             painter = painter,
             contentDescription = "Mural",
             initialPose = averagePose,
-            modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             width = width,
             height = height,
             alpha = opacity,
-            colorFilter = getColorFilter(saturation, brightness, contrast)
+            colorFilter = null
         )
     }
 }

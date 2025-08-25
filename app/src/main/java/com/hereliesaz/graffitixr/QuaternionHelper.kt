@@ -25,8 +25,8 @@ object QuaternionHelper {
             var q = quaternions[i]
             // If the dot product is negative, the quaternions are in opposite hemispheres.
             // Invert one of them to bring them to the same side.
-            if (Quaternion.dot(first, q) < 0) {
-                q = q.negate()
+            if (Quaternion.dotProduct(first, q) < 0) {
+                q = q.conjugate
             }
             alignedQuaternions.add(q)
         }
