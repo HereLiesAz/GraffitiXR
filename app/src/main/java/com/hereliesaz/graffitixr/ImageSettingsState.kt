@@ -1,3 +1,4 @@
+// TODO: This file is unused and should be removed. The state is handled by MainViewModel and UiState.
 package com.hereliesaz.graffitixr
 
 import android.net.Uri

@@ -3,6 +3,10 @@
 This file tracks the remaining tasks and potential improvements for the GraffitiXR application.
 
 ## High Priority
+- [ ] **Implement Core Feature Gaps:**
+    - [ ] Implement the `onClearMarkers` function in `AppNavRail.kt` to allow users to clear placed markers.
+    - [ ] Implement dynamic detection of predefined marker images as described in the README. The current implementation uses hardcoded poses.
+    - [ ] Implement dynamic loading of mural textures and marker images.
 - [ ] **Improve Robustness and Performance:**
     - [ ] Add a loading indicator while background removal is processing.
     - [ ] Ensure image processing runs on a background thread to avoid UI jank.

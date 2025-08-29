@@ -12,6 +12,12 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 
+/**
+ * A composable that displays a camera preview using CameraX.
+ * This is used as a fallback when AR is not available on the device.
+ *
+ * @param modifier The modifier to be applied to the camera preview.
+ */
 @Composable
 fun CameraPreview(modifier: Modifier = Modifier) {
     val lifecycleOwner = LocalLifecycleOwner.current

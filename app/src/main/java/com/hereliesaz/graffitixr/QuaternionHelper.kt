@@ -1,3 +1,4 @@
+// TODO: This file is unused and should be removed or integrated into the main application.
 package com.hereliesaz.graffitixr
 
 import org.apache.commons.math3.complex.Quaternion
