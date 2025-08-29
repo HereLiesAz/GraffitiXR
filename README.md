@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is an Android application that uses AndroidXR to overlay a virtual mural onto a set of real-world marker images. The application is built with Kotlin and uses ComposeXR for rendering the AR content. It's designed to track markings on a surface to better maintain the image's positioning, even if you have to put your phone in your pocket for a bit. 
+This is an Android application that uses AndroidXR to overlay a virtual mural onto a set of real-world markings on a surface. The application is built with Kotlin and uses ComposeXR for rendering the AR content. It's designed to track markings on a surface to better maintain the image's positioning, for when you drop your phone or have to put it in your pocket for a bit. 
 
 ## Features
 
