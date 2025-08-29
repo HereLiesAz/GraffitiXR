@@ -13,6 +13,16 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 
+/**
+ * A navigation rail composable that provides the main actions for the application.
+ *
+ * @param onSelectImage A callback for when the user wants to select an image.
+ * @param onRemoveBg A callback for when the user wants to remove the background of the image.
+ * @param onClearMarkers A callback for when the user wants to clear the placed markers.
+ * @param onLockMural A callback for when the user wants to lock the mural's position.
+ * @param onResetMural A callback for when the user wants to reset the mural.
+ * @param onSliderSelected A callback for when the user selects a slider for image adjustment.
+ */
 @Composable
 fun AppNavRail(
     onSelectImage: () -> Unit,
@@ -29,6 +39,7 @@ fun AppNavRail(
         IconButton(onClick = onRemoveBg) {
             Icon(Icons.Default.AutoAwesome, contentDescription = "Remove Background")
         }
+        // TODO: Add a button for onClearMarkers.
         IconButton(onClick = onLockMural) {
             Icon(Icons.Default.Lock, contentDescription = "Lock Mural")
         }

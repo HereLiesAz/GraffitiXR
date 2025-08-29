@@ -14,8 +14,18 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 
+/**
+ * Removes the background from an image using ML Kit's Selfie Segmentation.
+ * The resulting image has a transparent background.
+ *
+ * @param context The application context.
+ * @param imageUri The URI of the image to process.
+ * @return A [Result] containing the URI of the processed image, or an exception on failure.
+ */
 suspend fun removeBackground(context: Context, imageUri: Uri): Result<Uri> {
     return try {
+        // TODO: The SelfieSegmentation model is used here, which is optimized for selfies.
+        // For a more general-purpose background removal, a different model might be needed.
         val segmenter = SelfieSegmentation.getClient()
         val originalBitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, imageUri)
         val image = InputImage.fromBitmap(originalBitmap, 0)

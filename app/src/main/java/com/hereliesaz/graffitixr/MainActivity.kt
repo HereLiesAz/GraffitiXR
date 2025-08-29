@@ -47,6 +47,10 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.xr.arcore.rememberTrackedPlanes
 
+/**
+ * The main entry point of the GraffitiXR application.
+ * This activity handles camera permission requests and sets up the main UI.
+ */
 @OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,7 +61,11 @@ class MainActivity : ComponentActivity() {
                 if (cameraPermissionState.status.isGranted) {
                     MainScreen()
                 } else {
-                    Column {
+                    // A simple UI to request camera permission.
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text("Camera permission is required to use this app.")
                         androidx.compose.material3.Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
                             Text("Request permission")
@@ -69,6 +77,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * The main screen of the application, which orchestrates the UI components.
+ * It displays the appropriate content based on AR availability and handles user interactions.
+ *
+ * @param viewModel The [MainViewModel] that holds the application's state and logic.
+ */
 @Composable
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
@@ -81,6 +95,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         viewModel.onSelectImage(uri)
     }
 
+    // Shows a snackbar message when one is available in the UI state.
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -95,6 +110,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             AppNavRail(
                 onSelectImage = { launcher.launch("image/*") },
                 onRemoveBg = viewModel::onRemoveBgClicked,
+                // TODO: Implement the onClearMarkers functionality.
                 onClearMarkers = { /* Not implemented in this workflow */ },
                 onLockMural = viewModel::onLockMural,
                 onResetMural = viewModel::onResetMural,
@@ -107,6 +123,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     NonArContent(uiState)
                 }
 
+                // Show a loading indicator when processing.
                 if (uiState.isProcessing) {
                     Box(
                         modifier = Modifier
@@ -118,6 +135,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     }
                 }
 
+                // Show the slider popup when a slider is active.
                 uiState.activeSlider?.let {
                     SliderPopup(
                         sliderType = it,
@@ -131,13 +149,21 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     }
 }
 
+/**
+ * Composable for rendering the Augmented Reality content.
+ * It displays the virtual mural and markers in the AR scene.
+ *
+ * @param uiState The current state of the UI.
+ * @param onPoseUpdate A callback to update the camera pose.
+ */
 @Composable
 fun ArContent(uiState: UiState, onPoseUpdate: (Pose?) -> Unit) {
     val planes = rememberTrackedPlanes()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Show a snackbar message if no surfaces are detected after a delay.
     LaunchedEffect(Unit) {
-        delay(5000) // 5 seconds
+        kotlinx.coroutines.delay(5000) // 5 seconds
         if (planes.isEmpty()) {
             snackbarHostState.showSnackbar("Move your phone around to detect surfaces.")
         }
@@ -147,6 +173,7 @@ fun ArContent(uiState: UiState, onPoseUpdate: (Pose?) -> Unit) {
         modifier = Modifier.fillMaxSize(),
     ) {
         onPoseUpdate(session.camera.pose)
+        // TODO: Replace hardcoded marker poses with dynamically detected markers.
         if (!uiState.placementMode && uiState.lockedPose != null) {
             uiState.imageUri?.let {
                 val painter = rememberAsyncImagePainter(it)
@@ -178,6 +205,7 @@ fun ArContent(uiState: UiState, onPoseUpdate: (Pose?) -> Unit) {
         }
     }
 
+    // In placement mode, show the selected image overlaid on the screen.
     if (uiState.placementMode) {
         uiState.imageUri?.let {
             val painter = rememberAsyncImagePainter(it)
@@ -193,6 +221,12 @@ fun ArContent(uiState: UiState, onPoseUpdate: (Pose?) -> Unit) {
     }
 }
 
+/**
+ * Composable for rendering the content when AR is not available.
+ * It shows a camera preview with the selected image overlaid.
+ *
+ * @param uiState The current state of the UI.
+ */
 @Composable
 fun NonArContent(uiState: UiState) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -212,7 +246,14 @@ fun NonArContent(uiState: UiState) {
     }
 }
 
-
+/**
+ * A popup that displays a slider for adjusting image properties.
+ *
+ * @param sliderType The type of slider to display (e.g., Opacity, Contrast).
+ * @param uiState The current state of the UI.
+ * @param viewModel The [MainViewModel] to handle slider value changes.
+ * @param onDismiss A callback to dismiss the popup.
+ */
 @Composable
 fun SliderPopup(
     sliderType: SliderType,
@@ -246,6 +287,14 @@ fun SliderPopup(
     }
 }
 
+/**
+ * Creates a [ColorFilter] from saturation, brightness, and contrast values.
+ *
+ * @param saturation The saturation level.
+ * @param brightness The brightness level.
+ * @param contrast The contrast level.
+ * @return A [ColorFilter] that can be applied to an image.
+ */
 fun getColorFilter(saturation: Float, brightness: Float, contrast: Float): ColorFilter {
     val androidColorMatrix = android.graphics.ColorMatrix()
     androidColorMatrix.setSaturation(saturation)
