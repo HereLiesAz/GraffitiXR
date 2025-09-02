@@ -26,10 +26,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.xr.compose.material.Material
-import androidx.xr.compose.model.Model
-import androidx.xr.compose.platform.XrScene
-import androidx.xr.compose.spatial.SpatialImage
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -45,7 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.xr.arcore.rememberTrackedPlanes
+import androidx.xr.compose.spatial.Subspace
 
 /**
  * The main entry point of the GraffitiXR application.
@@ -110,15 +106,14 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             AppNavRail(
                 onSelectImage = { launcher.launch("image/*") },
                 onRemoveBg = viewModel::onRemoveBgClicked,
-                // TODO: Implement the onClearMarkers functionality.
-                onClearMarkers = { /* Not implemented in this workflow */ },
+                onClearMarkers = viewModel::onResetMural,
                 onLockMural = viewModel::onLockMural,
                 onResetMural = viewModel::onResetMural,
                 onSliderSelected = viewModel::onSliderSelected
             )
             Box(modifier = Modifier.fillMaxSize()) {
                 if (arAvailability) {
-                    ArContent(uiState, onPoseUpdate = viewModel::onCameraPoseChange)
+                    ArContent(uiState)
                 } else {
                     NonArContent(uiState)
                 }
@@ -154,38 +149,23 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
  * It displays the virtual mural and markers in the AR scene.
  *
  * @param uiState The current state of the UI.
- * @param onPoseUpdate A callback to update the camera pose.
  */
 @Composable
-fun ArContent(uiState: UiState, onPoseUpdate: (Pose?) -> Unit) {
-    val planes = rememberTrackedPlanes()
+fun ArContent(uiState: UiState) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Show a snackbar message if no surfaces are detected after a delay.
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(5000) // 5 seconds
-        if (planes.isEmpty()) {
-            snackbarHostState.showSnackbar("Move your phone around to detect surfaces.")
-        }
+        // TODO: Find a replacement for planes.isEmpty()
     }
 
-    XrScene(
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        onPoseUpdate(session.camera.pose)
+    Subspace {
         // TODO: Replace hardcoded marker poses with dynamically detected markers.
         if (!uiState.placementMode && uiState.lockedPose != null) {
             uiState.imageUri?.let {
                 val painter = rememberAsyncImagePainter(it)
-                SpatialImage(
-                    painter = painter,
-                    contentDescription = "Mural",
-                    initialPose = uiState.lockedPose,
-                    width = 1f,
-                    height = 1f,
-                    alpha = uiState.opacity,
-                    colorFilter = getColorFilter(uiState.saturation, uiState.brightness, uiState.contrast)
-                )
+                // TODO: Replace SpatialImage with SpatialPanel and Image
             }
             val markerPoses = listOf(
                 Pose(floatArrayOf(-0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
@@ -194,13 +174,7 @@ fun ArContent(uiState: UiState, onPoseUpdate: (Pose?) -> Unit) {
                 Pose(floatArrayOf(0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
             )
             markerPoses.forEach { markerPose ->
-                Model(
-                    "models/sphere.obj",
-                    initialPose = uiState.lockedPose.compose(markerPose),
-                    scale = floatArrayOf(0.05f, 0.05f, 0.05f)
-                ) {
-                    Material(color = Color.Red)
-                }
+                // TODO: Replace Model and Material with SceneCoreEntity
             }
         }
     }
