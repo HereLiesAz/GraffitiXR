@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -24,12 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Quaternion
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.xr.compose.material.Material
-import androidx.xr.compose.model.Model
-import androidx.xr.compose.platform.XrScene
-import androidx.xr.compose.spatial.SpatialImage
+import androidx.core.view.WindowCompat
+import androidx.xr.compose.subspace.layout.SubspaceModifier
+import androidx.xr.compose.subspace.toDp
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -45,7 +46,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.xr.arcore.rememberTrackedPlanes
+import androidx.xr.compose.spatial.Subspace
+import androidx.xr.compose.subspace.SpatialPanel
 
 /**
  * The main entry point of the GraffitiXR application.
@@ -55,6 +57,7 @@ import androidx.xr.arcore.rememberTrackedPlanes
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             GraffitiXRTheme {
                 val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
@@ -63,7 +66,9 @@ class MainActivity : ComponentActivity() {
                 } else {
                     // A simple UI to request camera permission.
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text("Camera permission is required to use this app.")
@@ -106,44 +111,45 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
-        Row(modifier = Modifier.padding(padding)) {
-            AppNavRail(
-                onSelectImage = { launcher.launch("image/*") },
-                onRemoveBg = viewModel::onRemoveBgClicked,
-                // TODO: Implement the onClearMarkers functionality.
-                onClearMarkers = { /* Not implemented in this workflow */ },
-                onLockMural = viewModel::onLockMural,
-                onResetMural = viewModel::onResetMural,
-                onSliderSelected = viewModel::onSliderSelected
-            )
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (arAvailability) {
-                    ArContent(uiState, onPoseUpdate = viewModel::onCameraPoseChange)
-                } else {
-                    NonArContent(uiState)
-                }
+        Box(modifier = Modifier.fillMaxSize()) {
+            // AR or Non-AR content is drawn first, covering the whole screen.
+            if (arAvailability) {
+                ArContent(uiState)
+            } else {
+                NonArContent(uiState)
+            }
 
-                // Show a loading indicator when processing.
-                if (uiState.isProcessing) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
+            Row(modifier = Modifier.padding(padding)) {
+                AppNavRail(
+                    onSelectImage = { launcher.launch("image/*") },
+                    onRemoveBg = viewModel::onRemoveBgClicked,
+                    onClearMarkers = viewModel::onResetMural,
+                    onLockMural = viewModel::onLockMural,
+                    onResetMural = viewModel::onResetMural,
+                    onSliderSelected = viewModel::onSliderSelected
+                )
+            }
 
-                // Show the slider popup when a slider is active.
-                uiState.activeSlider?.let {
-                    SliderPopup(
-                        sliderType = it,
-                        uiState = uiState,
-                        viewModel = viewModel,
-                        onDismiss = { viewModel.onSliderSelected(null) }
-                    )
+            // Show a loading indicator when processing.
+            if (uiState.isProcessing) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
                 }
+            }
+
+            // Show the slider popup when a slider is active.
+            uiState.activeSlider?.let {
+                SliderPopup(
+                    sliderType = it,
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onDismiss = { viewModel.onSliderSelected(null) }
+                )
             }
         }
     }
@@ -154,38 +160,45 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
  * It displays the virtual mural and markers in the AR scene.
  *
  * @param uiState The current state of the UI.
- * @param onPoseUpdate A callback to update the camera pose.
  */
 @Composable
-fun ArContent(uiState: UiState, onPoseUpdate: (Pose?) -> Unit) {
-    val planes = rememberTrackedPlanes()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    // Show a snackbar message if no surfaces are detected after a delay.
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(5000) // 5 seconds
-        if (planes.isEmpty()) {
-            snackbarHostState.showSnackbar("Move your phone around to detect surfaces.")
-        }
-    }
-
-    XrScene(
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        onPoseUpdate(session.camera.pose)
-        // TODO: Replace hardcoded marker poses with dynamically detected markers.
+fun ArContent(uiState: UiState) {
+    Subspace {
         if (!uiState.placementMode && uiState.lockedPose != null) {
             uiState.imageUri?.let {
-                val painter = rememberAsyncImagePainter(it)
-                SpatialImage(
-                    painter = painter,
-                    contentDescription = "Mural",
-                    initialPose = uiState.lockedPose,
-                    width = 1f,
-                    height = 1f,
-                    alpha = uiState.opacity,
-                    colorFilter = getColorFilter(uiState.saturation, uiState.brightness, uiState.contrast)
-                )
+                val pose = uiState.lockedPose!!
+                val rotation = pose.rotationQuaternion
+                val translation = pose.translation
+                SpatialPanel(
+                    modifier = androidx.xr.compose.subspace.layout.SubspaceModifier
+                        .offset(
+                            x = androidx.xr.compose.subspace.toDp(translation[0]),
+                            y = androidx.xr.compose.subspace.toDp(translation[1]),
+                            z = androidx.xr.compose.subspace.toDp(translation[2])
+                        )
+                        .rotate(
+                            androidx.compose.ui.graphics.Quaternion(
+                                rotation[0],
+                                rotation[1],
+                                rotation[2],
+                                rotation[3]
+                            )
+                        )
+                ) {
+                    val painter = rememberAsyncImagePainter(it)
+                    Image(
+                        painter = painter,
+                        contentDescription = "Selected Image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        alpha = uiState.opacity,
+                        colorFilter = getColorFilter(
+                            uiState.saturation,
+                            uiState.brightness,
+                            uiState.contrast
+                        )
+                    )
+                }
             }
             val markerPoses = listOf(
                 Pose(floatArrayOf(-0.5f, 0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
@@ -194,12 +207,25 @@ fun ArContent(uiState: UiState, onPoseUpdate: (Pose?) -> Unit) {
                 Pose(floatArrayOf(0.5f, -0.5f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
             )
             markerPoses.forEach { markerPose ->
-                Model(
-                    "models/sphere.obj",
-                    initialPose = uiState.lockedPose.compose(markerPose),
-                    scale = floatArrayOf(0.05f, 0.05f, 0.05f)
+                val rotation = markerPose.rotationQuaternion
+                val translation = markerPose.translation
+                SpatialPanel(
+                    modifier = androidx.xr.compose.subspace.layout.SubspaceModifier
+                        .offset(
+                            x = androidx.xr.compose.subspace.toDp(translation[0]),
+                            y = androidx.xr.compose.subspace.toDp(translation[1]),
+                            z = androidx.xr.compose.subspace.toDp(translation[2])
+                        )
+                        .rotate(
+                            androidx.compose.ui.graphics.Quaternion(
+                                rotation[0],
+                                rotation[1],
+                                rotation[2],
+                                rotation[3]
+                            )
+                        )
                 ) {
-                    Material(color = Color.Red)
+                    Box(modifier = Modifier.size(10.dp).background(Color.Red))
                 }
             }
         }

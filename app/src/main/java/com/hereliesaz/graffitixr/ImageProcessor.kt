@@ -8,7 +8,8 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.net.toUri
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.segmentation.selfie.SelfieSegmentation
+import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
+import com.google.mlkit.vision.segmentation.Segmentation
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
@@ -24,15 +25,18 @@ import java.nio.ByteBuffer
  */
 suspend fun removeBackground(context: Context, imageUri: Uri): Result<Uri> {
     return try {
-        // TODO: The SelfieSegmentation model is used here, which is optimized for selfies.
-        // For a more general-purpose background removal, a different model might be needed.
-        val segmenter = SelfieSegmentation.getClient()
+        val options =
+            SelfieSegmenterOptions.Builder()
+                .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
+                .enableRawSizeMask()
+                .build()
+        val segmenter = Segmentation.getClient(options)
         val originalBitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, imageUri)
         val image = InputImage.fromBitmap(originalBitmap, 0)
 
         val segmentationMask = segmenter.process(image).await()
 
-        val mask: ByteBuffer = segmentationMask.mask
+        val mask: ByteBuffer = segmentationMask.buffer
         val maskWidth: Int = segmentationMask.width
         val maskHeight: Int = segmentationMask.height
 

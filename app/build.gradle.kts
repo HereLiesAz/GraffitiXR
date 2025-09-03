@@ -1,16 +1,17 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
     namespace = "com.hereliesaz.graffitixr"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -50,6 +51,7 @@ android {
 }
 
 dependencies {
+    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -68,9 +70,13 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     // AR
-    implementation(libs.arcore.client)
-    implementation(libs.androidx.xr.compose)
-    implementation(libs.androidx.xr.arcore)
+    implementation(libs.google.arcore)
+    implementation(libs.androidx.arcore)
+    implementation(libs.androidx.compose)
+    implementation(libs.androidx.xr.compose.layout)
+    implementation(libs.androidx.scenecore)
+    compileOnly(libs.androidx.extensions.xr)
+
 
     // ML Kit
     implementation(libs.mlkit.segmentation.selfie)

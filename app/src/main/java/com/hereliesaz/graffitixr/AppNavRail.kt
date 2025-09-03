@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Brightness5
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationRail
@@ -39,7 +40,9 @@ fun AppNavRail(
         IconButton(onClick = onRemoveBg) {
             Icon(Icons.Default.AutoAwesome, contentDescription = "Remove Background")
         }
-        // TODO: Add a button for onClearMarkers.
+        IconButton(onClick = onClearMarkers) {
+            Icon(Icons.Default.Delete, contentDescription = "Clear Markers")
+        }
         IconButton(onClick = onLockMural) {
             Icon(Icons.Default.Lock, contentDescription = "Lock Mural")
         }
