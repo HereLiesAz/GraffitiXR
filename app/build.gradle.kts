@@ -73,6 +73,7 @@ dependencies {
     implementation(libs.google.arcore)
     implementation(libs.androidx.arcore)
     implementation(libs.androidx.compose)
+    implementation(libs.androidx.xr.compose.layout)
     implementation(libs.androidx.scenecore)
     compileOnly(libs.androidx.extensions.xr)
 
