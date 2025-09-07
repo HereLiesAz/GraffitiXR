@@ -86,6 +86,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.apache.commons.math)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation("com.github.HereLiesAz:AzNavRail:2.7")
 
 
     debugImplementation(libs.compose.ui.tooling)
