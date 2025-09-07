@@ -25,26 +25,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.Quaternion
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.xr.compose.subspace.layout.SubspaceModifier
-import androidx.xr.compose.subspace.toDp
+import androidx.xr.compose.subspace.layout.offset
+import androidx.xr.compose.subspace.layout.rotate
+import androidx.xr.runtime.math.Quaternion
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.hereliesaz.aznavrail.AzNavRail
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Pose
-import androidx.compose.runtime.getValue
+import com.hereliesaz.graffitixr.SliderType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.xr.compose.spatial.Subspace
 import androidx.xr.compose.subspace.SpatialPanel
@@ -120,14 +125,19 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             }
 
             Row(modifier = Modifier.padding(padding)) {
-                AppNavRail(
-                    onSelectImage = { launcher.launch("image/*") },
-                    onRemoveBg = viewModel::onRemoveBgClicked,
-                    onClearMarkers = viewModel::onResetMural,
-                    onLockMural = viewModel::onLockMural,
-                    onResetMural = viewModel::onResetMural,
-                    onSliderSelected = viewModel::onSliderSelected
-                )
+                var selected by remember { mutableStateOf<SliderType?>(null) }
+                AzNavRail(Modifier, true, true, {
+                    SliderType.values().forEach { sliderType ->
+                        azRailItem(
+                            sliderType.name,
+                            sliderType.name,
+                            if (selected == sliderType) Color.White else Color.Gray
+                        ) {
+                            selected = sliderType
+                            viewModel.onSliderSelected(sliderType)
+                        }
+                    }
+                })
             }
 
             // Show a loading indicator when processing.
@@ -170,14 +180,14 @@ fun ArContent(uiState: UiState) {
                 val rotation = pose.rotationQuaternion
                 val translation = pose.translation
                 SpatialPanel(
-                    modifier = androidx.xr.compose.subspace.layout.SubspaceModifier
+                    modifier = SubspaceModifier
                         .offset(
-                            x = androidx.xr.compose.subspace.toDp(translation[0]),
-                            y = androidx.xr.compose.subspace.toDp(translation[1]),
-                            z = androidx.xr.compose.subspace.toDp(translation[2])
+                            x = translation[0].dp,
+                            y = translation[1].dp,
+                            z = translation[2].dp
                         )
                         .rotate(
-                            androidx.compose.ui.graphics.Quaternion(
+                            Quaternion(
                                 rotation[0],
                                 rotation[1],
                                 rotation[2],
@@ -210,14 +220,14 @@ fun ArContent(uiState: UiState) {
                 val rotation = markerPose.rotationQuaternion
                 val translation = markerPose.translation
                 SpatialPanel(
-                    modifier = androidx.xr.compose.subspace.layout.SubspaceModifier
+                    modifier = SubspaceModifier
                         .offset(
-                            x = androidx.xr.compose.subspace.toDp(translation[0]),
-                            y = androidx.xr.compose.subspace.toDp(translation[1]),
-                            z = androidx.xr.compose.subspace.toDp(translation[2])
+                            x = translation[0].dp,
+                            y = translation[1].dp,
+                            z = translation[2].dp
                         )
                         .rotate(
-                            androidx.compose.ui.graphics.Quaternion(
+                            Quaternion(
                                 rotation[0],
                                 rotation[1],
                                 rotation[2],
