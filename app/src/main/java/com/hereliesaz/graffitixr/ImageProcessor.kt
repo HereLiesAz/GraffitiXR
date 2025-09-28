@@ -2,8 +2,8 @@ package com.hereliesaz.graffitixr
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
+import android.graphics.ImageDecoder // Added import
+import android.os.Build // Added import
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.net.toUri
@@ -31,7 +31,19 @@ suspend fun removeBackground(context: Context, imageUri: Uri): Result<Uri> {
                 .enableRawSizeMask()
                 .build()
         val segmenter = Segmentation.getClient(options)
-        val originalBitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, imageUri)
+
+        // Updated Bitmap loading
+        val originalBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, imageUri)
+            ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                decoder.isMutableRequired = true
+            }
+        } else {
+            @Suppress("DEPRECATION") // Suppress for older SDKs
+            MediaStore.Images.Media.getBitmap(context.contentResolver, imageUri)
+        }
+
         val image = InputImage.fromBitmap(originalBitmap, 0)
 
         val segmentationMask = segmenter.process(image).await()

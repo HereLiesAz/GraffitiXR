@@ -31,7 +31,8 @@ import androidx.core.view.WindowCompat
 import androidx.xr.compose.subspace.layout.SubspaceModifier
 import androidx.xr.compose.subspace.layout.offset
 import androidx.xr.compose.subspace.layout.rotate
-import androidx.xr.runtime.math.Quaternion
+import androidx.xr.compose.subspace.layout.offset
+import androidx.xr.compose.subspace.layout.rotate
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.hereliesaz.aznavrail.AzNavRail
@@ -53,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.xr.compose.spatial.Subspace
 import androidx.xr.compose.subspace.SpatialPanel
+import androidx.xr.runtime.math.Quaternion
 
 /**
  * The main entry point of the GraffitiXR application.
