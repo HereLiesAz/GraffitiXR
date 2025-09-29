@@ -16,10 +16,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,30 +38,20 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.xr.arcore.ARScene
+import androidx.xr.arcore.rememberARCamera
+import androidx.xr.arcore.rememberARPlanes
+import androidx.xr.compose.spatial.rememberSubspace
+import androidx.xr.runtime.rememberDefaultRun
+import androidx.xr.runtime.rememberSession
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
 import com.google.ar.core.TrackingState
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import com.hereliesaz.aznavrail.AzNavRail
-import androidx.xr.compose.ar.ARScene
-import androidx.xr.compose.ar.rememberARCamera
-import androidx.xr.compose.ar.rememberARPlanes
-import androidx.xr.compose.spatial.rememberSubspace
-import androidx.xr.compose.subspace.SubspaceComponent
-import androidx.xr.runtime.kotlin.rememberDefaultRun
-import androidx.xr.runtime.kotlin.rememberSession
+import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 
 /**
  * The main entry point of the GraffitiXR application.
