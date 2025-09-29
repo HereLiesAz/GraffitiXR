@@ -1,5 +1,5 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile // Added import
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget // Added import
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -37,7 +37,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    // kotlinOptions block removed
     buildFeatures {
         compose = true
     }
@@ -79,9 +78,9 @@ dependencies {
     // AR
     implementation(libs.google.arcore)
     implementation(libs.androidx.arcore)
-    implementation(libs.androidx.compose)
+    implementation(libs.androidx.xr.compose)
     implementation(libs.androidx.scenecore)
-    compileOnly(libs.androidx.extensions.xr)
+    implementation(libs.androidx.xr.runtime)
 
 
     // ML Kit
@@ -92,7 +91,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.apache.commons.math)
     implementation(libs.kotlinx.coroutines.play.services)
-    implementation("com.github.HereLiesAz:AzNavRail:2.7")
+    implementation(libs.az.nav.rail)
 
 
     debugImplementation(libs.compose.ui.tooling)
