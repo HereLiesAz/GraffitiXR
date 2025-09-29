@@ -76,7 +76,6 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     // AR
-    implementation(libs.google.arcore)
     implementation(libs.androidx.arcore)
     implementation(libs.androidx.xr.compose)
     implementation(libs.androidx.scenecore)

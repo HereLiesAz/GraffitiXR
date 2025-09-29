@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr
 
 import android.net.Uri
-import com.google.ar.core.Pose
+import androidx.xr.runtime.math.Pose
 
 /**
  * Represents the different types of sliders available for image adjustment.

@@ -42,14 +42,16 @@ import androidx.xr.arcore.ARScene
 import androidx.xr.arcore.rememberARCamera
 import androidx.xr.arcore.rememberARPlanes
 import androidx.xr.compose.spatial.rememberSubspace
+import androidx.xr.runtime.Config
+import androidx.xr.runtime.PlaneTrackingMode
+import androidx.xr.runtime.TrackingState
+import androidx.xr.runtime.XRCapabilities
+import androidx.xr.runtime.XrManager
 import androidx.xr.runtime.rememberDefaultRun
 import androidx.xr.runtime.rememberSession
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import com.google.ar.core.ArCoreApk
-import com.google.ar.core.Config
-import com.google.ar.core.TrackingState
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 
@@ -99,9 +101,18 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
-    val arAvailability = ArCoreApk.getInstance().checkAvailability(viewModel.getApplication()).isSupported
     val snackbarHostState = remember { SnackbarHostState() }
     val navRailColor = Color.hsl(uiState.hue, 1f, uiState.lightness)
+    var arAvailability by remember { mutableStateOf<Boolean?>(null) }
+    val context = viewModel.getApplication<Application>().applicationContext
+    LaunchedEffect(Unit) {
+        arAvailability = try {
+            val xrManager = XrManager.create(context)
+            xrManager.checkAvailability() == XRCapabilities.Availability.SUPPORTED_INSTALLED
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -120,10 +131,17 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            if (arAvailability) {
-                ArContent(uiState, viewModel)
-            } else {
-                NonArContent(uiState)
+            when (arAvailability) {
+                true -> ArContent(uiState, viewModel)
+                false -> NonArContent(uiState)
+                null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
             }
 
             Row(modifier = Modifier.padding(padding)) {
@@ -217,9 +235,8 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
         planes = planes,
         subspace = subspace,
         onSessionCreated = { session ->
-            val config = session.config.apply {
-                planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+            val config = Config(session).apply {
+                planeTrackingMode = PlaneTrackingMode.HORIZONTAL_AND_VERTICAL
             }
             session.configure(config)
             session.resume()
