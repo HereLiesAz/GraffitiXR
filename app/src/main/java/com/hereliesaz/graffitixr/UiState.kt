@@ -27,6 +27,9 @@ enum class SliderType {
  * @property saturation The saturation level of the image.
  * @property brightness The brightness level of the image.
  * @property activeSlider The currently active slider type, or null if no slider is active.
+ * @property showSettings Whether the settings screen is visible.
+ * @property hue The hue value for UI color customization.
+ * @property lightness The lightness value for UI color customization.
  */
 data class UiState(
     val imageUri: Uri? = null,
@@ -42,5 +45,10 @@ data class UiState(
     val saturation: Float = 1f,
     val brightness: Float = 0f,
 
-    val activeSlider: SliderType? = null
+    val activeSlider: SliderType? = null,
+
+    // Settings
+    val showSettings: Boolean = false,
+    val hue: Float = 200f,
+    val lightness: Float = 0.5f
 )

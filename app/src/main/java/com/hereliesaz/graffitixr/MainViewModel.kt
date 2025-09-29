@@ -40,12 +40,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Initiates the background removal process for the selected image.
      * This is a long-running operation that runs on a background thread.
      */
-    fun onRemoveBgClicked() {
+    fun onRemoveBg() {
         uiState.value.imageUri?.let { uri ->
             viewModelScope.launch {
                 _uiState.update { it.copy(isProcessing = true) }
                 val result = withContext(Dispatchers.IO) {
-                    removeBackground(getApplication(), uri)
+                    ImageProcessor.removeBackground(getApplication(), uri)
                 }
                 result.onSuccess { newUri ->
                     _uiState.update { it.copy(imageUri = newUri) }
@@ -54,6 +54,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _uiState.update { it.copy(isProcessing = false) }
             }
+        }
+    }
+
+    /**
+     * Clears all markers and returns to placement mode.
+     */
+    fun onClearMarkers() {
+        _uiState.update {
+            it.copy(
+                lockedPose = null,
+                placementMode = true
+            )
         }
     }
 
@@ -148,5 +160,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun onSnackbarMessageShown() {
         _uiState.update { it.copy(snackbarMessage = null) }
+    }
+
+    /**
+     * Toggles the visibility of the settings screen.
+     */
+    fun onSettingsClicked(show: Boolean) {
+        _uiState.update { it.copy(showSettings = show) }
+    }
+
+    /**
+     * Updates the hue value for UI color customization.
+     *
+     * @param value The new hue value.
+     */
+    fun onHueChange(value: Float) {
+        _uiState.update { it.copy(hue = value) }
+    }
+
+    /**
+     * Updates the lightness value for UI color customization.
+     *
+     * @param value The new lightness value.
+     */
+    fun onLightnessChange(value: Float) {
+        _uiState.update { it.copy(lightness = value) }
     }
 }
