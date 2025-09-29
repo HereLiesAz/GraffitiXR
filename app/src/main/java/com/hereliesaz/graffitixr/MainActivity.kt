@@ -31,8 +31,6 @@ import androidx.core.view.WindowCompat
 import androidx.xr.compose.subspace.layout.SubspaceModifier
 import androidx.xr.compose.subspace.layout.offset
 import androidx.xr.compose.subspace.layout.rotate
-import androidx.xr.compose.subspace.layout.offset
-import androidx.xr.compose.subspace.layout.rotate
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.hereliesaz.aznavrail.AzNavRail
@@ -129,6 +127,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             Row(modifier = Modifier.padding(padding)) {
                 var selected by remember { mutableStateOf<SliderType?>(null) }
                 AzNavRail(Modifier, true, true, {
+                    azRailItem(
+                        "Select Image",
+                        "Select Image",
+                        Color.White
+                    ) {
+                        launcher.launch("image/*")
+                    }
                     SliderType.values().forEach { sliderType ->
                         azRailItem(
                             sliderType.name,
@@ -254,6 +259,16 @@ fun ArContent(uiState: UiState) {
                 contentScale = ContentScale.Fit,
                 alpha = uiState.opacity,
                 colorFilter = getColorFilter(uiState.saturation, uiState.brightness, uiState.contrast)
+            )
+        }
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Text(
+                text = "Searching for surfaces...",
+                color = Color.White,
+                modifier = Modifier.padding(16.dp)
             )
         }
     }
