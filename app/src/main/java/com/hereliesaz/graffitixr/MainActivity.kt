@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,10 +39,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.xr.arcore.ARScene
+import androidx.xr.ARScene
 import androidx.xr.arcore.rememberARCamera
-import androidx.xr.arcore.rememberARPlanes
+import androidx.xr.compose.rememberARPlanes
 import androidx.xr.compose.spatial.rememberSubspace
+import androidx.xr.compose.spatial.SubspaceComponent
 import androidx.xr.runtime.Config
 import androidx.xr.runtime.PlaneTrackingMode
 import androidx.xr.runtime.TrackingState
@@ -246,7 +248,7 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
         planes.value.forEach { plane ->
             if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
                 subspace.Place(
-                    anchor = plane.createAnchor(plane.centerPose),
+                    anchor = session.createAnchor(plane.centerPose),
                     component = SubspaceComponent(
                         remember(plane) {
                             {

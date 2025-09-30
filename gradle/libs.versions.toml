@@ -1,26 +1,26 @@
 [versions]
-accompanist = "0.32.0"
+accompanist = "0.37.3"
 androidGradlePlugin = "8.13.0"
-androidxCamera = "1.3.1"
-androidxCore = "1.12.0"
-androidxLifecycle = "2.7.0"
-androidxMaterialIconsExtended = "1.6.3"
+androidxCamera = "1.5.0"
+androidxCore = "1.17.0"
+androidxLifecycle = "2.9.4"
+androidxMaterialIconsExtended = "1.7.8"
 arcore = "1.0.0-alpha06"
 googleArcore = "1.50.0"
-xrCompose = "1.0.0-alpha06"
-scenecore = "1.0.0-alpha06"
+xrCompose = "1.0.0-alpha07"
+scenecore = "1.0.0-alpha07"
 xrRuntime = "1.0.0-alpha06"
-composeBom = "2024.02.01"
-coil = "2.6.0"
+composeBom = "2025.09.01"
+coil = "2.7.0"
 composeCompiler = "1.5.8"
-composeMaterial3 = "1.2.0"
-composeUi = "1.6.3"
-guava = "33.0.0-android"
-kotlin = "2.2.0"
+composeMaterial3 = "1.4.0"
+composeUi = "1.9.2"
+guava = "33.5.0-android"
+kotlin = "2.2.20"
 mlkit = "16.0.0-beta6"
-activityCompose = "1.8.2"
+activityCompose = "1.11.0"
 apacheCommonsMath = "3.6.1"
-coroutinesPlayServices = "1.7.3"
+coroutinesPlayServices = "1.10.2"
 azNavRail = "3.10"
 
 [libraries]
@@ -45,7 +45,7 @@ compose-material3 = { module = "androidx.compose.material3:material3", version.r
 compose-ui = { module = "androidx.compose.ui:ui", version.ref = "composeUi" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "composeUi" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "composeUi" }
-google-android-material = { module = "com.google.android.material:material", version = "1.11.0" }
+google-android-material = { module = "com.google.android.material:material", version = "1.13.0" }
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 mlkit-segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "mlkit" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
