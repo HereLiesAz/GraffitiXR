@@ -378,7 +378,7 @@ fun NonArContent(uiState: UiState) {
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
                 alpha = uiState.opacity,
-                colorFilter = getColorFilter(uiState.saturation, 1f, uiState.contrast)
+                colorFilter = getColorFilter(uiState.saturation, uiState.contrast)
             )
         }
     }
