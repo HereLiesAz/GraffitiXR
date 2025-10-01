@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,7 +30,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,9 +48,10 @@ import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
  * The main and only Activity for the GraffitiXR application.
  *
  * This Activity serves as the entry point for the application. Its primary responsibilities are:
- * 1.  Handling essential runtime permissions, specifically for the camera.
- * 2.  Setting up the Jetpack Compose content with the application's theme.
- * 3.  Displaying the main UI of the app once permissions are granted.
+ * 1.  Handling the one-time user onboarding flow.
+ * 2.  Handling essential runtime permissions, specifically for the camera.
+ * 3.  Setting up the Jetpack Compose content with the application's theme.
+ * 4.  Displaying the main UI of the app once permissions are granted.
  */
 @OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
@@ -55,27 +59,43 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Make the app full-screen to draw behind system bars.
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        val prefs = getSharedPreferences("graffitixr_prefs", Context.MODE_PRIVATE)
+
         setContent {
             GraffitiXRTheme {
-                // Manages the state of the camera permission.
-                val permissionStates = rememberMultiplePermissionsState(
-                    listOf(Manifest.permission.CAMERA)
-                )
-                if (permissionStates.allPermissionsGranted) {
-                    // If permissions are granted, show the main application screen.
-                    MainScreen()
-                } else {
-                    // If permissions are not granted, show a rationale and a request button.
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Camera permission is required to use this application.")
-                        Button(onClick = { permissionStates.launchMultiplePermissionRequest() }) {
-                            Text("Request Permission")
+                var hasCompletedOnboarding by remember {
+                    mutableStateOf(prefs.getBoolean("onboarding_complete", false))
+                }
+
+                if (hasCompletedOnboarding) {
+                    // If onboarding is complete, check for camera permissions.
+                    val permissionStates = rememberMultiplePermissionsState(
+                        listOf(Manifest.permission.CAMERA)
+                    )
+                    if (permissionStates.allPermissionsGranted) {
+                        // If permissions are granted, show the main application screen.
+                        MainScreen()
+                    } else {
+                        // If permissions are not granted, show a rationale and a request button.
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Camera permission is required to use this application.")
+                            Button(onClick = { permissionStates.launchMultiplePermissionRequest() }) {
+                                Text("Request Permission")
+                            }
                         }
+                    }
+                } else {
+                    // If onboarding is not complete, show the OnboardingScreen.
+                    OnboardingScreen {
+                        // When onboarding is finished, update SharedPreferences and local state.
+                        prefs.edit().putBoolean("onboarding_complete", true).apply()
+                        hasCompletedOnboarding = true
                     }
                 }
             }
