@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -36,8 +35,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.xr.ARScene
 import androidx.xr.arcore.rememberARCamera
@@ -46,11 +47,17 @@ import androidx.xr.compose.spatial.rememberSubspace
 import androidx.xr.compose.spatial.SubspaceComponent
 import androidx.xr.runtime.Config
 import androidx.xr.runtime.PlaneTrackingMode
+import androidx.xr.runtime.Pose
 import androidx.xr.runtime.TrackingState
 import androidx.xr.runtime.XRCapabilities
 import androidx.xr.runtime.XrManager
 import androidx.xr.runtime.rememberDefaultRun
 import androidx.xr.runtime.rememberSession
+import androidx.xr.scenecore.Material
+import androidx.xr.scenecore.Mesh
+import androidx.xr.scenecore.RenderableEntity
+import androidx.xr.scenecore.ShapeEntity
+import androidx.xr.scenecore.Texture
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -94,12 +101,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.lifecycleScope
-import androidx.xr.scenecore.Material
-import androidx.xr.scenecore.Mesh
-import androidx.xr.scenecore.ShapeEntity
-
 /**
  * The main screen of the application, which orchestrates the UI components.
  * It displays the appropriate content based on AR availability and handles user interactions.
@@ -111,21 +112,30 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val navRailColor = Color.hsl(uiState.hue, 1f, uiState.lightness)
-    var arAvailability by remember { mutableStateOf<Boolean?>(null) }
     val context = viewModel.getApplication<Application>().applicationContext
+
+    // This effect will only run once, and will default to AR or Non-AR mode
     LaunchedEffect(Unit) {
-        arAvailability = try {
+        val isArAvailable = try {
             val xrManager = XrManager.create(context)
             xrManager.checkAvailability() == XRCapabilities.Availability.SUPPORTED_INSTALLED
         } catch (e: Exception) {
             false
         }
+        // Set the initial mode based on AR availability. The user can switch to Mock-up mode later.
+        viewModel.onSetEditorMode(if (isArAvailable) EditorMode.AR else EditorMode.NON_AR)
     }
 
-    val launcher = rememberLauncherForActivityResult(
+    val imageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         viewModel.onSelectImage(uri)
+    }
+
+    val backgroundLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        viewModel.onSelectBackgroundImage(uri)
     }
 
     LaunchedEffect(uiState.snackbarMessage) {
@@ -139,17 +149,10 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            when (arAvailability) {
-                true -> ArContent(uiState, viewModel)
-                false -> NonArContent(uiState)
-                null -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
+            when (uiState.editorMode) {
+                EditorMode.AR -> ArContent(uiState, viewModel)
+                EditorMode.NON_AR -> NonArContent(uiState)
+                EditorMode.STATIC_IMAGE -> StaticImageEditor(uiState, viewModel)
             }
 
             Row(modifier = Modifier.padding(padding)) {
@@ -157,7 +160,10 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 AzNavRail {
                     azSettings(isLoading = uiState.isProcessing)
                     azRailItem(id = "select_image", text = "Image", color = if (uiState.imageUri != null) Color.Green else navRailColor) {
-                        launcher.launch("image/*")
+                        imageLauncher.launch("image/*")
+                    }
+                    azRailItem(id = "select_bg_image", text = "Mock-up", color = if (uiState.backgroundImageUri != null) Color.Green else navRailColor) {
+                        backgroundLauncher.launch("image/*")
                     }
                     azRailItem(id = "settings", text = "Settings", color = navRailColor) {
                         viewModel.onSettingsClicked(true)
@@ -165,11 +171,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     azRailItem(id = "remove_bg", text = "Remove BG", color = navRailColor) {
                         viewModel.onRemoveBg()
                     }
-                    azRailItem(id = "add_marker", text = "Add Marker", color = if (uiState.markerPoses.size >= 4) Color.Gray else navRailColor) {
-                        viewModel.onAddMarker()
+                    if (uiState.editorMode == EditorMode.AR) {
+                        azRailItem(id = "add_marker", text = "Add Marker", color = if (uiState.markerPoses.size >= 4) Color.Gray else navRailColor) {
+                            viewModel.onAddMarker()
+                        }
                     }
-                    azRailItem(id = "clear_markers", text = "Clear", color = navRailColor) {
-                        viewModel.onClearMarkers()
+                    azRailItem(id = "clear", text = "Clear", color = navRailColor) {
+                        viewModel.onClear()
                     }
                     SliderType.values().forEach { sliderType ->
                         azRailItem(
@@ -216,10 +224,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         }
     }
 }
-
-import androidx.xr.runtime.Pose
-import androidx.xr.scenecore.RenderableEntity
-import androidx.xr.scenecore.Texture
 
 /**
  * Composable for rendering the Augmented Reality content.
@@ -374,7 +378,7 @@ fun NonArContent(uiState: UiState) {
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
                 alpha = uiState.opacity,
-                colorFilter = getColorFilter(uiState.saturation, uiState.brightness, uiState.contrast)
+                colorFilter = getColorFilter(uiState.saturation, 1f, uiState.contrast)
             )
         }
     }
@@ -406,7 +410,6 @@ fun SliderPopup(
                     SliderType.Opacity -> Slider(value = uiState.opacity, onValueChange = viewModel::onOpacityChange)
                     SliderType.Contrast -> Slider(value = uiState.contrast, onValueChange = viewModel::onContrastChange, valueRange = 0f..10f)
                     SliderType.Saturation -> Slider(value = uiState.saturation, onValueChange = viewModel::onSaturationChange, valueRange = 0f..10f)
-                    SliderType.Brightness -> Slider(value = uiState.brightness, onValueChange = viewModel::onBrightnessChange, valueRange = -1f..1f)
                 }
                 androidx.compose.material3.Button(onClick = onDismiss) {
                     Text("Close")

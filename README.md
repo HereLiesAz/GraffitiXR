@@ -1,13 +1,44 @@
-# Graffiti XR
+# GraffitiXR - Your Digital Blackbook
 
-## Overview
+**Tag the world, without the heat.**
 
-This is an Android application that uses AndroidXR to overlay a virtual mural onto a set of real-world markings on a surface. The application is built with Kotlin and uses ComposeXR for rendering the AR content. It's designed to track markings on a surface to better maintain the image's positioning, for when you drop your phone or have to put it in your pocket for a bit. 
+GraffitiXR is your secret weapon for planning your next piece. Whether you're a seasoned king or just starting to sketch, this app lets you mock up your art on any surface, anytime, anywhere. Scope out spots, test your designs, and perfect your vision before you even pop a cap.
 
-## Features
+---
 
-*   **Real-time Image Tracking:** The app uses Augmented Images API to detect and track multiple predefined marker images in the environment.
-*   **Virtual Mural Overlay:** Once the markers are detected, the app renders a virtual mural that appears to be painted on the surface where the markers are located.
-*   **Dynamic Mural Loading:** The mural texture and the marker images are loaded dynamically.
-*   **AndroidXR Rendering:** The camera feed and the virtual content are rendered using OpenGL ES 3.0.
-*   **Jetpack Compose XR:** The UI components are built with Jetpack Compose XR.
+## **Three Ways to Plan Your Attack**
+
+This ain't a one-trick pony. GraffitiXR gives you three modes to work with, so you can plan your piece no matter where you are.
+
+### **1. AR Mode: See it on the Spot**
+
+> The real deal. Use your phone's camera to project your art directly onto any wall, train car, or whatever spot you've got your eye on.
+>
+> 1.  **Scope it out:** Point your camera at the surface.
+> 2.  **Mark your territory:** Tap "Add Marker" to drop four points, defining the corners of your piece.
+> 3.  **Throw it up:** Watch your art snap into place, perfectly warped to the wall's perspective.
+
+### **2. Mock-up Mode: The Digital Blackbook**
+
+> Got a photo of a dope spot? Use Mock-up Mode to sketch out your ideas on a static image.
+>
+> 1.  **Pick your canvas:** Select a background image from your gallery.
+> 2.  **Choose your piece:** Select the art you want to overlay.
+> 3.  **Warp and Weave:** Drag the four corners of your image to match the perspective of the wall in the photo. Use two-finger gestures to scale and rotate your art until it's just right.
+
+### **3. On-the-Go Mode: Quick and Dirty**
+
+> No AR? No problem. This mode overlays your art directly onto your camera feed. It's a quick and easy way to get a feel for how your piece will look in a space, without the need for surface detection.
+
+---
+
+## **Tools of the Trade**
+
+*   **Image Loader:** Pull in any piece from your phone's gallery.
+*   **Background Remover:** Got a piece on a white background? Hit "Remove BG" to make it transparent for a clean overlay.
+*   **Adjustment Sliders:** Fine-tune your mock-up with sliders for opacity, contrast, and saturation.
+*   **Color Picker:** Customize the app's UI to match your style.
+
+---
+
+This is your lab. Your sketchbook. Your way to plan your next masterpiece without wasting paint or catching a case. Now get out there and create.

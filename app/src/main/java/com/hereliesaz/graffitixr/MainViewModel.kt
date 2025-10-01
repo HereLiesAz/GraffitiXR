@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.geometry.Offset
 import androidx.xr.runtime.math.Pose
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,12 +29,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val uiState = _uiState.asStateFlow()
 
     /**
-     * Handles the selection of a new image from the device's storage.
+     * Handles the selection of a new overlay image from the device's storage.
      *
      * @param uri The URI of the selected image.
      */
     fun onSelectImage(uri: Uri?) {
         _uiState.update { it.copy(imageUri = uri) }
+    }
+
+    /**
+     * Handles the selection of a new background image, switching to static image mode.
+     *
+     * @param uri The URI of the selected background image.
+     */
+    fun onSelectBackgroundImage(uri: Uri?) {
+        _uiState.update {
+            it.copy(
+                backgroundImageUri = uri,
+                editorMode = EditorMode.STATIC_IMAGE,
+                // Reset AR state when switching modes
+                markerPoses = emptyList(),
+                hitTestPose = null,
+                // Initialize sticker corners for the new background
+                stickerCorners = listOf(
+                    Offset(100f, 100f),
+                    Offset(300f, 100f),
+                    Offset(300f, 300f),
+                    Offset(100f, 300f)
+                )
+            )
+        }
     }
 
     /**
@@ -58,14 +83,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Clears all placed markers.
+     * Clears the work in the current mode.
      */
-    fun onClearMarkers() {
-        _uiState.update { it.copy(markerPoses = emptyList()) }
+    fun onClear() {
+        _uiState.update {
+            when (it.editorMode) {
+                EditorMode.AR -> it.copy(markerPoses = emptyList())
+                EditorMode.STATIC_IMAGE -> it.copy(
+                    stickerCorners = listOf(
+                        Offset(100f, 100f),
+                        Offset(300f, 100f),
+                        Offset(300f, 300f),
+                        Offset(100f, 300f)
+                    )
+                )
+                else -> it
+            }
+        }
     }
 
     /**
-     * Adds a new marker at the current hit test position.
+     * Adds a new marker at the current hit test position in AR mode.
      */
     fun onAddMarker() {
         uiState.value.hitTestPose?.let { pose ->
@@ -84,6 +122,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun onHitTestResult(pose: Pose?) {
         _uiState.update { it.copy(hitTestPose = pose) }
+    }
+
+    /**
+     * Updates the positions of the sticker corners in static image mode.
+     * @param corners The new list of corner offsets.
+     */
+    fun onStickerCornersChange(corners: List<Offset>) {
+        if (_uiState.value.editorMode == EditorMode.STATIC_IMAGE) {
+            _uiState.update { it.copy(stickerCorners = corners) }
+        }
     }
 
     /**
