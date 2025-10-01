@@ -4,7 +4,7 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
-## **V1.1 Completed Features**
+## **V1.2 Completed Features**
 
 -   **[x] AR Marker-Based Projection:**
     -   [x] Users can place four markers on detected real-world surfaces.
@@ -27,6 +27,8 @@ This document tracks the development status, future enhancements, and identified
 -   **[x] Robustness and Error Handling:**
     -   [x] Implemented error handling for background removal failures.
     -   [x] Implemented user guidance for AR plane detection failures.
+-   **[x] Automated Tests:**
+    -   [x] Added a suite of unit tests for the `MainViewModel`.
 
 ---
 
@@ -34,21 +36,19 @@ This document tracks the development status, future enhancements, and identified
 
 ### **High Priority**
 
--   **[ ] Add Automated Tests:** Create a suite of unit and instrumentation tests to ensure code quality and prevent regressions.
-
-### **Medium Priority**
-
 -   **[ ] Enhance User Experience (UX):**
     -   [ ] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the three different modes (AR, Mock-up, On-the-Go) to new users.
     -   [ ] **Refine Adjustment Slider UI:** Integrate the sliders into an expandable panel on the main screen instead of a full-screen popup.
     -   [ ] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
 
-### **Low Priority / Future Ideas**
+### **Medium Priority**
 
 -   **[ ] Add "Save/Export" Feature:**
     -   [ ] Allow users to save or export the final composed image from any of the modes.
 -   **[ ] Implement Advanced Image Editing:**
     -   [ ] Add more advanced image adjustment tools like color balance or blending modes.
+
+### **Low Priority / Future Ideas**
 -   **[ ] Create a Project Library:**
     -   [ ] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
 -   **[ ] Add Video Overlay Support:**

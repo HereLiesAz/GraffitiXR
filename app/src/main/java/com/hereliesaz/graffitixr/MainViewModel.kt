@@ -255,4 +255,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onLightnessChange(value: Float) {
         _uiState.update { it.copy(lightness = value) }
     }
+
+    /**
+     * Changes the active editor mode and performs necessary state cleanup.
+     *
+     * @param mode The new [EditorMode] to switch to.
+     */
+    fun onEditorModeChange(mode: EditorMode) {
+        // Cancel the AR guidance job if we are leaving AR mode.
+        if (mode != EditorMode.AR) {
+            arGuidanceJob?.cancel()
+        }
+        _uiState.update {
+            it.copy(
+                editorMode = mode,
+                // Reset AR state if not in AR mode.
+                showARGuidance = if (mode != EditorMode.AR) false else it.showARGuidance
+            )
+        }
+    }
 }

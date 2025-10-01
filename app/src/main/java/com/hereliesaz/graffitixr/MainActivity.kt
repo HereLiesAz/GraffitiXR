@@ -6,6 +6,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -123,13 +125,17 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            // The primary content view (AR or Static Image Editor).
-            // Currently, it's focused on the StaticImageEditor.
-            StaticImageEditor(uiState, viewModel)
+            // The primary content view, which crossfades between different editor modes.
+            Crossfade(targetState = uiState.editorMode, label = "Mode Switcher") { mode ->
+                when (mode) {
+                    EditorMode.AR -> ArModeScreen(viewModel = viewModel)
+                    EditorMode.NON_AR -> NonArModeScreen(uiState = uiState)
+                    EditorMode.STATIC_IMAGE -> StaticImageEditor(uiState, viewModel)
+                }
+            }
 
             // The main navigation rail on the side of the screen.
             Row(modifier = Modifier.padding(padding)) {
-                var selected by remember { mutableStateOf<SliderType?>(null) }
                 AzNavRail {
                     azSettings(isLoading = uiState.isProcessing)
                     azRailItem(id = "select_image", text = "Image", color = if (uiState.imageUri != null) Color.Green else navRailColor) {
@@ -147,15 +153,40 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     azRailItem(id = "clear", text = "Clear", color = navRailColor) {
                         viewModel.onClear()
                     }
+
+                    // Mode selection buttons
+                    azRailItem(
+                        id = "mode_ar",
+                        text = "AR",
+                        color = if (uiState.editorMode == EditorMode.AR) navRailColor else Color.Gray
+                    ) {
+                        viewModel.onEditorModeChange(EditorMode.AR)
+                    }
+                    azRailItem(
+                        id = "mode_non_ar",
+                        text = "Cam",
+                        color = if (uiState.editorMode == EditorMode.NON_AR) navRailColor else Color.Gray
+                    ) {
+                        viewModel.onEditorModeChange(EditorMode.NON_AR)
+                    }
+                    azRailItem(
+                        id = "mode_static",
+                        text = "Mockup",
+                        color = if (uiState.editorMode == EditorMode.STATIC_IMAGE) navRailColor else Color.Gray
+                    ) {
+                        viewModel.onEditorModeChange(EditorMode.STATIC_IMAGE)
+                    }
+
                     // Dynamically create a nav item for each slider type.
                     SliderType.values().forEach { sliderType ->
                         azRailItem(
                             id = sliderType.name,
                             text = sliderType.name,
-                            color = if (selected == sliderType) navRailColor else Color.Gray,
+                            color = if (uiState.activeSlider == sliderType) navRailColor else Color.Gray,
                         ) {
-                            selected = sliderType
-                            viewModel.onSliderSelected(sliderType)
+                            // If the same slider is clicked again, dismiss it. Otherwise, select it.
+                            val newSlider = if (uiState.activeSlider == sliderType) null else sliderType
+                            viewModel.onSliderSelected(newSlider)
                         }
                     }
                 }
@@ -183,6 +214,24 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 }
             }
 
+            // Container for the animated slider panel at the bottom of the screen.
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                AnimatedVisibility(
+                    visible = uiState.activeSlider != null,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it })
+                ) {
+                    // A let block is safe here because visibility is tied to activeSlider != null.
+                    uiState.activeSlider?.let { sliderType ->
+                        AdjustmentSliderPanel(
+                            sliderType = sliderType,
+                            uiState = uiState,
+                            viewModel = viewModel
+                        )
+                    }
+                }
+            }
+
             // A semi-transparent overlay and a progress indicator shown during long operations.
             if (uiState.isProcessing) {
                 Box(
@@ -193,16 +242,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 ) {
                     CircularProgressIndicator()
                 }
-            }
-
-            // Show the slider popup if a slider is active in the state.
-            uiState.activeSlider?.let {
-                SliderPopup(
-                    sliderType = it,
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    onDismiss = { viewModel.onSliderSelected(null) }
-                )
             }
 
             // Show the settings screen if it's active in the state.
