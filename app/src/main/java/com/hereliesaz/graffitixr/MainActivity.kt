@@ -1,18 +1,20 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -31,48 +33,55 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.xr.arcore.Anchor
+import androidx.xr.arcore.LocalSession
+import androidx.xr.arcore.Plane
+import androidx.xr.arcore.anchor.AnchorCreateSuccess
+import androidx.xr.arcore.anchor.create
+import androidx.xr.compose.ARScene
+import androidx.xr.compose.AnchorEntity
+import androidx.xr.scenecore.rememberAsset
+import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 
 /**
- * The main and only Activity for the GraffitiXR application.
- *
- * This Activity serves as the entry point for the application. Its primary responsibilities are:
- * 1.  Handling essential runtime permissions, specifically for the camera.
- * 2.  Setting up the Jetpack Compose content with the application's theme.
- * 3.  Displaying the main UI of the app once permissions are granted.
+ * The main entry point of the GraffitiXR application.
+ * This activity handles camera permission requests and sets up the main UI.
  */
 @OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Make the app full-screen to draw behind system bars.
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             GraffitiXRTheme {
-                // Manages the state of the camera permission.
                 val permissionStates = rememberMultiplePermissionsState(
-                    listOf(Manifest.permission.CAMERA)
+                    listOf(
+                        Manifest.permission.CAMERA,
+                        "android.permission.SCENE_UNDERSTANDING_COARSE"
+                    )
                 )
                 if (permissionStates.allPermissionsGranted) {
-                    // If permissions are granted, show the main application screen.
                     MainScreen()
                 } else {
-                    // If permissions are not granted, show a rationale and a request button.
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Camera permission is required to use this application.")
-                        Button(onClick = { permissionStates.launchMultiplePermissionRequest() }) {
-                            Text("Request Permission")
+                        Text("Camera and Scene Understanding permissions are required to use this app.")
+                        androidx.compose.material3.Button(onClick = { permissionStates.launchMultiplePermissionRequest() }) {
+                            Text("Request permissions")
                         }
                     }
                 }
@@ -82,13 +91,10 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * The main screen composable, which orchestrates the entire UI of the application.
+ * The main screen of the application, which orchestrates the UI components.
+ * It displays the appropriate content based on AR availability and handles user interactions.
  *
- * This composable function sets up the overall layout, including the camera view,
- * the navigation rail, popups, and dialogs. It observes the [UiState] from the
- * [MainViewModel] and recomposes in response to state changes.
- *
- * @param viewModel The [MainViewModel] instance that holds the application's state and business logic.
+ * @param viewModel The [MainViewModel] that holds the application's state and logic.
  */
 @Composable
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
@@ -96,25 +102,15 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val snackbarHostState = remember { SnackbarHostState() }
     val navRailColor = Color.hsl(uiState.hue, 1f, uiState.lightness)
 
-    // Activity result launcher for selecting the main overlay image.
-    val imageLauncher = rememberLauncherForActivityResult(
+    val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         viewModel.onSelectImage(uri)
     }
 
-    // Activity result launcher for selecting the background image for static mode.
-    val backgroundLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        viewModel.onSelectBackgroundImage(uri)
-    }
-
-    // A LaunchedEffect that shows a snackbar whenever a new message is available in the state.
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
-            // Notify the ViewModel that the message has been shown, so it doesn't reappear.
             viewModel.onSnackbarMessageShown()
         }
     }
@@ -123,20 +119,26 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            // The primary content view (AR or Static Image Editor).
-            // Currently, it's focused on the StaticImageEditor.
-            StaticImageEditor(uiState, viewModel)
+            ARScene(
+                modifier = Modifier.fillMaxSize(),
+                onTap = { event ->
+                    val session = LocalSession.current ?: return@ARScene
+                    if (uiState.placementMode) {
+                        val hitResults = session.hitTest(event)
+                        viewModel.onARTap(hitResults)
+                    }
+                }
+            ) {
+                ArContent(uiState, viewModel)
+            }
 
-            // The main navigation rail on the side of the screen.
+
             Row(modifier = Modifier.padding(padding)) {
                 var selected by remember { mutableStateOf<SliderType?>(null) }
                 AzNavRail {
                     azSettings(isLoading = uiState.isProcessing)
                     azRailItem(id = "select_image", text = "Image", color = if (uiState.imageUri != null) Color.Green else navRailColor) {
-                        imageLauncher.launch("image/*")
-                    }
-                    azRailItem(id = "select_bg_image", text = "BG Image", color = if (uiState.backgroundImageUri != null) Color.Green else navRailColor) {
-                        backgroundLauncher.launch("image/*")
+                        launcher.launch("image/*")
                     }
                     azRailItem(id = "settings", text = "Settings", color = navRailColor) {
                         viewModel.onSettingsClicked(true)
@@ -144,10 +146,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     azRailItem(id = "remove_bg", text = "Remove BG", color = navRailColor) {
                         viewModel.onRemoveBg()
                     }
-                    azRailItem(id = "clear", text = "Clear", color = navRailColor) {
-                        viewModel.onClear()
+                    azRailItem(id = "reset_mural", text = "Reset", color = navRailColor) {
+                        viewModel.onResetMural()
                     }
-                    // Dynamically create a nav item for each slider type.
                     SliderType.values().forEach { sliderType ->
                         azRailItem(
                             id = sliderType.name,
@@ -161,29 +162,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 }
             }
 
-            // Show AR guidance message if no planes are detected for a while.
-            if (uiState.showARGuidance) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 100.dp), // Position it above the bottom edge
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    Text(
-                        text = "Move phone slowly to scan for surfaces",
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier
-                            .background(
-                                color = Color.Black.copy(alpha = 0.5f),
-                                shape = MaterialTheme.shapes.medium
-                            )
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-            }
-
-            // A semi-transparent overlay and a progress indicator shown during long operations.
             if (uiState.isProcessing) {
                 Box(
                     modifier = Modifier
@@ -195,7 +173,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 }
             }
 
-            // Show the slider popup if a slider is active in the state.
             uiState.activeSlider?.let {
                 SliderPopup(
                     sliderType = it,
@@ -205,7 +182,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 )
             }
 
-            // Show the settings screen if it's active in the state.
             if (uiState.showSettings) {
                 SettingsScreen(
                     hue = uiState.hue,
@@ -220,14 +196,61 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 }
 
 /**
- * A modal popup dialog that displays a single slider for adjusting an image property.
- *
- * The popup darkens the background and presents a card containing the slider and a close button.
- *
- * @param sliderType The [SliderType] that determines which property this slider controls.
- * @param uiState The current [UiState] of the application, used to get the current value for the slider.
- * @param viewModel The [MainViewModel] instance, used to invoke callbacks when the slider value changes.
- * @param onDismiss A lambda function to be called when the user clicks the "Close" button.
+ * Composable for rendering the Augmented Reality content.
+ */
+@Composable
+fun ArContent(uiState: UiState, viewModel: MainViewModel) {
+    val session = LocalSession.current
+    val planes by Plane.subscribe(session).collectAsState(initial = emptyList())
+    val imageAsset = rememberAsset(uiState.imageUri)
+
+    if (session == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    LaunchedEffect(Unit) {
+        session.configure(
+            session.config.copy(
+                planeTracking = androidx.xr.arcore.PlaneTrackingMode.HORIZONTAL_AND_VERTICAL
+            )
+        )
+    }
+
+    // Draw the detected planes
+    planes.forEach { plane ->
+        // Plane visualizer can be added here if desired
+    }
+
+    // Draw the user's image if locked
+    uiState.graffiti.forEach { anchor ->
+        AnchorEntity(anchor = anchor) {
+            if (imageAsset != null) {
+                Image(
+                    painter = rememberAsyncImagePainter(imageAsset.uri),
+                    contentDescription = "Selected Image",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    alpha = uiState.opacity,
+                    colorFilter = getColorFilter(
+                        uiState.saturation,
+                        uiState.brightness,
+                        uiState.contrast
+                    )
+                )
+            }
+        }
+    }
+}
+
+
+/**
+ * A popup that displays a slider for adjusting image properties.
  */
 @Composable
 fun SliderPopup(
@@ -248,17 +271,43 @@ fun SliderPopup(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(text = sliderType.name, style = MaterialTheme.typography.headlineSmall)
-                // Display the correct slider based on the sliderType.
                 when (sliderType) {
                     SliderType.Opacity -> Slider(value = uiState.opacity, onValueChange = viewModel::onOpacityChange)
                     SliderType.Contrast -> Slider(value = uiState.contrast, onValueChange = viewModel::onContrastChange, valueRange = 0f..10f)
                     SliderType.Saturation -> Slider(value = uiState.saturation, onValueChange = viewModel::onSaturationChange, valueRange = 0f..10f)
                     SliderType.Brightness -> Slider(value = uiState.brightness, onValueChange = viewModel::onBrightnessChange, valueRange = -1f..1f)
                 }
-                Button(onClick = onDismiss) {
+                androidx.compose.material3.Button(onClick = onDismiss) {
                     Text("Close")
                 }
             }
         }
     }
+}
+
+/**
+ * Creates a [ColorFilter] from saturation, brightness, and contrast values.
+ */
+fun getColorFilter(saturation: Float, brightness: Float, contrast: Float): ColorFilter {
+    val androidColorMatrix = android.graphics.ColorMatrix()
+    androidColorMatrix.setSaturation(saturation)
+
+    val brightnessMatrix = android.graphics.ColorMatrix(floatArrayOf(
+        1f, 0f, 0f, 0f, brightness * 255,
+        0f, 1f, 0f, 0f, brightness * 255,
+        0f, 0f, 1f, 0f, brightness * 255,
+        0f, 0f, 0f, 1f, 0f
+    ))
+
+    val contrastMatrix = android.graphics.ColorMatrix(floatArrayOf(
+        contrast, 0f, 0f, 0f, 0f,
+        0f, contrast, 0f, 0f, 0f,
+        0f, 0f, contrast, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    ))
+
+    androidColorMatrix.postConcat(brightnessMatrix)
+    androidColorMatrix.postConcat(contrastMatrix)
+
+    return ColorFilter.colorMatrix(ColorMatrix(androidColorMatrix.array))
 }
