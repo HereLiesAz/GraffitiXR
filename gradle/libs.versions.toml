@@ -22,6 +22,12 @@ activityCompose = "1.11.0"
 apacheCommonsMath = "3.6.1"
 coroutinesPlayServices = "1.10.2"
 azNavRail = "3.10"
+junit = "4.13.2"
+mockito = "5.10.0"
+mockitoKotlin = "5.2.1"
+kotlinxCoroutinesTest = "1.7.3"
+turbine = "1.0.0"
+androidxArchCoreTesting = "2.2.0"
 
 [libraries]
 google-arcore = { module = "com.google.ar:core", version.ref = "googleArcore" }
@@ -52,6 +58,12 @@ androidx-activity-compose = { module = "androidx.activity:activity-compose", ver
 apache-commons-math = { module = "org.apache.commons:commons-math3", version.ref = "apacheCommonsMath" }
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 az-nav-rail = { module = "com.github.HereLiesAz:AzNavRail", version.ref = "azNavRail" }
+junit = { module = "junit:junit", version.ref = "junit" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockitoKotlin" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+androidx-arch-core-testing = { module = "androidx.arch.core:core-testing", version.ref = "androidxArchCoreTesting" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

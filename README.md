@@ -1,44 +1,74 @@
-# GraffitiXR - Your Digital Blackbook
+# GraffitiXR
 
-**Tag the world, without the heat.**
-
-GraffitiXR is your secret weapon for planning your next piece. Whether you're a seasoned king or just starting to sketch, this app lets you mock up your art on any surface, anytime, anywhere. Scope out spots, test your designs, and perfect your vision before you even pop a cap.
+GraffitiXR is an android app for someone painting a mural that overlays an image onto the camera view. Include sliders to change the opacity, contrast, and saturation of the image. There should also be a button to select a new image to overlay. Use com.hereliesaz.graffitixr.
 
 ---
 
-## **Three Ways to Plan Your Attack**
+## What it is
 
-This ain't a one-trick pony. GraffitiXR gives you three modes to work with, so you can plan your piece no matter where you are.
+This is an Android application that uses augmented reality (AR) to project an image onto a wall or other surface. It allows the user to see how a mural or other artwork would look in a real-world environment before it is created.
 
-### **1. AR Mode: See it on the Spot**
+## What it's for
 
-> The real deal. Use your phone's camera to project your art directly onto any wall, train car, or whatever spot you've got your eye on.
->
-> 1.  **Scope it out:** Point your camera at the surface.
-> 2.  **Mark your territory:** Tap "Add Marker" to drop four points, defining the corners of your piece.
-> 3.  **Throw it up:** Watch your art snap into place, perfectly warped to the wall's perspective.
+The main purpose of this application is to help artists, designers, and homeowners visualize how a mural or other large-scale artwork will look in a specific location. It can be used to test different images, sizes, and placements without the need for physical mockups.
 
-### **2. Mock-up Mode: The Digital Blackbook**
+## How it works
 
-> Got a photo of a dope spot? Use Mock-up Mode to sketch out your ideas on a static image.
->
-> 1.  **Pick your canvas:** Select a background image from your gallery.
-> 2.  **Choose your piece:** Select the art you want to overlay.
-> 3.  **Warp and Weave:** Drag the four corners of your image to match the perspective of the wall in the photo. Use two-finger gestures to scale and rotate your art until it's just right.
+If AR is enabled, the application uses the device's camera, AndroidXR, and Jetpack XR Scenecore to track the environment and detect surfaces. When a surface is detected, the user can select an image from their device to project onto it. The app uses a custom rendering engine to render the image on the surface, with controls for opacity, contrast, and saturation. The user can also define the area where the mural should be projected by placing markers on the wall. The app uses these markers to calculate the correct perspective and distortion for the projected image. If AR is not enabled, then the device will need to be placed on a tripod, and simply overlays the image onto the camera view, with the same adjustable settings for the image.
 
-### **3. On-the-Go Mode: Quick and Dirty**
+## How the user interacts with it
 
-> No AR? No problem. This mode overlays your art directly onto your camera feed. It's a quick and easy way to get a feel for how your piece will look in a space, without the need for surface detection.
+The user interacts with the application through a simple user interface. The main screen shows the camera view with the AR overlay. There are buttons to select an image, add markers, and adjust the properties of the projected image. The user flow is as follows (* denotes AR-specific step):
+
+1) The user points the camera at a wall or other surface.
+2) The user adds markers to the wall to define the area for the mural. *
+3) The user selects an image from their device.
+4) The app projects the image onto the defined area.
+5) The user can then adjust the opacity, contrast, and saturation of the image to see how it looks in the environment.
 
 ---
 
-## **Tools of the Trade**
+## Technology Stack
 
-*   **Image Loader:** Pull in any piece from your phone's gallery.
-*   **Background Remover:** Got a piece on a white background? Hit "Remove BG" to make it transparent for a clean overlay.
-*   **Adjustment Sliders:** Fine-tune your mock-up with sliders for opacity, contrast, and saturation.
-*   **Color Picker:** Customize the app's UI to match your style.
+-   **UI:** 100% [Jetpack Compose](https://developer.android.com/jetpack/compose) for a declarative and modern UI.
+-   **Architecture:** Follows the [MVVM (Model-View-ViewModel)](https://developer.android.com/jetpack/guide) pattern with a single-activity structure.
+-   **State Management:** Utilizes Kotlin's [Flow](https://developer.android.com/kotlin/flow) and `StateFlow` for reactive and centralized state management.
+-   **Augmented Reality:** [ARCore](https://developers.google.com/ar) via the AndroidX XR libraries (`androidx.xr.compose`, `androidx.xr.scenecore`, `androidx.xr.runtime`).
+-   **Camera:** [CameraX](https://developer.android.com/training/camerax) for a consistent and easy-to-use camera API.
+-   **Image Loading:** [Coil](https://coil-kt.github.io/coil/) for efficient and flexible image loading.
+-   **Machine Learning:** [Google ML Kit (Selfie Segmentation)](https://developers.google.com/ml-kit/vision/selfie-segmentation) for the background removal feature.
 
 ---
 
-This is your lab. Your sketchbook. Your way to plan your next masterpiece without wasting paint or catching a case. Now get out there and create.
+## Getting Started
+
+### Prerequisites
+-   Android Studio (latest stable version)
+-   An ARCore-compatible device or emulator (for AR Mode)
+-   Android SDK 34+
+
+### Build Instructions
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-repo/graffitixr.git
+    ```
+2.  **Open in Android Studio:**
+    -   Open Android Studio.
+    -   Select "Open an existing project".
+    -   Navigate to the cloned repository directory and open it.
+3.  **Build the project:**
+    -   Android Studio should automatically sync the Gradle files.
+    -   To build the project, click `Build > Make Project` or run the following command in the terminal:
+    ```bash
+    ./gradlew build
+    ```
+4.  **Run the application:**
+    -   Select a run configuration and a target device (or emulator).
+    -   Click `Run > Run 'app'`.
+
+---
+
+## Project Status & Roadmap
+
+This project is under active development. For a detailed list of completed features, planned enhancements, and known issues, please refer to the [TODO.md](TODO.md) file.

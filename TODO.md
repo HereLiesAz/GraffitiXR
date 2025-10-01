@@ -1,41 +1,54 @@
-# GraffitiXR To-Do List
+# GraffitiXR Project Roadmap & To-Do
 
-This file tracks the current state of the GraffitiXR application and outlines potential future enhancements.
+This document tracks the development status, future enhancements, and identified gaps in the GraffitiXR application.
 
-## Completed Features (v1.0)
-- [x] **Implement AR Marker-Based Projection:**
-    - [x] User can place four markers on detected real-world surfaces.
-    - [x] A custom 3D mesh is generated from the markers.
-    - [x] The selected image is applied as a texture with perspective correction.
-- [x] **Implement Mock-up Mode:**
-    - [x] User can select a static background image.
-    - [x] A four-point transformation UI allows the user to warp the overlay image.
-    - [x] Two-finger gestures for scaling and rotating the overlay are implemented.
-- [x] **Implement Non-AR Camera Mode:**
-    - [x] A fallback mode overlays the image on the live camera feed for non-AR devices.
-- [x] **Implement Core UI and Image Adjustments:**
-    - [x] UI for selecting overlay and background images.
-    - [x] Functional sliders for opacity, contrast, and saturation.
-    - [x] Background removal for the overlay image.
+---
 
-## High Priority
-- [ ] **Improve Robustness and Performance:**
-    - [ ] Ensure all image processing (background removal, bitmap loading) runs on a background thread to prevent UI jank.
-    - [ ] Add more robust user-facing error messages (e.g., for background removal failures, image loading issues).
-    - [ ] Add user guidance if no AR planes are detected for a prolonged period.
+## **V1.2 Completed Features**
 
-## Medium Priority
-- [ ] **Enhance User Experience (UX):**
-    - [ ] Create a simple onboarding flow or a series of tooltips to explain the three different modes to first-time users.
-    - [ ] Refine the UI for adjustment sliders (e.g., integrate into an expandable panel instead of a full-screen popup).
-    - [ ] Add visual feedback when a gesture (scale/rotation) is active in Mock-up mode.
+-   **[x] Mock-up Mode:**
+    -   [x] Users can select a static background image.
+    -   [x] A four-point transformation UI allows users to warp the overlay image.
+    -   [x] Two-finger gestures for scaling and rotating the overlay are implemented.
+-   **[x] On-the-Go Mode (Non-AR Camera):**
+    -   [x] A fallback mode overlays the image on the live camera feed for non-AR devices.
+-   **[x] Core UI and Image Adjustments:**
+    -   [x] UI for selecting overlay and background images.
+    -   [x] Functional sliders for opacity, contrast, and saturation.
+    -   [x] Background removal for the overlay image.
+-   **[x] Code & Project Documentation:**
+    -   [x] Added comprehensive KDocs to all classes, methods, and properties.
+    -   [x] Rewrote `README.md` and `AGENTS.md` to align with the project vision.
+-   **[x] Robustness and Error Handling:**
+    -   [x] Implemented error handling for background removal failures.
+    -   [x] Implemented user guidance for AR plane detection failures.
+-   **[x] Automated Tests:**
+    -   [x] Added a suite of unit tests for the `MainViewModel`.
 
-## Low Priority / Future Ideas
-- [ ] **Add "Save Mock-up" Feature:**
-    - [ ] Allow users to save their creations from the Mock-up mode as a flattened JPEG or PNG file to their gallery.
-- [ ] **Advanced Image Editing:**
-    - [ ] Add more advanced image adjustment tools (e.g., blending modes, color balance).
-- [ ] **Project Library:**
-    - [ ] Create a simple library within the app to save and manage different projects (a combination of background, overlay, and transformation settings).
-- [ ] **Video Support:**
-    - [ ] Allow users to select a video file as an overlay texture.
+---
+
+## **Project Backlog**
+
+### **High Priority**
+
+-   **[ ] Implement AR Core Functionality:**
+    -   [ ] **Enable Marker Placement:** Allow the user to tap to place up to four markers on a detected AR surface.
+    -   [ ] **Implement AR Image Projection:** Render the selected image onto the 3D mesh created by the four user-placed AR markers, with correct perspective.
+
+### **Medium Priority**
+
+-   **[ ] Enhance User Experience (UX):**
+    -   [ ] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the three different modes (AR, Mock-up, On-the-Go) to new users.
+    -   [ ] **Refine Adjustment Slider UI:** Integrate the sliders into an expandable panel on the main screen instead of a full-screen popup.
+    -   [ ] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
+
+### **Low Priority / Future Ideas**
+
+-   **[ ] Add "Save/Export" Feature:**
+    -   [ ] Allow users to save or export the final composed image from any of the modes.
+-   **[ ] Implement Advanced Image Editing:**
+    -   [ ] Add more advanced image adjustment tools like color balance or blending modes.
+-   **[ ] Create a Project Library:**
+    -   [ ] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
+-   **[ ] Add Video Overlay Support:**
+    -   [ ] Allow users to select video files as overlay textures.

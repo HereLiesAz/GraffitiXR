@@ -27,9 +27,22 @@ import coil.imageLoader
 import coil.request.ImageRequest
 
 /**
- * An editor for placing and transforming an overlay image on a static background image.
- * This composable provides a four-point perspective transformation UI with draggable corners
- * and two-finger gestures for scaling and rotation.
+ * A composable editor for placing and transforming an overlay image onto a static background.
+ *
+ * This screen is the core of the "Mock-up Mode". It displays a background image and allows the
+ * user to apply an overlay image on top. The overlay can be manipulated using two primary gestures:
+ * 1.  **Four-Corner Dragging:** Red handles at each corner of the overlay can be dragged to
+ *     apply a perspective transformation.
+ * 2.  **Two-Finger Gestures:** Pinch-to-zoom and twist-to-rotate gestures can be used to scale
+ *     and rotate the overlay image around its center.
+ *
+ * The overlay image is loaded asynchronously using Coil and drawn onto a `Canvas` using a
+ * calculated perspective transformation matrix.
+ *
+ * @param uiState The current [UiState] of the application. This composable uses the
+ *   `imageUri`, `backgroundImageUri`, and `stickerCorners` from the state.
+ * @param viewModel The [MainViewModel] instance, used to notify of changes to the
+ *   `stickerCorners` when the user manipulates the overlay.
  */
 @Composable
 fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
@@ -37,13 +50,15 @@ fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
     var overlayBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var draggedCornerIndex by remember { mutableStateOf<Int?>(null) }
 
-    // Load the overlay image as a bitmap when the URI changes
+    // A LaunchedEffect that loads the overlay image URI into a Bitmap.
+    // This is necessary because the Canvas requires a Bitmap object to perform the
+    // matrix transformation. Hardware bitmaps are disallowed to enable software rendering.
     LaunchedEffect(uiState.imageUri) {
-        overlayBitmap = null // Reset on new image
+        overlayBitmap = null // Reset bitmap when a new image is selected
         uiState.imageUri?.let { uri ->
             val request = ImageRequest.Builder(context)
                 .data(uri)
-                .allowHardware(false) // Required for software rendering on canvas
+                .allowHardware(false) // Required for software rendering on a Canvas
                 .target { result ->
                     overlayBitmap = (result as android.graphics.drawable.BitmapDrawable).bitmap
                 }
@@ -53,7 +68,7 @@ fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Display the background image
+        // Display the user-selected background image.
         uiState.backgroundImageUri?.let {
             Image(
                 painter = rememberAsyncImagePainter(it),
@@ -63,11 +78,12 @@ fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
             )
         }
 
-        // Canvas for drawing the overlay and handles
+        // The main canvas for drawing the transformed overlay and the draggable handles.
+        // It combines two pointerInput modifiers to handle different gestures.
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) { // Gesture detector for scale/rotation
+                .pointerInput(Unit) { // Gesture detector for two-finger scale and rotation.
                     detectTransformGestures { _, _, zoom, rotation ->
                         if (uiState.stickerCorners.size == 4) {
                             val currentCorners = uiState.stickerCorners
@@ -76,28 +92,25 @@ fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
                             val center = Offset(centerX, centerY)
 
                             val newCorners = currentCorners.map { corner ->
-                                // Create a vector from the center to the corner
+                                // Scale and rotate each corner's vector relative to the center.
                                 val vector = corner - center
-                                // Scale the vector
                                 val scaledVector = vector * zoom
-                                // Rotate the scaled vector
                                 val rotatedVector = scaledVector.rotateBy(rotation)
-                                // Get the new corner position
                                 center + rotatedVector
                             }
                             viewModel.onStickerCornersChange(newCorners)
                         }
                     }
                 }
-                .pointerInput(uiState.stickerCorners) { // Gesture detector for dragging corners
+                .pointerInput(uiState.stickerCorners) { // Gesture detector for dragging individual corners.
                     detectDragGestures(
                         onDragStart = { startOffset ->
-                            // Determine which corner is being dragged based on proximity
+                            // Find the corner closest to the drag start position.
                             draggedCornerIndex = uiState.stickerCorners
                                 .map { corner -> (corner - startOffset).getDistance() }
                                 .withIndex()
                                 .minByOrNull { it.value }
-                                ?.takeIf { it.value < 60f } // 60px touch radius
+                                ?.takeIf { it.value < 60f } // Use a 60px touch radius.
                                 ?.index
                         },
                         onDragEnd = {
@@ -105,6 +118,7 @@ fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
                         }
                     ) { change, dragAmount ->
                         draggedCornerIndex?.let { index ->
+                            // Update the position of the dragged corner.
                             val newCorners = uiState.stickerCorners.toMutableList()
                             newCorners[index] = newCorners[index] + dragAmount
                             viewModel.onStickerCornersChange(newCorners)
@@ -113,17 +127,18 @@ fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
                     }
                 }
         ) {
+            // Draw the perspective-warped bitmap if it's loaded and corners are defined.
             overlayBitmap?.let { bmp ->
                 if (uiState.stickerCorners.size == 4) {
                     val matrix = Matrix()
-                    // Define the source points as the corners of the bitmap
+                    // Source points are the four corners of the original bitmap.
                     val src = floatArrayOf(
-                        0f, 0f,                         // Top-left
-                        bmp.width.toFloat(), 0f,        // Top-right
-                        bmp.width.toFloat(), bmp.height.toFloat(), // Bottom-right
-                        0f, bmp.height.toFloat()        // Bottom-left
+                        0f, 0f,
+                        bmp.width.toFloat(), 0f,
+                        bmp.width.toFloat(), bmp.height.toFloat(),
+                        0f, bmp.height.toFloat()
                     )
-                    // Define the destination points as the user-dragged corners
+                    // Destination points are the four user-controlled sticker corners.
                     val dst = floatArrayOf(
                         uiState.stickerCorners[0].x, uiState.stickerCorners[0].y,
                         uiState.stickerCorners[1].x, uiState.stickerCorners[1].y,
@@ -131,17 +146,17 @@ fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
                         uiState.stickerCorners[3].x, uiState.stickerCorners[3].y
                     )
 
-                    // Create the perspective transformation matrix
+                    // Calculate the perspective transformation matrix.
                     matrix.setPolyToPoly(src, 0, dst, 0, 4)
 
-                    // Draw the bitmap with the transformation
+                    // Apply the matrix to the bitmap on the canvas.
                     drawIntoCanvas {
                         it.nativeCanvas.drawBitmap(bmp, matrix, null)
                     }
                 }
             }
 
-            // Draw draggable handles at each corner
+            // Draw the draggable handles on top of the overlay.
             uiState.stickerCorners.forEach { corner ->
                 drawCircle(
                     color = Color.Red.copy(alpha = 0.7f),
@@ -159,7 +174,10 @@ fun StaticImageEditor(uiState: UiState, viewModel: MainViewModel) {
 }
 
 /**
- * Helper extension function to rotate an Offset by a given angle in degrees.
+ * A private helper extension function to rotate a 2D [Offset] vector by a given angle in degrees.
+ *
+ * @param degrees The angle of rotation in degrees.
+ * @return The new [Offset] vector after rotation.
  */
 private fun Offset.rotateBy(degrees: Float): Offset {
     val angleRad = Math.toRadians(degrees.toDouble())
