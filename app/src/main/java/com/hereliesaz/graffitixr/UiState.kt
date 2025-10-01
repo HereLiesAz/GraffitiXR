@@ -1,9 +1,8 @@
 package com.hereliesaz.graffitixr
 
 import android.net.Uri
-import androidx.xr.runtime.math.Pose
-
 import androidx.compose.ui.geometry.Offset
+import androidx.xr.runtime.math.Pose
 
 /**
  * Represents the different types of sliders available for image adjustment.
@@ -12,6 +11,7 @@ enum class SliderType {
     Opacity,
     Contrast,
     Saturation,
+    Brightness,
 }
 
 /**
@@ -44,6 +44,7 @@ enum class EditorMode {
  * @property opacity The opacity level of the image.
  * @property contrast The contrast level of the image.
  * @property saturation The saturation level of the image.
+ * @property brightness The brightness level of the image.
  */
 data class UiState(
     // General State
@@ -68,4 +69,5 @@ data class UiState(
     val opacity: Float = 1f,
     val contrast: Float = 1f,
     val saturation: Float = 1f,
+    val brightness: Float = 0f, // Added brightness
 )
