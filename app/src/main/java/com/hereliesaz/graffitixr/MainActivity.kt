@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
-import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,16 +38,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.xr.ARScene
-import androidx.xr.arcore.rememberARCamera
+import androidx.xr.compose.ARScene
+import androidx.xr.compose.rememberARCamera
 import androidx.xr.compose.rememberARPlanes
-import androidx.xr.compose.spatial.rememberSubspace
 import androidx.xr.compose.spatial.SubspaceComponent
+import androidx.xr.compose.spatial.rememberSubspace
 import androidx.xr.runtime.Config
 import androidx.xr.runtime.PlaneTrackingMode
 import androidx.xr.runtime.TrackingState
-import androidx.xr.runtime.XRCapabilities
-import androidx.xr.runtime.XrManager
 import androidx.xr.runtime.rememberDefaultRun
 import androidx.xr.runtime.rememberSession
 import coil.compose.rememberAsyncImagePainter
