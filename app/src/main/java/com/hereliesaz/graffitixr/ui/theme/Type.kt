@@ -6,16 +6,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-/**
- * Defines the typography for the GraffitiXR application.
- *
- * This object configures the set of Material Design type styles, such as `bodyLarge`,
- * `titleLarge`, etc. By providing a custom [Typography] object to the [MaterialTheme],
- * we can ensure consistent font styling across the entire application.
- *
- * Currently, it only defines the `bodyLarge` style, inheriting the rest from the
- * Material Design defaults.
- */
+// Set of Material typography styles to start with
 val Typography = Typography(
     bodyLarge = TextStyle(
         fontFamily = FontFamily.Default,
