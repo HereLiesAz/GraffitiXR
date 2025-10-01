@@ -6,10 +6,6 @@ This document tracks the development status, future enhancements, and identified
 
 ## **V1.2 Completed Features**
 
--   **[x] AR Marker-Based Projection:**
-    -   [x] Users can place four markers on detected real-world surfaces.
-    -   [x] A custom 3D mesh is generated from these markers.
-    -   [x] The selected image is applied as a texture with perspective correction.
 -   **[x] Mock-up Mode:**
     -   [x] Users can select a static background image.
     -   [x] A four-point transformation UI allows users to warp the overlay image.
@@ -22,8 +18,7 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Background removal for the overlay image.
 -   **[x] Code & Project Documentation:**
     -   [x] Added comprehensive KDocs to all classes, methods, and properties.
-    -   [x] Rewrote `README.md` for a human developer audience.
-    -   [x] Rewrote `AGENTS.md` with specific instructions for AI agents.
+    -   [x] Rewrote `README.md` and `AGENTS.md` to align with the project vision.
 -   **[x] Robustness and Error Handling:**
     -   [x] Implemented error handling for background removal failures.
     -   [x] Implemented user guidance for AR plane detection failures.
@@ -36,19 +31,23 @@ This document tracks the development status, future enhancements, and identified
 
 ### **High Priority**
 
+-   **[ ] Implement AR Core Functionality:**
+    -   [ ] **Enable Marker Placement:** Allow the user to tap to place up to four markers on a detected AR surface.
+    -   [ ] **Implement AR Image Projection:** Render the selected image onto the 3D mesh created by the four user-placed AR markers, with correct perspective.
+
+### **Medium Priority**
+
 -   **[ ] Enhance User Experience (UX):**
     -   [ ] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the three different modes (AR, Mock-up, On-the-Go) to new users.
     -   [ ] **Refine Adjustment Slider UI:** Integrate the sliders into an expandable panel on the main screen instead of a full-screen popup.
     -   [ ] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
 
-### **Medium Priority**
+### **Low Priority / Future Ideas**
 
 -   **[ ] Add "Save/Export" Feature:**
     -   [ ] Allow users to save or export the final composed image from any of the modes.
 -   **[ ] Implement Advanced Image Editing:**
     -   [ ] Add more advanced image adjustment tools like color balance or blending modes.
-
-### **Low Priority / Future Ideas**
 -   **[ ] Create a Project Library:**
     -   [ ] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
 -   **[ ] Add Video Overlay Support:**
