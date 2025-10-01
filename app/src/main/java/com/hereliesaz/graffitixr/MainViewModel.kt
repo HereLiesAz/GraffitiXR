@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.geometry.Offset
 import androidx.xr.runtime.math.Pose
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,12 +29,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val uiState = _uiState.asStateFlow()
 
     /**
-     * Handles the selection of a new image from the device's storage.
+     * Handles the selection of a new overlay image from the device's storage.
      *
      * @param uri The URI of the selected image.
      */
     fun onSelectImage(uri: Uri?) {
         _uiState.update { it.copy(imageUri = uri) }
+    }
+
+    /**
+     * Handles the selection of a new background image, switching to static image mode.
+     *
+     * @param uri The URI of the selected background image.
+     */
+    fun onSelectBackgroundImage(uri: Uri?) {
+        _uiState.update {
+            it.copy(
+                backgroundImageUri = uri,
+                editorMode = EditorMode.STATIC_IMAGE,
+                // Reset AR state when switching modes
+                markerPoses = emptyList(),
+                hitTestPose = null,
+                // Initialize sticker corners for the new background
+                stickerCorners = listOf(
+                    Offset(100f, 100f),
+                    Offset(300f, 100f),
+                    Offset(300f, 300f),
+                    Offset(100f, 300f)
+                )
+            )
+        }
     }
 
     /**
@@ -58,54 +83,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Removes the last placed mural from the scene.
+     * Clears the work in the current mode.
      */
-    fun onUndoMural() {
+    fun onClear() {
         _uiState.update {
-            if (it.muralPoses.isNotEmpty()) {
-                it.copy(muralPoses = it.muralPoses.dropLast(1))
-            } else {
-                it
+            when (it.editorMode) {
+                EditorMode.AR -> it.copy(markerPoses = emptyList())
+                EditorMode.STATIC_IMAGE -> it.copy(
+                    stickerCorners = listOf(
+                        Offset(100f, 100f),
+                        Offset(300f, 100f),
+                        Offset(300f, 300f),
+                        Offset(100f, 300f)
+                    )
+                )
+                else -> it
             }
         }
     }
 
     /**
-     * Clears all placed murals from the scene and re-enables placement mode.
+     * Adds a new marker at the current hit test position in AR mode.
      */
-    fun onClearMarkers() {
-        _uiState.update {
-            it.copy(muralPoses = emptyList(), placementMode = true)
-        }
-    }
-
-    /**
-     * Places a new mural at the current placement pose.
-     */
-    fun onLockMural() {
-        uiState.value.placementPose?.let { pose ->
-            _uiState.update {
-                it.copy(muralPoses = it.muralPoses + pose)
+    fun onAddMarker() {
+        uiState.value.hitTestPose?.let { pose ->
+            if (uiState.value.markerPoses.size < 4) {
+                _uiState.update {
+                    it.copy(markerPoses = it.markerPoses + pose)
+                }
             }
         }
     }
 
     /**
-     * Updates the pose of the placement preview.
+     * Updates the current hit test pose from the AR scene.
      *
-     * @param pose The new pose for the placement preview, or null if no valid plane is hit.
+     * @param pose The new pose from the hit test, or null if no valid surface is hit.
      */
-    fun onPlacementPoseChange(pose: Pose?) {
-        _uiState.update { it.copy(placementPose = pose) }
+    fun onHitTestResult(pose: Pose?) {
+        _uiState.update { it.copy(hitTestPose = pose) }
     }
 
     /**
-     * Toggles the placement mode on or off.
+     * Updates the positions of the sticker corners in static image mode.
+     * @param corners The new list of corner offsets.
      */
-    fun onTogglePlacementMode() {
-        _uiState.update { it.copy(placementMode = !it.placementMode) }
+    fun onStickerCornersChange(corners: List<Offset>) {
+        if (_uiState.value.editorMode == EditorMode.STATIC_IMAGE) {
+            _uiState.update { it.copy(stickerCorners = corners) }
+        }
     }
-
 
     /**
      * Sets the active slider in the UI.
@@ -141,24 +168,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun onSaturationChange(value: Float) {
         _uiState.update { it.copy(saturation = value) }
-    }
-
-    /**
-     * Updates the brightness of the image.
-     *
-     * @param value The new brightness value.
-     */
-    fun onBrightnessChange(value: Float) {
-        _uiState.update { it.copy(brightness = value) }
-    }
-
-    /**
-     * Updates the camera pose in the UI state.
-     *
-     * @param pose The new camera pose.
-     */
-    fun onCameraPoseChange(pose: Pose?) {
-        _uiState.update { it.copy(cameraPose = pose) }
     }
 
     /**

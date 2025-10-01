@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -35,19 +35,29 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.xr.compose.ARScene
-import androidx.xr.compose.rememberARCamera
+import androidx.xr.ARScene
+import androidx.xr.arcore.rememberARCamera
 import androidx.xr.compose.rememberARPlanes
-import androidx.xr.compose.spatial.SubspaceComponent
 import androidx.xr.compose.spatial.rememberSubspace
+import androidx.xr.compose.spatial.SubspaceComponent
 import androidx.xr.runtime.Config
 import androidx.xr.runtime.PlaneTrackingMode
+import androidx.xr.runtime.Pose
 import androidx.xr.runtime.TrackingState
+import androidx.xr.runtime.XRCapabilities
+import androidx.xr.runtime.XrManager
 import androidx.xr.runtime.rememberDefaultRun
 import androidx.xr.runtime.rememberSession
+import androidx.xr.scenecore.Material
+import androidx.xr.scenecore.Mesh
+import androidx.xr.scenecore.RenderableEntity
+import androidx.xr.scenecore.ShapeEntity
+import androidx.xr.scenecore.Texture
 import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -102,10 +112,30 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val navRailColor = Color.hsl(uiState.hue, 1f, uiState.lightness)
-    val launcher = rememberLauncherForActivityResult(
+    val context = viewModel.getApplication<Application>().applicationContext
+
+    // This effect will only run once, and will default to AR or Non-AR mode
+    LaunchedEffect(Unit) {
+        val isArAvailable = try {
+            val xrManager = XrManager.create(context)
+            xrManager.checkAvailability() == XRCapabilities.Availability.SUPPORTED_INSTALLED
+        } catch (e: Exception) {
+            false
+        }
+        // Set the initial mode based on AR availability. The user can switch to Mock-up mode later.
+        viewModel.onSetEditorMode(if (isArAvailable) EditorMode.AR else EditorMode.NON_AR)
+    }
+
+    val imageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         viewModel.onSelectImage(uri)
+    }
+
+    val backgroundLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        viewModel.onSelectBackgroundImage(uri)
     }
 
     LaunchedEffect(uiState.snackbarMessage) {
@@ -119,14 +149,21 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            ArContent(uiState, viewModel)
+            when (uiState.editorMode) {
+                EditorMode.AR -> ArContent(uiState, viewModel)
+                EditorMode.NON_AR -> NonArContent(uiState)
+                EditorMode.STATIC_IMAGE -> StaticImageEditor(uiState, viewModel)
+            }
 
             Row(modifier = Modifier.padding(padding)) {
                 var selected by remember { mutableStateOf<SliderType?>(null) }
                 AzNavRail {
                     azSettings(isLoading = uiState.isProcessing)
                     azRailItem(id = "select_image", text = "Image", color = if (uiState.imageUri != null) Color.Green else navRailColor) {
-                        launcher.launch("image/*")
+                        imageLauncher.launch("image/*")
+                    }
+                    azRailItem(id = "select_bg_image", text = "Mock-up", color = if (uiState.backgroundImageUri != null) Color.Green else navRailColor) {
+                        backgroundLauncher.launch("image/*")
                     }
                     azRailItem(id = "settings", text = "Settings", color = navRailColor) {
                         viewModel.onSettingsClicked(true)
@@ -134,14 +171,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     azRailItem(id = "remove_bg", text = "Remove BG", color = navRailColor) {
                         viewModel.onRemoveBg()
                     }
-                    azRailItem(id = "lock_mural", text = "Lock", color = if (uiState.muralPoses.isNotEmpty()) Color.Green else navRailColor) {
-                        viewModel.onLockMural()
+                    if (uiState.editorMode == EditorMode.AR) {
+                        azRailItem(id = "add_marker", text = "Add Marker", color = if (uiState.markerPoses.size >= 4) Color.Gray else navRailColor) {
+                            viewModel.onAddMarker()
+                        }
                     }
-                    azRailItem(id = "undo_mural", text = "Undo", color = navRailColor) {
-                        viewModel.onUndoMural()
-                    }
-                    azRailItem(id = "clear_markers", text = "Clear", color = navRailColor) {
-                        viewModel.onClearMarkers()
+                    azRailItem(id = "clear", text = "Clear", color = navRailColor) {
+                        viewModel.onClear()
                     }
                     SliderType.values().forEach { sliderType ->
                         azRailItem(
@@ -194,6 +230,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
  */
 @Composable
 fun ArContent(uiState: UiState, viewModel: MainViewModel) {
+    val context = LocalContext.current
+    val lifecycleScope = LocalLifecycleOwner.current.lifecycleScope
     val run = rememberDefaultRun()
     val session = rememberSession(run)
     val camera = rememberARCamera(session)
@@ -201,26 +239,13 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
     val subspace = rememberSubspace()
 
     // Perform hit testing to find a placement pose
-    LaunchedEffect(session.frame, uiState.placementMode) {
-        if (uiState.placementMode) {
-            val frame = session.frame ?: return@LaunchedEffect
-            val hitResults = frame.hitTest(frame.camera.displayOrientedPose, 0f, 0f)
-            val hit = hitResults.firstOrNull {
-                it.trackable is androidx.xr.arcore.Plane && (it.trackable as androidx.xr.arcore.Plane).isPoseInPolygon(it.hitPose)
-            }
-
-            if (hit != null) {
-                viewModel.onPlacementPoseChange(hit.hitPose)
-            } else {
-                viewModel.onPlacementPoseChange(null)
-            }
-        } else {
-            viewModel.onPlacementPoseChange(null)
+    LaunchedEffect(session.frame) {
+        val frame = session.frame ?: return@LaunchedEffect
+        val hitResults = frame.hitTest(frame.camera.displayOrientedPose, 0f, 0f)
+        val hit = hitResults.firstOrNull {
+            it.trackable is androidx.xr.arcore.Plane && (it.trackable as androidx.xr.arcore.Plane).isPoseInPolygon(it.hitPose)
         }
-    }
-
-    LaunchedEffect(camera.pose) {
-        viewModel.onCameraPoseChange(camera.pose)
+        viewModel.onHitTestResult(hit?.hitPose)
     }
 
     ARScene(
@@ -238,86 +263,126 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
             session.resume()
         }
     ) {
-        // Draw the detected planes for visualization
-        planes.value.forEach { plane ->
-            if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                subspace.Place(
-                    anchor = session.createAnchor(plane.centerPose),
-                    component = SubspaceComponent(
-                        remember(plane) {
-                            {
-                                Box(
-                                    modifier = Modifier
-                                        .size(plane.extentX.dp, plane.extentZ.dp)
-                                        .background(Color.White.copy(alpha = 0.5f))
-                                )
-                            }
+        // Draw the placement cursor
+        uiState.hitTestPose?.let { pose ->
+            subspace.Place(
+                anchor = session.createAnchor(pose),
+                component = SubspaceComponent(
+                    remember(pose) {
+                        {
+                            ShapeEntity(
+                                mesh = Mesh.createSphere(0.03f),
+                                material = Material().apply { baseColor = Color.Green }
+                            )
                         }
-                    )
+                    }
                 )
-            }
+            )
         }
 
-        // Draw a mural for each pose in the list
-        uiState.imageUri?.let { uri ->
-            uiState.muralPoses.forEach { pose ->
-                subspace.Place(
-                    anchor = session.createAnchor(pose),
-                    component = SubspaceComponent(
-                        remember(uri, uiState, pose) {
-                            {
-                                val painter = rememberAsyncImagePainter(uri)
-                                Image(
-                                    painter = painter,
-                                    contentDescription = "Selected Image",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Fit,
-                                    alpha = uiState.opacity,
-                                    colorFilter = getColorFilter(
-                                        uiState.saturation,
-                                        uiState.brightness,
-                                        uiState.contrast
-                                    )
-                                )
-                            }
+        // Draw the placed markers
+        uiState.markerPoses.forEach { pose ->
+            subspace.Place(
+                anchor = session.createAnchor(pose),
+                component = SubspaceComponent(
+                    remember(pose) {
+                        {
+                            ShapeEntity(
+                                mesh = Mesh.createSphere(0.03f),
+                                material = Material().apply { baseColor = Color.Red }
+                            )
                         }
-                    )
+                    }
                 )
-            }
+            )
         }
 
-        // Draw the placement preview
-        if (uiState.placementMode) {
-            uiState.placementPose?.let { pose ->
-                subspace.Place(
-                    anchor = session.createAnchor(pose),
-                    component = SubspaceComponent(
-                        remember(uiState.imageUri, uiState.opacity) {
-                            {
-                                uiState.imageUri?.let { uri ->
-                                    val painter = rememberAsyncImagePainter(uri)
-                                    Image(
-                                        painter = painter,
-                                        contentDescription = "Placement Preview",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Fit,
-                                        alpha = uiState.opacity * 0.5f, // Semi-transparent
-                                        colorFilter = getColorFilter(
-                                            uiState.saturation,
-                                            uiState.brightness,
-                                            uiState.contrast
-                                        )
-                                    )
-                                }
-                            }
-                        }
+        // Draw the mural if 4 markers are placed
+        if (uiState.markerPoses.size == 4) {
+            val anchorPose = uiState.markerPoses[0]
+            val inverseAnchorPose = anchorPose.inverse()
+
+            val texture = remember(uiState.imageUri) {
+                uiState.imageUri?.let { Texture.createFromUri(context, it, lifecycleScope) }
+            }
+            val muralMaterial = remember(texture, uiState.opacity) {
+                Material().apply {
+                    baseColorMap = texture
+                    baseColorFactor = Color(1f, 1f, 1f, uiState.opacity)
+                    unlit = true
+                }
+            }
+            val muralMesh = remember(uiState.markerPoses) {
+                // Transform marker points from world space to the local space of the first marker
+                val p0 = inverseAnchorPose.transformPoint(uiState.markerPoses[0].translation)
+                val p1 = inverseAnchorPose.transformPoint(uiState.markerPoses[1].translation)
+                val p2 = inverseAnchorPose.transformPoint(uiState.markerPoses[2].translation)
+                val p3 = inverseAnchorPose.transformPoint(uiState.markerPoses[3].translation)
+
+                val vertices = floatArrayOf(
+                    p0[0], p0[1], p0[2],
+                    p1[0], p1[1], p1[2],
+                    p2[0], p2[1], p2[2],
+                    p3[0], p3[1], p3[2]
+                )
+                // Standard UV mapping for a quad. Assumes markers are placed
+                // in a counter-clockwise order starting from the bottom-left.
+                val uvs = floatArrayOf(
+                    0f, 0f, // p0, bottom-left
+                    1f, 0f, // p1, bottom-right
+                    1f, 1f, // p2, top-right
+                    0f, 1f  // p3, top-left
+                )
+                // Standard triangle indices for a quad.
+                val indices = shortArrayOf(0, 1, 2, 0, 2, 3)
+
+                Mesh(
+                    Mesh.Primitive(
+                        vertexPositions = vertices,
+                        triangleIndices = indices,
+                        vertexUVs = uvs
                     )
                 )
             }
+
+            subspace.Place(
+                anchor = session.createAnchor(anchorPose),
+                component = SubspaceComponent(
+                    remember(muralMesh, muralMaterial) {
+                        {
+                            RenderableEntity(
+                                mesh = muralMesh,
+                                material = muralMaterial
+                            )
+                        }
+                    }
+                )
+            )
         }
     }
 }
 
+/**
+ * Composable for rendering the content when AR is not available.
+ */
+@Composable
+fun NonArContent(uiState: UiState) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        CameraPreview(modifier = Modifier.fillMaxSize())
+
+        uiState.imageUri?.let {
+            val painter = rememberAsyncImagePainter(it)
+            Image(
+                painter = painter,
+                contentDescription = "Selected Image",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+                alpha = uiState.opacity,
+                colorFilter = getColorFilter(uiState.saturation, uiState.contrast)
+            )
+        }
+    }
+}
 
 /**
  * A popup that displays a slider for adjusting image properties.
@@ -345,7 +410,6 @@ fun SliderPopup(
                     SliderType.Opacity -> Slider(value = uiState.opacity, onValueChange = viewModel::onOpacityChange)
                     SliderType.Contrast -> Slider(value = uiState.contrast, onValueChange = viewModel::onContrastChange, valueRange = 0f..10f)
                     SliderType.Saturation -> Slider(value = uiState.saturation, onValueChange = viewModel::onSaturationChange, valueRange = 0f..10f)
-                    SliderType.Brightness -> Slider(value = uiState.brightness, onValueChange = viewModel::onBrightnessChange, valueRange = -1f..1f)
                 }
                 androidx.compose.material3.Button(onClick = onDismiss) {
                     Text("Close")
