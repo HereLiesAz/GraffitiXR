@@ -4,7 +4,7 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
-## **V1.0 Completed Features**
+## **V1.1 Completed Features**
 
 -   **[x] AR Marker-Based Projection:**
     -   [x] Users can place four markers on detected real-world surfaces.
@@ -20,6 +20,13 @@ This document tracks the development status, future enhancements, and identified
     -   [x] UI for selecting overlay and background images.
     -   [x] Functional sliders for opacity, contrast, and saturation.
     -   [x] Background removal for the overlay image.
+-   **[x] Code & Project Documentation:**
+    -   [x] Added comprehensive KDocs to all classes, methods, and properties.
+    -   [x] Rewrote `README.md` for a human developer audience.
+    -   [x] Rewrote `AGENTS.md` with specific instructions for AI agents.
+-   **[x] Robustness and Error Handling:**
+    -   [x] Implemented error handling for background removal failures.
+    -   [x] Implemented user guidance for AR plane detection failures.
 
 ---
 
@@ -27,14 +34,7 @@ This document tracks the development status, future enhancements, and identified
 
 ### **High Priority**
 
--   **[ ] Improve Code & Project Documentation:**
-    -   [ ] **Exhaustive KDoc Documentation:** Add comprehensive KDocs to all classes, methods, and properties across the entire codebase.
-    -   [ ] **Refine `README.md`:** Rewrite for a human audience (developers), including sections on tech stack, features, and build instructions.
-    -   [ ] **Refine `AGENTS.md`:** Create a dedicated file with instructions for AI agents, outlining project structure and development conventions.
--   **[ ] Enhance Robustness and Performance:**
-    -   [ ] **Add Robust Error Handling:** Implement detailed, user-facing error messages. For instance, if background removal fails, guide the user on how to proceed.
-    -   [ ] **Add AR Plane Detection Guidance:** Implement a mechanism to guide the user if the AR system fails to detect a surface (e.g., "Move your phone slowly to scan the area").
-    -   [ ] **Add Automated Tests:** Create a suite of unit and instrumentation tests to ensure code quality and prevent regressions.
+-   **[ ] Add Automated Tests:** Create a suite of unit and instrumentation tests to ensure code quality and prevent regressions.
 
 ### **Medium Priority**
 
