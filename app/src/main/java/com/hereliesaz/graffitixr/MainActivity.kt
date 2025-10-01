@@ -105,17 +105,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val navRailColor = Color.hsl(uiState.hue, 1f, uiState.lightness)
-    var arAvailability by remember { mutableStateOf<Boolean?>(null) }
-    val context = viewModel.getApplication<Application>().applicationContext
-    LaunchedEffect(Unit) {
-        arAvailability = try {
-            val xrManager = XrManager.create(context)
-            xrManager.checkAvailability() == XRCapabilities.Availability.SUPPORTED_INSTALLED
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -133,18 +122,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            when (arAvailability) {
-                true -> ArContent(uiState, viewModel)
-                false -> NonArContent(uiState)
-                null -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-            }
+            ArContent(uiState, viewModel)
 
             Row(modifier = Modifier.padding(padding)) {
                 var selected by remember { mutableStateOf<SliderType?>(null) }
@@ -159,11 +137,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     azRailItem(id = "remove_bg", text = "Remove BG", color = navRailColor) {
                         viewModel.onRemoveBg()
                     }
-                    azRailItem(id = "lock_mural", text = "Lock", color = if (uiState.lockedPose != null) Color.Green else navRailColor) {
+                    azRailItem(id = "lock_mural", text = "Lock", color = if (uiState.muralPoses.isNotEmpty()) Color.Green else navRailColor) {
                         viewModel.onLockMural()
                     }
-                    azRailItem(id = "reset_mural", text = "Reset", color = navRailColor) {
-                        viewModel.onResetMural()
+                    azRailItem(id = "undo_mural", text = "Undo", color = navRailColor) {
+                        viewModel.onUndoMural()
                     }
                     azRailItem(id = "clear_markers", text = "Clear", color = navRailColor) {
                         viewModel.onClearMarkers()
@@ -225,6 +203,25 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
     val planes = rememberARPlanes(session)
     val subspace = rememberSubspace()
 
+    // Perform hit testing to find a placement pose
+    LaunchedEffect(session.frame, uiState.placementMode) {
+        if (uiState.placementMode) {
+            val frame = session.frame ?: return@LaunchedEffect
+            val hitResults = frame.hitTest(frame.camera.displayOrientedPose, 0f, 0f)
+            val hit = hitResults.firstOrNull {
+                it.trackable is androidx.xr.arcore.Plane && (it.trackable as androidx.xr.arcore.Plane).isPoseInPolygon(it.hitPose)
+            }
+
+            if (hit != null) {
+                viewModel.onPlacementPoseChange(hit.hitPose)
+            } else {
+                viewModel.onPlacementPoseChange(null)
+            }
+        } else {
+            viewModel.onPlacementPoseChange(null)
+        }
+    }
+
     LaunchedEffect(camera.pose) {
         viewModel.onCameraPoseChange(camera.pose)
     }
@@ -244,7 +241,7 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
             session.resume()
         }
     ) {
-        // Draw the detected planes
+        // Draw the detected planes for visualization
         planes.value.forEach { plane ->
             if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
                 subspace.Place(
@@ -264,13 +261,13 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
             }
         }
 
-        // Draw the user's image if locked
-        if (!uiState.placementMode && uiState.lockedPose != null) {
-            uiState.imageUri?.let { uri ->
+        // Draw a mural for each pose in the list
+        uiState.imageUri?.let { uri ->
+            uiState.muralPoses.forEach { pose ->
                 subspace.Place(
-                    anchor = session.createAnchor(uiState.lockedPose!!),
+                    anchor = session.createAnchor(pose),
                     component = SubspaceComponent(
-                        remember(uri, uiState) {
+                        remember(uri, uiState, pose) {
                             {
                                 val painter = rememberAsyncImagePainter(uri)
                                 Image(
@@ -291,45 +288,39 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
                 )
             }
         }
-    }
 
-    // 2D overlay for placement mode
-    if (uiState.placementMode) {
-        uiState.imageUri?.let {
-            val painter = rememberAsyncImagePainter(it)
-            Image(
-                painter = painter,
-                contentDescription = "Selected Image",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-                alpha = uiState.opacity,
-                colorFilter = getColorFilter(uiState.saturation, uiState.brightness, uiState.contrast)
-            )
+        // Draw the placement preview
+        if (uiState.placementMode) {
+            uiState.placementPose?.let { pose ->
+                subspace.Place(
+                    anchor = session.createAnchor(pose),
+                    component = SubspaceComponent(
+                        remember(uiState.imageUri, uiState.opacity) {
+                            {
+                                uiState.imageUri?.let { uri ->
+                                    val painter = rememberAsyncImagePainter(uri)
+                                    Image(
+                                        painter = painter,
+                                        contentDescription = "Placement Preview",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Fit,
+                                        alpha = uiState.opacity * 0.5f, // Semi-transparent
+                                        colorFilter = getColorFilter(
+                                            uiState.saturation,
+                                            uiState.brightness,
+                                            uiState.contrast
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    )
+                )
+            }
         }
     }
 }
 
-/**
- * Composable for rendering the content when AR is not available.
- */
-@Composable
-fun NonArContent(uiState: UiState) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        CameraPreview(modifier = Modifier.fillMaxSize())
-
-        uiState.imageUri?.let {
-            val painter = rememberAsyncImagePainter(it)
-            Image(
-                painter = painter,
-                contentDescription = "Selected Image",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-                alpha = uiState.opacity,
-                colorFilter = getColorFilter(uiState.saturation, uiState.brightness, uiState.contrast)
-            )
-        }
-    }
-}
 
 /**
  * A popup that displays a slider for adjusting image properties.

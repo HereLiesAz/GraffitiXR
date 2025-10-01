@@ -17,9 +17,10 @@ enum class SliderType {
  * Represents the overall state of the UI for the GraffitiXR application.
  *
  * @property imageUri The URI of the image selected by the user.
- * @property placementMode Whether the app is in placement mode (true) or the mural is locked (false).
- * @property lockedPose The pose of the mural when it is locked in the AR scene.
+ * @property muralPoses A list of poses for each placed mural.
  * @property cameraPose The current pose of the device's camera.
+ * @property placementMode Whether the app is in placement mode.
+ * @property placementPose The pose of the placement preview.
  * @property isProcessing Whether a long-running operation (like background removal) is in progress.
  * @property snackbarMessage A message to be shown in a snackbar. Null if no message should be shown.
  * @property opacity The opacity level of the image.
@@ -33,9 +34,10 @@ enum class SliderType {
  */
 data class UiState(
     val imageUri: Uri? = null,
-    val placementMode: Boolean = true,
-    val lockedPose: Pose? = null,
+    val muralPoses: List<Pose> = emptyList(),
     val cameraPose: Pose? = null,
+    val placementMode: Boolean = true,
+    val placementPose: Pose? = null,
     val isProcessing: Boolean = false,
     val snackbarMessage: String? = null,
 

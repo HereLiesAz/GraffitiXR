@@ -58,48 +58,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Clears all markers and returns to placement mode.
+     * Removes the last placed mural from the scene.
      */
-    fun onClearMarkers() {
+    fun onUndoMural() {
         _uiState.update {
-            it.copy(
-                lockedPose = null,
-                placementMode = true
-            )
-        }
-    }
-
-    /**
-     * Locks the mural's pose in the AR scene based on the current camera pose.
-     * This exits placement mode.
-     */
-    fun onLockMural() {
-        uiState.value.cameraPose?.let {
-            // TODO: This is a placeholder for locking the mural.
-            // The final implementation should use marker detection to determine the pose.
-            val translation = floatArrayOf(0f, 0f, -2f)
-            val rotation = floatArrayOf(0f, 0f, 0f, 1f)
-            val lockedPose = it.compose(Pose(translation, rotation))
-            _uiState.update { state ->
-                state.copy(
-                    lockedPose = lockedPose,
-                    placementMode = false
-                )
+            if (it.muralPoses.isNotEmpty()) {
+                it.copy(muralPoses = it.muralPoses.dropLast(1))
+            } else {
+                it
             }
         }
     }
 
     /**
-     * Resets the mural, returning to placement mode.
+     * Clears all placed murals from the scene and re-enables placement mode.
      */
-    fun onResetMural() {
+    fun onClearMarkers() {
         _uiState.update {
-            it.copy(
-                placementMode = true,
-                lockedPose = null
-            )
+            it.copy(muralPoses = emptyList(), placementMode = true)
         }
     }
+
+    /**
+     * Places a new mural at the current placement pose.
+     */
+    fun onLockMural() {
+        uiState.value.placementPose?.let { pose ->
+            _uiState.update {
+                it.copy(muralPoses = it.muralPoses + pose)
+            }
+        }
+    }
+
+    /**
+     * Updates the pose of the placement preview.
+     *
+     * @param pose The new pose for the placement preview, or null if no valid plane is hit.
+     */
+    fun onPlacementPoseChange(pose: Pose?) {
+        _uiState.update { it.copy(placementPose = pose) }
+    }
+
+    /**
+     * Toggles the placement mode on or off.
+     */
+    fun onTogglePlacementMode() {
+        _uiState.update { it.copy(placementMode = !it.placementMode) }
+    }
+
 
     /**
      * Sets the active slider in the UI.
