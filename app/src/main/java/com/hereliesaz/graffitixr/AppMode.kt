@@ -15,9 +15,8 @@
  */
 package com.hereliesaz.graffitixr
 
-import android.graphics.Bitmap
-
-data class UiState(
-  val graffiti: Bitmap? = null,
-  val currentMode: AppMode = AppMode.MOCK_UP
-)
+enum class AppMode {
+  MOCK_UP,
+  NON_AR_CAMERA,
+  AR
+}

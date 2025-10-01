@@ -15,9 +15,16 @@
  */
 package com.hereliesaz.graffitixr
 
-import android.graphics.Bitmap
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 
-data class UiState(
-  val graffiti: Bitmap? = null,
-  val currentMode: AppMode = AppMode.MOCK_UP
-)
+@Composable
+fun ARView() {
+  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Text(text = "AR Mode")
+  }
+}

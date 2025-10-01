@@ -15,9 +15,20 @@
  */
 package com.hereliesaz.graffitixr
 
-import android.graphics.Bitmap
+import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-data class UiState(
-  val graffiti: Bitmap? = null,
-  val currentMode: AppMode = AppMode.MOCK_UP
-)
+class GraffitiViewModel : ViewModel() {
+  private val _uiState = MutableStateFlow(UiState())
+  val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+  fun setUiState(newUiState: UiState) {
+    _uiState.value = newUiState
+  }
+
+  fun setCurrentMode(mode: AppMode) {
+    _uiState.value = _uiState.value.copy(currentMode = mode)
+  }
+}
