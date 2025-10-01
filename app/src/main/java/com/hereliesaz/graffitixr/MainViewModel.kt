@@ -2,9 +2,9 @@ package com.hereliesaz.graffitixr
 
 import android.app.Application
 import android.net.Uri
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.compose.ui.geometry.Offset
 import androidx.xr.runtime.math.Pose
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -168,6 +168,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun onSaturationChange(value: Float) {
         _uiState.update { it.copy(saturation = value) }
+    }
+
+    /**
+     * Updates the brightness of the image.
+     *
+     * @param value The new brightness value.
+     */
+    fun onBrightnessChange(value: Float) {
+        _uiState.update { it.copy(brightness = value) }
     }
 
     /**
