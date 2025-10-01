@@ -58,47 +58,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Clears all markers and returns to placement mode.
+     * Clears all placed markers.
      */
     fun onClearMarkers() {
-        _uiState.update {
-            it.copy(
-                lockedPose = null,
-                placementMode = true
-            )
-        }
+        _uiState.update { it.copy(markerPoses = emptyList()) }
     }
 
     /**
-     * Locks the mural's pose in the AR scene based on the current camera pose.
-     * This exits placement mode.
+     * Adds a new marker at the current hit test position.
      */
-    fun onLockMural() {
-        uiState.value.cameraPose?.let {
-            // TODO: This is a placeholder for locking the mural.
-            // The final implementation should use marker detection to determine the pose.
-            val translation = floatArrayOf(0f, 0f, -2f)
-            val rotation = floatArrayOf(0f, 0f, 0f, 1f)
-            val lockedPose = it.compose(Pose(translation, rotation))
-            _uiState.update { state ->
-                state.copy(
-                    lockedPose = lockedPose,
-                    placementMode = false
-                )
+    fun onAddMarker() {
+        uiState.value.hitTestPose?.let { pose ->
+            if (uiState.value.markerPoses.size < 4) {
+                _uiState.update {
+                    it.copy(markerPoses = it.markerPoses + pose)
+                }
             }
         }
     }
 
     /**
-     * Resets the mural, returning to placement mode.
+     * Updates the current hit test pose from the AR scene.
+     *
+     * @param pose The new pose from the hit test, or null if no valid surface is hit.
      */
-    fun onResetMural() {
-        _uiState.update {
-            it.copy(
-                placementMode = true,
-                lockedPose = null
-            )
-        }
+    fun onHitTestResult(pose: Pose?) {
+        _uiState.update { it.copy(hitTestPose = pose) }
     }
 
     /**
@@ -135,24 +120,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun onSaturationChange(value: Float) {
         _uiState.update { it.copy(saturation = value) }
-    }
-
-    /**
-     * Updates the brightness of the image.
-     *
-     * @param value The new brightness value.
-     */
-    fun onBrightnessChange(value: Float) {
-        _uiState.update { it.copy(brightness = value) }
-    }
-
-    /**
-     * Updates the camera pose in the UI state.
-     *
-     * @param pose The new camera pose.
-     */
-    fun onCameraPoseChange(pose: Pose?) {
-        _uiState.update { it.copy(cameraPose = pose) }
     }
 
     /**

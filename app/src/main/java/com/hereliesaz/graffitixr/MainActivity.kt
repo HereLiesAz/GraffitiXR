@@ -94,6 +94,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.lifecycleScope
+import androidx.xr.scenecore.Material
+import androidx.xr.scenecore.Mesh
+import androidx.xr.scenecore.ShapeEntity
+
 /**
  * The main screen of the application, which orchestrates the UI components.
  * It displays the appropriate content based on AR availability and handles user interactions.
@@ -159,11 +165,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     azRailItem(id = "remove_bg", text = "Remove BG", color = navRailColor) {
                         viewModel.onRemoveBg()
                     }
-                    azRailItem(id = "lock_mural", text = "Lock", color = if (uiState.lockedPose != null) Color.Green else navRailColor) {
-                        viewModel.onLockMural()
-                    }
-                    azRailItem(id = "reset_mural", text = "Reset", color = navRailColor) {
-                        viewModel.onResetMural()
+                    azRailItem(id = "add_marker", text = "Add Marker", color = if (uiState.markerPoses.size >= 4) Color.Gray else navRailColor) {
+                        viewModel.onAddMarker()
                     }
                     azRailItem(id = "clear_markers", text = "Clear", color = navRailColor) {
                         viewModel.onClearMarkers()
@@ -214,19 +217,31 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     }
 }
 
+import androidx.xr.runtime.Pose
+import androidx.xr.scenecore.RenderableEntity
+import androidx.xr.scenecore.Texture
+
 /**
  * Composable for rendering the Augmented Reality content.
  */
 @Composable
 fun ArContent(uiState: UiState, viewModel: MainViewModel) {
+    val context = LocalContext.current
+    val lifecycleScope = LocalLifecycleOwner.current.lifecycleScope
     val run = rememberDefaultRun()
     val session = rememberSession(run)
     val camera = rememberARCamera(session)
     val planes = rememberARPlanes(session)
     val subspace = rememberSubspace()
 
-    LaunchedEffect(camera.pose) {
-        viewModel.onCameraPoseChange(camera.pose)
+    // Perform hit testing to find a placement pose
+    LaunchedEffect(session.frame) {
+        val frame = session.frame ?: return@LaunchedEffect
+        val hitResults = frame.hitTest(frame.camera.displayOrientedPose, 0f, 0f)
+        val hit = hitResults.firstOrNull {
+            it.trackable is androidx.xr.arcore.Plane && (it.trackable as androidx.xr.arcore.Plane).isPoseInPolygon(it.hitPose)
+        }
+        viewModel.onHitTestResult(hit?.hitPose)
     }
 
     ARScene(
@@ -244,66 +259,100 @@ fun ArContent(uiState: UiState, viewModel: MainViewModel) {
             session.resume()
         }
     ) {
-        // Draw the detected planes
-        planes.value.forEach { plane ->
-            if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                subspace.Place(
-                    anchor = session.createAnchor(plane.centerPose),
-                    component = SubspaceComponent(
-                        remember(plane) {
-                            {
-                                Box(
-                                    modifier = Modifier
-                                        .size(plane.extentX.dp, plane.extentZ.dp)
-                                        .background(Color.White.copy(alpha = 0.5f))
-                                )
-                            }
+        // Draw the placement cursor
+        uiState.hitTestPose?.let { pose ->
+            subspace.Place(
+                anchor = session.createAnchor(pose),
+                component = SubspaceComponent(
+                    remember(pose) {
+                        {
+                            ShapeEntity(
+                                mesh = Mesh.createSphere(0.03f),
+                                material = Material().apply { baseColor = Color.Green }
+                            )
                         }
+                    }
+                )
+            )
+        }
+
+        // Draw the placed markers
+        uiState.markerPoses.forEach { pose ->
+            subspace.Place(
+                anchor = session.createAnchor(pose),
+                component = SubspaceComponent(
+                    remember(pose) {
+                        {
+                            ShapeEntity(
+                                mesh = Mesh.createSphere(0.03f),
+                                material = Material().apply { baseColor = Color.Red }
+                            )
+                        }
+                    }
+                )
+            )
+        }
+
+        // Draw the mural if 4 markers are placed
+        if (uiState.markerPoses.size == 4) {
+            val anchorPose = uiState.markerPoses[0]
+            val inverseAnchorPose = anchorPose.inverse()
+
+            val texture = remember(uiState.imageUri) {
+                uiState.imageUri?.let { Texture.createFromUri(context, it, lifecycleScope) }
+            }
+            val muralMaterial = remember(texture, uiState.opacity) {
+                Material().apply {
+                    baseColorMap = texture
+                    baseColorFactor = Color(1f, 1f, 1f, uiState.opacity)
+                    unlit = true
+                }
+            }
+            val muralMesh = remember(uiState.markerPoses) {
+                // Transform marker points from world space to the local space of the first marker
+                val p0 = inverseAnchorPose.transformPoint(uiState.markerPoses[0].translation)
+                val p1 = inverseAnchorPose.transformPoint(uiState.markerPoses[1].translation)
+                val p2 = inverseAnchorPose.transformPoint(uiState.markerPoses[2].translation)
+                val p3 = inverseAnchorPose.transformPoint(uiState.markerPoses[3].translation)
+
+                val vertices = floatArrayOf(
+                    p0[0], p0[1], p0[2],
+                    p1[0], p1[1], p1[2],
+                    p2[0], p2[1], p2[2],
+                    p3[0], p3[1], p3[2]
+                )
+                // Standard UV mapping for a quad. Assumes markers are placed
+                // in a counter-clockwise order starting from the bottom-left.
+                val uvs = floatArrayOf(
+                    0f, 0f, // p0, bottom-left
+                    1f, 0f, // p1, bottom-right
+                    1f, 1f, // p2, top-right
+                    0f, 1f  // p3, top-left
+                )
+                // Standard triangle indices for a quad.
+                val indices = shortArrayOf(0, 1, 2, 0, 2, 3)
+
+                Mesh(
+                    Mesh.Primitive(
+                        vertexPositions = vertices,
+                        triangleIndices = indices,
+                        vertexUVs = uvs
                     )
                 )
             }
-        }
 
-        // Draw the user's image if locked
-        if (!uiState.placementMode && uiState.lockedPose != null) {
-            uiState.imageUri?.let { uri ->
-                subspace.Place(
-                    anchor = session.createAnchor(uiState.lockedPose!!),
-                    component = SubspaceComponent(
-                        remember(uri, uiState) {
-                            {
-                                val painter = rememberAsyncImagePainter(uri)
-                                Image(
-                                    painter = painter,
-                                    contentDescription = "Selected Image",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Fit,
-                                    alpha = uiState.opacity,
-                                    colorFilter = getColorFilter(
-                                        uiState.saturation,
-                                        uiState.brightness,
-                                        uiState.contrast
-                                    )
-                                )
-                            }
+            subspace.Place(
+                anchor = session.createAnchor(anchorPose),
+                component = SubspaceComponent(
+                    remember(muralMesh, muralMaterial) {
+                        {
+                            RenderableEntity(
+                                mesh = muralMesh,
+                                material = muralMaterial
+                            )
                         }
-                    )
+                    }
                 )
-            }
-        }
-    }
-
-    // 2D overlay for placement mode
-    if (uiState.placementMode) {
-        uiState.imageUri?.let {
-            val painter = rememberAsyncImagePainter(it)
-            Image(
-                painter = painter,
-                contentDescription = "Selected Image",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-                alpha = uiState.opacity,
-                colorFilter = getColorFilter(uiState.saturation, uiState.brightness, uiState.contrast)
             )
         }
     }
