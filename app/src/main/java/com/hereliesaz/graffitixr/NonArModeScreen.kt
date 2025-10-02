@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -50,22 +49,20 @@ fun NonArModeScreen(modifier: Modifier = Modifier, uiState: UiState) {
         // The overlay image, displayed if a URI is available.
         uiState.imageUri?.let {
             // Create a color matrix to adjust contrast and saturation.
-            val colorMatrix = ColorMatrix().apply {
-                setToSaturation(uiState.saturation)
-                times(
-                    ColorMatrix().apply {
-                        // A simple contrast formula.
-                        val scale = uiState.contrast
-                        val translate = (-0.5f * scale + 0.5f) * 255f
-                        set(
-                            floatArrayOf(
-                                scale, 0f, 0f, 0f, translate,
-                                0f, scale, 0f, 0f, translate,
-                                0f, 0f, scale, 0f, translate,
-                                0f, 0f, 0f, 1f, 0f
-                            )
+            val colorMatrix = android.graphics.ColorMatrix().apply {
+                setSaturation(uiState.saturation)
+                // A simple contrast formula.
+                val scale = uiState.contrast
+                val translate = (-0.5f * scale + 0.5f) * 255f
+                postConcat(
+                    android.graphics.ColorMatrix(
+                        floatArrayOf(
+                            scale, 0f, 0f, 0f, translate,
+                            0f, scale, 0f, 0f, translate,
+                            0f, 0f, scale, 0f, translate,
+                            0f, 0f, 0f, 1f, 0f
                         )
-                    }
+                    )
                 )
             }
 
@@ -76,7 +73,7 @@ fun NonArModeScreen(modifier: Modifier = Modifier, uiState: UiState) {
                     .fillMaxSize()
                     .alpha(uiState.opacity),
                 contentScale = ContentScale.Fit,
-                colorFilter = ColorFilter.colorMatrix(colorMatrix)
+                colorFilter = ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(colorMatrix.array))
             )
         }
     }

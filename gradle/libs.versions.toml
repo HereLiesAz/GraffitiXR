@@ -23,11 +23,12 @@ apacheCommonsMath = "3.6.1"
 coroutinesPlayServices = "1.10.2"
 azNavRail = "3.10"
 junit = "4.13.2"
-mockito = "5.10.0"
-mockitoKotlin = "5.2.1"
-kotlinxCoroutinesTest = "1.7.3"
-turbine = "1.0.0"
+mockito = "5.20.0"
+mockitoKotlin = "6.1.0"
+kotlinxCoroutinesTest = "1.10.2"
+turbine = "1.2.1"
 androidxArchCoreTesting = "2.2.0"
+filamentAndroid = "1.17.1"
 
 [libraries]
 google-arcore = { module = "com.google.ar:core", version.ref = "googleArcore" }
@@ -64,6 +65,7 @@ mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 androidx-arch-core-testing = { module = "androidx.arch.core:core-testing", version.ref = "androidxArchCoreTesting" }
+filament-android = { group = "com.google.ar.sceneform", name = "filament-android", version.ref = "filamentAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

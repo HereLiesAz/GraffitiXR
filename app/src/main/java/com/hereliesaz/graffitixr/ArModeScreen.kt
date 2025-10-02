@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr
 
-import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
@@ -16,22 +15,23 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.xr.compose.ArScene
 import androidx.xr.compose.HitTestResult
+import androidx.xr.compose.LocalEngine
 import androidx.xr.compose.PlaneFindingMode
 import androidx.xr.compose.rememberHitTestResult
-import androidx.xr.compose.runtime.rememberPlaneFindingMode
+import androidx.xr.compose.rememberNodes
+import androidx.xr.compose.rememberPlaneFindingMode
+import androidx.xr.scenecore.Node
+import androidx.xr.scenecore.assets.MaterialProvider
+import androidx.xr.scenecore.loaders.loadTexture
+import androidx.xr.scenecore.math.Position
+import androidx.xr.scenecore.math.Size
+import androidx.xr.scenecore.primitive.Mesh
+import androidx.xr.scenecore.primitive.Plane
+import androidx.xr.scenecore.primitive.Sphere
 import coil.imageLoader
 import coil.request.ImageRequest
-import io.github.sceneview.loaders.loadTexture
-import io.github.sceneview.material.Material
-import io.github.sceneview.material.MaterialInstance
-import io.github.sceneview.math.Position
-import io.github.sceneview.math.Size
-import io.github.sceneview.node.Node
-import io.github.sceneview.primitive.Mesh
-import io.github.sceneview.primitive.Plane
-import io.github.sceneview.primitive.Sphere
-import io.github.sceneview.rememberMaterial
-import io.github.sceneview.rememberNodes
+import com.google.android.filament.MaterialInstance
+import com.google.android.filament.Texture
 
 /**
  * A composable function that encapsulates the Augmented Reality (AR) mode of the application.
@@ -51,22 +51,26 @@ fun ArModeScreen(modifier: Modifier = Modifier, viewModel: MainViewModel) {
     val planeFindingMode = rememberPlaneFindingMode(PlaneFindingMode.Horizontal)
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var texture by remember { mutableStateOf<MaterialInstance.Texture?>(null) }
+    val engine = LocalEngine.current
+    var texture by remember { mutableStateOf<Texture?>(null) }
 
     // Asynchronously load the selected image URI into a texture.
-    LaunchedEffect(uiState.imageUri) {
-        texture = null
-        uiState.imageUri?.let { uri ->
+    LaunchedEffect(uiState.imageUri, engine) {
+        texture = null // Reset texture when URI changes
+        val currentUri = uiState.imageUri
+        if (currentUri != null) {
             val request = ImageRequest.Builder(context)
-                .data(uri)
+                .data(currentUri)
                 .allowHardware(false) // Software bitmap is required for texture loading.
-                .target { result ->
-                    val bitmap = (result as BitmapDrawable).bitmap
-                    // Load the bitmap into a SceneView texture.
-                    texture = loadTexture(context, bitmap)
-                }
                 .build()
-            context.imageLoader.enqueue(request)
+            try {
+                val bitmap = (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
+                if (bitmap != null) {
+                    texture = engine.loadTexture(bitmap)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -82,11 +86,13 @@ fun ArModeScreen(modifier: Modifier = Modifier, viewModel: MainViewModel) {
             hitTestResult.pose?.let { pose ->
                 add(
                     Node(
-                        position = Position(pose.position.x, pose.position.y, pose.position.z),
+                        engine = engine,
+                        position = Position(pose.position[0], pose.position[1], pose.position[2]),
                         primitive = Plane(
+                            engine = engine,
                             center = Position(0f, 0.01f, 0f),
                             size = Size(0.1f, 0.1f),
-                            material = CursorMaterial()
+                            materialInstance = CursorMaterial()
                         )
                     )
                 )
@@ -96,43 +102,50 @@ fun ArModeScreen(modifier: Modifier = Modifier, viewModel: MainViewModel) {
             uiState.markerPoses.forEach { pose ->
                 add(
                     Node(
-                        position = Position(pose.position.x, pose.position.y, pose.position.z),
-                        primitive = Sphere(radius = 0.02f, material = MarkerMaterial())
+                        engine = engine,
+                        position = Position(pose.position[0], pose.position[1], pose.position[2]),
+                        primitive = Sphere(
+                            engine = engine,
+                            radius = 0.02f,
+                            materialInstance = MarkerMaterial()
+                        )
                     )
                 )
             }
 
             // If four markers are placed and a texture is loaded, render the projected image.
-            if (uiState.markerPoses.size == 4 && texture != null) {
-                val material = rememberMaterial(baseColorTexture = texture)
-                val vertices = uiState.markerPoses.map {
-                    // Convert from AndroidX Pose to SceneView Position
-                    Position(it.position.x, it.position.y, it.position.z)
-                }
-                // Define the two triangles that form the quad.
-                val triangles = listOf(
-                    // First triangle (top-left, top-right, bottom-right)
-                    listOf(0, 1, 2),
-                    // Second triangle (top-left, bottom-right, bottom-left)
-                    listOf(0, 2, 3)
-                )
+            if (uiState.markerPoses.size == 4) {
+                val currentTexture = texture
+                if (currentTexture != null) {
+                    val material = remember(engine, currentTexture) {
+                        MaterialProvider.getInstance(engine).createUnlitMaterialInstance(baseColorMap = currentTexture)
+                    }
+                    val vertices = uiState.markerPoses.map { markerPose ->
+                        Position(markerPose.position[0], markerPose.position[1], markerPose.position[2])
+                    }
+                    val triangles = listOf(
+                        listOf(0, 1, 2),
+                        listOf(0, 2, 3)
+                    )
 
-                add(
-                    Node(
-                        primitive = Mesh(
-                            vertices = vertices,
-                            uvs = listOf(
-                                // Map the corners of the texture to the markers.
-                                floatArrayOf(0f, 0f), // Top-left
-                                floatArrayOf(1f, 0f), // Top-right
-                                floatArrayOf(1f, 1f), // Bottom-right
-                                floatArrayOf(0f, 1f)  // Bottom-left
-                            ),
-                            triangles = triangles,
-                            material = material
+                    add(
+                        Node(
+                            engine = engine,
+                            primitive = Mesh(
+                                engine = engine,
+                                vertices = vertices,
+                                uvs = listOf(
+                                    floatArrayOf(0f, 0f), // Top-left
+                                    floatArrayOf(1f, 0f), // Top-right
+                                    floatArrayOf(1f, 1f), // Bottom-right
+                                    floatArrayOf(0f, 1f)  // Bottom-left
+                                ),
+                                triangles = triangles,
+                                materialInstance = material
+                            )
                         )
                     )
-                )
+                }
             }
         }
     )
@@ -140,10 +153,22 @@ fun ArModeScreen(modifier: Modifier = Modifier, viewModel: MainViewModel) {
 
 @Composable
 private fun CursorMaterial(): MaterialInstance {
-    return rememberMaterial(Material(baseColor = Color.Green.copy(alpha = 0.5f)))
+    val engine = LocalEngine.current
+    return remember(engine) {
+        MaterialProvider.getInstance(engine).createColoredMaterialInstance(
+            color = Color.Green.copy(alpha = 0.5f),
+            isLit = false
+        )
+    }
 }
 
 @Composable
 private fun MarkerMaterial(): MaterialInstance {
-    return rememberMaterial(Material(baseColor = Color.Red.copy(alpha = 0.7f)))
+    val engine = LocalEngine.current
+    return remember(engine) {
+        MaterialProvider.getInstance(engine).createColoredMaterialInstance(
+            color = Color.Red.copy(alpha = 0.7f),
+            isLit = false
+        )
+    }
 }

@@ -92,6 +92,7 @@ dependencies {
     implementation(libs.apache.commons.math)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.az.nav.rail)
+    implementation(libs.filament.android)
 
 
     debugImplementation(libs.compose.ui.tooling)
