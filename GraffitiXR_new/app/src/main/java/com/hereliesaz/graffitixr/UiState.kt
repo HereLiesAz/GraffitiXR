@@ -6,9 +6,8 @@ package com.hereliesaz.graffitixr
  * to render the user interface at any given time.
  */
 import android.net.Uri
-import android.net.Uri
 import androidx.compose.ui.geometry.Offset
-import androidx.xr.core.Pose
+import androidx.xr.runtime.math.Pose
 
 /**
  * Enum to represent the different editor modes.

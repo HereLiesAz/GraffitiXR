@@ -1,11 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
     namespace = "com.hereliesaz.graffitixr"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
@@ -30,17 +31,14 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
     }
     packaging {
         resources {
@@ -73,9 +71,11 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     // AndroidXR
+    implementation(libs.androidx.xr.runtime)
     implementation(libs.androidx.xr.arcore)
     implementation(libs.androidx.xr.compose)
     implementation(libs.androidx.xr.scenecore)
+    implementation(libs.google.accompanist.permissions)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

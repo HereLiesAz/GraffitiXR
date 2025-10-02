@@ -2,29 +2,35 @@ package com.hereliesaz.graffitixr.composables
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMedia
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.ui.geometry.Offset
-import android.graphics.Matrix
-import androidx.compose.ui.graphics.asComposeMatrix
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -35,17 +41,6 @@ import com.hereliesaz.graffitixr.UiState
 /**
  * Composable for the mock-up mode on a static background image.
  * This screen will allow users to warp and edit an overlay image on a static background.
- *
- * @param uiState The current state of the UI.
- * @param onBackgroundImageSelected Callback for when a background image is selected.
- * @param onOverlayImageSelected Callback for when an overlay image is selected.
- * @param onOpacityChanged Callback for when the opacity is changed.
- * @param onContrastChanged Callback for when the contrast is changed.
- * @param onSaturationChanged Callback for when the saturation is changed.
- * @param onScaleChanged Callback for when the scale is changed.
- * @param onRotationChanged Callback for when the rotation is changed.
- * @param onPointsInitialized Callback for when the corner points are initialized.
- * @param onPointChanged Callback for when a corner point is changed.
  */
 @Composable
 fun StaticImageEditor(
@@ -72,16 +67,20 @@ fun StaticImageEditor(
         uri?.let { onOverlayImageSelected(it) }
     }
 
-    val colorMatrix = ColorMatrix().apply {
-        setToSaturation(uiState.saturation)
-        val contrast = uiState.contrast
-        val contrastMatrix = floatArrayOf(
-            contrast, 0f, 0f, 0f, (1 - contrast) * 128,
-            0f, contrast, 0f, 0f, (1 - contrast) * 128,
-            0f, 0f, contrast, 0f, (1 - contrast) * 128,
-            0f, 0f, 0f, 1f, 0f
-        )
-        postConcat(ColorMatrix(contrastMatrix))
+    val colorMatrix = remember(uiState.saturation, uiState.contrast) {
+        ColorMatrix().apply {
+            setToSaturation(uiState.saturation)
+            val contrast = uiState.contrast
+            val contrastMatrix = ColorMatrix(
+                floatArrayOf(
+                    contrast, 0f, 0f, 0f, (1 - contrast) * 128,
+                    0f, contrast, 0f, 0f, (1 - contrast) * 128,
+                    0f, 0f, contrast, 0f, (1 - contrast) * 128,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+            timesAssign(contrastMatrix)
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -113,20 +112,10 @@ fun StaticImageEditor(
                         }
                     }
             ) {
-                val perspectiveMatrix = remember(uiState.points) {
-                    Matrix().apply {
-                        if (uiState.points.size == 4) {
-                            val (w, h) = uiState.points[2] - uiState.points[0]
-                            setPolyToPoly(
-                                floatArrayOf(0f, 0f, w, 0f, w, h, 0f, h),
-                                0,
-                                uiState.points.flatMap { listOf(it.x, it.y) }.toFloatArray(),
-                                0,
-                                4
-                            )
-                        }
-                    }
-                }
+                // TODO: Restore perspective warp. The `graphicsLayer` API has changed, and
+                //  there is no direct replacement for applying a 2D perspective matrix.
+                //  A custom solution using a combination of other modifiers or a custom
+                //  layout would be required to re-implement this feature.
 
                 AsyncImage(
                     model = it,
@@ -137,10 +126,7 @@ fun StaticImageEditor(
                             scaleX = uiState.scale,
                             scaleY = uiState.scale,
                             rotationZ = uiState.rotation
-                        )
-                        .graphicsLayer {
-                            transformations.setFrom(perspectiveMatrix.asComposeMatrix())
-                        },
+                        ),
                     alpha = uiState.opacity,
                     colorFilter = ColorFilter.colorMatrix(colorMatrix)
                 )
@@ -148,12 +134,12 @@ fun StaticImageEditor(
                 // Draw the draggable points
                 if (uiState.points.isNotEmpty()) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        uiState.points.forEachIndexed { index, offset ->
+                        uiState.points.forEachIndexed { _, offset ->
                             drawCircle(
                                 color = Color.White,
                                 radius = 20f,
                                 center = offset,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5f)
+                                style = Stroke(width = 5f)
                             )
                         }
                     }
@@ -189,14 +175,14 @@ fun StaticImageEditor(
             ) {
                 Button(onClick = {
                     backgroundPickerLauncher.launch(
-                        PickVisualMedia.Request(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
                 }) {
                     Text("Select Background")
                 }
                 Button(onClick = {
                     overlayPickerLauncher.launch(
-                        PickVisualMedia.Request(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
                 }) {
                     Text("Select Overlay")
