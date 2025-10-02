@@ -3,7 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera.ar" android:required="true" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -25,7 +26,7 @@
             </intent-filter>
         </activity>
 
-        <meta-data android:name="com.google.ar.core" android:value="required" />
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
     </application>
 
 </manifest>

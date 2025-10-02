@@ -3,7 +3,9 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import android.app.Application
 import android.content.Context
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
+import androidx.xr.runtime.math.Pose
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,8 +80,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(scale = it.scale * scale) }
     }
 
-import androidx.compose.ui.geometry.Offset
-
     /**
      * Updates the rotation of the overlay image.
      * @param rotation The change in rotation value.
@@ -111,8 +111,6 @@ import androidx.compose.ui.geometry.Offset
             currentState.copy(points = updatedPoints)
         }
     }
-
-import androidx.xr.core.Pose
 
     /**
      * Changes the current editor mode.
