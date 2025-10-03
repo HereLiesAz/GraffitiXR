@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.composables
 import android.Manifest
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
@@ -10,7 +11,12 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -23,24 +29,29 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.hereliesaz.graffitixr.UiState
 
 /**
- * Composable for the simple camera overlay mode.
- * This screen is a fallback for devices that do not support AR.
+ * A composable screen for the "On-the-Go" non-AR camera overlay mode.
  *
- * @param uiState The current state of the UI.
- * @param onOverlayImageSelected Callback for when an overlay image is selected.
- * @param onOpacityChanged Callback for when the opacity is changed.
- * @param onContrastChanged Callback for when the contrast is changed.
- * @param onSaturationChanged Callback for when the saturation is changed.
- * @param onScaleChanged Callback for when the scale is changed.
- * @param onRotationChanged Callback for when the rotation is changed.
+ * This screen provides a lightweight way to preview a mural in a real-world environment.
+ * It uses [CameraX] to display a live camera feed and overlays the selected mural image
+ * on top. Users can perform basic transformations like scaling and rotating the overlay
+ * via touch gestures, and adjust its appearance using sliders. This mode serves as a
+ * fallback for devices that do not support ARCore or for users who want a quick preview.
+ *
+ * @param uiState The current state of the UI, containing all necessary data for rendering.
+ * @param onOverlayImageSelected A callback function invoked when the user selects a new overlay image.
+ * @param onOpacityChanged A callback function invoked when the user adjusts the opacity slider.
+ * @param onContrastChanged A callback function invoked when the user adjusts the contrast slider.
+ * @param onSaturationChanged A callback function invoked when the user adjusts the saturation slider.
+ * @param onScaleChanged A callback function invoked during a transform gesture to update the overlay image's scale.
+ * @param onRotationChanged A callback function invoked during a transform gesture to update the overlay image's rotation.
  */
 @Composable
 fun NonArModeScreen(
@@ -71,16 +82,20 @@ fun NonArModeScreen(
         uri?.let { onOverlayImageSelected(it) }
     }
 
-    val colorMatrix = ColorMatrix().apply {
-        setToSaturation(uiState.saturation)
-        val contrast = uiState.contrast
-        val contrastMatrix = floatArrayOf(
-            contrast, 0f, 0f, 0f, (1 - contrast) * 128,
-            0f, contrast, 0f, 0f, (1 - contrast) * 128,
-            0f, 0f, contrast, 0f, (1 - contrast) * 128,
-            0f, 0f, 0f, 1f, 0f
-        )
-        postConcat(ColorMatrix(contrastMatrix))
+    val colorMatrix = remember(uiState.saturation, uiState.contrast) {
+        ColorMatrix().apply {
+            setToSaturation(uiState.saturation)
+            val contrast = uiState.contrast
+            val contrastMatrix = ColorMatrix(
+                floatArrayOf(
+                    contrast, 0f, 0f, 0f, (1 - contrast) * 128,
+                    0f, contrast, 0f, 0f, (1 - contrast) * 128,
+                    0f, 0f, contrast, 0f, (1 - contrast) * 128,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+            timesAssign(contrastMatrix)
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -109,7 +124,6 @@ fun NonArModeScreen(
             )
         }
 
-        // Display the overlay image if selected
         uiState.overlayImageUri?.let {
             Box(
                 modifier = Modifier
@@ -137,7 +151,6 @@ fun NonArModeScreen(
             }
         }
 
-        // Control Panel
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -147,7 +160,7 @@ fun NonArModeScreen(
             Button(
                 onClick = {
                     overlayPickerLauncher.launch(
-                        ActivityResultContracts.PickVisualMedia.Request(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
                 },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -157,15 +170,12 @@ fun NonArModeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Opacity Slider
             Text("Opacity", color = Color.White)
             Slider(value = uiState.opacity, onValueChange = onOpacityChanged)
 
-            // Contrast Slider
             Text("Contrast", color = Color.White)
             Slider(value = uiState.contrast, onValueChange = onContrastChanged, valueRange = 0f..2f)
 
-            // Saturation Slider
             Text("Saturation", color = Color.White)
             Slider(value = uiState.saturation, onValueChange = onSaturationChanged, valueRange = 0f..2f)
         }

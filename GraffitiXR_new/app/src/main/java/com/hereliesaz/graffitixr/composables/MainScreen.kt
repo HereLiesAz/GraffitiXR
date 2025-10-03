@@ -16,11 +16,15 @@ import com.hereliesaz.graffitixr.EditorMode
 import com.hereliesaz.graffitixr.MainViewModel
 
 /**
- * The main screen of the application.
- * This composable will act as a router to display the correct
- * editor mode based on the current UI state.
+ * The main screen of the application, serving as the primary UI entry point.
  *
- * @param viewModel The [MainViewModel] instance for the application.
+ * This composable acts as a router, observing the `uiState` from the [MainViewModel] and
+ * displaying the appropriate editor screen (`StaticImageEditor` or `NonArModeScreen`)
+ * based on the current [EditorMode]. It also manages the display of the onboarding dialog
+ * for each mode and provides the top-level navigation controls for switching between modes.
+ *
+ * @param viewModel The central [MainViewModel] instance for the application, which provides
+ * the UI state and handles all user events.
  */
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
@@ -31,7 +35,6 @@ fun MainScreen(viewModel: MainViewModel) {
         val (title, message) = when (uiState.editorMode) {
             EditorMode.STATIC -> "Mock-up Mode" to "Use this mode to project an image onto a static background. You can warp the image, adjust its properties, and see how it looks."
             EditorMode.NON_AR -> "On-the-Go Mode" to "This mode uses your camera to overlay the image in a real-world environment, without AR tracking. It's great for quick previews."
-            EditorMode.AR -> "AR Mode" to "Enter Augmented Reality. Scan your environment, tap on a surface to place markers, and see your image projected in 3D space."
         }
         OnboardingDialog(
             title = title,
@@ -52,9 +55,6 @@ fun MainScreen(viewModel: MainViewModel) {
             }
             Button(onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) }) {
                 Text("Non-AR")
-            }
-            Button(onClick = { viewModel.onEditorModeChanged(EditorMode.AR) }) {
-                Text("AR")
             }
         }
 
@@ -79,10 +79,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 onSaturationChanged = viewModel::onSaturationChanged,
                 onScaleChanged = viewModel::onScaleChanged,
                 onRotationChanged = viewModel::onRotationChanged
-            )
-            EditorMode.AR -> ArModeScreen(
-                uiState = uiState,
-                onArMarkerPlaced = viewModel::onArMarkerPlaced
             )
         }
     }
