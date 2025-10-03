@@ -92,7 +92,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
                 }
                 EditorMode.MOCK_UP -> {
-                    azRailItem(id = "overlay", text = "Overlay") {
+                    azRailItem(id = "overlay", text = "Image") {
                         overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                     azRailItem(id = "background", text = "Background") {
