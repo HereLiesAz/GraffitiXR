@@ -4,7 +4,7 @@ GraffitiXR is an android app for street artists. There are plenty of apps that o
 
 So I'm making something better. I've used the grid method myself when getting a big piece up, and I keep thinking, "Why can't these specific scribbes be saved so that the image always just pops up right there, in the right place?" So, now they can. Progress tracking replaces those marks with the piece itself as you go, like an ever-evolving location fingerprint. 
 
-Just for shits and giggles, I included the non-AR version for image tracing just like you get with those other apps, too. Just in case you cray like that. 
+Just for shits and giggles, I included the non-AR version for image tracing just like you get with those other apps, too. Just in case you cray like that.      
 Or if you cray-cray, there's Mockup mode. Nab a picture of the wall, cuz I got some quick tools for a quick mockup. 
 
 
