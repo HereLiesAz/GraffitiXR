@@ -1,6 +1,5 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-  <!-- Base application theme. -->
-  <style name="Theme.GraffitiXR" parent="Theme.Material3.DayNight.NoActionBar">
-    <!-- Customize your theme here. -->
-  </style>
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.GraffitiXR" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>
