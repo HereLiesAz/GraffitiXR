@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -66,9 +67,12 @@ fun MainScreen(viewModel: MainViewModel) {
 
         val railState = rememberAzNavRailState()
         AzNavRail(state = railState) {
-            azSettings(isLoading = false,
+            azSettings(
+                isLoading = false,
                 packRailButtons = true,
-                backgroundColor = if (railState.isExpanded) MaterialTheme.colorScheme.surface else Color.Transparent
+                colors = AzNavRailDefaults.colors(
+                    backgroundColor = if (railState.isExpanded) MaterialTheme.colorScheme.surface else Color.Transparent
+                )
             )
 
 
