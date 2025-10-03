@@ -15,6 +15,8 @@ import java.nio.FloatBuffer
 class BackgroundRenderer {
     private var quadCoords: FloatBuffer? = null
     private var quadTexCoords: FloatBuffer? = null
+    private var quadTexCoordsCanonical: FloatBuffer? = null
+
     private var quadProgram = 0
     private var quadPositionAttrib = 0
     private var quadTexCoordAttrib = 0
@@ -42,6 +44,13 @@ class BackgroundRenderer {
         val bbTexCoords = ByteBuffer.allocateDirect(numVertices * TEXCOORDS_PER_VERTEX * BYTES_PER_FLOAT)
         bbTexCoords.order(ByteOrder.nativeOrder())
         quadTexCoords = bbTexCoords.asFloatBuffer()
+
+        val bbTexCoordsCanonical =
+            ByteBuffer.allocateDirect(QUAD_TEX_COORDS.size * BYTES_PER_FLOAT)
+        bbTexCoordsCanonical.order(ByteOrder.nativeOrder())
+        quadTexCoordsCanonical = bbTexCoordsCanonical.asFloatBuffer()
+        quadTexCoordsCanonical!!.put(QUAD_TEX_COORDS)
+        quadTexCoordsCanonical!!.position(0)
 
         val vertexShader = ShaderUtil.loadGLShader(TAG, VERTEX_SHADER, GLES20.GL_VERTEX_SHADER)
         val fragmentShader = ShaderUtil.loadGLShader(TAG, FRAGMENT_SHADER, GLES20.GL_FRAGMENT_SHADER)
@@ -72,7 +81,7 @@ class BackgroundRenderer {
             // This is to avoid drawing possible leftover data from previous sessions if the texture is reused.
             frame.transformCoordinates2d(
                 Coordinates2d.TEXTURE_NORMALIZED,
-                quadTexCoords!!,
+                quadTexCoordsCanonical!!,
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadTexCoords!!
             )
@@ -97,6 +106,12 @@ class BackgroundRenderer {
         private const val TEXCOORDS_PER_VERTEX = 2
         private const val BYTES_PER_FLOAT = 4
         private val QUAD_COORDS = floatArrayOf(-1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 1.0f)
+        private val QUAD_TEX_COORDS = floatArrayOf(
+            0.0f, 1.0f,
+            0.0f, 0.0f,
+            1.0f, 1.0f,
+            1.0f, 0.0f
+        )
         private const val VERTEX_SHADER = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;
