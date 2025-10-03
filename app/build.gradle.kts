@@ -71,8 +71,14 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    // AndroidXR
+    // Permissions
     implementation(libs.google.accompanist.permissions)
+
+    // AzNavRail
+    implementation(libs.aznavrail)
+
+    // OpenCV
+    implementation(libs.opencv.android)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
