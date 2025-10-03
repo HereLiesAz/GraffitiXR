@@ -74,6 +74,9 @@ dependencies {
     // AndroidXR
     implementation(libs.google.accompanist.permissions)
 
+    // Background Remover
+    implementation(libs.auto.background.remover)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

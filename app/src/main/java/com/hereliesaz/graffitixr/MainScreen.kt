@@ -1,0 +1,118 @@
+package com.hereliesaz.graffitixr
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
+import com.hereliesaz.graffitixr.ui.composables.ArModeScreen
+import com.hereliesaz.graffitixr.ui.composables.ImageTraceScreen
+import com.hereliesaz.graffitixr.ui.composables.MockupScreen
+import com.hereliesaz.graffitixr.ui.navigation.AzNavRail
+import com.hereliesaz.graffitixr.ui.navigation.azMenuCycler
+import com.hereliesaz.graffitixr.ui.navigation.azRailItem
+import com.hereliesaz.graffitixr.ui.navigation.azRailToggle
+import com.hereliesaz.graffitixr.ui.navigation.azSettings
+
+@Composable
+fun MainScreen(viewModel: MainViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+    var showSliderDialog by remember { mutableStateOf<String?>(null) }
+
+    val overlayImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { viewModel.onOverlayImageSelected(it) } }
+
+    val backgroundImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 80.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            when (uiState.editorMode) {
+                EditorMode.STATIC -> MockupScreen(
+                    uiState = uiState,
+                    onPointsChanged = { },
+                    isWarpEnabled = false,
+                    onPointsInitialized = { }
+                )
+                EditorMode.NON_AR -> ImageTraceScreen(
+                    uiState = uiState,
+                    onScaleChanged = viewModel::onScaleChanged,
+                    onRotationChanged = viewModel::onRotationChanged,
+                )
+            }
+        }
+
+        AzNavRail {
+            azSettings(isLoading = false) // Assuming loading state is handled elsewhere
+
+            azMenuCycler(
+                id = "mode_cycler",
+                options = EditorMode.values().map { it.name },
+                selectedOption = uiState.editorMode.name,
+                onClick = {
+                    val nextMode = EditorMode.values()[(uiState.editorMode.ordinal + 1) % EditorMode.values().size]
+                    viewModel.onEditorModeChanged(nextMode)
+                }
+            )
+
+            azRailItem(id = "overlay", text = "Overlay") {
+                overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }
+
+            if (uiState.editorMode == EditorMode.STATIC) {
+                azRailItem(id = "background", text = "Background") {
+                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+            }
+
+            if (uiState.overlayImageUri != null) {
+                 azRailItem(id = "remove_bg", text = "Remove BG", onClick = viewModel::onRemoveBackgroundClicked)
+            }
+
+            azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
+            azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
+            azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+        }
+
+        when (showSliderDialog) {
+            "Opacity" -> AdjustmentSliderDialog(
+                title = "Opacity",
+                value = uiState.opacity,
+                onValueChange = viewModel::onOpacityChanged,
+                onDismissRequest = { showSliderDialog = null }
+            )
+            "Contrast" -> AdjustmentSliderDialog(
+                title = "Contrast",
+                value = uiState.contrast,
+                onValueChange = viewModel::onContrastChanged,
+                onDismissRequest = { showSliderDialog = null },
+                valueRange = 0f..2f
+            )
+            "Saturation" -> AdjustmentSliderDialog(
+                title = "Saturation",
+                value = uiState.saturation,
+                onValueChange = viewModel::onSaturationChanged,
+                onDismissRequest = { showSliderDialog = null },
+                valueRange = 0f..2f
+            )
+        }
+    }
+}

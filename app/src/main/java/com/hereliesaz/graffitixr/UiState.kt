@@ -49,6 +49,7 @@ data class UiState(
     val editorMode: EditorMode = EditorMode.STATIC,
     val backgroundImageUri: Uri? = null,
     val overlayImageUri: Uri? = null,
+    val backgroundRemovedImageUri: Uri? = null,
     val opacity: Float = 1f,
     val contrast: Float = 1f,
     val saturation: Float = 1f,

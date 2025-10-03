@@ -14,9 +14,11 @@ coil = "2.5.0"
 arcore = "1.40.0"
 camerax = "1.3.1"
 accompanistPermissions = "0.34.0"
+autoBackgroundRemover = "1.0.7"
 
 [libraries]
 google-accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
+auto-background-remover = { group = "com.github.GhayasAhmad", name = "auto-background-remover", version.ref = "autoBackgroundRemover" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
