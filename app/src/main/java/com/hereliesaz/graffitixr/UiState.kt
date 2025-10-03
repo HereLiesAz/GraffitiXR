@@ -1,106 +1,65 @@
 package com.hereliesaz.graffitixr
 
+/**
+ * Represents the immutable state of the UI.
+ * This data class will hold all the necessary information
+ * to render the user interface at any given time.
+ */
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 
 /**
- * Defines the different operating modes of the application.
+ * Represents the different editing modes available in the application.
+ * Each mode provides a distinct user experience for visualizing the mural.
  */
 enum class EditorMode {
-    IMAGE_TRACE,
-    MOCK_UP,
-    AR_OVERLAY
+    /**
+     * A mode for mocking up a mural on a static background image.
+     * This allows for precise placement and adjustments in a controlled environment.
+     */
+    STATIC,
+
+    /**
+     * A mode for overlaying a mural on a live camera feed without using
+     * Augmented Reality tracking. This is a lightweight option for quick, on-the-go previews.
+     */
+    NON_AR,
+
+    /**
+     * A mode for projecting a mural onto a real-world surface using
+     * Augmented Reality. This mode provides the most immersive and realistic visualization.
+     */
+    AR_OVERLAY,
 }
 
 /**
  * Represents the complete and immutable state of the user interface at any given time.
  *
- * @property editorMode The currently active editor mode.
- * @property overlayImageUri The [Uri] of the artwork image selected by the user.
- * @property backgroundImageUri The [Uri] of the background image for mock-up mode.
- * @property opacity The transparency of the overlay image.
- * @property contrast The contrast of the overlay image.
- * @property saturation The color saturation of the overlay image.
- * @property imageTraceScale The scale factor for the overlay in Image Trace mode.
- * @property imageTraceOffset The offset for the overlay in Image Trace mode.
- * @property mockupPoints The list of four [Offset] points for the perspective warp in mock-up mode.
- * @property arImagePose The pose of the manually placed image in AR mode.
- * @property arFeaturePattern The unique "fingerprint" of the locked AR scene.
- * @property isArLocked A flag indicating whether the AR projection is locked.
- * @property isLoading A flag to indicate that a background process is running.
- * @property isWarpEnabled A flag indicating if the warp handles should be active.
- * @property mockupPointsHistory A list of previous states of `mockupPoints`.
- * @property mockupPointsHistoryIndex The current position in the `mockupPointsHistory`.
+ * This data class acts as the single source of truth for the UI. It is observed by the
+ * composables, and any change to an instance of this class will trigger a recomposition
+ * to reflect the new state. All properties have default values to ensure a consistent
+ * initial state.
+ *
+ * @property editorMode The currently active editor mode, which determines the main screen content. See [EditorMode].
+ * @property backgroundImageUri The [Uri] of the image selected by the user to serve as the background. This is only used in [EditorMode.STATIC].
+ * @property overlayImageUri The [Uri] of the mural or artwork image selected by the user to be overlaid on the background or camera feed.
+ * @property opacity The transparency of the overlay image, ranging from 0.0f (fully transparent) to 1.0f (fully opaque).
+ * @property contrast The contrast of the overlay image. A value of 1.0f is normal contrast.
+ * @property saturation The color saturation of the overlay image. A value of 0.0f is grayscale, and 1.0f is normal saturation.
+ * @property scale The uniform scale factor applied to the overlay image. Used for pinch-to-zoom gestures.
+ * @property rotation The rotation angle of the overlay image in degrees. Used for twist gestures.
+ * @property points A list of four [Offset] points representing the corners of the overlay image for perspective warping in non-AR modes.
+ * @property completedOnboardingModes A set containing the [EditorMode]s for which the user has already seen and dismissed the onboarding dialog. This is used to prevent showing the dialog repeatedly.
  */
 data class UiState(
-    val editorMode: EditorMode = EditorMode.IMAGE_TRACE,
-    val overlayImageUri: Uri? = null,
+    val editorMode: EditorMode = EditorMode.STATIC,
     val backgroundImageUri: Uri? = null,
-    val opacity: Float = 1.0f,
-    val contrast: Float = 1.0f,
-    val saturation: Float = 1.0f,
-    // Image Trace State
-    val imageTraceScale: Float = 1f,
-    val imageTraceOffset: Offset = Offset.Zero,
-    // Mock-up State
-    val mockupPoints: List<Offset> = emptyList(),
-    val isWarpEnabled: Boolean = false,
-    val mockupPointsHistory: List<List<Offset>> = emptyList(),
-    val mockupPointsHistoryIndex: Int = -1,
-    // AR State
-    val arImagePose: FloatArray? = null,
-    val arFeaturePattern: ArFeaturePattern? = null,
-    val isArLocked: Boolean = false,
-    // Global State
-    val isLoading: Boolean = false
-) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as UiState
-
-        if (editorMode != other.editorMode) return false
-        if (overlayImageUri != other.overlayImageUri) return false
-        if (backgroundImageUri != other.backgroundImageUri) return false
-        if (opacity != other.opacity) return false
-        if (contrast != other.contrast) return false
-        if (saturation != other.saturation) return false
-        if (imageTraceScale != other.imageTraceScale) return false
-        if (imageTraceOffset != other.imageTraceOffset) return false
-        if (mockupPoints != other.mockupPoints) return false
-        if (isWarpEnabled != other.isWarpEnabled) return false
-        if (mockupPointsHistory != other.mockupPointsHistory) return false
-        if (mockupPointsHistoryIndex != other.mockupPointsHistoryIndex) return false
-        if (arImagePose != null) {
-            if (other.arImagePose == null) return false
-            if (!arImagePose.contentEquals(other.arImagePose)) return false
-        } else if (other.arImagePose != null) return false
-        if (arFeaturePattern != other.arFeaturePattern) return false
-        if (isArLocked != other.isArLocked) return false
-        if (isLoading != other.isLoading) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = editorMode.hashCode()
-        result = 31 * result + (overlayImageUri?.hashCode() ?: 0)
-        result = 31 * result + (backgroundImageUri?.hashCode() ?: 0)
-        result = 31 * result + opacity.hashCode()
-        result = 31 * result + contrast.hashCode()
-        result = 31 * result + saturation.hashCode()
-        result = 31 * result + imageTraceScale.hashCode()
-        result = 31 * result + imageTraceOffset.hashCode()
-        result = 31 * result + mockupPoints.hashCode()
-        result = 31 * result + isWarpEnabled.hashCode()
-        result = 31 * result + mockupPointsHistory.hashCode()
-        result = 31 * result + mockupPointsHistoryIndex
-        result = 31 * result + (arImagePose?.contentHashCode() ?: 0)
-        result = 31 * result + (arFeaturePattern?.hashCode() ?: 0)
-        result = 31 * result + isArLocked.hashCode()
-        result = 31 * result + isLoading.hashCode()
-        return result
-    }
-}
+    val overlayImageUri: Uri? = null,
+    val opacity: Float = 1f,
+    val contrast: Float = 1f,
+    val saturation: Float = 1f,
+    val scale: Float = 1f,
+    val rotation: Float = 0f,
+    val points: List<Offset> = emptyList(),
+    val completedOnboardingModes: Set<EditorMode> = emptySet()
+)

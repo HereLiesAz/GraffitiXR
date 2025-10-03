@@ -1,213 +1,131 @@
 package com.hereliesaz.graffitixr.graphics
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
-import android.view.MotionEvent
-import android.view.View
-import coil.imageLoader
-import coil.request.ImageRequest
-import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
-import com.google.ar.core.Config
-import com.google.ar.core.Frame
-import com.google.ar.core.Plane
 import com.google.ar.core.Session
-import com.google.ar.core.TrackingState
-import com.google.ar.core.exceptions.NotYetAvailableException
-import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import org.opencv.core.Mat
-import java.util.concurrent.ConcurrentLinkedQueue
+import com.google.ar.core.exceptions.CameraNotAvailableException
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 /**
- * A custom renderer for handling the ARCore session and rendering content.
- *
- * @param context The application context.
- * @param view The GLSurfaceView, used for getting dimensions for homography calculation.
- * @param onArImagePlaced A callback invoked when the user places the initial image.
- * @param onArFeaturesDetected A callback invoked when the feature "fingerprint" of the scene is generated.
+ * The main renderer for the AR scene.
+ * This class implements the GLSurfaceView.Renderer interface and is responsible for
+ * managing the ARCore session, drawing the camera background, and rendering any virtual objects.
  */
-class ArRenderer(
-    private val context: Context,
-    private val view: View,
-    private val onArImagePlaced: (Anchor) -> Unit,
-    private val onArFeaturesDetected: (ArFeaturePattern) -> Unit
-) : GLSurfaceView.Renderer {
+import com.google.ar.core.Anchor
+import com.google.ar.core.Frame
+import com.google.ar.core.HitResult
+import com.google.ar.core.Plane
+import com.google.ar.core.Trackable
+import com.google.ar.core.TrackingState
+import com.hereliesaz.graffitixr.UiState
+
+class ArRenderer(private val context: Context, private val onSessionInitialized: (Session) -> Unit) : GLSurfaceView.Renderer {
 
     private var session: Session? = null
     private val backgroundRenderer = BackgroundRenderer()
-    private val planeRenderer = PlaneRenderer()
-    private val simpleQuadRenderer = SimpleQuadRenderer()
-    private val projectedImageRenderer = ProjectedImageRenderer()
-    private val markerDetector = MarkerDetector()
-    private val displayRotationHelper = DisplayRotationHelper(context)
+    private val objectRenderer = ObjectRenderer()
+    private var displayRotationHelper: DisplayRotationHelper = DisplayRotationHelper(context)
 
-    private val tapQueue = ConcurrentLinkedQueue<MotionEvent>()
-
-    // State from ViewModel
-    var arImagePose: FloatArray? = null
-    var arFeaturePattern: ArFeaturePattern? = null
-    var overlayImageUri: Uri? = null
-    var isArLocked: Boolean = false
-    var opacity: Float = 1.0f
-
-    private var overlayBitmap: Bitmap? = null
-    private var lastLoadedUri: Uri? = null
-    private var featurePatternGenerated = false
+    val anchors = mutableListOf<Anchor>()
+    var uiState: UiState = UiState()
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer.createOnGlThread()
-        planeRenderer.createOnGlThread()
-        simpleQuadRenderer.createOnGlThread()
-        projectedImageRenderer.createOnGlThread()
+        objectRenderer.createOnGlThread(context)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        displayRotationHelper.onSurfaceChanged(width, height)
         GLES20.glViewport(0, 0, width, height)
+        displayRotationHelper.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-
-        session ?: return
-
-        displayRotationHelper.updateSessionIfNeeded(session!!)
-        val frame = session!!.update()
-        backgroundRenderer.draw(frame)
-
-        val camera = frame.camera
-        if (camera.trackingState != TrackingState.TRACKING) return
-
-        if (isArLocked) {
-            if (!featurePatternGenerated) {
-                generateFeaturePattern(frame)
+        // Ensure ARCore session is initialized
+        if (session == null) {
+            // Check for ARCore availability and create a session
+            val availability = ArCoreApk.getInstance().checkAvailability(context)
+            if (availability.isTransient) {
+                // Re-check in a few frames
+                return
             }
-        } else {
-            handleTapForPlacement(frame)
-            featurePatternGenerated = false
-        }
-
-        val projectionMatrix = FloatArray(16)
-        camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
-        val viewMatrix = FloatArray(16)
-        camera.getViewMatrix(viewMatrix, 0)
-
-        if (!isArLocked) {
-            val planes = session!!.getAllTrackables(Plane::class.java)
-            for (plane in planes) {
-                if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                    planeRenderer.draw(plane, camera.displayOrientedPose, projectionMatrix)
-                }
+            session = if (availability.isSupported) {
+                Session(context).also { onSessionInitialized(it) }
+            } else {
+                // ARCore not supported or installed
+                null
             }
         }
 
-        if (overlayImageUri != lastLoadedUri) {
-            loadOverlayBitmap()
-        }
+        session?.let {
+            // Update the session display geometry if the rotation changes
+            displayRotationHelper.updateSessionIfNeeded(it)
 
-        val bmp = overlayBitmap
-        if (bmp != null) {
-            if (isArLocked) {
-                arFeaturePattern?.let { pattern ->
-                    val homography = HomographyHelper.calculateHomography(pattern.worldPoints, camera, view, bmp.width, bmp.height)
-                    homography?.let {
-                        projectedImageRenderer.draw(bmp, it, opacity)
+            try {
+                it.setCameraTextureName(backgroundRenderer.textureId)
+                val frame = it.update()
+                backgroundRenderer.draw(frame)
+
+                val camera = frame.camera
+                if(camera.trackingState == TrackingState.PAUSED) return@let
+
+                // Get projection matrix.
+                val projmtx = FloatArray(16)
+                camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
+
+                // Get camera matrix and draw objects.
+                val viewmtx = FloatArray(16)
+                camera.getViewMatrix(viewmtx, 0)
+
+                // Draw all placed anchors
+                for (anchor in anchors) {
+                    if (anchor.trackingState == TrackingState.TRACKING) {
+                        objectRenderer.draw(
+                            viewmtx,
+                            projmtx,
+                            anchor,
+                            uiState.opacity,
+                            uiState.contrast,
+                            uiState.saturation
+                        )
                     }
                 }
-            } else {
-                arImagePose?.let {
-                    simpleQuadRenderer.draw(it, viewMatrix, projectionMatrix, bmp, opacity)
-                }
+
+            } catch (e: CameraNotAvailableException) {
+                // Handle camera not available exception
             }
         }
     }
 
-    fun onSurfaceTapped(event: MotionEvent) {
-        if (!isArLocked) {
-            tapQueue.add(event)
-        }
+    fun updateTexture(uri: android.net.Uri) {
+        objectRenderer.updateTexture(context, uri)
     }
 
-    private fun handleTapForPlacement(frame: Frame) {
-        val tap = tapQueue.poll() ?: return
-        for (hit in frame.hitTest(tap)) {
+    fun handleTap(frame: com.google.ar.core.Frame, x: Float, y: Float) {
+        for (hit in frame.hitTest(x, y)) {
             val trackable = hit.trackable
+            // Check if the hit was on a plane
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                onArImagePlaced(hit.createAnchor())
-                break
-            }
-        }
-    }
-
-    private fun generateFeaturePattern(frame: Frame) {
-        try {
-            val image = frame.acquireCameraImage()
-            val mat = ImageConverter.toMat(image)
-            val (keypoints, descriptors) = markerDetector.detectAndCompute(mat)
-            image.close()
-
-            val worldPoints = mutableListOf<FloatArray>()
-            val validDescriptorsList = mutableListOf<Mat>()
-
-            keypoints.toList().forEachIndexed { i, keypoint ->
-                val hitResults = frame.hitTest(keypoint.pt.x.toFloat(), keypoint.pt.y.toFloat())
-                if (hitResults.isNotEmpty()) {
-                    val hitResult = hitResults.first()
-                    val pose = hitResult.hitPose
-                    worldPoints.add(floatArrayOf(pose.tx(), pose.ty(), pose.tz()))
-                    validDescriptorsList.add(descriptors.row(i))
-                }
-            }
-
-            if (worldPoints.size >= 4) { // Need at least 4 points for homography
-                val patternDescriptors = Mat()
-                org.opencv.core.Core.vconcat(validDescriptorsList, patternDescriptors)
-                onArFeaturesDetected(ArFeaturePattern(patternDescriptors, worldPoints))
-                featurePatternGenerated = true
-            }
-        } catch (e: NotYetAvailableException) {
-            // Camera image not yet available
-        }
-    }
-
-    private fun loadOverlayBitmap() {
-        lastLoadedUri = overlayImageUri
-        overlayImageUri?.let { uri ->
-            CoroutineScope(Dispatchers.IO).launch {
-                val request = ImageRequest.Builder(context).data(uri).build()
-                overlayBitmap = (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                // Create an anchor at the hit pose
+                anchors.add(hit.createAnchor())
+                break // Stop after the first valid hit
             }
         }
     }
 
     fun onResume() {
-        if (session == null) {
-            try {
-                val installStatus = ArCoreApk.getInstance().requestInstall(context as android.app.Activity, true)
-                if (installStatus == ArCoreApk.InstallStatus.INSTALLED) {
-                    session = Session(context)
-                    val config = Config(session)
-                    config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                    session!!.configure(config)
-                }
-            } catch (e: UnavailableUserDeclinedInstallationException) {
-                // Handle error
-            }
-        }
+        // The GLSurfaceView's onResume() is called on the main thread.
+        // We need to make sure the ARCore session is resumed.
         session?.resume()
         displayRotationHelper.onResume()
     }
 
     fun onPause() {
+        // The GLSurfaceView's onPause() is called on the main thread.
+        // We need to make sure the ARCore session is paused.
         displayRotationHelper.onPause()
         session?.pause()
     }

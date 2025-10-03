@@ -2,30 +2,22 @@ package com.hereliesaz.graffitixr.graphics
 
 import android.app.Activity
 import android.content.Context
-import android.hardware.camera2.CameraAccessException
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraManager
 import android.hardware.display.DisplayManager
-import android.hardware.display.DisplayManager.DisplayListener
 import android.view.Display
 import android.view.WindowManager
 import com.google.ar.core.Session
 
 /**
- * Helper to track the display rotations. In ARCore, we need to know the camera sensor orientation
- * and the display rotation value. This data is used by ARCore to transform camera images and
- * projection matrices.
+ * Helper class to manage display rotation and update the ARCore session accordingly.
+ * This class is necessary to ensure that the AR camera feed is rendered correctly
+ * when the device is rotated. It is a standard component in ARCore applications.
  */
-class DisplayRotationHelper(private val context: Context) : DisplayListener {
-    private var isDeviceRotated = false
-    private val display: Display
-    private val displayManager: DisplayManager
-
-    init {
-        displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        display = windowManager.defaultDisplay
-    }
+class DisplayRotationHelper(private val context: Context) : DisplayManager.DisplayListener {
+    private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+    private var viewportChanged = false
+    private var viewportWidth = 0
+    private var viewportHeight = 0
+    private val display: Display = (context as Activity).windowManager.defaultDisplay
 
     fun onResume() {
         displayManager.registerDisplayListener(this, null)
@@ -36,20 +28,22 @@ class DisplayRotationHelper(private val context: Context) : DisplayListener {
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
-        // No-op
+        viewportWidth = width
+        viewportHeight = height
+        viewportChanged = true
     }
 
     fun updateSessionIfNeeded(session: Session) {
-        if (isDeviceRotated) {
+        if (viewportChanged) {
             val displayRotation = display.rotation
-            session.setDisplayGeometry(displayRotation, display.width, display.height)
-            isDeviceRotated = false
+            session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
+            viewportChanged = false
         }
     }
 
     override fun onDisplayAdded(displayId: Int) {}
     override fun onDisplayRemoved(displayId: Int) {}
     override fun onDisplayChanged(displayId: Int) {
-        isDeviceRotated = true
+        viewportChanged = true
     }
 }
