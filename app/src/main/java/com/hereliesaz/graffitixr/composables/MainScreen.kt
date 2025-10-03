@@ -61,10 +61,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
                 EditorMode.IMAGE_TRACE -> ImageTraceScreen(
                     uiState = uiState,
-                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                    onOpacityChanged = viewModel::onOpacityChanged,
-                    onContrastChanged = viewModel::onContrastChanged,
-                    onSaturationChanged = viewModel::onSaturationChanged,
                     onScaleChanged = viewModel::onScaleChanged,
                     onRotationChanged = viewModel::onRotationChanged
                 )

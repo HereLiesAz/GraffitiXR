@@ -5,6 +5,7 @@ import android.hardware.display.DisplayManager
 import android.os.Build
 import android.view.Display
 import android.view.WindowManager
+import androidx.core.content.ContextCompat.getSystemService
 import com.google.ar.core.Session
 
 /**
@@ -17,15 +18,15 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
     private var viewportChanged = false
     private var viewportWidth = 0
     private var viewportHeight = 0
-    private val display: Display
+    private val display: Display?
 
     init {
         display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            context.display!!
+            context.display
         } else {
             @Suppress("DEPRECATION")
-            val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            windowManager.defaultDisplay
+            val windowManager = getSystemService(context, WindowManager::class.java)
+            windowManager?.defaultDisplay
         }
     }
 
@@ -44,7 +45,7 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
     }
 
     fun updateSessionIfNeeded(session: Session) {
-        if (viewportChanged) {
+        if (viewportChanged && display != null) {
             val displayRotation = display.rotation
             session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
             viewportChanged = false
