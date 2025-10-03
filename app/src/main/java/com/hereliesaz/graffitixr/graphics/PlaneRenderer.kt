@@ -61,8 +61,10 @@ class PlaneRenderer {
         val modelMatrix = FloatArray(16)
         plane.centerPose.toMatrix(modelMatrix, 0)
         val modelViewMatrix = FloatArray(16)
+        val invertedCameraPose = FloatArray(16)
+        cameraPose.inverse().toMatrix(invertedCameraPose, 0)
         // Correct matrix multiplication order for view matrix
-        android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, cameraPose.inverse().asMatrix(), 0, modelMatrix, 0)
+        android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, invertedCameraPose, 0, modelMatrix, 0)
         val modelViewProjectionMatrix = FloatArray(16)
         android.opengl.Matrix.multiplyMM(modelViewProjectionMatrix, 0, cameraProjection, 0, modelViewMatrix, 0)
 

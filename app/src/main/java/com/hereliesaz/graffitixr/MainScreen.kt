@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.graffitixr.composables.NonArModeScreen
+import com.hereliesaz.graffitixr.composables.StaticImageEditorScreen
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 
 /**
@@ -46,8 +48,23 @@ fun MainScreen(viewModel: MainViewModel) {
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
-                EditorMode.STATIC -> StaticImageEditorScreen(uiState = uiState)
-                EditorMode.NON_AR -> NonArModeScreen(uiState = uiState)
+                EditorMode.STATIC -> StaticImageEditorScreen(
+                    uiState = uiState,
+                    onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                    onOpacityChanged = viewModel::onOpacityChanged,
+                    onContrastChanged = viewModel::onContrastChanged,
+                    onSaturationChanged = viewModel::onSaturationChanged
+                )
+                EditorMode.NON_AR -> NonArModeScreen(
+                    uiState = uiState,
+                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                    onOpacityChanged = viewModel::onOpacityChanged,
+                    onContrastChanged = viewModel::onContrastChanged,
+                    onSaturationChanged = viewModel::onSaturationChanged,
+                    onScaleChanged = viewModel::onScaleChanged,
+                    onRotationChanged = viewModel::onRotationChanged
+                )
                 EditorMode.IMAGE_TRACE -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onImageTraceScaleChanged,
@@ -119,7 +136,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
                 EditorMode.AR_OVERLAY -> {
                     azRailItem(id = "image", text = "Image") {
-                        overlayImagepicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                     azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
                     azRailToggle(

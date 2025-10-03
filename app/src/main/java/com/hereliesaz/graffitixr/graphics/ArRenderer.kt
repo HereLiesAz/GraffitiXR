@@ -111,7 +111,7 @@ class ArRenderer(private val context: Context, private val onSessionInitialized:
         objectRenderer.updateTexture(context, uri)
     }
 
-    private fun handleTap(frame: Frame, x: Float, y: Float) {
+    fun handleTap(frame: Frame, x: Float, y: Float) {
         for (hit in frame.hitTest(x, y)) {
             val trackable = hit.trackable
             // Check if the hit was on a plane
