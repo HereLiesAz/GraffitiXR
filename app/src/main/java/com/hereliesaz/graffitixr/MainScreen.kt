@@ -64,13 +64,16 @@ fun MainScreen(viewModel: MainViewModel) {
         }
 
         AzNavRail {
-            azSettings(isLoading = false) // Assuming loading state is handled elsewhere
+            azSettings(isLoading = false,
+                packRailButtons = true
 
-            azRailItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-            azRailItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
-            azRailItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+            ) // Assuming loading state is handled elsewhere
 
-            azRailItem(id = "overlay", text = "Overlay") {
+            azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+            azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
+            azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+
+            azRailItem(id = "overlay", text = "Image") {
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
 
@@ -81,7 +84,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
 
             if (uiState.overlayImageUri != null) {
-                 azRailItem(id = "remove_bg", text = "Remove BG", onClick = viewModel::onRemoveBackgroundClicked)
+                 azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
             }
 
             azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
