@@ -25,6 +25,8 @@ class SimpleQuadRenderer {
     private var texCoordBuffer: FloatBuffer? = null
     private var textureId = -1
 
+    private var lastBitmap: Bitmap? = null // To avoid reloading the same texture
+
     fun createOnGlThread() {
         val vertexShader =
             ShaderUtil.loadGLShader(TAG, VERTEX_SHADER, GLES20.GL_VERTEX_SHADER)
@@ -35,6 +37,15 @@ class SimpleQuadRenderer {
         GLES20.glAttachShader(program, vertexShader)
         GLES20.glAttachShader(program, fragmentShader)
         GLES20.glLinkProgram(program)
+
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            val log = GLES20.glGetProgramInfoLog(program)
+            GLES20.glDeleteProgram(program)
+            throw RuntimeException("Error linking program: $log")
+        }
+
         GLES20.glUseProgram(program)
 
         positionAttrib = GLES20.glGetAttribLocation(program, "a_Position")
@@ -54,10 +65,19 @@ class SimpleQuadRenderer {
         texCoordBuffer = bbTex.asFloatBuffer()
         texCoordBuffer!!.put(TEX_COORDS)
         texCoordBuffer!!.position(0)
+
+        // Generate texture handle
+        val textures = IntArray(1)
+        GLES20.glGenTextures(1, textures, 0)
+        textureId = textures[0]
     }
 
     fun draw(modelMatrix: FloatArray, viewMatrix: FloatArray, projectionMatrix: FloatArray, bitmap: Bitmap, alpha: Float) {
-        loadTexture(bitmap)
+        if (lastBitmap != bitmap) {
+            loadTexture(bitmap)
+            lastBitmap = bitmap
+        }
+
         GLES20.glUseProgram(program)
 
         val modelViewMatrix = FloatArray(16)
@@ -88,9 +108,6 @@ class SimpleQuadRenderer {
     }
 
     private fun loadTexture(bitmap: Bitmap) {
-        val textures = IntArray(1)
-        GLES20.glGenTextures(1, textures, 0)
-        textureId = textures[0]
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)

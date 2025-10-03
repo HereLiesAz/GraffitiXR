@@ -29,8 +29,9 @@ class MainViewModel : ViewModel() {
                 overlayImageUri = uri,
                 // Reset mode-specific states when a new image is selected
                 mockupPoints = emptyList(),
-                mockupPointsHistory = emptyList(),
-                mockupPointsHistoryIndex = -1,
+                // Initialize history with a base empty state for undo/redo
+                mockupPointsHistory = listOf(emptyList()),
+                mockupPointsHistoryIndex = 0,
                 arImagePose = null,
                 arFeaturePattern = null,
                 isArLocked = false,
@@ -115,8 +116,9 @@ class MainViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 mockupPoints = emptyList(),
-                mockupPointsHistory = emptyList(),
-                mockupPointsHistoryIndex = -1
+                // Re-initialize history with a base empty state
+                mockupPointsHistory = listOf(emptyList()),
+                mockupPointsHistoryIndex = 0
             )
         }
     }

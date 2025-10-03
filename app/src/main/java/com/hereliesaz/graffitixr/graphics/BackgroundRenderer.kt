@@ -50,6 +50,15 @@ class BackgroundRenderer {
         GLES20.glAttachShader(quadProgram, vertexShader)
         GLES20.glAttachShader(quadProgram, fragmentShader)
         GLES20.glLinkProgram(quadProgram)
+
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(quadProgram, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            val log = GLES20.glGetProgramInfoLog(quadProgram)
+            GLES20.glDeleteProgram(quadProgram)
+            throw RuntimeException("Error linking program: $log")
+        }
+
         GLES20.glUseProgram(quadProgram)
 
         quadPositionAttrib = GLES20.glGetAttribLocation(quadProgram, "a_Position")

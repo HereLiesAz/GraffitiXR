@@ -28,6 +28,15 @@ class PlaneRenderer {
         GLES20.glAttachShader(program, vertexShader)
         GLES20.glAttachShader(program, fragmentShader)
         GLES20.glLinkProgram(program)
+
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            val log = GLES20.glGetProgramInfoLog(program)
+            GLES20.glDeleteProgram(program)
+            throw RuntimeException("Error linking program: $log")
+        }
+
         GLES20.glUseProgram(program)
         positionAttrib = GLES20.glGetAttribLocation(program, "a_Position")
         modelViewProjectionUniform = GLES20.glGetUniformLocation(program, "u_ModelViewProjection")
