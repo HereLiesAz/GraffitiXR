@@ -15,15 +15,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.aznavrail.*
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
+import com.hereliesaz.graffitixr.ui.composables.ArModeScreen
+import com.hereliesaz.graffitixr.ui.composables.ImageTraceScreen
+import com.hereliesaz.graffitixr.ui.composables.MockupScreen
+import com.hereliesaz.graffitixr.ui.navigation.AzNavRail
+import com.hereliesaz.graffitixr.ui.navigation.azMenuCycler
+import com.hereliesaz.graffitixr.ui.navigation.azRailItem
+import com.hereliesaz.graffitixr.ui.navigation.azRailToggle
+import com.hereliesaz.graffitixr.ui.navigation.azSettings
 
-/**
- * The main screen of the application, which hosts the AzNavRail navigation
- * and the content for the currently selected editor mode.
- *
- * @param viewModel The central [MainViewModel] instance for the application.
- */
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -45,87 +46,50 @@ fun MainScreen(viewModel: MainViewModel) {
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
-                EditorMode.IMAGE_TRACE -> ImageTraceScreen(
+                EditorMode.STATIC -> MockupScreen(
                     uiState = uiState,
-                    onScaleChanged = viewModel::onImageTraceScaleChanged,
-                    onOffsetChanged = viewModel::onImageTraceOffsetChanged
+                    onPointsChanged = { },
+                    isWarpEnabled = false,
+                    onPointsInitialized = { }
                 )
-                EditorMode.MOCK_UP -> MockupScreen(
+                EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
-                    onPointsChanged = viewModel::onMockupPointsChanged,
-                    isWarpEnabled = uiState.isWarpEnabled
-                )
-                EditorMode.AR_OVERLAY -> ArModeScreen(
-                    uiState = uiState,
-                    onArImagePlaced = viewModel::onArImagePlaced,
-                    onArFeaturesDetected = viewModel::onArFeaturesDetected
+                    onScaleChanged = viewModel::onScaleChanged,
+                    onRotationChanged = viewModel::onRotationChanged,
                 )
             }
         }
 
         AzNavRail {
-            azSettings(
-                isLoading = uiState.isLoading,
-                packRailButtons = true
-            )
-
-
+            azSettings(isLoading = false) // Assuming loading state is handled elsewhere
 
             azMenuCycler(
                 id = "mode_cycler",
-                options = EditorMode.values().map { it.name.replace("_", " ") },
-                selectedOption = uiState.editorMode.name.replace("_", " "),
+                options = EditorMode.values().map { it.name },
+                selectedOption = uiState.editorMode.name,
                 onClick = {
-                    val currentModeIndex = EditorMode.entries.indexOf(uiState.editorMode)
-                    val nextModeIndex = (currentModeIndex + 1) % EditorMode.entries.size
-                    viewModel.onEditorModeChanged(EditorMode.entries[nextModeIndex])
+                    val nextMode = EditorMode.values()[(uiState.editorMode.ordinal + 1) % EditorMode.values().size]
+                    viewModel.onEditorModeChanged(nextMode)
                 }
             )
 
-            when (uiState.editorMode) {
-                EditorMode.IMAGE_TRACE -> {
-                    azRailItem(id = "image", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                    azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-                    azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                }
-                EditorMode.MOCK_UP -> {
-                    azRailItem(id = "background", text = "Background") {
-                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "overlay", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                    azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-                    azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                    azRailToggle(
-                        id = "warp",
-                        isChecked = uiState.isWarpEnabled,
-                        toggleOnText = "Warp",
-                        toggleOffText = "Done",
-                        onClick = viewModel::onWarpToggled
-                    )
-                    azRailItem(id = "undo", text = "Undo", onClick = viewModel::onUndoMockup)
-                    azRailItem(id = "redo", text = "Redo", onClick = viewModel::onRedoMockup)
-                    azRailItem(id = "reset", text = "Reset", onClick = viewModel::onResetMockup)
-                }
-                EditorMode.AR_OVERLAY -> {
-                    azRailItem(id = "image", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                    azRailToggle(
-                        id = "lock",
-                        isChecked = uiState.isArLocked,
-                        toggleOnText = "Locked",
-                        toggleOffText = "Unlocked",
-                        onClick = viewModel::onArLockToggled
-                    )
+            azRailItem(id = "overlay", text = "Overlay") {
+                overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }
+
+            if (uiState.editorMode == EditorMode.STATIC) {
+                azRailItem(id = "background", text = "Background") {
+                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             }
+
+            if (uiState.overlayImageUri != null) {
+                 azRailItem(id = "remove_bg", text = "Remove BG", onClick = viewModel::onRemoveBackgroundClicked)
+            }
+
+            azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
+            azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
+            azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
         }
 
         when (showSliderDialog) {
@@ -135,17 +99,17 @@ fun MainScreen(viewModel: MainViewModel) {
                 onValueChange = viewModel::onOpacityChanged,
                 onDismissRequest = { showSliderDialog = null }
             )
-            "Saturation" -> AdjustmentSliderDialog(
-                title = "Saturation",
-                value = uiState.saturation,
-                onValueChange = viewModel::onSaturationChanged,
-                onDismissRequest = { showSliderDialog = null },
-                valueRange = 0f..2f
-            )
             "Contrast" -> AdjustmentSliderDialog(
                 title = "Contrast",
                 value = uiState.contrast,
                 onValueChange = viewModel::onContrastChanged,
+                onDismissRequest = { showSliderDialog = null },
+                valueRange = 0f..2f
+            )
+            "Saturation" -> AdjustmentSliderDialog(
+                title = "Saturation",
+                value = uiState.saturation,
+                onValueChange = viewModel::onSaturationChanged,
                 onDismissRequest = { showSliderDialog = null },
                 valueRange = 0f..2f
             )
