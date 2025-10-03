@@ -61,8 +61,12 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
                 EditorMode.IMAGE_TRACE -> ImageTraceScreen(
                     uiState = uiState,
-                    onScaleChanged = viewModel::onImageTraceScaleChanged,
-                    onOffsetChanged = viewModel::onImageTraceOffsetChanged
+                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                    onOpacityChanged = viewModel::onOpacityChanged,
+                    onContrastChanged = viewModel::onContrastChanged,
+                    onSaturationChanged = viewModel::onSaturationChanged,
+                    onScaleChanged = viewModel::onScaleChanged,
+                    onRotationChanged = viewModel::onRotationChanged
                 )
                 EditorMode.AR_OVERLAY -> ArModeScreen(
                     viewModel = viewModel
@@ -118,7 +122,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
                 EditorMode.AR_OVERLAY -> {
                     azRailItem(id = "image", text = "Image") {
-                        overlayImagePicker.launch(PickVisual-MediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                     azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
                     azRailToggle(
