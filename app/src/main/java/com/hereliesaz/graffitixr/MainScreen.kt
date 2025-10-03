@@ -15,7 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.*
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 
 /**
@@ -92,11 +92,11 @@ fun MainScreen(viewModel: MainViewModel) {
                     azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
                 }
                 EditorMode.MOCK_UP -> {
-                    azRailItem(id = "overlay", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
                     azRailItem(id = "background", text = "Background") {
                         backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                    azRailItem(id = "overlay", text = "Image") {
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                     azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
                     azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }

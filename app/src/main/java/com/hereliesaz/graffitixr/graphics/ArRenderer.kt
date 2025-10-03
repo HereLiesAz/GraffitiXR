@@ -184,19 +184,33 @@ class ArRenderer(
     fun onResume() {
         if (session == null) {
             try {
-                val installStatus = ArCoreApk.getInstance().requestInstall(context as android.app.Activity, true)
-                if (installStatus == ArCoreApk.InstallStatus.INSTALLED) {
-                    session = Session(context)
-                    val config = Config(session)
-                    config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                    session!!.configure(config)
+                // Session creation should be lightweight and not involve UI.
+                // We are assuming ARCore is installed and ready by the time this is called.
+                val installStatus = ArCoreApk.getInstance().checkAvailability(context)
+                if (installStatus.isSupported) {
+                    session = Session(context).also {
+                        val config = Config(it)
+                        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                        it.configure(config)
+                    }
+                } else {
+                    android.util.Log.e("ArRenderer", "ARCore not supported or installed.")
+                    return // Do not proceed with resume
                 }
-            } catch (e: UnavailableUserDeclinedInstallationException) {
-                // Handle error
+            } catch (e: Exception) {
+                android.util.Log.e("ArRenderer", "Failed to create or configure AR session", e)
+                session = null // Ensure session is null on failure
             }
         }
-        session?.resume()
-        displayRotationHelper.onResume()
+
+        try {
+            session?.resume()
+            displayRotationHelper.onResume()
+        } catch (e: com.google.ar.core.exceptions.CameraNotAvailableException) {
+            android.util.Log.e("ArRenderer", "Camera not available on resume", e)
+            session = null // Invalidate session
+        }
     }
 
     fun onPause() {
