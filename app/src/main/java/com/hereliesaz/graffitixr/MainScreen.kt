@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.NonArModeScreen
-import com.hereliesaz.graffitixr.composables.StaticImageEditorScreen
+import com.hereliesaz.graffitixr.composables.StaticImageEditor
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 
 /**
@@ -48,32 +48,36 @@ fun MainScreen(viewModel: MainViewModel) {
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
-                EditorMode.STATIC -> StaticImageEditorScreen(
+                EditorMode.STATIC -> MockupScreen( // Swapped from StaticImageEditorScreen
                     uiState = uiState,
-                    onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
-                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                    onOpacityChanged = viewModel::onOpacityChanged,
-                    onContrastChanged = viewModel::onContrastChanged,
-                    onSaturationChanged = viewModel::onSaturationChanged
+                    onPointsChanged = viewModel::onMockupPointsChanged,
+                    isWarpEnabled = uiState.isWarpEnabled
                 )
-                EditorMode.NON_AR -> NonArModeScreen(
+                EditorMode.NON_AR -> ImageTraceScreen( // Swapped from NonArModeScreen
+                    uiState = uiState,
+                    onScaleChanged = viewModel::onImageTraceScaleChanged,
+                    onOffsetChanged = viewModel::onImageTraceOffsetChanged
+                )
+                EditorMode.IMAGE_TRACE -> NonArModeScreen( // Swapped from ImageTraceScreen
                     uiState = uiState,
                     onOverlayImageSelected = viewModel::onOverlayImageSelected,
                     onOpacityChanged = viewModel::onOpacityChanged,
                     onContrastChanged = viewModel::onContrastChanged,
                     onSaturationChanged = viewModel::onSaturationChanged,
-                    onScaleChanged = viewModel::onScaleChanged,
-                    onRotationChanged = viewModel::onRotationChanged
+                    onScaleChanged = viewModel::onScaleChanged, // Now resolved from ViewModel
+                    onRotationChanged = viewModel::onRotationChanged // Now resolved from ViewModel
                 )
-                EditorMode.IMAGE_TRACE -> ImageTraceScreen(
+                EditorMode.MOCK_UP -> StaticImageEditor( // Swapped from MockupScreen, corrected name
                     uiState = uiState,
-                    onScaleChanged = viewModel::onImageTraceScaleChanged,
-                    onOffsetChanged = viewModel::onImageTraceOffsetChanged
-                )
-                EditorMode.MOCK_UP -> MockupScreen(
-                    uiState = uiState,
-                    onPointsChanged = viewModel::onMockupPointsChanged,
-                    isWarpEnabled = uiState.isWarpEnabled
+                    onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                    onOpacityChanged = viewModel::onOpacityChanged,
+                    onContrastChanged = viewModel::onContrastChanged,
+                    onSaturationChanged = viewModel::onSaturationChanged,
+                    onScaleChanged = viewModel::onScaleChanged, // Now resolved from ViewModel
+                    onRotationChanged = viewModel::onRotationChanged, // Now resolved from ViewModel
+                    onPointsInitialized = viewModel::onStaticPointsInitialized, // Now resolved from ViewModel
+                    onPointChanged = viewModel::onStaticPointChanged // Now resolved from ViewModel
                 )
                 EditorMode.AR_OVERLAY -> ArModeScreen(
                     uiState = uiState,
@@ -99,21 +103,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
             // Dynamic controls based on the current mode
             when (uiState.editorMode) {
-                EditorMode.STATIC -> {
-
-                }
-                EditorMode.NON_AR -> {
-
-                }
-                EditorMode.IMAGE_TRACE -> {
-                    azRailItem(id = "image", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                    azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-                    azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                }
-                EditorMode.MOCK_UP -> {
+                EditorMode.STATIC -> { // Now has Mockup controls
                     azRailItem(id = "overlay", text = "Overlay") {
                         overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
@@ -133,6 +123,20 @@ fun MainScreen(viewModel: MainViewModel) {
                     azRailItem(id = "undo", text = "Undo", onClick = viewModel::onUndoMockup)
                     azRailItem(id = "redo", text = "Redo", onClick = viewModel::onRedoMockup)
                     azRailItem(id = "reset", text = "Reset", onClick = viewModel::onResetMockup)
+                }
+                EditorMode.NON_AR -> { // Now has Image Trace controls
+                    azRailItem(id = "image", text = "Image") {
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                    azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
+                    azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+                    azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
+                }
+                EditorMode.IMAGE_TRACE -> { // Now empty (like original Non-AR)
+
+                }
+                EditorMode.MOCK_UP -> { // Now empty (like original Static)
+
                 }
                 EditorMode.AR_OVERLAY -> {
                     azRailItem(id = "image", text = "Image") {

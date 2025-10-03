@@ -35,7 +35,9 @@ class MainViewModel : ViewModel() {
                 arFeaturePattern = null,
                 isArLocked = false,
                 imageTraceScale = 1f,
-                imageTraceOffset = Offset.Zero
+                imageTraceOffset = Offset.Zero,
+                scale = 1f, // Reset general scale
+                rotation = 0f // Reset general rotation
             )
         }
     }
@@ -56,6 +58,15 @@ class MainViewModel : ViewModel() {
         _uiState.update { it.copy(saturation = saturation) }
     }
 
+    // --- General Image Transformations (used by NonArModeScreen and StaticImageEditor) ---
+    fun onScaleChanged(scaleFactor: Float) {
+        _uiState.update { it.copy(scale = it.scale * scaleFactor) }
+    }
+
+    fun onRotationChanged(angleChange: Float) {
+        _uiState.update { it.copy(rotation = it.rotation + angleChange) }
+    }
+
     // --- Image Trace Mode ---
     fun onImageTraceScaleChanged(scaleChange: Float) {
         _uiState.update { it.copy(imageTraceScale = it.imageTraceScale * scaleChange) }
@@ -66,7 +77,7 @@ class MainViewModel : ViewModel() {
     }
 
 
-    // --- Mock-up Mode ---
+    // --- Mock-up Mode (and StaticImageEditor) ---
     fun onMockupPointsChanged(points: List<Offset>) {
         _uiState.update {
             val newHistory = it.mockupPointsHistory.subList(0, it.mockupPointsHistoryIndex + 1).toMutableList()
@@ -117,6 +128,35 @@ class MainViewModel : ViewModel() {
                 mockupPoints = emptyList(),
                 mockupPointsHistory = emptyList(),
                 mockupPointsHistoryIndex = -1
+            )
+        }
+    }
+
+    // Functions for StaticImageEditor (manipulating mockup points for perspective warp)
+    fun onStaticPointsInitialized(points: List<Offset>) {
+        _uiState.update {
+            val newHistory = if (it.mockupPointsHistoryIndex == -1) mutableListOf() else it.mockupPointsHistory.subList(0, it.mockupPointsHistoryIndex + 1).toMutableList()
+            newHistory.add(points)
+            it.copy(
+                mockupPoints = points,
+                mockupPointsHistory = newHistory,
+                mockupPointsHistoryIndex = newHistory.lastIndex
+            )
+        }
+    }
+
+    fun onStaticPointChanged(index: Int, newOffset: Offset) {
+        _uiState.update {
+            val updatedPoints = it.mockupPoints.toMutableList()
+            if (index >= 0 && index < updatedPoints.size) {
+                updatedPoints[index] = newOffset
+            }
+            val newHistory = it.mockupPointsHistory.subList(0, it.mockupPointsHistoryIndex + 1).toMutableList()
+            newHistory.add(updatedPoints) // Add the new state to history
+            it.copy(
+                mockupPoints = updatedPoints,
+                mockupPointsHistory = newHistory,
+                mockupPointsHistoryIndex = newHistory.lastIndex
             )
         }
     }
