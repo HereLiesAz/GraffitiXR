@@ -5,26 +5,19 @@ coreKtx = "1.12.0"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
-lifecycleRuntimeKtx = "2.6.2"
 activityCompose = "1.8.2"
 composeBom = "2025.09.01"
-lifecycle = "2.6.2"
+lifecycle = "2.9.4"
 navigation = "2.7.5"
 coroutines = "1.7.3"
 coil = "2.5.0"
 arcore = "1.40.0"
 camerax = "1.3.1"
-androidXr = "1.0.0-alpha06"
-androidXrCompose = "1.0.0-alpha07"
 accompanistPermissions = "0.34.0"
 
 [libraries]
 google-accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-androidx-xr-runtime = { group = "androidx.xr.runtime", name = "runtime", version.ref = "androidXr" }
-androidx-xr-arcore = { group = "androidx.xr.arcore", name = "arcore", version.ref = "androidXr" }
-androidx-xr-compose = { group = "androidx.xr.compose", name = "compose", version.ref = "androidXrCompose" }
-androidx-xr-scenecore = { group = "androidx.xr.scenecore", name = "scenecore", version.ref = "androidXrCompose" }
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
@@ -37,7 +30,8 @@ arcore-client = { group = "com.google.ar", name = "core", version.ref = "arcore"
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }

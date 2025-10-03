@@ -134,19 +134,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Adds a new AR marker to the scene.
-     * If there are already 4 markers, the oldest one is replaced.
-     * @param pose The 3D pose of the new marker.
-     */
-    fun onArMarkerPlaced(pose: Pose) {
-        _uiState.update { currentState ->
-            val updatedMarkers = currentState.arMarkers.toMutableList()
-            if (updatedMarkers.size >= 4) {
-                updatedMarkers.removeAt(0) // Remove the oldest marker
-            }
-            updatedMarkers.add(pose)
-            currentState.copy(arMarkers = updatedMarkers)
-        }
-    }
 }

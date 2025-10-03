@@ -31,7 +31,6 @@ fun MainScreen(viewModel: MainViewModel) {
         val (title, message) = when (uiState.editorMode) {
             EditorMode.STATIC -> "Mock-up Mode" to "Use this mode to project an image onto a static background. You can warp the image, adjust its properties, and see how it looks."
             EditorMode.NON_AR -> "On-the-Go Mode" to "This mode uses your camera to overlay the image in a real-world environment, without AR tracking. It's great for quick previews."
-            EditorMode.AR -> "AR Mode" to "Enter Augmented Reality. Scan your environment, tap on a surface to place markers, and see your image projected in 3D space."
         }
         OnboardingDialog(
             title = title,
@@ -52,9 +51,6 @@ fun MainScreen(viewModel: MainViewModel) {
             }
             Button(onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) }) {
                 Text("Non-AR")
-            }
-            Button(onClick = { viewModel.onEditorModeChanged(EditorMode.AR) }) {
-                Text("AR")
             }
         }
 
@@ -79,10 +75,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 onSaturationChanged = viewModel::onSaturationChanged,
                 onScaleChanged = viewModel::onScaleChanged,
                 onRotationChanged = viewModel::onRotationChanged
-            )
-            EditorMode.AR -> ArModeScreen(
-                uiState = uiState,
-                onArMarkerPlaced = viewModel::onArMarkerPlaced
             )
         }
     }

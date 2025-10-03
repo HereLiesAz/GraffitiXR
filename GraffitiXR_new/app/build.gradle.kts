@@ -50,6 +50,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -71,10 +72,6 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     // AndroidXR
-    implementation(libs.androidx.xr.runtime)
-    implementation(libs.androidx.xr.arcore)
-    implementation(libs.androidx.xr.compose)
-    implementation(libs.androidx.xr.scenecore)
     implementation(libs.google.accompanist.permissions)
 
     testImplementation(libs.junit)

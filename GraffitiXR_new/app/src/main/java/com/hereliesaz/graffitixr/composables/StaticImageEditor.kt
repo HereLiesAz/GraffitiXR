@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.composables
 
+import android.graphics.Matrix
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -22,25 +23,35 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.UiState
+import kotlinx.coroutines.launch
 
 /**
  * Composable for the mock-up mode on a static background image.
- * This screen will allow users to warp and edit an overlay image on a static background.
  */
 @Composable
 fun StaticImageEditor(
@@ -55,6 +66,9 @@ fun StaticImageEditor(
     onPointsInitialized: (List<Offset>) -> Unit,
     onPointChanged: (Int, Offset) -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     val backgroundPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -84,7 +98,6 @@ fun StaticImageEditor(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Display the background image if selected
         uiState.backgroundImageUri?.let {
             AsyncImage(
                 model = it,
@@ -94,57 +107,85 @@ fun StaticImageEditor(
             )
         }
 
-        // Display the overlay image if selected
-        uiState.overlayImageUri?.let {
+        uiState.overlayImageUri?.let { uri ->
+            var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+            LaunchedEffect(uri) {
+                coroutineScope.launch {
+                    val request = ImageRequest.Builder(context)
+                        .data(uri)
+                        .build()
+                    val result = (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    imageBitmap = result
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .onGloballyPositioned { coordinates ->
-                        if (uiState.points.isEmpty()) {
-                            val size = coordinates.size
+                        if (uiState.points.isEmpty() && imageBitmap != null) {
+                            val w = imageBitmap!!.width.toFloat()
+                            val h = imageBitmap!!.height.toFloat()
                             val points = listOf(
                                 Offset(0f, 0f),
-                                Offset(size.width.toFloat(), 0f),
-                                Offset(size.width.toFloat(), size.height.toFloat()),
-                                Offset(0f, size.height.toFloat())
+                                Offset(w, 0f),
+                                Offset(w, h),
+                                Offset(0f, h)
                             )
                             onPointsInitialized(points)
                         }
                     }
             ) {
-                // TODO: Restore perspective warp. The `graphicsLayer` API has changed, and
-                //  there is no direct replacement for applying a 2D perspective matrix.
-                //  A custom solution using a combination of other modifiers or a custom
-                //  layout would be required to re-implement this feature.
+                val perspectiveMatrix = remember(uiState.points, imageBitmap) {
+                    Matrix().apply {
+                        imageBitmap?.let { bmp ->
+                            if (uiState.points.size == 4) {
+                                val w = bmp.width.toFloat()
+                                val h = bmp.height.toFloat()
+                                setPolyToPoly(
+                                    floatArrayOf(0f, 0f, w, 0f, w, h, 0f, h), 0,
+                                    uiState.points.flatMap { listOf(it.x, it.y) }.toFloatArray(), 0,
+                                    4
+                                )
+                            }
+                        }
+                    }
+                }
 
-                AsyncImage(
-                    model = it,
-                    contentDescription = "Overlay Image",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(
-                            scaleX = uiState.scale,
-                            scaleY = uiState.scale,
-                            rotationZ = uiState.rotation
-                        ),
-                    alpha = uiState.opacity,
-                    colorFilter = ColorFilter.colorMatrix(colorMatrix)
-                )
-
-                // Draw the draggable points
-                if (uiState.points.isNotEmpty()) {
+                imageBitmap?.let { bmp ->
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        uiState.points.forEachIndexed { _, offset ->
-                            drawCircle(
-                                color = Color.White,
-                                radius = 20f,
-                                center = offset,
-                                style = Stroke(width = 5f)
+                        withTransform({
+                            val matrix = androidx.compose.ui.graphics.Matrix()
+                            val values = FloatArray(9)
+                            perspectiveMatrix.getValues(values)
+                            matrix.values[0] = values[0]
+                            matrix.values[1] = values[1]
+                            matrix.values[3] = values[2]
+                            matrix.values[4] = values[3]
+                            matrix.values[5] = values[4]
+                            matrix.values[7] = values[5]
+                            matrix.values[12] = values[6]
+                            matrix.values[13] = values[7]
+                            matrix.values[15] = values[8]
+                            transform(matrix)
+                        }) {
+                            drawImage(
+                                image = bmp.asImageBitmap(),
+                                alpha = uiState.opacity,
+                                colorFilter = ColorFilter.colorMatrix(colorMatrix)
                             )
                         }
                     }
+                }
 
-                    // Add draggable handles
+                if (uiState.points.isNotEmpty()) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        uiState.points.forEach { offset ->
+                            drawCircle(color = Color.White, radius = 20f, center = offset, style = Stroke(width = 5f))
+                        }
+                    }
+
                     uiState.points.forEachIndexed { index, offset ->
                         Box(
                             modifier = Modifier
@@ -162,7 +203,6 @@ fun StaticImageEditor(
             }
         }
 
-        // Control Panel
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -173,33 +213,18 @@ fun StaticImageEditor(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Button(onClick = {
-                    backgroundPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                }) {
+                Button(onClick = { backgroundPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                     Text("Select Background")
                 }
-                Button(onClick = {
-                    overlayPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                }) {
+                Button(onClick = { overlayPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                     Text("Select Overlay")
                 }
             }
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Opacity Slider
             Text("Opacity", color = Color.White)
             Slider(value = uiState.opacity, onValueChange = onOpacityChanged)
-
-            // Contrast Slider
             Text("Contrast", color = Color.White)
             Slider(value = uiState.contrast, onValueChange = onContrastChanged, valueRange = 0f..2f)
-
-            // Saturation Slider
             Text("Saturation", color = Color.White)
             Slider(value = uiState.saturation, onValueChange = onSaturationChanged, valueRange = 0f..2f)
         }

@@ -34,25 +34,13 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.hereliesaz.graffitixr.UiState
 
-/**
- * Composable for the simple camera overlay mode.
- * This screen is a fallback for devices that do not support AR.
- *
- * @param uiState The current state of the UI.
- * @param onOverlayImageSelected Callback for when an overlay image is selected.
- * @param onOpacityChanged Callback for when the opacity is changed.
- * @param onContrastChanged Callback for when the contrast is changed.
- * @param onSaturationChanged Callback for when the saturation is changed.
- * @param onScaleChanged Callback for when the scale is changed.
- * @param onRotationChanged Callback for when the rotation is changed.
- */
 @Composable
 fun NonArModeScreen(
     uiState: UiState,
@@ -124,7 +112,6 @@ fun NonArModeScreen(
             )
         }
 
-        // Display the overlay image if selected
         uiState.overlayImageUri?.let {
             Box(
                 modifier = Modifier
@@ -152,7 +139,6 @@ fun NonArModeScreen(
             }
         }
 
-        // Control Panel
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -172,15 +158,12 @@ fun NonArModeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Opacity Slider
             Text("Opacity", color = Color.White)
             Slider(value = uiState.opacity, onValueChange = onOpacityChanged)
 
-            // Contrast Slider
             Text("Contrast", color = Color.White)
             Slider(value = uiState.contrast, onValueChange = onContrastChanged, valueRange = 0f..2f)
 
-            // Saturation Slider
             Text("Saturation", color = Color.White)
             Slider(value = uiState.saturation, onValueChange = onSaturationChanged, valueRange = 0f..2f)
         }
