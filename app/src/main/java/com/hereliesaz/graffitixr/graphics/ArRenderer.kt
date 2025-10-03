@@ -1,10 +1,12 @@
 package com.hereliesaz.graffitixr.graphics
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import coil.imageLoader
@@ -17,7 +19,6 @@ import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
-import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -180,7 +181,7 @@ class ArRenderer(
                     val result = context.imageLoader.execute(request).drawable
                     overlayBitmap = (result as? android.graphics.drawable.BitmapDrawable)?.bitmap
                 } catch (e: Exception) {
-                    android.util.Log.e("ArRenderer", "Failed to load overlay image", e)
+                    Log.e("ArRenderer", "Failed to load overlay image", e)
                     overlayBitmap = null
                 }
             }
@@ -190,23 +191,36 @@ class ArRenderer(
     fun onResume() {
         if (session == null) {
             try {
-                // Session creation should be lightweight and not involve UI.
-                // We are assuming ARCore is installed and ready by the time this is called.
-                val installStatus = ArCoreApk.getInstance().checkAvailability(context)
-                if (installStatus.isSupported) {
-                    session = Session(context).also {
-                        val config = Config(it)
-                        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                        it.configure(config)
+                val availability = ArCoreApk.getInstance().checkAvailability(context)
+                when (availability) {
+                    ArCoreApk.Availability.SUPPORTED_INSTALLED -> {
+                        session = Session(context).also {
+                            val config = Config(it)
+                            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                            it.configure(config)
+                        }
                     }
-                } else {
-                    android.util.Log.e("ArRenderer", "ARCore not supported or installed.")
-                    return // Do not proceed with resume
+                    ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD,
+                    ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> {
+                        try {
+                            // Request ARCore installation or update. This will redirect the user to the Play Store.
+                            ArCoreApk.getInstance().requestInstall(context as Activity, true)
+                            Log.i("ArRenderer", "ARCore installation or update requested.")
+                        } catch (e: Exception) {
+                            Log.e("ArRenderer", "Failed to request ARCore installation/update.", e)
+                        }
+                        return
+                    }
+                    else -> {
+                        Log.e("ArRenderer", "ARCore is not supported on this device. Availability: $availability")
+                        return
+                    }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("ArRenderer", "Failed to create or configure AR session", e)
+                Log.e("ArRenderer", "Failed to create or configure AR session", e)
                 session = null // Ensure session is null on failure
+                return
             }
         }
 
@@ -214,7 +228,7 @@ class ArRenderer(
             session?.resume()
             displayRotationHelper.onResume()
         } catch (e: com.google.ar.core.exceptions.CameraNotAvailableException) {
-            android.util.Log.e("ArRenderer", "Camera not available on resume", e)
+            Log.e("ArRenderer", "Camera not available on resume", e)
             session = null // Invalidate session
         }
     }
