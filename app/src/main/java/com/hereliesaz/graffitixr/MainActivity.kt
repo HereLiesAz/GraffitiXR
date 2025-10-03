@@ -79,7 +79,9 @@ fun PermissionScreen(onRequestPermission: () -> Unit) {
 @Preview
 @Composable
 fun PermissionScreenPreview() {
-    PermissionScreen {
+    GraffitiXRTheme {
+        PermissionScreen {
 
+        }
     }
 }

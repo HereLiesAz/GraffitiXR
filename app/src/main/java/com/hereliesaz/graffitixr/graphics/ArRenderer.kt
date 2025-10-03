@@ -175,8 +175,14 @@ class ArRenderer(
         lastLoadedUri = overlayImageUri
         overlayImageUri?.let { uri ->
             CoroutineScope(Dispatchers.IO).launch {
-                val request = ImageRequest.Builder(context).data(uri).build()
-                overlayBitmap = (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                try {
+                    val request = ImageRequest.Builder(context).data(uri).build()
+                    val result = context.imageLoader.execute(request).drawable
+                    overlayBitmap = (result as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                } catch (e: Exception) {
+                    android.util.Log.e("ArRenderer", "Failed to load overlay image", e)
+                    overlayBitmap = null
+                }
             }
         }
     }
