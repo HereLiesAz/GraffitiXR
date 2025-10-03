@@ -1,180 +1,114 @@
 package com.hereliesaz.graffitixr
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.aznavrail.AzNavRail
-import com.hereliesaz.graffitixr.composables.NonArModeScreen
-import com.hereliesaz.graffitixr.composables.StaticImageEditor
-import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
+import com.hereliesaz.graffitixr.composables.ArModeScreen
+import com.hereliesaz.graffitixr.composables.ImageTraceScreen
+import com.hereliesaz.graffitixr.composables.MockupScreen
+import com.hereliesaz.graffitixr.composables.OnboardingDialog
 
 /**
- * The main screen of the application, which hosts the AzNavRail navigation
- * and the content for the currently selected editor mode.
+ * The main screen of the application, serving as the primary UI entry point.
  *
- * @param viewModel The central [MainViewModel] instance for the application.
+ * This composable acts as a router, observing the `uiState` from the [MainViewModel] and
+ * displaying the appropriate editor screen (`StaticImageEditor` or `NonArModeScreen`)
+ * based on the current [EditorMode]. It also manages the display of the onboarding dialog
+ * for each mode and provides the top-level navigation controls for switching between modes.
+ *
+ * @param viewModel The central [MainViewModel] instance for the application, which provides
+ * the UI state and handles all user events.
  */
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    var showSliderDialog by remember { mutableStateOf<String?>(null) }
 
-    val overlayImagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri -> uri?.let { viewModel.onOverlayImageSelected(it) } }
+    // Show onboarding dialog if the current mode hasn't been completed yet
+    if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
+        val (title, message) = when (uiState.editorMode) {
+            EditorMode.STATIC -> "Mock-up Mode" to "Use this mode to project an image onto a static background. You can warp the image, adjust its properties, and see how it looks."
+            EditorMode.NON_AR -> "On-the-Go Mode" to "This mode uses your camera to overlay the image in a real-world environment, without AR tracking. It's great for quick previews."
+            EditorMode.AR_OVERLAY -> "AR Mode" to "This mode uses Augmented Reality to project the image onto a real-world surface. It's the most immersive way to visualize your artwork."
+            EditorMode.IMAGE_TRACE -> "Image Trace" to "Trace an image from your camera feed."
+            EditorMode.MOCK_UP -> "Mock Up" to "Mock up a mural on a static image."
+        }
+        OnboardingDialog(
+            title = title,
+            message = message,
+            onDismiss = { viewModel.onOnboardingComplete(uiState.editorMode) }
+        )
+    }
 
-    val backgroundImagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        // The main content area
-        Box(
+    Column {
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 80.dp), // Adjust padding to not be obscured by the rail
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            when (uiState.editorMode) {
-                EditorMode.STATIC -> MockupScreen( // Swapped from StaticImageEditorScreen
-                    uiState = uiState,
-                    onPointsChanged = viewModel::onMockupPointsChanged,
-                    isWarpEnabled = uiState.isWarpEnabled
-                )
-                EditorMode.NON_AR -> ImageTraceScreen( // Swapped from NonArModeScreen
-                    uiState = uiState,
-                    onScaleChanged = viewModel::onImageTraceScaleChanged,
-                    onOffsetChanged = viewModel::onImageTraceOffsetChanged
-                )
-                EditorMode.IMAGE_TRACE -> NonArModeScreen( // Swapped from ImageTraceScreen
-                    uiState = uiState,
-                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                    onOpacityChanged = viewModel::onOpacityChanged,
-                    onContrastChanged = viewModel::onContrastChanged,
-                    onSaturationChanged = viewModel::onSaturationChanged,
-                    onScaleChanged = viewModel::onScaleChanged, // Now resolved from ViewModel
-                    onRotationChanged = viewModel::onRotationChanged // Now resolved from ViewModel
-                )
-                EditorMode.MOCK_UP -> StaticImageEditor( // Swapped from MockupScreen, corrected name
-                    uiState = uiState,
-                    onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
-                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                    onOpacityChanged = viewModel::onOpacityChanged,
-                    onContrastChanged = viewModel::onContrastChanged,
-                    onSaturationChanged = viewModel::onSaturationChanged,
-                    onScaleChanged = viewModel::onScaleChanged, // Now resolved from ViewModel
-                    onRotationChanged = viewModel::onRotationChanged, // Now resolved from ViewModel
-                    onPointsInitialized = viewModel::onStaticPointsInitialized, // Now resolved from ViewModel
-                    onPointChanged = viewModel::onStaticPointChanged // Now resolved from ViewModel
-                )
-                EditorMode.AR_OVERLAY -> ArModeScreen(
-                    uiState = uiState,
-                    onSessionInitialized = viewModel::onArSessionInitialized,
-                )
+            Button(onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) }) {
+                Text("Static")
+            }
+            Button(onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) }) {
+                Text("Non-AR")
+            }
+            Button(onClick = { viewModel.onEditorModeChanged(EditorMode.AR_OVERLAY) }) {
+                Text("AR")
             }
         }
 
-        // The AzNavRail navigation
-        AzNavRail {
-            azSettings(isLoading = uiState.isLoading)
-
-            azMenuCycler(
-                id = "mode_cycler",
-                options = EditorMode.values().map { it.name.replace("_", " ") },
-                selectedOption = uiState.editorMode.name.replace("_", " "),
-                onClick = {
-                    val currentModeIndex = EditorMode.values().indexOf(uiState.editorMode)
-                    val nextModeIndex = (currentModeIndex + 1) % EditorMode.values().size
-                    viewModel.onEditorModeChanged(EditorMode.values()[nextModeIndex])
-                }
+        when (uiState.editorMode) {
+            EditorMode.STATIC -> MockupScreen(
+                uiState = uiState,
+                onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onPointsInitialized = viewModel::onPointsInitialized,
+                onPointChanged = viewModel::onPointChanged,
+                isWarpEnabled = uiState.isWarpEnabled
             )
-
-            // Dynamic controls based on the current mode
-            when (uiState.editorMode) {
-                EditorMode.STATIC -> { // Now has Mockup controls
-                    azRailItem(id = "overlay", text = "Overlay") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "background", text = "Background") {
-                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                    azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-                    azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                    azRailToggle(
-                        id = "warp",
-                        isChecked = uiState.isWarpEnabled,
-                        toggleOnText = "Warp On",
-                        toggleOffText = "Warp Off",
-                        onClick = viewModel::onWarpToggled
-                    )
-                    azRailItem(id = "undo", text = "Undo", onClick = viewModel::onUndoMockup)
-                    azRailItem(id = "redo", text = "Redo", onClick = viewModel::onRedoMockup)
-                    azRailItem(id = "reset", text = "Reset", onClick = viewModel::onResetMockup)
-                }
-                EditorMode.NON_AR -> { // Now has Image Trace controls
-                    azRailItem(id = "image", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                    azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-                    azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                }
-                EditorMode.IMAGE_TRACE -> { // Now empty (like original Non-AR)
-
-                }
-                EditorMode.MOCK_UP -> { // Now empty (like original Static)
-
-                }
-                EditorMode.AR_OVERLAY -> {
-                    azRailItem(id = "image", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                    azRailToggle(
-                        id = "lock",
-                        isChecked = uiState.isArLocked,
-                        toggleOnText = "Locked",
-                        toggleOffText = "Unlocked",
-                        onClick = viewModel::onArLockToggled
-                    )
-                }
-            }
-        }
-
-        // Show the adjustment slider dialog when needed
-        when (showSliderDialog) {
-            "Opacity" -> AdjustmentSliderDialog(
-                title = "Opacity",
-                value = uiState.opacity,
-                onValueChange = viewModel::onOpacityChanged,
-                onDismissRequest = { showSliderDialog = null }
+            EditorMode.NON_AR -> ImageTraceScreen(
+                uiState = uiState,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onScaleChanged = viewModel::onScaleChanged,
+                onRotationChanged = viewModel::onRotationChanged
             )
-            "Saturation" -> AdjustmentSliderDialog(
-                title = "Saturation",
-                value = uiState.saturation,
-                onValueChange = viewModel::onSaturationChanged,
-                onDismissRequest = { showSliderDialog = null },
-                valueRange = 0f..2f
+            EditorMode.AR_OVERLAY -> ArModeScreen(
+                viewModel = viewModel
             )
-            "Contrast" -> AdjustmentSliderDialog(
-                title = "Contrast",
-                value = uiState.contrast,
-                onValueChange = viewModel::onContrastChanged,
-                onDismissRequest = { showSliderDialog = null },
-                valueRange = 0f..2f
+            EditorMode.IMAGE_TRACE -> ImageTraceScreen(
+                uiState = uiState,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onScaleChanged = viewModel::onScaleChanged,
+                onRotationChanged = viewModel::onRotationChanged
+            )
+            EditorMode.MOCK_UP -> MockupScreen(
+                uiState = uiState,
+                onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onPointsInitialized = viewModel::onPointsInitialized,
+                onPointChanged = viewModel::onPointChanged,
+                isWarpEnabled = uiState.isWarpEnabled
             )
         }
     }
