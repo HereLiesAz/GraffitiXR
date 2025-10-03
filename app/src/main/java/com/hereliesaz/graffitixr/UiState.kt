@@ -5,15 +5,13 @@ import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 
 enum class EditorMode {
-    STATIC,
-    NON_AR,
     AR_OVERLAY,
     IMAGE_TRACE,
     MOCK_UP
 }
 
 data class UiState(
-    val editorMode: EditorMode = EditorMode.STATIC,
+    val editorMode: EditorMode = EditorMode.MOCK_UP,
     val backgroundImageUri: Uri? = null,
     val overlayImageUri: Uri? = null,
     val opacity: Float = 1f,
