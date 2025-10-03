@@ -207,30 +207,5 @@ fun MockupScreen(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .background(Color.Black.copy(alpha = 0.6f))
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(onClick = { backgroundPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Text("Select Background")
-                }
-                Button(onClick = { overlayPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Text("Select Overlay")
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Opacity", color = Color.White)
-            Slider(value = uiState.opacity, onValueChange = onOpacityChanged)
-            Text("Contrast", color = Color.White)
-            Slider(value = uiState.contrast, onValueChange = onContrastChanged, valueRange = 0f..2f)
-            Text("Saturation", color = Color.White)
-            Slider(value = uiState.saturation, onValueChange = onSaturationChanged, valueRange = 0f..2f)
-        }
     }
 }

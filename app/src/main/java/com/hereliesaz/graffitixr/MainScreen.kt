@@ -14,8 +14,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.*
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
@@ -63,10 +64,12 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        AzNavRail {
+        val railState = rememberAzNavRailState()
+        AzNavRail(state = railState) {
             azSettings(isLoading = false,
-                packRailButtons = true
-            ) // Assuming loading state is handled elsewhere
+                packRailButtons = true,
+                backgroundColor = if (railState.isExpanded) MaterialTheme.colorScheme.surface else Color.Transparent
+            )
 
 
             azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
