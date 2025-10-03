@@ -10,8 +10,8 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
-        minSdk = 24
-        targetSdk = 34
+        minSdk = 26
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -78,7 +78,7 @@ dependencies {
     implementation(libs.aznavrail)
 
     // OpenCV
-    implementation(libs.opencv.android)
+    implementation(libs.opencv)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
