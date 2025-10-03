@@ -2,6 +2,9 @@
 .gradle/
 build/
 
+# C/C++
+.cxx/
+
 # Local configuration
 local.properties
 
@@ -10,6 +13,7 @@ local.properties
 *.iml
 *.ipr
 *.iws
+.DS_Store
 
 # Keystore files
 *.jks
@@ -22,6 +26,13 @@ local.properties
 # Log files
 *.log
 
+# Profiler
+*.hprof
+*.heapdump
+captures/
+
 # Outputs
 /app/build
-/.kotlin/sessions/kotlin-compiler-4451903408772547140.salive
+/app/release/
+/app/debug/
+/.kotlin/sessions/
