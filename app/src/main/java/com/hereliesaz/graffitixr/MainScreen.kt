@@ -15,8 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.aznavrail.*
-import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 
 /**
@@ -65,7 +64,12 @@ fun MainScreen(viewModel: MainViewModel) {
         }
 
         AzNavRail {
-            azSettings(isLoading = uiState.isLoading)
+            azSettings(
+                isLoading = uiState.isLoading,
+                packRailButtons = true
+            )
+
+
 
             azMenuCycler(
                 id = "mode_cycler",
