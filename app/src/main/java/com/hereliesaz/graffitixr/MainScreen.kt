@@ -66,15 +66,9 @@ fun MainScreen(viewModel: MainViewModel) {
         AzNavRail {
             azSettings(isLoading = false) // Assuming loading state is handled elsewhere
 
-            azMenuCycler(
-                id = "mode_cycler",
-                options = EditorMode.values().map { it.name },
-                selectedOption = uiState.editorMode.name,
-                onClick = {
-                    val nextMode = EditorMode.values()[(uiState.editorMode.ordinal + 1) % EditorMode.values().size]
-                    viewModel.onEditorModeChanged(nextMode)
-                }
-            )
+            azRailItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+            azRailItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
+            azRailItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
             azRailItem(id = "overlay", text = "Overlay") {
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))

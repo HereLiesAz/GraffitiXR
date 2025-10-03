@@ -194,12 +194,12 @@ class ArRenderer(
                 val availability = ArCoreApk.getInstance().checkAvailability(context)
                 when (availability) {
                     ArCoreApk.Availability.SUPPORTED_INSTALLED -> {
-                        session = Session(context).also {
-                            val config = Config(it)
-                            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                            it.configure(config)
-                        }
+                        session = Session(context)
+                        val config = Config(session)
+                        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                        session!!.configure(config)
+
                     }
                     ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD,
                     ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> {
