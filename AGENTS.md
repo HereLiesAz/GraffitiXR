@@ -52,18 +52,3 @@ Refer to `TODO.md` for the up-to-date project backlog. The next high-priority ta
 
 ---
 
-
-
-```kotlin
-include(":app:opencv")
-```
-
-5. In the `app/build.gradle.kts` file, add the following to the `dependencies` block:
-
-```kotlin
-implementation(project(":app:opencv"))
-```
-
-6. Sync Gradle and rebuild the project.
-
-This will ensure that the project uses a stable, local version of the OpenCV library and will not be affected by issues with remote repositories.
