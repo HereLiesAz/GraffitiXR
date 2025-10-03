@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -71,8 +71,14 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    // AndroidXR
+    // Permissions
     implementation(libs.google.accompanist.permissions)
+
+    // AzNavRail
+    implementation(libs.aznavrail)
+
+    // OpenCV
+    implementation(libs.opencv)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
