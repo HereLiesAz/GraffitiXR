@@ -66,8 +66,8 @@ fun MainScreen(viewModel: MainViewModel) {
         AzNavRail {
             azSettings(isLoading = false,
                 packRailButtons = true
-
             ) // Assuming loading state is handled elsewhere
+
 
             azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
