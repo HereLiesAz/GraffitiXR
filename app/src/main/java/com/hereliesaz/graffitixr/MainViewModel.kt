@@ -3,8 +3,7 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
-import com.google.ar.core.Anchor
-import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import com.google.ar.core.Session
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +17,7 @@ class MainViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    var arSession: Session? = null
 
     fun onEditorModeChanged(mode: EditorMode) {
         _uiState.update { it.copy(editorMode = mode) }
@@ -122,22 +122,12 @@ class MainViewModel : ViewModel() {
     }
 
     // --- AR Overlay Mode ---
-    fun onArImagePlaced(anchor: Anchor) {
-        val poseMatrix = FloatArray(16)
-        anchor.pose.toMatrix(poseMatrix, 0)
-        _uiState.update { it.copy(arImagePose = poseMatrix, arFeaturePattern = null) }
-        anchor.detach()
-    }
-
-    fun onArFeaturesDetected(featurePattern: ArFeaturePattern) {
-        _uiState.update { it.copy(arFeaturePattern = featurePattern) }
+    fun onArSessionInitialized(session: Session) {
+        this.arSession = session
     }
 
     fun onArLockToggled() {
-        _uiState.update {
-            val pattern = if (it.isArLocked) null else it.arFeaturePattern
-            it.copy(isArLocked = !it.isArLocked, arFeaturePattern = pattern)
-        }
+        _uiState.update { it.copy(isArLocked = !it.isArLocked) }
     }
 
     // --- Global ---

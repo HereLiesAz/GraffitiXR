@@ -3,24 +3,18 @@ package com.hereliesaz.graffitixr.graphics
 import android.content.Context
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.view.MotionEvent
+import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Frame
+import com.google.ar.core.Plane
 import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.hereliesaz.graffitixr.UiState
+import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
-
-/**
- * The main renderer for the AR scene.
- * This class implements the GLSurfaceView.Renderer interface and is responsible for
- * managing the ARCore session, drawing the camera background, and rendering any virtual objects.
- */
-import com.google.ar.core.Anchor
-import com.google.ar.core.Frame
-import com.google.ar.core.HitResult
-import com.google.ar.core.Plane
-import com.google.ar.core.Trackable
-import com.google.ar.core.TrackingState
-import com.hereliesaz.graffitixr.UiState
 
 class ArRenderer(private val context: Context, private val onSessionInitialized: (Session) -> Unit) : GLSurfaceView.Renderer {
 
@@ -28,6 +22,7 @@ class ArRenderer(private val context: Context, private val onSessionInitialized:
     private val backgroundRenderer = BackgroundRenderer()
     private val objectRenderer = ObjectRenderer()
     private var displayRotationHelper: DisplayRotationHelper = DisplayRotationHelper(context)
+    private val queuedSingleTaps = ConcurrentLinkedQueue<MotionEvent>()
 
     val anchors = mutableListOf<Anchor>()
     var uiState: UiState = UiState()
@@ -70,6 +65,14 @@ class ArRenderer(private val context: Context, private val onSessionInitialized:
                 backgroundRenderer.draw(frame)
 
                 val camera = frame.camera
+
+                // Handle taps
+                queuedSingleTaps.poll()?.let { tap ->
+                    if (camera.trackingState == TrackingState.TRACKING) {
+                        handleTap(frame, tap.x, tap.y)
+                    }
+                }
+
                 if(camera.trackingState == TrackingState.PAUSED) return@let
 
                 // Get projection matrix.
@@ -100,11 +103,15 @@ class ArRenderer(private val context: Context, private val onSessionInitialized:
         }
     }
 
+    fun onSurfaceTapped(event: MotionEvent) {
+        queuedSingleTaps.add(event)
+    }
+
     fun updateTexture(uri: android.net.Uri) {
         objectRenderer.updateTexture(context, uri)
     }
 
-    fun handleTap(frame: com.google.ar.core.Frame, x: Float, y: Float) {
+    private fun handleTap(frame: Frame, x: Float, y: Float) {
         for (hit in frame.hitTest(x, y)) {
             val trackable = hit.trackable
             // Check if the hit was on a plane

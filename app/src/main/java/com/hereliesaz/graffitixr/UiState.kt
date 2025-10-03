@@ -1,56 +1,17 @@
 package com.hereliesaz.graffitixr
 
-/**
- * Represents the immutable state of the UI.
- * This data class will hold all the necessary information
- * to render the user interface at any given time.
- */
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 
-/**
- * Represents the different editing modes available in the application.
- * Each mode provides a distinct user experience for visualizing the mural.
- */
 enum class EditorMode {
-    /**
-     * A mode for mocking up a mural on a static background image.
-     * This allows for precise placement and adjustments in a controlled environment.
-     */
     STATIC,
-
-    /**
-     * A mode for overlaying a mural on a live camera feed without using
-     * Augmented Reality tracking. This is a lightweight option for quick, on-the-go previews.
-     */
     NON_AR,
-
-    /**
-     * A mode for projecting a mural onto a real-world surface using
-     * Augmented Reality. This mode provides the most immersive and realistic visualization.
-     */
     AR_OVERLAY,
+    IMAGE_TRACE,
+    MOCK_UP
 }
 
-/**
- * Represents the complete and immutable state of the user interface at any given time.
- *
- * This data class acts as the single source of truth for the UI. It is observed by the
- * composables, and any change to an instance of this class will trigger a recomposition
- * to reflect the new state. All properties have default values to ensure a consistent
- * initial state.
- *
- * @property editorMode The currently active editor mode, which determines the main screen content. See [EditorMode].
- * @property backgroundImageUri The [Uri] of the image selected by the user to serve as the background. This is only used in [EditorMode.STATIC].
- * @property overlayImageUri The [Uri] of the mural or artwork image selected by the user to be overlaid on the background or camera feed.
- * @property opacity The transparency of the overlay image, ranging from 0.0f (fully transparent) to 1.0f (fully opaque).
- * @property contrast The contrast of the overlay image. A value of 1.0f is normal contrast.
- * @property saturation The color saturation of the overlay image. A value of 0.0f is grayscale, and 1.0f is normal saturation.
- * @property scale The uniform scale factor applied to the overlay image. Used for pinch-to-zoom gestures.
- * @property rotation The rotation angle of the overlay image in degrees. Used for twist gestures.
- * @property points A list of four [Offset] points representing the corners of the overlay image for perspective warping in non-AR modes.
- * @property completedOnboardingModes A set containing the [EditorMode]s for which the user has already seen and dismissed the onboarding dialog. This is used to prevent showing the dialog repeatedly.
- */
 data class UiState(
     val editorMode: EditorMode = EditorMode.STATIC,
     val backgroundImageUri: Uri? = null,
@@ -61,5 +22,80 @@ data class UiState(
     val scale: Float = 1f,
     val rotation: Float = 0f,
     val points: List<Offset> = emptyList(),
-    val completedOnboardingModes: Set<EditorMode> = emptySet()
-)
+    val completedOnboardingModes: Set<EditorMode> = emptySet(),
+    val mockupPoints: List<Offset> = emptyList(),
+    val mockupPointsHistory: List<List<Offset>> = emptyList(),
+    val mockupPointsHistoryIndex: Int = -1,
+    val arImagePose: FloatArray? = null,
+    val arFeaturePattern: ArFeaturePattern? = null,
+    val isArLocked: Boolean = false,
+    val imageTraceScale: Float = 1f,
+    val imageTraceOffset: Offset = Offset.Zero,
+    val isWarpEnabled: Boolean = false,
+    val isLoading: Boolean = false,
+    val colorMatrix: FloatArray = floatArrayOf(
+        1f, 0f, 0f, 0f,
+        0f, 1f, 0f, 0f,
+        0f, 0f, 1f, 0f,
+        0f, 0f, 0f, 1f
+    )
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as UiState
+
+        if (editorMode != other.editorMode) return false
+        if (backgroundImageUri != other.backgroundImageUri) return false
+        if (overlayImageUri != other.overlayImageUri) return false
+        if (opacity != other.opacity) return false
+        if (contrast != other.contrast) return false
+        if (saturation != other.saturation) return false
+        if (scale != other.scale) return false
+        if (rotation != other.rotation) return false
+        if (points != other.points) return false
+        if (completedOnboardingModes != other.completedOnboardingModes) return false
+        if (mockupPoints != other.mockupPoints) return false
+        if (mockupPointsHistory != other.mockupPointsHistory) return false
+        if (mockupPointsHistoryIndex != other.mockupPointsHistoryIndex) return false
+        if (arImagePose != null) {
+            if (other.arImagePose == null) return false
+            if (!arImagePose.contentEquals(other.arImagePose)) return false
+        } else if (other.arImagePose != null) return false
+        if (arFeaturePattern != other.arFeaturePattern) return false
+        if (isArLocked != other.isArLocked) return false
+        if (imageTraceScale != other.imageTraceScale) return false
+        if (imageTraceOffset != other.imageTraceOffset) return false
+        if (isWarpEnabled != other.isWarpEnabled) return false
+        if (isLoading != other.isLoading) return false
+        if (!colorMatrix.contentEquals(other.colorMatrix)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = editorMode.hashCode()
+        result = 31 * result + (backgroundImageUri?.hashCode() ?: 0)
+        result = 31 * result + (overlayImageUri?.hashCode() ?: 0)
+        result = 31 * result + opacity.hashCode()
+        result = 31 * result + contrast.hashCode()
+        result = 31 * result + saturation.hashCode()
+        result = 31 * result + scale.hashCode()
+        result = 31 * result + rotation.hashCode()
+        result = 31 * result + points.hashCode()
+        result = 31 * result + completedOnboardingModes.hashCode()
+        result = 31 * result + mockupPoints.hashCode()
+        result = 31 * result + mockupPointsHistory.hashCode()
+        result = 31 * result + mockupPointsHistoryIndex
+        result = 31 * result + (arImagePose?.contentHashCode() ?: 0)
+        result = 31 * result + (arFeaturePattern?.hashCode() ?: 0)
+        result = 31 * result + isArLocked.hashCode()
+        result = 31 * result + imageTraceScale.hashCode()
+        result = 31 * result + imageTraceOffset.hashCode()
+        result = 31 * result + isWarpEnabled.hashCode()
+        result = 31 * result + isLoading.hashCode()
+        result = 31 * result + colorMatrix.contentHashCode()
+        return result
+    }
+}

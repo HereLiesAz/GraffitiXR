@@ -46,6 +46,8 @@ fun MainScreen(viewModel: MainViewModel) {
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
+                EditorMode.STATIC -> StaticImageEditorScreen(uiState = uiState)
+                EditorMode.NON_AR -> NonArModeScreen(uiState = uiState)
                 EditorMode.IMAGE_TRACE -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onImageTraceScaleChanged,
@@ -58,8 +60,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
                 EditorMode.AR_OVERLAY -> ArModeScreen(
                     uiState = uiState,
-                    onArImagePlaced = viewModel::onArImagePlaced,
-                    onArFeaturesDetected = viewModel::onArFeaturesDetected // This will be used in the next step
+                    onSessionInitialized = viewModel::onArSessionInitialized,
                 )
             }
         }
@@ -81,6 +82,12 @@ fun MainScreen(viewModel: MainViewModel) {
 
             // Dynamic controls based on the current mode
             when (uiState.editorMode) {
+                EditorMode.STATIC -> {
+
+                }
+                EditorMode.NON_AR -> {
+
+                }
                 EditorMode.IMAGE_TRACE -> {
                     azRailItem(id = "image", text = "Image") {
                         overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -112,7 +119,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
                 EditorMode.AR_OVERLAY -> {
                     azRailItem(id = "image", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        overlayImagepicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                     azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
                     azRailToggle(

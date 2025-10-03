@@ -1,12 +1,14 @@
 package com.hereliesaz.graffitixr
 
 import android.graphics.Bitmap
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -18,13 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -108,34 +110,37 @@ fun MockupScreen(
                         }
                     }
 
-                    val colorMatrix = ColorMatrix().apply {
-                        setToSaturation(uiState.saturation)
-                        val contrastValue = uiState.contrast
-                        val contrastMat = ColorMatrix(
-                            floatArrayOf(
-                                contrastValue, 0f, 0f, 0f, (1 - contrastValue) * 128,
-                                0f, contrastValue, 0f, 0f, (1 - contrastValue) * 128,
-                                0f, 0f, contrastValue, 0f, (1 - contrastValue) * 128,
-                                0f, 0f, 0f, 1f, 0f
-                            )
+                    val colorMatrix = android.graphics.ColorMatrix()
+                    colorMatrix.setSaturation(uiState.saturation)
+                    val contrastValue = uiState.contrast
+                    val contrastMat = android.graphics.ColorMatrix(
+                        floatArrayOf(
+                            contrastValue, 0f, 0f, 0f, (1 - contrastValue) * 128,
+                            0f, contrastValue, 0f, 0f, (1 - contrastValue) * 128,
+                            0f, 0f, contrastValue, 0f, (1 - contrastValue) * 128,
+                            0f, 0f, 0f, 1f, 0f
                         )
-                        this *= contrastMat
-                    }
+                    )
+                    colorMatrix.postConcat(contrastMat)
+
 
                     val paint = Paint().apply {
                         alpha = (uiState.opacity * 255).toInt()
-                        colorFilter = android.graphics.ColorFilter.colorMatrix(colorMatrix.values)
+                        colorFilter = ColorMatrixColorFilter(colorMatrix)
                     }
 
                     canvas.nativeCanvas.drawBitmapMesh(bmp, meshWidth, meshHeight, verts, 0, null, 0, paint)
                 }
             }
 
+            val density = LocalDensity.current
             if (isWarpEnabled) {
-                points.forEachIndexed { index, offset ->
+                points.forEachIndexed { index, point ->
+                    val xDp = with(density) { (point.x).toDp() - 12.dp }
+                    val yDp = with(density) { (point.y).toDp() - 12.dp }
                     Box(
                         modifier = Modifier
-                            .offset((offset.x - 12).dp, (offset.y - 12).dp)
+                            .offset(x = xDp, y = yDp)
                             .size(24.dp)
                             .background(Color.White.copy(alpha = 0.5f), CircleShape)
                             .pointerInput(Unit) {
