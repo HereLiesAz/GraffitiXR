@@ -6,9 +6,7 @@ package com.hereliesaz.graffitixr
  * to render the user interface at any given time.
  */
 import android.net.Uri
-import android.net.Uri
 import androidx.compose.ui.geometry.Offset
-import androidx.xr.core.Pose
 
 /**
  * Enum to represent the different editor modes.
@@ -16,7 +14,6 @@ import androidx.xr.core.Pose
 enum class EditorMode {
     STATIC, // Mock-up on a static image
     NON_AR, // On-the-go camera overlay
-    AR      // Augmented Reality mode
 }
 
 /**
@@ -33,7 +30,6 @@ enum class EditorMode {
  * @param scale The scale of the overlay image.
  * @param rotation The rotation of the overlay image.
  * @param points The four corner points for the perspective warp.
- * @param arMarkers The list of 3D markers placed in the AR scene.
  * @param completedOnboardingModes A set of modes for which the user has completed the onboarding.
  */
 data class UiState(
@@ -46,6 +42,5 @@ data class UiState(
     val scale: Float = 1f,
     val rotation: Float = 0f,
     val points: List<Offset> = emptyList(),
-    val arMarkers: List<Pose> = emptyList(),
     val completedOnboardingModes: Set<EditorMode> = emptySet()
 )

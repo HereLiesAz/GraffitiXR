@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import android.app.Application
 import android.content.Context
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -78,8 +79,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(scale = it.scale * scale) }
     }
 
-import androidx.compose.ui.geometry.Offset
-
     /**
      * Updates the rotation of the overlay image.
      * @param rotation The change in rotation value.
@@ -112,8 +111,6 @@ import androidx.compose.ui.geometry.Offset
         }
     }
 
-import androidx.xr.core.Pose
-
     /**
      * Changes the current editor mode.
      * @param mode The new editor mode.
@@ -136,19 +133,4 @@ import androidx.xr.core.Pose
         }
     }
 
-    /**
-     * Adds a new AR marker to the scene.
-     * If there are already 4 markers, the oldest one is replaced.
-     * @param pose The 3D pose of the new marker.
-     */
-    fun onArMarkerPlaced(pose: Pose) {
-        _uiState.update { currentState ->
-            val updatedMarkers = currentState.arMarkers.toMutableList()
-            if (updatedMarkers.size >= 4) {
-                updatedMarkers.removeAt(0) // Remove the oldest marker
-            }
-            updatedMarkers.add(pose)
-            currentState.copy(arMarkers = updatedMarkers)
-        }
-    }
 }
