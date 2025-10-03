@@ -1,73 +1,48 @@
 [versions]
-accompanist = "0.37.3"
-androidGradlePlugin = "8.13.0"
-androidxCamera = "1.5.0"
-androidxCore = "1.17.0"
-androidxLifecycle = "2.9.4"
-androidxMaterialIconsExtended = "1.7.8"
-arcore = "1.0.0-alpha06"
-googleArcore = "1.50.0"
-xrCompose = "1.0.0-alpha06"
-scenecore = "1.0.0-alpha06"
-xrRuntime = "1.0.0-alpha06"
-composeBom = "2025.09.01"
-coil = "2.7.0"
-composeCompiler = "1.5.8"
-composeMaterial3 = "1.4.0"
-composeUi = "1.9.2"
-guava = "33.5.0-android"
+agp = "8.13.0"
 kotlin = "2.2.20"
-mlkit = "16.0.0-beta6"
-activityCompose = "1.11.0"
-apacheCommonsMath = "3.6.1"
-coroutinesPlayServices = "1.10.2"
-azNavRail = "3.10"
+coreKtx = "1.12.0"
 junit = "4.13.2"
-mockito = "5.20.0"
-mockitoKotlin = "6.1.0"
-kotlinxCoroutinesTest = "1.10.2"
-turbine = "1.2.1"
-androidxArchCoreTesting = "2.2.0"
-filamentAndroid = "1.17.1"
+junitVersion = "1.1.5"
+espressoCore = "3.5.1"
+activityCompose = "1.8.2"
+composeBom = "2025.09.01"
+lifecycle = "2.9.4"
+navigation = "2.7.5"
+coroutines = "1.7.3"
+coil = "2.5.0"
+arcore = "1.40.0"
+camerax = "1.3.1"
+accompanistPermissions = "0.34.0"
 
 [libraries]
-google-arcore = { module = "com.google.ar:core", version.ref = "googleArcore" }
-accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist" }
-androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "androidxCamera" }
-androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "androidxCamera" }
-androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "androidxCamera" }
-androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "androidxCamera" }
-androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
-androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidxLifecycle" }
-androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
-androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
-androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "androidxMaterialIconsExtended" }
-androidx-arcore = { module = "androidx.xr.arcore:arcore", version.ref = "arcore" }
-androidx-xr-compose = { module = "androidx.xr.compose:compose", version.ref = "xrCompose" }
-androidx-scenecore = { module = "androidx.xr.scenecore:scenecore", version.ref = "scenecore" }
-androidx-xr-runtime = { module = "androidx.xr.runtime:runtime", version.ref = "xrRuntime" }
+google-accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+arcore-client = { group = "com.google.ar", name = "core", version.ref = "arcore" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
-coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "composeMaterial3" }
-compose-ui = { module = "androidx.compose.ui:ui", version.ref = "composeUi" }
-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "composeUi" }
-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "composeUi" }
-google-android-material = { module = "com.google.android.material:material", version = "1.13.0" }
-guava = { module = "com.google.guava:guava", version.ref = "guava" }
-mlkit-segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "mlkit" }
-androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
-apache-commons-math = { module = "org.apache.commons:commons-math3", version.ref = "apacheCommonsMath" }
-kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
-az-nav-rail = { module = "com.github.HereLiesAz:AzNavRail", version.ref = "azNavRail" }
-junit = { module = "junit:junit", version.ref = "junit" }
-mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
-mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockitoKotlin" }
-kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
-turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
-androidx-arch-core-testing = { module = "androidx.arch.core:core-testing", version.ref = "androidxArchCoreTesting" }
-filament-android = { group = "com.google.ar.sceneform", name = "filament-android", version.ref = "filamentAndroid" }
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 
 [plugins]
-android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

@@ -1,5 +1,10 @@
 package com.hereliesaz.graffitixr
 
+/**
+ * Represents the immutable state of the UI.
+ * This data class will hold all the necessary information
+ * to render the user interface at any given time.
+ */
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 

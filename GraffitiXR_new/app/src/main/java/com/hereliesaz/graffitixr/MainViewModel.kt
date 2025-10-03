@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
+import androidx.xr.runtime.math.Pose
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
