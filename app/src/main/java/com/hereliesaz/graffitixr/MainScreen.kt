@@ -104,8 +104,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     azRailToggle(
                         id = "warp",
                         isChecked = uiState.isWarpEnabled,
-                        toggleOnText = "Warp On",
-                        toggleOffText = "Warp Off",
+                        toggleOnText = "Warp",
+                        toggleOffText = "Done",
                         onClick = viewModel::onWarpToggled
                     )
                     azRailItem(id = "undo", text = "Undo", onClick = viewModel::onUndoMockup)
