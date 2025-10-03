@@ -23,6 +23,14 @@ class MainViewModel : ViewModel() {
         _uiState.update { it.copy(editorMode = mode) }
     }
 
+    fun onOnboardingComplete(mode: EditorMode) {
+        _uiState.update {
+            val completedModes = it.completedOnboardingModes.toMutableSet()
+            completedModes.add(mode)
+            it.copy(completedOnboardingModes = completedModes)
+        }
+    }
+
     fun onOverlayImageSelected(uri: Uri) {
         _uiState.update {
             it.copy(
@@ -133,7 +141,7 @@ class MainViewModel : ViewModel() {
     }
 
     // Functions for StaticImageEditor (manipulating mockup points for perspective warp)
-    fun onStaticPointsInitialized(points: List<Offset>) {
+    fun onPointsInitialized(points: List<Offset>) {
         _uiState.update {
             val newHistory = if (it.mockupPointsHistoryIndex == -1) mutableListOf() else it.mockupPointsHistory.subList(0, it.mockupPointsHistoryIndex + 1).toMutableList()
             newHistory.add(points)
@@ -145,7 +153,7 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun onStaticPointChanged(index: Int, newOffset: Offset) {
+    fun onPointChanged(index: Int, newOffset: Offset) {
         _uiState.update {
             val updatedPoints = it.mockupPoints.toMutableList()
             if (index >= 0 && index < updatedPoints.size) {

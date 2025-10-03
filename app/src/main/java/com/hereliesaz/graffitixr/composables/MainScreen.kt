@@ -36,6 +36,8 @@ fun MainScreen(viewModel: MainViewModel) {
             EditorMode.STATIC -> "Mock-up Mode" to "Use this mode to project an image onto a static background. You can warp the image, adjust its properties, and see how it looks."
             EditorMode.NON_AR -> "On-the-Go Mode" to "This mode uses your camera to overlay the image in a real-world environment, without AR tracking. It's great for quick previews."
             EditorMode.AR_OVERLAY -> "AR Mode" to "This mode uses Augmented Reality to project the image onto a real-world surface. It's the most immersive way to visualize your artwork."
+            EditorMode.IMAGE_TRACE -> "Image Trace" to "Trace an image from your camera feed."
+            EditorMode.MOCK_UP -> "Mock Up" to "Mock up a mural on a static image."
         }
         OnboardingDialog(
             title = title,
@@ -63,19 +65,18 @@ fun MainScreen(viewModel: MainViewModel) {
         }
 
         when (uiState.editorMode) {
-            EditorMode.STATIC -> StaticImageEditor(
+            EditorMode.STATIC -> MockupScreen(
                 uiState = uiState,
                 onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
                 onOverlayImageSelected = viewModel::onOverlayImageSelected,
                 onOpacityChanged = viewModel::onOpacityChanged,
                 onContrastChanged = viewModel::onContrastChanged,
                 onSaturationChanged = viewModel::onSaturationChanged,
-                onScaleChanged = viewModel::onScaleChanged,
-                onRotationChanged = viewModel::onRotationChanged,
                 onPointsInitialized = viewModel::onPointsInitialized,
-                onPointChanged = viewModel::onPointChanged
+                onPointChanged = viewModel::onPointChanged,
+                isWarpEnabled = uiState.isWarpEnabled
             )
-            EditorMode.NON_AR -> NonArModeScreen(
+            EditorMode.NON_AR -> ImageTraceScreen(
                 uiState = uiState,
                 onOverlayImageSelected = viewModel::onOverlayImageSelected,
                 onOpacityChanged = viewModel::onOpacityChanged,
@@ -86,6 +87,26 @@ fun MainScreen(viewModel: MainViewModel) {
             )
             EditorMode.AR_OVERLAY -> ArModeScreen(
                 viewModel = viewModel
+            )
+            EditorMode.IMAGE_TRACE -> ImageTraceScreen(
+                uiState = uiState,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onScaleChanged = viewModel::onScaleChanged,
+                onRotationChanged = viewModel::onRotationChanged
+            )
+            EditorMode.MOCK_UP -> MockupScreen(
+                uiState = uiState,
+                onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onPointsInitialized = viewModel::onPointsInitialized,
+                onPointChanged = viewModel::onPointChanged,
+                isWarpEnabled = uiState.isWarpEnabled
             )
         }
     }
