@@ -70,6 +70,7 @@ class ArRenderer(
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
         session?.let {
+            it.setCameraTextureName(backgroundRenderer.textureId)
             displayRotationHelper.updateSessionIfNeeded(it)
             val frame = it.update()
             backgroundRenderer.draw(frame)
