@@ -3,7 +3,8 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
-import com.google.ar.core.Session
+import com.google.ar.core.Anchor
+import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,18 +18,9 @@ class MainViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
-    var arSession: Session? = null
 
     fun onEditorModeChanged(mode: EditorMode) {
         _uiState.update { it.copy(editorMode = mode) }
-    }
-
-    fun onOnboardingComplete(mode: EditorMode) {
-        _uiState.update {
-            val completedModes = it.completedOnboardingModes.toMutableSet()
-            completedModes.add(mode)
-            it.copy(completedOnboardingModes = completedModes)
-        }
     }
 
     fun onOverlayImageSelected(uri: Uri) {
@@ -43,9 +35,7 @@ class MainViewModel : ViewModel() {
                 arFeaturePattern = null,
                 isArLocked = false,
                 imageTraceScale = 1f,
-                imageTraceOffset = Offset.Zero,
-                scale = 1f, // Reset general scale
-                rotation = 0f // Reset general rotation
+                imageTraceOffset = Offset.Zero
             )
         }
     }
@@ -66,15 +56,6 @@ class MainViewModel : ViewModel() {
         _uiState.update { it.copy(saturation = saturation) }
     }
 
-    // --- General Image Transformations (used by NonArModeScreen and StaticImageEditor) ---
-    fun onScaleChanged(scaleFactor: Float) {
-        _uiState.update { it.copy(scale = it.scale * scaleFactor) }
-    }
-
-    fun onRotationChanged(angleChange: Float) {
-        _uiState.update { it.copy(rotation = it.rotation + angleChange) }
-    }
-
     // --- Image Trace Mode ---
     fun onImageTraceScaleChanged(scaleChange: Float) {
         _uiState.update { it.copy(imageTraceScale = it.imageTraceScale * scaleChange) }
@@ -85,7 +66,7 @@ class MainViewModel : ViewModel() {
     }
 
 
-    // --- Mock-up Mode (and StaticImageEditor) ---
+    // --- Mock-up Mode ---
     fun onMockupPointsChanged(points: List<Offset>) {
         _uiState.update {
             val newHistory = it.mockupPointsHistory.subList(0, it.mockupPointsHistoryIndex + 1).toMutableList()
@@ -140,42 +121,23 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    // Functions for StaticImageEditor (manipulating mockup points for perspective warp)
-    fun onPointsInitialized(points: List<Offset>) {
-        _uiState.update {
-            val newHistory = if (it.mockupPointsHistoryIndex == -1) mutableListOf() else it.mockupPointsHistory.subList(0, it.mockupPointsHistoryIndex + 1).toMutableList()
-            newHistory.add(points)
-            it.copy(
-                mockupPoints = points,
-                mockupPointsHistory = newHistory,
-                mockupPointsHistoryIndex = newHistory.lastIndex
-            )
-        }
-    }
-
-    fun onPointChanged(index: Int, newOffset: Offset) {
-        _uiState.update {
-            val updatedPoints = it.mockupPoints.toMutableList()
-            if (index >= 0 && index < updatedPoints.size) {
-                updatedPoints[index] = newOffset
-            }
-            val newHistory = it.mockupPointsHistory.subList(0, it.mockupPointsHistoryIndex + 1).toMutableList()
-            newHistory.add(updatedPoints) // Add the new state to history
-            it.copy(
-                mockupPoints = updatedPoints,
-                mockupPointsHistory = newHistory,
-                mockupPointsHistoryIndex = newHistory.lastIndex
-            )
-        }
-    }
-
     // --- AR Overlay Mode ---
-    fun onArSessionInitialized(session: Session) {
-        this.arSession = session
+    fun onArImagePlaced(anchor: Anchor) {
+        val poseMatrix = FloatArray(16)
+        anchor.pose.toMatrix(poseMatrix, 0)
+        _uiState.update { it.copy(arImagePose = poseMatrix, arFeaturePattern = null) }
+        anchor.detach()
+    }
+
+    fun onArFeaturesDetected(featurePattern: ArFeaturePattern) {
+        _uiState.update { it.copy(arFeaturePattern = featurePattern) }
     }
 
     fun onArLockToggled() {
-        _uiState.update { it.copy(isArLocked = !it.isArLocked) }
+        _uiState.update {
+            val pattern = if (it.isArLocked) null else it.arFeaturePattern
+            it.copy(isArLocked = !it.isArLocked, arFeaturePattern = pattern)
+        }
     }
 
     // --- Global ---

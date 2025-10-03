@@ -60,11 +60,16 @@ class PlaneRenderer {
 
         val modelMatrix = FloatArray(16)
         plane.centerPose.toMatrix(modelMatrix, 0)
+
+        // Get the camera's view matrix and then invert it.
+        val viewMatrix = FloatArray(16)
+        cameraPose.toMatrix(viewMatrix, 0)
+        val invertedViewMatrix = FloatArray(16)
+        android.opengl.Matrix.invertM(invertedViewMatrix, 0, viewMatrix, 0)
+
         val modelViewMatrix = FloatArray(16)
-        val invertedCameraPose = FloatArray(16)
-        cameraPose.inverse().toMatrix(invertedCameraPose, 0)
-        // Correct matrix multiplication order for view matrix
-        android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, invertedCameraPose, 0, modelMatrix, 0)
+        android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, invertedViewMatrix, 0, modelMatrix, 0)
+
         val modelViewProjectionMatrix = FloatArray(16)
         android.opengl.Matrix.multiplyMM(modelViewProjectionMatrix, 0, cameraProjection, 0, modelViewMatrix, 0)
 
@@ -74,6 +79,7 @@ class PlaneRenderer {
             Plane.Type.HORIZONTAL_UPWARD_FACING -> floatArrayOf(0f, 1f, 0f, 0.5f) // Green
             Plane.Type.HORIZONTAL_DOWNWARD_FACING -> floatArrayOf(1f, 0f, 0f, 0.5f) // Red
             Plane.Type.VERTICAL -> floatArrayOf(0f, 0f, 1f, 0.5f) // Blue
+            else -> floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f) // Gray
         }
         GLES20.glUniform4fv(colorUniform, 1, color, 0)
 

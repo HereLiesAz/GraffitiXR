@@ -19,7 +19,7 @@ aznavrail = "3.10"
 
 [libraries]
 aznavrail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref = "aznavrail" }
-opencv = { module = "org.opencv:opencv", name = "opencv", version.ref = "opencv" }
+opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
 google-accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }

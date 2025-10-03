@@ -1,33 +1,30 @@
 package com.hereliesaz.graffitixr.graphics
 
+import android.app.Activity
 import android.content.Context
+import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.hardware.display.DisplayManager
-import android.os.Build
+import android.hardware.display.DisplayManager.DisplayListener
 import android.view.Display
 import android.view.WindowManager
-import androidx.core.content.ContextCompat.getSystemService
 import com.google.ar.core.Session
 
 /**
- * Helper class to manage display rotation and update the ARCore session accordingly.
- * This class is necessary to ensure that the AR camera feed is rendered correctly
- * when the device is rotated. It is a standard component in ARCore applications.
+ * Helper to track the display rotations. In ARCore, we need to know the camera sensor orientation
+ * and the display rotation value. This data is used by ARCore to transform camera images and
+ * projection matrices.
  */
-class DisplayRotationHelper(private val context: Context) : DisplayManager.DisplayListener {
-    private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-    private var viewportChanged = false
-    private var viewportWidth = 0
-    private var viewportHeight = 0
-    private val display: Display?
+class DisplayRotationHelper(private val context: Context) : DisplayListener {
+    private var isDeviceRotated = false
+    private val display: Display
+    private val displayManager: DisplayManager
 
     init {
-        display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            context.display
-        } else {
-            @Suppress("DEPRECATION")
-            val windowManager = getSystemService(context, WindowManager::class.java)
-            windowManager?.defaultDisplay
-        }
+        displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        display = windowManager.defaultDisplay
     }
 
     fun onResume() {
@@ -39,22 +36,20 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
-        viewportWidth = width
-        viewportHeight = height
-        viewportChanged = true
+        // No-op
     }
 
     fun updateSessionIfNeeded(session: Session) {
-        if (viewportChanged && display != null) {
+        if (isDeviceRotated) {
             val displayRotation = display.rotation
-            session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
-            viewportChanged = false
+            session.setDisplayGeometry(displayRotation, display.width, display.height)
+            isDeviceRotated = false
         }
     }
 
     override fun onDisplayAdded(displayId: Int) {}
     override fun onDisplayRemoved(displayId: Int) {}
     override fun onDisplayChanged(displayId: Int) {
-        viewportChanged = true
+        isDeviceRotated = true
     }
 }

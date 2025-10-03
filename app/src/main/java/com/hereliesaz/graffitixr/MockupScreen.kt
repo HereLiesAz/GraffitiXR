@@ -20,18 +20,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
+import kotlin.math.roundToInt
 
 /**
  * A composable screen for mocking up a mural on a static background image.
@@ -110,37 +112,34 @@ fun MockupScreen(
                         }
                     }
 
-                    val colorMatrix = android.graphics.ColorMatrix()
-                    colorMatrix.setSaturation(uiState.saturation)
-                    val contrastValue = uiState.contrast
-                    val contrastMat = android.graphics.ColorMatrix(
-                        floatArrayOf(
-                            contrastValue, 0f, 0f, 0f, (1 - contrastValue) * 128,
-                            0f, contrastValue, 0f, 0f, (1 - contrastValue) * 128,
-                            0f, 0f, contrastValue, 0f, (1 - contrastValue) * 128,
-                            0f, 0f, 0f, 1f, 0f
+                    val composeColorMatrix = ColorMatrix().apply {
+                        setToSaturation(uiState.saturation)
+                        val contrastValue = uiState.contrast
+                        val contrastMat = ColorMatrix(
+                            floatArrayOf(
+                                contrastValue, 0f, 0f, 0f, (1 - contrastValue) * 128,
+                                0f, contrastValue, 0f, 0f, (1 - contrastValue) * 128,
+                                0f, 0f, contrastValue, 0f, (1 - contrastValue) * 128,
+                                0f, 0f, 0f, 1f, 0f
+                            )
                         )
-                    )
-                    colorMatrix.postConcat(contrastMat)
-
+                        this *= contrastMat
+                    }
 
                     val paint = Paint().apply {
                         alpha = (uiState.opacity * 255).toInt()
-                        colorFilter = ColorMatrixColorFilter(colorMatrix)
+                        colorFilter = ColorMatrixColorFilter(composeColorMatrix.values)
                     }
 
                     canvas.nativeCanvas.drawBitmapMesh(bmp, meshWidth, meshHeight, verts, 0, null, 0, paint)
                 }
             }
 
-            val density = LocalDensity.current
             if (isWarpEnabled) {
                 points.forEachIndexed { index, point ->
-                    val xDp = with(density) { (point.x).toDp() - 12.dp }
-                    val yDp = with(density) { (point.y).toDp() - 12.dp }
                     Box(
                         modifier = Modifier
-                            .offset(x = xDp, y = yDp)
+                            .offset { IntOffset((point.x - 12).roundToInt(), (point.y - 12).roundToInt()) }
                             .size(24.dp)
                             .background(Color.White.copy(alpha = 0.5f), CircleShape)
                             .pointerInput(Unit) {

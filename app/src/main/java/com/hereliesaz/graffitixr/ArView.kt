@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr
 
+import android.net.Uri
 import android.opengl.GLSurfaceView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -9,25 +10,36 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.google.ar.core.Session
+import com.google.ar.core.Anchor
+import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.ArRenderer
 
 /**
  * A composable that provides a view for rendering the complete AR scene.
  *
- * @param uiState The current UI state.
- * @param onSessionInitialized A callback invoked when the AR session is initialized.
+ * @param arImagePose The pose of the manually placed image, as a model matrix.
+ * @param arFeaturePattern The unique "fingerprint" of the locked AR scene.
+ * @param overlayImageUri The URI of the image to be projected.
+ * @param isArLocked A flag indicating whether the AR projection is locked.
+ * @param opacity The opacity of the overlay image.
+ * @param onArImagePlaced A callback invoked when the user places the initial image.
+ * @param onArFeaturesDetected A callback invoked when the feature "fingerprint" of the scene is generated.
  */
 @Composable
 fun ArView(
-    uiState: UiState,
-    onSessionInitialized: (Session) -> Unit
+    arImagePose: FloatArray?,
+    arFeaturePattern: ArFeaturePattern?,
+    overlayImageUri: Uri?,
+    isArLocked: Boolean,
+    opacity: Float,
+    onArImagePlaced: (Anchor) -> Unit,
+    onArFeaturesDetected: (ArFeaturePattern) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val glSurfaceView = remember { GLSurfaceView(context) }
     val renderer = remember {
-        ArRenderer(context, onSessionInitialized)
+        ArRenderer(context, glSurfaceView, onArImagePlaced, onArFeaturesDetected)
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -63,9 +75,11 @@ fun ArView(
             }
         },
         update = {
-            renderer.uiState = uiState
-            uiState.overlayImageUri?.let { uri -> renderer.updateTexture(uri) }
+            renderer.arImagePose = arImagePose
+            renderer.arFeaturePattern = arFeaturePattern
+            renderer.overlayImageUri = overlayImageUri
+            renderer.isArLocked = isArLocked
+            renderer.opacity = opacity
         }
-
     )
 }
