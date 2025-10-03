@@ -24,6 +24,12 @@ enum class EditorMode {
      * Augmented Reality tracking. This is a lightweight option for quick, on-the-go previews.
      */
     NON_AR,
+
+    /**
+     * A mode for projecting a mural onto a real-world surface using
+     * Augmented Reality. This mode provides the most immersive and realistic visualization.
+     */
+    AR_OVERLAY,
 }
 
 /**
