@@ -41,6 +41,24 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.hereliesaz.graffitixr.UiState
 
+/**
+ * A composable screen for the "On-the-Go" non-AR camera overlay mode.
+ *
+ * This screen provides a lightweight way to preview a mural in a real-world environment.
+ * It uses [CameraX] to display a live camera feed and overlays the selected mural image
+ * on top. Users can perform basic transformations like scaling and rotating the overlay
+ * via touch gestures, and adjust its appearance using sliders. This mode serves as a
+ * fallback for devices that do not support ARCore or for users who want a quick preview.
+ *
+ * @param uiState The current state of the UI, containing all necessary data for rendering.
+ * @param onOverlayImageSelected A callback function invoked when the user selects a new overlay image.
+ * @param onOpacityChanged A callback function invoked when the user adjusts the opacity slider.
+ * @param onContrastChanged A callback function invoked when the user adjusts the contrast slider.
+ * @param onSaturationChanged A callback function invoked when the user adjusts the saturation slider.
+ * @param onScaleChanged A callback function invoked during a transform gesture to update the overlay image's scale.
+ * @param onRotationChanged A callback function invoked during a transform gesture to update the overlay image's rotation.
+ */
+
 @Composable
 fun NonArModeScreen(
     uiState: UiState,

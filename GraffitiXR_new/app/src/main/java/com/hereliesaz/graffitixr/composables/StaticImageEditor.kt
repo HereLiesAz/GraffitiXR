@@ -51,7 +51,26 @@ import com.hereliesaz.graffitixr.UiState
 import kotlinx.coroutines.launch
 
 /**
- * Composable for the mock-up mode on a static background image.
+ * A composable screen for the static image mock-up mode.
+ *
+ * This screen provides a user interface for selecting a background image and an overlay image.
+ * It allows the user to manipulate the overlay image by adjusting its opacity, contrast, and
+ * saturation via sliders. It also features a perspective warp capability, where the user can
+ * drag the four corners of the overlay image to match the perspective of the background.
+ *
+ * The perspective transformation is achieved by calculating a homography matrix from the four
+ * user-defined points and applying it to the overlay image within a `Canvas` `withTransform` block.
+ *
+ * @param uiState The current state of the UI, containing all necessary data for rendering.
+ * @param onBackgroundImageSelected A callback function invoked when the user selects a new background image. It provides the [Uri] of the selected image.
+ * @param onOverlayImageSelected A callback function invoked when the user selects a new overlay image. It provides the [Uri] of the selected image.
+ * @param onOpacityChanged A callback function invoked when the user adjusts the opacity slider.
+ * @param onContrastChanged A callback function invoked when the user adjusts the contrast slider.
+ * @param onSaturationChanged A callback function invoked when the user adjusts the saturation slider.
+ * @param onScaleChanged A callback function invoked during a transform gesture to update the overlay image's scale. (Note: Currently unused in favor of perspective warp).
+ * @param onRotationChanged A callback function invoked during a transform gesture to update the overlay image's rotation. (Note: Currently unused in favor of perspective warp).
+ * @param onPointsInitialized A callback function invoked once the overlay image is first laid out, providing the initial four corner points.
+ * @param onPointChanged A callback function invoked when the user drags one of the corner points of the overlay image. It provides the index of the point and its new [Offset].
  */
 @Composable
 fun StaticImageEditor(
