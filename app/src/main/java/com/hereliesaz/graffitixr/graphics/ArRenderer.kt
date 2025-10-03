@@ -26,14 +26,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/**
- * A custom renderer for handling the ARCore session and rendering content.
- *
- * @param context The application context.
- * @param view The GLSurfaceView, used for getting dimensions for homography calculation.
- * @param onArImagePlaced A callback invoked when the user places the initial image.
- * @param onArFeaturesDetected A callback invoked when the feature "fingerprint" of the scene is generated.
- */
 class ArRenderer(
     private val context: Context,
     private val view: View,
@@ -51,7 +43,6 @@ class ArRenderer(
 
     private val tapQueue = ConcurrentLinkedQueue<MotionEvent>()
 
-    // State from ViewModel
     var arImagePose: FloatArray? = null
     var arFeaturePattern: ArFeaturePattern? = null
     var overlayImageUri: Uri? = null
@@ -78,54 +69,54 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        session ?: return
+        session?.let {
+            displayRotationHelper.updateSessionIfNeeded(it)
+            val frame = it.update()
+            backgroundRenderer.draw(frame)
 
-        displayRotationHelper.updateSessionIfNeeded(session!!)
-        val frame = session!!.update()
-        backgroundRenderer.draw(frame)
+            val camera = frame.camera
+            if (camera.trackingState != TrackingState.TRACKING) return
 
-        val camera = frame.camera
-        if (camera.trackingState != TrackingState.TRACKING) return
-
-        if (isArLocked) {
-            if (!featurePatternGenerated) {
-                generateFeaturePattern(frame)
-            }
-        } else {
-            handleTapForPlacement(frame)
-            featurePatternGenerated = false
-        }
-
-        val projectionMatrix = FloatArray(16)
-        camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
-        val viewMatrix = FloatArray(16)
-        camera.getViewMatrix(viewMatrix, 0)
-
-        if (!isArLocked) {
-            val planes = session!!.getAllTrackables(Plane::class.java)
-            for (plane in planes) {
-                if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                    planeRenderer.draw(plane, camera.displayOrientedPose, projectionMatrix)
-                }
-            }
-        }
-
-        if (overlayImageUri != lastLoadedUri) {
-            loadOverlayBitmap()
-        }
-
-        val bmp = overlayBitmap
-        if (bmp != null) {
             if (isArLocked) {
-                arFeaturePattern?.let { pattern ->
-                    val homography = HomographyHelper.calculateHomography(pattern.worldPoints, camera, view, bmp.width, bmp.height)
-                    homography?.let {
-                        projectedImageRenderer.draw(bmp, it, opacity)
-                    }
+                if (!featurePatternGenerated) {
+                    generateFeaturePattern(frame)
                 }
             } else {
-                arImagePose?.let {
-                    simpleQuadRenderer.draw(it, viewMatrix, projectionMatrix, bmp, opacity)
+                handleTapForPlacement(frame)
+                featurePatternGenerated = false
+            }
+
+            val projectionMatrix = FloatArray(16)
+            camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+            val viewMatrix = FloatArray(16)
+            camera.getViewMatrix(viewMatrix, 0)
+
+            if (!isArLocked) {
+                val planes = it.getAllTrackables(Plane::class.java)
+                for (plane in planes) {
+                    if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
+                        planeRenderer.draw(plane, camera.displayOrientedPose, projectionMatrix)
+                    }
+                }
+            }
+
+            if (overlayImageUri != lastLoadedUri) {
+                loadOverlayBitmap()
+            }
+
+            val bmp = overlayBitmap
+            if (bmp != null) {
+                if (isArLocked) {
+                    arFeaturePattern?.let { pattern ->
+                        val homography = HomographyHelper.calculateHomography(pattern.worldPoints, camera, view, bmp.width, bmp.height)
+                        homography?.let {
+                            projectedImageRenderer.draw(bmp, it, opacity)
+                        }
+                    }
+                } else {
+                    arImagePose?.let {
+                        simpleQuadRenderer.draw(it, viewMatrix, projectionMatrix, bmp, opacity)
+                    }
                 }
             }
         }
