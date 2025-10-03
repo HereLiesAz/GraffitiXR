@@ -28,6 +28,7 @@ import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
+    val railState = rememberAzNavRailState()
 
     val overlayImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -40,8 +41,7 @@ fun MainScreen(viewModel: MainViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 80.dp),
+                .fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
@@ -65,7 +65,6 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        val railState = rememberAzNavRailState()
         AzNavRail(state = railState) {
             azSettings(
                 isLoading = false,
