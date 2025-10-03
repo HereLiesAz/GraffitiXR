@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.composables
 
 import android.Manifest
 import android.opengl.GLSurfaceView
+import android.os.Build
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
@@ -17,8 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.hereliesaz.graffitixr.MainViewModel
 import com.hereliesaz.graffitixr.UiState
 import com.hereliesaz.graffitixr.graphics.ArRenderer
@@ -27,19 +27,27 @@ import com.hereliesaz.graffitixr.graphics.ArRenderer
 @Composable
 fun ArModeScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    val cameraPermissionState = rememberPermissionState(permission = Manifest.permission.CAMERA)
+
+    val permissions = mutableListOf(Manifest.permission.CAMERA)
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+    } else {
+        permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
+    }
+    val permissionStates = rememberMultiplePermissionsState(permissions = permissions)
 
     LaunchedEffect(Unit) {
-        if (!cameraPermissionState.status.isGranted) {
-            cameraPermissionState.launchPermissionRequest()
+        if (!permissionStates.allPermissionsGranted) {
+            permissionStates.launchMultiplePermissionRequest()
         }
     }
 
-    if (cameraPermissionState.status.isGranted) {
+    if (permissionStates.allPermissionsGranted) {
         ArContent(viewModel = viewModel, uiState = uiState)
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Camera permission is required for AR mode.")
+            val revokedPermissions = permissionStates.revokedPermissions.joinToString { it.permission }
+            Text("Permissions required for AR mode: $revokedPermissions. Please grant them in settings.")
         }
     }
 }
