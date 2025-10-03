@@ -42,12 +42,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.UiState
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 fun MockupScreen(
@@ -119,7 +121,7 @@ fun MockupScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .onGloballyPositioned { coordinates ->
-                        if (uiState.points.isEmpty() && imageBitmap != null) {
+                        if (uiState.mockupPoints.isEmpty() && imageBitmap != null) {
                             val w = imageBitmap!!.width.toFloat()
                             val h = imageBitmap!!.height.toFloat()
                             val points = listOf(
@@ -132,15 +134,15 @@ fun MockupScreen(
                         }
                     }
             ) {
-                val perspectiveMatrix = remember(uiState.points, imageBitmap) {
+                val perspectiveMatrix = remember(uiState.mockupPoints, imageBitmap) {
                     Matrix().apply {
                         imageBitmap?.let { bmp ->
-                            if (uiState.points.size == 4) {
+                            if (uiState.mockupPoints.size == 4) {
                                 val w = bmp.width.toFloat()
                                 val h = bmp.height.toFloat()
                                 setPolyToPoly(
                                     floatArrayOf(0f, 0f, w, 0f, w, h, 0f, h), 0,
-                                    uiState.points.flatMap { listOf(it.x, it.y) }.toFloatArray(), 0,
+                                    uiState.mockupPoints.flatMap { listOf(it.x, it.y) }.toFloatArray(), 0,
                                     4
                                 )
                             }
@@ -176,17 +178,22 @@ fun MockupScreen(
                     }
                 }
 
-                if (uiState.points.isNotEmpty() && isWarpEnabled) {
+                if (uiState.mockupPoints.isNotEmpty() && isWarpEnabled) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        uiState.points.forEach { offset ->
+                        uiState.mockupPoints.forEach { offset ->
                             drawCircle(color = Color.White, radius = 20f, center = offset, style = Stroke(width = 5f))
                         }
                     }
 
-                    uiState.points.forEachIndexed { index, offset ->
+                    uiState.mockupPoints.forEachIndexed { index, offset ->
                         Box(
                             modifier = Modifier
-                                .offset(offset.x.dp, offset.y.dp)
+                                .offset {
+                                    IntOffset(
+                                        offset.x.roundToInt(),
+                                        offset.y.roundToInt()
+                                    )
+                                }
                                 .size(40.dp)
                                 .pointerInput(Unit) {
                                     detectDragGestures { change, dragAmount ->

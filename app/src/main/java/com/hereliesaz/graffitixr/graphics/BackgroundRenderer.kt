@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.graphics
 
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -60,7 +61,12 @@ class BackgroundRenderer {
         if (frame.timestamp != 0L) {
             // Suppress rendering if the camera did not produce the first frame yet.
             // This is to avoid drawing possible leftover data from previous sessions if the texture is reused.
-            frame.transformDisplayUvCoords(quadTexCoords!!, quadTexCoords!!)
+            frame.transformCoordinates2d(
+                Coordinates2d.TEXTURE_NORMALIZED,
+                quadTexCoords!!,
+                Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+                quadTexCoords!!
+            )
         }
 
         GLES20.glDepthMask(false)

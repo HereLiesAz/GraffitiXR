@@ -1,12 +1,10 @@
 package com.hereliesaz.graffitixr.graphics
 
-import android.app.Activity
 import android.content.Context
-import android.hardware.camera2.CameraAccessException
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraManager
+import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.hardware.display.DisplayManager.DisplayListener
+import android.os.Build
 import android.view.Display
 import android.view.WindowManager
 import com.google.ar.core.Session
@@ -18,13 +16,17 @@ import com.google.ar.core.Session
  */
 class DisplayRotationHelper(private val context: Context) : DisplayListener {
     private var isDeviceRotated = false
-    private val display: Display
+    private val display: Display?
     private val displayManager: DisplayManager
 
     init {
         displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        display = windowManager.defaultDisplay
+        display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.display
+        } else {
+            @Suppress("DEPRECATION")
+            (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+        }
     }
 
     fun onResume() {
@@ -35,14 +37,13 @@ class DisplayRotationHelper(private val context: Context) : DisplayListener {
         displayManager.unregisterDisplayListener(this)
     }
 
-    fun onSurfaceChanged(width: Int, height: Int) {
-        // No-op
-    }
-
     fun updateSessionIfNeeded(session: Session) {
-        if (isDeviceRotated) {
+        if (isDeviceRotated && display != null) {
             val displayRotation = display.rotation
-            session.setDisplayGeometry(displayRotation, display.width, display.height)
+            val displaySize = Point()
+            @Suppress("DEPRECATION")
+            display.getRealSize(displaySize)
+            session.setDisplayGeometry(displayRotation, displaySize.x, displaySize.y)
             isDeviceRotated = false
         }
     }

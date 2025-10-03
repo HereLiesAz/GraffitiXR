@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.composables
 
 import android.Manifest
 import android.opengl.GLSurfaceView
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
@@ -11,19 +10,15 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.MainViewModel
 import com.hereliesaz.graffitixr.UiState
 import com.hereliesaz.graffitixr.graphics.ArRenderer
@@ -41,7 +36,7 @@ fun ArModeScreen(viewModel: MainViewModel) {
     }
 
     if (cameraPermissionState.status.isGranted) {
-        ArContent(uiState = uiState)
+        ArContent(viewModel = viewModel, uiState = uiState)
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Camera permission is required for AR mode.")
@@ -50,27 +45,40 @@ fun ArModeScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-private fun ArContent(modifier: Modifier = Modifier, uiState: UiState) {
+private fun ArContent(
+    modifier: Modifier = Modifier,
+    viewModel: MainViewModel,
+    uiState: UiState
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var arSession by remember { mutableStateOf<Session?>(null) }
 
-    val renderer = remember {
-        ArRenderer(context) { session -> arSession = session }
+    val (renderer, glSurfaceView) = remember {
+        val view = GLSurfaceView(context)
+        val renderer = ArRenderer(
+            context = context,
+            view = view,
+            onArImagePlaced = viewModel::onArImagePlaced,
+            onArFeaturesDetected = viewModel::onArFeaturesDetected
+        )
+        view.apply {
+            setEGLContextClientVersion(2)
+            setRenderer(renderer)
+            setOnTouchListener { _, event ->
+                renderer.onSurfaceTapped(event)
+                true
+            }
+        }
+        renderer to view
     }
 
     // Update the renderer's state whenever the UiState changes
-    renderer.uiState = uiState
-
-    LaunchedEffect(uiState.overlayImageUri) {
-        uiState.overlayImageUri?.let { renderer.updateTexture(it) }
-    }
-
-    val glSurfaceView = remember {
-        GLSurfaceView(context).apply {
-            setEGLContextClientVersion(2)
-            setRenderer(renderer)
-        }
+    LaunchedEffect(uiState) {
+        renderer.arImagePose = uiState.arImagePose
+        renderer.arFeaturePattern = uiState.arFeaturePattern
+        renderer.overlayImageUri = uiState.overlayImageUri
+        renderer.isArLocked = uiState.isArLocked
+        renderer.opacity = uiState.opacity
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -80,31 +88,23 @@ private fun ArContent(modifier: Modifier = Modifier, uiState: UiState) {
                     glSurfaceView.onResume()
                     renderer.onResume()
                 }
+
                 androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
                     renderer.onPause()
                     glSurfaceView.onPause()
                 }
+
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            arSession?.close()
         }
     }
 
     AndroidView(
         factory = { glSurfaceView },
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    arSession?.let { session ->
-                        val frame = session.update()
-                        renderer.handleTap(frame, offset.x, offset.y)
-                    }
-                }
-            }
+        modifier = modifier.fillMaxSize()
     )
 }

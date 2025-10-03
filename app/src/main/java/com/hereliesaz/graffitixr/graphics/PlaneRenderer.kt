@@ -35,12 +35,7 @@ class PlaneRenderer {
     }
 
     private fun updateVertexBuffer(plane: Plane) {
-        val planePolygon = plane.polygon
-        if (planePolygon == null) {
-            vertexBuffer = null
-            return
-        }
-        val buffer = planePolygon
+        val buffer = plane.polygon
         if (vertexBuffer == null || vertexBuffer!!.capacity() < buffer.remaining()) {
             val bb = ByteBuffer.allocateDirect(buffer.remaining())
             bb.order(ByteOrder.nativeOrder())
@@ -56,6 +51,7 @@ class PlaneRenderer {
             return
         }
         updateVertexBuffer(plane)
+
         GLES20.glUseProgram(program)
 
         val modelMatrix = FloatArray(16)

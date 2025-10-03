@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
@@ -32,7 +33,7 @@ import com.hereliesaz.graffitixr.UiState
 fun ImageTraceScreen(
     uiState: UiState,
     onScaleChanged: (Float) -> Unit,
-    onRotationChanged: (Float) -> Unit
+    onOffsetChanged: (Offset) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -94,9 +95,9 @@ fun ImageTraceScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
-                        detectTransformGestures { _, _, zoom, rotation ->
+                        detectTransformGestures { _, pan, zoom, _ ->
                             onScaleChanged(zoom)
-                            onRotationChanged(rotation)
+                            onOffsetChanged(pan)
                         }
                     }
             ) {
@@ -106,9 +107,10 @@ fun ImageTraceScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer(
-                            scaleX = uiState.scale,
-                            scaleY = uiState.scale,
-                            rotationZ = uiState.rotation
+                            scaleX = uiState.imageTraceScale,
+                            scaleY = uiState.imageTraceScale,
+                            translationX = uiState.imageTraceOffset.x,
+                            translationY = uiState.imageTraceOffset.y
                         ),
                     alpha = uiState.opacity,
                     colorFilter = ColorFilter.colorMatrix(colorMatrix)
