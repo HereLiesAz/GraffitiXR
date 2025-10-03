@@ -15,7 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 
 /**
@@ -76,9 +76,9 @@ fun MainScreen(viewModel: MainViewModel) {
                 options = EditorMode.values().map { it.name.replace("_", " ") },
                 selectedOption = uiState.editorMode.name.replace("_", " "),
                 onClick = {
-                    val currentModeIndex = EditorMode.values().indexOf(uiState.editorMode)
-                    val nextModeIndex = (currentModeIndex + 1) % EditorMode.values().size
-                    viewModel.onEditorModeChanged(EditorMode.values()[nextModeIndex])
+                    val currentModeIndex = EditorMode.entries.indexOf(uiState.editorMode)
+                    val nextModeIndex = (currentModeIndex + 1) % EditorMode.entries.size
+                    viewModel.onEditorModeChanged(EditorMode.entries[nextModeIndex])
                 }
             )
 
