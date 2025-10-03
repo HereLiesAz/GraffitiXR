@@ -7,15 +7,18 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ar.core.Anchor
+import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.ArRenderer
 
 @Composable
 fun ArView(
-    arImagePose: FloatArray?,
+    arImagePose: Pose?,
     arFeaturePattern: ArFeaturePattern?,
     overlayImageUri: Uri?,
     isArLocked: Boolean,
@@ -27,33 +30,49 @@ fun ArView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    val glSurfaceView = remember { GLSurfaceView(context) }
     val renderer = remember {
         ArRenderer(
             context = context,
+            view = glSurfaceView,
             onArImagePlaced = onArImagePlaced,
             onArFeaturesDetected = onArFeaturesDetected
         )
     }
 
-    DisposableEffect(overlayImageUri, opacity, arImagePose, arFeaturePattern, isArLocked) {
-        overlayImageUri?.let { renderer.setOverlayImage(it) }
-        renderer.setOpacity(opacity)
-        renderer.setArImagePose(arImagePose)
-        renderer.setArFeaturePattern(arFeaturePattern)
-        renderer.setArLocked(isArLocked)
-        onDispose { }
-    }
-
     AndroidView(
-        factory = { ctx ->
-            GLSurfaceView(ctx).apply {
+        factory = {
+            glSurfaceView.apply {
                 setEGLContextClientVersion(3)
-                setRenderer(renderer)
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                setRenderer(renderer)
             }
         },
-        modifier = modifier
-    ) { view ->
-        renderer.attachLifecycle(lifecycleOwner.lifecycle)
+        modifier = modifier,
+        update = {
+            renderer.overlayImageUri = overlayImageUri
+            renderer.opacity = opacity
+            renderer.arImagePose = arImagePose?.let { pose ->
+                FloatArray(16).also { pose.toMatrix(it, 0) }
+            }
+            renderer.arFeaturePattern = arFeaturePattern
+            renderer.isArLocked = isArLocked
+        }
+    )
+
+    DisposableEffect(lifecycleOwner, renderer) {
+        val observer = object : DefaultLifecycleObserver {
+            override fun onResume(owner: LifecycleOwner) {
+                renderer.onResume()
+            }
+
+            override fun onPause(owner: LifecycleOwner) {
+                renderer.onPause()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 }

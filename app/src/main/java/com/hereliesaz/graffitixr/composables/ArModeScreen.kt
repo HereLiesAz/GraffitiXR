@@ -64,6 +64,7 @@ private fun ArContent(
         view.apply {
             setEGLContextClientVersion(2)
             setRenderer(renderer)
+            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             setOnTouchListener { _, event ->
                 renderer.onSurfaceTapped(event)
                 true
@@ -74,7 +75,9 @@ private fun ArContent(
 
     // Update the renderer's state whenever the UiState changes
     LaunchedEffect(uiState) {
-        renderer.arImagePose = uiState.arImagePose
+        renderer.arImagePose = uiState.arImagePose?.let { pose ->
+            FloatArray(16).also { pose.toMatrix(it, 0) }
+        }
         renderer.arFeaturePattern = uiState.arFeaturePattern
         renderer.overlayImageUri = uiState.overlayImageUri
         renderer.isArLocked = uiState.isArLocked

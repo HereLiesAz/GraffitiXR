@@ -1,12 +1,9 @@
 package com.hereliesaz.graffitixr
 
-/**
- * Represents the immutable state of the UI.
- * This data class will hold all the necessary information
- * to render the user interface at any given time.
- */
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import com.google.ar.core.Pose
+import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 
 /**
  * Represents the different editing modes available in the application.
@@ -24,6 +21,12 @@ enum class EditorMode {
      * Augmented Reality tracking. This is a lightweight option for quick, on-the-go previews.
      */
     NON_AR,
+
+    /**
+     * A mode that uses Augmented Reality to project the mural onto a surface in the real world.
+     * This provides the most realistic and immersive preview.
+     */
+    AR
 }
 
 /**
@@ -40,9 +43,12 @@ enum class EditorMode {
  * @property opacity The transparency of the overlay image, ranging from 0.0f (fully transparent) to 1.0f (fully opaque).
  * @property contrast The contrast of the overlay image. A value of 1.0f is normal contrast.
  * @property saturation The color saturation of the overlay image. A value of 0.0f is grayscale, and 1.0f is normal saturation.
- * @property scale The uniform scale factor applied to the overlay image. Used for pinch-to-zoom gestures.
- * @property rotation The rotation angle of the overlay image in degrees. Used for twist gestures.
- * @property points A list of four [Offset] points representing the corners of the overlay image for perspective warping in non-AR modes.
+ * @property scale The uniform scale factor applied to the overlay image in non-AR mode.
+ * @property offset The offset of the overlay image in non-AR mode.
+ * @property points A list of four [Offset] points representing the corners of the overlay image for perspective warping in static mode.
+ * @property arImagePose The pose of the AR image in the real world.
+ * @property arFeaturePattern The feature pattern detected in the AR scene.
+ * @property isArLocked A flag indicating whether the AR image is locked in place.
  * @property completedOnboardingModes A set containing the [EditorMode]s for which the user has already seen and dismissed the onboarding dialog. This is used to prevent showing the dialog repeatedly.
  */
 data class UiState(
@@ -54,7 +60,11 @@ data class UiState(
     val contrast: Float = 1f,
     val saturation: Float = 1f,
     val scale: Float = 1f,
-    val rotation: Float = 0f,
+    val offset: Offset = Offset.Zero,
     val points: List<Offset> = emptyList(),
+    val arImagePose: Pose? = null,
+    val arFeaturePattern: ArFeaturePattern? = null,
+    val isArLocked: Boolean = false,
+    val isLoading: Boolean = false,
     val completedOnboardingModes: Set<EditorMode> = emptySet()
 )

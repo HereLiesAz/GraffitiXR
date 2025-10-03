@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 
@@ -11,11 +12,11 @@ import androidx.lifecycle.ViewModelProvider
  * for ViewModel creation in Android, as it allows for dependencies to be passed
  * in a structured way.
  */
-class MainViewModelFactory : ViewModelProvider.Factory {
+class MainViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            return MainViewModel() as T
+            return MainViewModel(application) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

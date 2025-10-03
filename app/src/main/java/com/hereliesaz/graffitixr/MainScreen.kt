@@ -15,15 +15,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.graffitixr.composables.ArModeScreen
+import com.hereliesaz.graffitixr.composables.ImageTraceScreen
+import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
-import com.hereliesaz.graffitixr.ui.composables.ArModeScreen
-import com.hereliesaz.graffitixr.ui.composables.ImageTraceScreen
-import com.hereliesaz.graffitixr.ui.composables.MockupScreen
-import com.hereliesaz.graffitixr.ui.navigation.AzNavRail
-import com.hereliesaz.graffitixr.ui.navigation.azMenuCycler
-import com.hereliesaz.graffitixr.ui.navigation.azRailItem
-import com.hereliesaz.graffitixr.ui.navigation.azRailToggle
-import com.hereliesaz.graffitixr.ui.navigation.azSettings
+
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
@@ -48,15 +45,21 @@ fun MainScreen(viewModel: MainViewModel) {
             when (uiState.editorMode) {
                 EditorMode.STATIC -> MockupScreen(
                     uiState = uiState,
-                    onPointsChanged = { },
-                    isWarpEnabled = false,
-                    onPointsInitialized = { }
+                    onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                    onOpacityChanged = viewModel::onOpacityChanged,
+                    onContrastChanged = viewModel::onContrastChanged,
+                    onSaturationChanged = viewModel::onSaturationChanged,
+                    onPointsInitialized = viewModel::onMockupPointsChanged,
+                    onPointChanged = viewModel::onPointChanged,
+                    isWarpEnabled = true
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onScaleChanged,
-                    onRotationChanged = viewModel::onRotationChanged,
+                    onOffsetChanged = viewModel::onOffsetChanged,
                 )
+                EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
         }
 

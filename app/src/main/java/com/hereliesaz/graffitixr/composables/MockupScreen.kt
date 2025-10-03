@@ -121,7 +121,7 @@ fun MockupScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .onGloballyPositioned { coordinates ->
-                        if (uiState.mockupPoints.isEmpty() && imageBitmap != null) {
+                        if (uiState.points.isEmpty() && imageBitmap != null) {
                             val w = imageBitmap!!.width.toFloat()
                             val h = imageBitmap!!.height.toFloat()
                             val points = listOf(
@@ -134,15 +134,15 @@ fun MockupScreen(
                         }
                     }
             ) {
-                val perspectiveMatrix = remember(uiState.mockupPoints, imageBitmap) {
+                val perspectiveMatrix = remember(uiState.points, imageBitmap) {
                     Matrix().apply {
                         imageBitmap?.let { bmp ->
-                            if (uiState.mockupPoints.size == 4) {
+                            if (uiState.points.size == 4) {
                                 val w = bmp.width.toFloat()
                                 val h = bmp.height.toFloat()
                                 setPolyToPoly(
                                     floatArrayOf(0f, 0f, w, 0f, w, h, 0f, h), 0,
-                                    uiState.mockupPoints.flatMap { listOf(it.x, it.y) }.toFloatArray(), 0,
+                                    uiState.points.flatMap { listOf(it.x, it.y) }.toFloatArray(), 0,
                                     4
                                 )
                             }
@@ -178,14 +178,14 @@ fun MockupScreen(
                     }
                 }
 
-                if (uiState.mockupPoints.isNotEmpty() && isWarpEnabled) {
+                if (uiState.points.isNotEmpty() && isWarpEnabled) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        uiState.mockupPoints.forEach { offset ->
+                        uiState.points.forEach { offset ->
                             drawCircle(color = Color.White, radius = 20f, center = offset, style = Stroke(width = 5f))
                         }
                     }
 
-                    uiState.mockupPoints.forEachIndexed { index, offset ->
+                    uiState.points.forEachIndexed { index, offset ->
                         Box(
                             modifier = Modifier
                                 .offset {

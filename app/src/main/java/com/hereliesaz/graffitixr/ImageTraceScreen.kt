@@ -15,9 +15,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 
 /**
@@ -76,10 +76,10 @@ fun ImageTraceScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer(
-                        scaleX = uiState.imageTraceScale,
-                        scaleY = uiState.imageTraceScale,
-                        translationX = uiState.imageTraceOffset.x,
-                        translationY = uiState.imageTraceOffset.y,
+                        scaleX = uiState.scale,
+                        scaleY = uiState.scale,
+                        translationX = uiState.offset.x,
+                        translationY = uiState.offset.y,
                         alpha = uiState.opacity
                     )
                     .transformable(state = transformState),

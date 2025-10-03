@@ -9,7 +9,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.autobackgroundremover.removeBackground
+import com.google.ar.core.Anchor
+import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import com.hereliesaz.graffitixr.utils.removeBackground
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -120,11 +122,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(scale = it.scale * scale) }
     }
 
-    fun onRotationChanged(rotation: Float) {
-        _uiState.update { it.copy(rotation = it.rotation + rotation) }
+    fun onOffsetChanged(offset: Offset) {
+        _uiState.update { it.copy(offset = it.offset + offset) }
     }
 
-    fun onPointsInitialized(points: List<Offset>) {
+    fun onMockupPointsChanged(points: List<Offset>) {
         _uiState.update { it.copy(points = points) }
     }
 
@@ -150,5 +152,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .apply()
             currentState.copy(completedOnboardingModes = updatedModes)
         }
+    }
+
+    fun onArImagePlaced(anchor: Anchor) {
+        _uiState.update { it.copy(arImagePose = anchor.pose) }
+    }
+
+    fun onArFeaturesDetected(arFeaturePattern: ArFeaturePattern) {
+        _uiState.update { it.copy(arFeaturePattern = arFeaturePattern) }
     }
 }

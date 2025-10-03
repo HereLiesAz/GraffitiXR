@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
-import com.hereliesaz.graffitixr.ui.composables.ArView
 
 @Composable
 fun ArModeScreen(
