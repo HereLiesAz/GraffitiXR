@@ -1,9 +1,12 @@
 package com.hereliesaz.graffitixr
 
 import android.net.Uri
+import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import kotlinx.parcelize.IgnoredOnParcel
+import kotlinx.parcelize.Parcelize
 
 /**
  * Represents the different editing modes available in the application.
@@ -51,6 +54,7 @@ enum class EditorMode {
  * @property isArLocked A flag indicating whether the AR image is locked in place.
  * @property completedOnboardingModes A set containing the [EditorMode]s for which the user has already seen and dismissed the onboarding dialog. This is used to prevent showing the dialog repeatedly.
  */
+@Parcelize
 data class UiState(
     val editorMode: EditorMode = EditorMode.STATIC,
     val backgroundImageUri: Uri? = null,
@@ -62,9 +66,12 @@ data class UiState(
     val scale: Float = 1f,
     val offset: Offset = Offset.Zero,
     val points: List<Offset> = emptyList(),
-    val arImagePose: Pose? = null,
-    val arFeaturePattern: ArFeaturePattern? = null,
     val isArLocked: Boolean = false,
     val isLoading: Boolean = false,
     val completedOnboardingModes: Set<EditorMode> = emptySet()
-)
+) : Parcelable {
+    @IgnoredOnParcel
+    val arImagePose: Pose? = null
+    @IgnoredOnParcel
+    val arFeaturePattern: ArFeaturePattern? = null
+}

@@ -107,10 +107,10 @@ class BackgroundRenderer {
         private const val BYTES_PER_FLOAT = 4
         private val QUAD_COORDS = floatArrayOf(-1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 1.0f)
         private val QUAD_TEX_COORDS = floatArrayOf(
-            0.0f, 1.0f,
             0.0f, 0.0f,
-            1.0f, 1.0f,
-            1.0f, 0.0f
+            0.0f, 1.0f,
+            1.0f, 0.0f,
+            1.0f, 1.0f
         )
         private const val VERTEX_SHADER = """
             attribute vec4 a_Position;

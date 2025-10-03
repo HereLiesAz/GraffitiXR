@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,8 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.*
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
@@ -63,10 +65,15 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        AzNavRail {
-            azSettings(isLoading = false,
-                packRailButtons = true
-            ) // Assuming loading state is handled elsewhere
+        val railState = rememberAzNavRailState()
+        AzNavRail(state = railState) {
+            azSettings(
+                isLoading = false,
+                packRailButtons = true,
+                colors = AzNavRailDefaults.colors(
+                    backgroundColor = if (railState.isExpanded) MaterialTheme.colorScheme.surface else Color.Transparent
+                )
+            )
 
 
             azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
