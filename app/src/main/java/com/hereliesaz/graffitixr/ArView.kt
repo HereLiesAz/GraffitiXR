@@ -2,6 +2,9 @@ package com.hereliesaz.graffitixr
 
 import android.net.Uri
 import android.opengl.GLSurfaceView
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -106,13 +109,15 @@ fun ArView(
         }
     )
 
-    DisposableEffect(lifecycleOwner, renderer) {
+    DisposableEffect(lifecycleOwner, renderer, glSurfaceView) {
         val observer = object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
                 renderer.onResume()
+                glSurfaceView.onResume()
             }
 
             override fun onPause(owner: LifecycleOwner) {
+                glSurfaceView.onPause()
                 renderer.onPause()
             }
         }

@@ -22,6 +22,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
+import com.hereliesaz.graffitixr.ArState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -259,7 +260,10 @@ class ArRenderer(
         overlayImageUri?.let { uri ->
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val request = ImageRequest.Builder(context).data(uri).build()
+                    val request = ImageRequest.Builder(context)
+                        .data(uri)
+                        .allowHardware(false)
+                        .build()
                     val result = context.imageLoader.execute(request).drawable
                     overlayBitmap = (result as? android.graphics.drawable.BitmapDrawable)?.bitmap
                 } catch (e: Exception) {
