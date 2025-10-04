@@ -13,6 +13,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.removeBackground
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
@@ -94,7 +95,7 @@ class MainViewModel(
     }
 
     fun onOverlayImageSelected(uri: Uri) {
-        savedStateHandle["uiState"] = uiState.value.copy(overlayImageUri = uri, points = emptyList(), backgroundRemovedImageUri = null)
+        savedStateHandle["uiState"] = uiState.value.copy(overlayImageUri = uri, backgroundRemovedImageUri = null)
     }
 
     fun onOpacityChanged(opacity: Float) {
@@ -109,8 +110,9 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(saturation = saturation)
     }
 
-    fun onScaleChanged(scale: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(scale = uiState.value.scale * scale)
+    fun onScaleChanged(scaleFactor: Float) {
+        val currentScale = uiState.value.scale
+        savedStateHandle["uiState"] = uiState.value.copy(scale = currentScale * scaleFactor)
     }
 
     fun onRotationChanged(rotation: Float) {
@@ -121,17 +123,25 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(offset = uiState.value.offset + offset)
     }
 
-    fun onMockupPointsChanged(points: List<Offset>) {
-        savedStateHandle["uiState"] = uiState.value.copy(points = points)
+    fun onRotationZChanged(rotationDelta: Float) {
+        val currentRotation = uiState.value.rotationZ
+        savedStateHandle["uiState"] = uiState.value.copy(rotationZ = currentRotation + rotationDelta)
     }
 
-    fun onPointChanged(index: Int, newPosition: Offset) {
-        val currentState = uiState.value
-        val updatedPoints = currentState.points.toMutableList()
-        if (index in 0..3) {
-            updatedPoints[index] = newPosition
-        }
-        savedStateHandle["uiState"] = currentState.copy(points = updatedPoints)
+    fun onArObjectScaleChanged(scaleFactor: Float) {
+        val currentScale = uiState.value.arObjectScale
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
+    }
+
+    fun onArObjectRotated(pitch: Float, yaw: Float, roll: Float) {
+        val currentOrientation = uiState.value.arObjectOrientation
+
+        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch)
+        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw)
+        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll)
+
+        val newOrientation = currentOrientation * yawRotation * pitchRotation * rollRotation
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
     }
 
     fun onEditorModeChanged(mode: EditorMode) {

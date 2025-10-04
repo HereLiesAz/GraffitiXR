@@ -14,8 +14,8 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
-import com.hereliesaz.graffitixr.ArState
 import com.google.ar.core.Config
+import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
@@ -48,8 +48,7 @@ class ArRenderer(
     private val context: Context,
     private val view: View,
     private val onArImagePlaced: (Anchor) -> Unit,
-    private val onArFeaturesDetected: (ArFeaturePattern) -> Unit,
-    private val onPlanesDetected: (Boolean) -> Unit
+    private val onArFeaturesDetected: (ArFeaturePattern) -> Unit
 ) : GLSurfaceView.Renderer {
 
     private var session: Session? = null
@@ -66,9 +65,9 @@ class ArRenderer(
     var arImagePose: FloatArray? = null
     var arFeaturePattern: ArFeaturePattern? = null
     var overlayImageUri: Uri? = null
-    var arState: ArState = ArState.SEARCHING
+    var arObjectOrientation: Quaternion = Quaternion.identity()
     var arObjectScale: Float = 1.0f
-    var arObjectRotation: Float = 0.0f
+    var isArLocked: Boolean = false
     var opacity: Float = 1.0f
 
     private var overlayBitmap: Bitmap? = null
@@ -95,17 +94,20 @@ class ArRenderer(
         session?.let {
             it.setCameraTextureName(backgroundRenderer.textureId)
             displayRotationHelper.updateSessionIfNeeded(it)
-            val frame = try {
-                it.update()
-            } catch (e: com.google.ar.core.exceptions.SessionPausedException) {
-                // The session is paused, probably due to a lifecycle event.
-                // This is expected and we can just return since we have nothing to render.
-                return
-            }
+            val frame = it.update()
             backgroundRenderer.draw(frame)
 
             val camera = frame.camera
             if (camera.trackingState != TrackingState.TRACKING) return
+
+            if (isArLocked) {
+                if (!featurePatternGenerated) {
+                    generateFeaturePattern(frame)
+                }
+            } else {
+                handleTapForPlacement(frame)
+                featurePatternGenerated = false
+            }
 
             val projectionMatrix = FloatArray(16)
             camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
@@ -122,43 +124,11 @@ class ArRenderer(
                 // Point cloud is not available yet.
             }
 
-            when (arState) {
-                ArState.SEARCHING -> {
-                    handleTapForPlacement(frame)
-                    featurePatternGenerated = false
-                    val cameraPose = frame.camera.pose
-                    val allPlanes = it.getAllTrackables(Plane::class.java)
-                    val filteredPlanes = allPlanes.filter { plane ->
-                        if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
-                            false
-                        } else {
-                            val planeNormal = FloatArray(3)
-                            plane.centerPose.getYAxis(planeNormal, 0)
-
-                            val cameraToPlane = floatArrayOf(
-                                plane.centerPose.tx() - cameraPose.tx(),
-                                plane.centerPose.ty() - cameraPose.ty(),
-                                plane.centerPose.tz() - cameraPose.tz()
-                            )
-
-                            // Dot product to check if plane is facing camera
-                            val dotProduct = planeNormal[0] * cameraToPlane[0] + planeNormal[1] * cameraToPlane[1] + planeNormal[2] * cameraToPlane[2]
-
-                            // Negative dot product means the plane is facing towards the camera.
-                            dotProduct < 0
-                        }
-                    }
-
-                    onPlanesDetected(filteredPlanes.isNotEmpty())
-                    filteredPlanes.forEach { plane -> planeRenderer.draw(plane, viewMatrix, projectionMatrix) }
-                }
-                ArState.PLACED -> {
-                    onPlanesDetected(false)
-                }
-                ArState.LOCKED -> {
-                    onPlanesDetected(false)
-                    if (!featurePatternGenerated) {
-                        generateFeaturePattern(frame)
+            if (!isArLocked) {
+                val planes = it.getAllTrackables(Plane::class.java)
+                for (plane in planes) {
+                    if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
+                        planeRenderer.draw(plane, viewMatrix, projectionMatrix)
                     }
                 }
             }
@@ -169,31 +139,19 @@ class ArRenderer(
 
             val bmp = overlayBitmap
             if (bmp != null) {
-                if (arState == ArState.LOCKED) {
+                if (isArLocked) {
                     arFeaturePattern?.let { pattern ->
                         val homography = HomographyHelper.calculateHomography(pattern.worldPoints, camera, view, bmp.width, bmp.height)
                         homography?.let {
                             projectedImageRenderer.draw(bmp, it, opacity)
                         }
                     }
-                } else { // SEARCHING or PLACED
+                } else {
                     arImagePose?.let { poseMatrix ->
-                        // Create a copy of the pose matrix to apply transformations
-                        val modelMatrix = poseMatrix.clone()
-
-                        // We rotate around the Y-axis of the anchor's pose, which corresponds to the plane's normal.
-                        val upX = poseMatrix[4]
-                        val upY = poseMatrix[5]
-                        val upZ = poseMatrix[6]
-
-                        // Apply the current rotation. The rotation is in radians from the gesture detector.
-                        // We convert it to degrees for OpenGL.
-                        Matrix.rotateM(modelMatrix, 0, Math.toDegrees(arObjectRotation.toDouble()).toFloat(), upX, upY, upZ)
-
-                        // Apply the current scale.
+                        val rotationMatrix = arObjectOrientation.toRotationMatrix()
+                        val modelMatrix = FloatArray(16)
+                        Matrix.multiplyMM(modelMatrix, 0, poseMatrix, 0, rotationMatrix, 0)
                         Matrix.scaleM(modelMatrix, 0, arObjectScale, arObjectScale, arObjectScale)
-
-                        // Draw the quad with the final transformed matrix.
                         simpleQuadRenderer.draw(modelMatrix, viewMatrix, projectionMatrix, bmp, opacity)
                     }
                 }
@@ -202,33 +160,18 @@ class ArRenderer(
     }
 
     fun onSurfaceTapped(event: MotionEvent) {
-        if (arState == ArState.SEARCHING) {
+        if (!isArLocked) {
             tapQueue.add(event)
         }
     }
 
     private fun handleTapForPlacement(frame: Frame) {
         val tap = tapQueue.poll() ?: return
-        val cameraPose = frame.camera.pose
-
         for (hit in frame.hitTest(tap)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                val planeNormal = FloatArray(3)
-                trackable.centerPose.getYAxis(planeNormal, 0)
-
-                val cameraToPlane = floatArrayOf(
-                    trackable.centerPose.tx() - cameraPose.tx(),
-                    trackable.centerPose.ty() - cameraPose.ty(),
-                    trackable.centerPose.tz() - cameraPose.tz()
-                )
-
-                val dotProduct = planeNormal[0] * cameraToPlane[0] + planeNormal[1] * cameraToPlane[1] + planeNormal[2] * cameraToPlane[2]
-
-                if (dotProduct < 0) {
-                    onArImagePlaced(hit.createAnchor())
-                    break
-                }
+                onArImagePlaced(hit.createAnchor())
+                break
             }
         }
     }

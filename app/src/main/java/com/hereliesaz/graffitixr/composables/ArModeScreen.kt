@@ -52,28 +52,18 @@ private fun ArContent(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        ArView(
-            modifier = Modifier.fillMaxSize(),
-            arImagePose = uiState.arImagePose,
-            arFeaturePattern = uiState.arFeaturePattern,
-            overlayImageUri = uiState.overlayImageUri,
-            arState = uiState.arState,
-            arObjectScale = uiState.arObjectScale,
-            arObjectRotation = uiState.arObjectRotation,
-            opacity = uiState.opacity,
-            onArImagePlaced = viewModel::onArImagePlaced,
-            onArFeaturesDetected = viewModel::onArFeaturesDetected,
-            onPlanesDetected = viewModel::onPlanesDetected,
-            onArObjectScaleChanged = viewModel::onArObjectScaleChanged,
-            onArObjectRotationChanged = viewModel::onArObjectRotationChanged
-        )
-
-        if (!uiState.arePlanesDetected) {
-            Text(
-                text = "Move your device to find a surface.",
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-    }
+    ArView(
+        modifier = modifier.fillMaxSize(),
+        arImagePose = uiState.arImagePose,
+        arFeaturePattern = uiState.arFeaturePattern,
+        overlayImageUri = uiState.overlayImageUri,
+        arObjectOrientation = uiState.arObjectOrientation,
+        arObjectScale = uiState.arObjectScale,
+        isArLocked = uiState.isArLocked,
+        opacity = uiState.opacity,
+        onArImagePlaced = viewModel::onArImagePlaced,
+        onArFeaturesDetected = viewModel::onArFeaturesDetected,
+        onArObjectScaleChanged = viewModel::onArObjectScaleChanged,
+        onArObjectRotated = viewModel::onArObjectRotated
+    )
 }

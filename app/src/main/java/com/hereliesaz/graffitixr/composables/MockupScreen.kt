@@ -8,8 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.forEachGesture
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,8 +40,6 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -83,15 +81,11 @@ fun MockupScreen(
     onContrastChanged: (Float) -> Unit,
     onSaturationChanged: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
-    onRotationChanged: (Float) -> Unit,
     onOffsetChanged: (Offset) -> Unit,
-    onPointsInitialized: (List<Offset>) -> Unit,
-    onPointChanged: (Int, Offset) -> Unit,
-    isWarpEnabled: Boolean
+    onRotationZChanged: (Float) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var gestureInProgress by remember { mutableStateOf(false) }
 
     val backgroundPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -132,156 +126,28 @@ fun MockupScreen(
         }
 
         uiState.overlayImageUri?.let { uri ->
-            var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-
-            LaunchedEffect(uri) {
-                coroutineScope.launch {
-                    val request = ImageRequest.Builder(context)
-                        .data(uri)
-                        .build()
-                    val result =
-                        (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                    imageBitmap = result
-                }
+            val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
+                onScaleChanged(zoomChange)
+                onOffsetChanged(offsetChange)
+                onRotationZChanged(rotationChange)
             }
 
-            Box(
+            AsyncImage(
+                model = uri,
+                contentDescription = "Overlay Image",
                 modifier = Modifier
                     .fillMaxSize()
-                    .clipToBounds()
-                    .pointerInput(isWarpEnabled) {
-                        if (!isWarpEnabled) {
-                            forEachGesture {
-                                try {
-                                    gestureInProgress = true
-                                    detectTransformGestures { _, pan, zoom, rotation ->
-                                        onScaleChanged(zoom)
-                                        onRotationChanged(rotation)
-                                        onOffsetChanged(pan)
-                                    }
-                                } finally {
-                                    gestureInProgress = false
-                                }
-                            }
-                        }
-                    }
-                    .onGloballyPositioned { coordinates ->
-                        if (uiState.points.isEmpty() && imageBitmap != null) {
-                            val w = imageBitmap!!.width.toFloat()
-                            val h = imageBitmap!!.height.toFloat()
-                            val points = listOf(
-                                Offset(0f, 0f),
-                                Offset(w, 0f),
-                                Offset(w, h),
-                                Offset(0f, h)
-                            )
-                            onPointsInitialized(points)
-                        }
-                    }
-            ) {
-                val perspectiveMatrix = remember(uiState.points, imageBitmap) {
-                    Matrix().apply {
-                        imageBitmap?.let { bmp ->
-                            if (uiState.points.size == 4) {
-                                val w = bmp.width.toFloat()
-                                val h = bmp.height.toFloat()
-                                setPolyToPoly(
-                                    floatArrayOf(0f, 0f, w, 0f, w, h, 0f, h), 0,
-                                    uiState.points
-                                        .flatMap { listOf(it.x, it.y) }
-                                        .toFloatArray(), 0,
-                                    4
-                                )
-                            }
-                        }
-                    }
-                }
-
-                imageBitmap?.let { bmp ->
-                    Canvas(modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            if (!isWarpEnabled) {
-                                scaleX = uiState.scale
-                                scaleY = uiState.scale
-                                rotationZ = uiState.rotation
-                                translationX = uiState.offset.x
-                                translationY = uiState.offset.y
-                            }
-                        }) {
-                        withTransform({
-                            if (isWarpEnabled) {
-                                val matrix = androidx.compose.ui.graphics.Matrix()
-                                val values = FloatArray(9)
-                                perspectiveMatrix.getValues(values)
-                                matrix.values[0] = values[0]
-                                matrix.values[1] = values[1]
-                                matrix.values[3] = values[2]
-                                matrix.values[4] = values[3]
-                                matrix.values[5] = values[4]
-                                matrix.values[7] = values[5]
-                                matrix.values[12] = values[6]
-                                matrix.values[13] = values[7]
-                                matrix.values[15] = values[8]
-                                transform(matrix)
-                            }
-                        }) {
-                            drawImage(
-                                image = bmp.asImageBitmap(),
-                                alpha = uiState.opacity,
-                                colorFilter = ColorFilter.colorMatrix(colorMatrix)
-                            )
-                        }
-                    }
-                }
-
-                if (uiState.points.isNotEmpty() && isWarpEnabled) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        uiState.points.forEach { offset ->
-                            drawCircle(
-                                color = Color.White,
-                                radius = 20f,
-                                center = offset,
-                                style = Stroke(width = 5f)
-                            )
-                        }
-                    }
-
-                    uiState.points.forEachIndexed { index, offset ->
-                        Box(
-                            modifier = Modifier
-                                .offset {
-                                    IntOffset(
-                                        offset.x.roundToInt(),
-                                        offset.y.roundToInt()
-                                    )
-                                }
-                                .size(40.dp)
-                                .pointerInput(Unit) {
-                                    detectDragGestures { change, dragAmount ->
-                                        change.consume()
-                                        onPointChanged(index, offset + dragAmount)
-                                    }
-                                }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (gestureInProgress) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Scale: %.2f, Rotation: %.1f°".format(uiState.scale, uiState.rotation),
-                    color = Color.White
-                )
-            }
+                    .graphicsLayer(
+                        scaleX = uiState.scale,
+                        scaleY = uiState.scale,
+                        translationX = uiState.offset.x,
+                        translationY = uiState.offset.y,
+                        rotationZ = uiState.rotationZ,
+                        alpha = uiState.opacity
+                    )
+                    .transformable(state = transformState),
+                colorFilter = ColorFilter.colorMatrix(colorMatrix)
+            )
         }
     }
 }

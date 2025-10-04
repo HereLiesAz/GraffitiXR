@@ -32,8 +32,6 @@ import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
-    var isWarpEnabled by remember { mutableStateOf(true) }
-
 
     val overlayImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -58,16 +56,14 @@ fun MainScreen(viewModel: MainViewModel) {
                     onContrastChanged = viewModel::onContrastChanged,
                     onSaturationChanged = viewModel::onSaturationChanged,
                     onScaleChanged = viewModel::onScaleChanged,
-                    onRotationChanged = viewModel::onRotationChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
-                    onPointsInitialized = viewModel::onMockupPointsChanged,
-                    onPointChanged = viewModel::onPointChanged,
-                    isWarpEnabled = isWarpEnabled
+                    onRotationZChanged = viewModel::onRotationZChanged
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
+                    onRotationZChanged = viewModel::onRotationZChanged
                 )
                 EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
@@ -91,21 +87,10 @@ fun MainScreen(viewModel: MainViewModel) {
                 azRailItem(id = "background", text = "Background") {
                     backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
-
-                azRailItem(
-                    id = "toggle_warp",
-                    text = if (isWarpEnabled) "Warp" else "Transform"
-                ) {
-                    isWarpEnabled = !isWarpEnabled
-                }
             }
 
             if (uiState.overlayImageUri != null) {
                  azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
-            }
-
-            if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
-                azRailItem(id = "lock_ar", text = "Lock", onClick = viewModel::onArLockClicked)
             }
 
             azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }

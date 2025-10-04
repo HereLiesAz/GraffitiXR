@@ -34,6 +34,7 @@ fun ImageTraceScreen(
     uiState: UiState,
     onScaleChanged: (Float) -> Unit,
     onOffsetChanged: (androidx.compose.ui.geometry.Offset) -> Unit,
+    onRotationZChanged: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -66,9 +67,10 @@ fun ImageTraceScreen(
 
         // Interactive Overlay Image
         uiState.overlayImageUri?.let {
-            val transformState = rememberTransformableState { zoomChange, offsetChange, _ ->
+            val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
                 onScaleChanged(zoomChange)
                 onOffsetChanged(offsetChange)
+                onRotationZChanged(rotationChange)
             }
 
             AsyncImage(
@@ -81,6 +83,7 @@ fun ImageTraceScreen(
                         scaleY = uiState.scale,
                         translationX = uiState.offset.x,
                         translationY = uiState.offset.y,
+                        rotationZ = uiState.rotationZ,
                         alpha = uiState.opacity
                     )
                     .transformable(state = transformState),

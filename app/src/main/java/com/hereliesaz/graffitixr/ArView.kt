@@ -2,9 +2,6 @@ package com.hereliesaz.graffitixr
 
 import android.net.Uri
 import android.opengl.GLSurfaceView
-import android.view.GestureDetector
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -14,26 +11,29 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.View
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.ArRenderer
-import com.hereliesaz.graffitixr.utils.RotationGestureDetector
+import com.hereliesaz.graffitixr.graphics.Quaternion
+import com.hereliesaz.graffitixr.utils.MultiGestureDetector
 
 @Composable
 fun ArView(
     arImagePose: Pose?,
     arFeaturePattern: ArFeaturePattern?,
     overlayImageUri: Uri?,
-    arState: ArState,
+    arObjectOrientation: Quaternion,
     arObjectScale: Float,
-    arObjectRotation: Float,
+    isArLocked: Boolean,
     opacity: Float,
     onArImagePlaced: (Anchor) -> Unit,
     onArFeaturesDetected: (ArFeaturePattern) -> Unit,
-    onPlanesDetected: (Boolean) -> Unit,
     onArObjectScaleChanged: (Float) -> Unit,
-    onArObjectRotationChanged: (Float) -> Unit,
+    onArObjectRotated: (pitch: Float, yaw: Float, roll: Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -45,24 +45,25 @@ fun ArView(
             context = context,
             view = glSurfaceView,
             onArImagePlaced = onArImagePlaced,
-            onArFeaturesDetected = onArFeaturesDetected,
-            onPlanesDetected = onPlanesDetected
+            onArFeaturesDetected = onArFeaturesDetected
         )
     }
 
-    val scaleDetector = remember {
-        ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(detector: ScaleGestureDetector): Boolean {
-                onArObjectScaleChanged(detector.scaleFactor)
-                return true
+    val multiGestureDetector = remember {
+        MultiGestureDetector(object : MultiGestureDetector.OnMultiGestureListener {
+            override fun onScale(scaleFactor: Float) {
+                onArObjectScaleChanged(scaleFactor)
             }
-        })
-    }
 
-    val rotationDetector = remember {
-        RotationGestureDetector(object : RotationGestureDetector.OnRotationGestureListener {
-            override fun onRotation(rotationDelta: Float) {
-                onArObjectRotationChanged(rotationDelta)
+            override fun onRotate(rotationDelta: Float) {
+                onArObjectRotated(0f, 0f, rotationDelta)
+            }
+
+            override fun onPan(deltaX: Float, deltaY: Float) {
+                // Adjust sensitivity for pitch and yaw
+                val yaw = -deltaX * 0.005f
+                val pitch = -deltaY * 0.005f
+                onArObjectRotated(pitch, yaw, 0f)
             }
         })
     }
@@ -84,8 +85,10 @@ fun ArView(
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
                 setOnTouchListener { _, event ->
-                    var handled = scaleDetector.onTouchEvent(event)
-                    handled = rotationDetector.onTouchEvent(event) || handled
+                    var handled = false
+                    if (arImagePose != null) { // Only handle gestures if an object is placed
+                        handled = multiGestureDetector.onTouchEvent(event)
+                    }
                     handled = gestureDetector.onTouchEvent(event) || handled
                     handled
                 }
@@ -98,22 +101,20 @@ fun ArView(
             renderer.arImagePose = arImagePose?.let { pose ->
                 FloatArray(16).also { pose.toMatrix(it, 0) }
             }
-            renderer.arFeaturePattern = arFeaturePattern
-            renderer.arState = arState
+            renderer.arObjectOrientation = arObjectOrientation
             renderer.arObjectScale = arObjectScale
-            renderer.arObjectRotation = arObjectRotation
+            renderer.arFeaturePattern = arFeaturePattern
+            renderer.isArLocked = isArLocked
         }
     )
 
-    DisposableEffect(lifecycleOwner, renderer, glSurfaceView) {
+    DisposableEffect(lifecycleOwner, renderer) {
         val observer = object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
                 renderer.onResume()
-                glSurfaceView.onResume()
             }
 
             override fun onPause(owner: LifecycleOwner) {
-                glSurfaceView.onPause()
                 renderer.onPause()
             }
         }
