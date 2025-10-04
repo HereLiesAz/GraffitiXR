@@ -138,8 +138,9 @@ class ArRenderer(
                             false
                         } else {
                             val planeNormal = FloatArray(3).apply { p.centerPose.getYAxis(this, 0) }
-                            val dotProduct = cameraForward.zip(planeNormal, Float::times).sum()
-                            dotProduct < -0.7f
+                            // v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
+                            val dotProduct = cameraForward[0] * planeNormal[0] + cameraForward[1] * planeNormal[1] + cameraForward[2] * planeNormal[2]
+                            dotProduct < -0.95f
                         }
                     }
 
@@ -214,8 +215,8 @@ class ArRenderer(
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
                 val planeNormal = FloatArray(3).apply { trackable.centerPose.getYAxis(this, 0) }
-                val dotProduct = cameraForward.zip(planeNormal, Float::times).sum()
-                if (dotProduct < -0.7f) {
+                val dotProduct = cameraForward[0] * planeNormal[0] + cameraForward[1] * planeNormal[1] + cameraForward[2] * planeNormal[2]
+                if (dotProduct < -0.95f) {
                     onArImagePlaced(hit.createAnchor())
                     break
                 }
