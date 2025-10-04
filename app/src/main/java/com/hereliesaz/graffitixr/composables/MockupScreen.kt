@@ -8,6 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +40,9 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -77,12 +82,16 @@ fun MockupScreen(
     onOpacityChanged: (Float) -> Unit,
     onContrastChanged: (Float) -> Unit,
     onSaturationChanged: (Float) -> Unit,
+    onScaleChanged: (Float) -> Unit,
+    onRotationChanged: (Float) -> Unit,
+    onOffsetChanged: (Offset) -> Unit,
     onPointsInitialized: (List<Offset>) -> Unit,
     onPointChanged: (Int, Offset) -> Unit,
     isWarpEnabled: Boolean
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var gestureInProgress by remember { mutableStateOf(false) }
 
     val backgroundPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -130,7 +139,8 @@ fun MockupScreen(
                     val request = ImageRequest.Builder(context)
                         .data(uri)
                         .build()
-                    val result = (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    val result =
+                        (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
                     imageBitmap = result
                 }
             }
@@ -138,6 +148,23 @@ fun MockupScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .clipToBounds()
+                    .pointerInput(isWarpEnabled) {
+                        if (!isWarpEnabled) {
+                            forEachGesture {
+                                try {
+                                    gestureInProgress = true
+                                    detectTransformGestures { _, pan, zoom, rotation ->
+                                        onScaleChanged(zoom)
+                                        onRotationChanged(rotation)
+                                        onOffsetChanged(pan)
+                                    }
+                                } finally {
+                                    gestureInProgress = false
+                                }
+                            }
+                        }
+                    }
                     .onGloballyPositioned { coordinates ->
                         if (uiState.points.isEmpty() && imageBitmap != null) {
                             val w = imageBitmap!!.width.toFloat()
@@ -160,7 +187,9 @@ fun MockupScreen(
                                 val h = bmp.height.toFloat()
                                 setPolyToPoly(
                                     floatArrayOf(0f, 0f, w, 0f, w, h, 0f, h), 0,
-                                    uiState.points.flatMap { listOf(it.x, it.y) }.toFloatArray(), 0,
+                                    uiState.points
+                                        .flatMap { listOf(it.x, it.y) }
+                                        .toFloatArray(), 0,
                                     4
                                 )
                             }
@@ -169,7 +198,17 @@ fun MockupScreen(
                 }
 
                 imageBitmap?.let { bmp ->
-                    Canvas(modifier = Modifier.fillMaxSize()) {
+                    Canvas(modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            if (!isWarpEnabled) {
+                                scaleX = uiState.scale
+                                scaleY = uiState.scale
+                                rotationZ = uiState.rotation
+                                translationX = uiState.offset.x
+                                translationY = uiState.offset.y
+                            }
+                        }) {
                         withTransform({
                             if (isWarpEnabled) {
                                 val matrix = androidx.compose.ui.graphics.Matrix()
@@ -199,7 +238,12 @@ fun MockupScreen(
                 if (uiState.points.isNotEmpty() && isWarpEnabled) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         uiState.points.forEach { offset ->
-                            drawCircle(color = Color.White, radius = 20f, center = offset, style = Stroke(width = 5f))
+                            drawCircle(
+                                color = Color.White,
+                                radius = 20f,
+                                center = offset,
+                                style = Stroke(width = 5f)
+                            )
                         }
                     }
 
@@ -222,6 +266,21 @@ fun MockupScreen(
                         )
                     }
                 }
+            }
+        }
+
+        if (gestureInProgress) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Scale: %.2f, Rotation: %.1f°".format(uiState.scale, uiState.rotation),
+                    color = Color.White
+                )
             }
         }
     }
