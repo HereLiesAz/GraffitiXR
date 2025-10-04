@@ -1,68 +1,47 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Application
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.utils.removeBackground
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * The central ViewModel for the application, acting as the single source of truth for the UI state
- * and the handler for all user events.
- *
- * This class follows the MVVM architecture pattern. It holds the application's UI state in a
- * [StateFlow] and exposes public functions to modify that state in response to user interactions.
- * By extending [AndroidViewModel], it can safely access the application context to interact with
- * system services like [SharedPreferences].
- *
- * @param application The application instance, provided by the ViewModel factory. Used here to
- * access SharedPreferences for persisting user data (e.g., completed onboarding).
- */
-class MainViewModel(application: Application) : AndroidViewModel(application) {
+class MainViewModel(
+    application: Application,
+    private val savedStateHandle: SavedStateHandle
+) : AndroidViewModel(application) {
 
-    private val sharedPreferences = application.getSharedPreferences("GraffitiXR_prefs", Context.MODE_PRIVATE)
-
-    private val _uiState: MutableStateFlow<UiState>
-    val uiState: StateFlow<UiState>
-
-    init {
-        val completedModes = sharedPreferences.getStringSet("completed_onboarding", emptySet())
-            ?.mapNotNull {
-                try {
-                    EditorMode.valueOf(it)
-                } catch (e: IllegalArgumentException) {
-                    null
-                }
-            }
-            ?.toSet() ?: emptySet()
-        _uiState = MutableStateFlow(UiState(completedOnboardingModes = completedModes))
-        uiState = _uiState.asStateFlow()
-    }
+    val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
 
     private suspend fun removeBackground(uri: Uri): Uri? {
         return withContext(Dispatchers.IO) {
             try {
                 val context = getApplication<Application>().applicationContext
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                    decoder.isMutableRequired = true
-                }
+                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                        decoder.isMutableRequired = true
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }.copy(Bitmap.Config.ARGB_8888, true)
+
 
                 val resultBitmap = bitmap.removeBackground()
 
@@ -87,7 +66,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val uri = uiState.value.overlayImageUri
             if (uri != null) {
                 val resultUri = removeBackground(uri)
-                _uiState.update { it.copy(backgroundRemovedImageUri = resultUri, isLoading = false) }
+                savedStateHandle["uiState"] = uiState.value.copy(backgroundRemovedImageUri = resultUri, isLoading = false)
             } else {
                 setLoading(false)
             }
@@ -95,70 +74,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun setLoading(isLoading: Boolean) {
-        _uiState.update { it.copy(isLoading = isLoading) }
+        savedStateHandle["uiState"] = uiState.value.copy(isLoading = isLoading)
     }
 
     fun onBackgroundImageSelected(uri: Uri) {
-        _uiState.update { it.copy(backgroundImageUri = uri) }
+        savedStateHandle["uiState"] = uiState.value.copy(backgroundImageUri = uri)
     }
 
     fun onOverlayImageSelected(uri: Uri) {
-        _uiState.update { it.copy(overlayImageUri = uri, points = emptyList(), backgroundRemovedImageUri = null) }
+        savedStateHandle["uiState"] = uiState.value.copy(overlayImageUri = uri, points = emptyList(), backgroundRemovedImageUri = null)
     }
 
     fun onOpacityChanged(opacity: Float) {
-        _uiState.update { it.copy(opacity = opacity) }
+        savedStateHandle["uiState"] = uiState.value.copy(opacity = opacity)
     }
 
     fun onContrastChanged(contrast: Float) {
-        _uiState.update { it.copy(contrast = contrast) }
+        savedStateHandle["uiState"] = uiState.value.copy(contrast = contrast)
     }
 
     fun onSaturationChanged(saturation: Float) {
-        _uiState.update { it.copy(saturation = saturation) }
+        savedStateHandle["uiState"] = uiState.value.copy(saturation = saturation)
     }
 
     fun onScaleChanged(scale: Float) {
-        _uiState.update { it.copy(scale = it.scale * scale) }
+        savedStateHandle["uiState"] = uiState.value.copy(scale = uiState.value.scale * scale)
     }
 
     fun onOffsetChanged(offset: Offset) {
-        _uiState.update { it.copy(offset = it.offset + offset) }
+        savedStateHandle["uiState"] = uiState.value.copy(offset = uiState.value.offset + offset)
     }
 
     fun onMockupPointsChanged(points: List<Offset>) {
-        _uiState.update { it.copy(points = points) }
+        savedStateHandle["uiState"] = uiState.value.copy(points = points)
     }
 
     fun onPointChanged(index: Int, newPosition: Offset) {
-        _uiState.update { currentState ->
-            val updatedPoints = currentState.points.toMutableList()
-            if (index in 0..3) {
-                updatedPoints[index] = newPosition
-            }
-            currentState.copy(points = updatedPoints)
+        val currentState = uiState.value
+        val updatedPoints = currentState.points.toMutableList()
+        if (index in 0..3) {
+            updatedPoints[index] = newPosition
         }
+        savedStateHandle["uiState"] = currentState.copy(points = updatedPoints)
     }
 
     fun onEditorModeChanged(mode: EditorMode) {
-        _uiState.update { it.copy(editorMode = mode) }
+        savedStateHandle["uiState"] = uiState.value.copy(editorMode = mode)
     }
 
     fun onOnboardingComplete(mode: EditorMode) {
-        _uiState.update { currentState ->
-            val updatedModes = currentState.completedOnboardingModes + mode
-            sharedPreferences.edit()
-                .putStringSet("completed_onboarding", updatedModes.map { it.name }.toSet())
-                .apply()
-            currentState.copy(completedOnboardingModes = updatedModes)
-        }
+        val currentState = uiState.value
+        val updatedModes = currentState.completedOnboardingModes + mode
+        savedStateHandle["uiState"] = currentState.copy(completedOnboardingModes = updatedModes)
     }
 
     fun onArImagePlaced(anchor: Anchor) {
-        _uiState.update { it.copy(arImagePose = anchor.pose) }
+        savedStateHandle["uiState"] = uiState.value.copy(arImagePose = anchor.pose)
     }
 
     fun onArFeaturesDetected(arFeaturePattern: ArFeaturePattern) {
-        _uiState.update { it.copy(arFeaturePattern = arFeaturePattern) }
+        savedStateHandle["uiState"] = uiState.value.copy(arFeaturePattern = arFeaturePattern)
     }
 }
