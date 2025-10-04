@@ -37,6 +37,7 @@ class ArRenderer(
     private var session: Session? = null
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
+    private val pointCloudRenderer = PointCloudRenderer()
     private val simpleQuadRenderer = SimpleQuadRenderer()
     private val projectedImageRenderer = ProjectedImageRenderer()
     private val markerDetector = MarkerDetector()
@@ -58,6 +59,7 @@ class ArRenderer(
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer.createOnGlThread()
         planeRenderer.createOnGlThread()
+        pointCloudRenderer.createOnGlThread()
         simpleQuadRenderer.createOnGlThread()
         projectedImageRenderer.createOnGlThread()
     }
@@ -92,6 +94,12 @@ class ArRenderer(
             camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
             val viewMatrix = FloatArray(16)
             camera.getViewMatrix(viewMatrix, 0)
+
+            // Draw point cloud
+            frame.acquirePointCloud().use { pointCloud ->
+                pointCloudRenderer.update(pointCloud)
+                pointCloudRenderer.draw(viewMatrix, projectionMatrix)
+            }
 
             if (!isArLocked) {
                 val planes = it.getAllTrackables(Plane::class.java)
