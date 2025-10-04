@@ -14,6 +14,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
+import com.hereliesaz.graffitixr.ArState
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
@@ -21,7 +22,6 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
-import com.hereliesaz.graffitixr.ArState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -127,7 +127,7 @@ class ArRenderer(
                     handleTapForPlacement(frame)
                     featurePatternGenerated = false
                     val cameraPose = frame.camera.pose
-                    val cameraForward = cameraPose.getZAxis()
+                    val cameraForward = FloatArray(3).apply { cameraPose.getZAxis(this, 0) }
                     cameraForward[0] = -cameraForward[0]
                     cameraForward[1] = -cameraForward[1]
                     cameraForward[2] = -cameraForward[2]
@@ -137,9 +137,10 @@ class ArRenderer(
                         if (p.trackingState != TrackingState.TRACKING || p.subsumedBy != null) {
                             false
                         } else {
-                            val planeNormal = p.centerPose.getYAxis()
-                            val dotProduct = cameraForward.zip(planeNormal, Float::times).sum()
-                            dotProduct < -0.9f
+                            val planeNormal = FloatArray(3).apply { p.centerPose.getYAxis(this, 0) }
+                            // v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
+                            val dotProduct = cameraForward[0] * planeNormal[0] + cameraForward[1] * planeNormal[1] + cameraForward[2] * planeNormal[2]
+                            dotProduct < -0.95f
                         }
                     }
 
@@ -205,7 +206,7 @@ class ArRenderer(
         val tap = tapQueue.poll() ?: return
 
         val cameraPose = frame.camera.pose
-        val cameraForward = cameraPose.getZAxis()
+        val cameraForward = FloatArray(3).apply { cameraPose.getZAxis(this, 0) }
         cameraForward[0] = -cameraForward[0]
         cameraForward[1] = -cameraForward[1]
         cameraForward[2] = -cameraForward[2]
@@ -213,9 +214,9 @@ class ArRenderer(
         for (hit in frame.hitTest(tap)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                val planeNormal = trackable.centerPose.getYAxis()
-                val dotProduct = cameraForward.zip(planeNormal, Float::times).sum()
-                if (dotProduct < -0.9f) {
+                val planeNormal = FloatArray(3).apply { trackable.centerPose.getYAxis(this, 0) }
+                val dotProduct = cameraForward[0] * planeNormal[0] + cameraForward[1] * planeNormal[1] + cameraForward[2] * planeNormal[2]
+                if (dotProduct < -0.95f) {
                     onArImagePlaced(hit.createAnchor())
                     break
                 }
@@ -259,10 +260,7 @@ class ArRenderer(
         overlayImageUri?.let { uri ->
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val request = ImageRequest.Builder(context)
-                        .data(uri)
-                        .allowHardware(false)
-                        .build()
+                    val request = ImageRequest.Builder(context).data(uri).build()
                     val result = context.imageLoader.execute(request).drawable
                     overlayBitmap = (result as? android.graphics.drawable.BitmapDrawable)?.bitmap
                 } catch (e: Exception) {
