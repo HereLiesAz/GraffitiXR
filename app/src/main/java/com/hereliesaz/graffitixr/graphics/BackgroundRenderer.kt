@@ -73,7 +73,7 @@ class BackgroundRenderer {
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadCoords,
-                Coordinates2d.TEXTURE_UV,
+                Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoords
             )
         }
