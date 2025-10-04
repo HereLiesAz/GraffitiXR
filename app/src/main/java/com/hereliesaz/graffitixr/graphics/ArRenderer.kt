@@ -18,6 +18,7 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,7 @@ class ArRenderer(
     private var session: Session? = null
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
+    private val pointCloudRenderer = PointCloudRenderer()
     private val simpleQuadRenderer = SimpleQuadRenderer()
     private val projectedImageRenderer = ProjectedImageRenderer()
     private val markerDetector = MarkerDetector()
@@ -58,6 +60,7 @@ class ArRenderer(
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer.createOnGlThread()
         planeRenderer.createOnGlThread()
+        pointCloudRenderer.createOnGlThread()
         simpleQuadRenderer.createOnGlThread()
         projectedImageRenderer.createOnGlThread()
     }
@@ -93,11 +96,21 @@ class ArRenderer(
             val viewMatrix = FloatArray(16)
             camera.getViewMatrix(viewMatrix, 0)
 
+            // Draw point cloud
+            try {
+                frame.acquirePointCloud().use { pointCloud ->
+                    pointCloudRenderer.update(pointCloud)
+                    pointCloudRenderer.draw(viewMatrix, projectionMatrix)
+                }
+            } catch (e: NotYetAvailableException) {
+                // Point cloud is not available yet.
+            }
+
             if (!isArLocked) {
                 val planes = it.getAllTrackables(Plane::class.java)
                 for (plane in planes) {
                     if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                        planeRenderer.draw(plane, camera.displayOrientedPose, projectionMatrix)
+                        planeRenderer.draw(plane, viewMatrix, projectionMatrix)
                     }
                 }
             }
@@ -199,14 +212,11 @@ class ArRenderer(
                         config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                         config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                         session!!.configure(config)
-
                     }
                     ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD,
                     ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> {
                         try {
-                            // Request ARCore installation or update. This will redirect the user to the Play Store.
                             ArCoreApk.getInstance().requestInstall(context as Activity, true)
-                            Log.i("ArRenderer", "ARCore installation or update requested.")
                         } catch (e: Exception) {
                             Log.e("ArRenderer", "Failed to request ARCore installation/update.", e)
                         }
@@ -219,7 +229,7 @@ class ArRenderer(
                 }
             } catch (e: Exception) {
                 Log.e("ArRenderer", "Failed to create or configure AR session", e)
-                session = null // Ensure session is null on failure
+                session = null
                 return
             }
         }
@@ -227,9 +237,9 @@ class ArRenderer(
         try {
             session?.resume()
             displayRotationHelper.onResume()
-        } catch (e: com.google.ar.core.exceptions.CameraNotAvailableException) {
+        } catch (e: CameraNotAvailableException) {
             Log.e("ArRenderer", "Camera not available on resume", e)
-            session = null // Invalidate session
+            session = null
         }
     }
 
