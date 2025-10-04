@@ -1,8 +1,8 @@
 package com.hereliesaz.graffitixr.graphics
 
 import android.opengl.GLES20
+import android.opengl.Matrix
 import com.google.ar.core.Plane
-import com.google.ar.core.Pose
 import com.google.ar.core.TrackingState
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -18,6 +18,9 @@ class PlaneRenderer {
     private var colorUniform = 0
 
     private var vertexBuffer: FloatBuffer? = null
+    private val modelMatrix = FloatArray(16)
+    private val modelViewMatrix = FloatArray(16)
+    private val modelViewProjectionMatrix = FloatArray(16)
 
     fun createOnGlThread() {
         val vertexShader =
@@ -28,65 +31,50 @@ class PlaneRenderer {
         GLES20.glAttachShader(program, vertexShader)
         GLES20.glAttachShader(program, fragmentShader)
         GLES20.glLinkProgram(program)
-
-        val linkStatus = IntArray(1)
-        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
-        if (linkStatus[0] == 0) {
-            val log = GLES20.glGetProgramInfoLog(program)
-            GLES20.glDeleteProgram(program)
-            throw RuntimeException("Error linking program: $log")
-        }
-
         GLES20.glUseProgram(program)
+
         positionAttrib = GLES20.glGetAttribLocation(program, "a_Position")
         modelViewProjectionUniform = GLES20.glGetUniformLocation(program, "u_ModelViewProjection")
         colorUniform = GLES20.glGetUniformLocation(program, "u_Color")
     }
 
     private fun updateVertexBuffer(plane: Plane) {
-        val buffer = plane.polygon
-        if (vertexBuffer == null || vertexBuffer!!.capacity() < buffer.remaining()) {
-            val bb = ByteBuffer.allocateDirect(buffer.remaining())
+        val polygon = plane.polygon
+        if (vertexBuffer == null || vertexBuffer!!.capacity() < polygon.remaining()) {
+            val bb = ByteBuffer.allocateDirect(polygon.remaining())
             bb.order(ByteOrder.nativeOrder())
             vertexBuffer = bb.asFloatBuffer()
         }
         vertexBuffer!!.rewind()
-        vertexBuffer!!.put(buffer)
-        vertexBuffer!!.rewind()
+        vertexBuffer!!.put(polygon)
+        vertexBuffer!!.position(0)
     }
 
-    fun draw(plane: Plane, cameraPose: Pose, cameraProjection: FloatArray) {
+    fun draw(plane: Plane, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
         if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
             return
         }
-        updateVertexBuffer(plane)
 
+        updateVertexBuffer(plane)
         GLES20.glUseProgram(program)
 
-        val modelMatrix = FloatArray(16)
+        // Set up the model-view-projection matrix for the plane.
         plane.centerPose.toMatrix(modelMatrix, 0)
-
-        // Get the camera's view matrix and then invert it.
-        val viewMatrix = FloatArray(16)
-        cameraPose.toMatrix(viewMatrix, 0)
-        val invertedViewMatrix = FloatArray(16)
-        android.opengl.Matrix.invertM(invertedViewMatrix, 0, viewMatrix, 0)
-
-        val modelViewMatrix = FloatArray(16)
-        android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, invertedViewMatrix, 0, modelMatrix, 0)
-
-        val modelViewProjectionMatrix = FloatArray(16)
-        android.opengl.Matrix.multiplyMM(modelViewProjectionMatrix, 0, cameraProjection, 0, modelViewMatrix, 0)
+        Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
+        Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, modelViewMatrix, 0)
 
         GLES20.glUniformMatrix4fv(modelViewProjectionUniform, 1, false, modelViewProjectionMatrix, 0)
 
+        // Set the color of the plane.
         val color = when (plane.type) {
-            Plane.Type.HORIZONTAL_UPWARD_FACING -> floatArrayOf(0f, 1f, 0f, 0.5f) // Green
-            Plane.Type.HORIZONTAL_DOWNWARD_FACING -> floatArrayOf(1f, 0f, 0f, 0.5f) // Red
-            Plane.Type.VERTICAL -> floatArrayOf(0f, 0f, 1f, 0.5f) // Blue
+            Plane.Type.HORIZONTAL_UPWARD_FACING -> floatArrayOf(0.0f, 1.0f, 0.0f, 0.5f) // Green
+            Plane.Type.HORIZONTAL_DOWNWARD_FACING -> floatArrayOf(1.0f, 0.0f, 0.0f, 0.5f) // Red
+            Plane.Type.VERTICAL -> floatArrayOf(0.0f, 0.0f, 1.0f, 0.5f) // Blue
+            else -> floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f) // Gray
         }
         GLES20.glUniform4fv(colorUniform, 1, color, 0)
 
+        // Draw the plane.
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         GLES20.glVertexAttribPointer(positionAttrib, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer)
