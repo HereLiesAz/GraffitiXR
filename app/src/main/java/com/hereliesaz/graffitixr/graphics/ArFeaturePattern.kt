@@ -36,7 +36,9 @@ data class ArFeaturePattern(
             val matData = ByteArray(parcel.readInt())
             parcel.readByteArray(matData)
             val descriptors = Mat(rows, cols, type)
-            descriptors.put(0, 0, matData)
+            if(rows > 0 && cols > 0) {
+                descriptors.put(0, 0, matData)
+            }
 
             // Read world points
             val pointsList = mutableListOf<FloatArray>()
@@ -48,7 +50,9 @@ data class ArFeaturePattern(
         override fun ArFeaturePattern.write(parcel: Parcel, flags: Int) {
             // Write descriptors Mat
             val matData = ByteArray(descriptors.total().toInt() * descriptors.elemSize().toInt())
-            descriptors.get(0, 0, matData)
+            if(descriptors.rows() > 0 && descriptors.cols() > 0) {
+                descriptors.get(0, 0, matData)
+            }
             parcel.writeInt(descriptors.rows())
             parcel.writeInt(descriptors.cols())
             parcel.writeInt(descriptors.type())

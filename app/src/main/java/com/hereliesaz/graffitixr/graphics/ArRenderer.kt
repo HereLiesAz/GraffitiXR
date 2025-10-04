@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.graphics
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -11,10 +12,13 @@ import android.view.View
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
+import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,10 +32,10 @@ class ArRenderer(
     private val context: Context,
     private val view: View,
     private val onArImagePlaced: (Anchor) -> Unit,
-    private val onArFeaturesDetected: (ArFeaturePattern) -> Unit,
-    val session: Session?
+    private val onArFeaturesDetected: (ArFeaturePattern) -> Unit
 ) : GLSurfaceView.Renderer {
 
+    private var session: Session? = null
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
@@ -92,6 +96,7 @@ class ArRenderer(
             val viewMatrix = FloatArray(16)
             camera.getViewMatrix(viewMatrix, 0)
 
+            // Draw point cloud
             try {
                 frame.acquirePointCloud().use { pointCloud ->
                     pointCloudRenderer.update(pointCloud)
@@ -194,5 +199,52 @@ class ArRenderer(
                 }
             }
         }
+    }
+
+    fun onResume() {
+        if (session == null) {
+            try {
+                val availability = ArCoreApk.getInstance().checkAvailability(context)
+                when (availability) {
+                    ArCoreApk.Availability.SUPPORTED_INSTALLED -> {
+                        session = Session(context)
+                        val config = Config(session)
+                        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                        session!!.configure(config)
+                    }
+                    ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD,
+                    ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> {
+                        try {
+                            ArCoreApk.getInstance().requestInstall(context as Activity, true)
+                        } catch (e: Exception) {
+                            Log.e("ArRenderer", "Failed to request ARCore installation/update.", e)
+                        }
+                        return
+                    }
+                    else -> {
+                        Log.e("ArRenderer", "ARCore is not supported on this device. Availability: $availability")
+                        return
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ArRenderer", "Failed to create or configure AR session", e)
+                session = null
+                return
+            }
+        }
+
+        try {
+            session?.resume()
+            displayRotationHelper.onResume()
+        } catch (e: CameraNotAvailableException) {
+            Log.e("ArRenderer", "Camera not available on resume", e)
+            session = null
+        }
+    }
+
+    fun onPause() {
+        displayRotationHelper.onPause()
+        session?.pause()
     }
 }

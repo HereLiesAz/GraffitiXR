@@ -6,7 +6,6 @@ import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.utils.OffsetParceler
-import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.RawValue
 import kotlinx.parcelize.TypeParceler
@@ -40,10 +39,7 @@ data class UiState(
     val isArLocked: Boolean = false,
     val isLoading: Boolean = false,
     val arErrorMessage: String? = null,
+    val arImagePose: Pose? = null,
+    val arFeaturePattern: ArFeaturePattern? = null,
     val completedOnboardingModes: @RawValue Set<EditorMode> = emptySet()
-) : Parcelable {
-    @IgnoredOnParcel
-    val arImagePose: Pose? = null
-    @IgnoredOnParcel
-    val arFeaturePattern: ArFeaturePattern? = null
-}
+) : Parcelable
