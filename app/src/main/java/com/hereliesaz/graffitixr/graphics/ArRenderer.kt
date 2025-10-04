@@ -96,9 +96,13 @@ class ArRenderer(
             camera.getViewMatrix(viewMatrix, 0)
 
             // Draw point cloud
-            frame.acquirePointCloud().use { pointCloud ->
-                pointCloudRenderer.update(pointCloud)
-                pointCloudRenderer.draw(viewMatrix, projectionMatrix)
+            try {
+                frame.acquirePointCloud().use { pointCloud ->
+                    pointCloudRenderer.update(pointCloud)
+                    pointCloudRenderer.draw(viewMatrix, projectionMatrix)
+                }
+            } catch (e: NotYetAvailableException) {
+                // Point cloud is not available yet.
             }
 
             if (!isArLocked) {
