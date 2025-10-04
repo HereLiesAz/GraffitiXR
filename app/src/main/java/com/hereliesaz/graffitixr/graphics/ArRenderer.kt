@@ -14,6 +14,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
+import com.hereliesaz.graffitixr.ArState
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
@@ -126,11 +127,25 @@ class ArRenderer(
                 ArState.SEARCHING -> {
                     handleTapForPlacement(frame)
                     featurePatternGenerated = false
-                    val planes = it.getAllTrackables(Plane::class.java)
-                    val arePlanesDetected = planes.any { p -> p.trackingState == TrackingState.TRACKING && p.subsumedBy == null }
-                    onPlanesDetected(arePlanesDetected)
-                    planes.filter { p -> p.trackingState == TrackingState.TRACKING && p.subsumedBy == null }
-                        .forEach { plane -> planeRenderer.draw(plane, viewMatrix, projectionMatrix) }
+                    val cameraPose = frame.camera.pose
+                    val cameraForward = FloatArray(3).apply { cameraPose.getZAxis(this, 0) }
+                    cameraForward[0] = -cameraForward[0]
+                    cameraForward[1] = -cameraForward[1]
+                    cameraForward[2] = -cameraForward[2]
+
+                    val allPlanes = it.getAllTrackables(Plane::class.java)
+                    val filteredPlanes = allPlanes.filter { p ->
+                        if (p.trackingState != TrackingState.TRACKING || p.subsumedBy != null) {
+                            false
+                        } else {
+                            val planeNormal = FloatArray(3).apply { p.centerPose.getYAxis(this, 0) }
+                            val dotProduct = cameraForward.zip(planeNormal, Float::times).sum()
+                            dotProduct < -0.9f
+                        }
+                    }
+
+                    onPlanesDetected(filteredPlanes.isNotEmpty())
+                    filteredPlanes.forEach { plane -> planeRenderer.draw(plane, viewMatrix, projectionMatrix) }
                 }
                 ArState.PLACED -> {
                     onPlanesDetected(false)
@@ -189,11 +204,22 @@ class ArRenderer(
 
     private fun handleTapForPlacement(frame: Frame) {
         val tap = tapQueue.poll() ?: return
+
+        val cameraPose = frame.camera.pose
+        val cameraForward = FloatArray(3).apply { cameraPose.getZAxis(this, 0) }
+        cameraForward[0] = -cameraForward[0]
+        cameraForward[1] = -cameraForward[1]
+        cameraForward[2] = -cameraForward[2]
+
         for (hit in frame.hitTest(tap)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                onArImagePlaced(hit.createAnchor())
-                break
+                val planeNormal = FloatArray(3).apply { trackable.centerPose.getYAxis(this, 0) }
+                val dotProduct = cameraForward.zip(planeNormal, Float::times).sum()
+                if (dotProduct < -0.9f) {
+                    onArImagePlaced(hit.createAnchor())
+                    break
+                }
             }
         }
     }
