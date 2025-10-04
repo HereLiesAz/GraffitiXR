@@ -95,7 +95,13 @@ class ArRenderer(
         session?.let {
             it.setCameraTextureName(backgroundRenderer.textureId)
             displayRotationHelper.updateSessionIfNeeded(it)
-            val frame = it.update()
+            val frame = try {
+                it.update()
+            } catch (e: com.google.ar.core.exceptions.SessionPausedException) {
+                // The session is paused, probably due to a lifecycle event.
+                // This is expected and we can just return since we have nothing to render.
+                return
+            }
             backgroundRenderer.draw(frame)
 
             val camera = frame.camera
