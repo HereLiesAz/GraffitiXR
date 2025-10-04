@@ -20,6 +20,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -87,66 +88,72 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        session?.let {
-            it.setCameraTextureName(backgroundRenderer.textureId)
-            displayRotationHelper.updateSessionIfNeeded(it)
-            val frame = it.update()
-            backgroundRenderer.draw(frame)
-
-            val camera = frame.camera
-            if (camera.trackingState != TrackingState.TRACKING) return
-
-            if (isArLocked) {
-                if (!featurePatternGenerated) {
-                    generateFeaturePattern(frame)
-                }
-            } else {
-                handleTapForPlacement(frame)
-                featurePatternGenerated = false
-            }
-
-            val projectionMatrix = FloatArray(16)
-            camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
-            val viewMatrix = FloatArray(16)
-            camera.getViewMatrix(viewMatrix, 0)
-
-            // Draw point cloud
+        session?.let { session ->
             try {
-                frame.acquirePointCloud().use { pointCloud ->
-                    pointCloudRenderer.update(pointCloud)
-                    pointCloudRenderer.draw(viewMatrix, projectionMatrix)
-                }
-            } catch (e: NotYetAvailableException) {
-                // Point cloud is not available yet.
-            }
+                session.setCameraTextureName(backgroundRenderer.textureId)
+                displayRotationHelper.updateSessionIfNeeded(session)
+                val frame = session.update()
+                backgroundRenderer.draw(frame)
 
-            if (!isArLocked) {
-                val planes = it.getAllTrackables(Plane::class.java)
-                for (plane in planes) {
-                    if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                        planeRenderer.draw(plane, viewMatrix, projectionMatrix)
-                    }
-                }
-            }
+                val camera = frame.camera
+                if (camera.trackingState != TrackingState.TRACKING) return
 
-            if (overlayImageUri != lastLoadedUri) {
-                loadOverlayBitmap()
-            }
-
-            val bmp = overlayBitmap
-            if (bmp != null) {
                 if (isArLocked) {
-                    arFeaturePattern?.let { pattern ->
-                        val homography = HomographyHelper.calculateHomography(pattern.worldPoints, camera, view, bmp.width, bmp.height)
-                        homography?.let {
-                            projectedImageRenderer.draw(bmp, it, opacity)
-                        }
+                    if (!featurePatternGenerated) {
+                        generateFeaturePattern(frame)
                     }
                 } else {
-                    arImagePose?.let {
-                        simpleQuadRenderer.draw(it, viewMatrix, projectionMatrix, bmp, opacity)
+                    handleTapForPlacement(frame)
+                    featurePatternGenerated = false
+                }
+
+                val projectionMatrix = FloatArray(16)
+                camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+                val viewMatrix = FloatArray(16)
+                camera.getViewMatrix(viewMatrix, 0)
+
+                // Draw point cloud
+                try {
+                    frame.acquirePointCloud().use { pointCloud ->
+                        pointCloudRenderer.update(pointCloud)
+                        pointCloudRenderer.draw(viewMatrix, projectionMatrix)
+                    }
+                } catch (e: NotYetAvailableException) {
+                    // Point cloud is not available yet.
+                }
+
+                if (!isArLocked) {
+                    val planes = session.getAllTrackables(Plane::class.java)
+                    for (plane in planes) {
+                        if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
+                            planeRenderer.draw(plane, viewMatrix, projectionMatrix)
+                        }
                     }
                 }
+
+                if (overlayImageUri != lastLoadedUri) {
+                    loadOverlayBitmap()
+                }
+
+                val bmp = overlayBitmap
+                if (bmp != null) {
+                    if (isArLocked) {
+                        arFeaturePattern?.let { pattern ->
+                            val homography = HomographyHelper.calculateHomography(pattern.worldPoints, camera, view, bmp.width, bmp.height)
+                            homography?.let {
+                                projectedImageRenderer.draw(bmp, it, opacity)
+                            }
+                        }
+                    } else {
+                        arImagePose?.let {
+                            simpleQuadRenderer.draw(it, viewMatrix, projectionMatrix, bmp, opacity)
+                        }
+                    }
+                }
+            } catch (e: SessionPausedException) {
+                // Session is paused, do nothing
+            } catch (e: CameraNotAvailableException) {
+                // Camera is not available, do nothing
             }
         }
     }
@@ -260,5 +267,10 @@ class ArRenderer(
     fun onPause() {
         displayRotationHelper.onPause()
         session?.pause()
+    }
+
+    fun onDestroy() {
+        session?.close()
+        session = null
     }
 }

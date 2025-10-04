@@ -41,7 +41,7 @@ class PlaneRenderer {
     private fun updateVertexBuffer(plane: Plane) {
         val polygon = plane.polygon
         if (vertexBuffer == null || vertexBuffer!!.capacity() < polygon.remaining()) {
-            val bb = ByteBuffer.allocateDirect(polygon.remaining())
+            val bb = ByteBuffer.allocateDirect(polygon.remaining() * 4)
             bb.order(ByteOrder.nativeOrder())
             vertexBuffer = bb.asFloatBuffer()
         }
