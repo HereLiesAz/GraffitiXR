@@ -43,6 +43,9 @@ enum class EditorMode {
  * to reflect the new state. All properties have default values to ensure a consistent
  * initial state.
  *
+ * This class is [Parcelable] to allow it to be saved and restored from a [SavedStateHandle],
+ * ensuring the UI state survives process death.
+ *
  * @property editorMode The currently active editor mode, which determines the main screen content. See [EditorMode].
  * @property backgroundImageUri The [Uri] of the image selected by the user to serve as the background. This is only used in [EditorMode.STATIC].
  * @property overlayImageUri The [Uri] of the mural or artwork image selected by the user to be overlaid on the background or camera feed.

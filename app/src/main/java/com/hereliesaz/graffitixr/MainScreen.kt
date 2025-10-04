@@ -1,13 +1,11 @@
 package com.hereliesaz.graffitixr
 
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,20 +13,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import com.google.ar.core.Session
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 
-
+/**
+ * The main screen of the application.
+ *
+ * This composable acts as the primary container for the UI. It observes the [UiState] from the
+ * [MainViewModel] and displays the appropriate content based on the current [EditorMode].
+ * It also houses the `AzNavRail` for navigation and controls.
+ *
+ * @param viewModel The [MainViewModel] instance that holds the application's state and business logic.
+ */
 @Composable
-fun MainScreen(viewModel: MainViewModel, arSession: Session?) {
+fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
 
     val overlayImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -37,13 +40,6 @@ fun MainScreen(viewModel: MainViewModel, arSession: Session?) {
     val backgroundImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
-
-    LaunchedEffect(uiState.arErrorMessage) {
-        uiState.arErrorMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            viewModel.onArCoreCheckFailed(null) // Clear the error message
-        }
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -68,33 +64,17 @@ fun MainScreen(viewModel: MainViewModel, arSession: Session?) {
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
                 )
-                EditorMode.AR -> {
-                    if (arSession != null) {
-                        ArModeScreen(viewModel = viewModel, arSession = arSession)
-                    }
-                }
+                EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
         }
 
         AzNavRail {
-            azSettings(
-                isLoading = uiState.isLoading,
+            azSettings(isLoading = uiState.isLoading,
                 packRailButtons = true
             )
 
-            azMenuItem(
-                id = "ar_overlay",
-                text = "AR Overlay",
-                onClick = {
-                    if (arSession != null) {
-                        viewModel.onEditorModeChanged(EditorMode.AR)
-                    } else {
-                        // The MainActivity will show a toast if there's a specific error.
-                        // This is a fallback.
-                        Toast.makeText(context, "AR is not available on this device", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
+
+            azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
             azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
@@ -115,8 +95,6 @@ fun MainScreen(viewModel: MainViewModel, arSession: Session?) {
             azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
             azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
             azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-
-            azRailItem(id = "save", text = "Save") { /* TODO: Implement save functionality */ }
         }
 
         when (showSliderDialog) {
@@ -141,6 +119,5 @@ fun MainScreen(viewModel: MainViewModel, arSession: Session?) {
                 valueRange = 0f..2f
             )
         }
-
     }
 }

@@ -6,11 +6,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -39,6 +51,24 @@ import com.hereliesaz.graffitixr.UiState
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/**
+ * A composable screen for creating a mock-up of a mural on a static background image.
+ *
+ * This screen allows the user to select a background and an overlay image. The overlay image can
+ * be freely transformed using perspective warp handles, allowing for precise placement and
+ * realistic mock-ups. The image properties (opacity, contrast, saturation) are controlled
+ * via the main navigation rail.
+ *
+ * @param uiState The current UI state, containing the URIs for the images and their properties.
+ * @param onBackgroundImageSelected A callback to be invoked when the user selects a new background image.
+ * @param onOverlayImageSelected A callback to be invoked when the user selects a new overlay image.
+ * @param onOpacityChanged A callback to be invoked when the opacity of the overlay is changed.
+ * @param onContrastChanged A callback to be invoked when the contrast of the overlay is changed.
+ * @param onSaturationChanged A callback to be invoked when the saturation of the overlay is changed.
+ * @param onPointsInitialized A callback to initialize the positions of the warp handles.
+ * @param onPointChanged A callback to be invoked when a warp handle is dragged.
+ * @param isWarpEnabled A flag to enable or disable the perspective warping feature.
+ */
 @Composable
 fun MockupScreen(
     uiState: UiState,
@@ -194,6 +224,5 @@ fun MockupScreen(
                 }
             }
         }
-
     }
 }

@@ -21,6 +21,18 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
+/**
+ * The central ViewModel for the application, acting as the single source of truth for the UI state
+ * and the handler for all user events.
+ *
+ * This class follows the MVVM architecture pattern. It holds the application's UI state in a
+ * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
+ * configuration changes but also system-initiated process death, providing a robust user experience.
+ *
+ * @param application The application instance, used for accessing the application context.
+ * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory,
+ * used to store and restore the [UiState].
+ */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
