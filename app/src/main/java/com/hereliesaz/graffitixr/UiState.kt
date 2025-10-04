@@ -70,6 +70,7 @@ data class UiState(
     val contrast: Float = 1f,
     val saturation: Float = 1f,
     val scale: Float = 1f,
+    val rotation: Float = 0f,
     val offset: @WriteWith<OffsetParceler> Offset = Offset.Zero,
     val points: List<@WriteWith<OffsetParceler> Offset> = emptyList(),
     val arImagePose: @WriteWith<PoseParceler> Pose? = null,
