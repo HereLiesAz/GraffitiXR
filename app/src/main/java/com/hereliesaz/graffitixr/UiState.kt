@@ -58,6 +58,7 @@ data class UiState(
     val points: List<Offset> = emptyList(),
     val isArLocked: Boolean = false,
     val isLoading: Boolean = false,
+    val isArSupported: Boolean = true,
     val completedOnboardingModes: @RawValue Set<EditorMode> = emptySet()
 ) : Parcelable {
     @IgnoredOnParcel

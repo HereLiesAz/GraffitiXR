@@ -20,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.ar.core.ArCoreApk
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import org.opencv.android.OpenCVLoader
 
@@ -30,6 +31,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val availability = ArCoreApk.getInstance().checkAvailability(this)
+        viewModel.onArCoreAvailabilityChecked(availability.isSupported)
 
         if (!OpenCVLoader.initLocal()) {
             Log.e("OpenCV", "Unable to load OpenCV!")

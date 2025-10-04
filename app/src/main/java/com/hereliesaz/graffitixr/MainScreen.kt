@@ -1,11 +1,11 @@
 package com.hereliesaz.graffitixr
 
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,7 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
@@ -26,6 +26,7 @@ import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     val overlayImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -58,17 +59,31 @@ fun MainScreen(viewModel: MainViewModel) {
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
                 )
-                EditorMode.AR -> ArModeScreen(viewModel = viewModel)
+                EditorMode.AR -> {
+                    if (uiState.isArSupported) {
+                        ArModeScreen(viewModel = viewModel)
+                    }
+                }
             }
         }
 
         AzNavRail {
-            azSettings(isLoading = false,
+            azSettings(
+                isLoading = uiState.isLoading,
                 packRailButtons = true
-            ) // Assuming loading state is handled elsewhere
+            )
 
-
-            azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+            azMenuItem(
+                id = "ar_overlay",
+                text = "AR Overlay",
+                onClick = {
+                    if (uiState.isArSupported) {
+                        viewModel.onEditorModeChanged(EditorMode.AR)
+                    } else {
+                        Toast.makeText(context, "AR is not supported on this device", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
             azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
@@ -89,6 +104,8 @@ fun MainScreen(viewModel: MainViewModel) {
             azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
             azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
             azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+
+            azRailItem(id = "save", text = "Save") { /* TODO: Implement save functionality */ }
         }
 
         when (showSliderDialog) {

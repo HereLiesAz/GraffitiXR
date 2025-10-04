@@ -142,4 +142,8 @@ class MainViewModel(
     fun onArFeaturesDetected(arFeaturePattern: ArFeaturePattern) {
         // Transient AR state is not saved
     }
+
+    fun onArCoreAvailabilityChecked(isSupported: Boolean) {
+        savedStateHandle["uiState"] = uiState.value.copy(isArSupported = isSupported)
+    }
 }
