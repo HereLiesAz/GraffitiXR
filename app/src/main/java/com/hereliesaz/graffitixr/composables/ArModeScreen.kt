@@ -57,9 +57,13 @@ private fun ArContent(
         arImagePose = uiState.arImagePose,
         arFeaturePattern = uiState.arFeaturePattern,
         overlayImageUri = uiState.overlayImageUri,
+        arObjectOrientation = uiState.arObjectOrientation,
+        arObjectScale = uiState.arObjectScale,
         isArLocked = uiState.isArLocked,
         opacity = uiState.opacity,
         onArImagePlaced = viewModel::onArImagePlaced,
-        onArFeaturesDetected = viewModel::onArFeaturesDetected
+        onArFeaturesDetected = viewModel::onArFeaturesDetected,
+        onArObjectScaleChanged = viewModel::onArObjectScaleChanged,
+        onArObjectRotated = viewModel::onArObjectRotated
     )
 }

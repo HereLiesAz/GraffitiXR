@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.opengl.Matrix
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
@@ -14,6 +15,7 @@ import coil.request.ImageRequest
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
+import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
@@ -63,6 +65,8 @@ class ArRenderer(
     var arImagePose: FloatArray? = null
     var arFeaturePattern: ArFeaturePattern? = null
     var overlayImageUri: Uri? = null
+    var arObjectOrientation: Quaternion = Quaternion.identity()
+    var arObjectScale: Float = 1.0f
     var isArLocked: Boolean = false
     var opacity: Float = 1.0f
 
@@ -143,8 +147,12 @@ class ArRenderer(
                         }
                     }
                 } else {
-                    arImagePose?.let {
-                        simpleQuadRenderer.draw(it, viewMatrix, projectionMatrix, bmp, opacity)
+                    arImagePose?.let { poseMatrix ->
+                        val rotationMatrix = arObjectOrientation.toRotationMatrix()
+                        val modelMatrix = FloatArray(16)
+                        Matrix.multiplyMM(modelMatrix, 0, poseMatrix, 0, rotationMatrix, 0)
+                        Matrix.scaleM(modelMatrix, 0, arObjectScale, arObjectScale, arObjectScale)
+                        simpleQuadRenderer.draw(modelMatrix, viewMatrix, projectionMatrix, bmp, opacity)
                     }
                 }
             }

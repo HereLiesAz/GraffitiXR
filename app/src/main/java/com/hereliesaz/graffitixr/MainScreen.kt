@@ -55,14 +55,15 @@ fun MainScreen(viewModel: MainViewModel) {
                     onOpacityChanged = viewModel::onOpacityChanged,
                     onContrastChanged = viewModel::onContrastChanged,
                     onSaturationChanged = viewModel::onSaturationChanged,
-                    onPointsInitialized = viewModel::onMockupPointsChanged,
-                    onPointChanged = viewModel::onPointChanged,
-                    isWarpEnabled = true
+                    onScaleChanged = viewModel::onScaleChanged,
+                    onOffsetChanged = viewModel::onOffsetChanged,
+                    onRotationZChanged = viewModel::onRotationZChanged
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
+                    onRotationZChanged = viewModel::onRotationZChanged
                 )
                 EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }

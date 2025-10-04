@@ -5,6 +5,7 @@ import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.ArFeaturePatternParceler
 import com.hereliesaz.graffitixr.utils.OffsetParceler
 import com.hereliesaz.graffitixr.utils.PoseParceler
@@ -71,8 +72,10 @@ data class UiState(
     val saturation: Float = 1f,
     val scale: Float = 1f,
     val offset: @WriteWith<OffsetParceler> Offset = Offset.Zero,
-    val points: List<@WriteWith<OffsetParceler> Offset> = emptyList(),
+    val rotationZ: Float = 0f,
     val arImagePose: @WriteWith<PoseParceler> Pose? = null,
+    val arObjectScale: Float = 1f,
+    val arObjectOrientation: Quaternion = Quaternion.identity(),
     val arFeaturePattern: @WriteWith<ArFeaturePatternParceler> ArFeaturePattern? = null,
     val isArLocked: Boolean = false,
     val isLoading: Boolean = false,
