@@ -5,8 +5,11 @@ import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import com.hereliesaz.graffitixr.utils.OffsetParceler
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.RawValue
+import kotlinx.parcelize.TypeParceler
 
 /**
  * Represents the different editing modes available in the application.
@@ -39,22 +42,9 @@ enum class EditorMode {
  * composables, and any change to an instance of this class will trigger a recomposition
  * to reflect the new state. All properties have default values to ensure a consistent
  * initial state.
- *
- * @property editorMode The currently active editor mode, which determines the main screen content. See [EditorMode].
- * @property backgroundImageUri The [Uri] of the image selected by the user to serve as the background. This is only used in [EditorMode.STATIC].
- * @property overlayImageUri The [Uri] of the mural or artwork image selected by the user to be overlaid on the background or camera feed.
- * @property opacity The transparency of the overlay image, ranging from 0.0f (fully transparent) to 1.0f (fully opaque).
- * @property contrast The contrast of the overlay image. A value of 1.0f is normal contrast.
- * @property saturation The color saturation of the overlay image. A value of 0.0f is grayscale, and 1.0f is normal saturation.
- * @property scale The uniform scale factor applied to the overlay image in non-AR mode.
- * @property offset The offset of the overlay image in non-AR mode.
- * @property points A list of four [Offset] points representing the corners of the overlay image for perspective warping in static mode.
- * @property arImagePose The pose of the AR image in the real world.
- * @property arFeaturePattern The feature pattern detected in the AR scene.
- * @property isArLocked A flag indicating whether the AR image is locked in place.
- * @property completedOnboardingModes A set containing the [EditorMode]s for which the user has already seen and dismissed the onboarding dialog. This is used to prevent showing the dialog repeatedly.
  */
 @Parcelize
+@TypeParceler<Offset, OffsetParceler>
 data class UiState(
     val editorMode: EditorMode = EditorMode.STATIC,
     val backgroundImageUri: Uri? = null,
@@ -68,7 +58,7 @@ data class UiState(
     val points: List<Offset> = emptyList(),
     val isArLocked: Boolean = false,
     val isLoading: Boolean = false,
-    val completedOnboardingModes: Set<EditorMode> = emptySet()
+    val completedOnboardingModes: @RawValue Set<EditorMode> = emptySet()
 ) : Parcelable {
     @IgnoredOnParcel
     val arImagePose: Pose? = null
