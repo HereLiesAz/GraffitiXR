@@ -14,11 +14,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
-import android.view.View
 import com.google.ar.core.Anchor
-import android.view.GestureDetector
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.ArRenderer
