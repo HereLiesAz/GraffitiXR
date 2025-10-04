@@ -1,9 +1,15 @@
 package com.hereliesaz.graffitixr
 
 import android.net.Uri
+import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import com.hereliesaz.graffitixr.utils.ArFeaturePatternParceler
+import com.hereliesaz.graffitixr.utils.OffsetParceler
+import com.hereliesaz.graffitixr.utils.PoseParceler
+import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.WriteWith
 
 /**
  * Represents the different editing modes available in the application.
@@ -37,6 +43,9 @@ enum class EditorMode {
  * to reflect the new state. All properties have default values to ensure a consistent
  * initial state.
  *
+ * This class is [Parcelable] to allow it to be saved and restored from a [SavedStateHandle],
+ * ensuring the UI state survives process death.
+ *
  * @property editorMode The currently active editor mode, which determines the main screen content. See [EditorMode].
  * @property backgroundImageUri The [Uri] of the image selected by the user to serve as the background. This is only used in [EditorMode.STATIC].
  * @property overlayImageUri The [Uri] of the mural or artwork image selected by the user to be overlaid on the background or camera feed.
@@ -51,6 +60,7 @@ enum class EditorMode {
  * @property isArLocked A flag indicating whether the AR image is locked in place.
  * @property completedOnboardingModes A set containing the [EditorMode]s for which the user has already seen and dismissed the onboarding dialog. This is used to prevent showing the dialog repeatedly.
  */
+@Parcelize
 data class UiState(
     val editorMode: EditorMode = EditorMode.STATIC,
     val backgroundImageUri: Uri? = null,
@@ -60,11 +70,11 @@ data class UiState(
     val contrast: Float = 1f,
     val saturation: Float = 1f,
     val scale: Float = 1f,
-    val offset: Offset = Offset.Zero,
-    val points: List<Offset> = emptyList(),
-    val arImagePose: Pose? = null,
-    val arFeaturePattern: ArFeaturePattern? = null,
+    val offset: @WriteWith<OffsetParceler> Offset = Offset.Zero,
+    val points: List<@WriteWith<OffsetParceler> Offset> = emptyList(),
+    val arImagePose: @WriteWith<PoseParceler> Pose? = null,
+    val arFeaturePattern: @WriteWith<ArFeaturePatternParceler> ArFeaturePattern? = null,
     val isArLocked: Boolean = false,
     val isLoading: Boolean = false,
     val completedOnboardingModes: Set<EditorMode> = emptySet()
-)
+) : Parcelable

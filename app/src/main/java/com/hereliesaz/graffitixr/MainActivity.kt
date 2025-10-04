@@ -25,7 +25,7 @@ import org.opencv.android.OpenCVLoader
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels { MainViewModelFactory(application) }
+    private val viewModel: MainViewModel by viewModels { MainViewModelFactory(application, this) }
 
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {

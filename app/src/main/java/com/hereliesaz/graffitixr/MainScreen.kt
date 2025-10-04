@@ -5,7 +5,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,14 +13,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 
-
+/**
+ * The main screen of the application.
+ *
+ * This composable acts as the primary container for the UI. It observes the [UiState] from the
+ * [MainViewModel] and displays the appropriate content based on the current [EditorMode].
+ * It also houses the `AzNavRail` for navigation and controls.
+ *
+ * @param viewModel The [MainViewModel] instance that holds the application's state and business logic.
+ */
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -38,8 +44,7 @@ fun MainScreen(viewModel: MainViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 80.dp),
+                .fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
@@ -64,9 +69,9 @@ fun MainScreen(viewModel: MainViewModel) {
         }
 
         AzNavRail {
-            azSettings(isLoading = false,
+            azSettings(isLoading = uiState.isLoading,
                 packRailButtons = true
-            ) // Assuming loading state is handled elsewhere
+            )
 
 
             azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
