@@ -27,6 +27,20 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
+/**
+ * A GLES renderer for the AR experience.
+ *
+ * This class is responsible for managing the ARCore session, handling user input, and rendering the
+ * AR scene. This includes drawing the camera background, detected planes, and the virtual content
+ * (the user's overlay image). It now manages its own ARCore [Session] lifecycle, including robust
+ * installation and availability checks.
+ *
+ * @param context The application context.
+ * @param view The [View] that this renderer is attached to.
+ * @param onArImagePlaced A callback invoked when the user places the AR image.
+ * @param onArFeaturesDetected A callback invoked when a new set of AR features has been detected
+ * and computed.
+ */
 class ArRenderer(
     private val context: Context,
     private val view: View,

@@ -44,8 +44,8 @@ fun ArView(
         factory = {
             glSurfaceView.apply {
                 setEGLContextClientVersion(3)
-                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                 setRenderer(renderer)
+                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             }
         },
         modifier = modifier,

@@ -51,6 +51,24 @@ import com.hereliesaz.graffitixr.UiState
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/**
+ * A composable screen for creating a mock-up of a mural on a static background image.
+ *
+ * This screen allows the user to select a background and an overlay image. The overlay image can
+ * be freely transformed using perspective warp handles, allowing for precise placement and
+ * realistic mock-ups. The image properties (opacity, contrast, saturation) are controlled
+ * via the main navigation rail.
+ *
+ * @param uiState The current UI state, containing the URIs for the images and their properties.
+ * @param onBackgroundImageSelected A callback to be invoked when the user selects a new background image.
+ * @param onOverlayImageSelected A callback to be invoked when the user selects a new overlay image.
+ * @param onOpacityChanged A callback to be invoked when the opacity of the overlay is changed.
+ * @param onContrastChanged A callback to be invoked when the contrast of the overlay is changed.
+ * @param onSaturationChanged A callback to be invoked when the saturation of the overlay is changed.
+ * @param onPointsInitialized A callback to initialize the positions of the warp handles.
+ * @param onPointChanged A callback to be invoked when a warp handle is dragged.
+ * @param isWarpEnabled A flag to enable or disable the perspective warping feature.
+ */
 @Composable
 fun MockupScreen(
     uiState: UiState,
@@ -205,32 +223,6 @@ fun MockupScreen(
                     }
                 }
             }
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .background(Color.Black.copy(alpha = 0.6f))
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(onClick = { backgroundPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Text("Select Background")
-                }
-                Button(onClick = { overlayPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Text("Select Overlay")
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Opacity", color = Color.White)
-            Slider(value = uiState.opacity, onValueChange = onOpacityChanged)
-            Text("Contrast", color = Color.White)
-            Slider(value = uiState.contrast, onValueChange = onContrastChanged, valueRange = 0f..2f)
-            Text("Saturation", color = Color.White)
-            Slider(value = uiState.saturation, onValueChange = onSaturationChanged, valueRange = 0f..2f)
         }
     }
 }
