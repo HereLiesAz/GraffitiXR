@@ -18,6 +18,7 @@ import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
+import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 
 /**
  * The main screen of the application.
@@ -32,6 +33,14 @@ import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
+    var isWarpEnabled by remember { mutableStateOf(true) }
+    var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
+
+    LaunchedEffect(uiState.editorMode) {
+        if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
+            showOnboardingForMode = uiState.editorMode
+        }
+    }
 
     val overlayImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -56,14 +65,16 @@ fun MainScreen(viewModel: MainViewModel) {
                     onContrastChanged = viewModel::onContrastChanged,
                     onSaturationChanged = viewModel::onSaturationChanged,
                     onScaleChanged = viewModel::onScaleChanged,
+                    onRotationChanged = viewModel::onRotationChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
-                    onRotationZChanged = viewModel::onRotationZChanged
+                    onPointsInitialized = viewModel::onMockupPointsChanged,
+                    onPointChanged = viewModel::onPointChanged,
+                    isWarpEnabled = isWarpEnabled
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
-                    onRotationZChanged = viewModel::onRotationZChanged
                 )
                 EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
@@ -87,10 +98,21 @@ fun MainScreen(viewModel: MainViewModel) {
                 azRailItem(id = "background", text = "Background") {
                     backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
+
+                azRailItem(
+                    id = "toggle_warp",
+                    text = if (isWarpEnabled) "Warp" else "Transform"
+                ) {
+                    isWarpEnabled = !isWarpEnabled
+                }
             }
 
             if (uiState.overlayImageUri != null) {
                  azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
+            }
+
+            if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
+                azRailItem(id = "lock_ar", text = "Lock", onClick = viewModel::onArLockClicked)
             }
 
             azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
@@ -118,6 +140,16 @@ fun MainScreen(viewModel: MainViewModel) {
                 onValueChange = viewModel::onSaturationChanged,
                 onDismissRequest = { showSliderDialog = null },
                 valueRange = 0f..2f
+            )
+        }
+
+        showOnboardingForMode?.let { mode ->
+            OnboardingDialog(
+                editorMode = mode,
+                onDismissRequest = {
+                    viewModel.onOnboardingComplete(mode)
+                    showOnboardingForMode = null
+                }
             )
         }
     }
