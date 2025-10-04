@@ -14,7 +14,6 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
-import com.hereliesaz.graffitixr.ArState
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
@@ -128,7 +127,7 @@ class ArRenderer(
                     handleTapForPlacement(frame)
                     featurePatternGenerated = false
                     val cameraPose = frame.camera.pose
-                    val cameraForward = FloatArray(3).apply { cameraPose.getZAxis(this, 0) }
+                    val cameraForward = cameraPose.getZAxis()
                     cameraForward[0] = -cameraForward[0]
                     cameraForward[1] = -cameraForward[1]
                     cameraForward[2] = -cameraForward[2]
@@ -138,7 +137,7 @@ class ArRenderer(
                         if (p.trackingState != TrackingState.TRACKING || p.subsumedBy != null) {
                             false
                         } else {
-                            val planeNormal = FloatArray(3).apply { p.centerPose.getYAxis(this, 0) }
+                            val planeNormal = p.centerPose.getYAxis()
                             val dotProduct = cameraForward.zip(planeNormal, Float::times).sum()
                             dotProduct < -0.9f
                         }
@@ -206,7 +205,7 @@ class ArRenderer(
         val tap = tapQueue.poll() ?: return
 
         val cameraPose = frame.camera.pose
-        val cameraForward = FloatArray(3).apply { cameraPose.getZAxis(this, 0) }
+        val cameraForward = cameraPose.getZAxis()
         cameraForward[0] = -cameraForward[0]
         cameraForward[1] = -cameraForward[1]
         cameraForward[2] = -cameraForward[2]
@@ -214,7 +213,7 @@ class ArRenderer(
         for (hit in frame.hitTest(tap)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                val planeNormal = FloatArray(3).apply { trackable.centerPose.getYAxis(this, 0) }
+                val planeNormal = trackable.centerPose.getYAxis()
                 val dotProduct = cameraForward.zip(planeNormal, Float::times).sum()
                 if (dotProduct < -0.9f) {
                     onArImagePlaced(hit.createAnchor())
