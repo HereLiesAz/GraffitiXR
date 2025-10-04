@@ -141,5 +141,6 @@ fun MainScreen(viewModel: MainViewModel, arSession: Session?) {
                 valueRange = 0f..2f
             )
         }
+
     }
 }

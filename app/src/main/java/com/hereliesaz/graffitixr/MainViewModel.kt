@@ -4,6 +4,8 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
@@ -19,18 +21,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * The central ViewModel for the application, acting as the single source of truth for the UI state
- * and the handler for all user events.
- *
- * This class follows the MVVM architecture pattern. It holds the application's UI state in a
- * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
- * configuration changes but also system-initiated process death.
- *
- * @param application The application instance, provided by the ViewModel factory.
- * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory.
- * It is used to store and restore the [UiState].
- */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
@@ -42,10 +32,16 @@ class MainViewModel(
         return withContext(Dispatchers.IO) {
             try {
                 val context = getApplication<Application>().applicationContext
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                    decoder.isMutableRequired = true
-                }
+                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                        decoder.isMutableRequired = true
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }.copy(Bitmap.Config.ARGB_8888, true)
+
 
                 val resultBitmap = bitmap.removeBackground()
 

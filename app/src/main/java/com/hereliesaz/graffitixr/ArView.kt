@@ -3,19 +3,21 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import android.opengl.GLSurfaceView
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
-import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.ArRenderer
 
 @Composable
 fun ArView(
-    arSession: Session?,
     arImagePose: Pose?,
     arFeaturePattern: ArFeaturePattern?,
     overlayImageUri: Uri?,
@@ -26,13 +28,13 @@ fun ArView(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     val glSurfaceView = remember { GLSurfaceView(context) }
     val renderer = remember {
         ArRenderer(
             context = context,
             view = glSurfaceView,
-            session = arSession,
             onArImagePlaced = onArImagePlaced,
             onArFeaturesDetected = onArFeaturesDetected
         )
@@ -57,4 +59,20 @@ fun ArView(
             renderer.isArLocked = isArLocked
         }
     )
+
+    DisposableEffect(lifecycleOwner, renderer) {
+        val observer = object : DefaultLifecycleObserver {
+            override fun onResume(owner: LifecycleOwner) {
+                renderer.onResume()
+            }
+
+            override fun onPause(owner: LifecycleOwner) {
+                renderer.onPause()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 }
