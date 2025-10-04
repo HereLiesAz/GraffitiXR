@@ -34,6 +34,7 @@ fun ArView(
     onPlanesDetected: (Boolean) -> Unit,
     onArObjectScaleChanged: (Float) -> Unit,
     onArObjectRotationChanged: (Float) -> Unit,
+    onArtworkProgressChanged: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -46,7 +47,8 @@ fun ArView(
             view = glSurfaceView,
             onArImagePlaced = onArImagePlaced,
             onArFeaturesDetected = onArFeaturesDetected,
-            onPlanesDetected = onPlanesDetected
+            onPlanesDetected = onPlanesDetected,
+            onArtworkProgressChanged = onArtworkProgressChanged
         )
     }
 

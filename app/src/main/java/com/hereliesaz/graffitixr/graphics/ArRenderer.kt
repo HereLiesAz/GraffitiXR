@@ -8,6 +8,7 @@ import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import coil.imageLoader
@@ -25,7 +26,10 @@ import com.google.ar.core.exceptions.NotYetAvailableException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.opencv.core.DMatch
 import org.opencv.core.Mat
+import org.opencv.core.MatOfDMatch
+import org.opencv.features2d.DescriptorMatcher
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -49,7 +53,8 @@ class ArRenderer(
     private val view: View,
     private val onArImagePlaced: (Anchor) -> Unit,
     private val onArFeaturesDetected: (ArFeaturePattern) -> Unit,
-    private val onPlanesDetected: (Boolean) -> Unit
+    private val onPlanesDetected: (Boolean) -> Unit,
+    private val onArtworkProgressChanged: (Float) -> Unit
 ) : GLSurfaceView.Renderer {
 
     private var session: Session? = null
@@ -60,6 +65,8 @@ class ArRenderer(
     private val projectedImageRenderer = ProjectedImageRenderer()
     private val markerDetector = MarkerDetector()
     private val displayRotationHelper = DisplayRotationHelper(context)
+    private val descriptorMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+
 
     private val tapQueue = ConcurrentLinkedQueue<MotionEvent>()
 
@@ -74,6 +81,9 @@ class ArRenderer(
     private var overlayBitmap: Bitmap? = null
     private var lastLoadedUri: Uri? = null
     private var featurePatternGenerated = false
+    private var lastProgressCheckTime: Long = 0
+    private val progressCheckInterval: Long = 2000 // 2 seconds
+    private val regenerationThreshold = 0.8f // 80%
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
@@ -160,6 +170,7 @@ class ArRenderer(
                     if (!featurePatternGenerated) {
                         generateFeaturePattern(frame)
                     }
+                    checkArtworkProgress(frame)
                 }
             }
 
@@ -256,11 +267,55 @@ class ArRenderer(
             if (worldPoints.size >= 4) { // Need at least 4 points for homography
                 val patternDescriptors = Mat()
                 org.opencv.core.Core.vconcat(validDescriptorsList, patternDescriptors)
+                Log.d("ArRenderer", "New feature pattern generated.")
                 onArFeaturesDetected(ArFeaturePattern(patternDescriptors, worldPoints))
+                onArtworkProgressChanged(0f) // Reset progress after generating a new pattern
                 featurePatternGenerated = true
             }
         } catch (e: NotYetAvailableException) {
             // Camera image not yet available
+        }
+    }
+
+    private fun checkArtworkProgress(frame: Frame) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastProgressCheckTime < progressCheckInterval) {
+            return
+        }
+        lastProgressCheckTime = currentTime
+
+        arFeaturePattern?.let { pattern ->
+            if (pattern.descriptors.empty()) return
+
+            try {
+                val image = frame.acquireCameraImage()
+                val mat = ImageConverter.toMat(image)
+                val (_, currentDescriptors) = markerDetector.detectAndCompute(mat)
+                image.close()
+
+                val progress = if (currentDescriptors.empty()) {
+                    1.0f // No features detected, assume 100% covered
+                } else if (pattern.descriptors.rows() > 0) {
+                    val matches = MatOfDMatch()
+                    descriptorMatcher.knnMatch(pattern.descriptors, currentDescriptors, matches, 2)
+                    val goodMatches = matches.toList().mapNotNull {
+                        val m = it.toArray()
+                        if (m.size > 1 && m[0].distance < 0.75 * m[1].distance) m[0] else null
+                    }
+                    (1.0f - (goodMatches.size.toFloat() / pattern.descriptors.rows())).coerceIn(0f, 1f)
+                } else {
+                    0f // No original features to match against
+                }
+
+                onArtworkProgressChanged(progress)
+
+                if (progress >= regenerationThreshold) {
+                    Log.d("ArRenderer", "Regenerating feature pattern due to progress: $progress")
+                    generateFeaturePattern(frame)
+                }
+            } catch (e: NotYetAvailableException) {
+                // Camera image not yet available
+            }
         }
     }
 

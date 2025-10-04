@@ -113,6 +113,10 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(scale = uiState.value.scale * scale)
     }
 
+    fun onRotationChanged(rotation: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(rotation = uiState.value.rotation + rotation)
+    }
+
     fun onOffsetChanged(offset: Offset) {
         savedStateHandle["uiState"] = uiState.value.copy(offset = uiState.value.offset + offset)
     }
@@ -169,5 +173,9 @@ class MainViewModel(
     fun onArObjectRotationChanged(rotationDelta: Float) {
         val currentRotation = uiState.value.arObjectRotation
         savedStateHandle["uiState"] = uiState.value.copy(arObjectRotation = currentRotation + rotationDelta)
+    }
+
+    fun onArtworkProgressChanged(progress: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(artworkProgress = progress)
     }
 }
