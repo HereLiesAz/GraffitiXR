@@ -97,7 +97,7 @@ class ArRenderer(
                 val planes = it.getAllTrackables(Plane::class.java)
                 for (plane in planes) {
                     if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                        planeRenderer.draw(plane, camera.displayOrientedPose, projectionMatrix)
+                        planeRenderer.draw(plane, viewMatrix, projectionMatrix)
                     }
                 }
             }
