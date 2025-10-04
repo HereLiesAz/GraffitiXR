@@ -143,7 +143,7 @@ class MainViewModel(
         // Transient AR state is not saved
     }
 
-    fun onArCoreAvailabilityChecked(isSupported: Boolean) {
-        savedStateHandle["uiState"] = uiState.value.copy(isArSupported = isSupported)
+    fun onArCoreCheckFailed(message: String) {
+        savedStateHandle["uiState"] = uiState.value.copy(arErrorMessage = message)
     }
 }

@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.google.ar.core.Session
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
@@ -23,7 +25,7 @@ import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(viewModel: MainViewModel, arSession: Session?) {
     val uiState by viewModel.uiState.collectAsState()
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -35,6 +37,13 @@ fun MainScreen(viewModel: MainViewModel) {
     val backgroundImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+
+    LaunchedEffect(uiState.arErrorMessage) {
+        uiState.arErrorMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.onArCoreCheckFailed(null) // Clear the error message
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -60,8 +69,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     onOffsetChanged = viewModel::onOffsetChanged,
                 )
                 EditorMode.AR -> {
-                    if (uiState.isArSupported) {
-                        ArModeScreen(viewModel = viewModel)
+                    if (arSession != null) {
+                        ArModeScreen(viewModel = viewModel, arSession = arSession)
                     }
                 }
             }
@@ -77,10 +86,12 @@ fun MainScreen(viewModel: MainViewModel) {
                 id = "ar_overlay",
                 text = "AR Overlay",
                 onClick = {
-                    if (uiState.isArSupported) {
+                    if (arSession != null) {
                         viewModel.onEditorModeChanged(EditorMode.AR)
                     } else {
-                        Toast.makeText(context, "AR is not supported on this device", Toast.LENGTH_SHORT).show()
+                        // The MainActivity will show a toast if there's a specific error.
+                        // This is a fallback.
+                        Toast.makeText(context, "AR is not available on this device", Toast.LENGTH_SHORT).show()
                     }
                 }
             )
