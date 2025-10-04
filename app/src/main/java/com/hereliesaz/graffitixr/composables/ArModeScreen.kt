@@ -19,13 +19,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.MainViewModel
 import com.hereliesaz.graffitixr.UiState
 import com.hereliesaz.graffitixr.graphics.ArRenderer
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun ArModeScreen(viewModel: MainViewModel) {
+fun ArModeScreen(viewModel: MainViewModel, arSession: Session?) {
     val uiState by viewModel.uiState.collectAsState()
 
     val permissions = mutableListOf(Manifest.permission.CAMERA)
@@ -43,7 +44,11 @@ fun ArModeScreen(viewModel: MainViewModel) {
     }
 
     if (permissionStates.allPermissionsGranted) {
-        ArContent(viewModel = viewModel, uiState = uiState)
+        ArContent(
+            viewModel = viewModel,
+            uiState = uiState,
+            arSession = arSession
+        )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             val revokedPermissions = permissionStates.revokedPermissions.joinToString { it.permission }
@@ -56,16 +61,18 @@ fun ArModeScreen(viewModel: MainViewModel) {
 private fun ArContent(
     modifier: Modifier = Modifier,
     viewModel: MainViewModel,
-    uiState: UiState
+    uiState: UiState,
+    arSession: Session?
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val (renderer, glSurfaceView) = remember {
+    val (renderer, glSurfaceView) = remember(arSession) {
         val view = GLSurfaceView(context)
         val renderer = ArRenderer(
             context = context,
             view = view,
+            session = arSession,
             onArImagePlaced = viewModel::onArImagePlaced,
             onArFeaturesDetected = viewModel::onArFeaturesDetected
         )
@@ -95,16 +102,8 @@ private fun ArContent(
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             when (event) {
-                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
-                    glSurfaceView.onResume()
-                    renderer.onResume()
-                }
-
-                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
-                    renderer.onPause()
-                    glSurfaceView.onPause()
-                }
-
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> glSurfaceView.onResume()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> glSurfaceView.onPause()
                 else -> {}
             }
         }

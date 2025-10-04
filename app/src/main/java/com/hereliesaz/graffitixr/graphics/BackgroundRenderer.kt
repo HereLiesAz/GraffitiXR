@@ -13,9 +13,8 @@ import java.nio.FloatBuffer
  * given to ARCore to be filled with the camera image.
  */
 class BackgroundRenderer {
-    private var quadCoords: FloatBuffer? = null
-    private var quadTexCoords: FloatBuffer? = null
-    private var quadTexCoordsCanonical: FloatBuffer? = null
+    private lateinit var quadCoords: FloatBuffer
+    private lateinit var quadTexCoords: FloatBuffer
 
     private var quadProgram = 0
     private var quadPositionAttrib = 0
@@ -35,22 +34,18 @@ class BackgroundRenderer {
         GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST)
 
         val numVertices = 4
-        val bbCoords = ByteBuffer.allocateDirect(QUAD_COORDS.size * BYTES_PER_FLOAT)
-        bbCoords.order(ByteOrder.nativeOrder())
-        quadCoords = bbCoords.asFloatBuffer()
-        quadCoords!!.put(QUAD_COORDS)
-        quadCoords!!.position(0)
+        if (!::quadCoords.isInitialized) {
+            val bbCoords = ByteBuffer.allocateDirect(QUAD_COORDS.size * BYTES_PER_FLOAT)
+            bbCoords.order(ByteOrder.nativeOrder())
+            quadCoords = bbCoords.asFloatBuffer()
+            quadCoords.put(QUAD_COORDS)
+            quadCoords.position(0)
 
-        val bbTexCoords = ByteBuffer.allocateDirect(numVertices * TEXCOORDS_PER_VERTEX * BYTES_PER_FLOAT)
-        bbTexCoords.order(ByteOrder.nativeOrder())
-        quadTexCoords = bbTexCoords.asFloatBuffer()
-
-        val bbTexCoordsCanonical =
-            ByteBuffer.allocateDirect(QUAD_TEX_COORDS.size * BYTES_PER_FLOAT)
-        bbTexCoordsCanonical.order(ByteOrder.nativeOrder())
-        quadTexCoordsCanonical = bbTexCoordsCanonical.asFloatBuffer()
-        quadTexCoordsCanonical!!.put(QUAD_TEX_COORDS)
-        quadTexCoordsCanonical!!.position(0)
+            val bbTexCoords =
+                ByteBuffer.allocateDirect(numVertices * TEXCOORDS_PER_VERTEX * BYTES_PER_FLOAT)
+            bbTexCoords.order(ByteOrder.nativeOrder())
+            quadTexCoords = bbTexCoords.asFloatBuffer()
+        }
 
         val vertexShader = ShaderUtil.loadGLShader(TAG, VERTEX_SHADER, GLES20.GL_VERTEX_SHADER)
         val fragmentShader = ShaderUtil.loadGLShader(TAG, FRAGMENT_SHADER, GLES20.GL_FRAGMENT_SHADER)
@@ -59,15 +54,6 @@ class BackgroundRenderer {
         GLES20.glAttachShader(quadProgram, vertexShader)
         GLES20.glAttachShader(quadProgram, fragmentShader)
         GLES20.glLinkProgram(quadProgram)
-
-        val linkStatus = IntArray(1)
-        GLES20.glGetProgramiv(quadProgram, GLES20.GL_LINK_STATUS, linkStatus, 0)
-        if (linkStatus[0] == 0) {
-            val log = GLES20.glGetProgramInfoLog(quadProgram)
-            GLES20.glDeleteProgram(quadProgram)
-            throw RuntimeException("Error linking program: $log")
-        }
-
         GLES20.glUseProgram(quadProgram)
 
         quadPositionAttrib = GLES20.glGetAttribLocation(quadProgram, "a_Position")
@@ -75,43 +61,81 @@ class BackgroundRenderer {
         GLES20.glUniform1i(GLES20.glGetUniformLocation(quadProgram, "sTexture"), 0)
     }
 
+    /**
+     * Draws the AR background image. The image will be drawn such that virtual content rendered
+     * with the matrices provided by [Frame.getCamera] will be drawn correctly relative to the
+     * background.
+     */
     fun draw(frame: Frame) {
-        if (frame.timestamp != 0L) {
-            // Suppress rendering if the camera did not produce the first frame yet.
-            // This is to avoid drawing possible leftover data from previous sessions if the texture is reused.
+        // If display rotation changed (also includes view size change), we need to re-query the texture
+        // coordinates for the screen background, as they are tailored to the screen aspect ratio.
+        if (frame.hasDisplayGeometryChanged()) {
             frame.transformCoordinates2d(
-                Coordinates2d.TEXTURE_NORMALIZED,
-                quadTexCoordsCanonical!!,
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
-                quadTexCoords!!
+                quadCoords,
+                Coordinates2d.TEXTURE_NORMALIZED,
+                quadTexCoords
             )
         }
 
+        if (frame.timestamp == 0L) {
+            // Suppress rendering if the camera did not produce the first frame yet. This is to avoid
+            // drawing possible leftover data from previous sessions if the texture is reused.
+            return
+        }
+
         GLES20.glDepthMask(false)
+
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
+
         GLES20.glUseProgram(quadProgram)
-        GLES20.glVertexAttribPointer(quadPositionAttrib, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, quadCoords)
-        GLES20.glVertexAttribPointer(quadTexCoordAttrib, TEXCOORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, quadTexCoords)
+
+        // Set the vertex positions.
+        GLES20.glVertexAttribPointer(
+            quadPositionAttrib,
+            COORDS_PER_VERTEX,
+            GLES20.GL_FLOAT,
+            false,
+            0,
+            quadCoords
+        )
+
+        // Set the texture coordinates.
+        GLES20.glVertexAttribPointer(
+            quadTexCoordAttrib,
+            TEXCOORDS_PER_VERTEX,
+            GLES20.GL_FLOAT,
+            false,
+            0,
+            quadTexCoords
+        )
+
         GLES20.glEnableVertexAttribArray(quadPositionAttrib)
         GLES20.glEnableVertexAttribArray(quadTexCoordAttrib)
+
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+
         GLES20.glDisableVertexAttribArray(quadPositionAttrib)
         GLES20.glDisableVertexAttribArray(quadTexCoordAttrib)
+
         GLES20.glDepthMask(true)
     }
 
     companion object {
         private val TAG = BackgroundRenderer::class.java.simpleName
+
         private const val COORDS_PER_VERTEX = 2
         private const val TEXCOORDS_PER_VERTEX = 2
         private const val BYTES_PER_FLOAT = 4
-        private val QUAD_COORDS = floatArrayOf(-1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 1.0f)
-        private val QUAD_TEX_COORDS = floatArrayOf(
-            0.0f, 1.0f,
-            0.0f, 0.0f,
-            1.0f, 1.0f,
-            1.0f, 0.0f
+
+        // The quad vertex positions, in screen space.
+        private val QUAD_COORDS = floatArrayOf(
+            -1.0f, -1.0f,
+            -1.0f, +1.0f,
+            +1.0f, -1.0f,
+            +1.0f, +1.0f
         )
+
         private const val VERTEX_SHADER = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;
@@ -121,6 +145,7 @@ class BackgroundRenderer {
                v_TexCoord = a_TexCoord;
             }
         """
+
         private const val FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
             precision mediump float;

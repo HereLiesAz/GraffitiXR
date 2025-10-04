@@ -1,23 +1,35 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Application
+import android.os.Bundle
+import androidx.lifecycle.AbstractSavedStateViewModelFactory
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
+import androidx.savedstate.SavedStateRegistryOwner
 
 /**
- * Factory for creating a [MainViewModel].
+ * Factory for creating a [MainViewModel] with a [SavedStateHandle].
  *
- * This class is responsible for instantiating the [MainViewModel]. While the current
- * ViewModel doesn't have complex dependencies, using a factory is a best practice
- * for ViewModel creation in Android, as it allows for dependencies to be passed
- * in a structured way.
+ * This factory extends [AbstractSavedStateViewModelFactory] to allow the ViewModel
+ * to save and restore its state across process death. It's responsible for
+ * instantiating the [MainViewModel] and passing it the application context and the
+ * [SavedStateHandle] for state persistence.
  */
-class MainViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
+class MainViewModelFactory(
+    private val application: Application,
+    owner: SavedStateRegistryOwner,
+    defaultArgs: Bundle? = null
+) : AbstractSavedStateViewModelFactory(owner, defaultArgs) {
+
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(
+        key: String,
+        modelClass: Class<T>,
+        handle: SavedStateHandle
+    ): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            return MainViewModel(application) as T
+            return MainViewModel(application, handle) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }
