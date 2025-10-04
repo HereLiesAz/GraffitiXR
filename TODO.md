@@ -39,16 +39,17 @@ This document tracks the development status, future enhancements, and identified
 -   **[ ] Enhance User Experience (UX):**
     -   [ ] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the three different modes (AR, Mock-up, On-the-Go) to new users.
     -   [ ] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
+    **[ ] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
 
 ### **Medium Priority**
 
 -   **[ ] Add "Save/Export" Feature:**
     -   [ ] Allow users to save or export the final composed image from any of the modes.
+    -   [ ] Allow users to save the marks or griding "fingerprint" and overlay location, size, and orientation.
+    -   [ ] Saving the project includes the fingerprint history.
 -   **[ ] Implement Advanced Image Editing:**
     -   [ ] Add more advanced image adjustment tools like color balance or blending modes.
 
 ### **Low Priority / Future Ideas**
 -   **[ ] Create a Project Library:**
     -   [ ] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
--   **[ ] Add Video Overlay Support:**
-    -   [ ] Allow users to select video files as overlay textures.
