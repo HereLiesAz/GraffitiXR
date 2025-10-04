@@ -141,10 +141,33 @@ class MainViewModel(
     }
 
     fun onArImagePlaced(anchor: Anchor) {
-        savedStateHandle["uiState"] = uiState.value.copy(arImagePose = anchor.pose)
+        savedStateHandle["uiState"] = uiState.value.copy(
+            arImagePose = anchor.pose,
+            arState = ArState.PLACED
+        )
+    }
+
+    fun onArLockClicked() {
+        if (uiState.value.arState == ArState.PLACED) {
+            savedStateHandle["uiState"] = uiState.value.copy(arState = ArState.LOCKED)
+        }
     }
 
     fun onArFeaturesDetected(arFeaturePattern: ArFeaturePattern) {
         savedStateHandle["uiState"] = uiState.value.copy(arFeaturePattern = arFeaturePattern)
+    }
+
+    fun onPlanesDetected(arePlanesDetected: Boolean) {
+        savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
+    }
+
+    fun onArObjectScaleChanged(scaleFactor: Float) {
+        val currentScale = uiState.value.arObjectScale
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
+    }
+
+    fun onArObjectRotationChanged(rotationDelta: Float) {
+        val currentRotation = uiState.value.arObjectRotation
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectRotation = currentRotation + rotationDelta)
     }
 }
