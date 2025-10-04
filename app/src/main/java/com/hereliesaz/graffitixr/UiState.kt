@@ -73,8 +73,11 @@ data class UiState(
     val offset: @WriteWith<OffsetParceler> Offset = Offset.Zero,
     val points: List<@WriteWith<OffsetParceler> Offset> = emptyList(),
     val arImagePose: @WriteWith<PoseParceler> Pose? = null,
+    val arObjectScale: Float = 1f,
+    val arObjectRotation: Float = 0f,
     val arFeaturePattern: @WriteWith<ArFeaturePatternParceler> ArFeaturePattern? = null,
-    val isArLocked: Boolean = false,
+    val arState: ArState = ArState.SEARCHING,
     val isLoading: Boolean = false,
-    val completedOnboardingModes: Set<EditorMode> = emptySet()
+    val completedOnboardingModes: Set<EditorMode> = emptySet(),
+    val arePlanesDetected: Boolean = false
 ) : Parcelable

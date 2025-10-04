@@ -92,6 +92,10 @@ fun MainScreen(viewModel: MainViewModel) {
                  azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
             }
 
+            if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
+                azRailItem(id = "lock_ar", text = "Lock", onClick = viewModel::onArLockClicked)
+            }
+
             azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
             azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
             azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
