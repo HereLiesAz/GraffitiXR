@@ -127,20 +127,25 @@ class ArRenderer(
                     handleTapForPlacement(frame)
                     featurePatternGenerated = false
                     val cameraPose = frame.camera.pose
-                    val cameraForward = FloatArray(3).apply { cameraPose.getZAxis(this, 0) }
-                    cameraForward[0] = -cameraForward[0]
-                    cameraForward[1] = -cameraForward[1]
-                    cameraForward[2] = -cameraForward[2]
-
                     val allPlanes = it.getAllTrackables(Plane::class.java)
-                    val filteredPlanes = allPlanes.filter { p ->
-                        if (p.trackingState != TrackingState.TRACKING || p.subsumedBy != null) {
+                    val filteredPlanes = allPlanes.filter { plane ->
+                        if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
                             false
                         } else {
-                            val planeNormal = FloatArray(3).apply { p.centerPose.getYAxis(this, 0) }
-                            // v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
-                            val dotProduct = cameraForward[0] * planeNormal[0] + cameraForward[1] * planeNormal[1] + cameraForward[2] * planeNormal[2]
-                            dotProduct < -0.95f
+                            val planeNormal = FloatArray(3)
+                            plane.centerPose.getYAxis(planeNormal, 0)
+
+                            val cameraToPlane = floatArrayOf(
+                                plane.centerPose.tx() - cameraPose.tx(),
+                                plane.centerPose.ty() - cameraPose.ty(),
+                                plane.centerPose.tz() - cameraPose.tz()
+                            )
+
+                            // Dot product to check if plane is facing camera
+                            val dotProduct = planeNormal[0] * cameraToPlane[0] + planeNormal[1] * cameraToPlane[1] + planeNormal[2] * cameraToPlane[2]
+
+                            // Negative dot product means the plane is facing towards the camera.
+                            dotProduct < 0
                         }
                     }
 
@@ -204,19 +209,23 @@ class ArRenderer(
 
     private fun handleTapForPlacement(frame: Frame) {
         val tap = tapQueue.poll() ?: return
-
         val cameraPose = frame.camera.pose
-        val cameraForward = FloatArray(3).apply { cameraPose.getZAxis(this, 0) }
-        cameraForward[0] = -cameraForward[0]
-        cameraForward[1] = -cameraForward[1]
-        cameraForward[2] = -cameraForward[2]
 
         for (hit in frame.hitTest(tap)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                val planeNormal = FloatArray(3).apply { trackable.centerPose.getYAxis(this, 0) }
-                val dotProduct = cameraForward[0] * planeNormal[0] + cameraForward[1] * planeNormal[1] + cameraForward[2] * planeNormal[2]
-                if (dotProduct < -0.95f) {
+                val planeNormal = FloatArray(3)
+                trackable.centerPose.getYAxis(planeNormal, 0)
+
+                val cameraToPlane = floatArrayOf(
+                    trackable.centerPose.tx() - cameraPose.tx(),
+                    trackable.centerPose.ty() - cameraPose.ty(),
+                    trackable.centerPose.tz() - cameraPose.tz()
+                )
+
+                val dotProduct = planeNormal[0] * cameraToPlane[0] + planeNormal[1] * cameraToPlane[1] + planeNormal[2] * cameraToPlane[2]
+
+                if (dotProduct < 0) {
                     onArImagePlaced(hit.createAnchor())
                     break
                 }
