@@ -38,8 +38,7 @@ fun MainScreen(viewModel: MainViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 80.dp),
+                .fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
