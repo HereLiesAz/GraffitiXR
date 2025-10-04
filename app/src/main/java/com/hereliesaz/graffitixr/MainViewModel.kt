@@ -24,10 +24,12 @@ import java.io.FileOutputStream
  * and the handler for all user events.
  *
  * This class follows the MVVM architecture pattern. It holds the application's UI state in a
- * [StateFlow] that is persisted via a [SavedStateHandle] to survive process death.
+ * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
+ * configuration changes but also system-initiated process death.
  *
  * @param application The application instance, provided by the ViewModel factory.
- * @param savedStateHandle A handle to the saved state of the ViewModel, used for persistence.
+ * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory.
+ * It is used to store and restore the [UiState].
  */
 class MainViewModel(
     application: Application,
@@ -68,10 +70,7 @@ class MainViewModel(
             val uri = uiState.value.overlayImageUri
             if (uri != null) {
                 val resultUri = removeBackground(uri)
-                savedStateHandle["uiState"] = uiState.value.copy(
-                    backgroundRemovedImageUri = resultUri,
-                    isLoading = false
-                )
+                savedStateHandle["uiState"] = uiState.value.copy(backgroundRemovedImageUri = resultUri, isLoading = false)
             } else {
                 setLoading(false)
             }
@@ -87,11 +86,7 @@ class MainViewModel(
     }
 
     fun onOverlayImageSelected(uri: Uri) {
-        savedStateHandle["uiState"] = uiState.value.copy(
-            overlayImageUri = uri,
-            points = emptyList(),
-            backgroundRemovedImageUri = null
-        )
+        savedStateHandle["uiState"] = uiState.value.copy(overlayImageUri = uri, points = emptyList(), backgroundRemovedImageUri = null)
     }
 
     fun onOpacityChanged(opacity: Float) {
@@ -119,11 +114,12 @@ class MainViewModel(
     }
 
     fun onPointChanged(index: Int, newPosition: Offset) {
-        val updatedPoints = uiState.value.points.toMutableList()
-        if (index in updatedPoints.indices) {
+        val currentState = uiState.value
+        val updatedPoints = currentState.points.toMutableList()
+        if (index in 0..3) {
             updatedPoints[index] = newPosition
         }
-        savedStateHandle["uiState"] = uiState.value.copy(points = updatedPoints)
+        savedStateHandle["uiState"] = currentState.copy(points = updatedPoints)
     }
 
     fun onEditorModeChanged(mode: EditorMode) {
@@ -131,19 +127,16 @@ class MainViewModel(
     }
 
     fun onOnboardingComplete(mode: EditorMode) {
-        val updatedModes = uiState.value.completedOnboardingModes + mode
-        savedStateHandle["uiState"] = uiState.value.copy(completedOnboardingModes = updatedModes)
+        val currentState = uiState.value
+        val updatedModes = currentState.completedOnboardingModes + mode
+        savedStateHandle["uiState"] = currentState.copy(completedOnboardingModes = updatedModes)
     }
 
     fun onArImagePlaced(anchor: Anchor) {
-        // Transient AR state is not saved
+        savedStateHandle["uiState"] = uiState.value.copy(arImagePose = anchor.pose)
     }
 
     fun onArFeaturesDetected(arFeaturePattern: ArFeaturePattern) {
-        // Transient AR state is not saved
-    }
-
-    fun onArCoreCheckFailed(message: String?) {
-        savedStateHandle["uiState"] = uiState.value.copy(arErrorMessage = message)
+        savedStateHandle["uiState"] = uiState.value.copy(arFeaturePattern = arFeaturePattern)
     }
 }

@@ -10,10 +10,10 @@ import androidx.savedstate.SavedStateRegistryOwner
 /**
  * Factory for creating a [MainViewModel] with a [SavedStateHandle].
  *
- * This factory extends [AbstractSavedStateViewModelFactory] to allow the ViewModel
- * to save and restore its state across process death. It's responsible for
- * instantiating the [MainViewModel] and passing it the application context and the
- * [SavedStateHandle] for state persistence.
+ * This class is responsible for instantiating the [MainViewModel] and passing it the
+ * necessary dependencies, including the [Application] context and the [SavedStateHandle]
+ * for state persistence. It extends [AbstractSavedStateViewModelFactory] to automatically
+ * handle the creation and provision of the [SavedStateHandle].
  */
 class MainViewModelFactory(
     private val application: Application,
@@ -30,6 +30,6 @@ class MainViewModelFactory(
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             return MainViewModel(application, handle) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
