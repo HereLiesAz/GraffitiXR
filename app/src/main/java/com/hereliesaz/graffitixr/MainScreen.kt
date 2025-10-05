@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,9 +66,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     onContrastChanged = viewModel::onContrastChanged,
                     onSaturationChanged = viewModel::onSaturationChanged,
                     onScaleChanged = viewModel::onScaleChanged,
-                    onRotationChanged = viewModel::onRotationChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
-                    onPointsInitialized = viewModel::onMockupPointsChanged,
+                    onRotationZChanged = viewModel::onRotationZChanged,
+                    onPointsInitialized = viewModel::onPointsInitialized,
                     onPointChanged = viewModel::onPointChanged,
                     isWarpEnabled = isWarpEnabled
                 )
@@ -75,6 +76,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     uiState = uiState,
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
+                    onRotationZChanged = viewModel::onRotationZChanged
                 )
                 EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }

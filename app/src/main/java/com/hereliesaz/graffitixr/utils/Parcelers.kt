@@ -5,8 +5,28 @@ import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import kotlinx.parcelize.Parceler
-import org.opencv.core.CvType
 import org.opencv.core.Mat
+
+/**
+ * A custom [Parceler] for a list of [Offset] objects.
+ *
+ * This is necessary because lists of non-parcelable types are not inherently parcelable.
+ * This parceler enables the `points` list in `UiState` to be saved and restored.
+ */
+object OffsetListParceler : Parceler<List<Offset>> {
+    override fun create(parcel: Parcel): List<Offset> {
+        val size = parcel.readInt()
+        return List(size) { Offset(parcel.readFloat(), parcel.readFloat()) }
+    }
+
+    override fun List<Offset>.write(parcel: Parcel, flags: Int) {
+        parcel.writeInt(size)
+        forEach { offset ->
+            parcel.writeFloat(offset.x)
+            parcel.writeFloat(offset.y)
+        }
+    }
+}
 
 /**
  * A custom [Parceler] for the [Offset] class.
