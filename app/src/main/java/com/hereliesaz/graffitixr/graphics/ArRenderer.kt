@@ -8,14 +8,12 @@ import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
-import com.hereliesaz.graffitixr.ArState
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
@@ -23,38 +21,21 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
+import com.hereliesaz.graffitixr.ArState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.opencv.core.DMatch
 import org.opencv.core.Mat
-import org.opencv.core.MatOfDMatch
-import org.opencv.features2d.DescriptorMatcher
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/**
- * A GLES renderer for the AR experience.
- *
- * This class is responsible for managing the ARCore session, handling user input, and rendering the
- * AR scene. This includes drawing the camera background, detected planes, and the virtual content
- * (the user's overlay image). It now manages its own ARCore [Session] lifecycle, including robust
- * installation and availability checks.
- *
- * @param context The application context.
- * @param view The [View] that this renderer is attached to.
- * @param onArImagePlaced A callback invoked when the user places the AR image.
- * @param onArFeaturesDetected A callback invoked when a new set of AR features has been detected
- * and computed.
- */
 class ArRenderer(
     private val context: Context,
     private val view: View,
     private val onArImagePlaced: (Anchor) -> Unit,
     private val onArFeaturesDetected: (ArFeaturePattern) -> Unit,
-    private val onPlanesDetected: (Boolean) -> Unit,
-    private val onArtworkProgressChanged: (Float) -> Unit
+    private val onPlanesDetected: (Boolean) -> Unit
 ) : GLSurfaceView.Renderer {
 
     private var session: Session? = null
@@ -65,7 +46,6 @@ class ArRenderer(
     private val projectedImageRenderer = ProjectedImageRenderer()
     private val markerDetector = MarkerDetector()
     private val displayRotationHelper = DisplayRotationHelper(context)
-    private val descriptorMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
 
 
     private val tapQueue = ConcurrentLinkedQueue<MotionEvent>()
@@ -81,9 +61,6 @@ class ArRenderer(
     private var overlayBitmap: Bitmap? = null
     private var lastLoadedUri: Uri? = null
     private var featurePatternGenerated = false
-    private var lastProgressCheckTime: Long = 0
-    private val progressCheckInterval: Long = 2000 // 2 seconds
-    private val regenerationThreshold = 0.8f // 80%
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
@@ -108,8 +85,6 @@ class ArRenderer(
             val frame = try {
                 it.update()
             } catch (e: com.google.ar.core.exceptions.SessionPausedException) {
-                // The session is paused, probably due to a lifecycle event.
-                // This is expected and we can just return since we have nothing to render.
                 return
             }
             backgroundRenderer.draw(frame)
@@ -122,7 +97,6 @@ class ArRenderer(
             val viewMatrix = FloatArray(16)
             camera.getViewMatrix(viewMatrix, 0)
 
-            // Draw point cloud
             try {
                 frame.acquirePointCloud().use { pointCloud ->
                     pointCloudRenderer.update(pointCloud)
@@ -142,19 +116,13 @@ class ArRenderer(
                         if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
                             false
                         } else {
-                            val planeNormal = FloatArray(3)
-                            plane.centerPose.getYAxis(planeNormal, 0)
-
+                            val planeNormal = plane.centerPose.yAxis
                             val cameraToPlane = floatArrayOf(
                                 plane.centerPose.tx() - cameraPose.tx(),
                                 plane.centerPose.ty() - cameraPose.ty(),
                                 plane.centerPose.tz() - cameraPose.tz()
                             )
-
-                            // Dot product to check if plane is facing camera
-                            val dotProduct = planeNormal[0] * cameraToPlane[0] + planeNormal[1] * cameraToPlane[1] + planeNormal[2] * cameraToPlane[2]
-
-                            // Negative dot product means the plane is facing towards the camera.
+                            val dotProduct = planeNormal.zip(cameraToPlane).sumOf { (a, b) -> (a * b).toDouble() }.toFloat()
                             dotProduct < 0
                         }
                     }
@@ -170,7 +138,6 @@ class ArRenderer(
                     if (!featurePatternGenerated) {
                         generateFeaturePattern(frame)
                     }
-                    checkArtworkProgress(frame)
                 }
             }
 
@@ -189,22 +156,12 @@ class ArRenderer(
                     }
                 } else { // SEARCHING or PLACED
                     arImagePose?.let { poseMatrix ->
-                        // Create a copy of the pose matrix to apply transformations
                         val modelMatrix = poseMatrix.clone()
-
-                        // We rotate around the Y-axis of the anchor's pose, which corresponds to the plane's normal.
                         val upX = poseMatrix[4]
                         val upY = poseMatrix[5]
                         val upZ = poseMatrix[6]
-
-                        // Apply the current rotation. The rotation is in radians from the gesture detector.
-                        // We convert it to degrees for OpenGL.
                         Matrix.rotateM(modelMatrix, 0, Math.toDegrees(arObjectRotation.toDouble()).toFloat(), upX, upY, upZ)
-
-                        // Apply the current scale.
                         Matrix.scaleM(modelMatrix, 0, arObjectScale, arObjectScale, arObjectScale)
-
-                        // Draw the quad with the final transformed matrix.
                         simpleQuadRenderer.draw(modelMatrix, viewMatrix, projectionMatrix, bmp, opacity)
                     }
                 }
@@ -225,16 +182,13 @@ class ArRenderer(
         for (hit in frame.hitTest(tap)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                val planeNormal = FloatArray(3)
-                trackable.centerPose.getYAxis(planeNormal, 0)
-
+                val planeNormal = trackable.centerPose.yAxis
                 val cameraToPlane = floatArrayOf(
                     trackable.centerPose.tx() - cameraPose.tx(),
                     trackable.centerPose.ty() - cameraPose.ty(),
                     trackable.centerPose.tz() - cameraPose.tz()
                 )
-
-                val dotProduct = planeNormal[0] * cameraToPlane[0] + planeNormal[1] * cameraToPlane[1] + planeNormal[2] * cameraToPlane[2]
+                val dotProduct = planeNormal.zip(cameraToPlane).sumOf { (a, b) -> (a * b).toDouble() }.toFloat()
 
                 if (dotProduct < 0) {
                     onArImagePlaced(hit.createAnchor())
@@ -264,12 +218,11 @@ class ArRenderer(
                 }
             }
 
-            if (worldPoints.size >= 4) { // Need at least 4 points for homography
+            if (worldPoints.size >= 4) {
                 val patternDescriptors = Mat()
                 org.opencv.core.Core.vconcat(validDescriptorsList, patternDescriptors)
                 Log.d("ArRenderer", "New feature pattern generated.")
                 onArFeaturesDetected(ArFeaturePattern(patternDescriptors, worldPoints))
-                onArtworkProgressChanged(0f) // Reset progress after generating a new pattern
                 featurePatternGenerated = true
             }
         } catch (e: NotYetAvailableException) {
@@ -277,107 +230,58 @@ class ArRenderer(
         }
     }
 
-    private fun checkArtworkProgress(frame: Frame) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastProgressCheckTime < progressCheckInterval) {
+    private fun loadOverlayBitmap() {
+        val uri = overlayImageUri
+        if (uri == null) {
+            overlayBitmap = null
+            lastLoadedUri = null
             return
         }
-        lastProgressCheckTime = currentTime
 
-        arFeaturePattern?.let { pattern ->
-            if (pattern.descriptors.empty()) return
-
-            try {
-                val image = frame.acquireCameraImage()
-                val mat = ImageConverter.toMat(image)
-                val (_, currentDescriptors) = markerDetector.detectAndCompute(mat)
-                image.close()
-
-                val progress = if (currentDescriptors.empty()) {
-                    1.0f // No features detected, assume 100% covered
-                } else if (pattern.descriptors.rows() > 0) {
-                    val matches = MatOfDMatch()
-                    descriptorMatcher.knnMatch(pattern.descriptors, currentDescriptors, matches, 2)
-                    val goodMatches = matches.toList().mapNotNull {
-                        val m = it.toArray()
-                        if (m.size > 1 && m[0].distance < 0.75 * m[1].distance) m[0] else null
-                    }
-                    (1.0f - (goodMatches.size.toFloat() / pattern.descriptors.rows())).coerceIn(0f, 1f)
-                } else {
-                    0f // No original features to match against
-                }
-
-                onArtworkProgressChanged(progress)
-
-                if (progress >= regenerationThreshold) {
-                    Log.d("ArRenderer", "Regenerating feature pattern due to progress: $progress")
-                    generateFeaturePattern(frame)
-                }
-            } catch (e: NotYetAvailableException) {
-                // Camera image not yet available
+        lastLoadedUri = uri
+        CoroutineScope(Dispatchers.IO).launch {
+            val request = ImageRequest.Builder(context)
+                .data(uri)
+                .allowHardware(false)
+                .build()
+            val result = (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+            if (result != null) {
+                overlayBitmap = result
             }
         }
     }
 
-    private fun loadOverlayBitmap() {
-        lastLoadedUri = overlayImageUri
-        overlayImageUri?.let { uri ->
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val request = ImageRequest.Builder(context).data(uri).build()
-                    val result = context.imageLoader.execute(request).drawable
-                    overlayBitmap = (result as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                } catch (e: Exception) {
-                    Log.e("ArRenderer", "Failed to load overlay image", e)
-                    overlayBitmap = null
-                }
-            }
-        }
-    }
-
-    fun onResume() {
+    fun resume() {
         if (session == null) {
             try {
-                val availability = ArCoreApk.getInstance().checkAvailability(context)
-                when (availability) {
-                    ArCoreApk.Availability.SUPPORTED_INSTALLED -> {
+                when (ArCoreApk.getInstance().requestInstall(context as Activity, true)) {
+                    ArCoreApk.InstallStatus.INSTALLED -> {
                         session = Session(context)
                         val config = Config(session)
                         config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                        session!!.configure(config)
-                    }
-                    ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD,
-                    ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> {
-                        try {
-                            ArCoreApk.getInstance().requestInstall(context as Activity, true)
-                        } catch (e: Exception) {
-                            Log.e("ArRenderer", "Failed to request ARCore installation/update.", e)
-                        }
-                        return
+                        session?.configure(config)
                     }
                     else -> {
-                        Log.e("ArRenderer", "ARCore is not supported on this device. Availability: $availability")
+                        Log.e("ArRenderer", "ARCore installation required.")
                         return
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ArRenderer", "Failed to create or configure AR session", e)
-                session = null
+                Log.e("ArRenderer", "Failed to create AR session", e)
                 return
             }
         }
 
         try {
             session?.resume()
-            displayRotationHelper.onResume()
         } catch (e: CameraNotAvailableException) {
-            Log.e("ArRenderer", "Camera not available on resume", e)
+            Log.e("ArRenderer", "Camera not available. Please restart the app.", e)
             session = null
         }
+        displayRotationHelper.onResume()
     }
 
-    fun onPause() {
+    fun pause() {
         displayRotationHelper.onPause()
         session?.pause()
     }

@@ -115,18 +115,6 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(scale = currentScale * scaleFactor)
     }
 
-    fun onRotationChanged(rotation: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(rotation = uiState.value.rotation + rotation)
-    }
-
-    fun onRotationChanged(rotation: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(rotation = uiState.value.rotation + rotation)
-    }
-
-    fun onRotationChanged(rotation: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(rotation = uiState.value.rotation + rotation)
-    }
-
     fun onOffsetChanged(offset: Offset) {
         savedStateHandle["uiState"] = uiState.value.copy(offset = uiState.value.offset + offset)
     }
@@ -134,6 +122,16 @@ class MainViewModel(
     fun onRotationZChanged(rotationDelta: Float) {
         val currentRotation = uiState.value.rotationZ
         savedStateHandle["uiState"] = uiState.value.copy(rotationZ = currentRotation + rotationDelta)
+    }
+
+    fun onPointsInitialized(points: List<Offset>) {
+        savedStateHandle["uiState"] = uiState.value.copy(points = points)
+    }
+
+    fun onPointChanged(index: Int, offset: Offset) {
+        val newPoints = uiState.value.points.toMutableList()
+        newPoints[index] = offset
+        savedStateHandle["uiState"] = uiState.value.copy(points = newPoints)
     }
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
@@ -181,19 +179,5 @@ class MainViewModel(
 
     fun onPlanesDetected(arePlanesDetected: Boolean) {
         savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
-    }
-
-    fun onArObjectScaleChanged(scaleFactor: Float) {
-        val currentScale = uiState.value.arObjectScale
-        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
-    }
-
-    fun onArObjectRotationChanged(rotationDelta: Float) {
-        val currentRotation = uiState.value.arObjectRotation
-        savedStateHandle["uiState"] = uiState.value.copy(arObjectRotation = currentRotation + rotationDelta)
-    }
-
-    fun onArtworkProgressChanged(progress: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(artworkProgress = progress)
     }
 }

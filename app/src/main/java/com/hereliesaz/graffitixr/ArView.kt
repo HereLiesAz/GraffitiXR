@@ -34,7 +34,6 @@ fun ArView(
     onPlanesDetected: (Boolean) -> Unit,
     onArObjectScaleChanged: (Float) -> Unit,
     onArObjectRotationChanged: (Float) -> Unit,
-    onArtworkProgressChanged: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -47,8 +46,7 @@ fun ArView(
             view = glSurfaceView,
             onArImagePlaced = onArImagePlaced,
             onArFeaturesDetected = onArFeaturesDetected,
-            onPlanesDetected = onPlanesDetected,
-            onArtworkProgressChanged = onArtworkProgressChanged
+            onPlanesDetected = onPlanesDetected
         )
     }
 
@@ -110,13 +108,13 @@ fun ArView(
     DisposableEffect(lifecycleOwner, renderer, glSurfaceView) {
         val observer = object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
-                renderer.onResume()
+                renderer.resume()
                 glSurfaceView.onResume()
             }
 
             override fun onPause(owner: LifecycleOwner) {
                 glSurfaceView.onPause()
-                renderer.onPause()
+                renderer.pause()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

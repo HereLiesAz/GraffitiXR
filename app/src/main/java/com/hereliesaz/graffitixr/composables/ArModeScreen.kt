@@ -2,14 +2,8 @@ package com.hereliesaz.graffitixr.composables
 
 import android.Manifest
 import android.os.Build
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,14 +60,13 @@ private fun ArContent(
             overlayImageUri = uiState.overlayImageUri,
             arState = uiState.arState,
             arObjectScale = uiState.arObjectScale,
-            arObjectRotation = uiState.arObjectRotation,
+            arObjectRotation = uiState.rotationZ,
             opacity = uiState.opacity,
             onArImagePlaced = viewModel::onArImagePlaced,
             onArFeaturesDetected = viewModel::onArFeaturesDetected,
             onPlanesDetected = viewModel::onPlanesDetected,
             onArObjectScaleChanged = viewModel::onArObjectScaleChanged,
-            onArObjectRotationChanged = viewModel::onArObjectRotationChanged,
-            onArtworkProgressChanged = viewModel::onArtworkProgressChanged
+            onArObjectRotationChanged = viewModel::onRotationZChanged
         )
 
         if (!uiState.arePlanesDetected && uiState.arState == com.hereliesaz.graffitixr.ArState.SEARCHING) {
@@ -81,26 +74,6 @@ private fun ArContent(
                 text = "Move your device to find a surface.",
                 modifier = Modifier.align(Alignment.Center)
             )
-        }
-
-        if (uiState.arState == com.hereliesaz.graffitixr.ArState.LOCKED) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Artwork Progress: ${(uiState.artworkProgress * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                LinearProgressIndicator(
-                    progress = uiState.artworkProgress,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
         }
     }
 }
