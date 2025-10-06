@@ -82,5 +82,7 @@ data class UiState(
     val arState: ArState = ArState.SEARCHING,
     val isLoading: Boolean = false,
     val completedOnboardingModes: Set<EditorMode> = emptySet(),
-    val arePlanesDetected: Boolean = false
+    val arePlanesDetected: Boolean = false,
+    val arDrawingProgress: Float = 0f,
+    val saveRequestTimestamp: Long? = null
 ) : Parcelable
