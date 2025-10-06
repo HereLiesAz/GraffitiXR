@@ -94,7 +94,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     onRotationZChanged = viewModel::onRotationZChanged,
                     onRotationXChanged = viewModel::onRotationXChanged,
                     onRotationYChanged = viewModel::onRotationYChanged,
-                    onCycleRotationAxis = viewModel::onCycleRotationAxis
+                    onCycleRotationAxis = viewModel::onCycleRotationAxis,
+                    onPointsInitialized = viewModel::onPointsInitialized
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,

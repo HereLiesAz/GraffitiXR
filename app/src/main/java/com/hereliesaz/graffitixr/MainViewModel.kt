@@ -136,6 +136,9 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(rotationZ = currentRotation + rotationDelta)
     }
 
+    fun onPointsInitialized(points: List<Offset>) {
+        savedStateHandle["uiState"] = uiState.value.copy(points = points)
+    }
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
