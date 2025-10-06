@@ -5,8 +5,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,6 +27,7 @@ import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
+import com.hereliesaz.graffitixr.composables.TitleOverlay
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
@@ -74,7 +78,9 @@ fun MainScreen(viewModel: MainViewModel) {
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .windowInsetsPadding(WindowInsets.systemBars)) {
         Box(
             modifier = Modifier
                 .fillMaxSize(),
@@ -93,8 +99,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     onRotationZChanged = viewModel::onRotationZChanged,
                     onRotationXChanged = viewModel::onRotationXChanged,
                     onRotationYChanged = viewModel::onRotationYChanged,
-                    onCycleRotationAxis = viewModel::onCycleRotationAxis,
-                    onPointsInitialized = viewModel::onPointsInitialized
+                    onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
@@ -111,12 +116,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
         Box(modifier = Modifier.zIndex(2f)) {
             AzNavRail {
-                azSettings(
-                    isLoading = uiState.isLoading,
-                    packRailButtons = true
-                )
-
-
                 azMenuItem(
                     id = "ar_overlay",
                     text = "AR Overlay",
@@ -129,8 +128,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     id = "mockup",
                     text = "Mockup",
                     onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
-
-                azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
 
                 azRailItem(id = "overlay", text = "Image") {
                     overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -157,6 +154,15 @@ fun MainScreen(viewModel: MainViewModel) {
                 azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
                 azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
                 azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+
+                azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
+                azRailItem(id = "help", text = "Help") {
+                    //TODO: Add help dialog
+                }
+                azSettings(
+                    isLoading = uiState.isLoading,
+                    packRailButtons = true
+                )
             }
         }
 
@@ -200,6 +206,13 @@ fun MainScreen(viewModel: MainViewModel) {
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp)
+        )
+
+        TitleOverlay(
+            title = uiState.editorMode.name,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
         )
     }
 }

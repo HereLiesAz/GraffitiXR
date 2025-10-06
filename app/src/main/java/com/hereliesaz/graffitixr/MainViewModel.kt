@@ -142,15 +142,17 @@ class MainViewModel(
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
-        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
+        val dampedScaleFactor = 1.0f + (scaleFactor - 1.0f) * 0.25f
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * dampedScaleFactor)
     }
 
     fun onArObjectRotated(pitch: Float, yaw: Float, roll: Float) {
+        val damping = 0.25f
         val currentOrientation = uiState.value.arObjectOrientation
 
-        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch)
-        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw)
-        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll)
+        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch * damping)
+        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw * damping)
+        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll * damping)
 
         val newOrientation = currentOrientation * yawRotation * pitchRotation * rollRotation
         savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
