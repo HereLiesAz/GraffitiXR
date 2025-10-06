@@ -3,10 +3,15 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import android.opengl.GLSurfaceView
 import android.view.GestureDetector
+import android.graphics.Bitmap
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
+import android.view.PixelCopy
 import android.view.ScaleGestureDetector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,8 +37,11 @@ fun ArView(
     onArImagePlaced: (Anchor) -> Unit,
     onArFeaturesDetected: (ArFeaturePattern) -> Unit,
     onPlanesDetected: (Boolean) -> Unit,
+    onArDrawingProgressChanged: (Float) -> Unit,
     onArObjectScaleChanged: (Float) -> Unit,
     onArObjectRotationChanged: (Float) -> Unit,
+    saveRequestTimestamp: Long?,
+    onBitmapReadyForSaving: (Bitmap) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -46,7 +54,8 @@ fun ArView(
             view = glSurfaceView,
             onArImagePlaced = onArImagePlaced,
             onArFeaturesDetected = onArFeaturesDetected,
-            onPlanesDetected = onPlanesDetected
+            onPlanesDetected = onPlanesDetected,
+            onArDrawingProgressChanged = onArDrawingProgressChanged
         )
     }
 
@@ -104,6 +113,19 @@ fun ArView(
             renderer.arObjectRotation = arObjectRotation
         }
     )
+
+    LaunchedEffect(saveRequestTimestamp) {
+        if (saveRequestTimestamp != null) {
+            val view = glSurfaceView
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            val handler = Handler(Looper.getMainLooper())
+            PixelCopy.request(view, bitmap, { result ->
+                if (result == PixelCopy.SUCCESS) {
+                    onBitmapReadyForSaving(bitmap)
+                }
+            }, handler)
+        }
+    }
 
     DisposableEffect(lifecycleOwner, renderer, glSurfaceView) {
         val observer = object : DefaultLifecycleObserver {
