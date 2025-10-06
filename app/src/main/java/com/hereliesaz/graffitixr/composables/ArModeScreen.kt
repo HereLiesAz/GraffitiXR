@@ -27,6 +27,9 @@ fun ArModeScreen(viewModel: MainViewModel) {
     val permissions = mutableListOf(Manifest.permission.CAMERA)
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
         permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
     } else {
         permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
     }
@@ -70,7 +73,9 @@ private fun ArContent(
             onPlanesDetected = viewModel::onPlanesDetected,
             onArDrawingProgressChanged = viewModel::onArDrawingProgressChanged,
             onArObjectScaleChanged = viewModel::onArObjectScaleChanged,
-            onArObjectRotationChanged = viewModel::onRotationZChanged
+            onArObjectRotationChanged = viewModel::onRotationZChanged,
+            saveRequestTimestamp = uiState.saveRequestTimestamp,
+            onBitmapReadyForSaving = viewModel::onBitmapReadyForSaving
         )
 
         if (!uiState.arePlanesDetected && uiState.arState == com.hereliesaz.graffitixr.ArState.SEARCHING) {

@@ -15,6 +15,7 @@ import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.removeBackground
+import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -183,5 +184,17 @@ class MainViewModel(
 
     fun onArDrawingProgressChanged(progress: Float) {
         savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
+    }
+
+    fun onSaveClicked() {
+        savedStateHandle["uiState"] = uiState.value.copy(saveRequestTimestamp = System.currentTimeMillis())
+    }
+
+    fun onBitmapReadyForSaving(bitmap: Bitmap) {
+        viewModelScope.launch {
+            saveBitmapToGallery(getApplication(), bitmap, "GraffitiXR_Export_${System.currentTimeMillis()}")
+            // Reset the request timestamp after saving to prevent re-triggering
+            savedStateHandle["uiState"] = uiState.value.copy(saveRequestTimestamp = null)
+        }
     }
 }
