@@ -11,11 +11,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.hereliesaz.graffitixr.ArView
 import com.hereliesaz.graffitixr.MainViewModel
 import com.hereliesaz.graffitixr.UiState
+import androidx.compose.foundation.layout.padding
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -46,6 +48,7 @@ fun ArModeScreen(viewModel: MainViewModel) {
     }
 }
 
+
 @Composable
 private fun ArContent(
     uiState: UiState,
@@ -65,6 +68,7 @@ private fun ArContent(
             onArImagePlaced = viewModel::onArImagePlaced,
             onArFeaturesDetected = viewModel::onArFeaturesDetected,
             onPlanesDetected = viewModel::onPlanesDetected,
+            onArDrawingProgressChanged = viewModel::onArDrawingProgressChanged,
             onArObjectScaleChanged = viewModel::onArObjectScaleChanged,
             onArObjectRotationChanged = viewModel::onRotationZChanged
         )
@@ -73,6 +77,13 @@ private fun ArContent(
             Text(
                 text = "Move your device to find a surface.",
                 modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
+        if (uiState.arState == com.hereliesaz.graffitixr.ArState.LOCKED) {
+            ProgressIndicator(
+                progress = uiState.arDrawingProgress,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp)
             )
         }
     }

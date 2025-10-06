@@ -32,6 +32,7 @@ fun ArView(
     onArImagePlaced: (Anchor) -> Unit,
     onArFeaturesDetected: (ArFeaturePattern) -> Unit,
     onPlanesDetected: (Boolean) -> Unit,
+    onArDrawingProgressChanged: (Float) -> Unit,
     onArObjectScaleChanged: (Float) -> Unit,
     onArObjectRotationChanged: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -46,7 +47,8 @@ fun ArView(
             view = glSurfaceView,
             onArImagePlaced = onArImagePlaced,
             onArFeaturesDetected = onArFeaturesDetected,
-            onPlanesDetected = onPlanesDetected
+            onPlanesDetected = onPlanesDetected,
+            onArDrawingProgressChanged = onArDrawingProgressChanged
         )
     }
 

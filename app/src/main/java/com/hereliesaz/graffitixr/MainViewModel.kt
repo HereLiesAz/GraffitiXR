@@ -180,4 +180,8 @@ class MainViewModel(
     fun onPlanesDetected(arePlanesDetected: Boolean) {
         savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
     }
+
+    fun onArDrawingProgressChanged(progress: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
+    }
 }
