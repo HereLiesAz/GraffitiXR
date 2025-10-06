@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -70,6 +71,7 @@ fun ArView(
 
     Box(
         modifier = modifier
+            .fillMaxSize()
             .transformable(state = transformState)
             .pointerInput(activeRotationAxis) {
                 detectTapGestures(
@@ -79,6 +81,7 @@ fun ArView(
             }
     ) {
         AndroidView(
+            modifier = Modifier.fillMaxSize(),
             factory = {
                 glSurfaceView.apply {
                     setEGLContextClientVersion(3)
