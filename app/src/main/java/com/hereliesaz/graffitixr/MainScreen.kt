@@ -49,6 +49,10 @@ fun MainScreen(viewModel: MainViewModel) {
     val density = LocalDensity.current
     val navRailWidthPx = with(density) { 80.dp.toPx() }.toInt()
 
+    val writePermissionState = rememberPermissionState(
+        permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+    )
+
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
             showOnboardingForMode = uiState.editorMode
@@ -103,10 +107,6 @@ fun MainScreen(viewModel: MainViewModel) {
             azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
             azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
-
-            val writePermissionState = rememberPermissionState(
-                permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
-            )
 
             azRailItem(id = "save", text = "Save") {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || writePermissionState.status.isGranted) {
