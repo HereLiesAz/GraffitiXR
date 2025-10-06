@@ -13,8 +13,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import android.view.View
 import com.hereliesaz.graffitixr.graphics.Quaternion
+import com.hereliesaz.graffitixr.utils.captureViewAsBitmap
 import com.hereliesaz.graffitixr.utils.removeBackground
+import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -179,5 +182,19 @@ class MainViewModel(
 
     fun onPlanesDetected(arePlanesDetected: Boolean) {
         savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
+    }
+
+    fun onSaveClicked(view: View, navRailWidth: Int) {
+        viewModelScope.launch {
+            val fullBitmap = captureViewAsBitmap(view)
+            val croppedBitmap = Bitmap.createBitmap(
+                fullBitmap,
+                navRailWidth,
+                0,
+                fullBitmap.width - navRailWidth,
+                fullBitmap.height
+            )
+            saveBitmapToGallery(getApplication(), croppedBitmap, "GraffitiXR_Export_${System.currentTimeMillis()}")
+        }
     }
 }

@@ -25,10 +25,7 @@ import com.hereliesaz.graffitixr.ArState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.opencv.core.DMatch
 import org.opencv.core.Mat
-import org.opencv.core.MatOfDMatch
-import org.opencv.features2d.DescriptorMatcher
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -38,8 +35,7 @@ class ArRenderer(
     private val view: View,
     private val onArImagePlaced: (Anchor) -> Unit,
     private val onArFeaturesDetected: (ArFeaturePattern) -> Unit,
-    private val onPlanesDetected: (Boolean) -> Unit,
-    private val onArDrawingProgressChanged: (Float) -> Unit
+    private val onPlanesDetected: (Boolean) -> Unit
 ) : GLSurfaceView.Renderer {
 
     private var session: Session? = null
@@ -49,7 +45,6 @@ class ArRenderer(
     private val simpleQuadRenderer = SimpleQuadRenderer()
     private val projectedImageRenderer = ProjectedImageRenderer()
     private val markerDetector = MarkerDetector()
-    private val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
     private val displayRotationHelper = DisplayRotationHelper(context)
 
 
@@ -142,8 +137,6 @@ class ArRenderer(
                     onPlanesDetected(false)
                     if (!featurePatternGenerated) {
                         generateFeaturePattern(frame)
-                    } else {
-                        trackFeatureProgress(frame)
                     }
                 }
             }
@@ -201,34 +194,6 @@ class ArRenderer(
                     onArImagePlaced(hit.createAnchor())
                     break
                 }
-            }
-        }
-    }
-
-    private fun trackFeatureProgress(frame: Frame) {
-        arFeaturePattern?.let { pattern ->
-            if (pattern.descriptors.rows() == 0) {
-                onArDrawingProgressChanged(0f)
-                return
-            }
-
-            try {
-                val image = frame.acquireCameraImage()
-                val mat = ImageConverter.toMat(image)
-                val (_, currentDescriptors) = markerDetector.detectAndCompute(mat)
-                image.close()
-
-                if (currentDescriptors.rows() > 0) {
-                    val matches = MatOfDMatch()
-                    matcher.match(currentDescriptors, pattern.descriptors, matches)
-                    val goodMatches = matches.toList().filter { it.distance < 70 }
-                    val progress = goodMatches.size.toFloat() / pattern.descriptors.rows().toFloat()
-                    onArDrawingProgressChanged(progress.coerceIn(0f, 1f))
-                } else {
-                    onArDrawingProgressChanged(0f)
-                }
-            } catch (e: NotYetAvailableException) {
-                // Ignore frame if image is not available
             }
         }
     }
