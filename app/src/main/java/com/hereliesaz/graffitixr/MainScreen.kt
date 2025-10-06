@@ -13,12 +13,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -28,6 +27,8 @@ import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
+import com.hereliesaz.graffitixr.utils.captureViewAsBitmap
+import kotlinx.coroutines.launch
 
 /**
  * The main screen of the application.
@@ -46,8 +47,7 @@ fun MainScreen(viewModel: MainViewModel) {
     var isWarpEnabled by remember { mutableStateOf(true) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
     val view = LocalView.current
-    val density = LocalDensity.current
-    val navRailWidthPx = with(density) { 80.dp.toPx() }.toInt()
+    val coroutineScope = rememberCoroutineScope()
 
     val writePermissionState = rememberPermissionState(
         permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -110,7 +110,14 @@ fun MainScreen(viewModel: MainViewModel) {
 
             azRailItem(id = "save", text = "Save") {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || writePermissionState.status.isGranted) {
-                    viewModel.onSaveClicked(view, navRailWidthPx)
+                    if (uiState.editorMode == EditorMode.AR) {
+                        viewModel.onSaveClicked()
+                    } else {
+                        coroutineScope.launch {
+                            val bitmap = captureViewAsBitmap(view)
+                            viewModel.onBitmapReadyForSaving(bitmap)
+                        }
+                    }
                 } else {
                     writePermissionState.launchPermissionRequest()
                 }
