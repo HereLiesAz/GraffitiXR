@@ -29,6 +29,7 @@ import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
+import com.hereliesaz.graffitixr.composables.SettingsScreen
 import com.hereliesaz.graffitixr.composables.TitleOverlay
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
@@ -49,6 +50,11 @@ fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
+
+    if (uiState.showSettings) {
+        SettingsScreen(onBack = { viewModel.onSettingsClicked() })
+        return
+    }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -187,7 +193,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
 
                 if (uiState.editorMode == EditorMode.STATIC) {
-                    azRailItem(id = "background", text = "Background") {
+                    azRailItem(id = "background", text = "Base") {
                         backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                 }
@@ -195,7 +201,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 if (uiState.overlayImageUri != null) {
                     azRailItem(
                         id = "remove_bg",
-                        text = "Remove\n Background",
+                        text = "Background",
                         onClick = viewModel::onRemoveBackgroundClicked
                     )
                 }
@@ -208,12 +214,14 @@ fun MainScreen(viewModel: MainViewModel) {
                 azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
                 azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
 
-                azRailItem(id = "save_image", text = "Save Image", onClick = viewModel::onSaveClicked)
-                azRailItem(id = "save_project", text = "Save Project", onClick = viewModel::onSaveProjectClicked)
-                azRailItem(id = "load_project", text = "Load Project", onClick = viewModel::onLoadProjectClicked)
+                azMenuItem(id = "save_image", text = "Screenshot", onClick = viewModel::onSaveClicked)
+                azMenuItem(id = "save_project", text = "Save", onClick = viewModel::onSaveProjectClicked)
+                azMenuItem(id = "load_project", text = "Load", onClick = viewModel::onLoadProjectClicked)
                 azRailItem(id = "help", text = "Help") {
                     //TODO: Add help dialog
                 }
+                azMenuItem(id = "settings", text = "Settings", onClick = { viewModel.onSettingsClicked() }) 
+
                 azSettings(
                     isLoading = uiState.isLoading,
                     packRailButtons = true

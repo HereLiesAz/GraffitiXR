@@ -6,13 +6,13 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
-import android.util.Log
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
@@ -20,13 +20,13 @@ import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
 
@@ -325,5 +325,10 @@ class MainViewModel(
                 setLoading(false)
             }
         }
+    }
+
+    fun onSettingsClicked() {
+        val currentShowSettings = uiState.value.showSettings
+        savedStateHandle["uiState"] = uiState.value.copy(showSettings = !currentShowSettings)
     }
 }
