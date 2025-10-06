@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import android.widget.Toast
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,6 +78,57 @@ fun MainScreen(viewModel: MainViewModel) {
     val backgroundImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+
+    var jsonToSave by remember { mutableStateOf<String?>(null) }
+
+    val saveProjectLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let {
+            jsonToSave?.let { json ->
+                try {
+                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                        outputStream.write(json.toByteArray())
+                    }
+                    Toast.makeText(context, "Project saved", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to save project", Toast.LENGTH_SHORT).show()
+                } finally {
+                    jsonToSave = null
+                }
+            }
+        }
+    }
+
+    val loadProjectLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                context.contentResolver.openInputStream(it)?.use { inputStream ->
+                    val jsonString = inputStream.bufferedReader().use { it.readText() }
+                    viewModel.loadProject(jsonString)
+                }
+                Toast.makeText(context, "Project loaded", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to load project", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    LaunchedEffect(viewModel, context) {
+        viewModel.projectFileEvent.collect { event ->
+            when(event) {
+                is ProjectFileEvent.Save -> {
+                    jsonToSave = event.jsonString
+                    saveProjectLauncher.launch("GraffitiXR_Project.json")
+                }
+                is ProjectFileEvent.Load -> {
+                    loadProjectLauncher.launch(arrayOf("application/json"))
+                }
+            }
+        }
+    }
 
     Box(modifier = Modifier
         .fillMaxSize()
@@ -155,7 +207,9 @@ fun MainScreen(viewModel: MainViewModel) {
                 azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
                 azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
 
-                azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
+                azRailItem(id = "save_image", text = "Save Image", onClick = viewModel::onSaveClicked)
+                azRailItem(id = "save_project", text = "Save Project", onClick = viewModel::onSaveProjectClicked)
+                azRailItem(id = "load_project", text = "Load Project", onClick = viewModel::onLoadProjectClicked)
                 azRailItem(id = "help", text = "Help") {
                     //TODO: Add help dialog
                 }

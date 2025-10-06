@@ -12,6 +12,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
+import android.util.Log
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
@@ -19,6 +20,8 @@ import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -29,6 +32,11 @@ import java.io.FileOutputStream
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
+}
+
+sealed class ProjectFileEvent {
+    data class Save(val jsonString: String) : ProjectFileEvent()
+    object Load : ProjectFileEvent()
 }
 
 /**
@@ -52,6 +60,9 @@ class MainViewModel(
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
+
+    private val _projectFileEvent = MutableSharedFlow<ProjectFileEvent>()
+    val projectFileEvent = _projectFileEvent.asSharedFlow()
 
     private suspend fun removeBackground(uri: Uri): Uri? {
         return withContext(Dispatchers.IO) {
@@ -246,6 +257,58 @@ class MainViewModel(
     fun onSaveClicked() {
         viewModelScope.launch {
             _captureEvent.emit(CaptureEvent.RequestCapture)
+        }
+    }
+
+    fun onSaveProjectClicked() {
+        val currentState = uiState.value
+        val projectData = ProjectData(
+            overlayImageUri = currentState.overlayImageUri,
+            backgroundImageUri = currentState.backgroundImageUri,
+            opacity = currentState.opacity,
+            contrast = currentState.contrast,
+            saturation = currentState.saturation,
+            scale = currentState.scale,
+            rotationX = currentState.rotationX,
+            rotationY = currentState.rotationY,
+            rotationZ = currentState.rotationZ,
+            arImagePose = currentState.arImagePose,
+            arObjectScale = currentState.arObjectScale,
+            arObjectOrientation = currentState.arObjectOrientation
+        )
+
+        val jsonString = Json.encodeToString(projectData)
+        viewModelScope.launch {
+            _projectFileEvent.emit(ProjectFileEvent.Save(jsonString))
+        }
+    }
+
+    fun onLoadProjectClicked() {
+        viewModelScope.launch {
+            _projectFileEvent.emit(ProjectFileEvent.Load)
+        }
+    }
+
+    fun loadProject(jsonString: String) {
+        try {
+            val projectData = Json.decodeFromString<ProjectData>(jsonString)
+            savedStateHandle["uiState"] = uiState.value.copy(
+                overlayImageUri = projectData.overlayImageUri,
+                backgroundImageUri = projectData.backgroundImageUri,
+                opacity = projectData.opacity,
+                contrast = projectData.contrast,
+                saturation = projectData.saturation,
+                scale = projectData.scale,
+                rotationX = projectData.rotationX,
+                rotationY = projectData.rotationY,
+                rotationZ = projectData.rotationZ,
+                arImagePose = projectData.arImagePose,
+                arObjectScale = projectData.arObjectScale,
+                arObjectOrientation = projectData.arObjectOrientation
+            )
+        } catch (e: Exception) {
+            Log.e("LoadProject", "Failed to load project", e)
+            // Optionally, show a toast to the user
         }
     }
 
