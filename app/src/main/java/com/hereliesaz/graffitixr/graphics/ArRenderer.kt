@@ -8,8 +8,8 @@ import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
-import android.view.MotionEvent
 import android.view.View
+import androidx.compose.ui.geometry.Offset
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
@@ -48,14 +48,14 @@ class ArRenderer(
     private val displayRotationHelper = DisplayRotationHelper(context)
 
 
-    private val tapQueue = ConcurrentLinkedQueue<MotionEvent>()
+    private val tapQueue = ConcurrentLinkedQueue<Offset>()
 
     var arImagePose: FloatArray? = null
     var arFeaturePattern: ArFeaturePattern? = null
     var overlayImageUri: Uri? = null
     var arState: ArState = ArState.SEARCHING
     var arObjectScale: Float = 1.0f
-    var arObjectRotation: Float = 0.0f
+    var arObjectOrientation: Quaternion = Quaternion.identity()
     var opacity: Float = 1.0f
 
     private var overlayBitmap: Bitmap? = null
@@ -157,10 +157,8 @@ class ArRenderer(
                 } else { // SEARCHING or PLACED
                     arImagePose?.let { poseMatrix ->
                         val modelMatrix = poseMatrix.clone()
-                        val upX = poseMatrix[4]
-                        val upY = poseMatrix[5]
-                        val upZ = poseMatrix[6]
-                        Matrix.rotateM(modelMatrix, 0, Math.toDegrees(arObjectRotation.toDouble()).toFloat(), upX, upY, upZ)
+                        val rotationMatrix = arObjectOrientation.toRotationMatrix()
+                        Matrix.multiplyMM(modelMatrix, 0, modelMatrix, 0, rotationMatrix, 0)
                         Matrix.scaleM(modelMatrix, 0, arObjectScale, arObjectScale, arObjectScale)
                         simpleQuadRenderer.draw(modelMatrix, viewMatrix, projectionMatrix, bmp, opacity)
                     }
@@ -169,9 +167,9 @@ class ArRenderer(
         }
     }
 
-    fun onSurfaceTapped(event: MotionEvent) {
+    fun onSurfaceTapped(x: Float, y: Float) {
         if (arState == ArState.SEARCHING) {
-            tapQueue.add(event)
+            tapQueue.add(Offset(x,y))
         }
     }
 
@@ -179,7 +177,7 @@ class ArRenderer(
         val tap = tapQueue.poll() ?: return
         val cameraPose = frame.camera.pose
 
-        for (hit in frame.hitTest(tap)) {
+        for (hit in frame.hitTest(tap.x, tap.y)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
                 val planeNormal = trackable.centerPose.yAxis

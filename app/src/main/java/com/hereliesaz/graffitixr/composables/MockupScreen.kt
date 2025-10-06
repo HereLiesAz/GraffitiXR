@@ -7,8 +7,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.forEachGesture
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -74,9 +75,12 @@ fun MockupScreen(
     onSaturationChanged: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
     onRotationZChanged: (Float) -> Unit,
+    onRotationXChanged: (Float) -> Unit,
+    onRotationYChanged: (Float) -> Unit,
     onOffsetChanged: (Offset) -> Unit,
     onPointsInitialized: (List<Offset>) -> Unit,
     onPointChanged: (Int, Offset) -> Unit,
+    onCycleRotationAxis: () -> Unit,
     isWarpEnabled: Boolean
 ) {
     val context = LocalContext.current
@@ -135,27 +139,26 @@ fun MockupScreen(
                 }
             }
 
+            val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
+                onScaleChanged(zoomChange)
+                onOffsetChanged(offsetChange)
+                when (uiState.activeRotationAxis) {
+                    com.hereliesaz.graffitixr.RotationAxis.X -> onRotationXChanged(rotationChange)
+                    com.hereliesaz.graffitixr.RotationAxis.Y -> onRotationYChanged(rotationChange)
+                    com.hereliesaz.graffitixr.RotationAxis.Z -> onRotationZChanged(rotationChange)
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
                     .pointerInput(isWarpEnabled) {
                         if (!isWarpEnabled) {
-                            forEachGesture {
-                                try {
-                                    gestureInProgress = true
-                                    detectTransformGestures { _, pan, zoom, rotation ->
-                                        onScaleChanged(zoom)
-                                        onRotationZChanged(rotation)
-                                        onOffsetChanged(pan)
-                                    }
-                                } finally {
-                                    gestureInProgress = false
-                                }
-                            }
+                            detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                         }
                     }
-                    .onGloballyPositioned { coordinates ->
+                    .onGloballyPositioned {
                         if (uiState.points.isEmpty() && imageBitmap != null) {
                             val w = imageBitmap!!.width.toFloat()
                             val h = imageBitmap!!.height.toFloat()
@@ -188,17 +191,22 @@ fun MockupScreen(
                 }
 
                 imageBitmap?.let { bmp ->
-                    Canvas(modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            if (!isWarpEnabled) {
-                                scaleX = uiState.scale
-                                scaleY = uiState.scale
-                                rotationZ = uiState.rotationZ
-                                translationX = uiState.offset.x
-                                translationY = uiState.offset.y
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                if (!isWarpEnabled) {
+                                    scaleX = uiState.scale
+                                    scaleY = uiState.scale
+                                    rotationX = uiState.rotationX
+                                    rotationY = uiState.rotationY
+                                    rotationZ = uiState.rotationZ
+                                    translationX = uiState.offset.x
+                                    translationY = uiState.offset.y
+                                }
                             }
-                        }) {
+                            .transformable(state = transformState, enabled = !isWarpEnabled)
+                    ) {
                         withTransform({
                             if (isWarpEnabled) {
                                 val matrix = androidx.compose.ui.graphics.Matrix()

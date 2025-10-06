@@ -82,5 +82,9 @@ data class UiState(
     val arState: ArState = ArState.SEARCHING,
     val isLoading: Boolean = false,
     val completedOnboardingModes: Set<EditorMode> = emptySet(),
-    val arePlanesDetected: Boolean = false
+    val arePlanesDetected: Boolean = false,
+    val rotationX: Float = 0f,
+    val rotationY: Float = 0f,
+    val activeRotationAxis: RotationAxis = RotationAxis.Z,
+    val showRotationAxisFeedback: Boolean = false
 ) : Parcelable

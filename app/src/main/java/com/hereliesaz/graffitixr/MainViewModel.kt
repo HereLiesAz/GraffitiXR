@@ -12,10 +12,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
+import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.removeBackground
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -150,6 +152,17 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
     }
 
+    fun onArObjectPanned(delta: Offset) {
+        val currentPose = uiState.value.arImagePose ?: return
+
+        // A simple approximation: translate the object on the XY plane of its current pose.
+        // This doesn't account for camera perspective, so it might feel unnatural.
+        // A more advanced implementation would project the 2D pan onto the 3D plane.
+        val panScaleFactor = 0.005f
+        val newPose = currentPose.compose(Pose.makeTranslation(delta.x * panScaleFactor, -delta.y * panScaleFactor, 0f))
+        savedStateHandle["uiState"] = uiState.value.copy(arImagePose = newPose)
+    }
+
     fun onEditorModeChanged(mode: EditorMode) {
         savedStateHandle["uiState"] = uiState.value.copy(editorMode = mode)
     }
@@ -179,5 +192,33 @@ class MainViewModel(
 
     fun onPlanesDetected(arePlanesDetected: Boolean) {
         savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
+    }
+
+    fun onCycleRotationAxis() {
+        val currentAxis = uiState.value.activeRotationAxis
+        val nextAxis = when (currentAxis) {
+            RotationAxis.X -> RotationAxis.Y
+            RotationAxis.Y -> RotationAxis.Z
+            RotationAxis.Z -> RotationAxis.X
+        }
+        savedStateHandle["uiState"] = uiState.value.copy(
+            activeRotationAxis = nextAxis,
+            showRotationAxisFeedback = true
+        )
+    }
+
+    fun onRotationXChanged(delta: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(rotationX = uiState.value.rotationX + delta)
+    }
+
+    fun onRotationYChanged(delta: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(rotationY = uiState.value.rotationY + delta)
+    }
+
+    fun onFeedbackShown() {
+        viewModelScope.launch {
+            delay(1000) // Keep feedback visible for 1 second
+            savedStateHandle["uiState"] = uiState.value.copy(showRotationAxisFeedback = false)
+        }
     }
 }

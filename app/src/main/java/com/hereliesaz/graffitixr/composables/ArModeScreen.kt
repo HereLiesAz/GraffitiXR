@@ -60,13 +60,16 @@ private fun ArContent(
             overlayImageUri = uiState.overlayImageUri,
             arState = uiState.arState,
             arObjectScale = uiState.arObjectScale,
-            arObjectRotation = uiState.rotationZ,
+            arObjectOrientation = uiState.arObjectOrientation,
             opacity = uiState.opacity,
+            activeRotationAxis = uiState.activeRotationAxis,
             onArImagePlaced = viewModel::onArImagePlaced,
             onArFeaturesDetected = viewModel::onArFeaturesDetected,
             onPlanesDetected = viewModel::onPlanesDetected,
             onArObjectScaleChanged = viewModel::onArObjectScaleChanged,
-            onArObjectRotationChanged = viewModel::onRotationZChanged
+            onArObjectRotated = viewModel::onArObjectRotated,
+            onArObjectPanned = viewModel::onArObjectPanned,
+            onCycleRotationAxis = viewModel::onCycleRotationAxis
         )
 
         if (!uiState.arePlanesDetected && uiState.arState == com.hereliesaz.graffitixr.ArState.SEARCHING) {

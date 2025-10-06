@@ -2,13 +2,14 @@ package com.hereliesaz.graffitixr
 
 import android.net.Uri
 import android.opengl.GLSurfaceView
-import android.view.GestureDetector
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -18,7 +19,7 @@ import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.ArRenderer
-import com.hereliesaz.graffitixr.utils.RotationGestureDetector
+import com.hereliesaz.graffitixr.graphics.Quaternion
 
 @Composable
 fun ArView(
@@ -27,13 +28,16 @@ fun ArView(
     overlayImageUri: Uri?,
     arState: ArState,
     arObjectScale: Float,
-    arObjectRotation: Float,
+    arObjectOrientation: Quaternion,
     opacity: Float,
+    activeRotationAxis: RotationAxis,
     onArImagePlaced: (Anchor) -> Unit,
     onArFeaturesDetected: (ArFeaturePattern) -> Unit,
     onPlanesDetected: (Boolean) -> Unit,
     onArObjectScaleChanged: (Float) -> Unit,
-    onArObjectRotationChanged: (Float) -> Unit,
+    onArObjectRotated: (pitch: Float, yaw: Float, roll: Float) -> Unit,
+    onArObjectPanned: (Offset) -> Unit,
+    onCycleRotationAxis: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -50,48 +54,29 @@ fun ArView(
         )
     }
 
-    val scaleDetector = remember {
-        ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(detector: ScaleGestureDetector): Boolean {
-                onArObjectScaleChanged(detector.scaleFactor)
-                return true
-            }
-        })
-    }
-
-    val rotationDetector = remember {
-        RotationGestureDetector(object : RotationGestureDetector.OnRotationGestureListener {
-            override fun onRotation(rotationDelta: Float) {
-                onArObjectRotationChanged(rotationDelta)
-            }
-        })
-    }
-
-    val gestureDetector = remember {
-        GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onSingleTapUp(e: MotionEvent): Boolean {
-                renderer.onSurfaceTapped(e)
-                return true
-            }
-        })
-    }
-
     AndroidView(
         factory = {
             glSurfaceView.apply {
                 setEGLContextClientVersion(3)
                 setRenderer(renderer)
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-
-                setOnTouchListener { _, event ->
-                    var handled = scaleDetector.onTouchEvent(event)
-                    handled = rotationDetector.onTouchEvent(event) || handled
-                    handled = gestureDetector.onTouchEvent(event) || handled
-                    handled
+            }
+        },
+        modifier = modifier.pointerInput(activeRotationAxis) {
+            detectTapGestures(
+                onTap = { offset -> renderer.onSurfaceTapped(offset.x, offset.y) },
+                onDoubleTap = { onCycleRotationAxis() }
+            )
+            detectTransformGestures { _, pan, zoom, rotation ->
+                onArObjectScaleChanged(zoom)
+                onArObjectPanned(pan)
+                when (activeRotationAxis) {
+                    RotationAxis.X -> onArObjectRotated(rotation, 0f, 0f)
+                    RotationAxis.Y -> onArObjectRotated(0f, rotation, 0f)
+                    RotationAxis.Z -> onArObjectRotated(0f, 0f, rotation)
                 }
             }
         },
-        modifier = modifier,
         update = {
             renderer.overlayImageUri = overlayImageUri
             renderer.opacity = opacity
@@ -101,7 +86,7 @@ fun ArView(
             renderer.arFeaturePattern = arFeaturePattern
             renderer.arState = arState
             renderer.arObjectScale = arObjectScale
-            renderer.arObjectRotation = arObjectRotation
+            renderer.arObjectOrientation = arObjectOrientation
         }
     )
 

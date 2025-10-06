@@ -5,6 +5,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -14,10 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
+import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 
@@ -68,15 +71,21 @@ fun MainScreen(viewModel: MainViewModel) {
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
                     onRotationZChanged = viewModel::onRotationZChanged,
+                    onRotationXChanged = viewModel::onRotationXChanged,
+                    onRotationYChanged = viewModel::onRotationYChanged,
                     onPointsInitialized = viewModel::onPointsInitialized,
                     onPointChanged = viewModel::onPointChanged,
+                    onCycleRotationAxis = viewModel::onCycleRotationAxis,
                     isWarpEnabled = isWarpEnabled
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
-                    onRotationZChanged = viewModel::onRotationZChanged
+                    onRotationZChanged = viewModel::onRotationZChanged,
+                    onRotationXChanged = viewModel::onRotationXChanged,
+                    onRotationYChanged = viewModel::onRotationYChanged,
+                    onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
                 EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
@@ -154,5 +163,14 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
             )
         }
+
+        RotationAxisFeedback(
+            axis = uiState.activeRotationAxis,
+            visible = uiState.showRotationAxisFeedback,
+            onFeedbackShown = viewModel::onFeedbackShown,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+        )
     }
 }
