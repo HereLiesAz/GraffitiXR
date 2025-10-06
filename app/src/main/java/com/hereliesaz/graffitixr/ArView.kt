@@ -2,8 +2,11 @@ package com.hereliesaz.graffitixr
 
 import android.net.Uri
 import android.opengl.GLSurfaceView
+import android.net.Uri
+import android.opengl.GLSurfaceView
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -56,6 +59,16 @@ fun ArView(
         )
     }
 
+    val transformState = rememberTransformableState { zoomChange, panChange, rotationChange ->
+        onArObjectScaleChanged(zoomChange)
+        onArObjectPanned(panChange)
+        when (activeRotationAxis) {
+            RotationAxis.X -> onArObjectRotated(rotationChange, 0f, 0f)
+            RotationAxis.Y -> onArObjectRotated(0f, rotationChange, 0f)
+            RotationAxis.Z -> onArObjectRotated(0f, 0f, rotationChange)
+        }
+    }
+
     AndroidView(
         factory = {
             glSurfaceView.apply {
@@ -64,21 +77,14 @@ fun ArView(
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             }
         },
-        modifier = modifier.pointerInput(activeRotationAxis) {
-            detectTapGestures(
-                onTap = { offset -> renderer.onSurfaceTapped(offset.x, offset.y) },
-                onDoubleTap = { onCycleRotationAxis() }
-            )
-            detectTransformGestures { _, pan, zoom, rotation ->
-                onArObjectScaleChanged(zoom)
-                onArObjectPanned(pan)
-                when (activeRotationAxis) {
-                    RotationAxis.X -> onArObjectRotated(rotation, 0f, 0f)
-                    RotationAxis.Y -> onArObjectRotated(0f, rotation, 0f)
-                    RotationAxis.Z -> onArObjectRotated(0f, 0f, rotation)
-                }
-            }
-        },
+        modifier = modifier
+            .transformable(state = transformState)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { offset -> renderer.onSurfaceTapped(offset.x, offset.y) },
+                    onDoubleTap = { onCycleRotationAxis() }
+                )
+            },
         update = {
             renderer.overlayImageUri = overlayImageUri
             renderer.opacity = opacity
