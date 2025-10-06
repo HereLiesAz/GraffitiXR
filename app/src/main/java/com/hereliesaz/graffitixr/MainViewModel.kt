@@ -13,9 +13,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
+import android.app.Activity
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
+import com.hereliesaz.graffitixr.utils.captureWindow
 import com.hereliesaz.graffitixr.utils.removeBackground
+import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -224,5 +227,36 @@ class MainViewModel(
 
     fun onArDrawingProgressChanged(progress: Float) {
         savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
+    }
+
+    /**
+     * Handles the save button click event.
+     * Captures the current screen content as a bitmap and saves it to the device's gallery.
+     *
+     * @param activity The current activity, required for capturing the window content.
+     */
+    fun onSaveClicked(activity: Activity) {
+        viewModelScope.launch {
+            setLoading(true)
+            // Use the captureWindow utility to get a bitmap of the screen
+            captureWindow(activity) { bitmap ->
+                if (bitmap != null) {
+                    // Launch a new coroutine to save the bitmap
+                    viewModelScope.launch {
+                        saveBitmapToGallery(getApplication(), bitmap)
+                        // Reset loading state on the main thread
+                        withContext(Dispatchers.Main) {
+                            setLoading(false)
+                        }
+                    }
+                } else {
+                    // Handle the case where bitmap capture failed
+                    viewModelScope.launch(Dispatchers.Main) {
+                        setLoading(false)
+                        // Optionally show an error message to the user
+                    }
+                }
+            }
+        }
     }
 }
