@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr
 
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
@@ -36,8 +38,9 @@ import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
-    var isWarpEnabled by remember { mutableStateOf(true) }
+    var isWarpEnabled by remember { mutableStateOf(false) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
 
     LaunchedEffect(uiState.editorMode) {
@@ -100,6 +103,12 @@ fun MainScreen(viewModel: MainViewModel) {
             azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
             azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+
+            azRailItem(id = "save", text = "Save") {
+                (context as? Activity)?.let {
+                    viewModel.onSaveClicked(it)
+                }
+            }
 
             azRailItem(id = "overlay", text = "Image") {
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
