@@ -18,6 +18,7 @@ import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
+import com.hereliesaz.graffitixr.composables.TitleOverlay
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 
@@ -81,6 +82,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
         }
+
+        TitleOverlay(editorMode = uiState.editorMode)
 
         AzNavRail {
             azSettings(isLoading = uiState.isLoading,
