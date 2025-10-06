@@ -85,11 +85,6 @@ fun ImageTraceScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = { onCycleRotationAxis() }
-                        )
-                    }
             ) {
                 AsyncImage(
                     model = it,
@@ -106,7 +101,10 @@ fun ImageTraceScreen(
                             rotationZ = uiState.rotationZ,
                             alpha = uiState.opacity
                         )
-                        .transformable(state = transformState),
+                        .transformable(state = transformState)
+                        .pointerInput(Unit) {
+                            detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                        },
                     colorFilter = ColorFilter.colorMatrix(
                         ColorMatrix().apply {
                             setToSaturation(uiState.saturation)

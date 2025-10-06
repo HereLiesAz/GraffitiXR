@@ -78,10 +78,7 @@ fun MockupScreen(
     onRotationXChanged: (Float) -> Unit,
     onRotationYChanged: (Float) -> Unit,
     onOffsetChanged: (Offset) -> Unit,
-    onPointsInitialized: (List<Offset>) -> Unit,
-    onPointChanged: (Int, Offset) -> Unit,
-    onCycleRotationAxis: () -> Unit,
-    isWarpEnabled: Boolean
+    onCycleRotationAxis: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -153,114 +150,29 @@ fun MockupScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
-                    .pointerInput(isWarpEnabled) {
-                        if (!isWarpEnabled) {
-                            detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
-                        }
-                    }
-                    .onGloballyPositioned {
-                        if (uiState.points.isEmpty() && imageBitmap != null) {
-                            val w = imageBitmap!!.width.toFloat()
-                            val h = imageBitmap!!.height.toFloat()
-                            val points = listOf(
-                                Offset(0f, 0f),
-                                Offset(w, 0f),
-                                Offset(w, h),
-                                Offset(0f, h)
-                            )
-                            onPointsInitialized(points)
-                        }
-                    }
             ) {
-                val perspectiveMatrix = remember(uiState.points, imageBitmap) {
-                    Matrix().apply {
-                        imageBitmap?.let { bmp ->
-                            if (uiState.points.size == 4) {
-                                val w = bmp.width.toFloat()
-                                val h = bmp.height.toFloat()
-                                setPolyToPoly(
-                                    floatArrayOf(0f, 0f, w, 0f, w, h, 0f, h), 0,
-                                    uiState.points
-                                        .flatMap { listOf(it.x, it.y) }
-                                        .toFloatArray(), 0,
-                                    4
-                                )
-                            }
-                        }
-                    }
-                }
-
                 imageBitmap?.let { bmp ->
                     Canvas(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                if (!isWarpEnabled) {
-                                    scaleX = uiState.scale
-                                    scaleY = uiState.scale
-                                    rotationX = uiState.rotationX
-                                    rotationY = uiState.rotationY
-                                    rotationZ = uiState.rotationZ
-                                    translationX = uiState.offset.x
-                                    translationY = uiState.offset.y
-                                }
+                                scaleX = uiState.scale
+                                scaleY = uiState.scale
+                                rotationX = uiState.rotationX
+                                rotationY = uiState.rotationY
+                                rotationZ = uiState.rotationZ
+                                translationX = uiState.offset.x
+                                translationY = uiState.offset.y
                             }
-                            .transformable(state = transformState, enabled = !isWarpEnabled)
+                            .transformable(state = transformState)
+                            .pointerInput(Unit) {
+                                detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                            }
                     ) {
-                        withTransform({
-                            if (isWarpEnabled) {
-                                val matrix = androidx.compose.ui.graphics.Matrix()
-                                val values = FloatArray(9)
-                                perspectiveMatrix.getValues(values)
-                                matrix.values[0] = values[0]
-                                matrix.values[1] = values[1]
-                                matrix.values[3] = values[2]
-                                matrix.values[4] = values[3]
-                                matrix.values[5] = values[4]
-                                matrix.values[7] = values[5]
-                                matrix.values[12] = values[6]
-                                matrix.values[13] = values[7]
-                                matrix.values[15] = values[8]
-                                transform(matrix)
-                            }
-                        }) {
-                            drawImage(
-                                image = bmp.asImageBitmap(),
-                                alpha = uiState.opacity,
-                                colorFilter = ColorFilter.colorMatrix(colorMatrix)
-                            )
-                        }
-                    }
-                }
-
-                if (uiState.points.isNotEmpty() && isWarpEnabled) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        uiState.points.forEach { offset ->
-                            drawCircle(
-                                color = Color.White,
-                                radius = 20f,
-                                center = offset,
-                                style = Stroke(width = 5f)
-                            )
-                        }
-                    }
-
-                    uiState.points.forEachIndexed { index, offset ->
-                        Box(
-                            modifier = Modifier
-                                .offset {
-                                    IntOffset(
-                                        offset.x.roundToInt(),
-                                        offset.y.roundToInt()
-                                    )
-                                }
-                                .size(40.dp)
-                                .pointerInput(Unit) {
-                                    detectDragGestures { change, dragAmount ->
-                                        change.consume()
-                                        onPointChanged(index, offset + dragAmount)
-                                    }
-                                }
+                        drawImage(
+                            image = bmp.asImageBitmap(),
+                            alpha = uiState.opacity,
+                            colorFilter = ColorFilter.colorMatrix(colorMatrix)
                         )
                     }
                 }
