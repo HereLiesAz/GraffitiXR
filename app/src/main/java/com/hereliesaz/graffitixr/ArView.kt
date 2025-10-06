@@ -38,6 +38,7 @@ fun ArView(
     onArObjectRotated: (pitch: Float, yaw: Float, roll: Float) -> Unit,
     onArObjectPanned: (Offset) -> Unit,
     onCycleRotationAxis: () -> Unit,
+    onArDrawingProgressChanged: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -50,7 +51,8 @@ fun ArView(
             view = glSurfaceView,
             onArImagePlaced = onArImagePlaced,
             onArFeaturesDetected = onArFeaturesDetected,
-            onPlanesDetected = onPlanesDetected
+            onPlanesDetected = onPlanesDetected,
+            onArDrawingProgressChanged = onArDrawingProgressChanged
         )
     }
 

@@ -69,7 +69,8 @@ private fun ArContent(
             onArObjectScaleChanged = viewModel::onArObjectScaleChanged,
             onArObjectRotated = viewModel::onArObjectRotated,
             onArObjectPanned = viewModel::onArObjectPanned,
-            onCycleRotationAxis = viewModel::onCycleRotationAxis
+            onCycleRotationAxis = viewModel::onCycleRotationAxis,
+            onArDrawingProgressChanged = viewModel::onArDrawingProgressChanged
         )
 
         if (!uiState.arePlanesDetected && uiState.arState == com.hereliesaz.graffitixr.ArState.SEARCHING) {

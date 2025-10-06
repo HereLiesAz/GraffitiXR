@@ -221,4 +221,8 @@ class MainViewModel(
             savedStateHandle["uiState"] = uiState.value.copy(showRotationAxisFeedback = false)
         }
     }
+
+    fun onArDrawingProgressChanged(progress: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
+    }
 }

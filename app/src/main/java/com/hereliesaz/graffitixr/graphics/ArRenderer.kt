@@ -9,7 +9,6 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
 import android.view.View
-import androidx.compose.ui.geometry.Offset
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
@@ -25,10 +24,7 @@ import com.hereliesaz.graffitixr.ArState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.opencv.core.DMatch
 import org.opencv.core.Mat
-import org.opencv.core.MatOfDMatch
-import org.opencv.features2d.DescriptorMatcher
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -49,11 +45,10 @@ class ArRenderer(
     private val simpleQuadRenderer = SimpleQuadRenderer()
     private val projectedImageRenderer = ProjectedImageRenderer()
     private val markerDetector = MarkerDetector()
-    private val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
     private val displayRotationHelper = DisplayRotationHelper(context)
 
 
-    private val tapQueue = ConcurrentLinkedQueue<Offset>()
+    private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
 
     var arImagePose: FloatArray? = null
     var arFeaturePattern: ArFeaturePattern? = null
@@ -142,8 +137,6 @@ class ArRenderer(
                     onPlanesDetected(false)
                     if (!featurePatternGenerated) {
                         generateFeaturePattern(frame)
-                    } else {
-                        trackFeatureProgress(frame)
                     }
                 }
             }
@@ -164,8 +157,8 @@ class ArRenderer(
                 } else { // SEARCHING or PLACED
                     arImagePose?.let { poseMatrix ->
                         val modelMatrix = poseMatrix.clone()
-                        val rotationMatrix = arObjectOrientation.toRotationMatrix()
-                        Matrix.multiplyMM(modelMatrix, 0, modelMatrix, 0, rotationMatrix, 0)
+                        val orientation = arObjectOrientation.toGlMatrix()
+                        Matrix.multiplyMM(modelMatrix, 0, modelMatrix, 0, orientation, 0)
                         Matrix.scaleM(modelMatrix, 0, arObjectScale, arObjectScale, arObjectScale)
                         simpleQuadRenderer.draw(modelMatrix, viewMatrix, projectionMatrix, bmp, opacity)
                     }
@@ -176,7 +169,7 @@ class ArRenderer(
 
     fun onSurfaceTapped(x: Float, y: Float) {
         if (arState == ArState.SEARCHING) {
-            tapQueue.add(Offset(x,y))
+            tapQueue.add(Pair(x, y))
         }
     }
 
@@ -184,7 +177,7 @@ class ArRenderer(
         val tap = tapQueue.poll() ?: return
         val cameraPose = frame.camera.pose
 
-        for (hit in frame.hitTest(tap.x, tap.y)) {
+        for (hit in frame.hitTest(tap.first, tap.second)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
                 val planeNormal = trackable.centerPose.yAxis
@@ -199,34 +192,6 @@ class ArRenderer(
                     onArImagePlaced(hit.createAnchor())
                     break
                 }
-            }
-        }
-    }
-
-    private fun trackFeatureProgress(frame: Frame) {
-        arFeaturePattern?.let { pattern ->
-            if (pattern.descriptors.rows() == 0) {
-                onArDrawingProgressChanged(0f)
-                return
-            }
-
-            try {
-                val image = frame.acquireCameraImage()
-                val mat = ImageConverter.toMat(image)
-                val (_, currentDescriptors) = markerDetector.detectAndCompute(mat)
-                image.close()
-
-                if (currentDescriptors.rows() > 0) {
-                    val matches = MatOfDMatch()
-                    matcher.match(currentDescriptors, pattern.descriptors, matches)
-                    val goodMatches = matches.toList().filter { it.distance < 70 }
-                    val progress = goodMatches.size.toFloat() / pattern.descriptors.rows().toFloat()
-                    onArDrawingProgressChanged(progress.coerceIn(0f, 1f))
-                } else {
-                    onArDrawingProgressChanged(0f)
-                }
-            } catch (e: NotYetAvailableException) {
-                // Ignore frame if image is not available
             }
         }
     }

@@ -86,5 +86,6 @@ data class UiState(
     val rotationX: Float = 0f,
     val rotationY: Float = 0f,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
-    val showRotationAxisFeedback: Boolean = false
+    val showRotationAxisFeedback: Boolean = false,
+    val arDrawingProgress: Float = 0f
 ) : Parcelable
