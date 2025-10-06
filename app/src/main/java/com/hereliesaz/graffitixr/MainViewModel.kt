@@ -13,9 +13,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
-import android.view.View
 import com.hereliesaz.graffitixr.graphics.Quaternion
-import com.hereliesaz.graffitixr.utils.captureViewAsBitmap
 import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
@@ -25,18 +23,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * The central ViewModel for the application, acting as the single source of truth for the UI state
- * and the handler for all user events.
- *
- * This class follows the MVVM architecture pattern. It holds the application's UI state in a
- * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
- * configuration changes but also system-initiated process death, providing a robust user experience.
- *
- * @param application The application instance, used for accessing the application context.
- * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory,
- * used to store and restore the [UiState].
- */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
@@ -184,17 +170,22 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
     }
 
-    fun onSaveClicked(view: View, navRailWidth: Int) {
+    fun onArDrawingProgressChanged(progress: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
+    }
+
+    fun onSaveClicked() {
+        if (uiState.value.editorMode == EditorMode.AR) {
+            savedStateHandle["uiState"] = uiState.value.copy(saveRequestTimestamp = System.currentTimeMillis())
+        } else {
+            // Handle saving for non-AR modes if needed
+        }
+    }
+
+    fun onBitmapReadyForSaving(bitmap: Bitmap) {
         viewModelScope.launch {
-            val fullBitmap = captureViewAsBitmap(view)
-            val croppedBitmap = Bitmap.createBitmap(
-                fullBitmap,
-                navRailWidth,
-                0,
-                fullBitmap.width - navRailWidth,
-                fullBitmap.height
-            )
-            saveBitmapToGallery(getApplication(), croppedBitmap, "GraffitiXR_Export_${System.currentTimeMillis()}")
+            saveBitmapToGallery(getApplication(), bitmap, "GraffitiXR_Export_${System.currentTimeMillis()}")
+            savedStateHandle["uiState"] = uiState.value.copy(saveRequestTimestamp = null) // Reset timestamp
         }
     }
 }

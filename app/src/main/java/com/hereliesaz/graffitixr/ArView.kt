@@ -1,11 +1,11 @@
 package com.hereliesaz.graffitixr
 
+import android.graphics.Bitmap
 import android.net.Uri
 import android.opengl.GLSurfaceView
-import android.view.GestureDetector
-import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
+import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.PixelCopy
 import android.view.ScaleGestureDetector
@@ -119,8 +119,8 @@ fun ArView(
             val view = glSurfaceView
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             val handler = Handler(Looper.getMainLooper())
-            PixelCopy.request(view, bitmap, { result ->
-                if (result == PixelCopy.SUCCESS) {
+            PixelCopy.request(view, bitmap, {
+                if (it == PixelCopy.SUCCESS) {
                     onBitmapReadyForSaving(bitmap)
                 }
             }, handler)
