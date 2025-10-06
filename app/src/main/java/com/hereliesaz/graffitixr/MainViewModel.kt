@@ -139,28 +139,38 @@ class MainViewModel(
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
-        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
+        val dampedScaleFactor = 1.0f + (scaleFactor - 1.0f) * 0.25f
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * dampedScaleFactor)
     }
 
     fun onArObjectRotated(pitch: Float, yaw: Float, roll: Float) {
+        val damping = 0.25f
         val currentOrientation = uiState.value.arObjectOrientation
 
-        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch)
-        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw)
-        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll)
+        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch * damping)
+        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw * damping)
+        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll * damping)
 
         val newOrientation = currentOrientation * yawRotation * pitchRotation * rollRotation
         savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
     }
 
-    fun onArObjectPanned(delta: Offset) {
-        val currentPose = uiState.value.arImagePose ?: return
+    fun onArObjectPanned(delta: Offset, cameraPose: Pose?) {
+        val objectPose = uiState.value.arImagePose ?: return
+        val camPose = cameraPose ?: return
 
-        // A simple approximation: translate the object on the XY plane of its current pose.
-        // This doesn't account for camera perspective, so it might feel unnatural.
-        // A more advanced implementation would project the 2D pan onto the 3D plane.
-        val panScaleFactor = 0.005f
-        val newPose = currentPose.compose(Pose.makeTranslation(delta.x * panScaleFactor, -delta.y * panScaleFactor, 0f))
+        val panScaleFactor = 0.001f
+
+        val right = camPose.xAxis
+        val up = camPose.yAxis
+
+        val worldDeltaX = right[0] * delta.x * panScaleFactor + up[0] * -delta.y * panScaleFactor
+        val worldDeltaY = right[1] * delta.x * panScaleFactor + up[1] * -delta.y * panScaleFactor
+        val worldDeltaZ = right[2] * delta.x * panScaleFactor + up[2] * -delta.y * panScaleFactor
+
+        val translation = floatArrayOf(worldDeltaX, worldDeltaY, worldDeltaZ)
+        val newPose = objectPose.compose(Pose.makeTranslation(translation))
+
         savedStateHandle["uiState"] = uiState.value.copy(arImagePose = newPose)
     }
 

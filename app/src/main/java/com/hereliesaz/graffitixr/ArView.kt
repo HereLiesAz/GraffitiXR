@@ -3,7 +3,10 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -36,7 +39,7 @@ fun ArView(
     onPlanesDetected: (Boolean) -> Unit,
     onArObjectScaleChanged: (Float) -> Unit,
     onArObjectRotated: (pitch: Float, yaw: Float, roll: Float) -> Unit,
-    onArObjectPanned: (Offset) -> Unit,
+    onArObjectPanned: (Offset, Pose?) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onArDrawingProgressChanged: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -56,41 +59,49 @@ fun ArView(
         )
     }
 
-    AndroidView(
-        factory = {
-            glSurfaceView.apply {
-                setEGLContextClientVersion(3)
-                setRenderer(renderer)
-                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-            }
-        },
-        modifier = modifier.pointerInput(activeRotationAxis) {
-            detectTapGestures(
-                onTap = { offset -> renderer.onSurfaceTapped(offset.x, offset.y) },
-                onDoubleTap = { onCycleRotationAxis() }
-            )
-            detectTransformGestures { _, pan, zoom, rotation ->
-                onArObjectScaleChanged(zoom)
-                onArObjectPanned(pan)
-                when (activeRotationAxis) {
-                    RotationAxis.X -> onArObjectRotated(rotation, 0f, 0f)
-                    RotationAxis.Y -> onArObjectRotated(0f, rotation, 0f)
-                    RotationAxis.Z -> onArObjectRotated(0f, 0f, rotation)
-                }
-            }
-        },
-        update = {
-            renderer.overlayImageUri = overlayImageUri
-            renderer.opacity = opacity
-            renderer.arImagePose = arImagePose?.let { pose ->
-                FloatArray(16).also { pose.toMatrix(it, 0) }
-            }
-            renderer.arFeaturePattern = arFeaturePattern
-            renderer.arState = arState
-            renderer.arObjectScale = arObjectScale
-            renderer.arObjectOrientation = arObjectOrientation
+    val transformState = rememberTransformableState { zoomChange, panChange, rotationChange ->
+        onArObjectScaleChanged(zoomChange)
+        onArObjectPanned(panChange, renderer.latestCameraPose)
+        when (activeRotationAxis) {
+            RotationAxis.X -> onArObjectRotated(rotationChange, 0f, 0f)
+            RotationAxis.Y -> onArObjectRotated(0f, rotationChange, 0f)
+            RotationAxis.Z -> onArObjectRotated(0f, 0f, rotationChange)
         }
-    )
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .transformable(state = transformState)
+            .pointerInput(activeRotationAxis) {
+                detectTapGestures(
+                    onTap = { offset -> renderer.onSurfaceTapped(offset.x, offset.y) },
+                    onDoubleTap = { onCycleRotationAxis() }
+                )
+            }
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                glSurfaceView.apply {
+                    setEGLContextClientVersion(3)
+                    setRenderer(renderer)
+                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                }
+            },
+            update = {
+                renderer.overlayImageUri = overlayImageUri
+                renderer.opacity = opacity
+                renderer.arImagePose = arImagePose?.let { pose ->
+                    FloatArray(16).also { pose.toMatrix(it, 0) }
+                }
+                renderer.arFeaturePattern = arFeaturePattern
+                renderer.arState = arState
+                renderer.arObjectScale = arObjectScale
+                renderer.arObjectOrientation = arObjectOrientation
+            }
+        )
+    }
 
     DisposableEffect(lifecycleOwner, renderer, glSurfaceView) {
         val observer = object : DefaultLifecycleObserver {
