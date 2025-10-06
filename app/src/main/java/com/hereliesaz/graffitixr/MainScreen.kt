@@ -77,8 +77,7 @@ fun MainScreen(viewModel: MainViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .zIndex(1f),
+                .fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
@@ -110,39 +109,55 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        AzNavRail {
-            azSettings(isLoading = uiState.isLoading,
-                packRailButtons = true
-            )
+        Box(modifier = Modifier.zIndex(2f)) {
+            AzNavRail {
+                azSettings(
+                    isLoading = uiState.isLoading,
+                    packRailButtons = true
+                )
 
 
-            azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-            azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
-            azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+                azMenuItem(
+                    id = "ar_overlay",
+                    text = "AR Overlay",
+                    onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+                azMenuItem(
+                    id = "trace_image",
+                    text = "Trace Image",
+                    onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
+                azMenuItem(
+                    id = "mockup",
+                    text = "Mockup",
+                    onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
-            azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
+                azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
 
-            azRailItem(id = "overlay", text = "Image") {
-                overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
-
-            if (uiState.editorMode == EditorMode.STATIC) {
-                azRailItem(id = "background", text = "Background") {
-                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                azRailItem(id = "overlay", text = "Image") {
+                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
-            }
 
-            if (uiState.overlayImageUri != null) {
-                 azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
-            }
+                if (uiState.editorMode == EditorMode.STATIC) {
+                    azRailItem(id = "background", text = "Background") {
+                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                }
 
-            if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
-                azRailItem(id = "lock_ar", text = "Lock", onClick = viewModel::onArLockClicked)
-            }
+                if (uiState.overlayImageUri != null) {
+                    azRailItem(
+                        id = "remove_bg",
+                        text = "Remove\n Background",
+                        onClick = viewModel::onRemoveBackgroundClicked
+                    )
+                }
 
-            azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-            azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-            azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+                if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
+                    azRailItem(id = "lock_ar", text = "Lock", onClick = viewModel::onArLockClicked)
+                }
+
+                azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
+                azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
+                azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+            }
         }
 
         when (showSliderDialog) {
