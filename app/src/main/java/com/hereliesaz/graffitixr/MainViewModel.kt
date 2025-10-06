@@ -13,7 +13,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import android.view.View
 import com.hereliesaz.graffitixr.graphics.Quaternion
+import com.hereliesaz.graffitixr.utils.captureViewAsBitmap
 import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
@@ -182,19 +184,17 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
     }
 
-    fun onArDrawingProgressChanged(progress: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
-    }
-
-    fun onSaveClicked() {
-        savedStateHandle["uiState"] = uiState.value.copy(saveRequestTimestamp = System.currentTimeMillis())
-    }
-
-    fun onBitmapReadyForSaving(bitmap: Bitmap) {
+    fun onSaveClicked(view: View, navRailWidth: Int) {
         viewModelScope.launch {
-            saveBitmapToGallery(getApplication(), bitmap, "GraffitiXR_Export_${System.currentTimeMillis()}")
-            // Reset the request timestamp after saving to prevent re-triggering
-            savedStateHandle["uiState"] = uiState.value.copy(saveRequestTimestamp = null)
+            val fullBitmap = captureViewAsBitmap(view)
+            val croppedBitmap = Bitmap.createBitmap(
+                fullBitmap,
+                navRailWidth,
+                0,
+                fullBitmap.width - navRailWidth,
+                fullBitmap.height
+            )
+            saveBitmapToGallery(getApplication(), croppedBitmap, "GraffitiXR_Export_${System.currentTimeMillis()}")
         }
     }
 }

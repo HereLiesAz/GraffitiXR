@@ -12,6 +12,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.OutputStream
 
+/**
+ * Captures the content of a given [View] and returns it as a [Bitmap].
+ *
+ * @param view The view to capture.
+ * @return A [Bitmap] representing the view's content.
+ */
 fun captureViewAsBitmap(view: View): Bitmap {
     val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -19,6 +25,16 @@ fun captureViewAsBitmap(view: View): Bitmap {
     return bitmap
 }
 
+/**
+ * Saves a [Bitmap] to the device's image gallery.
+ *
+ * This function uses the [MediaStore] API to create a new image entry and writes the
+ * bitmap data to it. It provides user feedback via [Toast] messages on success or failure.
+ *
+ * @param context The application context.
+ * @param bitmap The [Bitmap] to save.
+ * @param displayName The desired display name for the image file in the gallery.
+ */
 suspend fun saveBitmapToGallery(context: Context, bitmap: Bitmap, displayName: String) {
     withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
