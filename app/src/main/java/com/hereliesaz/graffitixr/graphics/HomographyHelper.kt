@@ -52,7 +52,9 @@ object HomographyHelper {
 
         val dstPoints = MatOfPoint2f().apply { fromList(screenPoints) }
 
-        if (dstPoints.rows() < 4) return null
+        if (dstPoints.rows() < 4 || srcPoints.rows() < 4 || srcPoints.rows() != dstPoints.rows()) {
+            return null
+        }
 
         return Calib3d.findHomography(srcPoints, dstPoints, Calib3d.RANSAC, 5.0)
     }
