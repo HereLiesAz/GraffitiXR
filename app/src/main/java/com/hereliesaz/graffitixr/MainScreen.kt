@@ -26,7 +26,6 @@ import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
-import com.hereliesaz.graffitixr.composables.TitleOverlay
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 
@@ -48,6 +47,7 @@ fun MainScreen(viewModel: MainViewModel) {
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
     val view = LocalView.current
     val density = LocalDensity.current
+    val navRailWidthPx = with(density) { 80.dp.toPx() }.toInt()
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -94,8 +94,6 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        TitleOverlay(editorMode = uiState.editorMode)
-
         AzNavRail {
             azSettings(isLoading = uiState.isLoading,
                 packRailButtons = true
@@ -112,7 +110,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
             azRailItem(id = "save", text = "Save") {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || writePermissionState.status.isGranted) {
-                    val navRailWidthPx = with(density) { 80.dp.toPx() }.toInt()
                     viewModel.onSaveClicked(view, navRailWidthPx)
                 } else {
                     writePermissionState.launchPermissionRequest()
