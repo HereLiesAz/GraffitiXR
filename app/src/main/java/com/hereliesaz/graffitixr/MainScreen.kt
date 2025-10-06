@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr
 
+import android.Manifest
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +16,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
@@ -30,12 +38,16 @@ import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
  *
  * @param viewModel The [MainViewModel] instance that holds the application's state and business logic.
  */
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var isWarpEnabled by remember { mutableStateOf(true) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val navRailWidthPx = with(density) { 80.dp.toPx() }.toInt()
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -91,6 +103,18 @@ fun MainScreen(viewModel: MainViewModel) {
             azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
             azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+
+            val writePermissionState = rememberPermissionState(
+                permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+            )
+
+            azRailItem(id = "save", text = "Save") {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || writePermissionState.status.isGranted) {
+                    viewModel.onSaveClicked(view, navRailWidthPx)
+                } else {
+                    writePermissionState.launchPermissionRequest()
+                }
+            }
 
             azRailItem(id = "overlay", text = "Image") {
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
