@@ -1,8 +1,11 @@
 package com.hereliesaz.graffitixr.composables
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,15 +28,16 @@ fun TitleOverlay(editorMode: EditorMode) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp),
-        contentAlignment = Alignment.TopCenter
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .padding(top = 16.dp, end = 16.dp),
+        contentAlignment = Alignment.TopEnd
     ) {
         Text(
             text = title,
             color = Color.White,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.End
         )
     }
 }
