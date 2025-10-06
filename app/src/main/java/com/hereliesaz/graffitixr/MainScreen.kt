@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
@@ -25,6 +26,7 @@ import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
+import com.hereliesaz.graffitixr.utils.captureWindow
 
 /**
  * The main screen of the application.
@@ -40,12 +42,27 @@ fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
-    var isWarpEnabled by remember { mutableStateOf(false) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
             showOnboardingForMode = uiState.editorMode
+        }
+    }
+
+    LaunchedEffect(viewModel, context) {
+        viewModel.captureEvent.collect { event ->
+            when (event) {
+                is CaptureEvent.RequestCapture -> {
+                    (context as? Activity)?.let { activity ->
+                        captureWindow(activity) { bitmap ->
+                            bitmap?.let {
+                                viewModel.saveCapturedBitmap(it)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -60,7 +77,8 @@ fun MainScreen(viewModel: MainViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                .zIndex(1f),
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
@@ -76,10 +94,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     onRotationZChanged = viewModel::onRotationZChanged,
                     onRotationXChanged = viewModel::onRotationXChanged,
                     onRotationYChanged = viewModel::onRotationYChanged,
-                    onPointsInitialized = viewModel::onPointsInitialized,
-                    onPointChanged = viewModel::onPointChanged,
-                    onCycleRotationAxis = viewModel::onCycleRotationAxis,
-                    isWarpEnabled = isWarpEnabled
+                    onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
@@ -104,11 +119,7 @@ fun MainScreen(viewModel: MainViewModel) {
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
             azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
-            azRailItem(id = "save", text = "Save") {
-                (context as? Activity)?.let {
-                    viewModel.onSaveClicked(it)
-                }
-            }
+            azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
 
             azRailItem(id = "overlay", text = "Image") {
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -117,13 +128,6 @@ fun MainScreen(viewModel: MainViewModel) {
             if (uiState.editorMode == EditorMode.STATIC) {
                 azRailItem(id = "background", text = "Background") {
                     backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-
-                azRailItem(
-                    id = "toggle_warp",
-                    text = if (isWarpEnabled) "Warp" else "Transform"
-                ) {
-                    isWarpEnabled = !isWarpEnabled
                 }
             }
 

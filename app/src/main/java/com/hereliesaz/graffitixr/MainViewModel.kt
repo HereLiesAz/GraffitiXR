@@ -13,19 +13,23 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
-import android.app.Activity
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
-import com.hereliesaz.graffitixr.utils.captureWindow
 import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+
+sealed class CaptureEvent {
+    object RequestCapture : CaptureEvent()
+}
 
 /**
  * The central ViewModel for the application, acting as the single source of truth for the UI state
@@ -45,6 +49,9 @@ class MainViewModel(
 ) : AndroidViewModel(application) {
 
     val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
+
+    private val _captureEvent = MutableSharedFlow<CaptureEvent>()
+    val captureEvent = _captureEvent.asSharedFlow()
 
     private suspend fun removeBackground(uri: Uri): Uri? {
         return withContext(Dispatchers.IO) {
@@ -129,15 +136,6 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(rotationZ = currentRotation + rotationDelta)
     }
 
-    fun onPointsInitialized(points: List<Offset>) {
-        savedStateHandle["uiState"] = uiState.value.copy(points = points)
-    }
-
-    fun onPointChanged(index: Int, offset: Offset) {
-        val newPoints = uiState.value.points.toMutableList()
-        newPoints[index] = offset
-        savedStateHandle["uiState"] = uiState.value.copy(points = newPoints)
-    }
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
@@ -230,32 +228,25 @@ class MainViewModel(
     }
 
     /**
-     * Handles the save button click event.
-     * Captures the current screen content as a bitmap and saves it to the device's gallery.
-     *
-     * @param activity The current activity, required for capturing the window content.
+     * Handles the save button click event by emitting a capture request event.
      */
-    fun onSaveClicked(activity: Activity) {
+    fun onSaveClicked() {
+        viewModelScope.launch {
+            _captureEvent.emit(CaptureEvent.RequestCapture)
+        }
+    }
+
+    /**
+     * Saves a captured bitmap to the gallery.
+     *
+     * @param bitmap The bitmap to save.
+     */
+    fun saveCapturedBitmap(bitmap: Bitmap) {
         viewModelScope.launch {
             setLoading(true)
-            // Use the captureWindow utility to get a bitmap of the screen
-            captureWindow(activity) { bitmap ->
-                if (bitmap != null) {
-                    // Launch a new coroutine to save the bitmap
-                    viewModelScope.launch {
-                        saveBitmapToGallery(getApplication(), bitmap)
-                        // Reset loading state on the main thread
-                        withContext(Dispatchers.Main) {
-                            setLoading(false)
-                        }
-                    }
-                } else {
-                    // Handle the case where bitmap capture failed
-                    viewModelScope.launch(Dispatchers.Main) {
-                        setLoading(false)
-                        // Optionally show an error message to the user
-                    }
-                }
+            saveBitmapToGallery(getApplication(), bitmap)
+            withContext(Dispatchers.Main) {
+                setLoading(false)
             }
         }
     }
