@@ -2,8 +2,6 @@ package com.hereliesaz.graffitixr
 
 import android.net.Uri
 import android.opengl.GLSurfaceView
-import android.net.Uri
-import android.opengl.GLSurfaceView
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
