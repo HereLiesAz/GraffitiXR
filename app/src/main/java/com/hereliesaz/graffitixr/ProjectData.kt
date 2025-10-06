@@ -4,6 +4,7 @@ import android.net.Uri
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.PoseSerializer
+import com.hereliesaz.graffitixr.utils.QuaternionSerializer
 import com.hereliesaz.graffitixr.utils.UriSerializer
 import kotlinx.serialization.Serializable
 
@@ -29,5 +30,6 @@ data class ProjectData(
     @Serializable(with = PoseSerializer::class)
     val arImagePose: Pose?,
     val arObjectScale: Float,
+    @Serializable(with = QuaternionSerializer::class)
     val arObjectOrientation: Quaternion
 )

@@ -4,7 +4,6 @@ import android.os.Parcel
 import android.os.Parcelable
 import kotlinx.parcelize.Parceler
 import kotlinx.parcelize.Parcelize
-import org.opencv.core.CvType
 import org.opencv.core.Mat
 
 /**
@@ -36,13 +35,16 @@ data class ArFeaturePattern(
             val matData = ByteArray(parcel.readInt())
             parcel.readByteArray(matData)
             val descriptors = Mat(rows, cols, type)
-            if(rows > 0 && cols > 0) {
+            if (rows > 0 && cols > 0) {
                 descriptors.put(0, 0, matData)
             }
 
             // Read world points
+            val listSize = parcel.readInt()
             val pointsList = mutableListOf<FloatArray>()
-            parcel.readList(pointsList as List<*>, FloatArray::class.java.classLoader)
+            for (i in 0 until listSize) {
+                parcel.createFloatArray()?.let { pointsList.add(it) }
+            }
 
             return ArFeaturePattern(descriptors, pointsList)
         }
@@ -50,7 +52,7 @@ data class ArFeaturePattern(
         override fun ArFeaturePattern.write(parcel: Parcel, flags: Int) {
             // Write descriptors Mat
             val matData = ByteArray(descriptors.total().toInt() * descriptors.elemSize().toInt())
-            if(descriptors.rows() > 0 && descriptors.cols() > 0) {
+            if (descriptors.rows() > 0 && descriptors.cols() > 0) {
                 descriptors.get(0, 0, matData)
             }
             parcel.writeInt(descriptors.rows())
@@ -60,7 +62,10 @@ data class ArFeaturePattern(
             parcel.writeByteArray(matData)
 
             // Write world points
-            parcel.writeList(worldPoints)
+            parcel.writeInt(worldPoints.size)
+            for (point in worldPoints) {
+                parcel.writeFloatArray(point)
+            }
         }
     }
 }

@@ -18,6 +18,7 @@ package com.google.ar.core.examples.java.common.helpers
 import android.app.Activity
 import android.content.Context
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.view.Display
 import android.view.WindowManager
 import com.google.ar.core.Session
@@ -29,8 +30,17 @@ import com.google.ar.core.Session
 class DisplayRotationHelper(private val context: Context) : DisplayManager.DisplayListener {
     private var viewportWidth = 0
     private var viewportHeight = 0
-    private val display: Display = context.getSystemService(WindowManager::class.java).defaultDisplay
+    private val display: Display?
     private var viewportChanged = false
+
+    init {
+        display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.display
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(WindowManager::class.java).defaultDisplay
+        }
+    }
 
     /** Registers the display listener. Should be called from [Activity.onResume].  */
     fun onResume() {
@@ -61,8 +71,10 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
      */
     fun updateSessionIfNeeded(session: Session) {
         if (viewportChanged) {
-            val displayRotation = display.rotation
-            session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
+            display?.let {
+                val displayRotation = it.rotation
+                session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
+            }
             viewportChanged = false
         }
     }

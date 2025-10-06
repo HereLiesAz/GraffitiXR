@@ -12,14 +12,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun ProgressIndicator(progress: Float, modifier: Modifier = Modifier) {
+fun ProgressIndicator(progress: () -> Float, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         LinearProgressIndicator(progress = progress)
         Text(
-            text = "Coverage: ${(progress * 100).toInt()}%",
+            text = "Coverage: ${(progress() * 100).toInt()}%",
             color = Color.White,
             fontSize = 16.sp,
             modifier = Modifier.padding(top = 4.dp)

@@ -70,7 +70,6 @@ class PlaneRenderer {
             Plane.Type.HORIZONTAL_UPWARD_FACING -> floatArrayOf(0.0f, 1.0f, 0.0f, 0.5f) // Green
             Plane.Type.HORIZONTAL_DOWNWARD_FACING -> floatArrayOf(1.0f, 0.0f, 0.0f, 0.5f) // Red
             Plane.Type.VERTICAL -> floatArrayOf(0.0f, 0.0f, 1.0f, 0.5f) // Blue
-            else -> floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f) // Gray
         }
         GLES20.glUniform4fv(colorUniform, 1, color, 0)
 
