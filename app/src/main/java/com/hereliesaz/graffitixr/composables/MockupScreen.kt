@@ -121,7 +121,8 @@ fun MockupScreen(
             )
         }
 
-        uiState.overlayImageUri?.let { uri ->
+        val imageUri = uiState.backgroundRemovedImageUri ?: uiState.overlayImageUri
+        imageUri?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
             LaunchedEffect(uri) {

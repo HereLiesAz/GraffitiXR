@@ -39,7 +39,7 @@ fun ArView(
     onPlanesDetected: (Boolean) -> Unit,
     onArObjectScaleChanged: (Float) -> Unit,
     onArObjectRotated: (pitch: Float, yaw: Float, roll: Float) -> Unit,
-    onArObjectPanned: (Offset) -> Unit,
+    onArObjectPanned: (Offset, Pose?) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onArDrawingProgressChanged: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -61,7 +61,7 @@ fun ArView(
 
     val transformState = rememberTransformableState { zoomChange, panChange, rotationChange ->
         onArObjectScaleChanged(zoomChange)
-        onArObjectPanned(panChange)
+        onArObjectPanned(panChange, renderer.latestCameraPose)
         when (activeRotationAxis) {
             RotationAxis.X -> onArObjectRotated(rotationChange, 0f, 0f)
             RotationAxis.Y -> onArObjectRotated(0f, rotationChange, 0f)

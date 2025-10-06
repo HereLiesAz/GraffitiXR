@@ -158,14 +158,22 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
     }
 
-    fun onArObjectPanned(delta: Offset) {
-        val currentPose = uiState.value.arImagePose ?: return
+    fun onArObjectPanned(delta: Offset, cameraPose: Pose?) {
+        val objectPose = uiState.value.arImagePose ?: return
+        val camPose = cameraPose ?: return
 
-        // A simple approximation: translate the object on the XY plane of its current pose.
-        // This doesn't account for camera perspective, so it might feel unnatural.
-        // A more advanced implementation would project the 2D pan onto the 3D plane.
-        val panScaleFactor = 0.005f
-        val newPose = currentPose.compose(Pose.makeTranslation(delta.x * panScaleFactor, -delta.y * panScaleFactor, 0f))
+        val panScaleFactor = 0.001f
+
+        val right = camPose.xAxis
+        val up = camPose.yAxis
+
+        val worldDeltaX = right[0] * delta.x * panScaleFactor + up[0] * -delta.y * panScaleFactor
+        val worldDeltaY = right[1] * delta.x * panScaleFactor + up[1] * -delta.y * panScaleFactor
+        val worldDeltaZ = right[2] * delta.x * panScaleFactor + up[2] * -delta.y * panScaleFactor
+
+        val translation = floatArrayOf(worldDeltaX, worldDeltaY, worldDeltaZ)
+        val newPose = objectPose.compose(Pose.makeTranslation(translation))
+
         savedStateHandle["uiState"] = uiState.value.copy(arImagePose = newPose)
     }
 

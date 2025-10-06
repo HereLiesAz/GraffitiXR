@@ -118,11 +118,11 @@ fun MainScreen(viewModel: MainViewModel) {
             AzNavRail {
                 azMenuItem(
                     id = "ar_overlay",
-                    text = "AR Overlay",
+                    text = "Overlay",
                     onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
                 azMenuItem(
                     id = "trace_image",
-                    text = "Trace Image",
+                    text = "Trace",
                     onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
                 azMenuItem(
                     id = "mockup",
@@ -208,8 +208,13 @@ fun MainScreen(viewModel: MainViewModel) {
                 .padding(bottom = 32.dp)
         )
 
+        val title = when (uiState.editorMode) {
+            EditorMode.AR -> "Overlay"
+            EditorMode.NON_AR -> "Trace"
+            EditorMode.STATIC -> "Mockup"
+        }
         TitleOverlay(
-            title = uiState.editorMode.name,
+            title = title,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(16.dp)
