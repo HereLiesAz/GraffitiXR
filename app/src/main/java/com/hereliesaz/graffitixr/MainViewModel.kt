@@ -12,17 +12,30 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
+import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.removeBackground
-import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
+/**
+ * The central ViewModel for the application, acting as the single source of truth for the UI state
+ * and the handler for all user events.
+ *
+ * This class follows the MVVM architecture pattern. It holds the application's UI state in a
+ * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
+ * configuration changes but also system-initiated process death, providing a robust user experience.
+ *
+ * @param application The application instance, used for accessing the application context.
+ * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory,
+ * used to store and restore the [UiState].
+ */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
@@ -139,6 +152,17 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
     }
 
+    fun onArObjectPanned(delta: Offset) {
+        val currentPose = uiState.value.arImagePose ?: return
+
+        // A simple approximation: translate the object on the XY plane of its current pose.
+        // This doesn't account for camera perspective, so it might feel unnatural.
+        // A more advanced implementation would project the 2D pan onto the 3D plane.
+        val panScaleFactor = 0.005f
+        val newPose = currentPose.compose(Pose.makeTranslation(delta.x * panScaleFactor, -delta.y * panScaleFactor, 0f))
+        savedStateHandle["uiState"] = uiState.value.copy(arImagePose = newPose)
+    }
+
     fun onEditorModeChanged(mode: EditorMode) {
         savedStateHandle["uiState"] = uiState.value.copy(editorMode = mode)
     }
@@ -170,22 +194,31 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
     }
 
-    fun onArDrawingProgressChanged(progress: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
-    }
-
-    fun onSaveClicked() {
-        if (uiState.value.editorMode == EditorMode.AR) {
-            savedStateHandle["uiState"] = uiState.value.copy(saveRequestTimestamp = System.currentTimeMillis())
-        } else {
-            // Handle saving for non-AR modes if needed
+    fun onCycleRotationAxis() {
+        val currentAxis = uiState.value.activeRotationAxis
+        val nextAxis = when (currentAxis) {
+            RotationAxis.X -> RotationAxis.Y
+            RotationAxis.Y -> RotationAxis.Z
+            RotationAxis.Z -> RotationAxis.X
         }
+        savedStateHandle["uiState"] = uiState.value.copy(
+            activeRotationAxis = nextAxis,
+            showRotationAxisFeedback = true
+        )
     }
 
-    fun onBitmapReadyForSaving(bitmap: Bitmap) {
+    fun onRotationXChanged(delta: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(rotationX = uiState.value.rotationX + delta)
+    }
+
+    fun onRotationYChanged(delta: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(rotationY = uiState.value.rotationY + delta)
+    }
+
+    fun onFeedbackShown() {
         viewModelScope.launch {
-            saveBitmapToGallery(getApplication(), bitmap, "GraffitiXR_Export_${System.currentTimeMillis()}")
-            savedStateHandle["uiState"] = uiState.value.copy(saveRequestTimestamp = null) // Reset timestamp
+            delay(1000) // Keep feedback visible for 1 second
+            savedStateHandle["uiState"] = uiState.value.copy(showRotationAxisFeedback = false)
         }
     }
 }

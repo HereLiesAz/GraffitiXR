@@ -1,34 +1,28 @@
 package com.hereliesaz.graffitixr
 
-import android.Manifest
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
+import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
-import com.hereliesaz.graffitixr.utils.captureViewAsBitmap
-import kotlinx.coroutines.launch
 
 /**
  * The main screen of the application.
@@ -39,19 +33,12 @@ import kotlinx.coroutines.launch
  *
  * @param viewModel The [MainViewModel] instance that holds the application's state and business logic.
  */
-@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var isWarpEnabled by remember { mutableStateOf(true) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
-    val view = LocalView.current
-    val coroutineScope = rememberCoroutineScope()
-
-    val writePermissionState = rememberPermissionState(
-        permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
-    )
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -84,15 +71,21 @@ fun MainScreen(viewModel: MainViewModel) {
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
                     onRotationZChanged = viewModel::onRotationZChanged,
+                    onRotationXChanged = viewModel::onRotationXChanged,
+                    onRotationYChanged = viewModel::onRotationYChanged,
                     onPointsInitialized = viewModel::onPointsInitialized,
                     onPointChanged = viewModel::onPointChanged,
+                    onCycleRotationAxis = viewModel::onCycleRotationAxis,
                     isWarpEnabled = isWarpEnabled
                 )
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onScaleChanged,
                     onOffsetChanged = viewModel::onOffsetChanged,
-                    onRotationZChanged = viewModel::onRotationZChanged
+                    onRotationZChanged = viewModel::onRotationZChanged,
+                    onRotationXChanged = viewModel::onRotationXChanged,
+                    onRotationYChanged = viewModel::onRotationYChanged,
+                    onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
                 EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
@@ -107,21 +100,6 @@ fun MainScreen(viewModel: MainViewModel) {
             azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
             azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
-
-            azRailItem(id = "save", text = "Save") {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || writePermissionState.status.isGranted) {
-                    if (uiState.editorMode == EditorMode.AR) {
-                        viewModel.onSaveClicked()
-                    } else {
-                        coroutineScope.launch {
-                            val bitmap = captureViewAsBitmap(view)
-                            viewModel.onBitmapReadyForSaving(bitmap)
-                        }
-                    }
-                } else {
-                    writePermissionState.launchPermissionRequest()
-                }
-            }
 
             azRailItem(id = "overlay", text = "Image") {
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -185,5 +163,14 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
             )
         }
+
+        RotationAxisFeedback(
+            axis = uiState.activeRotationAxis,
+            visible = uiState.showRotationAxisFeedback,
+            onFeedbackShown = viewModel::onFeedbackShown,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+        )
     }
 }

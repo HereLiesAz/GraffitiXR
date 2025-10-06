@@ -4,8 +4,10 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -35,6 +37,9 @@ fun ImageTraceScreen(
     onScaleChanged: (Float) -> Unit,
     onOffsetChanged: (androidx.compose.ui.geometry.Offset) -> Unit,
     onRotationZChanged: (Float) -> Unit,
+    onRotationXChanged: (Float) -> Unit,
+    onRotationYChanged: (Float) -> Unit,
+    onCycleRotationAxis: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -70,38 +75,54 @@ fun ImageTraceScreen(
             val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
                 onScaleChanged(zoomChange)
                 onOffsetChanged(offsetChange)
-                onRotationZChanged(rotationChange)
+                when (uiState.activeRotationAxis) {
+                    com.hereliesaz.graffitixr.RotationAxis.X -> onRotationXChanged(rotationChange)
+                    com.hereliesaz.graffitixr.RotationAxis.Y -> onRotationYChanged(rotationChange)
+                    com.hereliesaz.graffitixr.RotationAxis.Z -> onRotationZChanged(rotationChange)
+                }
             }
 
-            AsyncImage(
-                model = it,
-                contentDescription = "Overlay Image",
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = uiState.scale,
-                        scaleY = uiState.scale,
-                        translationX = uiState.offset.x,
-                        translationY = uiState.offset.y,
-                        rotationZ = uiState.rotationZ,
-                        alpha = uiState.opacity
-                    )
-                    .transformable(state = transformState),
-                colorFilter = ColorFilter.colorMatrix(
-                    ColorMatrix().apply {
-                        setToSaturation(uiState.saturation)
-                        val contrastMatrix = ColorMatrix(
-                            floatArrayOf(
-                                uiState.contrast, 0f, 0f, 0f, (1 - uiState.contrast) * 128,
-                                0f, uiState.contrast, 0f, 0f, (1 - uiState.contrast) * 128,
-                                0f, 0f, uiState.contrast, 0f, (1 - uiState.contrast) * 128,
-                                0f, 0f, 0f, 1f, 0f
-                            )
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { onCycleRotationAxis() }
                         )
-                        this *= contrastMatrix
                     }
+            ) {
+                AsyncImage(
+                    model = it,
+                    contentDescription = "Overlay Image",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = uiState.scale,
+                            scaleY = uiState.scale,
+                            translationX = uiState.offset.x,
+                            translationY = uiState.offset.y,
+                            rotationX = uiState.rotationX,
+                            rotationY = uiState.rotationY,
+                            rotationZ = uiState.rotationZ,
+                            alpha = uiState.opacity
+                        )
+                        .transformable(state = transformState),
+                    colorFilter = ColorFilter.colorMatrix(
+                        ColorMatrix().apply {
+                            setToSaturation(uiState.saturation)
+                            val contrastMatrix = ColorMatrix(
+                                floatArrayOf(
+                                    uiState.contrast, 0f, 0f, 0f, (1 - uiState.contrast) * 128,
+                                    0f, uiState.contrast, 0f, 0f, (1 - uiState.contrast) * 128,
+                                    0f, 0f, uiState.contrast, 0f, (1 - uiState.contrast) * 128,
+                                    0f, 0f, 0f, 1f, 0f
+                                )
+                            )
+                            this *= contrastMatrix
+                        }
+                    )
                 )
-            )
+            }
         }
     }
 }

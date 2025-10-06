@@ -83,6 +83,8 @@ data class UiState(
     val isLoading: Boolean = false,
     val completedOnboardingModes: Set<EditorMode> = emptySet(),
     val arePlanesDetected: Boolean = false,
-    val arDrawingProgress: Float = 0f,
-    val saveRequestTimestamp: Long? = null
+    val rotationX: Float = 0f,
+    val rotationY: Float = 0f,
+    val activeRotationAxis: RotationAxis = RotationAxis.Z,
+    val showRotationAxisFeedback: Boolean = false
 ) : Parcelable
