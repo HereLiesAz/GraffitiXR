@@ -53,11 +53,12 @@ private fun ArContent(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
+        val imageUri = uiState.backgroundRemovedImageUri ?: uiState.overlayImageUri
         ArView(
             modifier = Modifier.fillMaxSize(),
             arImagePose = uiState.arImagePose,
             arFeaturePattern = uiState.arFeaturePattern,
-            overlayImageUri = uiState.overlayImageUri,
+            overlayImageUri = imageUri,
             arState = uiState.arState,
             arObjectScale = uiState.arObjectScale,
             arObjectOrientation = uiState.arObjectOrientation,
