@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -22,9 +24,11 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
+import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
+import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
 
@@ -40,6 +44,7 @@ import com.hereliesaz.graffitixr.utils.captureWindow
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
@@ -96,7 +101,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     onRotationYChanged = viewModel::onRotationYChanged,
                     onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
-
                 EditorMode.NON_AR -> ImageTraceScreen(
                     uiState = uiState,
                     onScaleChanged = viewModel::onScaleChanged,
@@ -106,32 +110,22 @@ fun MainScreen(viewModel: MainViewModel) {
                     onRotationYChanged = viewModel::onRotationYChanged,
                     onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
-
                 EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
         }
 
         Box(modifier = Modifier.zIndex(2f)) {
             AzNavRail {
-                azSettings(
-                    isLoading = uiState.isLoading,
+                azSettings(isLoading = uiState.isLoading,
                     packRailButtons = true
                 )
 
 
-                azMenuItem(
-                    id = "ar_overlay",
-                    text = "AR Overlay",
-                    onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-                azMenuItem(
-                    id = "trace_image",
-                    text = "Trace Image",
-                    onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
-                azMenuItem(
-                    id = "mockup",
-                    text = "Mockup",
-                    onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+                azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+                azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
+                azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
+                azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
 
                 azRailItem(id = "overlay", text = "Image") {
                     overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -144,11 +138,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
 
                 if (uiState.overlayImageUri != null) {
-                    azRailItem(
-                        id = "remove_bg",
-                        text = "Remove\n Background",
-                        onClick = viewModel::onRemoveBackgroundClicked
-                    )
+                     azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
                 }
 
                 if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
@@ -157,57 +147,67 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
                 azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                azRailItem(id = "saturation", text = "Saturation") {
-                    showSliderDialog = "Saturation"
-                }
-                azDivider()
-                azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
-
+                azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
             }
+        }
 
-            when (showSliderDialog) {
-                "Opacity" -> AdjustmentSliderDialog(
-                    title = "Opacity",
-                    value = uiState.opacity,
-                    onValueChange = viewModel::onOpacityChanged,
-                    onDismissRequest = { showSliderDialog = null }
-                )
-
-                "Contrast" -> AdjustmentSliderDialog(
-                    title = "Contrast",
-                    value = uiState.contrast,
-                    onValueChange = viewModel::onContrastChanged,
-                    onDismissRequest = { showSliderDialog = null },
-                    valueRange = 0f..2f
-                )
-
-                "Saturation" -> AdjustmentSliderDialog(
-                    title = "Saturation",
-                    value = uiState.saturation,
-                    onValueChange = viewModel::onSaturationChanged,
-                    onDismissRequest = { showSliderDialog = null },
-                    valueRange = 0f..2f
-                )
-            }
-
-            showOnboardingForMode?.let { mode ->
-                OnboardingDialog(
-                    editorMode = mode,
-                    onDismissRequest = {
-                        viewModel.onOnboardingComplete(mode)
-                        showOnboardingForMode = null
-                    }
-                )
-            }
-
-            RotationAxisFeedback(
-                axis = uiState.activeRotationAxis,
-                visible = uiState.showRotationAxisFeedback,
-                onFeedbackShown = viewModel::onFeedbackShown,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 32.dp)
+        when (showSliderDialog) {
+            "Opacity" -> AdjustmentSliderDialog(
+                title = "Opacity",
+                value = uiState.opacity,
+                onValueChange = viewModel::onOpacityChanged,
+                onDismissRequest = { showSliderDialog = null }
             )
+            "Contrast" -> AdjustmentSliderDialog(
+                title = "Contrast",
+                value = uiState.contrast,
+                onValueChange = viewModel::onContrastChanged,
+                onDismissRequest = { showSliderDialog = null },
+                valueRange = 0f..2f
+            )
+            "Saturation" -> AdjustmentSliderDialog(
+                title = "Saturation",
+                value = uiState.saturation,
+                onValueChange = viewModel::onSaturationChanged,
+                onDismissRequest = { showSliderDialog = null },
+                valueRange = 0f..2f
+            )
+        }
+
+        showOnboardingForMode?.let { mode ->
+            OnboardingDialog(
+                editorMode = mode,
+                onDismissRequest = {
+                    viewModel.onOnboardingComplete(mode)
+                    showOnboardingForMode = null
+                }
+            )
+        }
+
+        RotationAxisFeedback(
+            axis = uiState.activeRotationAxis,
+            visible = uiState.showRotationAxisFeedback,
+            onFeedbackShown = viewModel::onFeedbackShown,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+        )
+
+        TapFeedbackEffect(feedback = tapFeedback)
+
+        if (uiState.showDoubleTapHint) {
+            DoubleTapHintDialog(onDismissRequest = viewModel::onDoubleTapHintDismissed)
+        }
+
+        if (uiState.arState == ArState.PLACED) {
+            FloatingActionButton(
+                onClick = viewModel::onCancelPlacement,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Text("Cancel")
+            }
         }
     }
 }

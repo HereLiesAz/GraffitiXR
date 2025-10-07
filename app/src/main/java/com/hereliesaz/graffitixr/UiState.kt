@@ -74,7 +74,6 @@ data class UiState(
     val scale: Float = 1f,
     val rotationZ: Float = 0f,
     val offset: @WriteWith<OffsetParceler> Offset = Offset.Zero,
-    val points: @WriteWith<OffsetListParceler> List<Offset> = emptyList(),
     val arImagePose: @WriteWith<PoseParceler> Pose? = null,
     val arObjectScale: Float = 1f,
     val arObjectOrientation: Quaternion = Quaternion.identity(),
@@ -88,5 +87,5 @@ data class UiState(
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
     val arDrawingProgress: Float = 0f,
-    val showSettings: Boolean = false
+    val showDoubleTapHint: Boolean = false
 ) : Parcelable

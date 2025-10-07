@@ -15,13 +15,16 @@ import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
+import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -29,6 +32,11 @@ import java.io.FileOutputStream
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
+}
+
+sealed class TapFeedback {
+    data class Success(val position: Offset) : TapFeedback()
+    data class Failure(val position: Offset) : TapFeedback()
 }
 
 /**
@@ -48,10 +56,25 @@ class MainViewModel(
     private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
 
-    val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
+    private val onboardingManager = OnboardingManager(application)
+
+    val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState(
+        completedOnboardingModes = onboardingManager.getCompletedModes()
+    ))
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
+
+    private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
+    val tapFeedback = _tapFeedback.asStateFlow()
+
+    fun showTapFeedback(position: Offset, isSuccess: Boolean) {
+        viewModelScope.launch {
+            _tapFeedback.value = if (isSuccess) TapFeedback.Success(position) else TapFeedback.Failure(position)
+            delay(500)
+            _tapFeedback.value = null
+        }
+    }
 
     private suspend fun removeBackground(uri: Uri): Uri? {
         return withContext(Dispatchers.IO) {
@@ -107,7 +130,12 @@ class MainViewModel(
     }
 
     fun onOverlayImageSelected(uri: Uri) {
-        savedStateHandle["uiState"] = uiState.value.copy(overlayImageUri = uri, backgroundRemovedImageUri = null)
+        val showHint = !onboardingManager.hasSeenDoubleTapHint()
+        savedStateHandle["uiState"] = uiState.value.copy(
+            overlayImageUri = uri,
+            backgroundRemovedImageUri = null,
+            showDoubleTapHint = showHint
+        )
     }
 
     fun onOpacityChanged(opacity: Float) {
@@ -172,15 +200,22 @@ class MainViewModel(
     }
 
     fun onOnboardingComplete(mode: EditorMode) {
-        val currentState = uiState.value
-        val updatedModes = currentState.completedOnboardingModes + mode
-        savedStateHandle["uiState"] = currentState.copy(completedOnboardingModes = updatedModes)
+        onboardingManager.completeMode(mode)
+        val updatedModes = onboardingManager.getCompletedModes()
+        savedStateHandle["uiState"] = uiState.value.copy(completedOnboardingModes = updatedModes)
+    }
+
+    fun onDoubleTapHintDismissed() {
+        onboardingManager.setDoubleTapHintSeen()
+        savedStateHandle["uiState"] = uiState.value.copy(showDoubleTapHint = false)
     }
 
     fun onArImagePlaced(anchor: Anchor) {
+        val showHint = !onboardingManager.hasSeenDoubleTapHint()
         savedStateHandle["uiState"] = uiState.value.copy(
             arImagePose = anchor.pose,
-            arState = ArState.PLACED
+            arState = ArState.PLACED,
+            showDoubleTapHint = showHint
         )
     }
 
@@ -188,6 +223,13 @@ class MainViewModel(
         if (uiState.value.arState == ArState.PLACED) {
             savedStateHandle["uiState"] = uiState.value.copy(arState = ArState.LOCKED)
         }
+    }
+
+    fun onCancelPlacement() {
+        savedStateHandle["uiState"] = uiState.value.copy(
+            arState = ArState.SEARCHING,
+            arImagePose = null
+        )
     }
 
     fun onArFeaturesDetected(arFeaturePattern: ArFeaturePattern) {

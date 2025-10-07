@@ -21,6 +21,7 @@ import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.ArRenderer
 import com.hereliesaz.graffitixr.graphics.Quaternion
+import kotlinx.coroutines.flow.asStateFlow
 
 @Composable
 fun ArView(
@@ -40,6 +41,7 @@ fun ArView(
     onArObjectPanned: (Offset) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onArDrawingProgressChanged: (Float) -> Unit,
+    onShowTapFeedback: (Offset, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -53,7 +55,8 @@ fun ArView(
             onArImagePlaced = onArImagePlaced,
             onArFeaturesDetected = onArFeaturesDetected,
             onPlanesDetected = onPlanesDetected,
-            onArDrawingProgressChanged = onArDrawingProgressChanged
+            onArDrawingProgressChanged = onArDrawingProgressChanged,
+            onShowTapFeedback = onShowTapFeedback
         )
     }
 
