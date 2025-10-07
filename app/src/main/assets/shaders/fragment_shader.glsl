@@ -1,9 +1,14 @@
 precision mediump float;
 
+precision mediump float;
+
 uniform sampler2D u_Texture;
 uniform float u_Opacity;
 uniform float u_Contrast;
 uniform float u_Saturation;
+uniform float u_ColorBalanceR;
+uniform float u_ColorBalanceG;
+uniform float u_ColorBalanceB;
 
 varying vec2 v_TexCoordinate;
 
@@ -17,6 +22,9 @@ void main() {
     // Apply Contrast
     vec3 contrastedColor = mix(vec3(0.5), saturatedColor, u_Contrast);
 
+    // Apply Color Balance
+    vec3 balancedColor = contrastedColor * vec3(u_ColorBalanceR, u_ColorBalanceG, u_ColorBalanceB);
+
     // Apply Opacity and set final color
-    gl_FragColor = vec4(contrastedColor, textureColor.a * u_Opacity);
+    gl_FragColor = vec4(balancedColor, textureColor.a * u_Opacity);
 }

@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Activity
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,12 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.*
 import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
+import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
 
@@ -42,6 +44,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
+    var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
 
     LaunchedEffect(uiState.editorMode) {
@@ -73,6 +76,19 @@ fun MainScreen(viewModel: MainViewModel) {
     val backgroundImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+
+    val contentResolver = context.contentResolver
+    val saveProjectLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let { viewModel.saveProject(contentResolver, it) }
+    }
+
+    val loadProjectLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.loadProject(contentResolver, it) }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -119,7 +135,15 @@ fun MainScreen(viewModel: MainViewModel) {
             azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
             azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
-            azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
+            azRailItem(id = "export_image", text = "Export Image", onClick = viewModel::onSaveClicked)
+
+            azRailItem(id = "save_project", text = "Save Project") {
+                saveProjectLauncher.launch("graffitixr_project.json")
+            }
+
+            azRailItem(id = "load_project", text = "Load Project") {
+                loadProjectLauncher.launch(arrayOf("application/json"))
+            }
 
             azRailItem(id = "overlay", text = "Image") {
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -142,6 +166,19 @@ fun MainScreen(viewModel: MainViewModel) {
             azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
             azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
             azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+            azRailItem(id = "color_balance", text = "Color Balance") { showColorBalanceDialog = true }
+        }
+
+        if (showColorBalanceDialog) {
+            ColorBalanceDialog(
+                onDismissRequest = { showColorBalanceDialog = false },
+                redValue = uiState.colorBalanceR,
+                onRedValueChange = viewModel::onColorBalanceRChanged,
+                greenValue = uiState.colorBalanceG,
+                onGreenValueChange = viewModel::onColorBalanceGChanged,
+                blueValue = uiState.colorBalanceB,
+                onBlueValueChange = viewModel::onColorBalanceBChanged
+            )
         }
 
         when (showSliderDialog) {

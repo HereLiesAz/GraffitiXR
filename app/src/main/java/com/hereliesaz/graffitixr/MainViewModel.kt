@@ -13,6 +13,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
+import android.content.ContentResolver
+import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.removeBackground
@@ -24,8 +26,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStreamReader
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
@@ -227,6 +232,18 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
     }
 
+    fun onColorBalanceRChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceR = value)
+    }
+
+    fun onColorBalanceGChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceG = value)
+    }
+
+    fun onColorBalanceBChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceB = value)
+    }
+
     /**
      * Handles the save button click event by emitting a capture request event.
      */
@@ -247,6 +264,92 @@ class MainViewModel(
             saveBitmapToGallery(getApplication(), bitmap)
             withContext(Dispatchers.Main) {
                 setLoading(false)
+            }
+        }
+    }
+
+    fun saveProject(contentResolver: ContentResolver, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                setLoading(true)
+                val state = uiState.value
+                val projectData = ProjectData(
+                    editorMode = state.editorMode,
+                    backgroundImageUri = state.backgroundImageUri,
+                    overlayImageUri = state.overlayImageUri,
+                    backgroundRemovedImageUri = state.backgroundRemovedImageUri,
+                    opacity = state.opacity,
+                    contrast = state.contrast,
+                    saturation = state.saturation,
+                    scale = state.scale,
+                    rotationZ = state.rotationZ,
+                    offset = state.offset,
+                    arImagePose = state.arImagePose,
+                    arObjectScale = state.arObjectScale,
+                    arObjectOrientation = state.arObjectOrientation,
+                    arFeaturePattern = state.arFeaturePattern,
+                    rotationX = state.rotationX,
+                    rotationY = state.rotationY,
+                    activeRotationAxis = state.activeRotationAxis,
+                    colorBalanceR = state.colorBalanceR,
+                    colorBalanceG = state.colorBalanceG,
+                    colorBalanceB = state.colorBalanceB
+                )
+                val jsonString = Json.encodeToString(ProjectData.serializer(), projectData)
+                contentResolver.openOutputStream(uri)?.use {
+                    it.write(jsonString.toByteArray())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                withContext(Dispatchers.Main) {
+                    setLoading(false)
+                }
+            }
+        }
+    }
+
+    fun loadProject(contentResolver: ContentResolver, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                setLoading(true)
+                val jsonString = contentResolver.openInputStream(uri)?.use {
+                    BufferedReader(InputStreamReader(it)).readText()
+                }
+
+                if (jsonString != null) {
+                    val projectData = Json.decodeFromString(ProjectData.serializer(), jsonString)
+                    val currentState = uiState.value
+                    val newState = currentState.copy(
+                        editorMode = projectData.editorMode,
+                        backgroundImageUri = projectData.backgroundImageUri,
+                        overlayImageUri = projectData.overlayImageUri,
+                        backgroundRemovedImageUri = projectData.backgroundRemovedImageUri,
+                        opacity = projectData.opacity,
+                        contrast = projectData.contrast,
+                        saturation = projectData.saturation,
+                        scale = projectData.scale,
+                        rotationZ = projectData.rotationZ,
+                        offset = projectData.offset,
+                        arImagePose = projectData.arImagePose,
+                        arObjectScale = projectData.arObjectScale,
+                        arObjectOrientation = projectData.arObjectOrientation,
+                        arFeaturePattern = projectData.arFeaturePattern,
+                        rotationX = projectData.rotationX,
+                        rotationY = projectData.rotationY,
+                        activeRotationAxis = projectData.activeRotationAxis,
+                        colorBalanceR = projectData.colorBalanceR,
+                        colorBalanceG = projectData.colorBalanceG,
+                        colorBalanceB = projectData.colorBalanceB
+                    )
+                    savedStateHandle["uiState"] = newState
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                withContext(Dispatchers.Main) {
+                    setLoading(false)
+                }
             }
         }
     }

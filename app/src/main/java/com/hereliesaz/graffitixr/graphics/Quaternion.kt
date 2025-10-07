@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.graphics
 import android.opengl.Matrix
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.Serializable
 
 /**
  * A data class representing a quaternion, used for 3D rotations.
@@ -17,6 +18,7 @@ import kotlinx.parcelize.Parcelize
  * @property w The w component of the quaternion (scalar part).
  */
 @Parcelize
+@Serializable
 data class Quaternion(val x: Float, val y: Float, val z: Float, val w: Float) : Parcelable {
 
     /**
