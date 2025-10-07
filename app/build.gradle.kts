@@ -63,7 +63,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0")
+    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
     implementation(libs.arcore.client)
 
@@ -83,11 +83,15 @@ dependencies {
     implementation(libs.auto.background.remover)
 
     // ML Kit
-    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta5")
+    implementation(libs.segmentation.selfie)
 
 
     // OpenCV
     implementation(libs.opencv)
+
+    // Serialization
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.compose.material3)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

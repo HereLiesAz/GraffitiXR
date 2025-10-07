@@ -121,15 +121,18 @@ fun MainScreen(viewModel: MainViewModel) {
 
             azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
 
-            azRailItem(id = "overlay", text = "Image") {
-                overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
+                azDivider()
 
-            if (uiState.editorMode == EditorMode.STATIC) {
-                azRailItem(id = "background", text = "Background") {
-                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                if (uiState.editorMode == EditorMode.STATIC) {
+                    azRailItem(id = "background", text = "Base") {
+                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
                 }
-            }
+                azRailItem(id = "overlay", text = "Image") {
+                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+
+
 
             if (uiState.overlayImageUri != null) {
                  azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
