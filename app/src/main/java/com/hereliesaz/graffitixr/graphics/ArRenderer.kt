@@ -19,6 +19,7 @@ import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.hereliesaz.graffitixr.ArState
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +36,8 @@ class ArRenderer(
     private val onArImagePlaced: (Anchor) -> Unit,
     private val onArFeaturesDetected: (ArFeaturePattern) -> Unit,
     private val onPlanesDetected: (Boolean) -> Unit,
-    private val onArDrawingProgressChanged: (Float) -> Unit
+    private val onArDrawingProgressChanged: (Float) -> Unit,
+    val onShowTapFeedback: (Offset, Boolean) -> Unit
 ) : GLSurfaceView.Renderer {
 
     private var session: Session? = null
@@ -159,7 +161,10 @@ class ArRenderer(
                         val modelMatrix = poseMatrix.clone()
                         val orientation = arObjectOrientation.toGlMatrix()
                         Matrix.multiplyMM(modelMatrix, 0, modelMatrix, 0, orientation, 0)
-                        Matrix.scaleM(modelMatrix, 0, arObjectScale, arObjectScale, arObjectScale)
+
+                        val aspectRatio = if (bmp.height > 0) bmp.width.toFloat() / bmp.height.toFloat() else 1f
+                        Matrix.scaleM(modelMatrix, 0, arObjectScale * aspectRatio, arObjectScale, 1f)
+
                         simpleQuadRenderer.draw(modelMatrix, viewMatrix, projectionMatrix, bmp, opacity)
                     }
                 }
@@ -176,7 +181,7 @@ class ArRenderer(
     private fun handleTapForPlacement(frame: Frame) {
         val tap = tapQueue.poll() ?: return
         val cameraPose = frame.camera.pose
-
+        var wasSuccessful = false
         for (hit in frame.hitTest(tap.first, tap.second)) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
@@ -190,10 +195,12 @@ class ArRenderer(
 
                 if (dotProduct < 0) {
                     onArImagePlaced(hit.createAnchor())
+                    wasSuccessful = true
                     break
                 }
             }
         }
+        onShowTapFeedback(Offset(tap.first, tap.second), wasSuccessful)
     }
 
     private fun generateFeaturePattern(frame: Frame) {
