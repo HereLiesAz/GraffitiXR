@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
     id("kotlin-parcelize")
-    alias(libs.plugins.kotlinx.serialization)
 }
 
 android {
@@ -89,9 +88,6 @@ dependencies {
 
     // OpenCV
     implementation(libs.opencv)
-
-    // Serialization
-    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

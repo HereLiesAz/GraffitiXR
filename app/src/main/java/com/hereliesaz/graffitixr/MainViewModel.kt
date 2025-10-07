@@ -6,7 +6,6 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
@@ -15,6 +14,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
@@ -24,8 +24,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
 
@@ -33,11 +31,18 @@ sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
 }
 
-sealed class ProjectFileEvent {
-    data class Save(val jsonString: String) : ProjectFileEvent()
-    object Load : ProjectFileEvent()
-}
-
+/**
+ * The central ViewModel for the application, acting as the single source of truth for the UI state
+ * and the handler for all user events.
+ *
+ * This class follows the MVVM architecture pattern. It holds the application's UI state in a
+ * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
+ * configuration changes but also system-initiated process death, providing a robust user experience.
+ *
+ * @param application The application instance, used for accessing the application context.
+ * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory,
+ * used to store and restore the [UiState].
+ */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
@@ -47,9 +52,6 @@ class MainViewModel(
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
-
-    private val _projectFileEvent = MutableSharedFlow<ProjectFileEvent>()
-    val projectFileEvent = _projectFileEvent.asSharedFlow()
 
     private suspend fun removeBackground(uri: Uri): Uri? {
         return withContext(Dispatchers.IO) {
@@ -120,46 +122,46 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(saturation = saturation)
     }
 
-    /**
-     * Updates the uniform scale of the overlay image across all modes.
-     * The [scaleFactor] is a multiplier applied to the current scale.
-     */
     fun onScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.scale
         savedStateHandle["uiState"] = uiState.value.copy(scale = currentScale * scaleFactor)
     }
 
-    /**
-     * Updates the 2D offset of the overlay image across all modes.
-     * The [offset] is added to the current offset.
-     */
     fun onOffsetChanged(offset: Offset) {
         savedStateHandle["uiState"] = uiState.value.copy(offset = uiState.value.offset + offset)
     }
 
-    /**
-     * Updates the Z-axis rotation of the overlay image across all modes.
-     * The [rotationDelta] is added to the current rotation to match the user's finger-based rotation direction.
-     */
     fun onRotationZChanged(rotationDelta: Float) {
         val currentRotation = uiState.value.rotationZ
         savedStateHandle["uiState"] = uiState.value.copy(rotationZ = currentRotation + rotationDelta)
     }
 
-    /**
-     * Updates the X-axis rotation of the overlay image across all modes.
-     * The [delta] is added to the current rotation.
-     */
-    fun onRotationXChanged(delta: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(rotationX = uiState.value.rotationX + delta)
+
+    fun onArObjectScaleChanged(scaleFactor: Float) {
+        val currentScale = uiState.value.arObjectScale
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
     }
 
-    /**
-     * Updates the Y-axis rotation of the overlay image across all modes.
-     * The [delta] is added to the current rotation.
-     */
-    fun onRotationYChanged(delta: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(rotationY = uiState.value.rotationY + delta)
+    fun onArObjectRotated(pitch: Float, yaw: Float, roll: Float) {
+        val currentOrientation = uiState.value.arObjectOrientation
+
+        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch)
+        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw)
+        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll)
+
+        val newOrientation = currentOrientation * yawRotation * pitchRotation * rollRotation
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
+    }
+
+    fun onArObjectPanned(delta: Offset) {
+        val currentPose = uiState.value.arImagePose ?: return
+
+        // A simple approximation: translate the object on the XY plane of its current pose.
+        // This doesn't account for camera perspective, so it might feel unnatural.
+        // A more advanced implementation would project the 2D pan onto the 3D plane.
+        val panScaleFactor = 0.005f
+        val newPose = currentPose.compose(Pose.makeTranslation(delta.x * panScaleFactor, -delta.y * panScaleFactor, 0f))
+        savedStateHandle["uiState"] = uiState.value.copy(arImagePose = newPose)
     }
 
     fun onEditorModeChanged(mode: EditorMode) {
@@ -175,13 +177,7 @@ class MainViewModel(
     fun onArImagePlaced(anchor: Anchor) {
         savedStateHandle["uiState"] = uiState.value.copy(
             arImagePose = anchor.pose,
-            arState = ArState.PLACED,
-            // Reset 2D/3D transformations when a new anchor is placed
-            offset = Offset.Zero,
-            scale = 1f,
-            rotationX = 0f,
-            rotationY = 0f,
-            rotationZ = 0f
+            arState = ArState.PLACED
         )
     }
 
@@ -212,6 +208,14 @@ class MainViewModel(
         )
     }
 
+    fun onRotationXChanged(delta: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(rotationX = uiState.value.rotationX + delta)
+    }
+
+    fun onRotationYChanged(delta: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(rotationY = uiState.value.rotationY + delta)
+    }
+
     fun onFeedbackShown() {
         viewModelScope.launch {
             delay(1000) // Keep feedback visible for 1 second
@@ -223,59 +227,20 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
     }
 
+    /**
+     * Handles the save button click event by emitting a capture request event.
+     */
     fun onSaveClicked() {
         viewModelScope.launch {
             _captureEvent.emit(CaptureEvent.RequestCapture)
         }
     }
 
-    fun onSaveProjectClicked() {
-        val currentState = uiState.value
-        val projectData = ProjectData(
-            overlayImageUri = currentState.overlayImageUri,
-            backgroundImageUri = currentState.backgroundImageUri,
-            opacity = currentState.opacity,
-            contrast = currentState.contrast,
-            saturation = currentState.saturation,
-            scale = currentState.scale,
-            rotationX = currentState.rotationX,
-            rotationY = currentState.rotationY,
-            rotationZ = currentState.rotationZ,
-            arImagePose = currentState.arImagePose
-        )
-
-        val jsonString = Json.encodeToString(projectData)
-        viewModelScope.launch {
-            _projectFileEvent.emit(ProjectFileEvent.Save(jsonString))
-        }
-    }
-
-    fun onLoadProjectClicked() {
-        viewModelScope.launch {
-            _projectFileEvent.emit(ProjectFileEvent.Load)
-        }
-    }
-
-    fun loadProject(jsonString: String) {
-        try {
-            val projectData = Json.decodeFromString<ProjectData>(jsonString)
-            savedStateHandle["uiState"] = uiState.value.copy(
-                overlayImageUri = projectData.overlayImageUri,
-                backgroundImageUri = projectData.backgroundImageUri,
-                opacity = projectData.opacity,
-                contrast = projectData.contrast,
-                saturation = projectData.saturation,
-                scale = projectData.scale,
-                rotationX = projectData.rotationX,
-                rotationY = projectData.rotationY,
-                rotationZ = projectData.rotationZ,
-                arImagePose = projectData.arImagePose
-            )
-        } catch (e: Exception) {
-            Log.e("LoadProject", "Failed to load project", e)
-        }
-    }
-
+    /**
+     * Saves a captured bitmap to the gallery.
+     *
+     * @param bitmap The bitmap to save.
+     */
     fun saveCapturedBitmap(bitmap: Bitmap) {
         viewModelScope.launch {
             setLoading(true)
