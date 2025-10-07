@@ -1,17 +1,12 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Activity
-import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -29,8 +24,6 @@ import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
-import com.hereliesaz.graffitixr.composables.SettingsScreen
-import com.hereliesaz.graffitixr.composables.TitleOverlay
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
@@ -50,11 +43,6 @@ fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
-
-    if (uiState.showSettings) {
-        SettingsScreen(onBack = { viewModel.onSettingsClicked() })
-        return
-    }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -80,69 +68,17 @@ fun MainScreen(viewModel: MainViewModel) {
 
     val overlayImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? -> uri?.let { viewModel.onOverlayImageSelected(it) } }
+    ) { uri -> uri?.let { viewModel.onOverlayImageSelected(it) } }
 
     val backgroundImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+    ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
 
-    var jsonToSave by remember { mutableStateOf<String?>(null) }
-
-    val saveProjectLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri: Uri? ->
-        uri?.let {
-            jsonToSave?.let { json ->
-                try {
-                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                        outputStream.write(json.toByteArray())
-                    }
-                    Toast.makeText(context, "Project saved", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Failed to save project", Toast.LENGTH_SHORT).show()
-                } finally {
-                    jsonToSave = null
-                }
-            }
-        }
-    }
-
-    val loadProjectLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let {
-            try {
-                context.contentResolver.openInputStream(it)?.use { inputStream ->
-                    val jsonString = inputStream.bufferedReader().use { it.readText() }
-                    viewModel.loadProject(jsonString)
-                }
-                Toast.makeText(context, "Project loaded", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Failed to load project", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    LaunchedEffect(viewModel, context) {
-        viewModel.projectFileEvent.collect { event ->
-            when(event) {
-                is ProjectFileEvent.Save -> {
-                    jsonToSave = event.jsonString
-                    saveProjectLauncher.launch("GraffitiXR_Project.json")
-                }
-                is ProjectFileEvent.Load -> {
-                    loadProjectLauncher.launch(arrayOf("application/json"))
-                }
-            }
-        }
-    }
-
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .windowInsetsPadding(WindowInsets.systemBars)) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                .zIndex(1f),
             contentAlignment = Alignment.Center
         ) {
             when (uiState.editorMode) {
@@ -173,60 +109,39 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        Box(modifier = Modifier.zIndex(2f)) {
-            AzNavRail {
-                azMenuItem(
-                    id = "ar_overlay",
-                    text = "Overlay",
-                    onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-                azMenuItem(
-                    id = "trace_image",
-                    text = "Trace",
-                    onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
-                azMenuItem(
-                    id = "mockup",
-                    text = "Mockup",
-                    onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+        AzNavRail {
+            azSettings(isLoading = uiState.isLoading,
+                packRailButtons = true
+            )
 
-                azRailItem(id = "overlay", text = "Image") {
-                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
 
-                if (uiState.editorMode == EditorMode.STATIC) {
-                    azRailItem(id = "background", text = "Base") {
-                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                }
+            azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+            azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
+            azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
-                if (uiState.overlayImageUri != null) {
-                    azRailItem(
-                        id = "remove_bg",
-                        text = "Background",
-                        onClick = viewModel::onRemoveBackgroundClicked
-                    )
-                }
+            azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
 
-                if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
-                    azRailItem(id = "lock_ar", text = "Lock", onClick = viewModel::onArLockClicked)
-                }
-
-                azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-
-                azMenuItem(id = "save_image", text = "Screenshot", onClick = viewModel::onSaveClicked)
-                azMenuItem(id = "save_project", text = "Save", onClick = viewModel::onSaveProjectClicked)
-                azMenuItem(id = "load_project", text = "Load", onClick = viewModel::onLoadProjectClicked)
-                azRailItem(id = "help", text = "Help") {
-                    //TODO: Add help dialog
-                }
-                azMenuItem(id = "settings", text = "Settings", onClick = { viewModel.onSettingsClicked() }) 
-
-                azSettings(
-                    isLoading = uiState.isLoading,
-                    packRailButtons = true
-                )
+            azRailItem(id = "overlay", text = "Image") {
+                overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
+
+            if (uiState.editorMode == EditorMode.STATIC) {
+                azRailItem(id = "background", text = "Background") {
+                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+            }
+
+            if (uiState.overlayImageUri != null) {
+                 azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
+            }
+
+            if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
+                azRailItem(id = "lock_ar", text = "Lock", onClick = viewModel::onArLockClicked)
+            }
+
+            azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
+            azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
+            azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
         }
 
         when (showSliderDialog) {
@@ -269,18 +184,6 @@ fun MainScreen(viewModel: MainViewModel) {
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp)
-        )
-
-        val title = when (uiState.editorMode) {
-            EditorMode.AR -> "Overlay"
-            EditorMode.NON_AR -> "Trace"
-            EditorMode.STATIC -> "Mockup"
-        }
-        TitleOverlay(
-            title = title,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
         )
     }
 }

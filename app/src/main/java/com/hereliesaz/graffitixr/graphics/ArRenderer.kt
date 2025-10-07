@@ -16,7 +16,6 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
-import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
@@ -58,9 +57,6 @@ class ArRenderer(
     var arObjectScale: Float = 1.0f
     var arObjectOrientation: Quaternion = Quaternion.identity()
     var opacity: Float = 1.0f
-    @Volatile
-    var latestCameraPose: Pose? = null
-
 
     private var overlayBitmap: Bitmap? = null
     private var lastLoadedUri: Uri? = null
@@ -94,7 +90,6 @@ class ArRenderer(
             backgroundRenderer.draw(frame)
 
             val camera = frame.camera
-            latestCameraPose = camera.pose
             if (camera.trackingState != TrackingState.TRACKING) return
 
             val projectionMatrix = FloatArray(16)

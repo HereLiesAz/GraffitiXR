@@ -34,11 +34,6 @@ sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
 }
 
-sealed class ProjectFileEvent {
-    data class Save(val jsonString: String) : ProjectFileEvent()
-    object Load : ProjectFileEvent()
-}
-
 /**
  * The central ViewModel for the application, acting as the single source of truth for the UI state
  * and the handler for all user events.
@@ -60,9 +55,6 @@ class MainViewModel(
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
-
-    private val _projectFileEvent = MutableSharedFlow<ProjectFileEvent>()
-    val projectFileEvent = _projectFileEvent.asSharedFlow()
 
     private suspend fun removeBackground(uri: Uri): Uri? {
         return withContext(Dispatchers.IO) {
@@ -153,38 +145,28 @@ class MainViewModel(
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
-        val dampedScaleFactor = 1.0f + (scaleFactor - 1.0f) * 0.25f
-        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * dampedScaleFactor)
+        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
     }
 
     fun onArObjectRotated(pitch: Float, yaw: Float, roll: Float) {
-        val damping = 0.25f
         val currentOrientation = uiState.value.arObjectOrientation
 
-        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch * damping)
-        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw * damping)
-        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll * damping)
+        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch)
+        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw)
+        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll)
 
         val newOrientation = currentOrientation * yawRotation * pitchRotation * rollRotation
         savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
     }
 
-    fun onArObjectPanned(delta: Offset, cameraPose: Pose?) {
-        val objectPose = uiState.value.arImagePose ?: return
-        val camPose = cameraPose ?: return
+    fun onArObjectPanned(delta: Offset) {
+        val currentPose = uiState.value.arImagePose ?: return
 
-        val panScaleFactor = 0.001f
-
-        val right = camPose.xAxis
-        val up = camPose.yAxis
-
-        val worldDeltaX = right[0] * delta.x * panScaleFactor + up[0] * -delta.y * panScaleFactor
-        val worldDeltaY = right[1] * delta.x * panScaleFactor + up[1] * -delta.y * panScaleFactor
-        val worldDeltaZ = right[2] * delta.x * panScaleFactor + up[2] * -delta.y * panScaleFactor
-
-        val translation = floatArrayOf(worldDeltaX, worldDeltaY, worldDeltaZ)
-        val newPose = objectPose.compose(Pose.makeTranslation(translation))
-
+        // A simple approximation: translate the object on the XY plane of its current pose.
+        // This doesn't account for camera perspective, so it might feel unnatural.
+        // A more advanced implementation would project the 2D pan onto the 3D plane.
+        val panScaleFactor = 0.005f
+        val newPose = currentPose.compose(Pose.makeTranslation(delta.x * panScaleFactor, -delta.y * panScaleFactor, 0f))
         savedStateHandle["uiState"] = uiState.value.copy(arImagePose = newPose)
     }
 
@@ -257,58 +239,6 @@ class MainViewModel(
     fun onSaveClicked() {
         viewModelScope.launch {
             _captureEvent.emit(CaptureEvent.RequestCapture)
-        }
-    }
-
-    fun onSaveProjectClicked() {
-        val currentState = uiState.value
-        val projectData = ProjectData(
-            overlayImageUri = currentState.overlayImageUri,
-            backgroundImageUri = currentState.backgroundImageUri,
-            opacity = currentState.opacity,
-            contrast = currentState.contrast,
-            saturation = currentState.saturation,
-            scale = currentState.scale,
-            rotationX = currentState.rotationX,
-            rotationY = currentState.rotationY,
-            rotationZ = currentState.rotationZ,
-            arImagePose = currentState.arImagePose,
-            arObjectScale = currentState.arObjectScale,
-            arObjectOrientation = currentState.arObjectOrientation
-        )
-
-        val jsonString = Json.encodeToString(projectData)
-        viewModelScope.launch {
-            _projectFileEvent.emit(ProjectFileEvent.Save(jsonString))
-        }
-    }
-
-    fun onLoadProjectClicked() {
-        viewModelScope.launch {
-            _projectFileEvent.emit(ProjectFileEvent.Load)
-        }
-    }
-
-    fun loadProject(jsonString: String) {
-        try {
-            val projectData = Json.decodeFromString<ProjectData>(jsonString)
-            savedStateHandle["uiState"] = uiState.value.copy(
-                overlayImageUri = projectData.overlayImageUri,
-                backgroundImageUri = projectData.backgroundImageUri,
-                opacity = projectData.opacity,
-                contrast = projectData.contrast,
-                saturation = projectData.saturation,
-                scale = projectData.scale,
-                rotationX = projectData.rotationX,
-                rotationY = projectData.rotationY,
-                rotationZ = projectData.rotationZ,
-                arImagePose = projectData.arImagePose,
-                arObjectScale = projectData.arObjectScale,
-                arObjectOrientation = projectData.arObjectOrientation
-            )
-        } catch (e: Exception) {
-            Log.e("LoadProject", "Failed to load project", e)
-            // Optionally, show a toast to the user
         }
     }
 
