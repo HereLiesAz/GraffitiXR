@@ -22,9 +22,6 @@ class ProjectedImageRenderer {
     private var homographyUniform = 0
     private var textureUniform = 0
     private var alphaUniform: Int = 0
-    private var colorBalanceRUniform = 0
-    private var colorBalanceGUniform = 0
-    private var colorBalanceBUniform = 0
 
     private var vertexBuffer: FloatBuffer? = null
     private var texCoordBuffer: FloatBuffer? = null
@@ -56,9 +53,6 @@ class ProjectedImageRenderer {
         homographyUniform = GLES20.glGetUniformLocation(program, "u_Homography")
         textureUniform = GLES20.glGetUniformLocation(program, "u_Texture")
         alphaUniform = GLES20.glGetUniformLocation(program, "u_Alpha")
-        colorBalanceRUniform = GLES20.glGetUniformLocation(program, "u_ColorBalanceR")
-        colorBalanceGUniform = GLES20.glGetUniformLocation(program, "u_ColorBalanceG")
-        colorBalanceBUniform = GLES20.glGetUniformLocation(program, "u_ColorBalanceB")
 
         val bb = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4).apply { order(ByteOrder.nativeOrder()) }
         vertexBuffer = bb.asFloatBuffer().apply {
@@ -73,7 +67,7 @@ class ProjectedImageRenderer {
         }
     }
 
-    fun draw(bitmap: Bitmap, homography: Mat, alpha: Float, r: Float, g: Float, b: Float) {
+    fun draw(bitmap: Bitmap, homography: Mat, alpha: Float) {
         loadTexture(bitmap)
         GLES20.glUseProgram(program)
 
@@ -81,9 +75,6 @@ class ProjectedImageRenderer {
         homography.get(0, 0, homographyMatrix)
         GLES20.glUniformMatrix3fv(homographyUniform, 1, false, homographyMatrix, 0)
         GLES20.glUniform1f(alphaUniform, alpha)
-        GLES20.glUniform1f(colorBalanceRUniform, r)
-        GLES20.glUniform1f(colorBalanceGUniform, g)
-        GLES20.glUniform1f(colorBalanceBUniform, b)
 
         GLES20.glEnableVertexAttribArray(positionAttrib)
         GLES20.glVertexAttribPointer(positionAttrib, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
@@ -134,16 +125,12 @@ class ProjectedImageRenderer {
             uniform sampler2D u_Texture;
             uniform mat3 u_Homography;
             uniform float u_Alpha;
-            uniform float u_ColorBalanceR;
-            uniform float u_ColorBalanceG;
-            uniform float u_ColorBalanceB;
             varying vec2 v_TexCoord;
             void main() {
                 vec3 projected = u_Homography * vec3(v_TexCoord, 1.0);
                 vec2 projected_coord = projected.xy / projected.z;
                 vec4 color = texture2D(u_Texture, projected_coord);
-                vec3 balancedColor = color.rgb * vec3(u_ColorBalanceR, u_ColorBalanceG, u_ColorBalanceB);
-                gl_FragColor = vec4(balancedColor, color.a * u_Alpha);
+                gl_FragColor = vec4(color.rgb, color.a * u_Alpha);
             }
         """
     }

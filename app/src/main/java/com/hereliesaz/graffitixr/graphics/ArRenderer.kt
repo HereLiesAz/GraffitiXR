@@ -57,9 +57,6 @@ class ArRenderer(
     var arObjectScale: Float = 1.0f
     var arObjectOrientation: Quaternion = Quaternion.identity()
     var opacity: Float = 1.0f
-    var colorBalanceR: Float = 1.0f
-    var colorBalanceG: Float = 1.0f
-    var colorBalanceB: Float = 1.0f
 
     private var overlayBitmap: Bitmap? = null
     private var lastLoadedUri: Uri? = null
@@ -154,7 +151,7 @@ class ArRenderer(
                     arFeaturePattern?.let { pattern ->
                         val homography = HomographyHelper.calculateHomography(pattern.worldPoints, camera, view, bmp.width, bmp.height)
                         homography?.let {
-                            projectedImageRenderer.draw(bmp, it, opacity, colorBalanceR, colorBalanceG, colorBalanceB)
+                            projectedImageRenderer.draw(bmp, it, opacity)
                         }
                     }
                 } else { // SEARCHING or PLACED
@@ -163,7 +160,7 @@ class ArRenderer(
                         val orientation = arObjectOrientation.toGlMatrix()
                         Matrix.multiplyMM(modelMatrix, 0, modelMatrix, 0, orientation, 0)
                         Matrix.scaleM(modelMatrix, 0, arObjectScale, arObjectScale, arObjectScale)
-                        simpleQuadRenderer.draw(modelMatrix, viewMatrix, projectionMatrix, bmp, opacity, colorBalanceR, colorBalanceG, colorBalanceB)
+                        simpleQuadRenderer.draw(modelMatrix, viewMatrix, projectionMatrix, bmp, opacity)
                     }
                 }
             }

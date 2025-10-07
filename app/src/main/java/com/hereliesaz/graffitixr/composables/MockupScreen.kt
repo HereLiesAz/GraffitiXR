@@ -96,13 +96,7 @@ fun MockupScreen(
         uri?.let { onOverlayImageSelected(it) }
     }
 
-    val colorMatrix = remember(
-        uiState.saturation,
-        uiState.contrast,
-        uiState.colorBalanceR,
-        uiState.colorBalanceG,
-        uiState.colorBalanceB
-    ) {
+    val colorMatrix = remember(uiState.saturation, uiState.contrast) {
         ColorMatrix().apply {
             setToSaturation(uiState.saturation)
             val contrast = uiState.contrast
@@ -115,15 +109,6 @@ fun MockupScreen(
                 )
             )
             timesAssign(contrastMatrix)
-            val colorBalanceMatrix = ColorMatrix(
-                floatArrayOf(
-                    uiState.colorBalanceR, 0f, 0f, 0f, 0f,
-                    0f, uiState.colorBalanceG, 0f, 0f, 0f,
-                    0f, 0f, uiState.colorBalanceB, 0f, 0f,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-            timesAssign(colorBalanceMatrix)
         }
     }
 
