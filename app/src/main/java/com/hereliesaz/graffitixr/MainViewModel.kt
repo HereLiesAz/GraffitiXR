@@ -6,6 +6,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
@@ -17,6 +18,7 @@ import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.OnboardingManager
+import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
@@ -119,6 +121,39 @@ class MainViewModel(
             if (uri != null) {
                 val resultUri = removeBackground(uri)
                 savedStateHandle["uiState"] = uiState.value.copy(backgroundRemovedImageUri = resultUri, isLoading = false)
+            } else {
+                setLoading(false)
+            }
+        }
+    }
+
+    fun onLineDrawingClicked() {
+        viewModelScope.launch {
+            setLoading(true)
+            val uri = uiState.value.overlayImageUri
+            if (uri != null) {
+                val context = getApplication<Application>().applicationContext
+                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                        decoder.isMutableRequired = true
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }.copy(Bitmap.Config.ARGB_8888, true)
+
+                val lineDrawingBitmap = convertToLineDrawing(bitmap)
+
+                val cachePath = File(context.cacheDir, "images")
+                cachePath.mkdirs()
+                val file = File(cachePath, "line_drawing_${System.currentTimeMillis()}.png")
+                val fOut = FileOutputStream(file)
+                lineDrawingBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                fOut.close()
+
+                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                savedStateHandle["uiState"] = uiState.value.copy(overlayImageUri = newUri, isLoading = false)
             } else {
                 setLoading(false)
             }
@@ -247,6 +282,7 @@ class MainViewModel(
             RotationAxis.Y -> RotationAxis.Z
             RotationAxis.Z -> RotationAxis.X
         }
+        Toast.makeText(getApplication(), "Rotating around ${nextAxis.name} axis", Toast.LENGTH_SHORT).show()
         savedStateHandle["uiState"] = uiState.value.copy(
             activeRotationAxis = nextAxis,
             showRotationAxisFeedback = true
