@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlinx.serialization)
     id("kotlin-parcelize")
 }
 
@@ -63,7 +64,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.coroutines.play.services)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0")
     implementation(libs.coil.compose)
     implementation(libs.arcore.client)
 
@@ -83,7 +84,7 @@ dependencies {
     implementation(libs.auto.background.remover)
 
     // ML Kit
-    implementation(libs.segmentation.selfie)
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta5")
 
 
     // OpenCV
@@ -91,7 +92,6 @@ dependencies {
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.androidx.compose.material3)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
