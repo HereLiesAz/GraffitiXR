@@ -32,6 +32,9 @@ fun ArView(
     arObjectScale: Float,
     arObjectOrientation: Quaternion,
     opacity: Float,
+    colorBalanceR: Float,
+    colorBalanceG: Float,
+    colorBalanceB: Float,
     activeRotationAxis: RotationAxis,
     onArImagePlaced: (Anchor) -> Unit,
     onArFeaturesDetected: (ArFeaturePattern) -> Unit,
@@ -96,6 +99,9 @@ fun ArView(
             renderer.arState = arState
             renderer.arObjectScale = arObjectScale
             renderer.arObjectOrientation = arObjectOrientation
+            renderer.colorBalanceR = colorBalanceR
+            renderer.colorBalanceG = colorBalanceG
+            renderer.colorBalanceB = colorBalanceB
         }
     )
 

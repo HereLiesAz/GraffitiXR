@@ -13,6 +13,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
+import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.OnboardingManager
@@ -27,6 +28,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import java.io.File
 import java.io.FileOutputStream
 
@@ -164,10 +168,6 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(rotationZ = currentRotation + rotationDelta)
     }
 
-    fun onPointsInitialized(points: List<Offset>) {
-        savedStateHandle["uiState"] = uiState.value.copy(points = points)
-    }
-
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
         savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
@@ -296,8 +296,65 @@ class MainViewModel(
         }
     }
 
-    fun onSettingsClicked() {
-        val currentShowSettings = uiState.value.showSettings
-        savedStateHandle["uiState"] = uiState.value.copy(showSettings = !currentShowSettings)
+    fun onColorBalanceRChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceR = value)
+    }
+
+    fun onColorBalanceGChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceG = value)
+    }
+
+    fun onColorBalanceBChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceB = value)
+    }
+
+    fun saveProject(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val projectData = ProjectData(
+                    backgroundImageUri = uiState.value.backgroundImageUri,
+                    overlayImageUri = uiState.value.overlayImageUri,
+                    opacity = uiState.value.opacity,
+                    contrast = uiState.value.contrast,
+                    saturation = uiState.value.saturation,
+                    colorBalanceR = uiState.value.colorBalanceR,
+                    colorBalanceG = uiState.value.colorBalanceG,
+                    colorBalanceB = uiState.value.colorBalanceB,
+                    arImagePose = uiState.value.arImagePose,
+                    arFeaturePattern = uiState.value.arFeaturePattern
+                )
+                val jsonString = Json.encodeToString(projectData)
+                getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
+                    it.write(jsonString.toByteArray())
+                }
+            } catch (e: Exception) {
+                // Handle exception
+            }
+        }
+    }
+
+    fun loadProject(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonString = getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
+                if (jsonString != null) {
+                    val projectData = Json.decodeFromString<ProjectData>(jsonString)
+                    savedStateHandle["uiState"] = uiState.value.copy(
+                        backgroundImageUri = projectData.backgroundImageUri,
+                        overlayImageUri = projectData.overlayImageUri,
+                        opacity = projectData.opacity,
+                        contrast = projectData.contrast,
+                        saturation = projectData.saturation,
+                        colorBalanceR = projectData.colorBalanceR,
+                        colorBalanceG = projectData.colorBalanceG,
+                        colorBalanceB = projectData.colorBalanceB,
+                        arImagePose = projectData.arImagePose,
+                        arFeaturePattern = projectData.arFeaturePattern
+                    )
+                }
+            } catch (e: Exception) {
+                // Handle exception
+            }
+        }
     }
 }
