@@ -155,7 +155,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 if (uiState.overlayImageUri != null) {
                      azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
-                     azRailItem(id = "line_drawing", text = "Line Drawing", onClick = viewModel::onLineDrawingClicked)
+                     azRailItem(id = "line_drawing", text = "Outline", onClick = viewModel::onLineDrawingClicked)
                 }
 
                 if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
