@@ -116,7 +116,16 @@ fun ImageTraceScreen(
                                     0f, 0f, 0f, 1f, 0f
                                 )
                             )
+                            val colorBalanceMatrix = ColorMatrix(
+                                floatArrayOf(
+                                    uiState.colorBalanceR, 0f, 0f, 0f, 0f,
+                                    0f, uiState.colorBalanceG, 0f, 0f, 0f,
+                                    0f, 0f, uiState.colorBalanceB, 0f, 0f,
+                                    0f, 0f, 0f, 1f, 0f
+                                )
+                            )
                             this *= contrastMatrix
+                            this *= colorBalanceMatrix
                         }
                     )
                 )

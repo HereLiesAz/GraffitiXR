@@ -28,6 +28,7 @@ import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
+import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
@@ -48,6 +49,7 @@ fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
+    var showColorBalanceDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -78,6 +80,14 @@ fun MainScreen(viewModel: MainViewModel) {
     val backgroundImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+
+    val saveProjectLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { viewModel.saveProject(it) } }
+
+    val loadProjectLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { viewModel.loadProject(it) } }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -125,7 +135,13 @@ fun MainScreen(viewModel: MainViewModel) {
                 azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
-                azRailItem(id = "save", text = "Save", onClick = viewModel::onSaveClicked)
+                azRailItem(id = "export", text = "Export Image", onClick = viewModel::onSaveClicked)
+                azRailItem(id = "save_project", text = "Save Project") {
+                    saveProjectLauncher.launch("project.json")
+                }
+                azRailItem(id = "load_project", text = "Load Project") {
+                    loadProjectLauncher.launch(arrayOf("application/json"))
+                }
 
                 azRailItem(id = "overlay", text = "Image") {
                     overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -139,6 +155,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 if (uiState.overlayImageUri != null) {
                      azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
+                     azRailItem(id = "line_drawing", text = "Line Drawing", onClick = viewModel::onLineDrawingClicked)
                 }
 
                 if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
@@ -148,7 +165,21 @@ fun MainScreen(viewModel: MainViewModel) {
                 azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
                 azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
                 azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+                azRailItem(id = "color_balance", text = "Color Balance") { showColorBalanceDialog = true }
             }
+        }
+
+        if (showColorBalanceDialog) {
+            ColorBalanceDialog(
+                title = "Color Balance",
+                valueR = uiState.colorBalanceR,
+                valueG = uiState.colorBalanceG,
+                valueB = uiState.colorBalanceB,
+                onValueRChange = viewModel::onColorBalanceRChanged,
+                onValueGChange = viewModel::onColorBalanceGChanged,
+                onValueBChange = viewModel::onColorBalanceBChanged,
+                onDismissRequest = { showColorBalanceDialog = false }
+            )
         }
 
         when (showSliderDialog) {
