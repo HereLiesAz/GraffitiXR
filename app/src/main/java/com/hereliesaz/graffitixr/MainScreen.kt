@@ -7,8 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,24 +22,15 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
-import com.hereliesaz.graffitixr.composables.VuforiaCameraScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
+import com.hereliesaz.graffitixr.composables.VuforiaCameraScreen
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
 
-/**
- * The main screen of the application.
- *
- * This composable acts as the primary container for the UI. It observes the [UiState] from the
- * [MainViewModel] and displays the appropriate content based on the current [EditorMode].
- * It also houses the `AzNavRail` for navigation and controls.
- *
- * @param viewModel The [MainViewModel] instance that holds the application's state and business logic.
- */
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -120,7 +109,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     onRotationYChanged = viewModel::onRotationYChanged,
                     onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
-                EditorMode.AR -> VuforiaCameraScreen(viewModel = viewModel)
+                EditorMode.AR -> VuforiaCameraScreen()
             }
         }
 

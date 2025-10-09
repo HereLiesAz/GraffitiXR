@@ -13,11 +13,11 @@ android {
 
     sourceSets {
         getByName("main") {
-            jniLibs.srcDirs("lib")
+            jniLibs.srcDirs("build/lib")
         }
     }
 }
 
 dependencies {
-    api(files("java/VuforiaEngine.jar"))
+    api(files("build/java/VuforiaEngine.jar"))
 }
