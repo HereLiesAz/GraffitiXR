@@ -39,6 +39,17 @@ class MainActivity : ComponentActivity() {
 
         VuforiaJNI.initAR(this, assets, 0)
 
+        val astronautTexture = com.hereliesaz.graffitixr.utils.Texture.loadTextureFromApk("Astronaut.jpg", assets)
+        val landerTexture = com.hereliesaz.graffitixr.utils.Texture.loadTextureFromApk("Lander.jpg", assets)
+        if (astronautTexture != null && landerTexture != null) {
+            VuforiaJNI.setTextures(
+                astronautTexture.width, astronautTexture.height, astronautTexture.data!!,
+                landerTexture.width, landerTexture.height, landerTexture.data!!
+            )
+        } else {
+            Log.e("VuforiaSample", "Failed to load astronaut or lander texture")
+        }
+
         setContent {
             GraffitiXRTheme {
                 Surface(

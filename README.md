@@ -1,13 +1,12 @@
 # GraffitiXR
 
-GraffitiXR is an android app for street artists. There are plenty of apps that overlay an image on your camera view so you can trace it, but when I'm painting a mural based on a sketch I have saved on my phone, my flow doesn't get along well with putting my phone on a tripod. Me, I put my phone in my pocket. Even the apps that use AR to keep the image steady and in one place can't deal with that. 
+GraffitiXR is an advanced augmented reality application for Android, designed to assist artists in visualizing and planning large-scale artworks such as murals. The app provides a suite of tools to project a digital image onto a real-world surface, offering a seamless workflow from concept to creation.
 
-So I'm making something better. I've used the grid method myself when getting a big piece up, and I keep thinking, "Why can't these specific scribbes be saved so that the image always just pops up right there, in the right place?" So, now they can. Progress tracking replaces those marks with the piece itself as you go, like an ever-evolving location fingerprint. 
+## Features
 
-Just for shits and giggles, I included the non-AR version for image tracing just like you get with those other apps, too. Just in case you cray like that.      
-Or if you cray-cray, there's Mockup mode. Nab a picture of the wall, cuz I got some quick tools for a quick mockup. 
-
-
+-   **AR Mockup Mode:** Leveraging the powerful Vuforia Engine, this mode allows artists to anchor a digital image to a physical location with high precision. The application can save the location "fingerprint," allowing the artist to return to the site and have the image overlay automatically reappear in the correct position, size, and orientation.
+-   **Image Trace Mode:** A non-AR mode that overlays a semi-transparent image on the camera feed, useful for direct tracing when the device is held in a fixed position (e.g., on a tripod).
+-   **Static Mockup Mode:** Allows artists to create a quick visualization by taking a photo of a surface and using perspective warp tools to fit their artwork onto it.
 
 ## Project Status & Roadmap
 

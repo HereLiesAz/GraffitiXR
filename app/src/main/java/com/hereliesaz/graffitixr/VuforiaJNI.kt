@@ -22,6 +22,7 @@ object VuforiaJNI {
         astronautWidth: Int, astronautHeight: Int, astronautByteBuffer: ByteBuffer,
         landerWidth: Int, landerHeight: Int, landerByteBuffer: ByteBuffer
     )
+    external fun setOverlayTexture(width: Int, height: Int, byteBuffer: ByteBuffer)
     external fun deinitRendering()
 
     external fun configureRendering(width: Int, height: Int, orientation: Int, rotation: Int): Boolean
