@@ -22,8 +22,45 @@ enum class EditorMode {
      * A mode for overlaying a mural on a live camera feed without using
      * Augmented Reality tracking. This is a lightweight option for quick, on-the-go previews.
      */
-    NON_AR
+    NON_AR,
+
+    /**
+     * An Augmented Reality mode that allows users to place and manipulate virtual objects
+     * in the real world.
+     */
+    AR
 }
+
+/**
+ * Represents the different states of the Image Target creation process.
+ */
+@Parcelize
+sealed class TargetCreationState : Parcelable {
+    /**
+     * The initial state where no target creation is in progress.
+     */
+    @Parcelize
+    data object IDLE : TargetCreationState()
+
+    /**
+     * The state where the application is actively creating an Image Target.
+     */
+    @Parcelize
+    data object CREATING : TargetCreationState()
+
+    /**
+     * The state after an Image Target has been successfully created.
+     */
+    @Parcelize
+    data object SUCCESS : TargetCreationState()
+
+    /**
+     * The state when an error has occurred during the target creation process.
+     */
+    @Parcelize
+    data object ERROR : TargetCreationState()
+}
+
 
 /**
  * Represents the complete and immutable state of the user interface at any given time.
@@ -72,5 +109,7 @@ data class UiState(
     val rotationY: Float = 0f,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
-    val showDoubleTapHint: Boolean = false
+    val showDoubleTapHint: Boolean = false,
+    val arState: ArState = ArState.SEARCHING,
+    val targetCreationState: TargetCreationState = TargetCreationState.IDLE
 ) : Parcelable

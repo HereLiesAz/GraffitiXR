@@ -19,6 +19,7 @@ fun TitleOverlay(editorMode: EditorMode) {
     val title = when (editorMode) {
         EditorMode.STATIC -> "Mockup"
         EditorMode.NON_AR -> "Trace Image"
+        EditorMode.AR -> "AR"
     }
 
     Box(

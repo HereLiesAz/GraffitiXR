@@ -8,10 +8,11 @@ countries.
 #include <jni.h>
 
 #include "GLESRenderer.h"
-#include <AppController.h>
 #include <Log.h>
 
 #include <VuforiaEngine/VuforiaEngine.h>
+#include <VuforiaEngine/Engine/LicenseConfig.h>
+#include <VuforiaEngine/Engine/Android/PlatformConfig_Android.h>
 
 #include <GLES3/gl31.h>
 #include <android/asset_manager.h>
@@ -25,8 +26,8 @@ countries.
 
 #include <arcore_c_api.h>
 
-// Cross-platform AppController providing high level Vuforia Engine operations
-AppController controller;
+// Vuforia Engine instance
+VuEngine* gVuforiaEngine = nullptr;
 
 /// JVM pointer obtained in the JNI_OnLoad method below and consumed in the cross-platform code
 void* javaVM;
@@ -102,8 +103,8 @@ JNI_OnLoad(JavaVM* vm, void* reserved)
 
 
 JNIEXPORT void JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_initAR(JNIEnv* env, jobject /* this */, jobject activity, jobject assetManager,
-                                                              jint target)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_initAR(JNIEnv* env, jobject /* this */, jobject activity, jobject assetManager,
+                                                              jint /*target*/) // target is no longer used
 {
     // Store the Java VM pointer so we can get a JNIEnv in callbacks
     if (env->GetJavaVM(&gWrapperData.vm) != 0)
@@ -168,17 +169,46 @@ Java_com_vuforia_engine_native_1sample_VuforiaActivity_initAR(JNIEnv* env, jobje
     gWrapperData.assetManager = AAssetManager_fromJava(env, assetManager);
     if (gWrapperData.assetManager == nullptr)
     {
-        initConfig.errorMessageCallback("Error: Failed to get the asset manager");
+        callPresentError("Error: Failed to get the asset manager");
         return;
     }
 
-    // Start Vuforia initialization
-    controller.initAR(initConfig, target);
+    // Create the engine config set
+    VuEngineConfigSet* configSet = nullptr;
+    vuEngineConfigSetCreate(&configSet);
+
+    // Create and add license config
+    VuLicenseConfig licenseConfig = vuLicenseConfigDefault();
+    licenseConfig.key = "YOUR_CLIENT_ID YOUR_CLIENT_SECRET"; // Placeholder
+    vuEngineConfigSetAddLicenseConfig(configSet, &licenseConfig);
+
+    // Create and add platform config
+    VuPlatformAndroidConfig platformConfig = vuPlatformAndroidConfigDefault();
+    platformConfig.javaVM = gWrapperData.vm;
+    platformConfig.activity = gWrapperData.activity;
+    vuEngineConfigSetAddPlatformAndroidConfig(configSet, &platformConfig);
+
+    // Create the engine
+    VuErrorCode errorCode = 0;
+    if (vuEngineCreate(&gVuforiaEngine, configSet, &errorCode) != VU_SUCCESS)
+    {
+        LOG("Failed to create Vuforia Engine. Error code: 0x%02x", errorCode);
+        callPresentError("Failed to create Vuforia Engine.");
+    }
+
+    vuEngineConfigSetDestroy(configSet);
+
+    // Manually call initDone for now, as we haven't re-implemented the callbacks yet
+    JNIEnv* initDoneEnv = nullptr;
+    if (gWrapperData.vm->GetEnv((void**)&initDoneEnv, JNI_VERSION_1_6) == 0)
+    {
+        initDoneEnv->CallVoidMethod(gWrapperData.activity, gWrapperData.initDoneMethodID);
+    }
 }
 
 
 JNIEXPORT jboolean JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_startAR(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_startAR(JNIEnv* /* env */, jobject /* this */)
 {
     // Update usingARCore flag to avoid checking this every frame
     auto platformController = controller.getPlatformController();
@@ -207,14 +237,14 @@ Java_com_vuforia_engine_native_1sample_VuforiaActivity_startAR(JNIEnv* /* env */
 
 
 JNIEXPORT void JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_stopAR(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_stopAR(JNIEnv* /* env */, jobject /* this */)
 {
     controller.stopAR();
 }
 
 
 JNIEXPORT void JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_deinitAR(JNIEnv* env, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_deinitAR(JNIEnv* env, jobject /* this */)
 {
     controller.deinitAR();
 
@@ -225,21 +255,21 @@ Java_com_vuforia_engine_native_1sample_VuforiaActivity_deinitAR(JNIEnv* env, job
 
 
 JNIEXPORT void JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_cameraPerformAutoFocus(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_cameraPerformAutoFocus(JNIEnv* /* env */, jobject /* this */)
 {
     controller.cameraPerformAutoFocus();
 }
 
 
 JNIEXPORT void JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_cameraRestoreAutoFocus(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_cameraRestoreAutoFocus(JNIEnv* /* env */, jobject /* this */)
 {
     controller.cameraRestoreAutoFocus();
 }
 
 
 JNIEXPORT void JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_initRendering(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_initRendering(JNIEnv* /* env */, jobject /* this */)
 {
     // Define clear color
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -252,7 +282,7 @@ Java_com_vuforia_engine_native_1sample_VuforiaActivity_initRendering(JNIEnv* /* 
 
 
 JNIEXPORT void JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_setTextures(JNIEnv* env, jobject /* this */, jint astronautWidth,
+Java_com_hereliesaz_graffitixr_VuforiaJNI_setTextures(JNIEnv* env, jobject /* this */, jint astronautWidth,
                                                                    jint astronautHeight, jobject astronautByteBuffer, jint landerWidth,
                                                                    jint landerHeight, jobject landerByteBuffer)
 {
@@ -266,14 +296,14 @@ Java_com_vuforia_engine_native_1sample_VuforiaActivity_setTextures(JNIEnv* env, 
 
 
 JNIEXPORT void JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_deinitRendering(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_deinitRendering(JNIEnv* /* env */, jobject /* this */)
 {
     gWrapperData.renderer.deinit();
 }
 
 
 JNIEXPORT jboolean JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_configureRendering(JNIEnv* /* env */, jobject /* this */, jint width, jint height,
+Java_com_hereliesaz_graffitixr_VuforiaJNI_configureRendering(JNIEnv* /* env */, jobject /* this */, jint width, jint height,
                                                                           jint orientation, jint rotation)
 {
     std::vector<int> androidOrientation{ orientation, rotation };
@@ -282,7 +312,7 @@ Java_com_vuforia_engine_native_1sample_VuforiaActivity_configureRendering(JNIEnv
 
 
 JNIEXPORT jboolean JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_renderFrame(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_renderFrame(JNIEnv* /* env */, jobject /* this */)
 {
     if (!controller.isARStarted())
     {
@@ -347,16 +377,23 @@ Java_com_vuforia_engine_native_1sample_VuforiaActivity_renderFrame(JNIEnv* /* en
 
 
 JNIEXPORT jint JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_00024Companion_getImageTargetId(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_00024Companion_getImageTargetId(JNIEnv* /* env */, jobject /* this */)
 {
     return AppController::IMAGE_TARGET_ID;
 }
 
 
 JNIEXPORT jint JNICALL
-Java_com_vuforia_engine_native_1sample_VuforiaActivity_00024Companion_getModelTargetId(JNIEnv* /* env */, jobject /* this */)
+Java_com_hereliesaz_graffitixr_VuforiaJNI_00024Companion_getModelTargetId(JNIEnv* /* env */, jobject /* this */)
 {
     return AppController::MODEL_TARGET_ID;
+}
+
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_VuforiaJNI_createImageTarget(JNIEnv* /* env */, jobject /* this */)
+{
+    return controller.createInstantImageTarget("instantTarget", 1.0f) ? JNI_TRUE : JNI_FALSE;
 }
 
 

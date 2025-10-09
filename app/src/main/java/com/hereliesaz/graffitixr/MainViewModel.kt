@@ -318,4 +318,27 @@ class MainViewModel(
             }
         }
     }
+
+    fun onArStateChanged(newState: ArState) {
+        savedStateHandle["uiState"] = uiState.value.copy(arState = newState)
+    }
+
+    fun onTargetCreationStateChanged(newState: TargetCreationState) {
+        savedStateHandle["uiState"] = uiState.value.copy(targetCreationState = newState)
+    }
+
+    fun createImageTarget() {
+        viewModelScope.launch {
+            onTargetCreationStateChanged(TargetCreationState.CREATING)
+            val success = withContext(Dispatchers.IO) {
+                VuforiaJNI.createImageTarget()
+            }
+            if (success) {
+                onTargetCreationStateChanged(TargetCreationState.SUCCESS)
+                onArStateChanged(ArState.PLACED)
+            } else {
+                onTargetCreationStateChanged(TargetCreationState.ERROR)
+            }
+        }
+    }
 }

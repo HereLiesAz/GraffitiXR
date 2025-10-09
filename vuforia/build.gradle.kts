@@ -19,5 +19,5 @@ android {
 }
 
 dependencies {
-    implementation(files("java/VuforiaEngine.jar"))
+    api(files("java/VuforiaEngine.jar"))
 }

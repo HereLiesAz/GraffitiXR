@@ -37,6 +37,8 @@ class MainActivity : ComponentActivity() {
             Log.d("OpenCV", "OpenCV loaded successfully!")
         }
 
+        VuforiaJNI.initAR(this, assets, 0)
+
         setContent {
             GraffitiXRTheme {
                 Surface(
@@ -59,6 +61,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        VuforiaJNI.deinitAR()
     }
 }
 
