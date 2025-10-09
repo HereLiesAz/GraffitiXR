@@ -12,11 +12,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import com.google.ar.core.Anchor
-import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.data.ProjectData
-import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
-import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
@@ -197,28 +193,6 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
     }
 
-    fun onArObjectRotated(pitch: Float, yaw: Float, roll: Float) {
-        val currentOrientation = uiState.value.arObjectOrientation
-
-        val pitchRotation = Quaternion.fromAxisAngle(floatArrayOf(1f, 0f, 0f), pitch)
-        val yawRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 1f, 0f), yaw)
-        val rollRotation = Quaternion.fromAxisAngle(floatArrayOf(0f, 0f, 1f), roll)
-
-        val newOrientation = currentOrientation * yawRotation * pitchRotation * rollRotation
-        savedStateHandle["uiState"] = uiState.value.copy(arObjectOrientation = newOrientation)
-    }
-
-    fun onArObjectPanned(delta: Offset) {
-        val currentPose = uiState.value.arImagePose ?: return
-
-        // A simple approximation: translate the object on the XY plane of its current pose.
-        // This doesn't account for camera perspective, so it might feel unnatural.
-        // A more advanced implementation would project the 2D pan onto the 3D plane.
-        val panScaleFactor = 0.005f
-        val newPose = currentPose.compose(Pose.makeTranslation(delta.x * panScaleFactor, -delta.y * panScaleFactor, 0f))
-        savedStateHandle["uiState"] = uiState.value.copy(arImagePose = newPose)
-    }
-
     fun onEditorModeChanged(mode: EditorMode) {
         savedStateHandle["uiState"] = uiState.value.copy(editorMode = mode)
     }
@@ -232,36 +206,6 @@ class MainViewModel(
     fun onDoubleTapHintDismissed() {
         onboardingManager.setDoubleTapHintSeen()
         savedStateHandle["uiState"] = uiState.value.copy(showDoubleTapHint = false)
-    }
-
-    fun onArImagePlaced(anchor: Anchor) {
-        val showHint = !onboardingManager.hasSeenDoubleTapHint()
-        savedStateHandle["uiState"] = uiState.value.copy(
-            arImagePose = anchor.pose,
-            arState = ArState.PLACED,
-            showDoubleTapHint = showHint
-        )
-    }
-
-    fun onArLockClicked() {
-        if (uiState.value.arState == ArState.PLACED) {
-            savedStateHandle["uiState"] = uiState.value.copy(arState = ArState.LOCKED)
-        }
-    }
-
-    fun onCancelPlacement() {
-        savedStateHandle["uiState"] = uiState.value.copy(
-            arState = ArState.SEARCHING,
-            arImagePose = null
-        )
-    }
-
-    fun onArFeaturesDetected(arFeaturePattern: ArFeaturePattern) {
-        savedStateHandle["uiState"] = uiState.value.copy(arFeaturePattern = arFeaturePattern)
-    }
-
-    fun onPlanesDetected(arePlanesDetected: Boolean) {
-        savedStateHandle["uiState"] = uiState.value.copy(arePlanesDetected = arePlanesDetected)
     }
 
     fun onCycleRotationAxis() {
@@ -291,10 +235,6 @@ class MainViewModel(
             delay(1000) // Keep feedback visible for 1 second
             savedStateHandle["uiState"] = uiState.value.copy(showRotationAxisFeedback = false)
         }
-    }
-
-    fun onArDrawingProgressChanged(progress: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(arDrawingProgress = progress)
     }
 
     /**
@@ -344,9 +284,7 @@ class MainViewModel(
                     saturation = uiState.value.saturation,
                     colorBalanceR = uiState.value.colorBalanceR,
                     colorBalanceG = uiState.value.colorBalanceG,
-                    colorBalanceB = uiState.value.colorBalanceB,
-                    arImagePose = uiState.value.arImagePose,
-                    arFeaturePattern = uiState.value.arFeaturePattern
+                    colorBalanceB = uiState.value.colorBalanceB
                 )
                 val jsonString = Json.encodeToString(projectData)
                 getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
@@ -372,9 +310,7 @@ class MainViewModel(
                         saturation = projectData.saturation,
                         colorBalanceR = projectData.colorBalanceR,
                         colorBalanceG = projectData.colorBalanceG,
-                        colorBalanceB = projectData.colorBalanceB,
-                        arImagePose = projectData.arImagePose,
-                        arFeaturePattern = projectData.arFeaturePattern
+                        colorBalanceB = projectData.colorBalanceB
                     )
                 }
             } catch (e: Exception) {

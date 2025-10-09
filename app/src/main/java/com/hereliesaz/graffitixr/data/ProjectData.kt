@@ -1,8 +1,7 @@
 package com.hereliesaz.graffitixr.data
 
 import android.net.Uri
-import com.google.ar.core.Pose
-import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
+import com.hereliesaz.graffitixr.data.UriSerializer
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -16,9 +15,5 @@ data class ProjectData(
     val saturation: Float,
     val colorBalanceR: Float,
     val colorBalanceG: Float,
-    val colorBalanceB: Float,
-    @Serializable(with = PoseSerializer::class)
-    val arImagePose: Pose?,
-    @Serializable(with = ArFeaturePatternSerializer::class)
-    val arFeaturePattern: ArFeaturePattern?
+    val colorBalanceB: Float
 )

@@ -22,7 +22,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
-import com.hereliesaz.graffitixr.composables.ArModeScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
@@ -120,7 +119,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     onRotationYChanged = viewModel::onRotationYChanged,
                     onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
-                EditorMode.AR -> ArModeScreen(viewModel = viewModel)
             }
         }
 
@@ -132,7 +130,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 azDivider()
 
-                azMenuItem(id = "ar_overlay", text = "AR Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
                 azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
@@ -157,10 +154,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 if (uiState.overlayImageUri != null) {
                      azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
                      azRailItem(id = "line_drawing", text = "Outline", onClick = viewModel::onLineDrawingClicked)
-                }
-
-                if (uiState.editorMode == EditorMode.AR && uiState.arState == ArState.PLACED) {
-                    azRailItem(id = "lock_ar", text = "Lock", onClick = viewModel::onArLockClicked)
                 }
 
                 azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
@@ -229,17 +222,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
         if (uiState.showDoubleTapHint) {
             DoubleTapHintDialog(onDismissRequest = viewModel::onDoubleTapHintDismissed)
-        }
-
-        if (uiState.arState == ArState.PLACED) {
-            FloatingActionButton(
-                onClick = viewModel::onCancelPlacement,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-            ) {
-                Text("Cancel")
-            }
         }
     }
 }

@@ -3,13 +3,7 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
-import com.google.ar.core.Pose
-import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
-import com.hereliesaz.graffitixr.graphics.Quaternion
-import com.hereliesaz.graffitixr.utils.ArFeaturePatternParceler
-import com.hereliesaz.graffitixr.utils.OffsetListParceler
 import com.hereliesaz.graffitixr.utils.OffsetParceler
-import com.hereliesaz.graffitixr.utils.PoseParceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
 
@@ -28,13 +22,7 @@ enum class EditorMode {
      * A mode for overlaying a mural on a live camera feed without using
      * Augmented Reality tracking. This is a lightweight option for quick, on-the-go previews.
      */
-    NON_AR,
-
-    /**
-     * A mode that uses Augmented Reality to project the mural onto a surface in the real world.
-     * This provides the most realistic and immersive preview.
-     */
-    AR
+    NON_AR
 }
 
 /**
@@ -77,18 +65,12 @@ data class UiState(
     val scale: Float = 1f,
     val rotationZ: Float = 0f,
     val offset: @WriteWith<OffsetParceler> Offset = Offset.Zero,
-    val arImagePose: @WriteWith<PoseParceler> Pose? = null,
     val arObjectScale: Float = 1f,
-    val arObjectOrientation: Quaternion = Quaternion.identity(),
-    val arFeaturePattern: @WriteWith<ArFeaturePatternParceler> ArFeaturePattern? = null,
-    val arState: ArState = ArState.SEARCHING,
     val isLoading: Boolean = false,
     val completedOnboardingModes: Set<EditorMode> = emptySet(),
-    val arePlanesDetected: Boolean = false,
     val rotationX: Float = 0f,
     val rotationY: Float = 0f,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
-    val arDrawingProgress: Float = 0f,
     val showDoubleTapHint: Boolean = false
 ) : Parcelable

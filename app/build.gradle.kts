@@ -60,13 +60,13 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // ViewModel, Navigation, Coroutines, Coil, ARCore
+    // ViewModel, Navigation, Coroutines, Coil, Vuforia
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0")
     implementation(libs.coil.compose)
-    implementation(libs.arcore.client)
+    implementation(project(":vuforia"))
 
     // CameraX
     implementation(libs.androidx.camera.core)

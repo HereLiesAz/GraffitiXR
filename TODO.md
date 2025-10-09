@@ -24,9 +24,6 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Implemented user guidance for AR plane detection failures.
 -   **[x] Automated Tests:**
     -   [x] Added a suite of unit tests for the `MainViewModel`.
--   **[x] AR Core Functionality:**
-    -   [x] Enabled Marker Placement: Users can tap to place up to four markers.
-    -   [x] Implemented AR Image Projection: Renders the selected image onto the 3D mesh created by the markers.
 -   **[x] UI Refinements:**
      -   [x] Refined the Adjustment Slider UI into an integrated, animated panel.
 
@@ -36,10 +33,14 @@ This document tracks the development status, future enhancements, and identified
 
 ### **High Priority**
 
--   **[x] Enhance User Experience (UX):**
-    -   [x] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the three different modes (AR, Mock-up, On-the-Go) to new users.
-    -   [x] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
--   **[x] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
+-   **[ ] Refactor from ARCore to Vuforia Engine:**
+    -   [ ] Remove all ARCore dependencies and code.
+    -   [ ] Integrate the Vuforia Engine SDK.
+    -   [ ] Implement runtime Image Target creation using the device camera.
+-   **[ ] Enhance User Experience (UX):**
+    -   [ ] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
+    -   [ ] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
+-   **[ ] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
 
 ### **Medium Priority**
 
