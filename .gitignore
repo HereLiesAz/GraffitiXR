@@ -35,5 +35,6 @@ captures/
 /app/build
 /app/release/
 /app/debug/
-/.kotlin/sessions/!/vuforia/build/
+/.kotlin/sessions/
+!/vuforia/build/
 !/vuforia/build/java/
