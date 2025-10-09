@@ -81,10 +81,11 @@ dependencies {
     implementation(libs.az.nav.rail)
 
     // Background Remover
-    implementation(libs.auto.background.remover)
+    implementation("com.github.GhayasAhmad:auto-background-remover:1.0.7")
 
     // ML Kit
     implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta5")
+
 
 
     // OpenCV
