@@ -12,6 +12,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.github.GhayasAhmad.autobackgroundremover.removeBackground
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
 import com.hereliesaz.graffitixr.data.ProjectData
@@ -19,7 +20,6 @@ import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
-import com.hereliesaz.graffitixr.utils.removeBackground
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -30,9 +30,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
 
@@ -82,45 +82,36 @@ class MainViewModel(
         }
     }
 
-    private suspend fun removeBackground(uri: Uri): Uri? {
-        return withContext(Dispatchers.IO) {
-            try {
-                val context = getApplication<Application>().applicationContext
-                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                        decoder.isMutableRequired = true
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                }.copy(Bitmap.Config.ARGB_8888, true)
-
-
-                val resultBitmap = bitmap.removeBackground()
-
-                val cachePath = File(context.cacheDir, "images")
-                cachePath.mkdirs()
-                val file = File(cachePath, "background_removed_${System.currentTimeMillis()}.png")
-                val fOut = FileOutputStream(file)
-                resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
-                fOut.close()
-
-                FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
-    }
-
     fun onRemoveBackgroundClicked() {
         viewModelScope.launch {
             setLoading(true)
             val uri = uiState.value.overlayImageUri
             if (uri != null) {
-                val resultUri = removeBackground(uri)
-                savedStateHandle["uiState"] = uiState.value.copy(backgroundRemovedImageUri = resultUri, isLoading = false)
+                try {
+                    val context = getApplication<Application>().applicationContext
+                    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        val source = ImageDecoder.createSource(context.contentResolver, uri)
+                        ImageDecoder.decodeBitmap(source)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                    }
+
+                    val resultBitmap = bitmap.removeBackground(context)
+
+                    val cachePath = File(context.cacheDir, "images")
+                    cachePath.mkdirs()
+                    val file = File(cachePath, "background_removed_${System.currentTimeMillis()}.png")
+                    val fOut = FileOutputStream(file)
+                    resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                    fOut.close()
+
+                    val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                    savedStateHandle["uiState"] = uiState.value.copy(backgroundRemovedImageUri = newUri, isLoading = false)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    setLoading(false)
+                }
             } else {
                 setLoading(false)
             }

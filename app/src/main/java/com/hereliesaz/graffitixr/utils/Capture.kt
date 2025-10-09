@@ -21,7 +21,7 @@ fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PixelCopy.request(
                 window,
-                Rect(0, 0, window.decorView.width, window.decorView.height),
+                Rect(0, 0, window.decorView.width, window.decorVew.height),
                 bitmap,
                 { copyResult ->
                     if (copyResult == PixelCopy.SUCCESS) {

@@ -56,6 +56,7 @@ class ProjectedImageRenderer {
         alphaUniform = GLES20.glGetUniformLocation(program, "u_Alpha")
         colorBalanceUniform = GLES20.glGetUniformLocation(program, "u_ColorBalance")
 
+
         val bb = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4).apply { order(ByteOrder.nativeOrder()) }
         vertexBuffer = bb.asFloatBuffer().apply {
             put(QUAD_COORDS)
@@ -78,6 +79,7 @@ class ProjectedImageRenderer {
         GLES20.glUniformMatrix3fv(homographyUniform, 1, false, homographyMatrix, 0)
         GLES20.glUniform1f(alphaUniform, alpha)
         GLES20.glUniform3f(colorBalanceUniform, colorR, colorG, colorB)
+
 
         GLES20.glEnableVertexAttribArray(positionAttrib)
         GLES20.glVertexAttribPointer(positionAttrib, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
