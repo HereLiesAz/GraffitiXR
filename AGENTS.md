@@ -13,15 +13,16 @@ This is an Android application that uses augmented reality (AR) to project an im
 The main purpose of this application is to help artists, designers, and homeowners visualize how a mural or other large-scale artwork will look in a specific location. It can be used to test different images, sizes, and placements without the need for physical mockups.
 
 ### **How it works**
-If AR is enabled, the application uses the device's camera and the Vuforia Engine to track the environment and detect surfaces. When a surface is detected, the user can select an image from their device to project onto it. The app uses a custom rendering engine to render the image on the surface, with controls for opacity, contrast, and saturation. If AR is not enabled, then the device will need to be placed on a tripod, and simply overlays the image onto the camera view, with the same adjustable settings for the image.
+If AR is enabled, the application uses the device's camera and the Vuforia Engine. The user can create an "Image Target" at runtime by pointing the camera at a real-world object or surface and tapping a button. This captures the camera view and uses it to create a target that Vuforia can recognize and track. The user can then select an image from their device to project onto this newly created target. The app uses a custom rendering engine to render the image on the target, with controls for opacity, contrast, and saturation. If AR is not enabled, the device will need to be placed on a tripod, and simply overlays the image onto the camera view, with the same adjustable settings for the image.
 
 ### **How the user interacts with it**
 The user interacts with the application through a simple user interface. The main screen shows the camera view with the AR overlay. There are buttons to select an image and adjust the properties of the projected image.
 
 1) The user points the camera at a wall or other surface.
-2) The user selects an image from their device.
-3) The app projects the image onto the camera feed.
-4) The user can then adjust the opacity, contrast, and saturation of the image to see how it looks in the environment.
+2) The user taps "Create Target" to generate a trackable AR target from the camera view.
+3) The user selects an image from their device.
+4) The app projects the image onto the AR target.
+5) The user can then adjust the opacity, contrast, and saturation of the image to see how it looks in the environment.
 
 ---
 
@@ -32,12 +33,12 @@ The user interacts with the application through a simple user interface. The mai
 -   **State Management:** All UI state is held in the immutable `UiState.kt` data class and managed via a `StateFlow` in `MainViewModel.kt`.
 
 ### **Key Files**
--   `MainActivity.kt`: The single activity entry point. It handles permissions and hosts the `MainScreen` composable, which acts as a router for the different editor modes.
+-   `MainActivity.kt`: The single activity entry point. It handles permissions, initializes the Vuforia engine, and hosts the `MainScreen` composable.
 -   `MainViewModel.kt`: The central logic hub. It manages all state changes and user events.
 -   `VuforiaCameraScreen.kt`: The composable for the AR experience.
 -   `VuforiaRenderer.kt`: The renderer for the AR experience.
--   `NonArModeScreen.kt`: The composable for the simple camera overlay mode.
--   `StaticImageEditor.kt`: The composable for the mock-up mode on a static background image.
+-   `ImageTraceScreen.kt`: The composable for the simple camera overlay mode (non-AR).
+-   `MockupScreen.kt`: The composable for the mock-up mode on a static background image.
 
 ### **Development Guidelines**
 -   **State:** All state changes MUST be initiated via a function call on the `MainViewModel`.
@@ -48,7 +49,6 @@ The user interacts with the application through a simple user interface. The mai
 
 ## **3. Current Project Goals**
 
-Refer to `TODO.md` for the up-to-date project backlog. The next high-priority task is to refactor the application from ARCore to the Vuforia Engine and implement runtime Image Target creation.
+Refer to `TODO.md` for the up-to-date project backlog. The next high-priority task is to enhance the user experience by creating an onboarding flow and adding more visual feedback for gestures.
 
 ---
-

@@ -4,8 +4,12 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
-## **V1.3 Completed Features**
+## **V1.4 Completed Features**
 
+-   **[x] Refactor from ARCore to Vuforia Engine:**
+    -   [x] Removed all ARCore dependencies and code.
+    -   [x] Integrated the Vuforia Engine SDK.
+    -   [x] Implemented runtime Image Target creation using the device camera.
 -   **[x] Mock-up Mode:**
     -   [x] Users can select a static background image.
     -   [x] A four-point transformation UI allows users to warp the overlay image.
@@ -18,7 +22,7 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Background removal for the overlay image.
 -   **[x] Code & Project Documentation:**
     -   [x] Added comprehensive KDocs to all classes, methods, and properties.
-    -   [x] Rewrote `README.md` and `AGENTS.md` to align with the project vision.
+    -   [x] Rewrote `README.md`, `AGENTS.md`, and `BLUEPRINT.md` to align with the project vision.
 -   **[x] Robustness and Error Handling:**
     -   [x] Implemented error handling for background removal failures.
     -   [x] Implemented user guidance for AR plane detection failures.
@@ -33,10 +37,6 @@ This document tracks the development status, future enhancements, and identified
 
 ### **High Priority**
 
--   **[ ] Refactor from ARCore to Vuforia Engine:**
-    -   [ ] Remove all ARCore dependencies and code.
-    -   [ ] Integrate the Vuforia Engine SDK.
-    -   [ ] Implement runtime Image Target creation using the device camera.
 -   **[ ] Enhance User Experience (UX):**
     -   [ ] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
     -   [ ] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.

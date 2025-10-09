@@ -125,6 +125,10 @@ fun MainScreen(viewModel: MainViewModel) {
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
                 azMenuItem(id = "ar", text = "AR", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
 
+                if (uiState.editorMode == EditorMode.AR) {
+                    azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
+                }
+
                 azRailItem(id = "export", text = "Export Image", onClick = viewModel::onSaveClicked)
                 azRailItem(id = "save_project", text = "Save Project") {
                     saveProjectLauncher.launch("project.json")
