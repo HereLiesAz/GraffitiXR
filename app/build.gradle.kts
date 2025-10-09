@@ -13,7 +13,7 @@ android {
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
         minSdk = 26
-        targetSdk = 36
+        targetSdkPreview = "CANARY"
         versionCode = 1
         versionName = "1.0"
 
@@ -21,6 +21,7 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -47,6 +48,8 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    buildToolsVersion = "36.0.0"
+    ndkVersion = "29.0.14033849 rc4"
 }
 
 dependencies {
@@ -64,7 +67,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation(libs.coil.compose)
     implementation(project(":vuforia"))
 
@@ -84,7 +87,7 @@ dependencies {
     implementation("com.github.GhayasAhmad:auto-background-remover:1.0.7")
 
     // ML Kit
-    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta5")
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
 
 
 
