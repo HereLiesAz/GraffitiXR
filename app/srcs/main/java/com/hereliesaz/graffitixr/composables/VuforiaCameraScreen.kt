@@ -9,12 +9,13 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.hereliesaz.graffitixr.VuforiaJNI
+import com.hereliesaz.graffitixr.MainActivity
 
 @Composable
 fun VuforiaCameraScreen() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val vuforiaEngine = MainActivity.vuforiaEngine
 
     val glSurfaceView = remember {
         GLSurfaceView(context).apply {
@@ -28,11 +29,11 @@ fun VuforiaCameraScreen() {
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     glSurfaceView.onResume()
-                    VuforiaJNI.startAR()
+                    vuforiaEngine.camera?.start()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     glSurfaceView.onPause()
-                    VuforiaJNI.stopAR()
+                    vuforiaEngine.camera?.stop()
                 }
                 else -> {}
             }

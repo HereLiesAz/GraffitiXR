@@ -24,6 +24,7 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
+import com.hereliesaz.graffitixr.composables.VuforiaCameraScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
@@ -119,6 +120,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     onRotationYChanged = viewModel::onRotationYChanged,
                     onCycleRotationAxis = viewModel::onCycleRotationAxis
                 )
+                EditorMode.AR -> VuforiaCameraScreen(viewModel = viewModel)
             }
         }
 
@@ -132,6 +134,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+                azMenuItem(id = "ar", text = "AR", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
 
                 azRailItem(id = "export", text = "Export Image", onClick = viewModel::onSaveClicked)
                 azRailItem(id = "save_project", text = "Save Project") {

@@ -14,11 +14,13 @@ fun OnboardingDialog(
     val title = when (editorMode) {
         EditorMode.STATIC -> "Mock-up Mode"
         EditorMode.NON_AR -> "On-the-Go Mode"
+        EditorMode.AR -> "AR Mode"
     }
 
     val description = when (editorMode) {
         EditorMode.STATIC -> "Use this mode to mock-up your artwork on a static background image. You can use two fingers to scale, rotate, and pan the image. For more precise adjustments, toggle to 'Warp' mode to manipulate the perspective with four corner handles."
         EditorMode.NON_AR -> "This mode overlays your image on the live camera feed. It's a quick way to get a preview without full AR tracking. Use two fingers to scale, rotate, and pan the image."
+        EditorMode.AR -> "This mode uses Augmented Reality to place your artwork in the real world. Point your camera at a surface and tap 'Create Target' to place the image. You can then use two fingers to scale and rotate it."
     }
 
     AlertDialog(
