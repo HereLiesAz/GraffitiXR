@@ -6,17 +6,20 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.github.GhayasAhmad.autobackgroundremover.removeBackground
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
+import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.graphics.ArFeaturePattern
 import com.hereliesaz.graffitixr.graphics.Quaternion
 import com.hereliesaz.graffitixr.utils.OnboardingManager
-import com.hereliesaz.graffitixr.utils.removeBackground
+import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -27,6 +30,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
 
@@ -76,9 +82,47 @@ class MainViewModel(
         }
     }
 
-    private suspend fun removeBackground(uri: Uri): Uri? {
-        return withContext(Dispatchers.IO) {
-            try {
+    fun onRemoveBackgroundClicked() {
+        viewModelScope.launch {
+            setLoading(true)
+            val uri = uiState.value.overlayImageUri
+            if (uri != null) {
+                try {
+                    val context = getApplication<Application>().applicationContext
+                    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        val source = ImageDecoder.createSource(context.contentResolver, uri)
+                        ImageDecoder.decodeBitmap(source)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                    }
+
+                    val resultBitmap = bitmap.removeBackground(context)
+
+                    val cachePath = File(context.cacheDir, "images")
+                    cachePath.mkdirs()
+                    val file = File(cachePath, "background_removed_${System.currentTimeMillis()}.png")
+                    val fOut = FileOutputStream(file)
+                    resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                    fOut.close()
+
+                    val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                    savedStateHandle["uiState"] = uiState.value.copy(backgroundRemovedImageUri = newUri, isLoading = false)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    setLoading(false)
+                }
+            } else {
+                setLoading(false)
+            }
+        }
+    }
+
+    fun onLineDrawingClicked() {
+        viewModelScope.launch {
+            setLoading(true)
+            val uri = uiState.value.overlayImageUri
+            if (uri != null) {
                 val context = getApplication<Application>().applicationContext
                 val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     val source = ImageDecoder.createSource(context.contentResolver, uri)
@@ -90,31 +134,17 @@ class MainViewModel(
                     MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                 }.copy(Bitmap.Config.ARGB_8888, true)
 
-
-                val resultBitmap = bitmap.removeBackground()
+                val lineDrawingBitmap = convertToLineDrawing(bitmap)
 
                 val cachePath = File(context.cacheDir, "images")
                 cachePath.mkdirs()
-                val file = File(cachePath, "background_removed_${System.currentTimeMillis()}.png")
+                val file = File(cachePath, "line_drawing_${System.currentTimeMillis()}.png")
                 val fOut = FileOutputStream(file)
-                resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                lineDrawingBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
                 fOut.close()
 
-                FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
-    }
-
-    fun onRemoveBackgroundClicked() {
-        viewModelScope.launch {
-            setLoading(true)
-            val uri = uiState.value.overlayImageUri
-            if (uri != null) {
-                val resultUri = removeBackground(uri)
-                savedStateHandle["uiState"] = uiState.value.copy(backgroundRemovedImageUri = resultUri, isLoading = false)
+                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                savedStateHandle["uiState"] = uiState.value.copy(overlayImageUri = newUri, isLoading = false)
             } else {
                 setLoading(false)
             }
@@ -162,10 +192,6 @@ class MainViewModel(
     fun onRotationZChanged(rotationDelta: Float) {
         val currentRotation = uiState.value.rotationZ
         savedStateHandle["uiState"] = uiState.value.copy(rotationZ = currentRotation + rotationDelta)
-    }
-
-    fun onPointsInitialized(points: List<Offset>) {
-        savedStateHandle["uiState"] = uiState.value.copy(points = points)
     }
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
@@ -247,6 +273,7 @@ class MainViewModel(
             RotationAxis.Y -> RotationAxis.Z
             RotationAxis.Z -> RotationAxis.X
         }
+        Toast.makeText(getApplication(), "Rotating around ${nextAxis.name} axis", Toast.LENGTH_SHORT).show()
         savedStateHandle["uiState"] = uiState.value.copy(
             activeRotationAxis = nextAxis,
             showRotationAxisFeedback = true
@@ -296,8 +323,65 @@ class MainViewModel(
         }
     }
 
-    fun onSettingsClicked() {
-        val currentShowSettings = uiState.value.showSettings
-        savedStateHandle["uiState"] = uiState.value.copy(showSettings = !currentShowSettings)
+    fun onColorBalanceRChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceR = value)
+    }
+
+    fun onColorBalanceGChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceG = value)
+    }
+
+    fun onColorBalanceBChanged(value: Float) {
+        savedStateHandle["uiState"] = uiState.value.copy(colorBalanceB = value)
+    }
+
+    fun saveProject(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val projectData = ProjectData(
+                    backgroundImageUri = uiState.value.backgroundImageUri,
+                    overlayImageUri = uiState.value.overlayImageUri,
+                    opacity = uiState.value.opacity,
+                    contrast = uiState.value.contrast,
+                    saturation = uiState.value.saturation,
+                    colorBalanceR = uiState.value.colorBalanceR,
+                    colorBalanceG = uiState.value.colorBalanceG,
+                    colorBalanceB = uiState.value.colorBalanceB,
+                    arImagePose = uiState.value.arImagePose,
+                    arFeaturePattern = uiState.value.arFeaturePattern
+                )
+                val jsonString = Json.encodeToString(projectData)
+                getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
+                    it.write(jsonString.toByteArray())
+                }
+            } catch (e: Exception) {
+                // Handle exception
+            }
+        }
+    }
+
+    fun loadProject(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonString = getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
+                if (jsonString != null) {
+                    val projectData = Json.decodeFromString<ProjectData>(jsonString)
+                    savedStateHandle["uiState"] = uiState.value.copy(
+                        backgroundImageUri = projectData.backgroundImageUri,
+                        overlayImageUri = projectData.overlayImageUri,
+                        opacity = projectData.opacity,
+                        contrast = projectData.contrast,
+                        saturation = projectData.saturation,
+                        colorBalanceR = projectData.colorBalanceR,
+                        colorBalanceG = projectData.colorBalanceG,
+                        colorBalanceB = projectData.colorBalanceB,
+                        arImagePose = projectData.arImagePose,
+                        arFeaturePattern = projectData.arFeaturePattern
+                    )
+                }
+            } catch (e: Exception) {
+                // Handle exception
+            }
+        }
     }
 }
