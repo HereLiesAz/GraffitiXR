@@ -8,7 +8,7 @@ object VuforiaJNI {
     }
 
     // Engine Lifecycle
-    external fun engineCreate(): Long
+    external fun engineCreate(configSet: Long): Long
     external fun engineDestroy(engine: Long)
     external fun engineStart(engine: Long): Boolean
     external fun engineStop(engine: Long): Boolean
@@ -16,13 +16,13 @@ object VuforiaJNI {
     // Configuration
     external fun configSetCreate(): Long
     external fun configSetDestroy(configSet: Long)
-    external fun configSetAddPlatformAndroidConfig(configSet: Long, activity: Any, javaVM: Any)
+    external fun configSetAddPlatformAndroidConfig(configSet: Long, activity: Any)
     external fun configSetAddLicenseConfig(configSet: Long, licenseKey: String)
 
     // Rendering
     external fun initRendering(): Int
     external fun configureRendering(width: Int, height: Int, orientation: Int)
-    external fun renderFrame(): Boolean
+    external fun renderFrame(engine: Long): Boolean
 
     // Target Management
     external fun createImageTarget(engine: Long): Boolean

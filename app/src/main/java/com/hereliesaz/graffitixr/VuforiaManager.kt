@@ -17,12 +17,10 @@ object VuforiaManager {
             return
         }
 
-        // TODO: Pass the real JavaVM pointer. For now, we pass a placeholder.
-        // A proper implementation would require getting this from the native context.
-        VuforiaJNI.configSetAddPlatformAndroidConfig(configSet, activity, 0L)
+        VuforiaJNI.configSetAddPlatformAndroidConfig(configSet, activity)
         VuforiaJNI.configSetAddLicenseConfig(configSet, BuildConfig.VUFORIA_LICENSE_KEY)
 
-        engine = VuforiaJNI.engineCreate()
+        engine = VuforiaJNI.engineCreate(configSet)
         if (engine == 0L) {
             Log.e("VuforiaManager", "Failed to create Vuforia engine")
         }

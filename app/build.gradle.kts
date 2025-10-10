@@ -78,6 +78,13 @@ android {
     }
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.14033849 rc4"
+
+    externalNativeBuild {
+        cmake {
+            path = file("CMakeLists.txt")
+            version = "3.18.1"
+        }
+    }
 }
 
 dependencies {

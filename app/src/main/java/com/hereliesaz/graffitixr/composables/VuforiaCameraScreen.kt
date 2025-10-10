@@ -18,7 +18,7 @@ fun VuforiaCameraScreen() {
     val glSurfaceView = remember {
         GLSurfaceView(context).apply {
             setEGLContextClientVersion(2)
-            setRenderer(VuforiaRenderer())
+            setRenderer(VuforiaRenderer(context))
         }
     }
 
