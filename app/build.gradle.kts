@@ -43,6 +43,7 @@ android {
         multiDexEnabled = true
         buildConfigField("String", "VUFORIA_CLIENT_ID", "\"${localProperties.getProperty("vuforia.clientId")}\"")
         buildConfigField("String", "VUFORIA_CLIENT_SECRET", "\"${localProperties.getProperty("vuforia.clientSecret")}\"")
+        buildConfigField("String", "VUFORIA_LICENSE_KEY", "\"${localProperties.getProperty("vuforia.licenseKey")}\"")
     }
 
     buildTypes {
@@ -77,6 +78,13 @@ android {
     }
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.14033849 rc4"
+
+    externalNativeBuild {
+        cmake {
+            path = file("CMakeLists.txt")
+            version = "3.18.1"
+        }
+    }
 }
 
 dependencies {
