@@ -160,6 +160,14 @@ class MainViewModel(
             backgroundRemovedImageUri = null,
             showDoubleTapHint = showHint
         )
+
+        viewModelScope.launch {
+            val context = getApplication<Application>().applicationContext
+            val texture = com.hereliesaz.graffitixr.utils.Texture.loadTextureFromUri(context, uri)
+            if (texture != null) {
+                VuforiaJNI.setOverlayTexture(texture.width, texture.height, texture.data!!)
+            }
+        }
     }
 
     fun onOpacityChanged(opacity: Float) {
@@ -325,6 +333,10 @@ class MainViewModel(
 
     fun onTargetCreationStateChanged(newState: TargetCreationState) {
         savedStateHandle["uiState"] = uiState.value.copy(targetCreationState = newState)
+    }
+
+    fun onCreateTargetClicked() {
+        createImageTarget()
     }
 
     fun createImageTarget() {
