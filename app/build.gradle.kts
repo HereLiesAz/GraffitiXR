@@ -47,7 +47,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments.add("-DVuforia_ROOT_DIR=${rootProject.projectDir}/vuforia")
+                arguments.add("-DVuforia_DIR=${rootProject.projectDir}/vuforia")
             }
         }
         
@@ -65,27 +65,29 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
     }
+
     buildFeatures {
         compose = true
         buildConfig = true
     }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    sourceSets {
-        getByName("main") {
-            jniLibs.srcDirs("../vuforia/lib")
-        }
-    }
+
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.14033849 rc4"
 
