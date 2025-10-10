@@ -45,5 +45,5 @@ android {
 }
 
 dependencies {
-    api(fileTree(mapOf("dir" to "java", "include" to listOf("*.jar"))))
+    api(files("java/VuforiaEngine.jar"))
 }
