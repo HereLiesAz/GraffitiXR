@@ -44,6 +44,10 @@ android {
         buildConfigField("String", "VUFORIA_CLIENT_ID", "\"${localProperties.getProperty("vuforia.clientId")}\"")
         buildConfigField("String", "VUFORIA_CLIENT_SECRET", "\"${localProperties.getProperty("vuforia.clientSecret")}\"")
         buildConfigField("String", "VUFORIA_LICENSE_KEY", "\"${localProperties.getProperty("vuforia.licenseKey")}\"")
+        
+        ndk {
+            abiFilters.add("arm64-v8a")
+        }
     }
 
     buildTypes {

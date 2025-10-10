@@ -208,11 +208,18 @@ Java_com_hereliesaz_graffitixr_VuforiaJNI_createImageTarget(JNIEnv *env, jobject
         return false;
     }
 
+    VuImageInfo imageInfo;
+    if (vuImageGetImageInfo(image, &imageInfo) != VU_SUCCESS) {
+        LOGE("Could not get image info");
+        vuImageListDestroy(imageList);
+        vuStateRelease(state);
+        return false;
+    }
+
     VuImageTargetBufferConfig config = vuImageTargetBufferConfigDefault();
-    config.pixelBuffer = vuImageGetPixels(image);
-    config.bufferFormat = vuImageGetPixelFormat(image);
-    VuVector2I size;
-    vuImageGetSize(image, &size);
+    config.pixelBuffer = const_cast<void*>(imageInfo.buffer);
+    config.bufferFormat = imageInfo.format;
+    VuVector2I size = { imageInfo.width, imageInfo.height };
     config.bufferSize = size;
     config.targetName = "runtime_target";
     config.targetWidth = 0.1f; // 10cm, should be configurable in a real app
