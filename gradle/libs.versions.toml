@@ -18,8 +18,10 @@ autoBackgroundRemover = "1.0.7"
 opencv = "4.12.0"
 azNavRail = "3.13"
 kotlinxSerialization = "1.9.0"
+segmentationSelfie = "16.0.0-beta6"
 
 [libraries]
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 google-accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
 auto-background-remover = { group = "com.github.GhayasAhmad", name = "auto-background-remover", version.ref = "autoBackgroundRemover" }
@@ -49,6 +51,7 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -7,13 +7,21 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        create("release") {
+            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
+            storePassword = "18187077190901818"
+            keyAlias = "key0"
+            keyPassword = "18187077190901818"
+        }
+    }
     namespace = "com.hereliesaz.graffitixr"
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
         minSdk = 26
-        targetSdkPreview = "CANARY"
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -67,7 +75,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
     implementation(project(":vuforia"))
 
@@ -84,10 +92,10 @@ dependencies {
     implementation(libs.az.nav.rail)
 
     // Background Remover
-    implementation("com.github.GhayasAhmad:auto-background-remover:1.0.7")
+    implementation(libs.auto.background.remover)
 
     // ML Kit
-    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+    implementation(libs.segmentation.selfie)
 
 
 
