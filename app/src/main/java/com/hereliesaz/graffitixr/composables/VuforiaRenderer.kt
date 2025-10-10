@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.composables
 
 import android.opengl.GLSurfaceView
-import com.hereliesaz.graffitixr.VuforiaJNI
+import com.vuforia.VuforiaJNI
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 

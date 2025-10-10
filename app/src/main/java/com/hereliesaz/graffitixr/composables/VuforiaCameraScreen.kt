@@ -9,7 +9,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.hereliesaz.graffitixr.VuforiaJNI
+import com.vuforia.VuforiaJNI
 
 @Composable
 fun VuforiaCameraScreen() {

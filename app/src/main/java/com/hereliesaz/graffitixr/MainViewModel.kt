@@ -17,6 +17,7 @@ import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import com.slowmac.autobackgroundremover.removeBackground
+import com.vuforia.VuforiaJNI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
