@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.hereliesaz.graffitixr.VuforiaManager
 
 @Composable
 fun VuforiaCameraScreen() {
@@ -27,8 +28,10 @@ fun VuforiaCameraScreen() {
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     glSurfaceView.onResume()
+                    VuforiaManager.start()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
+                    VuforiaManager.stop()
                     glSurfaceView.onPause()
                 }
                 else -> {}
