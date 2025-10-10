@@ -17,7 +17,6 @@ import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import com.slowmac.autobackgroundremover.removeBackground
-import com.vuforia.VuforiaJNI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -161,14 +160,6 @@ class MainViewModel(
             backgroundRemovedImageUri = null,
             showDoubleTapHint = showHint
         )
-
-        viewModelScope.launch {
-            val context = getApplication<Application>().applicationContext
-            val texture = com.hereliesaz.graffitixr.utils.Texture.loadTextureFromUri(context, uri)
-            if (texture != null) {
-                VuforiaJNI.setOverlayTexture(texture.width, texture.height, texture.data!!)
-            }
-        }
     }
 
     fun onOpacityChanged(opacity: Float) {
@@ -344,7 +335,8 @@ class MainViewModel(
         viewModelScope.launch {
             onTargetCreationStateChanged(TargetCreationState.CREATING)
             val success = withContext(Dispatchers.IO) {
-                VuforiaJNI.createImageTarget()
+                // TODO: Implement this
+                false
             }
             if (success) {
                 onTargetCreationStateChanged(TargetCreationState.SUCCESS)

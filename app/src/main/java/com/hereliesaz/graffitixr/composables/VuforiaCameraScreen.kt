@@ -9,7 +9,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.vuforia.VuforiaJNI
 
 @Composable
 fun VuforiaCameraScreen() {
@@ -28,11 +27,9 @@ fun VuforiaCameraScreen() {
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     glSurfaceView.onResume()
-                    VuforiaJNI.startAR()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     glSurfaceView.onPause()
-                    VuforiaJNI.stopAR()
                 }
                 else -> {}
             }

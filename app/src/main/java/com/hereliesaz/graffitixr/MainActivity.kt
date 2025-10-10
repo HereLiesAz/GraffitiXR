@@ -21,7 +21,6 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
-import com.vuforia.VuforiaJNI
 import org.opencv.android.OpenCVLoader
 
 class MainActivity : ComponentActivity() {
@@ -38,18 +37,7 @@ class MainActivity : ComponentActivity() {
             Log.d("OpenCV", "OpenCV loaded successfully!")
         }
 
-        VuforiaJNI.initAR(this, assets, 0)
-
-        val astronautTexture = com.hereliesaz.graffitixr.utils.Texture.loadTextureFromApk("Astronaut.jpg", assets)
-        val landerTexture = com.hereliesaz.graffitixr.utils.Texture.loadTextureFromApk("Lander.jpg", assets)
-        if (astronautTexture != null && landerTexture != null) {
-            VuforiaJNI.setTextures(
-                astronautTexture.width, astronautTexture.height, astronautTexture.data!!,
-                landerTexture.width, landerTexture.height, landerTexture.data!!
-            )
-        } else {
-            Log.e("VuforiaSample", "Failed to load astronaut or lander texture")
-        }
+        VuforiaManager.init(this)
 
         setContent {
             GraffitiXRTheme {
@@ -77,7 +65,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        VuforiaJNI.deinitAR()
+        VuforiaManager.deinit()
     }
 }
 

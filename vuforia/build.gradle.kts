@@ -29,6 +29,8 @@ android {
     defaultConfig {
         minSdk = 26
         targetSdk = 36
+        buildConfigField("String", "VUFORIA_CLIENT_ID", "\"${localProperties.getProperty("vuforia.clientId")}\"")
+        buildConfigField("String", "VUFORIA_CLIENT_SECRET", "\"${localProperties.getProperty("vuforia.clientSecret")}\"")
     }
 
     sourceSets {
@@ -36,8 +38,12 @@ android {
             jniLibs.srcDirs("lib")
         }
     }
+
+    buildFeatures {
+        buildConfig = true
+    }
 }
 
 dependencies {
-    api(files("java/VuforiaEngine.jar"))
+    api(fileTree(mapOf("dir" to "java", "include" to listOf("*.jar"))))
 }
