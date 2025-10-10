@@ -1,9 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlinx.serialization)
     id("kotlin-parcelize")
+}
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { fis ->
+            load(fis)
+        }
+    }
 }
 
 android {
@@ -30,6 +41,8 @@ android {
             useSupportLibrary = true
         }
         multiDexEnabled = true
+        buildConfigField("String", "VUFORIA_CLIENT_ID", "\"${localProperties.getProperty("vuforia.clientId")}\"")
+        buildConfigField("String", "VUFORIA_CLIENT_SECRET", "\"${localProperties.getProperty("vuforia.clientSecret")}\"")
     }
 
     buildTypes {
@@ -50,10 +63,16 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs("../vuforia/lib")
         }
     }
     buildToolsVersion = "36.0.0"
@@ -77,7 +96,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
-    implementation(project(":vuforia"))
+    implementation(files("../vuforia/java/VuforiaEngine.jar"))
 
     // CameraX
     implementation(libs.androidx.camera.core)
