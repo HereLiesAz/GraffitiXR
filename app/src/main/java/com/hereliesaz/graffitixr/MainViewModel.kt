@@ -335,8 +335,12 @@ class MainViewModel(
         viewModelScope.launch {
             onTargetCreationStateChanged(TargetCreationState.CREATING)
             val success = withContext(Dispatchers.IO) {
-                // TODO: Implement this
-                false
+                val engine = VuforiaManager.getEngine()
+                if (engine != 0L) {
+                    VuforiaJNI.createImageTarget(engine)
+                } else {
+                    false
+                }
             }
             if (success) {
                 onTargetCreationStateChanged(TargetCreationState.SUCCESS)
