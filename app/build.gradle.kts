@@ -47,10 +47,11 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments.add("-DVuforia_DIR=${rootProject.projectDir}/vuforia")
+                arguments.add("-DVuforia_INCLUDE_DIR=${project(":vuforia").projectDir}/include")
+                arguments.add("-DVuforia_LIBRARY_DIR=${project(":vuforia").projectDir}/lib")
             }
         }
-        
+
         ndk {
             abiFilters.add("arm64-v8a")
         }
@@ -117,7 +118,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
-    implementation(files("../vuforia/java/VuforiaEngine.jar"))
+    implementation(project(":vuforia"))
 
     // CameraX
     implementation(libs.androidx.camera.core)

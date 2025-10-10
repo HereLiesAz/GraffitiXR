@@ -1,1 +1,1 @@
-com.vuforia
+com.vuforia.engine

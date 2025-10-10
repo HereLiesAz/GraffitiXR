@@ -4,7 +4,7 @@
     "type": "AAPT_FRIENDLY_MERGED_MANIFESTS",
     "kind": "Directory"
   },
-  "applicationId": "com.vuforia",
+  "applicationId": "com.vuforia.engine",
   "variantName": "debug",
   "elements": [
     {

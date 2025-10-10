@@ -1,49 +1,28 @@
-import java.util.Properties
-
 plugins {
     id("com.android.library")
     id("kotlin-android")
 }
 
-val localProperties = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        localPropertiesFile.inputStream().use { fis ->
-            load(fis)
-        }
-    }
-}
-
 android {
-    signingConfigs {
-        create("release") {
-            keyAlias = localProperties.getProperty("keyAlias")
-            keyPassword = localProperties.getProperty("keyPassword")
-            storeFile = localProperties.getProperty("storeFile")?.let { file(it) }
-            storePassword = localProperties.getProperty("storePassword")
-        }
-    }
+    namespace = "com.vuforia.engine"
     compileSdk = 36
-    namespace = "com.vuforia"
 
     defaultConfig {
         minSdk = 26
-        targetSdk = 36
-        buildConfigField("String", "VUFORIA_CLIENT_ID", "\"${localProperties.getProperty("vuforia.clientId")}\"")
-        buildConfigField("String", "VUFORIA_CLIENT_SECRET", "\"${localProperties.getProperty("vuforia.clientSecret")}\"")
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
 
     sourceSets {
         getByName("main") {
             jniLibs.srcDirs("lib")
+            java.srcDirs("java")
         }
     }
-
-    buildFeatures {
-        buildConfig = true
-    }
-}
-
-dependencies {
-    api(files("java/VuforiaEngine.jar"))
 }

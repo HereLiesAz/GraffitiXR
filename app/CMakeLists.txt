@@ -15,14 +15,13 @@ find_library(
         log-lib
         log)
 
-# Specifies the path to the pre-compiled Vuforia Engine library.
-# The path is passed from build.gradle.kts via -DVuforia_ROOT_DIR
+# Adds the Vuforia library as a pre-compiled dependency.
 add_library(VuforiaEngine SHARED IMPORTED)
 set_target_properties(VuforiaEngine PROPERTIES IMPORTED_LOCATION
-        "${Vuforia_ROOT_DIR}/lib/${ANDROID_ABI}/libVuforiaEngine.so")
+        "${Vuforia_LIBRARY_DIR}/${ANDROID_ABI}/libVuforiaEngine.so")
 
 # Specifies the include directories.
-include_directories("${Vuforia_ROOT_DIR}/include")
+include_directories(${Vuforia_INCLUDE_DIR})
 
 # Links the libraries.
 target_link_libraries(
