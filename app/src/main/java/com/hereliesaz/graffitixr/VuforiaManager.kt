@@ -1,13 +1,16 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Activity
+import android.opengl.GLSurfaceView
 import android.util.Log
+import com.hereliesaz.graffitixr.composables.VuforiaRenderer
 import java.lang.ref.WeakReference
 
 object VuforiaManager {
 
     private var engine: Long = 0
     private lateinit var activityRef: WeakReference<Activity>
+    private var glSurfaceView: GLSurfaceView? = null
 
     fun init(activity: Activity) {
         activityRef = WeakReference(activity)
@@ -26,10 +29,19 @@ object VuforiaManager {
         }
 
         VuforiaJNI.configSetDestroy(configSet)
+
+        glSurfaceView = GLSurfaceView(activity).apply {
+            setEGLContextClientVersion(2)
+            setRenderer(VuforiaRenderer(activity))
+        }
     }
 
     fun getEngine(): Long {
         return engine
+    }
+
+    fun getGLSurfaceView(): GLSurfaceView? {
+        return glSurfaceView
     }
 
     fun start() {
@@ -53,5 +65,6 @@ object VuforiaManager {
             VuforiaJNI.engineDestroy(engine)
             engine = 0
         }
+        glSurfaceView = null
     }
 }
