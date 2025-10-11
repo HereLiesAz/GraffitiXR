@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml:2:13-83
+INJECTED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml:2:13-83
+	package
+		INJECTED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml
+	xmlns:android
+		ADDED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml:2:23-81
+uses-sdk
+INJECTED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml reason: use-sdk injection requested
+INJECTED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml
+INJECTED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml
+	android:targetSdkVersion
+		INJECTED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml
+	android:minSdkVersion
+		INJECTED from G:\My Drive\GraffitiXR\vuforia\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest9747581889092092141.xml
