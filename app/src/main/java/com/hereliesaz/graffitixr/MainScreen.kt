@@ -119,43 +119,44 @@ fun MainScreen(viewModel: MainViewModel) {
                     packRailButtons = true
                 )
 
-                azDivider()
+                azMenuItem(id = "ar", text = "Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
 
                 azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
-                azMenuItem(id = "ar", text = "AR", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
 
                 if (uiState.editorMode == EditorMode.AR) {
                     azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
                 }
-
-                azRailItem(id = "export", text = "Export Image", onClick = viewModel::onSaveClicked)
-                azRailItem(id = "save_project", text = "Save Project") {
-                    saveProjectLauncher.launch("project.json")
-                }
-                azRailItem(id = "load_project", text = "Load Project") {
-                    loadProjectLauncher.launch(arrayOf("application/json"))
-                }
-
-                azRailItem(id = "overlay", text = "Image") {
-                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-
+                azDivider()
                 if (uiState.editorMode == EditorMode.STATIC) {
                     azRailItem(id = "background", text = "Background") {
                         backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                 }
+                azRailItem(id = "overlay", text = "Image") {
+                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+
+
 
                 if (uiState.overlayImageUri != null) {
                      azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
                      azRailItem(id = "line_drawing", text = "Outline", onClick = viewModel::onLineDrawingClicked)
                 }
 
+                azDivider()
                 azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
                 azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
                 azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-                azRailItem(id = "color_balance", text = "Color Balance") { showColorBalanceDialog = true }
+                azRailItem(id = "color_balance", text = "Balance") { showColorBalanceDialog = true }
+                azDivider()
+                azRailItem(id = "export", text = "Export", onClick = viewModel::onSaveClicked)
+                azRailItem(id = "save_project", text = "Save") {
+                    saveProjectLauncher.launch("project.json")
+                }
+                azRailItem(id = "load_project", text = "Load") {
+                    loadProjectLauncher.launch(arrayOf("application/json"))
+                }
             }
         }
 
