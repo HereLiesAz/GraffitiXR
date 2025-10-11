@@ -13,27 +13,15 @@ import com.hereliesaz.graffitixr.VuforiaManager
 
 @Composable
 fun VuforiaCameraScreen() {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val glSurfaceView = VuforiaManager.getGLSurfaceView()
 
-    val glSurfaceView = remember {
-        GLSurfaceView(context).apply {
-            setEGLContextClientVersion(2)
-            setRenderer(VuforiaRenderer(context))
-        }
-    }
-
-    DisposableEffect(lifecycleOwner) {
+    // Handles GLSurfaceView pause/resume according to the Activity lifecycle
+    DisposableEffect(lifecycleOwner, glSurfaceView) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    glSurfaceView.onResume()
-                    VuforiaManager.start()
-                }
-                Lifecycle.Event.ON_PAUSE -> {
-                    VuforiaManager.stop()
-                    glSurfaceView.onPause()
-                }
+                Lifecycle.Event.ON_RESUME -> glSurfaceView?.onResume()
+                Lifecycle.Event.ON_PAUSE -> glSurfaceView?.onPause()
                 else -> {}
             }
         }
@@ -43,5 +31,30 @@ fun VuforiaCameraScreen() {
         }
     }
 
-    AndroidView({ glSurfaceView })
+    // Handles Vuforia Engine start/stop.
+    // Starts when the composable becomes active and resumes.
+    // Stops when the composable becomes inactive or pauses.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> VuforiaManager.start()
+                Lifecycle.Event.ON_PAUSE -> VuforiaManager.stop()
+                else -> {}
+            }
+        }
+        // If we are already resumed, start the engine.
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            VuforiaManager.start()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            // Stop the engine when the composable is disposed.
+            VuforiaManager.stop()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    glSurfaceView?.let { view ->
+        AndroidView({ view })
+    }
 }
