@@ -6,10 +6,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import android.util.Log
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.hereliesaz.graffitixr.VuforiaManager
+
+private const val TAG = "VuforiaCameraScreen"
 
 @Composable
 fun VuforiaCameraScreen() {
@@ -20,13 +23,20 @@ fun VuforiaCameraScreen() {
     DisposableEffect(lifecycleOwner, glSurfaceView) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> glSurfaceView?.onResume()
-                Lifecycle.Event.ON_PAUSE -> glSurfaceView?.onPause()
+                Lifecycle.Event.ON_RESUME -> {
+                    Log.d(TAG, "GLSurfaceView onResume")
+                    glSurfaceView?.onResume()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    Log.d(TAG, "GLSurfaceView onPause")
+                    glSurfaceView?.onPause()
+                }
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            Log.d(TAG, "GLSurfaceView DisposableEffect onDispose")
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
@@ -37,18 +47,26 @@ fun VuforiaCameraScreen() {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> VuforiaManager.start()
-                Lifecycle.Event.ON_PAUSE -> VuforiaManager.stop()
+                Lifecycle.Event.ON_RESUME -> {
+                    Log.d(TAG, "VuforiaManager.start() called from ON_RESUME")
+                    VuforiaManager.start()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    Log.d(TAG, "VuforiaManager.stop() called from ON_PAUSE")
+                    VuforiaManager.stop()
+                }
                 else -> {}
             }
         }
         // If we are already resumed, start the engine.
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            Log.d(TAG, "VuforiaManager.start() called from RESUMED state")
             VuforiaManager.start()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             // Stop the engine when the composable is disposed.
+            Log.d(TAG, "VuforiaManager.stop() called from onDispose")
             VuforiaManager.stop()
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
