@@ -34,7 +34,6 @@ object VuforiaManager {
         }
 
         activityRef.get()?.let { VuforiaJNI.configSetAddPlatformAndroidConfig(configSet, it) }
-        VuforiaJNI.configSetAddLicenseConfig(configSet, BuildConfig.VUFORIA_LICENSE_KEY)
 
         engine = VuforiaJNI.engineCreate(configSet)
         if (engine == 0L) {
