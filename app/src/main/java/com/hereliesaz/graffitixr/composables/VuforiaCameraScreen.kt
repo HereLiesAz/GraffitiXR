@@ -54,7 +54,7 @@ fun VuforiaCameraScreen() {
         }
     }
 
-    glSurfaceView?.let {
-        AndroidView({ it })
+    glSurfaceView?.let { view ->
+        AndroidView({ view })
     }
 }
