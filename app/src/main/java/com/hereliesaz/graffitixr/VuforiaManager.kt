@@ -9,37 +9,39 @@ import java.lang.ref.WeakReference
 object VuforiaManager {
 
     private const val TAG = "VuforiaManager"
-    private var engine: Long = 0
+    var engine: Long = 0
+        private set
+
     private lateinit var activityRef: WeakReference<Activity>
     private var glSurfaceView: GLSurfaceView? = null
 
     fun init(activity: Activity) {
         Log.d(TAG, "init() called")
         activityRef = WeakReference(activity)
-        val configSet = VuforiaJNI.configSetCreate()
-        if (configSet == 0L) {
-            Log.e("VuforiaManager", "Failed to create config set")
-            return
-        }
 
-        VuforiaJNI.configSetAddPlatformAndroidConfig(configSet, activity)
-        VuforiaJNI.configSetAddLicenseConfig(configSet, BuildConfig.VUFORIA_LICENSE_KEY)
-
-        engine = VuforiaJNI.engineCreate(configSet)
-        if (engine == 0L) {
-            Log.e("VuforiaManager", "Failed to create Vuforia engine")
-        }
-
-        VuforiaJNI.configSetDestroy(configSet)
-
+        // Defer engine creation to the renderer
         glSurfaceView = GLSurfaceView(activity).apply {
             setEGLContextClientVersion(2)
             setRenderer(VuforiaRenderer(activity))
         }
     }
 
-    fun getEngine(): Long {
-        return engine
+    fun createEngine() {
+        val configSet = VuforiaJNI.configSetCreate()
+        if (configSet == 0L) {
+            Log.e(TAG, "Failed to create config set")
+            return
+        }
+
+        activityRef.get()?.let { VuforiaJNI.configSetAddPlatformAndroidConfig(configSet, it) }
+        VuforiaJNI.configSetAddLicenseConfig(configSet, BuildConfig.VUFORIA_LICENSE_KEY)
+
+        engine = VuforiaJNI.engineCreate(configSet)
+        if (engine == 0L) {
+            Log.e(TAG, "Failed to create Vuforia engine")
+        }
+
+        VuforiaJNI.configSetDestroy(configSet)
     }
 
     fun getGLSurfaceView(): GLSurfaceView? {

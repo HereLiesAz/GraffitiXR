@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.composables
 
 import android.content.Context
-import android.content.res.Configuration
 import android.opengl.GLSurfaceView
 import android.util.Log
 import com.hereliesaz.graffitixr.VuforiaJNI
@@ -14,6 +13,7 @@ private const val TAG = "VuforiaRenderer"
 class VuforiaRenderer(private val context: Context) : GLSurfaceView.Renderer {
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Log.d(TAG, "onSurfaceCreated() called")
+        VuforiaManager.createEngine()
         VuforiaJNI.initRendering()
     }
 
@@ -25,9 +25,8 @@ class VuforiaRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     override fun onDrawFrame(gl: GL10?) {
         Log.d(TAG, "onDrawFrame() called")
-        val engine = VuforiaManager.getEngine()
-        if (engine != 0L) {
-            VuforiaJNI.renderFrame(engine)
+        if (VuforiaManager.engine != 0L) {
+            VuforiaJNI.renderFrame(VuforiaManager.engine)
         }
     }
 }

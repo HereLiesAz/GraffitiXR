@@ -45,15 +45,15 @@ android {
         buildConfigField("String", "VUFORIA_CLIENT_SECRET", "\"${localProperties.getProperty("vuforia.clientSecret")}\"")
         buildConfigField("String", "VUFORIA_LICENSE_KEY", "\"${localProperties.getProperty("vuforia.licenseKey")}\"")
 
-        externalNativeBuild {
-            cmake {
-                arguments.add("-DVuforia_INCLUDE_DIR=${project(":vuforia").projectDir}/include")
-                arguments.add("-DVuforia_LIBRARY_DIR=${project(":vuforia").projectDir}/lib")
-            }
-        }
-
         ndk {
             abiFilters.add("arm64-v8a")
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments += "-DVuforia_INCLUDE_DIR=${project(":vuforia").projectDir}/include"
+                arguments += "-DVuforia_LIBRARY_DIR=${project(":vuforia").projectDir}/lib"
+            }
         }
     }
 
