@@ -1,3 +1,4 @@
+
 import java.util.Properties
 
 plugins {
@@ -20,10 +21,8 @@ val localProperties = Properties().apply {
 android {
     signingConfigs {
         create("release") {
-            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
-            storePassword = "18187077190901818"
-            keyAlias = "key0"
-            keyPassword = "18187077190901818"
+            keyAlias = localProperties.getProperty("keyAlias")
+            keyPassword = localProperties.getProperty("keyPassword")
         }
     }
     namespace = "com.hereliesaz.graffitixr"
@@ -50,8 +49,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments += "-DVuforia_INCLUDE_DIR=${project(":vuforia").projectDir}/include"
-                arguments += "-DVuforia_LIBRARY_DIR=${project(":vuforia").projectDir}/lib"
+                arguments += "-DANDROID_STL=c++_shared"
             }
         }
     }
@@ -80,6 +78,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        prefab = true
     }
 
     packaging {
@@ -89,16 +88,14 @@ android {
     }
 
     buildToolsVersion = "36.0.0"
-    ndkVersion = "29.0.14033849 rc4"
+    ndkVersion = "26.1.10909125"
 
     externalNativeBuild {
         cmake {
             path = file("CMakeLists.txt")
-            version = "3.22.1"
         }
     }
 }
-
 
 dependencies {
     implementation(libs.androidx.core.ktx)

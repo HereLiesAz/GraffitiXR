@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 3.22.1)
 # Declares the project name.
 project("graffitixr")
 
+# Find and link Vuforia using prefab
+find_package(VuforiaEngine REQUIRED CONFIG)
+
 # Adds the C++ source file to the library.
 add_library(
         graffitixr
@@ -15,16 +18,8 @@ find_library(
         log-lib
         log)
 
-# Adds the Vuforia library as a pre-compiled dependency.
-add_library(VuforiaEngine SHARED IMPORTED)
-set_target_properties(VuforiaEngine PROPERTIES IMPORTED_LOCATION
-        "${Vuforia_LIBRARY_DIR}/${ANDROID_ABI}/libVuforiaEngine.so")
-
-# Specifies the include directories.
-include_directories(${Vuforia_INCLUDE_DIR})
-
 # Links the libraries.
 target_link_libraries(
         graffitixr
         ${log-lib}
-        VuforiaEngine)
+        Vuforia::Vuforia)
