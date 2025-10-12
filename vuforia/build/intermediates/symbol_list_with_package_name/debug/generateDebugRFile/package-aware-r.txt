@@ -1,0 +1,1 @@
+com.hereliesaz.graffitixr.vuforia
