@@ -22,4 +22,4 @@ find_library(
 target_link_libraries(
         graffitixr
         ${log-lib}
-        vuforia::vuforia)
+        vuforia::VuforiaEngine)

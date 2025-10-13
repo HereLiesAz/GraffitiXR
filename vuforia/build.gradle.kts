@@ -26,16 +26,15 @@ android {
         prefabPublishing = true
     }
 
-    // This block tells consumers (your app) where to find the headers.
     prefab {
         vuforia {
-            headers = "sdk/include"
+            headers("src/main/prefab/headers")
+            libraryName = "VuforiaEngine"
         }
     }
 
-    // This block tells Gradle where the pre-built .so files are.
     sourceSets {
-        main {
+        named("main") {
             jniLibs.srcDirs("sdk/lib")
         }
     }
