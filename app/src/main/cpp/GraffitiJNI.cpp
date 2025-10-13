@@ -142,7 +142,7 @@ Java_com_hereliesaz_graffitixr_VuforiaJNI_configureRendering(JNIEnv *env, jobjec
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_VuforiaJNI_renderFrame(JNIEnv *env, jobject thiz, jlong engine_handle) {
     auto* engine = reinterpret_cast<VuEngine*>(engine_handle);
-    if (engine == nullptr || !vuEngineIsRunning(engine)) {
+    if (engine == nullptr) {
         return false;
     }
 
@@ -174,7 +174,7 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_VuforiaJNI_createImageTarget(JNIEnv *env, jobject thiz, jlong engine_handle) {
     LOGI("createImageTarget called");
     auto* engine = reinterpret_cast<VuEngine*>(engine_handle);
-    if (engine == nullptr || !vuEngineIsRunning(engine)) {
+    if (engine == nullptr) {
         LOGE("Engine not running, cannot create image target.");
         return false;
     }

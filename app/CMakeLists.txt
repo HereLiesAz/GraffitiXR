@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.22.1)
 project("graffitixr")
 
 # Find and link Vuforia using prefab
-find_package(VuforiaEngine REQUIRED CONFIG)
+find_package(vuforia REQUIRED CONFIG)
 
 # Adds the C++ source file to the library.
 add_library(
@@ -22,4 +22,4 @@ find_library(
 target_link_libraries(
         graffitixr
         ${log-lib}
-        Vuforia::Vuforia)
+        vuforia::vuforia)
