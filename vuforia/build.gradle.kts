@@ -27,15 +27,14 @@ android {
     }
 
     prefab {
-        vuforia {
-            headers("src/main/prefab/headers")
-            libraryName = "VuforiaEngine"
+        create("VuforiaEngine") {
+            headers = "sdk/include"
         }
     }
 
-    sourceSets {
-        named("main") {
-            jniLibs.srcDirs("sdk/lib")
+    externalNativeBuild {
+        cmake {
+            path = file("CMakeLists.txt")
         }
     }
 }

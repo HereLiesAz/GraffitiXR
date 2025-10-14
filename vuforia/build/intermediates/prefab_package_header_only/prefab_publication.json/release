@@ -1,0 +1,17 @@
+{
+  "installationFolder": "/app/vuforia/build/intermediates/prefab_package/release/prefab",
+  "gradlePath": ":vuforia",
+  "packageInfo": {
+    "packageName": "vuforia",
+    "packageSchemaVersion": 2,
+    "packageDependencies": [],
+    "modules": [
+      {
+        "moduleName": "VuforiaEngine",
+        "moduleHeaders": "/app/vuforia/sdk/include",
+        "moduleExportLibraries": [],
+        "abis": []
+      }
+    ]
+  }
+}
