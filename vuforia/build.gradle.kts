@@ -13,20 +13,20 @@ val localProperties = Properties().apply {
     }
 }
 android {
-    signingConfigs {
-        getByName("debug") {
-            keyAlias = localProperties.getProperty("keyAlias")
-            keyPassword = localProperties.getProperty("keyPassword")
-            storeFile = file(localProperties.getProperty("storeFile"))
-            storePassword = localProperties.getProperty("storePassword")
-        }
-        create("release") {
-            keyAlias = localProperties.getProperty("keyAlias")
-            keyPassword = localProperties.getProperty("keyPassword")
-            storeFile = file(localProperties.getProperty("storeFile"))
-            storePassword = localProperties.getProperty("storePassword")
-        }
-    }
+//    signingConfigs {
+//        getByName("debug") {
+//            keyAlias = localProperties.getProperty("keyAlias")
+//            keyPassword = localProperties.getProperty("keyPassword")
+//            storeFile = file(localProperties.getProperty("storeFile"))
+//            storePassword = localProperties.getProperty("storePassword")
+//        }
+//        create("release") {
+//            keyAlias = localProperties.getProperty("keyAlias")
+//            keyPassword = localProperties.getProperty("keyPassword")
+//            storeFile = file(localProperties.getProperty("storeFile"))
+//            storePassword = localProperties.getProperty("storePassword")
+//        }
+//    }
     namespace = "com.vuforia.engine"
     compileSdk = 36
 
@@ -64,4 +64,6 @@ android {
     ndkVersion = "29.0.14033849 rc4"
 }
 
-dependencies {}
+dependencies {
+    implementation(files("libs/VuforiaEngine.jar"))
+}
