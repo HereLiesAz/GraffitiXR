@@ -22,19 +22,11 @@ android {
         }
     }
 
-    buildFeatures {
-        prefabPublishing = true
-    }
 
-    prefab {
-        create("VuforiaEngine") {
-            headers = "sdk/include"
-        }
-    }
 
-    externalNativeBuild {
-        cmake {
-            path = file("CMakeLists.txt")
+    sourceSets {
+        named("main") {
+            jniLibs.srcDirs("src/main/jniLibs")
         }
     }
 }
