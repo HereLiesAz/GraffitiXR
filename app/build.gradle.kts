@@ -23,6 +23,8 @@ android {
         create("release") {
             keyAlias = localProperties.getProperty("keyAlias")
             keyPassword = localProperties.getProperty("keyPassword")
+            storeFile = file(localProperties.getProperty("storeFile"))
+            storePassword = localProperties.getProperty("storePassword")
         }
     }
     namespace = "com.hereliesaz.graffitixr"

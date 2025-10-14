@@ -1,5 +1,5 @@
 {
-  "installationFolder": "/app/vuforia/build/intermediates/prefab_package/debug/prefab",
+  "installationFolder": "G:\\My Drive\\GraffitiXR\\vuforia\\build\\intermediates\\prefab_package\\debug\\prefab",
   "gradlePath": ":vuforia",
   "packageInfo": {
     "packageName": "vuforia",
@@ -8,7 +8,7 @@
     "modules": [
       {
         "moduleName": "VuforiaEngine",
-        "moduleHeaders": "/app/vuforia/sdk/include",
+        "moduleHeaders": "G:\\My Drive\\GraffitiXR\\vuforia\\sdk\\include",
         "moduleExportLibraries": [],
         "abis": []
       }
