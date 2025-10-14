@@ -4,8 +4,7 @@ import android.app.Activity
 import android.opengl.GLSurfaceView
 import android.util.Log
 import com.hereliesaz.graffitixr.composables.VuforiaRenderer
-import com.vuforia.Vuforia
-import com.vuforia.engine.BuildConfig
+import com.qualcomm.vuforia.Vuforia // Reverted to com.qualcomm.vuforia.Vuforia
 import java.lang.ref.WeakReference
 
 object VuforiaManager {
@@ -34,7 +33,7 @@ object VuforiaManager {
             return
         }
 
-        val licenseKey = "${BuildConfig.VUFORIA_CLIENT_ID},${BuildConfig.VUFORIA_CLIENT_SECRET}"
+        val licenseKey = "${com.hereliesaz.graffitixr.BuildConfig.VUFORIA_CLIENT_ID},${com.hereliesaz.graffitixr.BuildConfig.VUFORIA_CLIENT_SECRET}"
         Vuforia.setInitParameters(activity, 0, licenseKey) // Set license key and other parameters
         Log.d(TAG, "Vuforia license key set via setInitParameters.")
 

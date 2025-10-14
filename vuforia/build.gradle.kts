@@ -38,7 +38,6 @@ android {
         minSdk = 26
         consumerProguardFiles("consumer-rules.pro")
         targetSdk = 36
-        buildConfigField("String", "VUFORIA_LICENSE_KEY", "\"${localProperties.getProperty("vuforia.clientId")},${localProperties.getProperty("vuforia.clientSecret")}\"")
     }
 
     buildTypes {
@@ -70,5 +69,5 @@ android {
 }
 
 dependencies {
-    implementation(files("libs/VuforiaEngine.jar"))
+    api(files("libs/Vuforia.jar"))
 }
