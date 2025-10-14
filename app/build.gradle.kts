@@ -19,14 +19,18 @@ val localProperties = Properties().apply {
 }
 
 android {
-//    signingConfigs {
-//        create("release") {
-//            keyAlias = localProperties.getProperty("keyAlias")
-//            keyPassword = localProperties.getProperty("keyPassword")
-//            storeFile = file(localProperties.getProperty("storeFile"))
-//            storePassword = localProperties.getProperty("storePassword")
-//        }
-//    }
+    signingConfigs {
+        create("release") {
+            keyAlias = localProperties.getProperty("keyAlias")
+            keyPassword = localProperties.getProperty("keyPassword")
+            storeFile = file(localProperties.getProperty("storeFile"))
+            storePassword = localProperties.getProperty("storePassword")
+        }
+
+    }
+    buildFeatures {
+        buildConfig = true
+    }
     namespace = "com.hereliesaz.graffitixr"
     compileSdk = 36
 
@@ -36,6 +40,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

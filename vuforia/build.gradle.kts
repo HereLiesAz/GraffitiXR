@@ -13,27 +13,32 @@ val localProperties = Properties().apply {
     }
 }
 android {
-//    signingConfigs {
-//        getByName("debug") {
-//            keyAlias = localProperties.getProperty("keyAlias")
-//            keyPassword = localProperties.getProperty("keyPassword")
-//            storeFile = file(localProperties.getProperty("storeFile"))
-//            storePassword = localProperties.getProperty("storePassword")
-//        }
-//        create("release") {
-//            keyAlias = localProperties.getProperty("keyAlias")
-//            keyPassword = localProperties.getProperty("keyPassword")
-//            storeFile = file(localProperties.getProperty("storeFile"))
-//            storePassword = localProperties.getProperty("storePassword")
-//        }
-//    }
+    signingConfigs {
+        getByName("debug") {
+            keyAlias = localProperties.getProperty("keyAlias")
+            keyPassword = localProperties.getProperty("keyPassword")
+            storeFile = file(localProperties.getProperty("storeFile"))
+            storePassword = localProperties.getProperty("storePassword")
+        }
+        create("release") {
+            keyAlias = localProperties.getProperty("keyAlias")
+            keyPassword = localProperties.getProperty("keyPassword")
+            storeFile = file(localProperties.getProperty("storeFile"))
+            storePassword = localProperties.getProperty("storePassword")
+        }
+
+    }
+    buildFeatures {
+        buildConfig = true
+    }
     namespace = "com.vuforia.engine"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 26
         consumerProguardFiles("consumer-rules.pro")
-        testOptions.targetSdk = 36
+        targetSdk = 36
+        buildConfigField("String", "VUFORIA_LICENSE_KEY", "\"${localProperties.getProperty("vuforia.clientId")},${localProperties.getProperty("vuforia.clientSecret")}\"")
     }
 
     buildTypes {

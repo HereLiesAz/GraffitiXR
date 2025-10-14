@@ -4,6 +4,8 @@ import android.app.Activity
 import android.opengl.GLSurfaceView
 import android.util.Log
 import com.hereliesaz.graffitixr.composables.VuforiaRenderer
+import com.vuforia.Vuforia
+import com.vuforia.engine.BuildConfig
 import java.lang.ref.WeakReference
 
 object VuforiaManager {
@@ -27,17 +29,26 @@ object VuforiaManager {
     }
 
     fun createEngine() {
+        val activity = activityRef.get() ?: run {
+            Log.e(TAG, "Activity is null, cannot create Vuforia engine.")
+            return
+        }
+
+        val licenseKey = "${BuildConfig.VUFORIA_CLIENT_ID},${BuildConfig.VUFORIA_CLIENT_SECRET}"
+        Vuforia.setInitParameters(activity, 0, licenseKey) // Set license key and other parameters
+        Log.d(TAG, "Vuforia license key set via setInitParameters.")
+
         val configSet = VuforiaJNI.configSetCreate()
         if (configSet == 0L) {
             Log.e(TAG, "Failed to create config set")
             return
         }
 
-        activityRef.get()?.let { VuforiaJNI.configSetAddPlatformAndroidConfig(configSet, it) }
+        VuforiaJNI.configSetAddPlatformAndroidConfig(configSet, activity)
 
         engine = VuforiaJNI.engineCreate(configSet)
         if (engine == 0L) {
-            Log.e(TAG, "Failed to create Vuforia engine")
+            Log.e(TAG, "Failed to create Vuforia engine.")
         }
 
         VuforiaJNI.configSetDestroy(configSet)
