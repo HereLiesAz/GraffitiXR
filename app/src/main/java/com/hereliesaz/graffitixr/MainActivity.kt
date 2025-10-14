@@ -31,6 +31,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Load the native Vuforia library
+        try {
+            System.loadLibrary("Vuforia")
+            Log.d("MainActivity", "libVuforia.so loaded successfully.")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e("MainActivity", "Failed to load libVuforia.so: ${e.message}")
+            // Handle the error appropriately, e.g., show a dialog and exit
+            return
+        }
+
         if (!OpenCVLoader.initLocal()) {
             Log.e("OpenCV", "Unable to load OpenCV!")
         } else {

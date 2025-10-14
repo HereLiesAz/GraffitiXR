@@ -11,13 +11,13 @@ find_library(
         log-lib
         log)
 
-add_library(VuforiaEngine SHARED IMPORTED)
-set_target_properties(VuforiaEngine PROPERTIES IMPORTED_LOCATION
-        ${CMAKE_CURRENT_SOURCE_DIR}/../vuforia/src/main/jniLibs/${ANDROID_ABI}/libVuforiaEngine.so)
+add_library(Vuforia SHARED IMPORTED)
+set_target_properties(Vuforia PROPERTIES IMPORTED_LOCATION
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vuforia/src/main/jniLibs/${ANDROID_ABI}/libVuforia.so)
 
 target_link_libraries(
         graffitixr
         ${log-lib}
-        VuforiaEngine)
+        Vuforia)
 
 target_include_directories(graffitixr PRIVATE ../vuforia/sdk/include)

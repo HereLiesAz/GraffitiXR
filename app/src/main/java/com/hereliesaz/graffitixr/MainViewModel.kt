@@ -335,11 +335,7 @@ class MainViewModel(
         viewModelScope.launch {
             onTargetCreationStateChanged(TargetCreationState.CREATING)
             val success = withContext(Dispatchers.IO) {
-                if (VuforiaManager.engine != 0L) {
-                    VuforiaJNI.createImageTarget(VuforiaManager.engine)
-                } else {
-                    false
-                }
+                VuforiaManager.createImageTarget()
             }
             if (success) {
                 onTargetCreationStateChanged(TargetCreationState.SUCCESS)

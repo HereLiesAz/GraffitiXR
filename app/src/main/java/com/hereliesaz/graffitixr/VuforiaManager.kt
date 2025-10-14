@@ -4,53 +4,54 @@ import android.app.Activity
 import android.opengl.GLSurfaceView
 import android.util.Log
 import com.hereliesaz.graffitixr.composables.VuforiaRenderer
-import com.qualcomm.vuforia.Vuforia // Reverted to com.qualcomm.vuforia.Vuforia
+import com.qualcomm.vuforia.Vuforia
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 
 object VuforiaManager {
 
     private const val TAG = "VuforiaManager"
-    var engine: Long = 0
-        private set
-
     private lateinit var activityRef: WeakReference<Activity>
     private var glSurfaceView: GLSurfaceView? = null
+    private var isVuforiaInitialized = false
 
     fun init(activity: Activity) {
         Log.d(TAG, "init() called")
         activityRef = WeakReference(activity)
 
-        // Defer engine creation to the renderer
         glSurfaceView = GLSurfaceView(activity).apply {
             setEGLContextClientVersion(2)
             setRenderer(VuforiaRenderer(activity))
         }
     }
 
-    fun createEngine() {
-        val activity = activityRef.get() ?: run {
-            Log.e(TAG, "Activity is null, cannot create Vuforia engine.")
-            return
+    fun createEngine(scope: CoroutineScope) {
+        if (isVuforiaInitialized) return
+
+        scope.launch(Dispatchers.IO) {
+            val activity = activityRef.get() ?: run {
+                Log.e(TAG, "Activity is null, cannot create Vuforia engine.")
+                return@launch
+            }
+
+            val licenseKey = "${BuildConfig.VUFORIA_CLIENT_ID},${BuildConfig.VUFORIA_CLIENT_SECRET}"
+            Vuforia.setInitParameters(activity, 0, licenseKey)
+
+            var progress = 0
+            do {
+                progress = Vuforia.init()
+                Log.d(TAG, "Vuforia init progress: $progress%")
+            } while (progress >= 0 && progress < 100)
+
+            if (progress < 0) {
+                Log.e(TAG, "Vuforia initialization failed with error code: $progress")
+            } else {
+                isVuforiaInitialized = true
+                Log.d(TAG, "Vuforia initialized successfully.")
+            }
         }
-
-        val licenseKey = "${com.hereliesaz.graffitixr.BuildConfig.VUFORIA_CLIENT_ID},${com.hereliesaz.graffitixr.BuildConfig.VUFORIA_CLIENT_SECRET}"
-        Vuforia.setInitParameters(activity, 0, licenseKey) // Set license key and other parameters
-        Log.d(TAG, "Vuforia license key set via setInitParameters.")
-
-        val configSet = VuforiaJNI.configSetCreate()
-        if (configSet == 0L) {
-            Log.e(TAG, "Failed to create config set")
-            return
-        }
-
-        VuforiaJNI.configSetAddPlatformAndroidConfig(configSet, activity)
-
-        engine = VuforiaJNI.engineCreate(configSet)
-        if (engine == 0L) {
-            Log.e(TAG, "Failed to create Vuforia engine.")
-        }
-
-        VuforiaJNI.configSetDestroy(configSet)
     }
 
     fun getGLSurfaceView(): GLSurfaceView? {
@@ -58,28 +59,21 @@ object VuforiaManager {
     }
 
     fun start() {
-        Log.d(TAG, "start() called")
-        if (engine != 0L) {
-            if (!VuforiaJNI.engineStart(engine)) {
-                Log.e(TAG, "Failed to start Vuforia engine")
-            }
+        if (isVuforiaInitialized) {
+            Vuforia.onResume()
         }
     }
 
     fun stop() {
-        Log.d(TAG, "stop() called")
-        if (engine != 0L) {
-            if (!VuforiaJNI.engineStop(engine)) {
-                Log.e(TAG, "Failed to stop Vuforia engine")
-            }
+        if (isVuforiaInitialized) {
+            Vuforia.onPause()
         }
     }
 
     fun deinit() {
-        Log.d(TAG, "deinit() called")
-        if (engine != 0L) {
-            VuforiaJNI.engineDestroy(engine)
-            engine = 0
+        if (isVuforiaInitialized) {
+            Vuforia.deinit()
+            isVuforiaInitialized = false
         }
         glSurfaceView = null
     }
