@@ -286,7 +286,7 @@ class MainViewModel(
                     colorBalanceG = uiState.value.colorBalanceG,
                     colorBalanceB = uiState.value.colorBalanceB
                 )
-                val jsonString = Json.encodeToString(projectData)
+                val jsonString = Json.encodeToString(ProjectData.serializer(), projectData)
                 getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
                     it.write(jsonString.toByteArray())
                 }

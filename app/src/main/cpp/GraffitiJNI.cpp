@@ -17,9 +17,7 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
 
 // --- Configuration ---
 
-extern "C" JNIEXPORT jlong
-
-jlong
+extern "C" JNIEXPORT jlong JNICALL
 Java_com_hereliesaz_graffitixr_VuforiaJNI_configSetCreate(JNIEnv *env, jobject thiz) {
     VuEngineConfigSet* configSet;
     if (vuEngineConfigSetCreate(&configSet) != VU_SUCCESS) {
