@@ -170,6 +170,9 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azRailItem(id = "project_library", text = "Library") {
                     showProjectLibrary = true
                 }
+                azRailItem(id = "project_library", text = "Library") {
+                    showProjectLibrary = true
+                }
             }
         }
 

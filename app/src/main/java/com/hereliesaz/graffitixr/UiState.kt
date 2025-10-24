@@ -10,30 +10,6 @@ import androidx.compose.ui.graphics.BlendMode
 import kotlinx.parcelize.RawValue
 
 /**
- * Represents the different editing modes available in the application.
- * Each mode provides a distinct user experience for visualizing the mural.
- */
-enum class EditorMode {
-    /**
-     * A mode for mocking up a mural on a static background image.
-     * This allows for precise placement and adjustments in a controlled environment.
-     */
-    STATIC,
-
-    /**
-     * A mode for overlaying a mural on a live camera feed without using
-     * Augmented Reality tracking. This is a lightweight option for quick, on-the-go previews.
-     */
-    NON_AR,
-
-    /**
-     * An Augmented Reality mode that allows users to place and manipulate virtual objects
-     * in the real world.
-     */
-    AR
-}
-
-/**
  * Represents the different states of the Image Target creation process.
  */
 @Parcelize
