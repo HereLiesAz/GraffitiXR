@@ -6,6 +6,7 @@ import com.google.ar.core.AugmentedImage
 import com.google.ar.core.Frame
 import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.rendering.AugmentedImageRenderer
+import android.util.Log
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import org.opencv.core.Mat
 import org.opencv.android.Utils
@@ -15,6 +16,7 @@ import org.opencv.features2d.DescriptorMatcher
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.core.MatOfDMatch
 import org.opencv.calib3d.Calib3d
+import org.opencv.core.MatOfPoint2f
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -27,6 +29,8 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
     private val matcher by lazy { DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING) }
     private var fingerprintKeypoints: MatOfKeyPoint? = null
     private var fingerprintDescriptors: Mat? = null
+    private var surfaceWidth: Int = 0
+    private var surfaceHeight: Int = 0
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
@@ -37,12 +41,14 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
         arCoreManager.displayRotationHelper.onSurfaceChanged(width, height)
+        surfaceWidth = width
+        surfaceHeight = height
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        val frame: Frame = arCoreManager.onDrawFrame(GLES20.glGetString(GLES20.GL_VERSION).hashCode(), GLES20.glGetString(GLES20.GL_VERSION).hashCode()) ?: return
+        val frame: Frame = arCoreManager.onDrawFrame(surfaceWidth, surfaceHeight) ?: return
         backgroundRenderer.draw(frame)
 
         try {
@@ -79,7 +85,9 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
                         fingerprintPts.fromList(goodMatches.map { fingerprintKeypointsList[it.trainIdx].pt })
                         currentPts.fromList(goodMatches.map { currentKeypointsList[it.queryIdx].pt })
 
-                        Calib3d.findHomography(fingerprintPts, currentPts, Calib3d.RANSAC, 5.0)
+                        val homography = Calib3d.findHomography(fingerprintPts, currentPts, Calib3d.RANSAC, 5.0)
+                        val area = Imgproc.contourArea(homography)
+                        Log.d("ARCoreRenderer", "Homography area: $area")
                     }
                 }
 

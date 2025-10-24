@@ -188,7 +188,8 @@ fun MockupScreen(
                         drawImage(
                             image = bmp.asImageBitmap(),
                             alpha = uiState.opacity,
-                            colorFilter = ColorFilter.colorMatrix(colorMatrix)
+                            colorFilter = ColorFilter.colorMatrix(colorMatrix),
+                            blendMode = uiState.blendMode
                         )
                     }
                 }

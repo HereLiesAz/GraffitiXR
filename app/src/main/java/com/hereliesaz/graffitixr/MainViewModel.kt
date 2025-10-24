@@ -15,6 +15,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.utils.OnboardingManager
+import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import com.slowmac.autobackgroundremover.removeBackground
@@ -29,8 +30,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
+import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Session
+import com.hereliesaz.graffitixr.data.Fingerprint
 import kotlinx.serialization.json.Json
+import org.opencv.android.Utils
+import org.opencv.core.Mat
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.features2d.ORB
+import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
 
@@ -62,6 +70,7 @@ class MainViewModel(
 ) : AndroidViewModel(application) {
 
     private val onboardingManager = OnboardingManager(application)
+    private val projectManager = ProjectManager(application)
 
     val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
 
@@ -286,8 +295,23 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(colorBalanceB = value)
     }
 
-    fun saveProject(uri: Uri) {
-        viewModelScope.launch {
+    fun onCycleBlendMode() {
+        val currentMode = uiState.value.blendMode
+        val nextMode = when (currentMode) {
+            BlendMode.SrcOver -> BlendMode.Multiply
+            BlendMode.Multiply -> BlendMode.Screen
+            BlendMode.Screen -> BlendMode.Overlay
+            BlendMode.Overlay -> BlendMode.Darken
+            BlendMode.Darken -> BlendMode.Lighten
+            BlendMode.Lighten -> BlendMode.SrcOver
+            else -> BlendMode.SrcOver
+        }
+        Toast.makeText(getApplication(), "Blend Mode: ${nextMode.toString()}", Toast.LENGTH_SHORT).show()
+        savedStateHandle["uiState"] = uiState.value.copy(blendMode = nextMode)
+    }
+
+    fun saveProject(projectName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val projectData = ProjectData(
                     backgroundImageUri = uiState.value.backgroundImageUri,
@@ -302,16 +326,13 @@ class MainViewModel(
                     rotationZ = uiState.value.rotationZ,
                     rotationX = uiState.value.rotationX,
                     rotationY = uiState.value.rotationY,
-                    offset = uiState.value.offset
+                    offset = uiState.value.offset,
+                    blendMode = uiState.value.blendMode,
+                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) }
                 )
-                val jsonString = Json.encodeToString(ProjectData.serializer(), projectData)
-                withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
-                        it.write(jsonString.toByteArray())
-                    }
-                }
+                projectManager.saveProject(projectName, projectData)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(getApplication(), "Project saved", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(getApplication(), "Project '$projectName' saved", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error saving project", e)
@@ -322,14 +343,10 @@ class MainViewModel(
         }
     }
 
-    fun loadProject(uri: Uri) {
-        viewModelScope.launch {
+    fun loadProject(projectName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val jsonString = withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
-                }
-                if (jsonString != null) {
-                    val projectData = Json.decodeFromString<ProjectData>(jsonString)
+                projectManager.loadProject(projectName)?.let { projectData ->
                     savedStateHandle["uiState"] = uiState.value.copy(
                         backgroundImageUri = projectData.backgroundImageUri,
                         overlayImageUri = projectData.overlayImageUri,
@@ -343,10 +360,26 @@ class MainViewModel(
                         rotationZ = projectData.rotationZ,
                         rotationX = projectData.rotationX,
                         rotationY = projectData.rotationY,
-                        offset = projectData.offset
+                        offset = projectData.offset,
+                        blendMode = projectData.blendMode,
+                        fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }
                     )
+                    projectData.overlayImageUri?.let { uri ->
+                        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            MediaStore.Images.Media.getBitmap(getApplication<Application>().contentResolver, uri)
+                        }
+                        val session = arCoreManager.session ?: return@launch
+                        val config = session.config
+                        val database = AugmentedImageDatabase(session)
+                        database.addImage("target", bitmap)
+                        config.augmentedImageDatabase = database
+                        session.configure(config)
+                    }
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "Project loaded", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
@@ -354,6 +387,19 @@ class MainViewModel(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Failed to load project", Toast.LENGTH_SHORT).show()
                 }
+            }
+        }
+    }
+
+    fun getProjectList(): List<String> {
+        return projectManager.getProjectList()
+    }
+
+    fun deleteProject(projectName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            projectManager.deleteProject(projectName)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(getApplication(), "Project '$projectName' deleted", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -368,6 +414,9 @@ class MainViewModel(
 
     fun onCreateTargetClicked() {
         viewModelScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(getApplication(), "Creating target...", Toast.LENGTH_SHORT).show()
+            }
             try {
                 onTargetCreationStateChanged(TargetCreationState.CREATING)
                 val bitmap = uiState.value.overlayImageUri?.let { uri ->
@@ -382,16 +431,38 @@ class MainViewModel(
                 if (bitmap != null) {
                     val session = arCoreManager.session ?: return@launch
                     val config = session.config
+                    val grayMat = Mat()
+                    Utils.bitmapToMat(bitmap, grayMat)
+                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                    val orb = ORB.create()
+                    val keypoints = MatOfKeyPoint()
+                    val descriptors = Mat()
+                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+
+                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+
                     val database = AugmentedImageDatabase(session)
                     database.addImage("target", bitmap)
                     config.augmentedImageDatabase = database
                     session.configure(config)
+
+                    savedStateHandle["uiState"] = uiState.value.copy(fingerprintJson = fingerprintJson)
                     onTargetCreationStateChanged(TargetCreationState.SUCCESS)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
+                    }
                 } else {
                     onTargetCreationStateChanged(TargetCreationState.ERROR)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "Failed to create target: No image selected", Toast.LENGTH_LONG).show()
+                    }
                 }
             } catch (e: Exception) {
                 onTargetCreationStateChanged(TargetCreationState.ERROR)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

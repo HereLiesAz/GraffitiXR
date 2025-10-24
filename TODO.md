@@ -6,10 +6,10 @@ This document tracks the development status, future enhancements, and identified
 
 ## **V1.4 Completed Features**
 
--   **[ ] Refactor from Vuforia Engine to ARCore:**
+-   **[x] Refactor from Vuforia Engine to ARCore:**
     -   [x] Removed all Vuforia dependencies and code.
-    -   [ ] Integrate the ARCore SDK.
-    -   [ ] Implement runtime Image Target creation using the device camera.
+    -   [x] Integrate the ARCore SDK.
+    -   [x] Implement runtime Image Target creation using the device camera.
 -   **[x] Mock-up Mode:**
     -   [x] Users can select a static background image.
     -   [x] A four-point transformation UI allows users to warp the overlay image.
@@ -40,17 +40,18 @@ This document tracks the development status, future enhancements, and identified
 -   **[x] Enhance User Experience (UX):**
     -   [x] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
     -   [x] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
--   **[ ] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
+-   **[x] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
 
 ### **Medium Priority**
 
--   **[ ] Add "Save/Export" Feature:**
+-   **[x] Add "Save/Export" Feature:**
     -   [x] Allow users to save or export the final composed image from any of the modes.
     -   [x] Allow users to save the marks or griding "fingerprint" and overlay location, size, and orientation.
-    -   [ ] Saving the project includes the fingerprint history.
+    -   [x] Saving the project includes the fingerprint history.
 -   **[ ] Implement Advanced Image Editing:**
     -   [x] Add more advanced image adjustment tools like color balance or blending modes.
+    -   [ ] **Curves Adjustment:** Implement a user interface for adjusting the image's tonal range using curves. (This was previously a placeholder and has been removed for now).
 
 ### **Low Priority / Future Ideas**
--   **[ ] Create a Project Library:**
-    -   [ ] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
+-   **[x] Create a Project Library:**
+    -   [x] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
