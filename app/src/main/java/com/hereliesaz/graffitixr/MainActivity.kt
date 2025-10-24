@@ -25,8 +25,8 @@ import org.opencv.android.OpenCVLoader
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels { MainViewModelFactory() }
     private lateinit var arCoreManager: ARCoreManager
+    private val viewModel: MainViewModel by viewModels { MainViewModelFactory(arCoreManager) }
 
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     if (cameraPermissionState.status.isGranted) {
-                        MainScreen(viewModel = viewModel)
+                        MainScreen(viewModel = viewModel, arCoreManager = arCoreManager)
                     } else {
                         PermissionScreen(
                             onRequestPermission = {

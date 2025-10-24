@@ -32,7 +32,7 @@ import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     val uiState by viewModel.uiState.collectAsState()
     val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
@@ -89,9 +89,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 onLoadProject = {
                     loadProjectLauncher.launch(arrayOf("application/json"))
                     showProjectLibrary = false
-                },
-                onDeleteProject = {
-                    // TODO: Implement delete project functionality
                 }
             )
         } else {
@@ -125,7 +122,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         onRotationYChanged = viewModel::onRotationYChanged,
                         onCycleRotationAxis = viewModel::onCycleRotationAxis
                     )
-                    EditorMode.AR -> ARCameraScreen()
+                    EditorMode.AR -> ARScreen(arCoreManager = arCoreManager)
                 }
             }
         }

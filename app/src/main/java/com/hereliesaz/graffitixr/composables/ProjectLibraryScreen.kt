@@ -13,8 +13,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ProjectLibraryScreen(
     onNewProject: () -> Unit,
-    onLoadProject: () -> Unit,
-    onDeleteProject: () -> Unit
+    onLoadProject: () -> Unit
 ) {
     Column {
         Text(text = "Project Library")
@@ -25,10 +24,6 @@ fun ProjectLibraryScreen(
             Spacer(modifier = Modifier.width(16.dp))
             Button(onClick = onLoadProject) {
                 Text(text = "Load Project")
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Button(onClick = onDeleteProject) {
-                Text(text = "Delete Project")
             }
         }
     }

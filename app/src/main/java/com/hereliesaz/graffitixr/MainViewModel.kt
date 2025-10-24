@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.google.ar.core.AugmentedImageDatabase
+import com.google.ar.core.Config
+import com.google.ar.core.Session
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
@@ -54,7 +57,8 @@ sealed class TapFeedback {
  */
 class MainViewModel(
     application: Application,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
+    private val arCoreManager: ARCoreManager
 ) : AndroidViewModel(application) {
 
     private val onboardingManager = OnboardingManager(application)
@@ -360,7 +364,33 @@ class MainViewModel(
     }
 
     fun onCreateTargetClicked() {
-        // TODO: Implement ARCore image target creation
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                onTargetCreationStateChanged(TargetCreationState.CREATING)
+                val bitmap = uiState.value.overlayImageUri?.let { uri ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        MediaStore.Images.Media.getBitmap(getApplication<Application>().contentResolver, uri)
+                    }
+                }
+
+                if (bitmap != null) {
+                    val session = arCoreManager.session ?: return@launch
+                    val config = session.config
+                    val database = AugmentedImageDatabase(session)
+                    database.addImage("target", bitmap)
+                    config.augmentedImageDatabase = database
+                    session.configure(config)
+                    onTargetCreationStateChanged(TargetCreationState.SUCCESS)
+                } else {
+                    onTargetCreationStateChanged(TargetCreationState.ERROR)
+                }
+            } catch (e: Exception) {
+                onTargetCreationStateChanged(TargetCreationState.ERROR)
+            }
+        }
     }
 
     fun onNewProject() {
