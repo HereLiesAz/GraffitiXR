@@ -26,28 +26,20 @@ import org.opencv.android.OpenCVLoader
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels { MainViewModelFactory() }
+    private lateinit var arCoreManager: ARCoreManager
 
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Load the native Vuforia library
-        try {
-            System.loadLibrary("Vuforia")
-            Log.d("MainActivity", "libVuforia.so loaded successfully.")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e("MainActivity", "Failed to load libVuforia.so: ${e.message}")
-            // Handle the error appropriately, e.g., show a dialog and exit
-            return
-        }
+        arCoreManager = ARCoreManager(this)
+        lifecycle.addObserver(arCoreManager)
 
         if (!OpenCVLoader.initLocal()) {
             Log.e("OpenCV", "Unable to load OpenCV!")
         } else {
             Log.d("OpenCV", "OpenCV loaded successfully!")
         }
-
-        VuforiaManager.init(this)
 
         setContent {
             GraffitiXRTheme {
@@ -71,11 +63,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        VuforiaManager.deinit()
     }
 }
 

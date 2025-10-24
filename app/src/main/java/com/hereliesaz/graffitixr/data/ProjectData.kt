@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.data
 
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.graffitixr.data.UriSerializer
 import kotlinx.serialization.Serializable
 
 @Serializable

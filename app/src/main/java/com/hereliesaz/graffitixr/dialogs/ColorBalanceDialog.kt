@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,8 +20,7 @@ fun ColorBalanceDialog(
     onValueRChange: (Float) -> Unit,
     onValueGChange: (Float) -> Unit,
     onValueBChange: (Float) -> Unit,
-    onDismissRequest: () -> Unit,
-    valueRange: ClosedFloatingPointRange<Float> = 0f..2f
+    onDismissRequest: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -32,26 +31,26 @@ fun ColorBalanceDialog(
                 Slider(
                     value = valueR,
                     onValueChange = onValueRChange,
-                    valueRange = valueRange
+                    valueRange = 0f..2f
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(text = "Green")
                 Slider(
                     value = valueG,
                     onValueChange = onValueGChange,
-                    valueRange = valueRange
+                    valueRange = 0f..2f
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(text = "Blue")
                 Slider(
                     value = valueB,
                     onValueChange = onValueBChange,
-                    valueRange = valueRange
+                    valueRange = 0f..2f
                 )
             }
         },
         confirmButton = {
-            Button(onClick = onDismissRequest) {
+            TextButton(onClick = onDismissRequest) {
                 Text("Done")
             }
         }

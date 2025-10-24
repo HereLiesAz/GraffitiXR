@@ -6,10 +6,10 @@ This document tracks the development status, future enhancements, and identified
 
 ## **V1.4 Completed Features**
 
--   **[x] Refactor from ARCore to Vuforia Engine:**
-    -   [x] Removed all ARCore dependencies and code.
-    -   [x] Integrated the Vuforia Engine SDK.
-    -   [x] Implemented runtime Image Target creation using the device camera.
+-   **[ ] Refactor from Vuforia Engine to ARCore:**
+    -   [x] Removed all Vuforia dependencies and code.
+    -   [ ] Integrate the ARCore SDK.
+    -   [ ] Implement runtime Image Target creation using the device camera.
 -   **[x] Mock-up Mode:**
     -   [x] Users can select a static background image.
     -   [x] A four-point transformation UI allows users to warp the overlay image.
@@ -37,19 +37,19 @@ This document tracks the development status, future enhancements, and identified
 
 ### **High Priority**
 
--   **[x] Enhance User Experience (UX):**
-    -   [x] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
-    -   [x] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
+-   **[ ] Enhance User Experience (UX):**
+    -   [ ] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
+    -   [ ] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
 -   **[ ] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
 
 ### **Medium Priority**
 
--   **[x] Add "Save/Export" Feature:**
+-   **[ ] Add "Save/Export" Feature:**
     -   [x] Allow users to save or export the final composed image from any of the modes.
     -   [x] Allow users to save the marks or griding "fingerprint" and overlay location, size, and orientation.
-    -   [x] Saving the project includes the fingerprint history.
+    -   [ ] Saving the project includes the fingerprint history.
 -   **[ ] Implement Advanced Image Editing:**
-    -   [ ] Add more advanced image adjustment tools like color balance or blending modes.
+    -   [x] Add more advanced image adjustment tools like color balance or blending modes.
 
 ### **Low Priority / Future Ideas**
 -   **[ ] Create a Project Library:**

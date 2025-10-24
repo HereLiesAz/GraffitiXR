@@ -362,4 +362,8 @@ class MainViewModel(
     fun onCreateTargetClicked() {
         // TODO: Implement ARCore image target creation
     }
+
+    fun onNewProject() {
+        savedStateHandle["uiState"] = UiState()
+    }
 }

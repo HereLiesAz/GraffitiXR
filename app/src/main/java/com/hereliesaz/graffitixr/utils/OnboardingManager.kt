@@ -1,22 +1,21 @@
 package com.hereliesaz.graffitixr.utils
 
 import android.content.Context
-import android.content.SharedPreferences
 import com.hereliesaz.graffitixr.EditorMode
 
 class OnboardingManager(context: Context) {
-
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
-
-    fun completeMode(mode: EditorMode) {
-        prefs.edit().putBoolean(mode.name, true).apply()
-    }
+    private val prefs = context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
 
     fun getCompletedModes(): Set<EditorMode> {
-        return EditorMode.values().filter {
-            prefs.getBoolean(it.name, false)
-        }.toSet()
+        return prefs.getStringSet("completed_modes", emptySet())
+            ?.mapNotNull { runCatching { EditorMode.valueOf(it) }.getOrNull() }
+            ?.toSet() ?: emptySet()
+    }
+
+    fun completeMode(mode: EditorMode) {
+        val currentModes = getCompletedModes().toMutableSet()
+        currentModes.add(mode)
+        prefs.edit().putStringSet("completed_modes", currentModes.map { it.name }.toSet()).apply()
     }
 
     fun hasSeenDoubleTapHint(): Boolean {

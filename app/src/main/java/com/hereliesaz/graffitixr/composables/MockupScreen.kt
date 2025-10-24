@@ -178,7 +178,6 @@ fun MockupScreen(
                                 detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                             }
                     ) {
-                        gestureInProgress = transformState.isTransformInProgress
                         drawImage(
                             image = bmp.asImageBitmap(),
                             alpha = uiState.opacity,
