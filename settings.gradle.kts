@@ -17,4 +17,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "GraffitiXR"
 include(":app")
-include(":vuforia")

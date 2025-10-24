@@ -257,8 +257,11 @@ class MainViewModel(
     fun saveCapturedBitmap(bitmap: Bitmap) {
         viewModelScope.launch {
             setLoading(true)
-            saveBitmapToGallery(getApplication(), bitmap)
+            withContext(Dispatchers.IO) {
+                saveBitmapToGallery(getApplication(), bitmap)
+            }
             withContext(Dispatchers.Main) {
+                Toast.makeText(getApplication(), "Image saved to gallery", Toast.LENGTH_SHORT).show()
                 setLoading(false)
             }
         }
@@ -277,7 +280,7 @@ class MainViewModel(
     }
 
     fun saveProject(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
                 val projectData = ProjectData(
                     backgroundImageUri = uiState.value.backgroundImageUri,
@@ -287,22 +290,37 @@ class MainViewModel(
                     saturation = uiState.value.saturation,
                     colorBalanceR = uiState.value.colorBalanceR,
                     colorBalanceG = uiState.value.colorBalanceG,
-                    colorBalanceB = uiState.value.colorBalanceB
+                    colorBalanceB = uiState.value.colorBalanceB,
+                    scale = uiState.value.scale,
+                    rotationZ = uiState.value.rotationZ,
+                    rotationX = uiState.value.rotationX,
+                    rotationY = uiState.value.rotationY,
+                    offset = uiState.value.offset
                 )
                 val jsonString = Json.encodeToString(ProjectData.serializer(), projectData)
-                getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
-                    it.write(jsonString.toByteArray())
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
+                        it.write(jsonString.toByteArray())
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Project saved", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error saving project", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to save project", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
 
     fun loadProject(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
-                val jsonString = getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
+                val jsonString = withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
+                }
                 if (jsonString != null) {
                     val projectData = Json.decodeFromString<ProjectData>(jsonString)
                     savedStateHandle["uiState"] = uiState.value.copy(
@@ -313,11 +331,22 @@ class MainViewModel(
                         saturation = projectData.saturation,
                         colorBalanceR = projectData.colorBalanceR,
                         colorBalanceG = projectData.colorBalanceG,
-                        colorBalanceB = projectData.colorBalanceB
+                        colorBalanceB = projectData.colorBalanceB,
+                        scale = projectData.scale,
+                        rotationZ = projectData.rotationZ,
+                        rotationX = projectData.rotationX,
+                        rotationY = projectData.rotationY,
+                        offset = projectData.offset
                     )
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "Project loaded", Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error loading project", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to load project", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -332,5 +361,9 @@ class MainViewModel(
 
     fun onCreateTargetClicked() {
         // TODO: Implement ARCore image target creation
+    }
+
+    fun onNewProject() {
+        savedStateHandle["uiState"] = UiState()
     }
 }
