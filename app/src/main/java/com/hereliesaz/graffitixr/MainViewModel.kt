@@ -32,7 +32,13 @@ import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Session
+import com.hereliesaz.graffitixr.data.Fingerprint
 import kotlinx.serialization.json.Json
+import org.opencv.android.Utils
+import org.opencv.core.Mat
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.features2d.ORB
+import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
 
@@ -321,7 +327,8 @@ class MainViewModel(
                     rotationX = uiState.value.rotationX,
                     rotationY = uiState.value.rotationY,
                     offset = uiState.value.offset,
-                    blendMode = uiState.value.blendMode
+                    blendMode = uiState.value.blendMode,
+                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) }
                 )
                 projectManager.saveProject(projectName, projectData)
                 withContext(Dispatchers.Main) {
@@ -354,8 +361,23 @@ class MainViewModel(
                         rotationX = projectData.rotationX,
                         rotationY = projectData.rotationY,
                         offset = projectData.offset,
-                        blendMode = projectData.blendMode
+                        blendMode = projectData.blendMode,
+                        fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }
                     )
+                    projectData.overlayImageUri?.let { uri ->
+                        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            MediaStore.Images.Media.getBitmap(getApplication<Application>().contentResolver, uri)
+                        }
+                        val session = arCoreManager.session ?: return@launch
+                        val config = session.config
+                        val database = AugmentedImageDatabase(session)
+                        database.addImage("target", bitmap)
+                        config.augmentedImageDatabase = database
+                        session.configure(config)
+                    }
                     withContext(Dispatchers.Main) {
                         Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show()
                     }
@@ -409,10 +431,23 @@ class MainViewModel(
                 if (bitmap != null) {
                     val session = arCoreManager.session ?: return@launch
                     val config = session.config
+                    val grayMat = Mat()
+                    Utils.bitmapToMat(bitmap, grayMat)
+                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                    val orb = ORB.create()
+                    val keypoints = MatOfKeyPoint()
+                    val descriptors = Mat()
+                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+
+                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+
                     val database = AugmentedImageDatabase(session)
                     database.addImage("target", bitmap)
                     config.augmentedImageDatabase = database
                     session.configure(config)
+
+                    savedStateHandle["uiState"] = uiState.value.copy(fingerprintJson = fingerprintJson)
                     onTargetCreationStateChanged(TargetCreationState.SUCCESS)
                     withContext(Dispatchers.Main) {
                         Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()

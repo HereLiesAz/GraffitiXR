@@ -24,5 +24,14 @@ data class ProjectData(
     @Serializable(with = OffsetSerializer::class)
     val offset: Offset,
     @Serializable(with = BlendModeSerializer::class)
-    val blendMode: androidx.compose.ui.graphics.BlendMode
+    val blendMode: androidx.compose.ui.graphics.BlendMode,
+    @Serializable(with = FingerprintSerializer::class)
+    val fingerprint: Fingerprint?
+)
+
+@Serializable
+data class Fingerprint(
+    val keypoints: List<@Serializable(with = KeyPointSerializer::class) org.opencv.core.KeyPoint>,
+    @Serializable(with = MatSerializer::class)
+    val descriptors: org.opencv.core.Mat
 )

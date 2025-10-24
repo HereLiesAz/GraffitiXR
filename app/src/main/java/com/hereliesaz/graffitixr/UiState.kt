@@ -114,7 +114,9 @@ data class UiState(
     val showDoubleTapHint: Boolean = false,
     val arState: ArState = ArState.SEARCHING,
     val targetCreationState: TargetCreationState = TargetCreationState.IDLE,
-    val blendMode: @WriteWith<com.hereliesaz.graffitixr.utils.BlendModeParceler> BlendMode = BlendMode.SrcOver
+    val blendMode: @WriteWith<com.hereliesaz.graffitixr.utils.BlendModeParceler> BlendMode = BlendMode.SrcOver,
+    val showCurvesDialog: Boolean = false,
+    val fingerprintJson: String? = null
 ) : Parcelable
 
 enum class AppBlendMode {
