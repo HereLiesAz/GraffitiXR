@@ -22,9 +22,9 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
+import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
-import com.hereliesaz.graffitixr.composables.VuforiaCameraScreen
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
@@ -32,13 +32,14 @@ import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     val uiState by viewModel.uiState.collectAsState()
     val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
+    var showProjectLibrary by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -79,37 +80,50 @@ fun MainScreen(viewModel: MainViewModel) {
     ) { uri -> uri?.let { viewModel.loadProject(it) } }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(1f),
-            contentAlignment = Alignment.Center
-        ) {
-            when (uiState.editorMode) {
-                EditorMode.STATIC -> MockupScreen(
-                    uiState = uiState,
-                    onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
-                    onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                    onOpacityChanged = viewModel::onOpacityChanged,
-                    onContrastChanged = viewModel::onContrastChanged,
-                    onSaturationChanged = viewModel::onSaturationChanged,
-                    onScaleChanged = viewModel::onScaleChanged,
-                    onOffsetChanged = viewModel::onOffsetChanged,
-                    onRotationZChanged = viewModel::onRotationZChanged,
-                    onRotationXChanged = viewModel::onRotationXChanged,
-                    onRotationYChanged = viewModel::onRotationYChanged,
-                    onCycleRotationAxis = viewModel::onCycleRotationAxis
-                )
-                EditorMode.NON_AR -> ImageTraceScreen(
-                    uiState = uiState,
-                    onScaleChanged = viewModel::onScaleChanged,
-                    onOffsetChanged = viewModel::onOffsetChanged,
-                    onRotationZChanged = viewModel::onRotationZChanged,
-                    onRotationXChanged = viewModel::onRotationXChanged,
-                    onRotationYChanged = viewModel::onRotationYChanged,
-                    onCycleRotationAxis = viewModel::onCycleRotationAxis
-                )
-                EditorMode.AR -> VuforiaCameraScreen()
+        if (showProjectLibrary) {
+            ProjectLibraryScreen(
+                onNewProject = {
+                    viewModel.onNewProject()
+                    showProjectLibrary = false
+                },
+                onLoadProject = {
+                    loadProjectLauncher.launch(arrayOf("application/json"))
+                    showProjectLibrary = false
+                }
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                when (uiState.editorMode) {
+                    EditorMode.STATIC -> MockupScreen(
+                        uiState = uiState,
+                        onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                        onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                        onOpacityChanged = viewModel::onOpacityChanged,
+                        onContrastChanged = viewModel::onContrastChanged,
+                        onSaturationChanged = viewModel::onSaturationChanged,
+                        onScaleChanged = viewModel::onScaleChanged,
+                        onOffsetChanged = viewModel::onOffsetChanged,
+                        onRotationZChanged = viewModel::onRotationZChanged,
+                        onRotationXChanged = viewModel::onRotationXChanged,
+                        onRotationYChanged = viewModel::onRotationYChanged,
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis
+                    )
+                    EditorMode.NON_AR -> ImageTraceScreen(
+                        uiState = uiState,
+                        onScaleChanged = viewModel::onScaleChanged,
+                        onOffsetChanged = viewModel::onOffsetChanged,
+                        onRotationZChanged = viewModel::onRotationZChanged,
+                        onRotationXChanged = viewModel::onRotationXChanged,
+                        onRotationYChanged = viewModel::onRotationYChanged,
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis
+                    )
+                    EditorMode.AR -> ARScreen(arCoreManager = arCoreManager)
+                }
             }
         }
 
@@ -119,9 +133,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     packRailButtons = true
                 )
 
-                azMenuItem(id = "ar", text = "Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+                azMenuItem(id = "ar", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
 
-                azMenuItem(id = "trace_image", text = "Trace Image", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
+                azMenuItem(id = "trace_image", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
                 if (uiState.editorMode == EditorMode.AR) {
@@ -156,6 +170,9 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
                 azRailItem(id = "load_project", text = "Load") {
                     loadProjectLauncher.launch(arrayOf("application/json"))
+                }
+                azRailItem(id = "project_library", text = "Library") {
+                    showProjectLibrary = true
                 }
             }
         }
@@ -199,8 +216,8 @@ fun MainScreen(viewModel: MainViewModel) {
         showOnboardingForMode?.let { mode ->
             OnboardingDialog(
                 editorMode = mode,
-                onDismissRequest = {
-                    viewModel.onOnboardingComplete(mode)
+                onDismissRequest = { dontShowAgain ->
+                    viewModel.onOnboardingComplete(mode, dontShowAgain)
                     showOnboardingForMode = null
                 }
             )

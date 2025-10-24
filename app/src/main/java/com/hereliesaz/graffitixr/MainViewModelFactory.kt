@@ -13,7 +13,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
  * necessary dependencies, including the [Application] context and the [SavedStateHandle]
  * for state persistence.
  */
-class MainViewModelFactory : ViewModelProvider.Factory {
+class MainViewModelFactory(private val arCoreManager: ARCoreManager) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
@@ -21,7 +21,7 @@ class MainViewModelFactory : ViewModelProvider.Factory {
         val savedStateHandle = extras.createSavedStateHandle()
 
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            return MainViewModel(application, savedStateHandle) as T
+            return MainViewModel(application, savedStateHandle, arCoreManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

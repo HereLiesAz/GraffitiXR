@@ -6,6 +6,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
@@ -26,6 +27,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.google.ar.core.AugmentedImageDatabase
+import com.google.ar.core.Config
+import com.google.ar.core.Session
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
@@ -53,14 +57,13 @@ sealed class TapFeedback {
  */
 class MainViewModel(
     application: Application,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
+    private val arCoreManager: ARCoreManager
 ) : AndroidViewModel(application) {
 
     private val onboardingManager = OnboardingManager(application)
 
-    val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState(
-        completedOnboardingModes = onboardingManager.getCompletedModes()
-    ))
+    val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
@@ -197,10 +200,17 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(editorMode = mode)
     }
 
-    fun onOnboardingComplete(mode: EditorMode) {
-        onboardingManager.completeMode(mode)
-        val updatedModes = onboardingManager.getCompletedModes()
-        savedStateHandle["uiState"] = uiState.value.copy(completedOnboardingModes = updatedModes)
+    init {
+        val completedModes = onboardingManager.getCompletedModes()
+        savedStateHandle["uiState"] = uiState.value.copy(completedOnboardingModes = completedModes)
+    }
+
+    fun onOnboardingComplete(mode: EditorMode, dontShowAgain: Boolean) {
+        if (dontShowAgain) {
+            onboardingManager.completeMode(mode)
+            val updatedModes = onboardingManager.getCompletedModes()
+            savedStateHandle["uiState"] = uiState.value.copy(completedOnboardingModes = updatedModes)
+        }
     }
 
     fun onDoubleTapHintDismissed() {
@@ -254,8 +264,11 @@ class MainViewModel(
     fun saveCapturedBitmap(bitmap: Bitmap) {
         viewModelScope.launch {
             setLoading(true)
-            saveBitmapToGallery(getApplication(), bitmap)
+            withContext(Dispatchers.IO) {
+                saveBitmapToGallery(getApplication(), bitmap)
+            }
             withContext(Dispatchers.Main) {
+                Toast.makeText(getApplication(), "Image saved to gallery", Toast.LENGTH_SHORT).show()
                 setLoading(false)
             }
         }
@@ -274,7 +287,7 @@ class MainViewModel(
     }
 
     fun saveProject(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
                 val projectData = ProjectData(
                     backgroundImageUri = uiState.value.backgroundImageUri,
@@ -284,22 +297,37 @@ class MainViewModel(
                     saturation = uiState.value.saturation,
                     colorBalanceR = uiState.value.colorBalanceR,
                     colorBalanceG = uiState.value.colorBalanceG,
-                    colorBalanceB = uiState.value.colorBalanceB
+                    colorBalanceB = uiState.value.colorBalanceB,
+                    scale = uiState.value.scale,
+                    rotationZ = uiState.value.rotationZ,
+                    rotationX = uiState.value.rotationX,
+                    rotationY = uiState.value.rotationY,
+                    offset = uiState.value.offset
                 )
                 val jsonString = Json.encodeToString(ProjectData.serializer(), projectData)
-                getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
-                    it.write(jsonString.toByteArray())
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
+                        it.write(jsonString.toByteArray())
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Project saved", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                // Handle exception
+                Log.e("MainViewModel", "Error saving project", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to save project", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
 
     fun loadProject(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
-                val jsonString = getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
+                val jsonString = withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
+                }
                 if (jsonString != null) {
                     val projectData = Json.decodeFromString<ProjectData>(jsonString)
                     savedStateHandle["uiState"] = uiState.value.copy(
@@ -310,11 +338,22 @@ class MainViewModel(
                         saturation = projectData.saturation,
                         colorBalanceR = projectData.colorBalanceR,
                         colorBalanceG = projectData.colorBalanceG,
-                        colorBalanceB = projectData.colorBalanceB
+                        colorBalanceB = projectData.colorBalanceB,
+                        scale = projectData.scale,
+                        rotationZ = projectData.rotationZ,
+                        rotationX = projectData.rotationX,
+                        rotationY = projectData.rotationY,
+                        offset = projectData.offset
                     )
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "Project loaded", Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: Exception) {
-                // Handle exception
+                Log.e("MainViewModel", "Error loading project", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to load project", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -328,21 +367,36 @@ class MainViewModel(
     }
 
     fun onCreateTargetClicked() {
-        createImageTarget()
-    }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                onTargetCreationStateChanged(TargetCreationState.CREATING)
+                val bitmap = uiState.value.overlayImageUri?.let { uri ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        MediaStore.Images.Media.getBitmap(getApplication<Application>().contentResolver, uri)
+                    }
+                }
 
-    fun createImageTarget() {
-        viewModelScope.launch {
-            onTargetCreationStateChanged(TargetCreationState.CREATING)
-            val success = withContext(Dispatchers.IO) {
-                VuforiaManager.createImageTarget()
-            }
-            if (success) {
-                onTargetCreationStateChanged(TargetCreationState.SUCCESS)
-                onArStateChanged(ArState.PLACED)
-            } else {
+                if (bitmap != null) {
+                    val session = arCoreManager.session ?: return@launch
+                    val config = session.config
+                    val database = AugmentedImageDatabase(session)
+                    database.addImage("target", bitmap)
+                    config.augmentedImageDatabase = database
+                    session.configure(config)
+                    onTargetCreationStateChanged(TargetCreationState.SUCCESS)
+                } else {
+                    onTargetCreationStateChanged(TargetCreationState.ERROR)
+                }
+            } catch (e: Exception) {
                 onTargetCreationStateChanged(TargetCreationState.ERROR)
             }
         }
+    }
+
+    fun onNewProject() {
+        savedStateHandle["uiState"] = UiState()
     }
 }
