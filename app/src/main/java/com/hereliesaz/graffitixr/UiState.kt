@@ -92,7 +92,9 @@ data class UiState(
     val targetCreationState: TargetCreationState = TargetCreationState.IDLE,
     val blendMode: @WriteWith<com.hereliesaz.graffitixr.utils.BlendModeParceler> BlendMode = BlendMode.SrcOver,
     val showCurvesDialog: Boolean = false,
-    val fingerprintJson: String? = null
+    val fingerprintJson: String? = null,
+    val curvesPoints: @RawValue List<Offset> = listOf(Offset(0f, 1f), Offset(1f, 0f)),
+    val processedImageUri: Uri? = null
 ) : Parcelable
 
 enum class AppBlendMode {

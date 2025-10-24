@@ -222,6 +222,46 @@ class MainViewModel(
         }
     }
 
+    fun onCurvesPointsChangeFinished() {
+        viewModelScope.launch {
+            val uri = uiState.value.overlayImageUri
+            if (uri != null) {
+                applyCurvesToOverlay(uri, uiState.value.curvesPoints)
+            }
+        }
+    }
+
+    private fun applyCurvesToOverlay(uri: Uri, points: List<Offset>) {
+        viewModelScope.launch {
+            setLoading(true)
+            try {
+                val context = getApplication<Application>().applicationContext
+                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+
+                val resultBitmap = com.hereliesaz.graffitixr.utils.applyCurves(bitmap, points)
+
+                val cachePath = File(context.cacheDir, "images")
+                cachePath.mkdirs()
+                val file = File(cachePath, "curves_processed_${System.currentTimeMillis()}.png")
+                val fOut = FileOutputStream(file)
+                resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                fOut.close()
+
+                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                savedStateHandle["uiState"] = uiState.value.copy(processedImageUri = newUri, isLoading = false)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                setLoading(false)
+            }
+        }
+    }
+
     fun onDoubleTapHintDismissed() {
         onboardingManager.setDoubleTapHintSeen()
         savedStateHandle["uiState"] = uiState.value.copy(showDoubleTapHint = false)
@@ -469,5 +509,9 @@ class MainViewModel(
 
     fun onNewProject() {
         savedStateHandle["uiState"] = UiState()
+    }
+
+    fun onCurvesPointsChanged(points: List<Offset>) {
+        savedStateHandle["uiState"] = uiState.value.copy(curvesPoints = points)
     }
 }
