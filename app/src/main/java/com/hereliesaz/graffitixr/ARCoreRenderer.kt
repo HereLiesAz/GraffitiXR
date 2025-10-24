@@ -7,6 +7,14 @@ import com.google.ar.core.Frame
 import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.rendering.AugmentedImageRenderer
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
+import org.opencv.core.Mat
+import org.opencv.android.Utils
+import org.opencv.imgproc.Imgproc
+import org.opencv.features2d.ORB
+import org.opencv.features2d.DescriptorMatcher
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.core.MatOfDMatch
+import org.opencv.calib3d.Calib3d
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -15,6 +23,10 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
     private val backgroundRenderer = BackgroundRenderer()
     private val augmentedImageRenderer = AugmentedImageRenderer()
     private val trackedImages = mutableMapOf<Int, Pair<AugmentedImage, AugmentedImageRenderer>>()
+    private val orb by lazy { ORB.create() }
+    private val matcher by lazy { DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING) }
+    private var fingerprintKeypoints: MatOfKeyPoint? = null
+    private var fingerprintDescriptors: Mat? = null
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
@@ -32,6 +44,51 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
 
         val frame: Frame = arCoreManager.onDrawFrame(GLES20.glGetString(GLES20.GL_VERSION).hashCode(), GLES20.glGetString(GLES20.GL_VERSION).hashCode()) ?: return
         backgroundRenderer.draw(frame)
+
+        try {
+            frame.acquireCameraImage().use { image ->
+                val yuvBytes = ByteArray(image.planes[0].buffer.remaining())
+                image.planes[0].buffer.get(yuvBytes)
+                val mat = Mat(image.height + image.height / 2, image.width, org.opencv.core.CvType.CV_8UC1)
+                mat.put(0, 0, yuvBytes)
+                val grayMat = Mat()
+                Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_YUV2GRAY_NV21)
+
+                val keypoints = MatOfKeyPoint()
+                val descriptors = Mat()
+                orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+
+                if (fingerprintKeypoints == null) {
+                    fingerprintKeypoints = keypoints
+                    fingerprintDescriptors = descriptors
+                } else {
+                    val matches = MatOfDMatch()
+                    matcher.match(descriptors, fingerprintDescriptors, matches)
+
+                    val goodMatches = matches.toList().filter { it.distance < 70 }
+                    val goodMatchesMat = MatOfDMatch()
+                    goodMatchesMat.fromList(goodMatches)
+
+                    if (goodMatches.size > 10) {
+                        val fingerprintPts = MatOfPoint2f()
+                        val currentPts = MatOfPoint2f()
+
+                        val fingerprintKeypointsList = fingerprintKeypoints!!.toList()
+                        val currentKeypointsList = keypoints.toList()
+
+                        fingerprintPts.fromList(goodMatches.map { fingerprintKeypointsList[it.trainIdx].pt })
+                        currentPts.fromList(goodMatches.map { currentKeypointsList[it.queryIdx].pt })
+
+                        Calib3d.findHomography(fingerprintPts, currentPts, Calib3d.RANSAC, 5.0)
+                    }
+                }
+
+                mat.release()
+                grayMat.release()
+            }
+        } catch (e: Exception) {
+            // Handle exceptions
+        }
 
         val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
 

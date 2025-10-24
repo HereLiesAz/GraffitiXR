@@ -216,8 +216,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
         showOnboardingForMode?.let { mode ->
             OnboardingDialog(
                 editorMode = mode,
-                onDismissRequest = {
-                    viewModel.onOnboardingComplete(mode, false)
+                onDismissRequest = { dontShowAgain ->
+                    viewModel.onOnboardingComplete(mode, dontShowAgain)
                     showOnboardingForMode = null
                 }
             )

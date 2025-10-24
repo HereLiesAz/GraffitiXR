@@ -159,6 +159,12 @@ fun MockupScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { gestureInProgress = true },
+                            onDragEnd = { gestureInProgress = false }
+                        ) { _, _ -> }
+                    }
             ) {
                 imageBitmap?.let { bmp ->
                     Canvas(
@@ -190,6 +196,11 @@ fun MockupScreen(
         }
 
         if (gestureInProgress) {
+            val rotationValue = when (uiState.activeRotationAxis) {
+                com.hereliesaz.graffitixr.RotationAxis.X -> uiState.rotationX
+                com.hereliesaz.graffitixr.RotationAxis.Y -> uiState.rotationY
+                com.hereliesaz.graffitixr.RotationAxis.Z -> uiState.rotationZ
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -198,7 +209,7 @@ fun MockupScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Scale: %.2f, Rotation: %.1f°".format(uiState.scale, uiState.rotationZ),
+                    text = "Scale: %.2f, Rotation (%s): %.1f°".format(uiState.scale, uiState.activeRotationAxis.name, rotationValue),
                     color = Color.White
                 )
             }

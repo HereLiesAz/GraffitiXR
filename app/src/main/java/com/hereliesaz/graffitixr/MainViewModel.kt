@@ -63,9 +63,7 @@ class MainViewModel(
 
     private val onboardingManager = OnboardingManager(application)
 
-    val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState(
-        completedOnboardingModes = onboardingManager.getCompletedModes()
-    ))
+    val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
@@ -200,6 +198,11 @@ class MainViewModel(
 
     fun onEditorModeChanged(mode: EditorMode) {
         savedStateHandle["uiState"] = uiState.value.copy(editorMode = mode)
+    }
+
+    init {
+        val completedModes = onboardingManager.getCompletedModes()
+        savedStateHandle["uiState"] = uiState.value.copy(completedOnboardingModes = completedModes)
     }
 
     fun onOnboardingComplete(mode: EditorMode, dontShowAgain: Boolean) {

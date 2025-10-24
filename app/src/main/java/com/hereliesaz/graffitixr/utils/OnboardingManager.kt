@@ -6,8 +6,11 @@ import com.hereliesaz.graffitixr.EditorMode
 
 class OnboardingManager(context: Context) {
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
+    fun getCompletedModes(): Set<EditorMode> {
+        return prefs.getStringSet("completed_modes", emptySet())
+            ?.mapNotNull { EditorMode.valueOf(it) }
+            ?.toSet() ?: emptySet()
+    }
 
     fun completeMode(mode: EditorMode) {
         prefs.edit().putBoolean(mode.name, true).apply()
@@ -20,10 +23,10 @@ class OnboardingManager(context: Context) {
     }
 
     fun hasSeenDoubleTapHint(): Boolean {
-        return prefs.getBoolean("double_tap_hint_seen", false)
+        return prefs.getBoolean("seen_double_tap_hint", false)
     }
 
     fun setDoubleTapHintSeen() {
-        prefs.edit().putBoolean("double_tap_hint_seen", true).apply()
+        prefs.edit().putBoolean("seen_double_tap_hint", true).apply()
     }
 }
