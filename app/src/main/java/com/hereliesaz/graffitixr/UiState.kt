@@ -6,6 +6,8 @@ import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.utils.OffsetParceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
+import androidx.compose.ui.graphics.BlendMode
+import kotlinx.parcelize.RawValue
 
 /**
  * Represents the different editing modes available in the application.
@@ -111,5 +113,26 @@ data class UiState(
     val showRotationAxisFeedback: Boolean = false,
     val showDoubleTapHint: Boolean = false,
     val arState: ArState = ArState.SEARCHING,
-    val targetCreationState: TargetCreationState = TargetCreationState.IDLE
+    val targetCreationState: TargetCreationState = TargetCreationState.IDLE,
+    val blendMode: @WriteWith<com.hereliesaz.graffitixr.utils.BlendModeParceler> BlendMode = BlendMode.SrcOver
 ) : Parcelable
+
+enum class AppBlendMode {
+    NORMAL,
+    MULTIPLY,
+    SCREEN,
+    OVERLAY,
+    DARKEN,
+    LIGHTEN;
+
+    fun toComposeBlendMode(): BlendMode {
+        return when (this) {
+            NORMAL -> BlendMode.SrcOver
+            MULTIPLY -> BlendMode.Multiply
+            SCREEN -> BlendMode.Screen
+            OVERLAY -> BlendMode.Overlay
+            DARKEN -> BlendMode.Darken
+            LIGHTEN -> BlendMode.Lighten
+        }
+    }
+}

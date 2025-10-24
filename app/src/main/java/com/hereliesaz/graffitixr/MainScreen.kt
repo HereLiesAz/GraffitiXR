@@ -29,6 +29,7 @@ import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
+import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
 
 @Composable
@@ -40,6 +41,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
+    var showSaveProjectDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -71,23 +73,19 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
 
-    val saveProjectLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri -> uri?.let { viewModel.saveProject(it) } }
-
-    val loadProjectLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri -> uri?.let { viewModel.loadProject(it) } }
-
     Box(modifier = Modifier.fillMaxSize()) {
         if (showProjectLibrary) {
             ProjectLibraryScreen(
-                onNewProject = {
-                    viewModel.onNewProject()
+                projects = viewModel.getProjectList(),
+                onLoadProject = { projectName ->
+                    viewModel.loadProject(projectName)
                     showProjectLibrary = false
                 },
-                onLoadProject = {
-                    loadProjectLauncher.launch(arrayOf("application/json"))
+                onDeleteProject = { projectName ->
+                    viewModel.deleteProject(projectName)
+                },
+                onNewProject = {
+                    viewModel.onNewProject()
                     showProjectLibrary = false
                 }
             )
@@ -163,18 +161,26 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
                 azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
                 azRailItem(id = "color_balance", text = "Balance") { showColorBalanceDialog = true }
+                azRailItem(id = "blend_mode", text = "Blend Mode", onClick = viewModel::onCycleBlendMode)
                 azDivider()
                 azRailItem(id = "export", text = "Export", onClick = viewModel::onSaveClicked)
                 azRailItem(id = "save_project", text = "Save") {
-                    saveProjectLauncher.launch("project.json")
-                }
-                azRailItem(id = "load_project", text = "Load") {
-                    loadProjectLauncher.launch(arrayOf("application/json"))
+                    showSaveProjectDialog = true
                 }
                 azRailItem(id = "project_library", text = "Library") {
                     showProjectLibrary = true
                 }
             }
+        }
+
+        if (showSaveProjectDialog) {
+            SaveProjectDialog(
+                onDismissRequest = { showSaveProjectDialog = false },
+                onSaveRequest = { projectName ->
+                    viewModel.saveProject(projectName)
+                    showSaveProjectDialog = false
+                }
+            )
         }
 
         if (showColorBalanceDialog) {

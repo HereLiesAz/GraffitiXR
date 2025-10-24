@@ -15,6 +15,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.utils.OnboardingManager
+import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import com.slowmac.autobackgroundremover.removeBackground
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
+import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Session
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -62,6 +64,7 @@ class MainViewModel(
 ) : AndroidViewModel(application) {
 
     private val onboardingManager = OnboardingManager(application)
+    private val projectManager = ProjectManager(application)
 
     val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
 
@@ -286,8 +289,23 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(colorBalanceB = value)
     }
 
-    fun saveProject(uri: Uri) {
-        viewModelScope.launch {
+    fun onCycleBlendMode() {
+        val currentMode = uiState.value.blendMode
+        val nextMode = when (currentMode) {
+            BlendMode.SrcOver -> BlendMode.Multiply
+            BlendMode.Multiply -> BlendMode.Screen
+            BlendMode.Screen -> BlendMode.Overlay
+            BlendMode.Overlay -> BlendMode.Darken
+            BlendMode.Darken -> BlendMode.Lighten
+            BlendMode.Lighten -> BlendMode.SrcOver
+            else -> BlendMode.SrcOver
+        }
+        Toast.makeText(getApplication(), "Blend Mode: ${nextMode.toString()}", Toast.LENGTH_SHORT).show()
+        savedStateHandle["uiState"] = uiState.value.copy(blendMode = nextMode)
+    }
+
+    fun saveProject(projectName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val projectData = ProjectData(
                     backgroundImageUri = uiState.value.backgroundImageUri,
@@ -302,16 +320,12 @@ class MainViewModel(
                     rotationZ = uiState.value.rotationZ,
                     rotationX = uiState.value.rotationX,
                     rotationY = uiState.value.rotationY,
-                    offset = uiState.value.offset
+                    offset = uiState.value.offset,
+                    blendMode = uiState.value.blendMode
                 )
-                val jsonString = Json.encodeToString(ProjectData.serializer(), projectData)
-                withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
-                        it.write(jsonString.toByteArray())
-                    }
-                }
+                projectManager.saveProject(projectName, projectData)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(getApplication(), "Project saved", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(getApplication(), "Project '$projectName' saved", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error saving project", e)
@@ -322,14 +336,10 @@ class MainViewModel(
         }
     }
 
-    fun loadProject(uri: Uri) {
-        viewModelScope.launch {
+    fun loadProject(projectName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val jsonString = withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
-                }
-                if (jsonString != null) {
-                    val projectData = Json.decodeFromString<ProjectData>(jsonString)
+                projectManager.loadProject(projectName)?.let { projectData ->
                     savedStateHandle["uiState"] = uiState.value.copy(
                         backgroundImageUri = projectData.backgroundImageUri,
                         overlayImageUri = projectData.overlayImageUri,
@@ -343,10 +353,11 @@ class MainViewModel(
                         rotationZ = projectData.rotationZ,
                         rotationX = projectData.rotationX,
                         rotationY = projectData.rotationY,
-                        offset = projectData.offset
+                        offset = projectData.offset,
+                        blendMode = projectData.blendMode
                     )
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "Project loaded", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
@@ -354,6 +365,19 @@ class MainViewModel(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Failed to load project", Toast.LENGTH_SHORT).show()
                 }
+            }
+        }
+    }
+
+    fun getProjectList(): List<String> {
+        return projectManager.getProjectList()
+    }
+
+    fun deleteProject(projectName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            projectManager.deleteProject(projectName)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(getApplication(), "Project '$projectName' deleted", Toast.LENGTH_SHORT).show()
             }
         }
     }

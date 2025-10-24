@@ -22,5 +22,7 @@ data class ProjectData(
     val rotationX: Float,
     val rotationY: Float,
     @Serializable(with = OffsetSerializer::class)
-    val offset: Offset
+    val offset: Offset,
+    @Serializable(with = BlendModeSerializer::class)
+    val blendMode: androidx.compose.ui.graphics.BlendMode
 )
