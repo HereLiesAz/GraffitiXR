@@ -6,6 +6,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.FileProvider
@@ -197,10 +198,12 @@ class MainViewModel(
         savedStateHandle["uiState"] = uiState.value.copy(editorMode = mode)
     }
 
-    fun onOnboardingComplete(mode: EditorMode) {
-        onboardingManager.completeMode(mode)
-        val updatedModes = onboardingManager.getCompletedModes()
-        savedStateHandle["uiState"] = uiState.value.copy(completedOnboardingModes = updatedModes)
+    fun onOnboardingComplete(mode: EditorMode, dontShowAgain: Boolean) {
+        if (dontShowAgain) {
+            onboardingManager.completeMode(mode)
+            val updatedModes = onboardingManager.getCompletedModes()
+            savedStateHandle["uiState"] = uiState.value.copy(completedOnboardingModes = updatedModes)
+        }
     }
 
     fun onDoubleTapHintDismissed() {
@@ -291,7 +294,7 @@ class MainViewModel(
                     it.write(jsonString.toByteArray())
                 }
             } catch (e: Exception) {
-                // Handle exception
+                Log.e("MainViewModel", "Error saving project", e)
             }
         }
     }
@@ -314,7 +317,7 @@ class MainViewModel(
                     )
                 }
             } catch (e: Exception) {
-                // Handle exception
+                Log.e("MainViewModel", "Error loading project", e)
             }
         }
     }
@@ -328,21 +331,6 @@ class MainViewModel(
     }
 
     fun onCreateTargetClicked() {
-        createImageTarget()
-    }
-
-    fun createImageTarget() {
-        viewModelScope.launch {
-            onTargetCreationStateChanged(TargetCreationState.CREATING)
-            val success = withContext(Dispatchers.IO) {
-                VuforiaManager.createImageTarget()
-            }
-            if (success) {
-                onTargetCreationStateChanged(TargetCreationState.SUCCESS)
-                onArStateChanged(ArState.PLACED)
-            } else {
-                onTargetCreationStateChanged(TargetCreationState.ERROR)
-            }
-        }
+        // TODO: Implement ARCore image target creation
     }
 }

@@ -199,8 +199,8 @@ fun MainScreen(viewModel: MainViewModel) {
         showOnboardingForMode?.let { mode ->
             OnboardingDialog(
                 editorMode = mode,
-                onDismissRequest = {
-                    viewModel.onOnboardingComplete(mode)
+                onDismissRequest = { dontShowAgain ->
+                    viewModel.onOnboardingComplete(mode, dontShowAgain)
                     showOnboardingForMode = null
                 }
             )
