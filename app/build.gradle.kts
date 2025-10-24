@@ -19,15 +19,15 @@ val localProperties = Properties().apply {
 }
 
 android {
-    signingConfigs {
-        create("release") {
-            keyAlias = localProperties.getProperty("keyAlias")
-            keyPassword = localProperties.getProperty("keyPassword")
-            storeFile = file(localProperties.getProperty("storeFile"))
-            storePassword = localProperties.getProperty("storePassword")
-        }
-
-    }
+//    signingConfigs {
+//        create("release") {
+//            keyAlias = localProperties.getProperty("keyAlias")
+//            keyPassword = localProperties.getProperty("keyPassword")
+//            storeFile = file(localProperties.getProperty("storeFile"))
+//            storePassword = localProperties.getProperty("storePassword")
+//        }
+//
+//    }
     buildFeatures {
         buildConfig = true
     }
@@ -47,9 +47,6 @@ android {
             useSupportLibrary = true
         }
         multiDexEnabled = true
-        buildConfigField("String", "VUFORIA_CLIENT_ID", "\"${localProperties.getProperty("vuforia.clientId")}\"")
-        buildConfigField("String", "VUFORIA_CLIENT_SECRET", "\"${localProperties.getProperty("vuforia.clientSecret")}\"")
-
         ndk {
             abiFilters.add("arm64-v8a")
         }
@@ -121,7 +118,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
-    implementation(project(":vuforia"))
+
+    // ARCore
+    implementation(libs.arcore.client)
 
     // CameraX
     implementation(libs.androidx.camera.core)

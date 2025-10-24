@@ -13,21 +13,21 @@ val localProperties = Properties().apply {
     }
 }
 android {
-    signingConfigs {
-        getByName("debug") {
-            keyAlias = localProperties.getProperty("keyAlias")
-            keyPassword = localProperties.getProperty("keyPassword")
-            storeFile = file(localProperties.getProperty("storeFile"))
-            storePassword = localProperties.getProperty("storePassword")
-        }
-        create("release") {
-            keyAlias = localProperties.getProperty("keyAlias")
-            keyPassword = localProperties.getProperty("keyPassword")
-            storeFile = file(localProperties.getProperty("storeFile"))
-            storePassword = localProperties.getProperty("storePassword")
-        }
-
-    }
+//    signingConfigs {
+//        getByName("debug") {
+//            keyAlias = localProperties.getProperty("keyAlias")
+//            keyPassword = localProperties.getProperty("keyPassword")
+//            storeFile = file(localProperties.getProperty("storeFile"))
+//            storePassword = localProperties.getProperty("storePassword")
+//        }
+//        create("release") {
+//            keyAlias = localProperties.getProperty("keyAlias")
+//            keyPassword = localProperties.getProperty("keyPassword")
+//            storeFile = file(localProperties.getProperty("storeFile"))
+//            storePassword = localProperties.getProperty("storePassword")
+//        }
+//
+//    }
     buildFeatures {
         buildConfig = true
     }
