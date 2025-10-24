@@ -10,10 +10,20 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +55,7 @@ fun ImageTraceScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var gestureInProgress by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
         // CameraX Preview
@@ -85,6 +96,12 @@ fun ImageTraceScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { gestureInProgress = true },
+                            onDragEnd = { gestureInProgress = false }
+                        ) { _, _ -> }
+                    }
             ) {
                 AsyncImage(
                     model = it,
@@ -128,6 +145,25 @@ fun ImageTraceScreen(
                             this *= colorBalanceMatrix
                         }
                     )
+                )
+            }
+        }
+        if (gestureInProgress) {
+            val rotationValue = when (uiState.activeRotationAxis) {
+                com.hereliesaz.graffitixr.RotationAxis.X -> uiState.rotationX
+                com.hereliesaz.graffitixr.RotationAxis.Y -> uiState.rotationY
+                com.hereliesaz.graffitixr.RotationAxis.Z -> uiState.rotationZ
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Scale: %.2f, Rotation (%s): %.1f°".format(uiState.scale, uiState.activeRotationAxis.name, rotationValue),
+                    color = Color.White
                 )
             }
         }

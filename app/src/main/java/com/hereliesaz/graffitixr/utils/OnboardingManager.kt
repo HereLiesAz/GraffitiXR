@@ -8,7 +8,7 @@ class OnboardingManager(context: Context) {
 
     fun getCompletedModes(): Set<EditorMode> {
         return prefs.getStringSet("completed_modes", emptySet())
-            ?.mapNotNull { runCatching { EditorMode.valueOf(it) }.getOrNull() }
+            ?.mapNotNull { EditorMode.valueOf(it) }
             ?.toSet() ?: emptySet()
     }
 
@@ -19,10 +19,10 @@ class OnboardingManager(context: Context) {
     }
 
     fun hasSeenDoubleTapHint(): Boolean {
-        return prefs.getBoolean("double_tap_hint_seen", false)
+        return prefs.getBoolean("seen_double_tap_hint", false)
     }
 
     fun setDoubleTapHintSeen() {
-        prefs.edit().putBoolean("double_tap_hint_seen", true).apply()
+        prefs.edit().putBoolean("seen_double_tap_hint", true).apply()
     }
 }
