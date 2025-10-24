@@ -51,6 +51,8 @@ This document tracks the development status, future enhancements, and identified
 -   **[ ] Implement Advanced Image Editing:**
     -   [x] Add more advanced image adjustment tools like color balance or blending modes.
     -   [ ] **Curves Adjustment:** Implement a user interface for adjusting the image's tonal range using curves. (This was previously a placeholder and has been removed for now).
+-   **[x] Refactor Gesture Handling:**
+    -   [x] Create a shared composable for gesture detection to reduce code duplication between screens.
 
 ### **Low Priority / Future Ideas**
 -   **[x] Create a Project Library:**
