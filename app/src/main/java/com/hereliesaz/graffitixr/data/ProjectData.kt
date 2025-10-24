@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.data
 
 import android.net.Uri
-import com.hereliesaz.graffitixr.data.UriSerializer
+import androidx.compose.ui.geometry.Offset
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -15,5 +15,11 @@ data class ProjectData(
     val saturation: Float,
     val colorBalanceR: Float,
     val colorBalanceG: Float,
-    val colorBalanceB: Float
+    val colorBalanceB: Float,
+    val scale: Float,
+    val rotationZ: Float,
+    val rotationX: Float,
+    val rotationY: Float,
+    @Serializable(with = OffsetSerializer::class)
+    val offset: Offset
 )
