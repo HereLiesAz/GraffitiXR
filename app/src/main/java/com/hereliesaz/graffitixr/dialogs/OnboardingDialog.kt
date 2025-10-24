@@ -28,6 +28,7 @@ fun OnboardingDialog(
         EditorMode.NON_AR -> "In this mode, you can overlay your artwork on the live camera feed. This is a great way to get a quick preview of your work in the real world."
         EditorMode.AR -> "In this mode, you can use Augmented Reality to place your artwork in the real world. First, you'll need to create an image target by pointing your camera at a real-world object."
     }
+    var dontShowAgain by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = { onDismissRequest(dontShowAgain) },
