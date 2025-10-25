@@ -19,8 +19,12 @@ import org.opencv.calib3d.Calib3d
 import org.opencv.core.MatOfPoint2f
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.opengl.GLUtils
 
-class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.Renderer {
+class ARCoreRenderer(private val arCoreManager: ARCoreManager, private val context: Context) : GLSurfaceView.Renderer {
 
     private val backgroundRenderer = BackgroundRenderer()
     private val augmentedImageRenderer = AugmentedImageRenderer()
@@ -31,6 +35,22 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
     private var fingerprintDescriptors: Mat? = null
     private var surfaceWidth: Int = 0
     private var surfaceHeight: Int = 0
+    private var textureId = -1
+
+
+    fun updateTexture(uri: Uri) {
+        val bitmap = context.contentResolver.openInputStream(uri).use {
+            BitmapFactory.decodeStream(it)
+        }
+        val textureIds = IntArray(1)
+        GLES20.glGenTextures(1, textureIds, 0)
+        textureId = textureIds[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        bitmap.recycle()
+    }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
@@ -53,19 +73,25 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
 
         val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
 
-        for (augmentedImage in updatedAugmentedImages) {
-            if (augmentedImage.trackingState == TrackingState.TRACKING) {
-                if (!trackedImages.containsKey(augmentedImage.index)) {
-                    val renderer = AugmentedImageRenderer()
-                    renderer.createOnGlThread()
-                    trackedImages[augmentedImage.index] = Pair(augmentedImage, renderer)
+        if (textureId != -1) {
+            for (augmentedImage in updatedAugmentedImages) {
+                if (augmentedImage.trackingState == TrackingState.TRACKING) {
+                    if (!trackedImages.containsKey(augmentedImage.index)) {
+                        val renderer = AugmentedImageRenderer()
+                        renderer.createOnGlThread()
+                        trackedImages[augmentedImage.index] = Pair(augmentedImage, renderer)
+                    }
+                    val (image, renderer) = trackedImages[augmentedImage.index]!!
+                    val projectionMatrix = FloatArray(16)
+                    val viewMatrix = FloatArray(16)
+                    frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+                    frame.camera.getViewMatrix(viewMatrix, 0)
+
+                    GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+                    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
+
+                    renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ)
                 }
-                val (image, renderer) = trackedImages[augmentedImage.index]!!
-                val projectionMatrix = FloatArray(16)
-                val viewMatrix = FloatArray(16)
-                frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
-                frame.camera.getViewMatrix(viewMatrix, 0)
-                renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ)
             }
         }
     }

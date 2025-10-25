@@ -128,7 +128,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationYChanged = viewModel::onRotationYChanged,
                         onCycleRotationAxis = viewModel::onCycleRotationAxis
                     )
-                    EditorMode.AR -> ARScreen(arCoreManager = arCoreManager)
+                    EditorMode.AR -> ARScreen(arCoreManager = arCoreManager, overlayImageUri = uiState.overlayImageUri)
                 }
             }
         }
