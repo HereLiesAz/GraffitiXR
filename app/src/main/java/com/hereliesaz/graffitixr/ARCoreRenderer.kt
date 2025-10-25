@@ -26,7 +26,7 @@ import android.opengl.GLUtils
 
 class ARCoreRenderer(private val arCoreManager: ARCoreManager, private val context: Context) : GLSurfaceView.Renderer {
 
-    private val backgroundRenderer = BackgroundRenderer()
+    private val backgroundRenderer = arCoreManager.backgroundRenderer
     private val augmentedImageRenderer = AugmentedImageRenderer()
     private val trackedImages = mutableMapOf<Int, Pair<AugmentedImage, AugmentedImageRenderer>>()
     private val orb by lazy { ORB.create() }

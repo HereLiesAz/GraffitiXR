@@ -99,35 +99,3 @@ fun GeneralSettings(
         Slider(value = uiState.colorBalanceB, onValueChange = onColorBalanceBChanged)
     }
 }
-
-@Composable
-fun GeneralSettings(
-    uiState: UiState,
-    onOpacityChanged: (Float) -> Unit,
-    onSaturationChanged: (Float) -> Unit,
-    onContrastChanged: (Float) -> Unit,
-    onColorBalanceRChanged: (Float) -> Unit,
-    onColorBalanceGChanged: (Float) -> Unit,
-    onColorBalanceBChanged: (Float) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text("Opacity")
-        Slider(value = uiState.opacity, onValueChange = onOpacityChanged)
-        Text("Saturation")
-        Slider(value = uiState.saturation, onValueChange = onSaturationChanged)
-        Text("Contrast")
-        Slider(value = uiState.contrast, onValueChange = onContrastChanged)
-        Text("Red")
-        Slider(value = uiState.colorBalanceR, onValueChange = onColorBalanceRChanged)
-        Text("Green")
-        Slider(value = uiState.colorBalanceG, onValueChange = onColorBalanceGChanged)
-        Text("Blue")
-        Slider(value = uiState.colorBalanceB, onValueChange = onColorBalanceBChanged)
-    }
-}
