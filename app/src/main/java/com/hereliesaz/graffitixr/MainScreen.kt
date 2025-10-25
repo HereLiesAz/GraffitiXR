@@ -24,9 +24,8 @@ import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
+import com.hereliesaz.graffitixr.composables.SettingsScreen
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
-import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
-import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
@@ -37,9 +36,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     val uiState by viewModel.uiState.collectAsState()
     val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
-    var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
-    var showColorBalanceDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
     var showSaveProjectDialog by remember { mutableStateOf(false) }
 
@@ -157,10 +155,6 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 }
 
                 azDivider()
-                azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-                azRailItem(id = "color_balance", text = "Balance") { showColorBalanceDialog = true }
                 azRailItem(id = "blend_mode", text = "Blend Mode", onClick = viewModel::onCycleBlendMode)
                 azDivider()
                 azRailItem(id = "export", text = "Export", onClick = viewModel::onSaveClicked)
@@ -170,8 +164,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azRailItem(id = "project_library", text = "Library") {
                     showProjectLibrary = true
                 }
-                azRailItem(id = "project_library", text = "Library") {
-                    showProjectLibrary = true
+                azRailItem(id = "settings", text = "Settings") {
+                    showSettingsDialog = true
                 }
             }
         }
@@ -186,39 +180,18 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
             )
         }
 
-        if (showColorBalanceDialog) {
-            ColorBalanceDialog(
-                title = "Color Balance",
-                valueR = uiState.colorBalanceR,
-                valueG = uiState.colorBalanceG,
-                valueB = uiState.colorBalanceB,
-                onValueRChange = viewModel::onColorBalanceRChanged,
-                onValueGChange = viewModel::onColorBalanceGChanged,
-                onValueBChange = viewModel::onColorBalanceBChanged,
-                onDismissRequest = { showColorBalanceDialog = false }
-            )
-        }
-
-        when (showSliderDialog) {
-            "Opacity" -> AdjustmentSliderDialog(
-                title = "Opacity",
-                value = uiState.opacity,
-                onValueChange = viewModel::onOpacityChanged,
-                onDismissRequest = { showSliderDialog = null }
-            )
-            "Contrast" -> AdjustmentSliderDialog(
-                title = "Contrast",
-                value = uiState.contrast,
-                onValueChange = viewModel::onContrastChanged,
-                onDismissRequest = { showSliderDialog = null },
-                valueRange = 0f..2f
-            )
-            "Saturation" -> AdjustmentSliderDialog(
-                title = "Saturation",
-                value = uiState.saturation,
-                onValueChange = viewModel::onSaturationChanged,
-                onDismissRequest = { showSliderDialog = null },
-                valueRange = 0f..2f
+        if (showSettingsDialog) {
+            SettingsScreen(
+                uiState = uiState,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onColorBalanceRChanged = viewModel::onColorBalanceRChanged,
+                onColorBalanceGChanged = viewModel::onColorBalanceGChanged,
+                onColorBalanceBChanged = viewModel::onColorBalanceBChanged,
+                onCurvesPointsChanged = viewModel::onCurvesPointsChanged,
+                onCurvesPointsChangeFinished = viewModel::onCurvesPointsChangeFinished,
+                onBack = { showSettingsDialog = false }
             )
         }
 
