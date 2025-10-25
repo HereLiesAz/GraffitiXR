@@ -38,7 +38,7 @@ A pivotal requirement for GraffitiXR is the ability for users to adjust the opac
 
 #### **Computer Vision: OpenCV for Android SDK**
 
-OpenCV is the industry-standard library for computer vision tasks. It is used in this project for generating an AR target 'fingerprint' using the ORB feature detector to extract keypoints and descriptors from a target image.
+OpenCV is the industry-standard library for computer vision tasks. While it was previously used for an experimental feature-matching implementation, it is no longer actively used in the rendering pipeline. It remains a dependency for potential future computer vision features.
 
 ### **1.3. Project Setup and Configuration**
 

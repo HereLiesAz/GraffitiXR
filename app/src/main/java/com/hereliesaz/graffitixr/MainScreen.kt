@@ -95,7 +95,9 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                     showProjectLibrary = false
                 }
             )
-        } else {
+        }
+
+        if (!showProjectLibrary) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -231,7 +233,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
+                .padding(bottom = 82.dp)
         ) {
             IconButton(
                 onClick = viewModel::onUndoClicked,
