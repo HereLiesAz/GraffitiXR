@@ -131,7 +131,7 @@ fun MockupScreen(
             )
         }
 
-        uiState.overlayImageUri?.let { uri ->
+        (uiState.processedImageUri ?: uiState.overlayImageUri)?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
             LaunchedEffect(uri) {
