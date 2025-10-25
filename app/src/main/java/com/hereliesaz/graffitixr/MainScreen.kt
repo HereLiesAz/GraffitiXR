@@ -155,7 +155,6 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 }
 
                 azDivider()
-                azRailItem(id = "adjust", text = "Adjust") { showSettingsDialog = true }
                 azRailItem(id = "blend_mode", text = "Blend Mode", onClick = viewModel::onCycleBlendMode)
                 azDivider()
                 azRailItem(id = "export", text = "Export", onClick = viewModel::onSaveClicked)
@@ -165,8 +164,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azRailItem(id = "project_library", text = "Library") {
                     showProjectLibrary = true
                 }
-                azRailItem(id = "project_library", text = "Library") {
-                    showProjectLibrary = true
+                azRailItem(id = "settings", text = "Settings") {
+                    showSettingsDialog = true
                 }
             }
         }
