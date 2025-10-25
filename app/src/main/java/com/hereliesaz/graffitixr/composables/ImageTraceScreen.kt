@@ -52,9 +52,10 @@ fun ImageTraceScreen(
     onCycleRotationAxis: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    ConstraintBox {
+        val context = LocalContext.current
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var gestureInProgress by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -82,7 +83,7 @@ fun ImageTraceScreen(
         )
 
         // Interactive Overlay Image
-        uiState.overlayImageUri?.let {
+        (uiState.processedImageUri ?: uiState.overlayImageUri)?.let {
             val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
                 onScaleChanged(zoomChange)
                 onOffsetChanged(offsetChange)
@@ -168,4 +169,5 @@ fun ImageTraceScreen(
             }
         }
     }
+}
 }
