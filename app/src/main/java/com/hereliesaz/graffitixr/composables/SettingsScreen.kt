@@ -3,9 +3,11 @@ package com.hereliesaz.graffitixr.composables
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.background
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.UiState
 
@@ -26,8 +28,14 @@ fun SettingsScreen(
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("General", "Curves")
 
-    Scaffold { padding ->
-        Column(modifier = Modifier.padding(padding)) {
+    Scaffold(
+        containerColor = Color.Transparent
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .background(Color.Black.copy(alpha = 0.5f))
+        ) {
             TabRow(selectedTabIndex = selectedTab) {
                 tabs.forEachIndexed { index, title ->
                     Tab(

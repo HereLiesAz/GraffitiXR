@@ -71,7 +71,7 @@ data class UiState(
     val backgroundImageUri: Uri? = null,
     val overlayImageUri: Uri? = null,
     val backgroundRemovedImageUri: Uri? = null,
-    val opacity: Float = 1f,
+    val opacity: Float = 0.5f,
     val contrast: Float = 1f,
     val saturation: Float = 1f,
     val colorBalanceR: Float = 1f,
