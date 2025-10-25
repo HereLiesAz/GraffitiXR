@@ -6,20 +6,16 @@ import com.hereliesaz.graffitixr.EditorMode
 
 class OnboardingManager(context: Context) {
 
-    fun getCompletedModes(): Set<EditorMode> {
-        return prefs.getStringSet("completed_modes", emptySet())
-            ?.mapNotNull { EditorMode.valueOf(it) }
-            ?.toSet() ?: emptySet()
-    }
-
-    fun completeMode(mode: EditorMode) {
-        prefs.edit().putBoolean(mode.name, true).apply()
-    }
+    private val prefs: SharedPreferences = context.getSharedPreferences("onboarding", Context.MODE_PRIVATE)
 
     fun getCompletedModes(): Set<EditorMode> {
         return EditorMode.values().filter {
             prefs.getBoolean(it.name, false)
         }.toSet()
+    }
+
+    fun completeMode(mode: EditorMode) {
+        prefs.edit().putBoolean(mode.name, true).apply()
     }
 
     fun hasSeenDoubleTapHint(): Boolean {

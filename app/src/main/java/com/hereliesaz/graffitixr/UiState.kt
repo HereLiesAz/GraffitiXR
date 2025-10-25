@@ -71,7 +71,7 @@ data class UiState(
     val backgroundImageUri: Uri? = null,
     val overlayImageUri: Uri? = null,
     val backgroundRemovedImageUri: Uri? = null,
-    val opacity: Float = 1f,
+    val opacity: Float = 0.5f,
     val contrast: Float = 1f,
     val saturation: Float = 1f,
     val colorBalanceR: Float = 1f,
@@ -92,7 +92,9 @@ data class UiState(
     val targetCreationState: TargetCreationState = TargetCreationState.IDLE,
     val blendMode: @WriteWith<com.hereliesaz.graffitixr.utils.BlendModeParceler> BlendMode = BlendMode.SrcOver,
     val showCurvesDialog: Boolean = false,
-    val fingerprintJson: String? = null
+    val fingerprintJson: String? = null,
+    val curvesPoints: @RawValue List<Offset> = listOf(Offset(0f, 1f), Offset(1f, 0f)),
+    val processedImageUri: Uri? = null
 ) : Parcelable
 
 enum class AppBlendMode {
