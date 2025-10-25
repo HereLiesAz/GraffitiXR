@@ -8,8 +8,10 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,7 +22,7 @@ fun OnboardingDialog(
     editorMode: EditorMode,
     onDismissRequest: (dontShowAgain: Boolean) -> Unit
 ) {
-    val (dontShowAgain, setDontShowAgain) = remember { mutableStateOf(false) }
+    var dontShowAgain by remember { mutableStateOf(false) }
 
     val title = "Welcome to ${editorMode.name} Mode!"
     val message = when (editorMode) {
@@ -28,14 +30,13 @@ fun OnboardingDialog(
         EditorMode.NON_AR -> "In this mode, you can overlay your artwork on the live camera feed. This is a great way to get a quick preview of your work in the real world."
         EditorMode.AR -> "In this mode, you can use Augmented Reality to place your artwork in the real world. First, you'll need to create an image target by pointing your camera at a real-world object."
     }
-    var dontShowAgain by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = { onDismissRequest(dontShowAgain) },
         title = { Text(text = title) },
         text = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = dontShowAgain, onCheckedChange = setDontShowAgain)
+                Checkbox(checked = dontShowAgain, onCheckedChange = { dontShowAgain = it })
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Don't show this again")
             }
