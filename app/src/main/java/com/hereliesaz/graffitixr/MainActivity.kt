@@ -22,11 +22,18 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import org.opencv.android.OpenCVLoader
+import com.google.ar.core.ArCoreApk
+import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var arCoreManager: ARCoreManager
     private val viewModel: MainViewModel by viewModels { MainViewModelFactory(arCoreManager) }
+    private var arCoreInstallRequested by mutableStateOf(false)
+
 
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,28 +47,52 @@ class MainActivity : ComponentActivity() {
         } else {
             Log.d("OpenCV", "OpenCV loaded successfully!")
         }
-
         setContent {
             GraffitiXRTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    val cameraPermissionState = rememberPermissionState(
-                        permission = Manifest.permission.CAMERA
-                    )
+                AppContent(viewModel = viewModel, arCoreManager = arCoreManager)
+            }
+        }
+    }
 
-                    if (cameraPermissionState.status.isGranted) {
-                        MainScreen(viewModel = viewModel, arCoreManager = arCoreManager)
-                    } else {
-                        PermissionScreen(
-                            onRequestPermission = {
-                                cameraPermissionState.launchPermissionRequest()
-                            }
-                        )
-                    }
+    override fun onResume() {
+        super.onResume()
+        maybeRequestArCoreInstallation()
+    }
+
+    private fun maybeRequestArCoreInstallation() {
+        try {
+            when (ArCoreApk.getInstance().requestInstall(this, !arCoreInstallRequested)) {
+                ArCoreApk.InstallStatus.INSTALLED -> {
+                }
+                ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
+                    arCoreInstallRequested = true
                 }
             }
+        } catch (e: UnavailableUserDeclinedInstallationException) {
+            // User declined installation. Handle this case.
+        }
+    }
+}
+
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+fun AppContent(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        val cameraPermissionState = rememberPermissionState(
+            permission = Manifest.permission.CAMERA
+        )
+
+        if (cameraPermissionState.status.isGranted) {
+            MainScreen(viewModel = viewModel, arCoreManager = arCoreManager)
+        } else {
+            PermissionScreen(
+                onRequestPermission = {
+                    cameraPermissionState.launchPermissionRequest()
+                }
+            )
         }
     }
 }
