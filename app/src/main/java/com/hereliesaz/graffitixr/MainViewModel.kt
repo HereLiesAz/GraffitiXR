@@ -72,6 +72,9 @@ class MainViewModel(
     private val onboardingManager = OnboardingManager(application)
     private val projectManager = ProjectManager(application)
 
+    private val undoStack = mutableListOf<UiState>()
+    private val redoStack = mutableListOf<UiState>()
+
     val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
@@ -175,38 +178,38 @@ class MainViewModel(
     }
 
     fun onOpacityChanged(opacity: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(opacity = opacity)
+        updateState(uiState.value.copy(opacity = opacity))
     }
 
     fun onContrastChanged(contrast: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(contrast = contrast)
+        updateState(uiState.value.copy(contrast = contrast))
     }
 
     fun onSaturationChanged(saturation: Float) {
-        savedStateHandle["uiState"] = uiState.value.copy(saturation = saturation)
+        updateState(uiState.value.copy(saturation = saturation))
     }
 
     fun onScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.scale
-        savedStateHandle["uiState"] = uiState.value.copy(scale = currentScale * scaleFactor)
+        updateState(uiState.value.copy(scale = currentScale * scaleFactor))
     }
 
     fun onOffsetChanged(offset: Offset) {
-        savedStateHandle["uiState"] = uiState.value.copy(offset = uiState.value.offset + offset)
+        updateState(uiState.value.copy(offset = uiState.value.offset + offset))
     }
 
     fun onRotationZChanged(rotationDelta: Float) {
         val currentRotation = uiState.value.rotationZ
-        savedStateHandle["uiState"] = uiState.value.copy(rotationZ = currentRotation + rotationDelta)
+        updateState(uiState.value.copy(rotationZ = currentRotation + rotationDelta))
     }
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
-        savedStateHandle["uiState"] = uiState.value.copy(arObjectScale = currentScale * scaleFactor)
+        updateState(uiState.value.copy(arObjectScale = currentScale * scaleFactor))
     }
 
     fun onEditorModeChanged(mode: EditorMode) {
-        savedStateHandle["uiState"] = uiState.value.copy(editorMode = mode)
+        updateState(uiState.value.copy(editorMode = mode))
     }
 
     init {
@@ -512,6 +515,28 @@ class MainViewModel(
     }
 
     fun onCurvesPointsChanged(points: List<Offset>) {
-        savedStateHandle["uiState"] = uiState.value.copy(curvesPoints = points)
+        updateState(uiState.value.copy(curvesPoints = points))
+    }
+
+    fun onUndoClicked() {
+        if (undoStack.isNotEmpty()) {
+            val lastState = undoStack.removeLast()
+            redoStack.add(uiState.value)
+            savedStateHandle["uiState"] = lastState.copy(canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty())
+        }
+    }
+
+    fun onRedoClicked() {
+        if (redoStack.isNotEmpty()) {
+            val nextState = redoStack.removeLast()
+            undoStack.add(uiState.value)
+            savedStateHandle["uiState"] = nextState.copy(canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty())
+        }
+    }
+
+    private fun updateState(newState: UiState) {
+        undoStack.add(uiState.value)
+        redoStack.clear()
+        savedStateHandle["uiState"] = newState.copy(canUndo = true, canRedo = false)
     }
 }

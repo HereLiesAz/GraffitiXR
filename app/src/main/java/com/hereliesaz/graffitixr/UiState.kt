@@ -94,7 +94,9 @@ data class UiState(
     val showCurvesDialog: Boolean = false,
     val fingerprintJson: String? = null,
     val curvesPoints: @RawValue List<Offset> = listOf(Offset(0f, 0f), Offset(1f, 1f)),
-    val processedImageUri: Uri? = null
+    val processedImageUri: Uri? = null,
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false
 ) : Parcelable
 
 enum class AppBlendMode {

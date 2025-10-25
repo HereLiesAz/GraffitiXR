@@ -5,8 +5,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -218,6 +226,26 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
 
         if (uiState.showDoubleTapHint) {
             DoubleTapHintDialog(onDismissRequest = viewModel::onDoubleTapHintDismissed)
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+        ) {
+            IconButton(
+                onClick = viewModel::onUndoClicked,
+                enabled = uiState.canUndo
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            IconButton(
+                onClick = viewModel::onRedoClicked,
+                enabled = uiState.canRedo
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+            }
         }
     }
 }
