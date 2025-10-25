@@ -11,6 +11,8 @@ data class ProjectData(
     val backgroundImageUri: Uri?,
     @Serializable(with = UriSerializer::class)
     val overlayImageUri: Uri?,
+    @Serializable(with = UriSerializer::class)
+    val targetImageUri: Uri? = null,
     val opacity: Float,
     val contrast: Float,
     val saturation: Float,
@@ -25,13 +27,5 @@ data class ProjectData(
     val offset: Offset,
     @Serializable(with = BlendModeSerializer::class)
     val blendMode: androidx.compose.ui.graphics.BlendMode,
-    @Serializable(with = FingerprintSerializer::class)
-    val fingerprint: Fingerprint?
-)
-
-@Serializable
-data class Fingerprint(
-    val keypoints: List<@Serializable(with = KeyPointSerializer::class) org.opencv.core.KeyPoint>,
-    @Serializable(with = MatSerializer::class)
-    val descriptors: org.opencv.core.Mat
+    val fingerprintJson: String?
 )

@@ -87,10 +87,7 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager, private val conte
                     frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
                     frame.camera.getViewMatrix(viewMatrix, 0)
 
-                    GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-                    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
-
-                    renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ)
+                    renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ, textureId)
                 }
             }
         }

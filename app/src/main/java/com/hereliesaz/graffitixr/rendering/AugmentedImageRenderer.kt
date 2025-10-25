@@ -76,10 +76,14 @@ class AugmentedImageRenderer {
         textureCoordinatesBuffer?.position(0)
     }
 
-    fun draw(viewMatrix: FloatArray, projectionMatrix: FloatArray, pose: Pose, width: Float, height: Float) {
+    fun draw(viewMatrix: FloatArray, projectionMatrix: FloatArray, pose: Pose, width: Float, height: Float, textureId: Int) {
         GLES20.glUseProgram(program)
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
+        GLES20.glUniform1i(textureHandle, 0)
 
         GLES20.glEnableVertexAttribArray(positionHandle)
         GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, verticesBuffer)
@@ -103,6 +107,7 @@ class AugmentedImageRenderer {
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
         GLES20.glDrawElements(GLES20.GL_TRIANGLES, indices.size, GLES20.GL_UNSIGNED_SHORT, indicesBuffer)
         GLES20.glDisableVertexAttribArray(positionHandle)
+        GLES20.glDisableVertexAttribArray(textureCoordinatesHandle)
     }
 
     companion object {
