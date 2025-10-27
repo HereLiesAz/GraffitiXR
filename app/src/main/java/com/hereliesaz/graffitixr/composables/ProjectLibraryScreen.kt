@@ -22,10 +22,11 @@ fun ProjectLibraryScreen(
     onDeleteProject: (String) -> Unit,
     onNewProject: () -> Unit
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text(text = "Project Library")
-        Button(onClick = onNewProject) {
-            Text(text = "New Project")
+    ConstraintBox {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "Project Library")
+            Button(onClick = onNewProject) {
+                Text(text = "New Project")
         }
         LazyColumn {
             items(projects) { project ->
@@ -49,4 +50,5 @@ fun ProjectLibraryScreen(
             }
         }
     }
+}
 }
