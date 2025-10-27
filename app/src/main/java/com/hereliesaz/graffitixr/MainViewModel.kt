@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
@@ -367,7 +368,8 @@ class MainViewModel(
                     rotationY = uiState.value.rotationY,
                     offset = uiState.value.offset,
                     blendMode = uiState.value.blendMode,
-                    fingerprintJson = uiState.value.fingerprintJson
+                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
+                    drawingPaths = uiState.value.drawingPaths
                 )
                 projectManager.saveProject(projectName, projectData)
                 withContext(Dispatchers.Main) {
@@ -402,7 +404,8 @@ class MainViewModel(
                         rotationY = projectData.rotationY,
                         offset = projectData.offset,
                         blendMode = projectData.blendMode,
-                        fingerprintJson = projectData.fingerprintJson
+                        fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) },
+                        drawingPaths = projectData.drawingPaths
                     )
                     projectData.targetImageUri?.let { uri ->
                         val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -524,5 +527,50 @@ class MainViewModel(
         undoStack.add(uiState.value)
         redoStack.clear()
         savedStateHandle["uiState"] = newState.copy(canUndo = true, canRedo = false)
+    }
+
+    fun onMarkProgressToggled() {
+        savedStateHandle["uiState"] = uiState.value.copy(isMarkingProgress = !uiState.value.isMarkingProgress)
+    }
+
+    fun onDrawingPathUpdate(points: List<Pair<Float, Float>>) {
+        val newPaths = uiState.value.drawingPaths + listOf(points)
+        savedStateHandle["uiState"] = uiState.value.copy(drawingPaths = newPaths)
+        updateProgress()
+    }
+
+    private fun updateProgress() {
+        viewModelScope.launch {
+            val overlayImageUri = uiState.value.overlayImageUri ?: return@launch
+            val (width, height) = getBitmapDimensions(overlayImageUri)
+            val paths = uiState.value.drawingPaths.map { points ->
+                val path = androidx.compose.ui.graphics.Path()
+                if (points.isNotEmpty()) {
+                    path.moveTo(points[0].first, points[0].second)
+                    for (i in 1 until points.size) {
+                        path.lineTo(points[i].first, points[i].second)
+                    }
+                }
+                path
+            }
+            val progress = com.hereliesaz.graffitixr.utils.calculateProgress(paths, width, height)
+            savedStateHandle["uiState"] = uiState.value.copy(progressPercentage = progress)
+        }
+    }
+
+    private suspend fun getBitmapDimensions(uri: Uri): Pair<Int, Int> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                val context = getApplication<Application>().applicationContext
+                val inputStream = context.contentResolver.openInputStream(uri)
+                BitmapFactory.decodeStream(inputStream, null, options)
+                inputStream?.close()
+                Pair(options.outWidth, options.outHeight)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Pair(0, 0)
+            }
+        }
     }
 }

@@ -96,7 +96,10 @@ data class UiState(
     val curvesPoints: @RawValue List<Offset> = listOf(Offset(0f, 0f), Offset(1f, 1f)),
     val processedImageUri: Uri? = null,
     val canUndo: Boolean = false,
-    val canRedo: Boolean = false
+    val canRedo: Boolean = false,
+    val isMarkingProgress: Boolean = false,
+    val drawingPaths: @RawValue List<List<Pair<Float, Float>>> = emptyList(),
+    val progressPercentage: Float = 0f
 ) : Parcelable
 
 enum class AppBlendMode {
