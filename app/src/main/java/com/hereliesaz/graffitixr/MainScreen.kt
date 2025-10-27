@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
+import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -50,6 +51,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
     var showSaveProjectDialog by remember { mutableStateOf(false) }
+    var gestureInProgress by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -119,7 +121,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationZChanged = viewModel::onRotationZChanged,
                         onRotationXChanged = viewModel::onRotationXChanged,
                         onRotationYChanged = viewModel::onRotationYChanged,
-                        onCycleRotationAxis = viewModel::onCycleRotationAxis
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis,
+                        onGestureInProgress = { gestureInProgress = it }
                     )
                     EditorMode.NON_AR -> ImageTraceScreen(
                         uiState = uiState,
@@ -128,11 +131,22 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationZChanged = viewModel::onRotationZChanged,
                         onRotationXChanged = viewModel::onRotationXChanged,
                         onRotationYChanged = viewModel::onRotationYChanged,
-                        onCycleRotationAxis = viewModel::onCycleRotationAxis
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis,
+                        onGestureInProgress = { gestureInProgress = it }
                     )
                     EditorMode.AR -> ARScreen(arCoreManager = arCoreManager, overlayImageUri = uiState.overlayImageUri)
                 }
             }
+        }
+
+        if (gestureInProgress) {
+            GestureFeedback(
+                uiState = uiState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .zIndex(3f)
+            )
         }
 
         Box(modifier = Modifier.zIndex(2f)) {

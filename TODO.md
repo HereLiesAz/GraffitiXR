@@ -43,6 +43,8 @@ This document tracks the development status, future enhancements, and identified
 -   **[x] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
 -   **[x] Undo/Redo Functionality:**
     -   [x] Implement undo and redo buttons to revert or reapply image adjustments.
+-   **[ ] Refine Gesture Feedback UI:**
+    -   [ ] Replace the full-screen gesture feedback with a more subtle, non-intrusive indicator.
 
 ### **Medium Priority**
 

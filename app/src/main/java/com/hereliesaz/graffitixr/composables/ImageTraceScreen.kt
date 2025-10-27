@@ -50,13 +50,12 @@ fun ImageTraceScreen(
     onRotationXChanged: (Float) -> Unit,
     onRotationYChanged: (Float) -> Unit,
     onCycleRotationAxis: () -> Unit,
+    onGestureInProgress: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    ConstraintBox {
-        val context = LocalContext.current
-        val lifecycleOwner = LocalLifecycleOwner.current
-        val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
-    var gestureInProgress by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     Box(modifier = modifier.fillMaxSize()) {
         // CameraX Preview
@@ -99,8 +98,8 @@ fun ImageTraceScreen(
                     .fillMaxSize()
                     .pointerInput(Unit) {
                         detectDragGestures(
-                            onDragStart = { gestureInProgress = true },
-                            onDragEnd = { gestureInProgress = false }
+                            onDragStart = { onGestureInProgress(true) },
+                            onDragEnd = { onGestureInProgress(false) }
                         ) { _, _ -> }
                     }
             ) {
@@ -119,7 +118,7 @@ fun ImageTraceScreen(
                             rotationZ = uiState.rotationZ,
                             alpha = uiState.opacity
                         )
-                        .transformable(state = transformState)
+                        .transformable(state = transformState, canPan = { true })
                         .pointerInput(Unit) {
                             detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                         },
@@ -146,25 +145,6 @@ fun ImageTraceScreen(
                             this *= colorBalanceMatrix
                         }
                     )
-                )
-            }
-        }
-        if (gestureInProgress) {
-            val rotationValue = when (uiState.activeRotationAxis) {
-                com.hereliesaz.graffitixr.RotationAxis.X -> uiState.rotationX
-                com.hereliesaz.graffitixr.RotationAxis.Y -> uiState.rotationY
-                com.hereliesaz.graffitixr.RotationAxis.Z -> uiState.rotationZ
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Scale: %.2f, Rotation (%s): %.1f°".format(uiState.scale, uiState.activeRotationAxis.name, rotationValue),
-                    color = Color.White
                 )
             }
         }
