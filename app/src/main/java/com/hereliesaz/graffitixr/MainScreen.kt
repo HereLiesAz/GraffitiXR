@@ -20,6 +20,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.graffitixr.composables.DrawingCanvas
+import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -31,6 +33,7 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
+import androidx.compose.material3.Text
 
 @Composable
 fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
@@ -42,6 +45,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
     var showSaveProjectDialog by remember { mutableStateOf(false) }
+    var gestureInProgress by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -109,7 +113,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationZChanged = viewModel::onRotationZChanged,
                         onRotationXChanged = viewModel::onRotationXChanged,
                         onRotationYChanged = viewModel::onRotationYChanged,
-                        onCycleRotationAxis = viewModel::onCycleRotationAxis
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis,
+                        onGestureInProgress = { gestureInProgress = it }
                     )
                     EditorMode.NON_AR -> ImageTraceScreen(
                         uiState = uiState,
@@ -118,11 +123,22 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationZChanged = viewModel::onRotationZChanged,
                         onRotationXChanged = viewModel::onRotationXChanged,
                         onRotationYChanged = viewModel::onRotationYChanged,
-                        onCycleRotationAxis = viewModel::onCycleRotationAxis
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis,
+                        onGestureInProgress = { gestureInProgress = it }
                     )
                     EditorMode.AR -> ARScreen(arCoreManager = arCoreManager)
                 }
             }
+        }
+
+        if (gestureInProgress) {
+            GestureFeedback(
+                uiState = uiState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .zIndex(3f)
+            )
         }
 
         Box(modifier = Modifier.zIndex(2f)) {
@@ -170,10 +186,15 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azRailItem(id = "project_library", text = "Library") {
                     showProjectLibrary = true
                 }
-                azRailItem(id = "project_library", text = "Library") {
-                    showProjectLibrary = true
-                }
+                azRailItem(id = "mark_progress", text = "Mark Progress", onClick = viewModel::onMarkProgressToggled)
             }
+        }
+
+        if (uiState.isMarkingProgress) {
+            DrawingCanvas(
+                paths = uiState.drawingPaths,
+                onPathUpdate = viewModel::onDrawingPathUpdate
+            )
         }
 
         if (showSaveProjectDialog) {
@@ -245,6 +266,16 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
 
         if (uiState.showDoubleTapHint) {
             DoubleTapHintDialog(onDismissRequest = viewModel::onDoubleTapHintDismissed)
+        }
+
+        if (uiState.isMarkingProgress) {
+            Text(
+                text = "Progress: %.2f%%".format(uiState.progressPercentage),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .zIndex(3f)
+            )
         }
     }
 }

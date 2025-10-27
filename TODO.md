@@ -41,16 +41,21 @@ This document tracks the development status, future enhancements, and identified
     -   [x] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
     -   [x] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
 -   **[x] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
+-   **[x] Undo/Redo Functionality:**
+    -   [x] Implement undo and redo buttons to revert or reapply image adjustments.
+-   **[ ] Refine Gesture Feedback UI:**
+    -   [ ] Replace the full-screen gesture feedback with a more subtle, non-intrusive indicator.
 
 ### **Medium Priority**
-
+-   **[ ] Optimize Progress Calculation Performance:**
+    -   [ ] Refactor the progress calculation logic to avoid recalculating the entire bitmap on every update.
 -   **[x] Add "Save/Export" Feature:**
     -   [x] Allow users to save or export the final composed image from any of the modes.
     -   [x] Allow users to save the marks or griding "fingerprint" and overlay location, size, and orientation.
-    -   [x] Saving the project includes the fingerprint history.
--   **[ ] Implement Advanced Image Editing:**
+    -   [x] Saving the project includes the fingerprint and undo/redo history.
+-   **[x] Implement Advanced Image Editing:**
     -   [x] Add more advanced image adjustment tools like color balance or blending modes.
-    -   [ ] **Curves Adjustment:** Implement a user interface for adjusting the image's tonal range using curves. (This was previously a placeholder and has been removed for now).
+    -   [x] **Curves Adjustment:** Implement a user interface for adjusting the image's tonal range using curves.
 
 ### **Low Priority / Future Ideas**
 -   **[x] Create a Project Library:**

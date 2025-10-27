@@ -1,4 +1,4 @@
-# **A Developer's Blueprint for GraffitiXR: Integrating Vuforia, Custom Rendering, and Computer Vision on Android**
+# **A Developer's Blueprint for GraffitiXR: Integrating ARCore, Custom Rendering, and Computer Vision on Android**
 
 ## **Part I: Project Foundation and Architecture**
 
@@ -15,7 +15,7 @@ The architecture of GraffitiXR is designed to be modular, scalable, and robust, 
 The application is structured into several distinct layers, each with a clear separation of concerns:
 
 *   **UI Layer (Jetpack Compose & ViewModels):** This layer is the user's entry point, built entirely with Jetpack Compose for a modern, declarative UI. It is responsible for managing all user interactions and reflecting the application's state. State will be managed in ViewModels and hoisted to the UI, following modern Compose best practices.
-*   **Camera & AR Service Layer:** A critical abstraction layer that provides a unified interface for camera and AR session management. This service is responsible for managing the Vuforia Engine for the AR Overlay mode.
+*   **Camera & AR Service Layer:** A critical abstraction layer that provides a unified interface for camera and AR session management. This service is responsible for managing the ARCore SDK for the AR Overlay mode.
 *   **Rendering Engine (OpenGL ES):** A custom rendering pipeline built around Android's GLSurfaceView and GLSurfaceView.Renderer. This engine is responsible for two primary tasks: drawing the live camera feed to the screen background and rendering the user's overlay image with real-time adjustments for opacity, saturation, and contrast controlled by custom fragment shaders.
 *   **Computer Vision Module (OpenCV):** An isolated module that can be used for advanced features like stabilizing the AR projection against drift.
 *   **Data Layer (Repositories/Models):** This layer handles data persistence and retrieval, including loading user-selected images and managing project states.
@@ -28,9 +28,9 @@ The application is structured into several distinct layers, each with a clear se
 
 ### **1.2. Core Technology Stack Selection & Justification**
 
-#### **AR Framework: Vuforia Engine SDK**
+#### **AR Framework: ARCore SDK**
 
-The Vuforia Engine is a powerful and mature platform for building augmented reality experiences. It provides robust image recognition and tracking capabilities, which are essential for GraffitiXR's core feature of creating and tracking Image Targets at runtime. This allows the user to turn any part of their environment into a trackable AR marker, providing a flexible and intuitive workflow for placing virtual content.
+ARCore is Google's platform for building augmented reality experiences. It provides robust image recognition and tracking capabilities, which are essential for GraffitiXR's core feature of creating and tracking Image Targets (Augmented Images) at runtime. This allows the user to turn any part of their environment into a trackable AR marker, providing a flexible and intuitive workflow for placing virtual content.
 
 #### **Mandating a Custom OpenGL ES Renderer**
 
@@ -38,13 +38,13 @@ A pivotal requirement for GraffitiXR is the ability for users to adjust the opac
 
 #### **Computer Vision: OpenCV for Android SDK**
 
-OpenCV is the industry-standard library for computer vision tasks. While not fully implemented for stabilization in the current version, its inclusion in the project provides the foundation for future enhancements, such as augmenting Vuforia's tracking to counteract drift by tracking user-placed real-world marks.
+OpenCV is the industry-standard library for computer vision tasks. While it was previously used for an experimental feature-matching implementation, it is no longer actively used in the rendering pipeline. It remains a dependency for potential future computer vision features.
 
 ### **1.3. Project Setup and Configuration**
 
 #### **build.gradle(.kts) Configuration**
 
-The application's module-level `build.gradle.kts` file is configured with the necessary dependencies, including Jetpack Compose, CameraX, OpenCV, and the local `:vuforia` module which encapsulates the Vuforia Engine SDK.
+The application's module-level `build.gradle.kts` file is configured with the necessary dependencies, including Jetpack Compose, CameraX, OpenCV, and ARCore.
 
 #### **AndroidManifest.xml Configuration**
 
@@ -67,24 +67,23 @@ A well-organized package structure is employed:
 |                         | `androidx.compose.ui:ui`                 | Core Jetpack Compose UI library.                                       |
 |                         | `androidx.compose.material3:material3`   | Provides Material Design 3 components.                                 |
 | **CameraX**             | `androidx.camera:camera-core`, etc.      | Provides a consistent API for camera access (used in non-AR modes).    |
-| **AR**                  | `project(":vuforia")`                    | The Vuforia Engine SDK, included as a local module.                    |
+| **AR**                  | `com.google.ar:core`                    | The ARCore SDK for Android.                    |
 | **Computer Vision**     | `libs.opencv`                            | The OpenCV for Android library for computer vision tasks.              |
 | **Coroutines**          | `org.jetbrains.kotlinx:kotlinx-coroutines-android` | Library for managing asynchronous operations.                          |
 
 ## **Part II: Implementation of AR Overlay Mode**
 
-This mode is the centerpiece of the GraffitiXR application, leveraging the Vuforia Engine to project the user's artwork onto real-world surfaces.
+This mode is the centerpiece of the GraffitiXR application, leveraging ARCore to project the user's artwork onto real-world surfaces.
 
-### **2.1. Integrating the Vuforia Engine**
+### **2.1. Integrating ARCore**
 
 #### **Session Management**
 
-The `MainActivity.kt` is responsible for the lifecycle management of the Vuforia Engine.
+The `ARCoreManager.kt` class is responsible for the lifecycle management of the ARCore session.
 
-1.  **Initialization:** In `onCreate()`, `VuforiaJNI.initAR()` is called to initialize the native Vuforia components.
-2.  **Texture Loading:** Immediately after initialization, textures required by the rendering engine (e.g., for placeholder objects) are loaded from the app's assets and passed to the native layer via `VuforiaJNI.setTextures()`.
-3.  **Lifecycle Integration:** The `VuforiaCameraScreen.kt` composable uses a `DisposableEffect` with a `LifecycleEventObserver` to manage the AR session. It calls `VuforiaJNI.startAR()` on `ON_RESUME` and `VuforiaJNI.stopAR()` on `ON_PAUSE`.
-4.  **Deinitialization:** In `onDestroy()`, `VuforiaJNI.deinitAR()` is called to clean up resources.
+1.  **Initialization:** The `ARCoreManager` is instantiated in `MainActivity` and passed to the `MainViewModel`.
+2.  **Lifecycle Integration:** The `ARScreen` composable uses a `LifecycleEventObserver` to manage the AR session via the `ARCoreManager`. It calls `arCoreManager.resume()` on `ON_RESUME` and `arCoreManager.pause()` on `ON_PAUSE`.
+3.  **Deinitialization:** The `MainActivity`'s `onDestroy` method calls `arCoreManager.close()` to clean up resources.
 
 #### **Runtime Image Target Creation**
 
@@ -92,9 +91,8 @@ This is a core feature of the AR mode.
 
 1.  **User Trigger:** The user taps a "Create Target" button in the UI (`MainScreen.kt`).
 2.  **ViewModel Logic:** This action calls the `onCreateTargetClicked()` function in the `MainViewModel`.
-3.  **Native Call:** The ViewModel then invokes the native `VuforiaJNI.createImageTarget()` function.
-4.  **Vuforia Process:** The native Vuforia code captures the current camera frame and processes it to create a new, trackable Image Target.
-5.  **State Update:** The ViewModel updates the `UiState` to reflect that a target has been successfully created.
+3.  **ARCore Process:** The ViewModel takes the current screen content as a `Bitmap`, creates an `AugmentedImageDatabase` from it, and reconfigures the ARCore session to use this new database for tracking.
+4.  **State Update:** The ViewModel updates the `UiState` to reflect that a target has been successfully created.
 
 ### **2.2. The Custom OpenGL ES Rendering Engine**
 
@@ -102,18 +100,9 @@ The application uses a custom rendering engine built on `GLSurfaceView` to gain 
 
 #### **GLSurfaceView and Renderer in Compose**
 
-The `VuforiaCameraScreen.kt` composable uses the `AndroidView` composable to embed a `GLSurfaceView` into the Jetpack Compose UI. A custom `VuforiaRenderer.kt` class is set as the renderer for this surface.
+The `ARScreen.kt` composable uses the `AndroidView` composable to embed a `GLSurfaceView` into the Jetpack Compose UI. A custom `ARCoreRenderer.kt` class is set as the renderer for this surface.
 
-*   `onSurfaceCreated()`: Calls `VuforiaJNI.initRendering()` to set up the native rendering pipeline.
-*   `onSurfaceChanged()`: Calls `VuforiaJNI.configureRendering()` to inform the native layer of the screen dimensions and orientation.
-*   `onDrawFrame()`: The heart of the rendering loop. It calls the native `VuforiaJNI.renderFrame()` function on every frame. This single call is responsible for drawing the camera background and any AR content. The actual rendering logic is handled entirely in the native C++ code.
+*   `onSurfaceCreated()`: Initializes the `BackgroundRenderer` and `AugmentedImageRenderer`.
+*   `onSurfaceChanged()`: Sets the viewport and display rotation.
+*   `onDrawFrame()`: The heart of the rendering loop. It gets the latest ARCore `Frame`, draws the background camera image, and then iterates through any tracked `AugmentedImage`s, using the `AugmentedImageRenderer` to draw content on top of them.
 
-### **2.3. Projecting and Manipulating the Image**
-
-Once an Image Target is created, the user can project their chosen artwork onto it.
-
-*   **Image Selection:** The user selects an overlay image from their device. This triggers the `onOverlayImageSelected(uri)` function in the `MainViewModel`.
-*   **Texture Preparation:** The ViewModel uses a `Texture` utility class to load the image from the provided `Uri` and convert it into a `ByteBuffer`.
-*   **Passing to Native:** The ViewModel then calls the `VuforiaJNI.setOverlayTexture()` function, passing the dimensions and `ByteBuffer` of the user's image to the native rendering engine.
-*   **Rendering the Overlay:** The native rendering code is responsible for detecting when an Image Target is being tracked by the camera. When a target is visible, the renderer draws the user-provided overlay image, mapped onto a 3D quad, at the target's position and orientation.
-*   **Applying Visual Effects:** The custom fragment shader (implemented in native code) will eventually be used to apply real-time adjustments for opacity, saturation, and contrast, based on values passed from the UI through the JNI bridge.
