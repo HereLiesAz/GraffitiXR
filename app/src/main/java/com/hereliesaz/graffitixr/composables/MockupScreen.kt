@@ -80,9 +80,10 @@ fun MockupScreen(
     onOffsetChanged: (Offset) -> Unit,
     onCycleRotationAxis: () -> Unit
 ) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var gestureInProgress by remember { mutableStateOf(false) }
+    ConstraintBox {
+        val context = LocalContext.current
+        val coroutineScope = rememberCoroutineScope()
+        var gestureInProgress by remember { mutableStateOf(false) }
 
     val backgroundPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -131,7 +132,7 @@ fun MockupScreen(
             )
         }
 
-        uiState.overlayImageUri?.let { uri ->
+        (uiState.processedImageUri ?: uiState.overlayImageUri)?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
             LaunchedEffect(uri) {
@@ -216,4 +217,5 @@ fun MockupScreen(
             }
         }
     }
+}
 }
