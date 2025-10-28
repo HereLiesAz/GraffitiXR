@@ -6,6 +6,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
 import com.google.ar.core.Frame
+import android.util.Log
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
@@ -24,6 +25,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
 
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
+        Log.d(TAG, "onResume")
 
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(context, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
@@ -31,11 +33,13 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
         }
 
         if (session == null) {
+            Log.d(TAG, "Session is null, creating a new one")
             try {
                 val installStatus = ArCoreApk.getInstance().requestInstall(context as android.app.Activity, true)
                 when (installStatus) {
                     ArCoreApk.InstallStatus.INSTALLED -> {
                         session = Session(context)
+                        Log.d(TAG, "Session created")
                     }
                     else -> {
                         Toast.makeText(context, "ARCore installation required.", Toast.LENGTH_LONG).show()
@@ -49,6 +53,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
         }
 
         try {
+            Log.d(TAG, "Resuming session")
             session?.resume()
         } catch (e: CameraNotAvailableException) {
             Toast.makeText(context, "Camera not available. Please restart the app.", Toast.LENGTH_LONG).show()
@@ -60,6 +65,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
 
     override fun onPause(owner: LifecycleOwner) {
         super.onPause(owner)
+        Log.d(TAG, "onPause")
         session?.pause()
         displayRotationHelper.onPause()
     }
@@ -71,6 +77,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
             return try {
                 it.update()
             } catch (e: CameraNotAvailableException) {
+                Log.e(TAG, "Camera not available during onDrawFrame", e)
                 null
             }
         }
@@ -79,7 +86,12 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
 
     override fun onDestroy(owner: LifecycleOwner) {
         super.onDestroy(owner)
+        Log.d(TAG, "onDestroy")
         session?.close()
         session = null
+    }
+
+    companion object {
+        private const val TAG = "ARCoreManager"
     }
 }

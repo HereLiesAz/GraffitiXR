@@ -20,9 +20,11 @@ import org.opencv.core.MatOfPoint2f
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.Renderer {
+class ARCoreRenderer(
+    private val arCoreManager: ARCoreManager,
+    private val backgroundRenderer: BackgroundRenderer
+) : GLSurfaceView.Renderer {
 
-    private val backgroundRenderer = BackgroundRenderer()
     private val augmentedImageRenderer = AugmentedImageRenderer()
     private val trackedImages = mutableMapOf<Int, Pair<AugmentedImage, AugmentedImageRenderer>>()
     private val orb by lazy { ORB.create() }
@@ -33,12 +35,14 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
     private var surfaceHeight: Int = 0
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        Log.d(TAG, "onSurfaceCreated")
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer.createOnGlThread()
         augmentedImageRenderer.createOnGlThread()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        Log.d(TAG, "onSurfaceChanged: width=$width, height=$height")
         GLES20.glViewport(0, 0, width, height)
         arCoreManager.displayRotationHelper.onSurfaceChanged(width, height)
         surfaceWidth = width
@@ -46,6 +50,7 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        Log.d(TAG, "onDrawFrame")
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
         val frame: Frame = arCoreManager.onDrawFrame(surfaceWidth, surfaceHeight) ?: return
@@ -115,5 +120,9 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
                 renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ)
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "ARCoreRenderer"
     }
 }

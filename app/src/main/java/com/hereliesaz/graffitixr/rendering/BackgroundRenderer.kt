@@ -2,12 +2,14 @@ package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.util.Log
 import com.google.ar.core.Frame
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 class BackgroundRenderer {
+
     private val quadCoords = floatArrayOf(
         -1.0f, -1.0f,
         -1.0f, +1.0f,
@@ -29,6 +31,7 @@ class BackgroundRenderer {
         private set
 
     fun createOnGlThread() {
+        Log.d(TAG, "createOnGlThread")
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
         textureId = textures[0]
@@ -72,6 +75,7 @@ class BackgroundRenderer {
     }
 
     fun draw(frame: Frame) {
+        Log.d(TAG, "draw")
         GLES20.glDepthMask(false)
         GLES20.glUseProgram(program)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
@@ -86,6 +90,7 @@ class BackgroundRenderer {
     }
 
     companion object {
+        private const val TAG = "BackgroundRenderer"
         private const val VERTEX_SHADER = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;
