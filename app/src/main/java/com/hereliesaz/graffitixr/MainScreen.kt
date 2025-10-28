@@ -67,6 +67,15 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         }
                     }
                 }
+                is CaptureEvent.RequestTargetCapture -> {
+                    (context as? Activity)?.let { activity ->
+                        captureWindow(activity) { bitmap ->
+                            bitmap?.let {
+                                viewModel.setArTarget(it)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
