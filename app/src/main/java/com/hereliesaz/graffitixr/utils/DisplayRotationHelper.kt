@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.utils
 
 import android.content.Context
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.view.Display
 import android.view.WindowManager
 import com.google.ar.core.Session
@@ -10,7 +11,15 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
     private var viewportChanged = false
     private var viewportWidth = 0
     private var viewportHeight = 0
-    private val display: Display = context.getSystemService(WindowManager::class.java).defaultDisplay
+    private val display: Display? by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.display
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(WindowManager::class.java).defaultDisplay
+        }
+    }
+
 
     fun onResume() {
         context.getSystemService(DisplayManager::class.java).registerDisplayListener(this, null)
@@ -27,8 +36,9 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
     }
 
     fun updateSessionIfNeeded(session: Session) {
-        if (viewportChanged) {
-            val displayRotation = display.rotation
+        val localDisplay = display
+        if (viewportChanged && localDisplay != null) {
+            val displayRotation = localDisplay.rotation
             session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
             viewportChanged = false
         }

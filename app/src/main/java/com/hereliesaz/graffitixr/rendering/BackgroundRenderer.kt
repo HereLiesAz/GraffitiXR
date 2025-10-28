@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.rendering
 
+import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import com.google.ar.core.Frame
 import java.nio.ByteBuffer
@@ -31,7 +32,7 @@ class BackgroundRenderer {
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
         textureId = textures[0]
-        val textureTarget = GLES20.GL_TEXTURE_2D
+        val textureTarget = GLES11Ext.GL_TEXTURE_EXTERNAL_OES
         GLES20.glBindTexture(textureTarget, textureId)
         GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
@@ -73,7 +74,7 @@ class BackgroundRenderer {
     fun draw(frame: Frame) {
         GLES20.glDepthMask(false)
         GLES20.glUseProgram(program)
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quadVertices)
         GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoord)
         GLES20.glEnableVertexAttribArray(positionHandle)
@@ -96,9 +97,10 @@ class BackgroundRenderer {
         """
 
         private const val FRAGMENT_SHADER = """
+            #extension GL_OES_EGL_image_external : require
             precision mediump float;
             varying vec2 v_TexCoord;
-            uniform sampler2D s_Texture;
+            uniform samplerExternalOES s_Texture;
             void main() {
                gl_FragColor = texture2D(s_Texture, v_TexCoord);
             }
