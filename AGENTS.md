@@ -44,6 +44,15 @@ The user interacts with the application through a simple user interface. The mai
 -   **State:** All state changes MUST be initiated via a function call on the `MainViewModel`.
 -   **Documentation:** All new public code MUST be documented with exhaustive KDocs.
 -   **Testing:** New features should be accompanied by corresponding unit tests in `app/src/test/`.
+-   **Critical Dependencies:** The OpenCV dependency is **critical** for the AR fingerprinting feature and **must not be removed**.
+
+### **AR Persistence (Fingerprinting)**
+A core feature is the ability to save an AR project and have the digital overlay reappear in the correct physical location when the project is reloaded. This is mission-critical for the app's professional use case.
+
+-   **How it Works:** When an AR target is created, the app uses OpenCV's ORB feature detector to extract a unique "fingerprint" (keypoints and descriptors) from the target image.
+-   **Serialization:** This fingerprint data, which consists of non-standard OpenCV types, is serialized into a JSON string using custom serializers (`KeyPointSerializer`, `MatSerializer`) and saved within the project file.
+-   **Reloading:** When a project is loaded, the app reloads the original target image `Bitmap` and uses that to reconstruct the `AugmentedImageDatabase` for live ARCore tracking. The fingerprint's purpose is for stable, persistent storage of the target's identity, not for live tracking.
+-   **Do Not Remove:** The entire OpenCV-based fingerprinting and serialization pipeline is essential. Do not modify or remove it without a full understanding of the persistence architecture.
 
 ---
 

@@ -47,7 +47,8 @@ This document tracks the development status, future enhancements, and identified
     -   [ ] Replace the full-screen gesture feedback with a more subtle, non-intrusive indicator.
 
 ### **Medium Priority**
-
+-   **[ ] Optimize Progress Calculation Performance:**
+    -   [ ] Refactor the progress calculation logic to avoid recalculating the entire bitmap on every update.
 -   **[x] Add "Save/Export" Feature:**
     -   [x] Allow users to save or export the final composed image from any of the modes.
     -   [x] Allow users to save the marks or griding "fingerprint" and overlay location, size, and orientation.

@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,7 +51,8 @@ fun ImageTraceScreen(
     onRotationXChanged: (Float) -> Unit,
     onRotationYChanged: (Float) -> Unit,
     onCycleRotationAxis: () -> Unit,
-    onGestureInProgress: (Boolean) -> Unit,
+    onGestureStart: () -> Unit,
+    onGestureEnd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -82,7 +84,7 @@ fun ImageTraceScreen(
         )
 
         // Interactive Overlay Image
-        (uiState.processedImageUri ?: uiState.overlayImageUri)?.let {
+        uiState.overlayImageUri?.let {
             val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
                 onScaleChanged(zoomChange)
                 onOffsetChanged(offsetChange)
@@ -98,11 +100,18 @@ fun ImageTraceScreen(
                     .fillMaxSize()
                     .pointerInput(Unit) {
                         detectDragGestures(
-                            onDragStart = { onGestureInProgress(true) },
-                            onDragEnd = { onGestureInProgress(false) }
+                            onDragStart = { onGestureStart() },
+                            onDragEnd = { onGestureEnd() }
                         ) { _, _ -> }
                     }
             ) {
+                LaunchedEffect(transformState.isTransformInProgress) {
+                    if (transformState.isTransformInProgress) {
+                        onGestureStart()
+                    } else {
+                        onGestureEnd()
+                    }
+                }
                 AsyncImage(
                     model = it,
                     contentDescription = "Overlay Image",
@@ -149,5 +158,4 @@ fun ImageTraceScreen(
             }
         }
     }
-}
 }
