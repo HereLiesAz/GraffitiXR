@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.utils
 
 import android.content.Context
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.view.Display
 import android.view.WindowManager
 import com.google.ar.core.Session

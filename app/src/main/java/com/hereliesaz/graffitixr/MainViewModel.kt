@@ -51,18 +51,6 @@ sealed class TapFeedback {
     data class Failure(val position: Offset) : TapFeedback()
 }
 
-/**
- * The central ViewModel for the application, acting as the single source of truth for the UI state
- * and the handler for all user events.
- *
- * This class follows the MVVM architecture pattern. It holds the application's UI state in a
- * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
- * configuration changes but also system-initiated process death, providing a robust user experience.
- *
- * @param application The application instance, used for accessing the application context.
- * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory,
- * used to store and restore the [UiState].
- */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle,
@@ -96,6 +84,22 @@ class MainViewModel(
             _tapFeedback.value = if (isSuccess) TapFeedback.Success(position) else TapFeedback.Failure(position)
             delay(500)
             _tapFeedback.value = null
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getBitmapFromUri(uri: Uri): Bitmap? {
+        val context = getApplication<Application>().applicationContext
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val source = ImageDecoder.createSource(context.contentResolver, uri)
+                ImageDecoder.decodeBitmap(source)
+            } else {
+                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 
@@ -294,9 +298,6 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Handles the save button click event by emitting a capture request event.
-     */
     fun onSaveClicked() {
         viewModelScope.launch {
             _captureEvent.emit(CaptureEvent.RequestCapture)
@@ -518,7 +519,7 @@ class MainViewModel(
         updateState(uiState.value.copy(targetCreationState = newState), isUndoable = false)
     }
 
-    fun onCreateTargetClicked() {
+    fun setArTarget(bitmap: Bitmap) {
         viewModelScope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
                 Toast.makeText(getApplication(), "Creating target...", Toast.LENGTH_SHORT).show()
@@ -566,6 +567,12 @@ class MainViewModel(
                     Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    fun onCreateTargetClicked() {
+        viewModelScope.launch {
+            _captureEvent.emit(CaptureEvent.RequestTargetCapture)
         }
     }
 
