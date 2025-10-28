@@ -33,18 +33,13 @@ import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Session
-import com.hereliesaz.graffitixr.data.Fingerprint
 import kotlinx.serialization.json.Json
-import org.opencv.android.Utils
-import org.opencv.core.Mat
-import org.opencv.core.MatOfKeyPoint
-import org.opencv.features2d.ORB
-import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
+    object RequestTargetCapture : CaptureEvent()
 }
 
 sealed class TapFeedback {
@@ -371,6 +366,7 @@ class MainViewModel(
                 val projectData = ProjectData(
                     backgroundImageUri = uiState.value.backgroundImageUri,
                     overlayImageUri = uiState.value.overlayImageUri,
+                    targetImageUri = uiState.value.targetImageUri,
                     opacity = uiState.value.opacity,
                     contrast = uiState.value.contrast,
                     saturation = uiState.value.saturation,
@@ -406,6 +402,7 @@ class MainViewModel(
                     savedStateHandle["uiState"] = uiState.value.copy(
                         backgroundImageUri = projectData.backgroundImageUri,
                         overlayImageUri = projectData.overlayImageUri,
+                        targetImageUri = projectData.targetImageUri,
                         opacity = projectData.opacity,
                         contrast = projectData.contrast,
                         saturation = projectData.saturation,
@@ -421,7 +418,7 @@ class MainViewModel(
                         fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) },
                         drawingPaths = projectData.drawingPaths
                     )
-                    projectData.overlayImageUri?.let { uri ->
+                    projectData.targetImageUri?.let { uri ->
                         val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                             ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri))
                         } else {
@@ -471,6 +468,12 @@ class MainViewModel(
     }
 
     fun onCreateTargetClicked() {
+        viewModelScope.launch {
+            _captureEvent.emit(CaptureEvent.RequestTargetCapture)
+        }
+    }
+
+    fun setArTarget(bitmap: Bitmap) {
         viewModelScope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
                 Toast.makeText(getApplication(), "Creating target...", Toast.LENGTH_SHORT).show()
@@ -487,36 +490,21 @@ class MainViewModel(
                     }
                 }
 
-                if (bitmap != null) {
-                    val session = arCoreManager.session ?: return@launch
-                    val config = session.config
-                    val grayMat = Mat()
-                    Utils.bitmapToMat(bitmap, grayMat)
-                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
-                    val orb = ORB.create()
-                    val keypoints = MatOfKeyPoint()
-                    val descriptors = Mat()
-                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+                val context = getApplication<Application>().applicationContext
+                val cachePath = File(context.cacheDir, "images")
+                cachePath.mkdirs()
+                val file = File(cachePath, "target_image_${System.currentTimeMillis()}.png")
+                val fOut = FileOutputStream(file)
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                fOut.close()
+                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
 
-                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
-
-                    val database = AugmentedImageDatabase(session)
-                    database.addImage("target", bitmap)
-                    config.augmentedImageDatabase = database
-                    session.configure(config)
-
-                    savedStateHandle["uiState"] = uiState.value.copy(fingerprintJson = fingerprintJson)
-                    onTargetCreationStateChanged(TargetCreationState.SUCCESS)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    onTargetCreationStateChanged(TargetCreationState.ERROR)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "Failed to create target: No image selected", Toast.LENGTH_LONG).show()
-                    }
+                savedStateHandle["uiState"] = uiState.value.copy(targetImageUri = newUri)
+                onTargetCreationStateChanged(TargetCreationState.SUCCESS)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
                 }
+
             } catch (e: Exception) {
                 onTargetCreationStateChanged(TargetCreationState.ERROR)
                 withContext(Dispatchers.Main) {

@@ -84,7 +84,7 @@ fun ImageTraceScreen(
         )
 
         // Interactive Overlay Image
-        uiState.overlayImageUri?.let {
+        (uiState.processedImageUri ?: uiState.overlayImageUri)?.let {
             val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
                 onScaleChanged(zoomChange)
                 onOffsetChanged(offsetChange)
@@ -158,4 +158,5 @@ fun ImageTraceScreen(
             }
         }
     }
+}
 }
