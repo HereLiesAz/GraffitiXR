@@ -16,8 +16,6 @@ data class ProjectData(
     val backgroundImageUri: Uri?,
     @Serializable(with = UriSerializer::class)
     val overlayImageUri: Uri?,
-    @Serializable(with = UriSerializer::class)
-    val targetImageUri: Uri? = null,
     val opacity: Float,
     val contrast: Float,
     val saturation: Float,

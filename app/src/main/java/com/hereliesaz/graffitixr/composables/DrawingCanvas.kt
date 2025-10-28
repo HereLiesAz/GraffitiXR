@@ -15,9 +15,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 @Composable
 fun DrawingCanvas(
     paths: List<List<Pair<Float, Float>>>,
-    onPathUpdate: (List<Pair<Float, Float>>) -> Unit
+    onPathFinished: (List<Pair<Float, Float>>) -> Unit
 ) {
-    val currentPath = remember { mutableStateOf<MutableList<Pair<Float, Float>>?>(null) }
+    val currentPath = remember { mutableStateOf<List<Pair<Float, Float>>?>(null) }
 
     Canvas(
         modifier = Modifier
@@ -25,13 +25,14 @@ fun DrawingCanvas(
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { offset ->
-                        currentPath.value = mutableListOf(Pair(offset.x, offset.y))
+                        currentPath.value = listOf(Pair(offset.x, offset.y))
                     },
                     onDrag = { change, _ ->
-                        currentPath.value?.add(Pair(change.position.x, change.position.y))
-                        onPathUpdate(currentPath.value!!)
+                        val newPoint = Pair(change.position.x, change.position.y)
+                        currentPath.value = currentPath.value?.plus(newPoint)
                     },
                     onDragEnd = {
+                        currentPath.value?.let { onPathFinished(it) }
                         currentPath.value = null
                     }
                 )
