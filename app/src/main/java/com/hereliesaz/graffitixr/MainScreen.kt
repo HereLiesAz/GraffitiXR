@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
-import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -34,6 +33,8 @@ import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
 import androidx.compose.material3.Text
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 
 @Composable
 fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
@@ -45,7 +46,6 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
     var showSaveProjectDialog by remember { mutableStateOf(false) }
-    var gestureInProgress by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -114,7 +114,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationXChanged = viewModel::onRotationXChanged,
                         onRotationYChanged = viewModel::onRotationYChanged,
                         onCycleRotationAxis = viewModel::onCycleRotationAxis,
-                        onGestureInProgress = { gestureInProgress = it }
+                        onGestureStart = viewModel::onGestureStart,
+                        onGestureEnd = viewModel::onGestureEnd
                     )
                     EditorMode.NON_AR -> ImageTraceScreen(
                         uiState = uiState,
@@ -124,21 +125,23 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationXChanged = viewModel::onRotationXChanged,
                         onRotationYChanged = viewModel::onRotationYChanged,
                         onCycleRotationAxis = viewModel::onCycleRotationAxis,
-                        onGestureInProgress = { gestureInProgress = it }
+                        onGestureStart = viewModel::onGestureStart,
+                        onGestureEnd = viewModel::onGestureEnd
                     )
-                    EditorMode.AR -> ARScreen(arCoreManager = arCoreManager)
+                    EditorMode.AR -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = { viewModel.onGestureStart() },
+                                    onDragEnd = { viewModel.onGestureEnd() }
+                                ) { _, _ -> }
+                            }
+                    ) {
+                        ARScreen(arCoreManager = arCoreManager)
+                    }
                 }
             }
-        }
-
-        if (gestureInProgress) {
-            GestureFeedback(
-                uiState = uiState,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
-                    .zIndex(3f)
-            )
         }
 
         Box(modifier = Modifier.zIndex(2f)) {

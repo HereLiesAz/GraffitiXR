@@ -106,3 +106,33 @@ The `ARScreen.kt` composable uses the `AndroidView` composable to embed a `GLSur
 *   `onSurfaceChanged()`: Sets the viewport and display rotation.
 *   `onDrawFrame()`: The heart of the rendering loop. It gets the latest ARCore `Frame`, draws the background camera image, and then iterates through any tracked `AugmentedImage`s, using the `AugmentedImageRenderer` to draw content on top of them.
 
+### **2.3. AR Persistence via OpenCV Fingerprinting**
+
+A cornerstone of GraffitiXR's professional utility is its AR persistence. An artist can begin work at a location, save their project, and return later to find their digital artwork precisely re-anchored to the same physical spot. This is accomplished through a sophisticated "fingerprinting" process that leverages the OpenCV library, while relying on ARCore for live tracking.
+
+#### **The Core Problem of Persistence**
+
+ARCore's `AugmentedImageDatabase` is a powerful tool for real-time tracking, but it is a runtime object that cannot be directly serialized or saved. To persist an AR session, we must store a representation of the real-world target that can be used to reconstruct the tracking database later.
+
+#### **Solution: OpenCV ORB Feature Extraction**
+
+When a user designates an image as an AR target (via `onCreateTargetClicked()` in the `MainViewModel`), the following occurs:
+
+1.  **Bitmap to Mat Conversion:** The target `Bitmap` is converted into an OpenCV `Mat` object, the standard matrix data structure used by the library.
+2.  **ORB Feature Detection:** The ORB (Oriented FAST and Rotated BRIEF) algorithm, a high-performance and rotation-invariant feature detector, is used to analyze the `Mat`.
+    *   `KeyPoints` are identified: These are the most visually distinct points in the image (corners, edges, etc.).
+    *   `Descriptors` are computed: For each keypoint, a descriptor is a vector that describes the unique visual pattern of the pixels surrounding that point.
+3.  **Serialization:** The list of `KeyPoints` and the `Mat` of descriptors together form the target's unique "fingerprint." Because these are not standard data types, they are serialized to a JSON string using custom `kotlinx.serialization` serializers (`KeyPointSerializer`, `MatSerializer`). This JSON string is then stored within the `ProjectData` object.
+
+This fingerprint is a compact, storable, and robust representation of the visual information needed to identify the target.
+
+#### **Reloading a Project: Reconstructing the AR Session**
+
+When a saved project is loaded:
+
+1.  The `ProjectData` is deserialized from JSON, restoring the OpenCV fingerprint.
+2.  Crucially, the original target image `Bitmap` is also reloaded from its saved URI. The fingerprint alone is not used for tracking.
+3.  The reloaded `Bitmap` is used to reconstruct a fresh `AugmentedImageDatabase` for ARCore.
+4.  The ARCore session is configured with this new database, and ARCore takes over the live tracking.
+
+This hybrid approach provides a robust and efficient solution: OpenCV creates a persistent, storable "identity" for the AR target, while ARCore handles the high-performance, real-time tracking in the live session.

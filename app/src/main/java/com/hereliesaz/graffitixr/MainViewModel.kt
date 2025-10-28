@@ -107,7 +107,8 @@ class MainViewModel(
                         ImageDecoder.decodeBitmap(source)
                     } else {
                         @Suppress("DEPRECATION")
-                        MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                        val source = ImageDecoder.createSource(context.contentResolver, uri)
+                        ImageDecoder.decodeBitmap(source)
                     }
 
                     val resultBitmap = bitmap.removeBackground(context)
@@ -144,7 +145,8 @@ class MainViewModel(
                     }
                 } else {
                     @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source)
                 }.copy(Bitmap.Config.ARGB_8888, true)
 
                 val lineDrawingBitmap = convertToLineDrawing(bitmap)
@@ -200,21 +202,21 @@ class MainViewModel(
 
     fun onScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.scale
-        updateState(uiState.value.copy(scale = currentScale * scaleFactor))
+        updateState(uiState.value.copy(scale = currentScale * scaleFactor), isUndoable = false)
     }
 
     fun onOffsetChanged(offset: Offset) {
-        updateState(uiState.value.copy(offset = uiState.value.offset + offset))
+        updateState(uiState.value.copy(offset = uiState.value.offset + offset), isUndoable = false)
     }
 
     fun onRotationZChanged(rotationDelta: Float) {
         val currentRotation = uiState.value.rotationZ
-        updateState(uiState.value.copy(rotationZ = currentRotation + rotationDelta))
+        updateState(uiState.value.copy(rotationZ = currentRotation + rotationDelta), isUndoable = false)
     }
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
-        updateState(uiState.value.copy(arObjectScale = currentScale * scaleFactor))
+        updateState(uiState.value.copy(arObjectScale = currentScale * scaleFactor), isUndoable = false)
     }
 
     fun onEditorModeChanged(mode: EditorMode) {
@@ -253,7 +255,8 @@ class MainViewModel(
                     ImageDecoder.decodeBitmap(source)
                 } else {
                     @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source)
                 }
 
                 val resultBitmap = com.hereliesaz.graffitixr.utils.applyCurves(bitmap, points)
@@ -423,7 +426,8 @@ class MainViewModel(
                             ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri))
                         } else {
                             @Suppress("DEPRECATION")
-                            MediaStore.Images.Media.getBitmap(getApplication<Application>().contentResolver, uri)
+                            val source = ImageDecoder.createSource(getApplication<Application>().contentResolver, uri)
+                            ImageDecoder.decodeBitmap(source)
                         }
                         val session = arCoreManager.session ?: return@launch
                         val config = session.config
@@ -478,7 +482,8 @@ class MainViewModel(
                         ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri))
                     } else {
                         @Suppress("DEPRECATION")
-                        MediaStore.Images.Media.getBitmap(getApplication<Application>().contentResolver, uri)
+                        val source = ImageDecoder.createSource(getApplication<Application>().contentResolver, uri)
+                        ImageDecoder.decodeBitmap(source)
                     }
                 }
 
@@ -531,7 +536,7 @@ class MainViewModel(
 
     fun onUndoClicked() {
         if (undoStack.isNotEmpty()) {
-            val lastState = undoStack.removeLast()
+            val lastState = undoStack.removeAt(undoStack.lastIndex)
             redoStack.add(uiState.value)
             savedStateHandle["uiState"] = lastState.copy(canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty())
         }
@@ -539,16 +544,35 @@ class MainViewModel(
 
     fun onRedoClicked() {
         if (redoStack.isNotEmpty()) {
-            val nextState = redoStack.removeLast()
+            val nextState = redoStack.removeAt(redoStack.lastIndex)
             undoStack.add(uiState.value)
             savedStateHandle["uiState"] = nextState.copy(canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty())
         }
     }
 
-    private fun updateState(newState: UiState) {
-        undoStack.add(uiState.value)
+    fun onGestureStart() {
+        // Overwrite the last state in the undo stack
+        if (undoStack.isNotEmpty()) {
+            undoStack[undoStack.lastIndex] = uiState.value
+        } else {
+            undoStack.add(uiState.value)
+        }
         redoStack.clear()
-        savedStateHandle["uiState"] = newState.copy(canUndo = true, canRedo = false)
+    }
+
+    fun onGestureEnd() {
+        // No action needed here as the state is already saved at the start
+    }
+
+    private fun updateState(newState: UiState, isUndoable: Boolean = true) {
+        if (isUndoable) {
+            undoStack.add(uiState.value)
+            redoStack.clear()
+        }
+        savedStateHandle["uiState"] = newState.copy(
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
     }
 
     fun onMarkProgressToggled() {
@@ -575,22 +599,22 @@ class MainViewModel(
                     path.lineTo(newPath[i].first, newPath[i].second)
                 }
             }
-            val newColoredPixels = com.hereliesaz.graffitixr.utils.calculateProgress(listOf(path), width, height)
-            totalColoredPixels += (newColoredPixels / 100 * (width * height)).toInt()
+
+            val newColoredPixels = coloredPixelsBitmap?.let {
+                com.hereliesaz.graffitixr.utils.calculateProgress(listOf(path), it)
+            } ?: 0
+            totalColoredPixels += newColoredPixels
             val progress = (totalColoredPixels.toFloat() / (width * height).toFloat()) * 100
             savedStateHandle["uiState"] = uiState.value.copy(progressPercentage = progress)
         }
     }
-
     private suspend fun getBitmapDimensions(uri: Uri): Pair<Int, Int> {
         return withContext(Dispatchers.IO) {
             try {
-                val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 val context = getApplication<Application>().applicationContext
-                val inputStream = context.contentResolver.openInputStream(uri)
-                BitmapFactory.decodeStream(inputStream, null, options)
-                inputStream?.close()
-                Pair(options.outWidth, options.outHeight)
+                val source = ImageDecoder.createSource(context.contentResolver, uri)
+                val bitmap = ImageDecoder.decodeBitmap(source)
+                Pair(bitmap.width, bitmap.height)
             } catch (e: Exception) {
                 e.printStackTrace()
                 Pair(0, 0)

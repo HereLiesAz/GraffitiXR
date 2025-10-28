@@ -8,10 +8,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.toArgb
 
-fun calculateProgress(paths: List<Path>, width: Int, height: Int): Float {
-    if (width == 0 || height == 0) return 0f
+fun calculateProgress(paths: List<Path>, bitmap: Bitmap): Int {
+    val width = bitmap.width
+    val height = bitmap.height
+    if (width == 0 || height == 0) return 0
 
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val paint = Paint().apply {
         color = Color.Red.toArgb()
@@ -26,7 +27,5 @@ fun calculateProgress(paths: List<Path>, width: Int, height: Int): Float {
     val pixels = IntArray(width * height)
     bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
-    val coloredPixels = pixels.count { it != 0 }
-
-    return (coloredPixels.toFloat() / (width * height).toFloat()) * 100
+    return pixels.count { it != 0 }
 }

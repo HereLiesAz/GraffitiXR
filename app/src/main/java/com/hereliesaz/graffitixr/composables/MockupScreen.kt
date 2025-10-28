@@ -79,7 +79,8 @@ fun MockupScreen(
     onRotationYChanged: (Float) -> Unit,
     onOffsetChanged: (Offset) -> Unit,
     onCycleRotationAxis: () -> Unit,
-    onGestureInProgress: (Boolean) -> Unit
+    onGestureStart: () -> Unit,
+    onGestureEnd: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -161,11 +162,18 @@ fun MockupScreen(
                     .clipToBounds()
                     .pointerInput(Unit) {
                         detectDragGestures(
-                            onDragStart = { onGestureInProgress(true) },
-                            onDragEnd = { onGestureInProgress(false) }
+                            onDragStart = { onGestureStart() },
+                            onDragEnd = { onGestureEnd() }
                         ) { _, _ -> }
                     }
             ) {
+                LaunchedEffect(transformState.isTransformInProgress) {
+                    if (transformState.isTransformInProgress) {
+                        onGestureStart()
+                    } else {
+                        onGestureEnd()
+                    }
+                }
                 imageBitmap?.let { bmp ->
                     Canvas(
                         modifier = Modifier
@@ -184,7 +192,6 @@ fun MockupScreen(
                                 detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                             }
                     ) {
-                        onGestureInProgress(transformState.isTransformInProgress)
                         drawImage(
                             image = bmp.asImageBitmap(),
                             alpha = uiState.opacity,
