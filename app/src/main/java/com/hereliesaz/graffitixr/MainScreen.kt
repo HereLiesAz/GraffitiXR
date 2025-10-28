@@ -28,6 +28,7 @@ import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.composables.RefinementScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
@@ -67,11 +68,11 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         }
                     }
                 }
-                is CaptureEvent.RequestTargetCapture -> {
+                is CaptureEvent.RequestCaptureForRefinement -> {
                     (context as? Activity)?.let { activity ->
                         captureWindow(activity) { bitmap ->
                             bitmap?.let {
-                                viewModel.setArTarget(it)
+                                viewModel.setRefinementBitmap(it)
                             }
                         }
                     }
@@ -89,7 +90,13 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (showProjectLibrary) {
+        if (uiState.refinementImageUri != null) {
+            RefinementScreen(
+                imageUri = uiState.refinementImageUri!!,
+                onConfirm = viewModel::onRefinementConfirm,
+                onCancel = viewModel::onRefinementCancel
+            )
+        } else if (showProjectLibrary) {
             ProjectLibraryScreen(
                 projects = viewModel.getProjectList(),
                 onLoadProject = { projectName ->
@@ -195,7 +202,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
                 if (uiState.editorMode == EditorMode.AR) {
-                    azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
+                    azRailItem(id = "capture", text = "Capture", onClick = viewModel::onCaptureForRefinementClicked)
+                    azRailItem(id = "refine_target", text = "Refine Target", onClick = { /* TODO */ })
                 }
                 azDivider()
                 if (uiState.editorMode == EditorMode.STATIC) {

@@ -11,14 +11,7 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
     private var viewportChanged = false
     private var viewportWidth = 0
     private var viewportHeight = 0
-    private val display: Display? by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            context.display
-        } else {
-            @Suppress("DEPRECATION")
-            (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
-        }
-    }
+    private val display: Display? = context.display
 
     fun onResume() {
         context.getSystemService(DisplayManager::class.java).registerDisplayListener(this, null)
@@ -36,7 +29,7 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
 
     fun updateSessionIfNeeded(session: Session) {
         if (viewportChanged && display != null) {
-            val displayRotation = display!!.rotation
+            val displayRotation = display.rotation
             session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
             viewportChanged = false
         }

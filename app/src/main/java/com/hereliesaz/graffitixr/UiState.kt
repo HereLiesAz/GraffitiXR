@@ -99,7 +99,8 @@ data class UiState(
     val canRedo: Boolean = false,
     val isMarkingProgress: Boolean = false,
     val drawingPaths: @RawValue List<List<Pair<Float, Float>>> = emptyList(),
-    val progressPercentage: Float = 0f
+    val progressPercentage: Float = 0f,
+    val refinementImageUri: Uri? = null
 ) : Parcelable
 
 enum class AppBlendMode {

@@ -4,7 +4,7 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
-## **V1.4 Completed Features**
+## **V1.5 Completed Features**
 
 -   **[x] Refactor from Vuforia Engine to ARCore:**
     -   [x] Removed all Vuforia dependencies and code.
@@ -30,25 +30,16 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Added a suite of unit tests for the `MainViewModel`.
 -   **[x] UI Refinements:**
      -   [x] Refined the Adjustment Slider UI into an integrated, animated panel.
-
----
-
-## **Project Backlog**
-
-### **High Priority**
-
 -   **[x] Enhance User Experience (UX):**
     -   [x] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
     -   [x] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
 -   **[x] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
 -   **[x] Undo/Redo Functionality:**
     -   [x] Implement undo and redo buttons to revert or reapply image adjustments.
--   **[ ] Refine Gesture Feedback UI:**
-    -   [ ] Replace the full-screen gesture feedback with a more subtle, non-intrusive indicator.
-
-### **Medium Priority**
--   **[ ] Optimize Progress Calculation Performance:**
-    -   [ ] Refactor the progress calculation logic to avoid recalculating the entire bitmap on every update.
+-   **[x] Refine Gesture Feedback UI:**
+    -   [x] Replace the full-screen gesture feedback with a more subtle, non-intrusive indicator.
+-   **[x] Optimize Progress Calculation Performance:**
+    -   [x] Refactor the progress calculation logic to avoid recalculating the entire bitmap on every update.
 -   **[x] Add "Save/Export" Feature:**
     -   [x] Allow users to save or export the final composed image from any of the modes.
     -   [x] Allow users to save the marks or griding "fingerprint" and overlay location, size, and orientation.
@@ -56,7 +47,11 @@ This document tracks the development status, future enhancements, and identified
 -   **[x] Implement Advanced Image Editing:**
     -   [x] Add more advanced image adjustment tools like color balance or blending modes.
     -   [x] **Curves Adjustment:** Implement a user interface for adjusting the image's tonal range using curves.
-
-### **Low Priority / Future Ideas**
 -   **[x] Create a Project Library:**
     -   [x] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
+
+---
+
+## **Project Backlog**
+
+All items completed. Ready for the next phase of development.
