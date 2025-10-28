@@ -10,7 +10,7 @@ fun ARScreen(arCoreManager: ARCoreManager) {
         factory = { context ->
             GLSurfaceView(context).apply {
                 setEGLContextClientVersion(2)
-                setRenderer(ARCoreRenderer(arCoreManager))
+                setRenderer(ARCoreRenderer(arCoreManager, arCoreManager.backgroundRenderer))
             }
         }
     )
