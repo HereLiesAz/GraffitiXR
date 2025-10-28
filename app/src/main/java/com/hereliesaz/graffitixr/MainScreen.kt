@@ -4,9 +4,11 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -16,13 +18,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.graffitixr.composables.DrawingCanvas
+import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.composables.RefinementScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
@@ -42,6 +48,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
     var showSaveProjectDialog by remember { mutableStateOf(false) }
+    var gestureInProgress by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.editorMode) {
         if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
@@ -61,6 +68,15 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         }
                     }
                 }
+                is CaptureEvent.RequestCaptureForRefinement -> {
+                    (context as? Activity)?.let { activity ->
+                        captureWindow(activity) { bitmap ->
+                            bitmap?.let {
+                                viewModel.setRefinementBitmap(it)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -74,7 +90,13 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (showProjectLibrary) {
+        if (uiState.refinementImageUri != null) {
+            RefinementScreen(
+                imageUri = uiState.refinementImageUri!!,
+                onConfirm = viewModel::onRefinementConfirm,
+                onCancel = viewModel::onRefinementCancel
+            )
+        } else if (showProjectLibrary) {
             ProjectLibraryScreen(
                 projects = viewModel.getProjectList(),
                 onLoadProject = { projectName ->
@@ -109,7 +131,15 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationZChanged = viewModel::onRotationZChanged,
                         onRotationXChanged = viewModel::onRotationXChanged,
                         onRotationYChanged = viewModel::onRotationYChanged,
-                        onCycleRotationAxis = viewModel::onCycleRotationAxis
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis,
+                        onGestureStart = {
+                            viewModel.onGestureStart()
+                            gestureInProgress = true
+                        },
+                        onGestureEnd = {
+                            viewModel.onGestureEnd()
+                            gestureInProgress = false
+                        }
                     )
                     EditorMode.NON_AR -> ImageTraceScreen(
                         uiState = uiState,
@@ -118,11 +148,46 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         onRotationZChanged = viewModel::onRotationZChanged,
                         onRotationXChanged = viewModel::onRotationXChanged,
                         onRotationYChanged = viewModel::onRotationYChanged,
-                        onCycleRotationAxis = viewModel::onCycleRotationAxis
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis,
+                        onGestureStart = {
+                            viewModel.onGestureStart()
+                            gestureInProgress = true
+                        },
+                        onGestureEnd = {
+                            viewModel.onGestureEnd()
+                            gestureInProgress = false
+                        }
                     )
-                    EditorMode.AR -> ARScreen(arCoreManager = arCoreManager)
+                    EditorMode.AR -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        viewModel.onGestureStart()
+                                        gestureInProgress = true
+                                    },
+                                    onDragEnd = {
+                                        viewModel.onGestureEnd()
+                                        gestureInProgress = false
+                                    }
+                                ) { _, _ -> }
+                            }
+                    ) {
+                        ARScreen(arCoreManager = arCoreManager)
+                    }
                 }
             }
+        }
+
+        if (gestureInProgress) {
+            GestureFeedback(
+                uiState = uiState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .zIndex(3f)
+            )
         }
 
         Box(modifier = Modifier.zIndex(2f)) {
@@ -137,7 +202,8 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
                 if (uiState.editorMode == EditorMode.AR) {
-                    azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
+                    azRailItem(id = "capture", text = "Capture", onClick = viewModel::onCaptureForRefinementClicked)
+                    azRailItem(id = "refine_target", text = "Refine Target", onClick = { /* TODO */ })
                 }
                 azDivider()
                 if (uiState.editorMode == EditorMode.STATIC) {
@@ -170,10 +236,15 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azRailItem(id = "project_library", text = "Library") {
                     showProjectLibrary = true
                 }
-                azRailItem(id = "project_library", text = "Library") {
-                    showProjectLibrary = true
-                }
+                azRailItem(id = "mark_progress", text = "Mark Progress", onClick = viewModel::onMarkProgressToggled)
             }
+        }
+
+        if (uiState.isMarkingProgress) {
+            DrawingCanvas(
+                paths = uiState.drawingPaths,
+                onPathFinished = viewModel::onDrawingPathFinished
+            )
         }
 
         if (showSaveProjectDialog) {
@@ -245,6 +316,16 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
 
         if (uiState.showDoubleTapHint) {
             DoubleTapHintDialog(onDismissRequest = viewModel::onDoubleTapHintDismissed)
+        }
+
+        if (uiState.isMarkingProgress) {
+            Text(
+                text = "Progress: %.2f%%".format(uiState.progressPercentage),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .zIndex(3f)
+            )
         }
     }
 }

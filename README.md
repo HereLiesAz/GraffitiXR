@@ -4,7 +4,7 @@ GraffitiXR is an advanced augmented reality application for Android, designed to
 
 ## Features
 
--   **AR Mockup Mode:** Leveraging the powerful Vuforia Engine, this mode allows artists to anchor a digital image to a physical location with high precision. The application can save the location "fingerprint," allowing the artist to return to the site and have the image overlay automatically reappear in the correct position, size, and orientation.
+-   **Persistent AR Mockup Mode:** Leveraging ARCore and OpenCV, this mode allows artists to anchor a digital image to a physical location with high precision. The application's key feature is its ability to save the location "fingerprint," allowing the artist to return to the site at a later time and have the image overlay automatically reappear in the correct position, size, and orientation.
 -   **Image Trace Mode:** A non-AR mode that overlays a semi-transparent image on the camera feed, useful for direct tracing when the device is held in a fixed position (e.g., on a tripod).
 -   **Static Mockup Mode:** Allows artists to create a quick visualization by taking a photo of a surface and using perspective warp tools to fit their artwork onto it.
 

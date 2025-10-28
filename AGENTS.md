@@ -13,7 +13,7 @@ This is an Android application that uses augmented reality (AR) to project an im
 The main purpose of this application is to help artists, designers, and homeowners visualize how a mural or other large-scale artwork will look in a specific location. It can be used to test different images, sizes, and placements without the need for physical mockups.
 
 ### **How it works**
-If AR is enabled, the application uses the device's camera and the Vuforia Engine. The user can create an "Image Target" at runtime by pointing the camera at a real-world object or surface and tapping a button. This captures the camera view and uses it to create a target that Vuforia can recognize and track. The user can then select an image from their device to project onto this newly created target. The app uses a custom rendering engine to render the image on the target, with controls for opacity, contrast, and saturation. If AR is not enabled, the device will need to be placed on a tripod, and simply overlays the image onto the camera view, with the same adjustable settings for the image.
+If AR is enabled, the application uses the device's camera and ARCore. The user can create an "Image Target" at runtime by pointing the camera at a real-world object or surface and tapping a button. This captures the camera view and uses it to create a target that ARCore can recognize and track. The user can then select an image from their device to project onto this newly created target. The app uses a custom rendering engine to render the image on the target, with controls for opacity, contrast, and saturation. If AR is not enabled, the device will need to be placed on a tripod, and simply overlays the image onto the camera view, with the same adjustable settings for the image.
 
 ### **How the user interacts with it**
 The user interacts with the application through a simple user interface. The main screen shows the camera view with the AR overlay. There are buttons to select an image and adjust the properties of the projected image.
@@ -33,10 +33,10 @@ The user interacts with the application through a simple user interface. The mai
 -   **State Management:** All UI state is held in the immutable `UiState.kt` data class and managed via a `StateFlow` in `MainViewModel.kt`.
 
 ### **Key Files**
--   `MainActivity.kt`: The single activity entry point. It handles permissions, initializes the Vuforia engine, and hosts the `MainScreen` composable.
+-   `MainActivity.kt`: The single activity entry point. It handles permissions, initializes the ARCore session, and hosts the `MainScreen` composable.
 -   `MainViewModel.kt`: The central logic hub. It manages all state changes and user events.
--   `VuforiaCameraScreen.kt`: The composable for the AR experience.
--   `VuforiaRenderer.kt`: The renderer for the AR experience.
+-   `ARScreen.kt`: The composable for the AR experience.
+-   `ARCoreRenderer.kt`: The renderer for the AR experience.
 -   `ImageTraceScreen.kt`: The composable for the simple camera overlay mode (non-AR).
 -   `MockupScreen.kt`: The composable for the mock-up mode on a static background image.
 
@@ -44,6 +44,15 @@ The user interacts with the application through a simple user interface. The mai
 -   **State:** All state changes MUST be initiated via a function call on the `MainViewModel`.
 -   **Documentation:** All new public code MUST be documented with exhaustive KDocs.
 -   **Testing:** New features should be accompanied by corresponding unit tests in `app/src/test/`.
+-   **Critical Dependencies:** The OpenCV dependency is **critical** for the AR fingerprinting feature and **must not be removed**.
+
+### **AR Persistence (Fingerprinting)**
+A core feature is the ability to save an AR project and have the digital overlay reappear in the correct physical location when the project is reloaded. This is mission-critical for the app's professional use case.
+
+-   **How it Works:** When an AR target is created, the app uses OpenCV's ORB feature detector to extract a unique "fingerprint" (keypoints and descriptors) from the target image.
+-   **Serialization:** This fingerprint data, which consists of non-standard OpenCV types, is serialized into a JSON string using custom serializers (`KeyPointSerializer`, `MatSerializer`) and saved within the project file.
+-   **Reloading:** When a project is loaded, the app reloads the original target image `Bitmap` and uses that to reconstruct the `AugmentedImageDatabase` for live ARCore tracking. The fingerprint's purpose is for stable, persistent storage of the target's identity, not for live tracking.
+-   **Do Not Remove:** The entire OpenCV-based fingerprinting and serialization pipeline is essential. Do not modify or remove it without a full understanding of the persistence architecture.
 
 ---
 
