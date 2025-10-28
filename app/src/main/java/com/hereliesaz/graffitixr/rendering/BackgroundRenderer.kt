@@ -2,31 +2,43 @@ package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
-import android.util.Log
 import com.google.ar.core.Frame
+import com.google.ar.core.Coordinates2d
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 class BackgroundRenderer {
 
-    private val quadCoords = floatArrayOf(
+    private val quadVertices = floatArrayOf(
         -1.0f, -1.0f,
         -1.0f, +1.0f,
         +1.0f, -1.0f,
         +1.0f, +1.0f
-    )
+    ).toBuffer()
 
-    private var quadTexCoord: FloatBuffer? = null
-    private var quadTexCoordTransformed: FloatBuffer? = null
+    private val quadTexCoords = floatArrayOf(
+        0.0f, 1.0f,
+        0.0f, 0.0f,
+        1.0f, 1.0f,
+        1.0f, 0.0f
+    ).toBuffer()
+
+    private val quadTexCoordsTransformed: FloatBuffer
+
     private var program = 0
     private var positionHandle = 0
     private var texCoordHandle = 0
     var textureId = -1
         private set
 
+    init {
+        val bbTexCoordsTransformed = ByteBuffer.allocateDirect(quadTexCoords.capacity() * 4)
+        bbTexCoordsTransformed.order(ByteOrder.nativeOrder())
+        quadTexCoordsTransformed = bbTexCoordsTransformed.asFloatBuffer()
+    }
+
     fun createOnGlThread() {
-        Log.d(TAG, "createOnGlThread")
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
         textureId = textures[0]
@@ -55,34 +67,23 @@ class BackgroundRenderer {
 
         positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
         texCoordHandle = GLES20.glGetAttribLocation(program, "a_TexCoord")
-
-        val bbTexCoords = ByteBuffer.allocateDirect(QUAD_TEXCOORDS.size * 4)
-        bbTexCoords.order(ByteOrder.nativeOrder())
-        quadTexCoord = bbTexCoords.asFloatBuffer()
-        quadTexCoord?.put(QUAD_TEXCOORDS)
-        quadTexCoord?.position(0)
-
-        val bbTexCoordsTransformed = ByteBuffer.allocateDirect(QUAD_TEXCOORDS.size * 4)
-        bbTexCoordsTransformed.order(ByteOrder.nativeOrder())
-        quadTexCoordTransformed = bbTexCoordsTransformed.asFloatBuffer()
     }
 
     fun draw(frame: Frame) {
-        Log.d(TAG, "draw")
         if (frame.hasDisplayGeometryChanged()) {
             frame.transformCoordinates2d(
-                com.google.ar.core.Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
-                quadTexCoord!!,
-                com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
-                quadTexCoordTransformed!!
+                Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+                quadVertices,
+                Coordinates2d.TEXTURE_NORMALIZED,
+                quadTexCoordsTransformed
             )
         }
 
         GLES20.glDepthMask(false)
         GLES20.glUseProgram(program)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
-        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quadCoords.toBuffer())
-        GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoordTransformed)
+        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quadVertices)
+        GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoordsTransformed)
         GLES20.glEnableVertexAttribArray(positionHandle)
         GLES20.glEnableVertexAttribArray(texCoordHandle)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
@@ -92,13 +93,6 @@ class BackgroundRenderer {
     }
 
     companion object {
-        private const val TAG = "BackgroundRenderer"
-        private val QUAD_TEXCOORDS = floatArrayOf(
-            0.0f, 1.0f,
-            0.0f, 0.0f,
-            1.0f, 1.0f,
-            1.0f, 0.0f
-        )
         private const val VERTEX_SHADER = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;
