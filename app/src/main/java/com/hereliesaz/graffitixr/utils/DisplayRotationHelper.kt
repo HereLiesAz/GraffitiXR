@@ -4,6 +4,7 @@ import android.content.Context
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.view.Display
+import android.view.Surface
 import android.view.WindowManager
 import com.google.ar.core.Session
 
@@ -38,7 +39,13 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
     fun updateSessionIfNeeded(session: Session) {
         val localDisplay = display
         if (viewportChanged && localDisplay != null) {
-            val displayRotation = localDisplay.rotation
+            val displayRotation = when (localDisplay.rotation) {
+                Surface.ROTATION_0 -> 0
+                Surface.ROTATION_90 -> 90
+                Surface.ROTATION_180 -> 180
+                Surface.ROTATION_270 -> 270
+                else -> 0
+            }
             session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
             viewportChanged = false
         }
