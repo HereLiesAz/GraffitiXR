@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
@@ -14,7 +15,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.AugmentedImageDatabase
-import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.utils.OnboardingManager
@@ -42,6 +42,7 @@ import org.opencv.imgproc.Imgproc
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
+    object RequestTargetCapture : CaptureEvent()
 }
 
 sealed class TapFeedback {
@@ -85,6 +86,22 @@ class MainViewModel(
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun getBitmapFromUri(uri: Uri): Bitmap? {
+        val context = getApplication<Application>().applicationContext
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val source = ImageDecoder.createSource(context.contentResolver, uri)
+                ImageDecoder.decodeBitmap(source)
+            } else {
+                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     fun onRemoveBackgroundClicked() {
         viewModelScope.launch {
             setLoading(true)
@@ -92,8 +109,7 @@ class MainViewModel(
             if (uri != null) {
                 try {
                     val context = getApplication<Application>().applicationContext
-                    val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    val bitmap = ImageDecoder.decodeBitmap(source)
+                    val bitmap = getBitmapFromUri(uri) ?: return@launch
 
                     val resultBitmap = bitmap.removeBackground(context)
 
@@ -122,10 +138,7 @@ class MainViewModel(
             val uri = uiState.value.overlayImageUri
             if (uri != null) {
                 val context = getApplication<Application>().applicationContext
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                    decoder.isMutableRequired = true
-                }.copy(Bitmap.Config.ARGB_8888, true)
+                val bitmap = getBitmapFromUri(uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch
 
                 val lineDrawingBitmap = convertToLineDrawing(bitmap)
 
@@ -229,8 +242,7 @@ class MainViewModel(
             setLoading(true)
             try {
                 val context = getApplication<Application>().applicationContext
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                val bitmap = ImageDecoder.decodeBitmap(source)
+                val bitmap = getBitmapFromUri(uri) ?: return@launch
 
                 val resultBitmap = com.hereliesaz.graffitixr.utils.applyCurves(bitmap, points)
 
@@ -364,27 +376,29 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 projectManager.loadProject(projectName)?.let { projectData ->
-                    updateState(uiState.value.copy(
-                        backgroundImageUri = projectData.backgroundImageUri,
-                        overlayImageUri = projectData.overlayImageUri,
-                        opacity = projectData.opacity,
-                        contrast = projectData.contrast,
-                        saturation = projectData.saturation,
-                        colorBalanceR = projectData.colorBalanceR,
-                        colorBalanceG = projectData.colorBalanceG,
-                        colorBalanceB = projectData.colorBalanceB,
-                        scale = projectData.scale,
-                        rotationZ = projectData.rotationZ,
-                        rotationX = projectData.rotationX,
-                        rotationY = projectData.rotationY,
-                        offset = projectData.offset,
-                        blendMode = projectData.blendMode,
-                        fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) },
-                        drawingPaths = projectData.drawingPaths
-                    ))
+                    updateState(
+                        uiState.value.copy(
+                            backgroundImageUri = projectData.backgroundImageUri,
+                            overlayImageUri = projectData.overlayImageUri,
+                            opacity = projectData.opacity,
+                            contrast = projectData.contrast,
+                            saturation = projectData.saturation,
+                            colorBalanceR = projectData.colorBalanceR,
+                            colorBalanceG = projectData.colorBalanceG,
+                            colorBalanceB = projectData.colorBalanceB,
+                            scale = projectData.scale,
+                            rotationZ = projectData.rotationZ,
+                            rotationX = projectData.rotationX,
+                            rotationY = projectData.rotationY,
+                            offset = projectData.offset,
+                            blendMode = projectData.blendMode,
+                            fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) },
+                            drawingPaths = projectData.drawingPaths
+                        ),
+                        isUndoable = false
+                    )
                     projectData.overlayImageUri?.let { uri ->
-                        val source = ImageDecoder.createSource(getApplication<Application>().contentResolver, uri)
-                        val bitmap = ImageDecoder.decodeBitmap(source)
+                        val bitmap = getBitmapFromUri(uri) ?: return@let
                         val session = arCoreManager.session ?: return@launch
                         val config = session.config
                         val database = AugmentedImageDatabase(session)
@@ -426,47 +440,35 @@ class MainViewModel(
         updateState(uiState.value.copy(targetCreationState = newState), isUndoable = false)
     }
 
-    fun onCreateTargetClicked() {
+    fun setArTarget(bitmap: Bitmap) {
         viewModelScope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
                 Toast.makeText(getApplication(), "Creating target...", Toast.LENGTH_SHORT).show()
             }
             try {
                 onTargetCreationStateChanged(TargetCreationState.CREATING)
-                val bitmap = uiState.value.overlayImageUri?.let { uri ->
-                    val source = ImageDecoder.createSource(getApplication<Application>().contentResolver, uri)
-                    ImageDecoder.decodeBitmap(source)
-                }
+                val session = arCoreManager.session ?: return@launch
+                val config = session.config
+                val grayMat = Mat()
+                Utils.bitmapToMat(bitmap, grayMat)
+                Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                val orb = ORB.create()
+                val keypoints = MatOfKeyPoint()
+                val descriptors = Mat()
+                orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
 
-                if (bitmap != null) {
-                    val session = arCoreManager.session ?: return@launch
-                    val config = session.config
-                    val grayMat = Mat()
-                    Utils.bitmapToMat(bitmap, grayMat)
-                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
-                    val orb = ORB.create()
-                    val keypoints = MatOfKeyPoint()
-                    val descriptors = Mat()
-                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+                val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+                val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
-                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+                val database = AugmentedImageDatabase(session)
+                database.addImage("target", bitmap)
+                config.augmentedImageDatabase = database
+                session.configure(config)
 
-                    val database = AugmentedImageDatabase(session)
-                    database.addImage("target", bitmap)
-                    config.augmentedImageDatabase = database
-                    session.configure(config)
-
-                    updateState(uiState.value.copy(fingerprintJson = fingerprintJson))
-                    onTargetCreationStateChanged(TargetCreationState.SUCCESS)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    onTargetCreationStateChanged(TargetCreationState.ERROR)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "Failed to create target: No image selected", Toast.LENGTH_LONG).show()
-                    }
+                updateState(uiState.value.copy(fingerprintJson = fingerprintJson))
+                onTargetCreationStateChanged(TargetCreationState.SUCCESS)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 onTargetCreationStateChanged(TargetCreationState.ERROR)
@@ -474,6 +476,12 @@ class MainViewModel(
                     Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    fun onCreateTargetClicked() {
+        viewModelScope.launch {
+            _captureEvent.emit(CaptureEvent.RequestTargetCapture)
         }
     }
 
@@ -561,15 +569,9 @@ class MainViewModel(
     }
     private suspend fun getBitmapDimensions(uri: Uri): Pair<Int, Int> {
         return withContext(Dispatchers.IO) {
-            try {
-                val context = getApplication<Application>().applicationContext
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                val bitmap = ImageDecoder.decodeBitmap(source)
-                Pair(bitmap.width, bitmap.height)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Pair(0, 0)
-            }
+            getBitmapFromUri(uri)?.let {
+                Pair(it.width, it.height)
+            } ?: Pair(0, 0)
         }
     }
 }
