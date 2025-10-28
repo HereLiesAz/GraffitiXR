@@ -77,6 +77,15 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         }
                     }
                 }
+                is CaptureEvent.RequestTargetCapture -> {
+                    (context as? Activity)?.let { activity ->
+                        captureWindow(activity) { bitmap ->
+                            bitmap?.let {
+                                viewModel.setArTarget(it)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -202,8 +211,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
                 if (uiState.editorMode == EditorMode.AR) {
-                    azRailItem(id = "capture", text = "Capture", onClick = viewModel::onCaptureForRefinementClicked)
-                    azRailItem(id = "refine_target", text = "Refine Target", onClick = { /* TODO */ })
+                    azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
                 }
                 azDivider()
                 if (uiState.editorMode == EditorMode.STATIC) {

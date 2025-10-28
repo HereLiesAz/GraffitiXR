@@ -65,10 +65,3 @@ object PairFloatFloatSerializer : KSerializer<Pair<Float, Float>> {
         return Pair(list[0], list[1])
     }
 }
-
-@Serializable
-data class Fingerprint(
-    val keypoints: List<@Serializable(with = KeyPointSerializer::class) org.opencv.core.KeyPoint>,
-    @Serializable(with = MatSerializer::class)
-    val descriptors: org.opencv.core.Mat
-)
