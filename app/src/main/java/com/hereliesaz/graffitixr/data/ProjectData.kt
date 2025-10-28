@@ -16,8 +16,6 @@ data class ProjectData(
     val backgroundImageUri: Uri?,
     @Serializable(with = UriSerializer::class)
     val overlayImageUri: Uri?,
-    @Serializable(with = UriSerializer::class)
-    val targetImageUri: Uri? = null,
     val opacity: Float,
     val contrast: Float,
     val saturation: Float,
@@ -65,3 +63,10 @@ object PairFloatFloatSerializer : KSerializer<Pair<Float, Float>> {
         return Pair(list[0], list[1])
     }
 }
+
+@Serializable
+data class Fingerprint(
+    val keypoints: List<@Serializable(with = KeyPointSerializer::class) org.opencv.core.KeyPoint>,
+    @Serializable(with = MatSerializer::class)
+    val descriptors: org.opencv.core.Mat
+)

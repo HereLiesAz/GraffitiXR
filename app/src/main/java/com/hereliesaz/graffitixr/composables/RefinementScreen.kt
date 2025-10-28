@@ -31,7 +31,7 @@ fun RefinementScreen(
     onConfirm: (Rect) -> Unit,
     onCancel: () -> Unit
 ) {
-    var cropRect by remember { mutableStateOf(Rect(100f, 100f, 300f, 300f)) }
+    var cropRect by remember { mutableStateOf<Rect?>(null) }
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -41,23 +41,40 @@ fun RefinementScreen(
             model = imageUri,
             contentDescription = "Image for refinement",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
+            contentScale = ContentScale.Fit,
+            onSuccess = { state ->
+                val painter = state.painter
+                val imageWidth = painter.intrinsicSize.width
+                val imageHeight = painter.intrinsicSize.height
+                if (cropRect == null && imageWidth > 0 && imageHeight > 0) {
+                    val cropWidth = imageWidth * 0.5f
+                    val cropHeight = imageHeight * 0.5f
+                    cropRect = Rect(
+                        left = (imageWidth - cropWidth) / 2,
+                        top = (imageHeight - cropHeight) / 2,
+                        right = (imageWidth + cropWidth) / 2,
+                        bottom = (imageHeight + cropHeight) / 2
+                    )
+                }
+            }
         )
 
-        Canvas(modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    cropRect = cropRect.translate(dragAmount)
-                }
-            }) {
-            drawRect(
-                color = Color.White,
-                topLeft = cropRect.topLeft,
-                size = cropRect.size,
-                style = Stroke(width = 2f)
-            )
+        cropRect?.let { rect ->
+            Canvas(modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        cropRect = rect.translate(dragAmount)
+                    }
+                }) {
+                drawRect(
+                    color = Color.White,
+                    topLeft = rect.topLeft,
+                    size = rect.size,
+                    style = Stroke(width = 2f)
+                )
+            }
         }
 
         Column(
@@ -65,7 +82,7 @@ fun RefinementScreen(
                 .align(Alignment.BottomCenter)
                 .padding(16.dp)
         ) {
-            Button(onClick = { onConfirm(cropRect) }) {
+            Button(onClick = { cropRect?.let(onConfirm) }) {
                 Text("Confirm")
             }
             Button(onClick = onCancel) {

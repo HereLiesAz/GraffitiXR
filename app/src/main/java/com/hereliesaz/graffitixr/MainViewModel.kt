@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
@@ -19,6 +18,7 @@ import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.ProjectData
+import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
@@ -44,7 +44,6 @@ import org.opencv.imgproc.Imgproc
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
-    object RequestTargetCapture : CaptureEvent()
     object RequestCaptureForRefinement : CaptureEvent()
 }
 
@@ -53,6 +52,18 @@ sealed class TapFeedback {
     data class Failure(val position: Offset) : TapFeedback()
 }
 
+/**
+ * The central ViewModel for the application, acting as the single source of truth for the UI state
+ * and the handler for all user events.
+ *
+ * This class follows the MVVM architecture pattern. It holds the application's UI state in a
+ * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
+ * configuration changes but also system-initiated process death, providing a robust user experience.
+ *
+ * @param application The application instance, used for accessing the application context.
+ * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory,
+ * used to store and restore the [UiState].
+ */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle,
@@ -61,9 +72,6 @@ class MainViewModel(
 
     private val onboardingManager = OnboardingManager(application)
     private val projectManager = ProjectManager(application)
-
-    private var coloredPixelsBitmap: Bitmap? = null
-    private var totalColoredPixels = 0
 
     private val undoStack = mutableListOf<UiState>()
     private val redoStack = mutableListOf<UiState>()
@@ -89,22 +97,6 @@ class MainViewModel(
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun getBitmapFromUri(uri: Uri): Bitmap? {
-        val context = getApplication<Application>().applicationContext
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                ImageDecoder.decodeBitmap(source)
-            } else {
-                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
     fun onRemoveBackgroundClicked() {
         viewModelScope.launch {
             setLoading(true)
@@ -112,7 +104,7 @@ class MainViewModel(
             if (uri != null) {
                 try {
                     val context = getApplication<Application>().applicationContext
-                    val bitmap = getBitmapFromUri(uri) ?: return@launch
+                    val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
 
                     val resultBitmap = bitmap.removeBackground(context)
 
@@ -141,7 +133,7 @@ class MainViewModel(
             val uri = uiState.value.overlayImageUri
             if (uri != null) {
                 val context = getApplication<Application>().applicationContext
-                val bitmap = getBitmapFromUri(uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch
+                val bitmap = BitmapUtils.getBitmapFromUri(context, uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch
 
                 val lineDrawingBitmap = convertToLineDrawing(bitmap)
 
@@ -175,11 +167,6 @@ class MainViewModel(
             backgroundRemovedImageUri = null,
             showDoubleTapHint = showHint
         ))
-        viewModelScope.launch {
-            val (width, height) = getBitmapDimensions(uri)
-            coloredPixelsBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            totalColoredPixels = 0
-        }
     }
 
     fun onOpacityChanged(opacity: Float) {
@@ -245,7 +232,7 @@ class MainViewModel(
             setLoading(true)
             try {
                 val context = getApplication<Application>().applicationContext
-                val bitmap = getBitmapFromUri(uri) ?: return@launch
+                val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
 
                 val resultBitmap = com.hereliesaz.graffitixr.utils.applyCurves(bitmap, points)
 
@@ -295,6 +282,9 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Handles the save button click event by emitting a capture request event.
+     */
     fun onSaveClicked() {
         viewModelScope.launch {
             _captureEvent.emit(CaptureEvent.RequestCapture)
@@ -347,7 +337,7 @@ class MainViewModel(
             try {
                 val uri = uiState.value.refinementImageUri ?: return@launch
                 val context = getApplication<Application>().applicationContext
-                val bitmap = getBitmapFromUri(uri) ?: return@launch
+                val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
 
                 val croppedBitmap = Bitmap.createBitmap(
                     bitmap,
@@ -472,7 +462,7 @@ class MainViewModel(
                         drawingPaths = projectData.drawingPaths
                     ))
                     projectData.overlayImageUri?.let { uri ->
-                        val bitmap = getBitmapFromUri(uri) ?: return@let
+                        val bitmap = BitmapUtils.getBitmapFromUri(getApplication(), uri) ?: return@launch
                         val session = arCoreManager.session ?: return@launch
                         val config = session.config
                         val database = AugmentedImageDatabase(session)
@@ -514,35 +504,46 @@ class MainViewModel(
         updateState(uiState.value.copy(targetCreationState = newState), isUndoable = false)
     }
 
-    fun setArTarget(bitmap: Bitmap) {
+    fun onCreateTargetClicked() {
         viewModelScope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
                 Toast.makeText(getApplication(), "Creating target...", Toast.LENGTH_SHORT).show()
             }
             try {
                 onTargetCreationStateChanged(TargetCreationState.CREATING)
-                val session = arCoreManager.session ?: return@launch
-                val config = session.config
-                val grayMat = Mat()
-                Utils.bitmapToMat(bitmap, grayMat)
-                Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
-                val orb = ORB.create()
-                val keypoints = MatOfKeyPoint()
-                val descriptors = Mat()
-                orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+                val bitmap = uiState.value.overlayImageUri?.let { uri ->
+                    BitmapUtils.getBitmapFromUri(getApplication(), uri)
+                }
 
-                val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-                val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+                if (bitmap != null) {
+                    val session = arCoreManager.session ?: return@launch
+                    val config = session.config
+                    val grayMat = Mat()
+                    Utils.bitmapToMat(bitmap, grayMat)
+                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                    val orb = ORB.create()
+                    val keypoints = MatOfKeyPoint()
+                    val descriptors = Mat()
+                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
 
-                val database = AugmentedImageDatabase(session)
-                database.addImage("target", bitmap)
-                config.augmentedImageDatabase = database
-                session.configure(config)
+                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
-                updateState(uiState.value.copy(fingerprintJson = fingerprintJson))
-                onTargetCreationStateChanged(TargetCreationState.SUCCESS)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
+                    val database = AugmentedImageDatabase(session)
+                    database.addImage("target", bitmap)
+                    config.augmentedImageDatabase = database
+                    session.configure(config)
+
+                    updateState(uiState.value.copy(fingerprintJson = fingerprintJson))
+                    onTargetCreationStateChanged(TargetCreationState.SUCCESS)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    onTargetCreationStateChanged(TargetCreationState.ERROR)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "Failed to create target: No image selected", Toast.LENGTH_LONG).show()
+                    }
                 }
             } catch (e: Exception) {
                 onTargetCreationStateChanged(TargetCreationState.ERROR)
@@ -550,12 +551,6 @@ class MainViewModel(
                     Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
-        }
-    }
-
-    fun onCreateTargetClicked() {
-        viewModelScope.launch {
-            _captureEvent.emit(CaptureEvent.RequestTargetCapture)
         }
     }
 
@@ -600,6 +595,9 @@ class MainViewModel(
     private fun updateState(newState: UiState, isUndoable: Boolean = true) {
         if (isUndoable) {
             undoStack.add(uiState.value)
+            if (undoStack.size > MAX_UNDO_STACK_SIZE) {
+                undoStack.removeAt(0)
+            }
             redoStack.clear()
         }
         savedStateHandle["uiState"] = newState.copy(
@@ -615,37 +613,42 @@ class MainViewModel(
     fun onDrawingPathFinished(points: List<Pair<Float, Float>>) {
         val newPaths = uiState.value.drawingPaths + listOf(points)
         updateState(uiState.value.copy(drawingPaths = newPaths))
-        updateProgress(points)
+        recalculateProgress()
     }
 
-    private fun updateProgress(newPath: List<Pair<Float, Float>>) {
+    private fun recalculateProgress() {
         viewModelScope.launch {
             val overlayImageUri = uiState.value.overlayImageUri ?: return@launch
-            val (width, height) = getBitmapDimensions(overlayImageUri)
-            if (coloredPixelsBitmap == null) {
-                coloredPixelsBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val allPaths = uiState.value.drawingPaths
+
+            if (allPaths.isEmpty()) {
+                updateState(uiState.value.copy(progressPercentage = 0f), isUndoable = false)
+                return@launch
             }
-            val path = androidx.compose.ui.graphics.Path()
-            if (newPath.isNotEmpty()) {
-                path.moveTo(newPath[0].first, newPath[0].second)
-                for (i in 1 until newPath.size) {
-                    path.lineTo(newPath[i].first, newPath[i].second)
+
+            val (width, height) = BitmapUtils.getBitmapDimensions(getApplication(), overlayImageUri)
+            if (width == 0 || height == 0) return@launch
+
+            val progressBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+            val composePaths = allPaths.map { pointList ->
+                androidx.compose.ui.graphics.Path().apply {
+                    if (pointList.isNotEmpty()) {
+                        moveTo(pointList.first().first, pointList.first().second)
+                        for (i in 1 until pointList.size) {
+                            lineTo(pointList[i].first, pointList[i].second)
+                        }
+                    }
                 }
             }
 
-            val newColoredPixels = coloredPixelsBitmap?.let {
-                com.hereliesaz.graffitixr.utils.calculateProgress(listOf(path), it)
-            } ?: 0
-            totalColoredPixels += newColoredPixels
+            val totalColoredPixels = com.hereliesaz.graffitixr.utils.calculateProgress(composePaths, progressBitmap)
             val progress = (totalColoredPixels.toFloat() / (width * height).toFloat()) * 100
             updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
         }
     }
-    private suspend fun getBitmapDimensions(uri: Uri): Pair<Int, Int> {
-        return withContext(Dispatchers.IO) {
-            getBitmapFromUri(uri)?.let {
-                Pair(it.width, it.height)
-            } ?: Pair(0, 0)
-        }
+
+    companion object {
+        private const val MAX_UNDO_STACK_SIZE = 50
     }
 }
