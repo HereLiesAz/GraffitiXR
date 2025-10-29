@@ -7,7 +7,10 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
 import com.google.ar.core.Frame
 import android.util.Log
+import com.google.ar.core.CameraConfig
+import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import java.io.IOException
@@ -53,6 +56,17 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
         }
 
         try {
+            session?.let {
+                val filter = CameraConfigFilter(it)
+                val configs = it.getSupportedCameraConfigs(filter)
+                var bestConfig = it.cameraConfig
+                for (config in configs) {
+                    if (config.imageSize.width > bestConfig.imageSize.width) {
+                        bestConfig = config
+                    }
+                }
+                it.cameraConfig = bestConfig
+            }
             Log.d(TAG, "Resuming session")
             session?.resume()
         } catch (e: CameraNotAvailableException) {
@@ -78,6 +92,9 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
                 it.update()
             } catch (e: CameraNotAvailableException) {
                 Log.e(TAG, "Camera not available during onDrawFrame", e)
+                null
+            } catch (e: SessionPausedException) {
+                Log.d(TAG, "Session paused, returning null frame")
                 null
             }
         }

@@ -5,9 +5,12 @@ import android.opengl.GLSurfaceView
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.Frame
 import com.google.ar.core.TrackingState
+import com.google.ar.core.Plane
 import com.hereliesaz.graffitixr.rendering.AugmentedImageRenderer
 import android.util.Log
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
+import com.hereliesaz.graffitixr.rendering.PlaneRenderer
+import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import org.opencv.core.Mat
 import org.opencv.android.Utils
 import org.opencv.imgproc.Imgproc
@@ -26,6 +29,8 @@ class ARCoreRenderer(
 ) : GLSurfaceView.Renderer {
 
     private val augmentedImageRenderer = AugmentedImageRenderer()
+    private val pointCloudRenderer = PointCloudRenderer()
+    private val planeRenderer = PlaneRenderer()
     private val trackedImages = mutableMapOf<Int, Pair<AugmentedImage, AugmentedImageRenderer>>()
     private val orb by lazy { ORB.create() }
     private val matcher by lazy { DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING) }
@@ -39,6 +44,8 @@ class ARCoreRenderer(
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer.createOnGlThread()
         augmentedImageRenderer.createOnGlThread()
+        pointCloudRenderer.createOnGlThread()
+        planeRenderer.createOnGlThread()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -55,6 +62,21 @@ class ARCoreRenderer(
 
         val frame: Frame = arCoreManager.onDrawFrame(surfaceWidth, surfaceHeight) ?: return
         backgroundRenderer.draw(frame)
+
+        val projectionMatrix = FloatArray(16)
+        val viewMatrix = FloatArray(16)
+        frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+        frame.camera.getViewMatrix(viewMatrix, 0)
+
+        frame.acquirePointCloud().use { pointCloud ->
+            pointCloudRenderer.draw(pointCloud, viewMatrix, projectionMatrix)
+        }
+
+        for (plane in frame.getUpdatedTrackables(Plane::class.java)) {
+            if (plane.type == Plane.Type.VERTICAL && isPlaneFacingUser(plane, frame)) {
+                planeRenderer.draw(plane, viewMatrix, projectionMatrix)
+            }
+        }
 
         try {
             frame.acquireCameraImage().use { image ->
@@ -120,6 +142,18 @@ class ARCoreRenderer(
                 renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ)
             }
         }
+    }
+
+    private fun isPlaneFacingUser(plane: Plane, frame: Frame): Boolean {
+        val planeNormal = FloatArray(3)
+        plane.centerPose.getTransformedAxis(1, 1.0f, planeNormal, 0)
+        val cameraPose = frame.camera.pose
+        val cameraDirection = FloatArray(3)
+        cameraPose.getTransformedAxis(2, 1.0f, cameraDirection, 0)
+        val dotProduct = planeNormal[0] * cameraDirection[0] +
+                         planeNormal[1] * cameraDirection[1] +
+                         planeNormal[2] * cameraDirection[2]
+        return dotProduct < -0.707 // Check if the angle is within 45 degrees
     }
 
     companion object {
