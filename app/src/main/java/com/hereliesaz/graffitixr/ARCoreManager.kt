@@ -10,6 +10,7 @@ import android.util.Log
 import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import java.io.IOException
@@ -91,6 +92,9 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
                 it.update()
             } catch (e: CameraNotAvailableException) {
                 Log.e(TAG, "Camera not available during onDrawFrame", e)
+                null
+            } catch (e: SessionPausedException) {
+                Log.d(TAG, "Session paused, returning null frame")
                 null
             }
         }
