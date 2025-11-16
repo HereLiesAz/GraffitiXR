@@ -5,6 +5,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
+import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import android.util.Log
 import com.google.ar.core.CameraConfig
@@ -43,8 +44,13 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
                 val installStatus = ArCoreApk.getInstance().requestInstall(context as android.app.Activity, true)
                 when (installStatus) {
                     ArCoreApk.InstallStatus.INSTALLED -> {
-                        session = Session(context)
-                        Log.d(TAG, "Session created")
+                        session = Session(context).also {
+                            val config = Config(it)
+                            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                            it.configure(config)
+                        }
+                        Log.d(TAG, "Session created and configured")
                     }
                     else -> {
                         Toast.makeText(context, "ARCore installation required.", Toast.LENGTH_LONG).show()
