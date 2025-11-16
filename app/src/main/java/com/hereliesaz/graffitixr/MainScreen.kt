@@ -25,6 +25,7 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
+import com.hereliesaz.graffitixr.composables.HelpScreen
 import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -119,6 +120,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 contentAlignment = Alignment.Center
             ) {
                 when (uiState.editorMode) {
+                    EditorMode.HELP -> HelpScreen(onGetStarted = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
                     EditorMode.STATIC -> MockupScreen(
                         uiState = uiState,
                         onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
