@@ -25,11 +25,11 @@ import javax.microedition.khronos.opengles.GL10
 
 class ARCoreRenderer(
     private val arCoreManager: ARCoreManager,
-    private val backgroundRenderer: BackgroundRenderer
+    private val backgroundRenderer: BackgroundRenderer,
+    private val pointCloudRenderer: PointCloudRenderer
 ) : GLSurfaceView.Renderer {
 
     private val augmentedImageRenderer = AugmentedImageRenderer()
-    private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
     private val trackedImages = mutableMapOf<Int, Pair<AugmentedImage, AugmentedImageRenderer>>()
     private val orb by lazy { ORB.create() }

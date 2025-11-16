@@ -11,6 +11,7 @@ import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
+import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import java.io.IOException
@@ -24,6 +25,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
     var session: Session? = null
         private set
     val backgroundRenderer = BackgroundRenderer()
+    val pointCloudRenderer = PointCloudRenderer()
     val displayRotationHelper = DisplayRotationHelper(context)
 
     override fun onResume(owner: LifecycleOwner) {
