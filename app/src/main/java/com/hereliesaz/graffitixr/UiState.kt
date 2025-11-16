@@ -67,7 +67,7 @@ sealed class TargetCreationState : Parcelable {
  */
 @Parcelize
 data class UiState(
-    val editorMode: EditorMode = EditorMode.STATIC,
+    val editorMode: EditorMode = EditorMode.HELP,
     val backgroundImageUri: Uri? = null,
     val overlayImageUri: Uri? = null,
     val backgroundRemovedImageUri: Uri? = null,
