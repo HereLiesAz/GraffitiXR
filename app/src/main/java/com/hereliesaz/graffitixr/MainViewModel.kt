@@ -278,7 +278,6 @@ class MainViewModel(
             RotationAxis.Y -> RotationAxis.Z
             RotationAxis.Z -> RotationAxis.X
         }
-        Toast.makeText(getApplication(), "Rotating around ${nextAxis.name} axis", Toast.LENGTH_SHORT).show()
         updateState(uiState.value.copy(
             activeRotationAxis = nextAxis,
             showRotationAxisFeedback = true

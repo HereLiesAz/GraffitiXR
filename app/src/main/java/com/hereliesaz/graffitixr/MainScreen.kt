@@ -174,15 +174,14 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
             }
         }
 
-        if (gestureInProgress) {
-            GestureFeedback(
-                uiState = uiState,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
-                    .zIndex(3f)
-            )
-        }
+        GestureFeedback(
+            uiState = uiState,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+                .zIndex(3f),
+            isVisible = gestureInProgress
+        )
 
         Box(modifier = Modifier.zIndex(2f)) {
             AzNavRail {
