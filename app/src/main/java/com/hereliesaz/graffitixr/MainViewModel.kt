@@ -2,20 +2,17 @@ package com.hereliesaz.graffitixr
 
 import android.app.Application
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.AugmentedImageDatabase
-import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.utils.BitmapUtils
@@ -24,8 +21,6 @@ import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import com.slowmac.autobackgroundremover.removeBackground
-import java.io.File
-import java.io.FileOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -41,6 +36,8 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
+import java.io.File
+import java.io.FileOutputStream
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
@@ -86,7 +83,10 @@ class MainViewModel(
 
     init {
         val completedModes = onboardingManager.getCompletedModes()
-        updateState(uiState.value.copy(completedOnboardingModes = completedModes), isUndoable = false)
+        updateState(uiState.value.copy(
+            completedOnboardingModes = completedModes,
+            showOnboardingDialogForMode = if (!completedModes.contains(uiState.value.editorMode)) uiState.value.editorMode else null
+        ), isUndoable = false)
     }
 
     fun showTapFeedback(position: Offset, isSuccess: Boolean) {
@@ -201,14 +201,32 @@ class MainViewModel(
     }
 
     fun onEditorModeChanged(mode: EditorMode) {
-        updateState(uiState.value.copy(editorMode = mode))
+        val showOnboarding = !uiState.value.completedOnboardingModes.contains(mode)
+        updateState(
+            uiState.value.copy(
+                editorMode = mode,
+                showOnboardingDialogForMode = if (showOnboarding) mode else null
+            )
+        )
     }
 
     fun onOnboardingComplete(mode: EditorMode, dontShowAgain: Boolean) {
-        if (dontShowAgain) {
+        val updatedState = if (dontShowAgain) {
             onboardingManager.completeMode(mode)
             val updatedModes = onboardingManager.getCompletedModes()
-            updateState(uiState.value.copy(completedOnboardingModes = updatedModes))
+            uiState.value.copy(
+                completedOnboardingModes = updatedModes,
+                showOnboardingDialogForMode = null
+            )
+        } else {
+            uiState.value.copy(showOnboardingDialogForMode = null)
+        }
+
+        if (mode == EditorMode.HELP) {
+            // After showing HELP onboarding, switch to a default mode like STATIC
+            updateState(updatedState.copy(editorMode = EditorMode.STATIC))
+        } else {
+            updateState(updatedState)
         }
     }
 
