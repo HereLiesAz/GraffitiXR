@@ -26,7 +26,6 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
     var session: Session? = null
         private set
     val backgroundRenderer = BackgroundRenderer()
-    val pointCloudRenderer = PointCloudRenderer()
     val displayRotationHelper = DisplayRotationHelper(context)
 
     override fun onResume(owner: LifecycleOwner) {
