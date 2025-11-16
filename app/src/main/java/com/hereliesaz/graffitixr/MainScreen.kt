@@ -44,17 +44,10 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
     val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
-    var showOnboardingForMode by remember { mutableStateOf<EditorMode?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
     var showSaveProjectDialog by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
-
-    LaunchedEffect(uiState.editorMode) {
-        if (!uiState.completedOnboardingModes.contains(uiState.editorMode)) {
-            showOnboardingForMode = uiState.editorMode
-        }
-    }
 
     LaunchedEffect(viewModel, context) {
         viewModel.captureEvent.collect { event ->
@@ -294,25 +287,13 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
             )
         }
 
-        showOnboardingForMode?.let { mode ->
-            if (mode == EditorMode.HELP) {
-                OnboardingDialog(
-                    editorMode = mode,
-                    onDismissRequest = { dontShowAgain ->
-                        viewModel.onOnboardingComplete(mode, dontShowAgain)
-                        showOnboardingForMode = null
-                        viewModel.onEditorModeChanged(EditorMode.STATIC)
-                    }
-                )
-            } else {
-                OnboardingDialog(
-                    editorMode = mode,
-                    onDismissRequest = { dontShowAgain ->
-                        viewModel.onOnboardingComplete(mode, dontShowAgain)
-                        showOnboardingForMode = null
-                    }
-                )
-            }
+        uiState.showOnboardingDialogForMode?.let { mode ->
+            OnboardingDialog(
+                editorMode = mode,
+                onDismissRequest = { dontShowAgain ->
+                    viewModel.onOnboardingComplete(mode, dontShowAgain)
+                }
+            )
         }
 
         RotationAxisFeedback(
