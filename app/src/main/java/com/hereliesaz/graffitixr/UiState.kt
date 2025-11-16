@@ -3,11 +3,11 @@ package com.hereliesaz.graffitixr
 import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.utils.OffsetParceler
 import kotlinx.parcelize.Parcelize
-import kotlinx.parcelize.WriteWith
-import androidx.compose.ui.graphics.BlendMode
 import kotlinx.parcelize.RawValue
+import kotlinx.parcelize.WriteWith
 
 /**
  * Represents the different states of the Image Target creation process.
@@ -100,7 +100,8 @@ data class UiState(
     val isMarkingProgress: Boolean = false,
     val drawingPaths: @RawValue List<List<Pair<Float, Float>>> = emptyList(),
     val progressPercentage: Float = 0f,
-    val refinementImageUri: Uri? = null
+    val refinementImageUri: Uri? = null,
+    val showOnboardingDialogForMode: EditorMode? = null
 ) : Parcelable
 
 enum class AppBlendMode {

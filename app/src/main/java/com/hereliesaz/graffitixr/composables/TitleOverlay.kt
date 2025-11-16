@@ -20,6 +20,7 @@ fun TitleOverlay(editorMode: EditorMode) {
         EditorMode.STATIC -> "Mockup"
         EditorMode.NON_AR -> "Trace Image"
         EditorMode.AR -> "AR"
+        EditorMode.HELP -> "Help"
     }
 
     Box(
