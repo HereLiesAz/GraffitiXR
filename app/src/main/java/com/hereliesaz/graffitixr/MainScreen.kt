@@ -294,13 +294,24 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
         }
 
         showOnboardingForMode?.let { mode ->
-            OnboardingDialog(
-                editorMode = mode,
-                onDismissRequest = { dontShowAgain ->
-                    viewModel.onOnboardingComplete(mode, dontShowAgain)
-                    showOnboardingForMode = null
-                }
-            )
+            if (mode == EditorMode.HELP) {
+                OnboardingDialog(
+                    editorMode = mode,
+                    onDismissRequest = { dontShowAgain ->
+                        viewModel.onOnboardingComplete(mode, dontShowAgain)
+                        showOnboardingForMode = null
+                        viewModel.onEditorModeChanged(EditorMode.STATIC)
+                    }
+                )
+            } else {
+                OnboardingDialog(
+                    editorMode = mode,
+                    onDismissRequest = { dontShowAgain ->
+                        viewModel.onOnboardingComplete(mode, dontShowAgain)
+                        showOnboardingForMode = null
+                    }
+                )
+            }
         }
 
         RotationAxisFeedback(
