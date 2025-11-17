@@ -21,7 +21,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.core.content.ContextCompat
-import java.util.concurrent.ConcurrentLinkedQueue
 
 class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
 
@@ -30,12 +29,6 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
     val backgroundRenderer = BackgroundRenderer()
     val pointCloudRenderer = PointCloudRenderer()
     val displayRotationHelper = DisplayRotationHelper(context)
-
-    private val augmentedImageDatabaseQueue = ConcurrentLinkedQueue<AugmentedImageDatabase>()
-
-    fun setAugmentedImageDatabase(augmentedImageDatabase: AugmentedImageDatabase) {
-        augmentedImageDatabaseQueue.add(augmentedImageDatabase)
-    }
 
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
@@ -53,7 +46,18 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
                 when (installStatus) {
                     ArCoreApk.InstallStatus.INSTALLED -> {
                         session = Session(context)
-                        session?.let { configureSession(it) }
+                        session?.let {
+                            configureSession(it)
+                            val filter = CameraConfigFilter(it)
+                            val configs = it.getSupportedCameraConfigs(filter)
+                            var bestConfig = it.cameraConfig
+                            for (config in configs) {
+                                if (config.imageSize.width > bestConfig.imageSize.width) {
+                                    bestConfig = config
+                                }
+                            }
+                            it.cameraConfig = bestConfig
+                        }
                         Log.d(TAG, "Session created and configured")
                     }
                     else -> {
@@ -67,22 +71,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
             }
         }
 
-        session?.let {
-            configureSession(it)
-        }
-
         try {
-            session?.let {
-                val filter = CameraConfigFilter(it)
-                val configs = it.getSupportedCameraConfigs(filter)
-                var bestConfig = it.cameraConfig
-                for (config in configs) {
-                    if (config.imageSize.width > bestConfig.imageSize.width) {
-                        bestConfig = config
-                    }
-                }
-                it.cameraConfig = bestConfig
-            }
             Log.d(TAG, "Resuming session")
             session?.resume()
         } catch (e: CameraNotAvailableException) {
@@ -103,15 +92,6 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
     fun onDrawFrame(width: Int, height: Int): Frame? {
         session?.let {
             displayRotationHelper.updateSessionIfNeeded(it)
-
-            // Process the queue of AugmentedImageDatabase objects.
-            while (augmentedImageDatabaseQueue.isNotEmpty()) {
-                val database = augmentedImageDatabaseQueue.poll()
-                val config = it.config
-                config.augmentedImageDatabase = database
-                it.configure(config)
-            }
-
             it.setCameraTextureName(backgroundRenderer.textureId)
             return try {
                 it.update()

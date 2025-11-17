@@ -2,17 +2,24 @@ package com.hereliesaz.graffitixr
 
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
-import android.util.Log
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.Frame
-import com.google.ar.core.Plane
 import com.google.ar.core.TrackingState
+import com.google.ar.core.Plane
 import com.hereliesaz.graffitixr.rendering.AugmentedImageRenderer
+import android.util.Log
+import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
+import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import org.opencv.core.Mat
-import org.opencv.core.MatOfKeyPoint
-import org.opencv.features2d.DescriptorMatcher
+import org.opencv.android.Utils
+import org.opencv.imgproc.Imgproc
 import org.opencv.features2d.ORB
+import org.opencv.features2d.DescriptorMatcher
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.core.MatOfDMatch
+import org.opencv.calib3d.Calib3d
+import org.opencv.core.MatOfPoint2f
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -58,61 +65,12 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
         frame.camera.getViewMatrix(viewMatrix, 0)
 
         frame.acquirePointCloud().use { pointCloud ->
-            Log.d("ARCoreDebug", "Feature points found: ${pointCloud.points.remaining()}")
-
             arCoreManager.pointCloudRenderer.draw(pointCloud, viewMatrix, projectionMatrix)
         }
 
         for (plane in frame.getUpdatedTrackables(Plane::class.java)) {
             planeRenderer.draw(plane, viewMatrix, projectionMatrix)
         }
-
-//        try {
-//            frame.acquireCameraImage().use { image ->
-//                val yuvBytes = ByteArray(image.planes[0].buffer.remaining())
-//                image.planes[0].buffer.get(yuvBytes)
-//                val mat = Mat(image.height + image.height / 2, image.width, org.opencv.core.CvType.CV_8UC1)
-//                mat.put(0, 0, yuvBytes)
-//                val grayMat = Mat()
-//                Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_YUV2GRAY_NV21)
-//
-//                val keypoints = MatOfKeyPoint()
-//                val descriptors = Mat()
-//                orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
-//
-//                if (fingerprintKeypoints == null) {
-//                    fingerprintKeypoints = keypoints
-//                    fingerprintDescriptors = descriptors
-//                } else {
-//                    val matches = MatOfDMatch()
-//                    matcher.match(descriptors, fingerprintDescriptors, matches)
-//
-//                    val goodMatches = matches.toList().filter { it.distance < 70 }
-//                    val goodMatchesMat = MatOfDMatch()
-//                    goodMatchesMat.fromList(goodMatches)
-//
-//                    if (goodMatches.size > 10) {
-//                        val fingerprintPts = MatOfPoint2f()
-//                        val currentPts = MatOfPoint2f()
-//
-//                        val fingerprintKeypointsList = fingerprintKeypoints!!.toList()
-//                        val currentKeypointsList = keypoints.toList()
-//
-//                        fingerprintPts.fromList(goodMatches.map { fingerprintKeypointsList[it.trainIdx].pt })
-//                        currentPts.fromList(goodMatches.map { currentKeypointsList[it.queryIdx].pt })
-//
-//                        val homography = Calibd.findHomography(fingerprintPts, currentPts, Calibd.RANSAC, 5.0)
-//                        val area = Imgproc.contourArea(homography)
-//                        Log.d("ARCoreRenderer", "Homography area: $area")
-//                    }
-//                }
-//
-//                mat.release()
-//                grayMat.release()
-//            }
-//        } catch (e: Exception) {
-//            // Handle exceptions
-//        }
 
         val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
 
