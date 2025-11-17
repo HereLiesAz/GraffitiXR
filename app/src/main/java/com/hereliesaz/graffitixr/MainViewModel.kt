@@ -379,8 +379,7 @@ class MainViewModel(
 
                 val database = AugmentedImageDatabase(session)
                 database.addImage("target", croppedBitmap)
-                config.augmentedImageDatabase = database
-                session.configure(config)
+                arCoreManager.updateAugmentedImageDatabase(database)
 
                 updateState(uiState.value.copy(fingerprintJson = fingerprintJson, refinementImageUri = null))
                 withContext(Dispatchers.Main) {
@@ -548,8 +547,7 @@ class MainViewModel(
 
                     val database = AugmentedImageDatabase(session)
                     database.addImage("target", bitmap)
-                    config.augmentedImageDatabase = database
-                    session.configure(config)
+                    arCoreManager.updateAugmentedImageDatabase(database)
 
                     updateState(uiState.value.copy(fingerprintJson = fingerprintJson))
                     onTargetCreationStateChanged(TargetCreationState.SUCCESS)

@@ -69,57 +69,55 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
         }
 
         for (plane in frame.getUpdatedTrackables(Plane::class.java)) {
-            if (plane.type == Plane.Type.VERTICAL) {
-                planeRenderer.draw(plane, viewMatrix, projectionMatrix)
-            }
+            planeRenderer.draw(plane, viewMatrix, projectionMatrix)
         }
 
-        try {
-            frame.acquireCameraImage().use { image ->
-                val yuvBytes = ByteArray(image.planes[0].buffer.remaining())
-                image.planes[0].buffer.get(yuvBytes)
-                val mat = Mat(image.height + image.height / 2, image.width, org.opencv.core.CvType.CV_8UC1)
-                mat.put(0, 0, yuvBytes)
-                val grayMat = Mat()
-                Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_YUV2GRAY_NV21)
-
-                val keypoints = MatOfKeyPoint()
-                val descriptors = Mat()
-                orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
-
-                if (fingerprintKeypoints == null) {
-                    fingerprintKeypoints = keypoints
-                    fingerprintDescriptors = descriptors
-                } else {
-                    val matches = MatOfDMatch()
-                    matcher.match(descriptors, fingerprintDescriptors, matches)
-
-                    val goodMatches = matches.toList().filter { it.distance < 70 }
-                    val goodMatchesMat = MatOfDMatch()
-                    goodMatchesMat.fromList(goodMatches)
-
-                    if (goodMatches.size > 10) {
-                        val fingerprintPts = MatOfPoint2f()
-                        val currentPts = MatOfPoint2f()
-
-                        val fingerprintKeypointsList = fingerprintKeypoints!!.toList()
-                        val currentKeypointsList = keypoints.toList()
-
-                        fingerprintPts.fromList(goodMatches.map { fingerprintKeypointsList[it.trainIdx].pt })
-                        currentPts.fromList(goodMatches.map { currentKeypointsList[it.queryIdx].pt })
-
-                        val homography = Calib3d.findHomography(fingerprintPts, currentPts, Calib3d.RANSAC, 5.0)
-                        val area = Imgproc.contourArea(homography)
-                        Log.d("ARCoreRenderer", "Homography area: $area")
-                    }
-                }
-
-                mat.release()
-                grayMat.release()
-            }
-        } catch (e: Exception) {
-            // Handle exceptions
-        }
+//        try {
+//            frame.acquireCameraImage().use { image ->
+//                val yuvBytes = ByteArray(image.planes[0].buffer.remaining())
+//                image.planes[0].buffer.get(yuvBytes)
+//                val mat = Mat(image.height + image.height / 2, image.width, org.opencv.core.CvType.CV_8UC1)
+//                mat.put(0, 0, yuvBytes)
+//                val grayMat = Mat()
+//                Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_YUV2GRAY_NV21)
+//
+//                val keypoints = MatOfKeyPoint()
+//                val descriptors = Mat()
+//                orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+//
+//                if (fingerprintKeypoints == null) {
+//                    fingerprintKeypoints = keypoints
+//                    fingerprintDescriptors = descriptors
+//                } else {
+//                    val matches = MatOfDMatch()
+//                    matcher.match(descriptors, fingerprintDescriptors, matches)
+//
+//                    val goodMatches = matches.toList().filter { it.distance < 70 }
+//                    val goodMatchesMat = MatOfDMatch()
+//                    goodMatchesMat.fromList(goodMatches)
+//
+//                    if (goodMatches.size > 10) {
+//                        val fingerprintPts = MatOfPoint2f()
+//                        val currentPts = MatOfPoint2f()
+//
+//                        val fingerprintKeypointsList = fingerprintKeypoints!!.toList()
+//                        val currentKeypointsList = keypoints.toList()
+//
+//                        fingerprintPts.fromList(goodMatches.map { fingerprintKeypointsList[it.trainIdx].pt })
+//                        currentPts.fromList(goodMatches.map { currentKeypointsList[it.queryIdx].pt })
+//
+//                        val homography = Calibd.findHomography(fingerprintPts, currentPts, Calibd.RANSAC, 5.0)
+//                        val area = Imgproc.contourArea(homography)
+//                        Log.d("ARCoreRenderer", "Homography area: $area")
+//                    }
+//                }
+//
+//                mat.release()
+//                grayMat.release()
+//            }
+//        } catch (e: Exception) {
+//            // Handle exceptions
+//        }
 
         val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
 
