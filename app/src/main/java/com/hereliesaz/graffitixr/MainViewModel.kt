@@ -44,11 +44,6 @@ sealed class CaptureEvent {
     object RequestCaptureForRefinement : CaptureEvent()
 }
 
-sealed class TapFeedback {
-    data class Success(val position: Offset) : TapFeedback()
-    data class Failure(val position: Offset) : TapFeedback()
-}
-
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle,
@@ -496,10 +491,6 @@ class MainViewModel(
         }
     }
 
-    fun onArStateChanged(newState: ArState) {
-        updateState(uiState.value.copy(arState = newState), isUndoable = false)
-    }
-
     fun onTargetCreationStateChanged(newState: TargetCreationState) {
         updateState(uiState.value.copy(targetCreationState = newState), isUndoable = false)
     }
@@ -554,7 +545,7 @@ class MainViewModel(
     }
 
     fun onNewProject() {
-        updateState(UiState())
+        updateState(UiState(), isUndoable = false)
     }
 
     fun onCurvesPointsChanged(points: List<Offset>) {
@@ -592,8 +583,9 @@ class MainViewModel(
     }
 
     private fun updateState(newState: UiState, isUndoable: Boolean = true) {
+        val currentState = savedStateHandle.get<UiState>("uiState") ?: UiState()
         if (isUndoable) {
-            undoStack.add(uiState.value)
+            undoStack.add(currentState)
             if (undoStack.size > MAX_UNDO_STACK_SIZE) {
                 undoStack.removeAt(0)
             }

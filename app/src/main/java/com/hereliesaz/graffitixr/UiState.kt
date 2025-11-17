@@ -5,9 +5,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 
 
-enum class RotationAxis { X, Y, Z }
-enum class TargetCreationState { IDLE, CREATING, SUCCESS, ERROR }
-
 data class UiState(
     val editorMode: EditorMode = EditorMode.STATIC,
     val completedOnboardingModes: Set<EditorMode> = emptySet(),
@@ -38,6 +35,7 @@ data class UiState(
     val isBackgroundRemovalEnabled: Boolean = false,
     val isBackgroundRemovalLoading: Boolean = false,
     val backgroundRemovalError: String? = null,
+    val arState: ArState = ArState.SEARCHING,
     val targetCreationState: TargetCreationState = TargetCreationState.IDLE,
     val isArPlanesDetected: Boolean = false,
     val isArTargetCreated: Boolean = false,
