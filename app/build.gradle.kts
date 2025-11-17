@@ -113,7 +113,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
 
-    // ViewModel, Navigation, Coroutines, Coil, Vuforia
+    // ViewModel, Navigation, Coroutines, Coil
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)

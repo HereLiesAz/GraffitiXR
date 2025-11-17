@@ -36,7 +36,6 @@ captures/
 /app/release/
 /app/debug/
 /.kotlin/sessions/
-/vuforia/build/
 
 backup.ps1
 project_backup_*
