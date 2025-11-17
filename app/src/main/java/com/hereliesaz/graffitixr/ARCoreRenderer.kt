@@ -23,11 +23,7 @@ import org.opencv.core.MatOfPoint2f
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-class ARCoreRenderer(
-    private val arCoreManager: ARCoreManager,
-    private val backgroundRenderer: BackgroundRenderer,
-    private val pointCloudRenderer: PointCloudRenderer
-) : GLSurfaceView.Renderer {
+class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.Renderer {
 
     private val augmentedImageRenderer = AugmentedImageRenderer()
     private val planeRenderer = PlaneRenderer()
@@ -42,9 +38,9 @@ class ARCoreRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Log.d(TAG, "onSurfaceCreated")
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
-        backgroundRenderer.createOnGlThread()
+        arCoreManager.backgroundRenderer.createOnGlThread()
         augmentedImageRenderer.createOnGlThread()
-        pointCloudRenderer.createOnGlThread()
+        arCoreManager.pointCloudRenderer.createOnGlThread()
         planeRenderer.createOnGlThread()
     }
 
@@ -61,7 +57,7 @@ class ARCoreRenderer(
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
         val frame: Frame = arCoreManager.onDrawFrame(surfaceWidth, surfaceHeight) ?: return
-        backgroundRenderer.draw(frame)
+        arCoreManager.backgroundRenderer.draw(frame)
 
         val projectionMatrix = FloatArray(16)
         val viewMatrix = FloatArray(16)
@@ -69,11 +65,11 @@ class ARCoreRenderer(
         frame.camera.getViewMatrix(viewMatrix, 0)
 
         frame.acquirePointCloud().use { pointCloud ->
-            pointCloudRenderer.draw(pointCloud, viewMatrix, projectionMatrix)
+            arCoreManager.pointCloudRenderer.draw(pointCloud, viewMatrix, projectionMatrix)
         }
 
         for (plane in frame.getUpdatedTrackables(Plane::class.java)) {
-            if (plane.type == Plane.Type.VERTICAL && isPlaneFacingUser(plane, frame)) {
+            if (plane.type == Plane.Type.VERTICAL) {
                 planeRenderer.draw(plane, viewMatrix, projectionMatrix)
             }
         }
@@ -113,8 +109,6 @@ class ARCoreRenderer(
                         currentPts.fromList(goodMatches.map { currentKeypointsList[it.queryIdx].pt })
 
                         val homography = Calib3d.findHomography(fingerprintPts, currentPts, Calib3d.RANSAC, 5.0)
-                        val area = Imgproc.contourArea(homography)
-                        Log.d("ARCoreRenderer", "Homography area: $area")
                     }
                 }
 
@@ -142,18 +136,6 @@ class ARCoreRenderer(
                 renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ)
             }
         }
-    }
-
-    private fun isPlaneFacingUser(plane: Plane, frame: Frame): Boolean {
-        val planeNormal = FloatArray(3)
-        plane.centerPose.getTransformedAxis(1, 1.0f, planeNormal, 0)
-        val cameraPose = frame.camera.pose
-        val cameraDirection = FloatArray(3)
-        cameraPose.getTransformedAxis(2, 1.0f, cameraDirection, 0)
-        val dotProduct = planeNormal[0] * cameraDirection[0] +
-                         planeNormal[1] * cameraDirection[1] +
-                         planeNormal[2] * cameraDirection[2]
-        return dotProduct < -0.707 // Check if the angle is within 45 degrees
     }
 
     companion object {

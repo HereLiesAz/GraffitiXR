@@ -8,7 +8,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 @Composable
 fun ARScreen(arCoreManager: ARCoreManager) {
     val renderer = remember {
-        ARCoreRenderer(arCoreManager, arCoreManager.backgroundRenderer, arCoreManager.pointCloudRenderer)
+        ARCoreRenderer(arCoreManager)
     }
 
     AndroidView(
@@ -16,6 +16,7 @@ fun ARScreen(arCoreManager: ARCoreManager) {
             GLSurfaceView(context).apply {
                 setEGLContextClientVersion(2)
                 setRenderer(renderer)
+                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             }
         }
     )
