@@ -365,6 +365,7 @@ class MainViewModel(
                 )
 
                 val session = arCoreManager.session ?: return@launch
+                val config = session.config
                 val grayMat = Mat()
                 Utils.bitmapToMat(croppedBitmap, grayMat)
                 Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
@@ -378,7 +379,7 @@ class MainViewModel(
 
                 val database = AugmentedImageDatabase(session)
                 database.addImage("target", croppedBitmap)
-                arCoreManager.setAugmentedImageDatabase(database)
+                arCoreManager.updateAugmentedImageDatabase(database)
 
                 updateState(uiState.value.copy(fingerprintJson = fingerprintJson, refinementImageUri = null))
                 withContext(Dispatchers.Main) {
@@ -479,9 +480,11 @@ class MainViewModel(
                     projectData.overlayImageUri?.let { uri ->
                         val bitmap = BitmapUtils.getBitmapFromUri(getApplication(), uri) ?: return@launch
                         val session = arCoreManager.session ?: return@launch
+                        val config = session.config
                         val database = AugmentedImageDatabase(session)
                         database.addImage("target", bitmap)
-                        arCoreManager.setAugmentedImageDatabase(database)
+                        config.augmentedImageDatabase = database
+                        session.configure(config)
                     }
                     withContext(Dispatchers.Main) {
                         Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show()
@@ -530,6 +533,7 @@ class MainViewModel(
 
                 if (bitmap != null) {
                     val session = arCoreManager.session ?: return@launch
+                    val config = session.config
                     val grayMat = Mat()
                     Utils.bitmapToMat(bitmap, grayMat)
                     Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
@@ -543,7 +547,7 @@ class MainViewModel(
 
                     val database = AugmentedImageDatabase(session)
                     database.addImage("target", bitmap)
-                    arCoreManager.setAugmentedImageDatabase(database)
+                    arCoreManager.updateAugmentedImageDatabase(database)
 
                     updateState(uiState.value.copy(fingerprintJson = fingerprintJson))
                     onTargetCreationStateChanged(TargetCreationState.SUCCESS)

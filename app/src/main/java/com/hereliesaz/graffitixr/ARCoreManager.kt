@@ -53,7 +53,8 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
                 when (installStatus) {
                     ArCoreApk.InstallStatus.INSTALLED -> {
                         session = Session(context)
-                        Log.d(TAG, "Session created")
+                        session?.let { configureSession(it) }
+                        Log.d(TAG, "Session created and configured")
                     }
                     else -> {
                         Toast.makeText(context, "ARCore installation required.", Toast.LENGTH_LONG).show()
@@ -67,11 +68,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
         }
 
         session?.let {
-            val config = Config(it)
-            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-            it.configure(config)
-            Log.d(TAG, "Session configured")
+            configureSession(it)
         }
 
         try {
@@ -129,11 +126,33 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
         return null
     }
 
+    fun updateAugmentedImageDatabase(database: AugmentedImageDatabase) {
+        session?.let {
+            try {
+                it.pause()
+                val config = it.config
+                config.augmentedImageDatabase = database
+                it.configure(config)
+                it.resume()
+            } catch (e: CameraNotAvailableException) {
+                Log.e(TAG, "Camera not available during session update", e)
+            }
+        }
+    }
+
     override fun onDestroy(owner: LifecycleOwner) {
         super.onDestroy(owner)
         Log.d(TAG, "onDestroy")
         session?.close()
         session = null
+    }
+
+    private fun configureSession(session: Session) {
+        val config = session.config
+        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+        session.configure(config)
+        Log.d(TAG, "Session configured")
     }
 
     companion object {
