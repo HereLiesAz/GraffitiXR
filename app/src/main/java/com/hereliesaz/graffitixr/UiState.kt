@@ -4,9 +4,9 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import com.hereliesaz.graffitixr.utils.OffsetListParceler
 import com.hereliesaz.graffitixr.utils.OffsetParceler
 import kotlinx.parcelize.Parcelize
-import kotlinx.parcelize.RawValue
 import kotlinx.parcelize.WriteWith
 
 /**
@@ -93,12 +93,12 @@ data class UiState(
     val blendMode: @WriteWith<com.hereliesaz.graffitixr.utils.BlendModeParceler> BlendMode = BlendMode.SrcOver,
     val showCurvesDialog: Boolean = false,
     val fingerprintJson: String? = null,
-    val curvesPoints: @RawValue List<Offset> = listOf(Offset(0f, 0f), Offset(1f, 1f)),
+    val curvesPoints: @WriteWith<OffsetListParceler> List<Offset> = listOf(Offset(0f, 0f), Offset(1f, 1f)),
     val processedImageUri: Uri? = null,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val isMarkingProgress: Boolean = false,
-    val drawingPaths: @RawValue List<List<Pair<Float, Float>>> = emptyList(),
+    val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
     val progressPercentage: Float = 0f,
     val refinementImageUri: Uri? = null,
     val showOnboardingDialogForMode: EditorMode? = null

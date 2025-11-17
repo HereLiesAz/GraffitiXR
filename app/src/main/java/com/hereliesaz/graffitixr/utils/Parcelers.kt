@@ -14,3 +14,23 @@ object OffsetParceler : Parceler<Offset> {
         parcel.writeFloat(y)
     }
 }
+
+object OffsetListParceler : Parceler<List<Offset>> {
+    override fun create(parcel: Parcel): List<Offset> {
+        val size = parcel.readInt()
+        val list = mutableListOf<Offset>()
+        repeat(size) {
+            list.add(OffsetParceler.create(parcel))
+        }
+        return list
+    }
+
+    override fun List<Offset>.write(parcel: Parcel, flags: Int) {
+        parcel.writeInt(size)
+        forEach {
+            with(OffsetParceler) {
+                it.write(parcel, flags)
+            }
+        }
+    }
+}
