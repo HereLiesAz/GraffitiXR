@@ -4,6 +4,13 @@ import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 
+enum class TargetCreationState {
+    IDLE,
+    CREATING,
+    SAVING,
+    SUCCESS,
+    ERROR
+}
 
 data class UiState(
     val editorMode: EditorMode = EditorMode.STATIC,
