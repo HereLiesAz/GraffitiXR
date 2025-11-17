@@ -1,8 +1,11 @@
 package com.hereliesaz.graffitixr
 
 import android.net.Uri
+import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.WriteWith
 
 enum class TargetCreationState {
     IDLE,
@@ -12,6 +15,7 @@ enum class TargetCreationState {
     ERROR
 }
 
+@Parcelize
 data class UiState(
     val editorMode: EditorMode = EditorMode.STATIC,
     val completedOnboardingModes: Set<EditorMode> = emptySet(),
@@ -22,16 +26,16 @@ data class UiState(
     val rotationY: Float = 0f,
     val rotationZ: Float = 0f,
     val arObjectScale: Float = 1f,
-    val offset: Offset = Offset.Zero,
+    val offset: @WriteWith<OffsetParceler> Offset = Offset.Zero,
     val opacity: Float = 1f,
     val contrast: Float = 1f,
     val saturation: Float = 1f,
     val colorBalanceR: Float = 1f,
     val colorBalanceG: Float = 1f,
     val colorBalanceB: Float = 1f,
-    val curvesPoints: List<Offset> = emptyList(),
+    val curvesPoints: List<@WriteWith<OffsetParceler> Offset> = emptyList(),
     val processedImageUri: Uri? = null,
-    val blendMode: BlendMode = BlendMode.SrcOver,
+    val blendMode: @WriteWith<BlendModeParceler> BlendMode = BlendMode.SrcOver,
     val activeRotationAxis: RotationAxis = RotationAxis.X,
     val isToolbarVisible: Boolean = true,
     val isSettingsPanelVisible: Boolean = false,
@@ -51,10 +55,10 @@ data class UiState(
     val showGestureFeedback: Boolean = false,
     val showRotationAxisFeedback: Boolean = false,
     val showDoubleTapHint: Boolean = false,
-    val tapFeedback: TapFeedback? = null,
+    val tapFeedback: @WriteWith<TapFeedbackParceler> TapFeedback? = null,
     val refinementImageUri: Uri? = null,
     val fingerprintJson: String? = null,
     val isMarkingProgress: Boolean = false,
     val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
     val progressPercentage: Float = 0f
-)
+) : Parcelable
