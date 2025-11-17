@@ -109,8 +109,6 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
                         currentPts.fromList(goodMatches.map { currentKeypointsList[it.queryIdx].pt })
 
                         val homography = Calib3d.findHomography(fingerprintPts, currentPts, Calib3d.RANSAC, 5.0)
-                        val area = Imgproc.contourArea(homography)
-                        Log.d("ARCoreRenderer", "Homography area: $area")
                     }
                 }
 
