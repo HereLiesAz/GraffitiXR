@@ -1,6 +1,10 @@
 package com.hereliesaz.graffitixr
 
-enum class EditorMode {
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
+enum class EditorMode : Parcelable {
     STATIC,
     NON_AR,
     AR,

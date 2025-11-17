@@ -1,5 +1,9 @@
 package com.hereliesaz.graffitixr
 
-enum class RotationAxis {
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
+enum class RotationAxis : Parcelable {
     X, Y, Z
 }
