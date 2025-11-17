@@ -49,18 +49,6 @@ sealed class TapFeedback {
     data class Failure(val position: Offset) : TapFeedback()
 }
 
-/**
- * The central ViewModel for the application, acting as the single source of truth for the UI state
- * and the handler for all user events.
- *
- * This class follows the MVVM architecture pattern. It holds the application's UI state in a
- * [StateFlow] backed by [SavedStateHandle]. This ensures that the UI state survives not only
- * configuration changes but also system-initiated process death, providing a robust user experience.
- *
- * @param application The application instance, used for accessing the application context.
- * @param savedStateHandle A handle to the saved state, provided by the ViewModel factory,
- * used to store and restore the [UiState].
- */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle,
@@ -87,6 +75,10 @@ class MainViewModel(
             completedOnboardingModes = completedModes,
             showOnboardingDialogForMode = if (!completedModes.contains(uiState.value.editorMode)) uiState.value.editorMode else null
         ), isUndoable = false)
+    }
+
+    fun onProgressUpdate(progress: Float) {
+        updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
     }
 
     fun showTapFeedback(position: Offset, isSuccess: Boolean) {
@@ -299,9 +291,6 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Handles the save button click event by emitting a capture request event.
-     */
     fun onSaveClicked() {
         viewModelScope.launch {
             _captureEvent.emit(CaptureEvent.RequestCapture)
@@ -315,11 +304,6 @@ class MainViewModel(
     }
 
 
-    /**
-     * Saves a captured bitmap to the gallery.
-     *
-     * @param bitmap The bitmap to save.
-     */
     fun saveCapturedBitmap(bitmap: Bitmap) {
         viewModelScope.launch {
             setLoading(true)

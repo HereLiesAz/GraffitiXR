@@ -10,14 +10,18 @@ class PointCloudRenderer {
     private val vertexShaderCode =
         "uniform mat4 u_MvpMatrix;" +
         "attribute vec4 a_Position;" +
+        "varying float v_Confidence;" +
         "void main() {" +
         "   gl_Position = u_MvpMatrix * a_Position;" +
-        "   gl_PointSize = 10.0;" +
+        "   gl_PointSize = 5.0;" +
+        "   v_Confidence = a_Position.w;" +
         "}"
 
     private val fragmentShaderCode =
+        "precision mediump float;" +
+        "varying float v_Confidence;" +
         "void main() {" +
-        "    gl_FragColor = vec4(1.0, 1.0, 0.0, 1.0);" +
+        "    gl_FragColor = vec4(1.0, 1.0, 0.0, v_Confidence);" +
         "}"
 
     private var program: Int = 0

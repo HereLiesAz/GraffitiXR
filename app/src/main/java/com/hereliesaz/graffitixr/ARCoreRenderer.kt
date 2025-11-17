@@ -2,24 +2,17 @@ package com.hereliesaz.graffitixr
 
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.util.Log
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.Frame
-import com.google.ar.core.TrackingState
 import com.google.ar.core.Plane
+import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.rendering.AugmentedImageRenderer
-import android.util.Log
-import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
-import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import org.opencv.core.Mat
-import org.opencv.android.Utils
-import org.opencv.imgproc.Imgproc
-import org.opencv.features2d.ORB
-import org.opencv.features2d.DescriptorMatcher
 import org.opencv.core.MatOfKeyPoint
-import org.opencv.core.MatOfDMatch
-import org.opencv.calib3d.Calib3d
-import org.opencv.core.MatOfPoint2f
+import org.opencv.features2d.DescriptorMatcher
+import org.opencv.features2d.ORB
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -57,6 +50,11 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
         val frame: Frame = arCoreManager.onDrawFrame(surfaceWidth, surfaceHeight) ?: return
+
+        if (frame.timestamp == 0L) {
+            return
+        }
+
         arCoreManager.backgroundRenderer.draw(frame)
 
         val projectionMatrix = FloatArray(16)

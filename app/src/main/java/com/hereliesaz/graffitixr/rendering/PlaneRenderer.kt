@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES20
 import com.google.ar.core.Plane
-import com.google.ar.core.Pose
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -11,13 +10,25 @@ class PlaneRenderer {
     private val vertexShaderCode =
         "uniform mat4 u_MvpMatrix;" +
         "attribute vec2 a_Position;" +
+        "varying vec2 v_GridCoord;" +
         "void main() {" +
         "   gl_Position = u_MvpMatrix * vec4(a_Position.x, 0.0, a_Position.y, 1.0);" +
+        "   v_GridCoord = a_Position;" +
         "}"
 
     private val fragmentShaderCode =
+        "precision mediump float;" +
+        "varying vec2 v_GridCoord;" +
         "void main() {" +
-        "    gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);" +
+        "    float grid_spacing = 0.1;" +
+        "    vec2 grid_coord = fract(v_GridCoord / grid_spacing);" +
+        "    float line_width = 0.02;" +
+        "    if (grid_coord.x < line_width || grid_coord.x > 1.0 - line_width ||" +
+        "        grid_coord.y < line_width || grid_coord.y > 1.0 - line_width) {" +
+        "        gl_FragColor = vec4(1.0, 1.0, 1.0, 0.5);" +
+        "    } else {" +
+        "        gl_FragColor = vec4(0.2, 0.4, 1.0, 0.2);" +
+        "    }" +
         "}"
 
     private var program: Int = 0
