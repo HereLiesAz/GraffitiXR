@@ -26,6 +26,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
     var session: Session? = null
         private set
     val backgroundRenderer = BackgroundRenderer()
+    val pointCloudRenderer = PointCloudRenderer()
     val displayRotationHelper = DisplayRotationHelper(context)
 
     override fun onResume(owner: LifecycleOwner) {
@@ -43,13 +44,8 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
                 val installStatus = ArCoreApk.getInstance().requestInstall(context as android.app.Activity, true)
                 when (installStatus) {
                     ArCoreApk.InstallStatus.INSTALLED -> {
-                        session = Session(context).also {
-                            val config = Config(it)
-                            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                            it.configure(config)
-                        }
-                        Log.d(TAG, "Session created and configured")
+                        session = Session(context)
+                        Log.d(TAG, "Session created")
                     }
                     else -> {
                         Toast.makeText(context, "ARCore installation required.", Toast.LENGTH_LONG).show()
@@ -60,6 +56,14 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
                 Toast.makeText(context, "Failed to create AR session: ${e.message}", Toast.LENGTH_LONG).show()
                 return
             }
+        }
+
+        session?.let {
+            val config = Config(it)
+            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+            it.configure(config)
+            Log.d(TAG, "Session configured")
         }
 
         try {
