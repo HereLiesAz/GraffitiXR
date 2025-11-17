@@ -8,6 +8,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import android.util.Log
+import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.exceptions.CameraNotAvailableException
@@ -45,7 +46,19 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
                 when (installStatus) {
                     ArCoreApk.InstallStatus.INSTALLED -> {
                         session = Session(context)
-                        Log.d(TAG, "Session created")
+                        session?.let {
+                            configureSession(it)
+                            val filter = CameraConfigFilter(it)
+                            val configs = it.getSupportedCameraConfigs(filter)
+                            var bestConfig = it.cameraConfig
+                            for (config in configs) {
+                                if (config.imageSize.width > bestConfig.imageSize.width) {
+                                    bestConfig = config
+                                }
+                            }
+                            it.cameraConfig = bestConfig
+                        }
+                        Log.d(TAG, "Session created and configured")
                     }
                     else -> {
                         Toast.makeText(context, "ARCore installation required.", Toast.LENGTH_LONG).show()
@@ -58,26 +71,7 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
             }
         }
 
-        session?.let {
-            val config = Config(it)
-            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-            it.configure(config)
-            Log.d(TAG, "Session configured")
-        }
-
         try {
-            session?.let {
-                val filter = CameraConfigFilter(it)
-                val configs = it.getSupportedCameraConfigs(filter)
-                var bestConfig = it.cameraConfig
-                for (config in configs) {
-                    if (config.imageSize.width > bestConfig.imageSize.width) {
-                        bestConfig = config
-                    }
-                }
-                it.cameraConfig = bestConfig
-            }
             Log.d(TAG, "Resuming session")
             session?.resume()
         } catch (e: CameraNotAvailableException) {
@@ -112,11 +106,33 @@ class ARCoreManager(private val context: Context) : DefaultLifecycleObserver {
         return null
     }
 
+    fun updateAugmentedImageDatabase(database: AugmentedImageDatabase) {
+        session?.let {
+            try {
+                it.pause()
+                val config = it.config
+                config.augmentedImageDatabase = database
+                it.configure(config)
+                it.resume()
+            } catch (e: CameraNotAvailableException) {
+                Log.e(TAG, "Camera not available during session update", e)
+            }
+        }
+    }
+
     override fun onDestroy(owner: LifecycleOwner) {
         super.onDestroy(owner)
         Log.d(TAG, "onDestroy")
         session?.close()
         session = null
+    }
+
+    private fun configureSession(session: Session) {
+        val config = session.config
+        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+        session.configure(config)
+        Log.d(TAG, "Session configured")
     }
 
     companion object {
