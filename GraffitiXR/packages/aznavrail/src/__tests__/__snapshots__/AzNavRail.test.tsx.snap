@@ -1,0 +1,5 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`AzNavRail renders correctly when expanded 1`] = `null`;
+
+exports[`AzNavRail renders correctly with rail items 1`] = `null`;
