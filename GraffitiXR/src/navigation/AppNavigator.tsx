@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
+import MockupScreen from '../screens/MockupScreen';
 import ARScreen from '../screens/ARScreen';
 import TraceScreen from '../screens/TraceScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -18,6 +19,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         expandedRailWidth={200}
     >
       <AzRailItem id="home" text="Home" onClick={() => navigation.navigate('Home' as never)} />
+      <AzRailItem id="mockup" text="Mockup" onClick={() => navigation.navigate('Mockup' as never)} />
       <AzRailItem id="ar" text="AR" onClick={() => navigation.navigate('AR' as never)} />
       <AzRailItem id="trace" text="Trace" onClick={() => navigation.navigate('Trace' as never)} />
       <AzRailItem id="settings" text="Settings" onClick={() => navigation.navigate('Settings' as never)} />
@@ -35,6 +37,7 @@ const AppNavigator = () => {
       <MainLayout>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Mockup" component={MockupScreen} />
           <Stack.Screen name="AR" component={ARScreen} />
           <Stack.Screen name="Trace" component={TraceScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
