@@ -4,6 +4,9 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import com.hereliesaz.graffitixr.utils.BlendModeParceler
+import com.hereliesaz.graffitixr.utils.OffsetParceler
+import com.hereliesaz.graffitixr.utils.TapFeedbackParceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
 
