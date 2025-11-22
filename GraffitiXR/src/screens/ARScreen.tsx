@@ -4,11 +4,15 @@ import { ViroARSceneNavigator } from '@reactvision/react-viro';
 import { launchImageLibrary } from 'react-native-image-picker';
 import ARScene from './ARScene';
 
+interface ViroNavigator {
+    takeScreenshot: (fileName: string, saveToCameraRoll: boolean) => Promise<{ success: boolean, url: string, errorCode: number }>;
+}
+
 const ARScreen = () => {
   const [targetImageUri, setTargetImageUri] = useState<string | null>(null);
   const [overlayImageUri, setOverlayImageUri] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('Point at surface');
-  const navigatorRef = useRef<any>(null);
+  const navigatorRef = useRef<ViroNavigator>(null);
 
   const createTarget = async () => {
     if (navigatorRef.current) {
@@ -65,9 +69,21 @@ const ARScreen = () => {
         <View style={styles.overlay}>
             <Text style={styles.status}>{status}</Text>
             <View style={styles.buttons}>
-                {!targetImageUri && <Button title="Create Target" onPress={createTarget} />}
-                {targetImageUri && !overlayImageUri && <Button title="Select Overlay" onPress={pickOverlay} />}
-                {targetImageUri && <Button title="Reset" onPress={reset} color="red" />}
+                {!targetImageUri && (
+                    <View style={styles.buttonWrapper}>
+                        <Button title="Create Target" onPress={createTarget} />
+                    </View>
+                )}
+                {targetImageUri && !overlayImageUri && (
+                    <View style={styles.buttonWrapper}>
+                        <Button title="Select Overlay" onPress={pickOverlay} />
+                    </View>
+                )}
+                {targetImageUri && (
+                    <View style={styles.buttonWrapper}>
+                        <Button title="Reset" onPress={reset} color="red" />
+                    </View>
+                )}
             </View>
         </View>
     </View>
@@ -92,8 +108,10 @@ const styles = StyleSheet.create({
   },
   buttons: {
       flexDirection: 'row',
-      gap: 10,
-  }
+  },
+  buttonWrapper: {
+      marginHorizontal: 5,
+  },
 });
 
 export default ARScreen;

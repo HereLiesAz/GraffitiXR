@@ -10,7 +10,16 @@ import {
   ViroConstants,
 } from '@reactvision/react-viro';
 
-const ARScene = (props: any) => {
+interface ARSceneProps {
+  sceneNavigator: {
+    viroAppProps: {
+      targetImageUri?: string;
+      overlayImageUri?: string;
+    };
+  };
+}
+
+const ARScene = (props: ARSceneProps) => {
   const { targetImageUri, overlayImageUri } = props.sceneNavigator.viroAppProps || {};
   const [targetCreated, setTargetCreated] = useState(false);
 
@@ -41,28 +50,20 @@ const ARScene = (props: any) => {
   }, [targetImageUri]);
 
   const onPinch = (pinchState: number, scaleFactor: number, source: any) => {
-      if (pinchState === 2) { // Active
+      if (pinchState === 1) { // Begin
+          baseScale.current = scale;
+      } else if (pinchState === 2) { // Active
           const newScale = baseScale.current.map(s => s * scaleFactor);
           setScale(newScale);
-      } else if (pinchState === 3) { // Finished
-          baseScale.current = scale;
       }
   };
 
   const onRotate = (rotateState: number, rotationFactor: number, source: any) => {
-       if (rotateState === 2) { // Active
-           // Viro rotation is usually X,Y,Z. We want Z rotation (roll) for 2D image on surface.
-           // rotationFactor is in degrees? or radians? Viro usually degrees.
-           const newRotationZ = baseRotation.current - rotationFactor;
-           setRotation([-90, 0, newRotationZ]); // -90 X to make it flat on the marker if marker is Up?
-           // Wait, ViroARImageMarker with orientation "Up" -> Y is up (normal to surface).
-           // Image defaults to vertical?
-           // Usually ViroImage is vertical. To lay flat on a vertical marker, it should match.
-           // If marker is "Up" (vertical wall), ViroImage should be upright.
-           // So Z rotation is correct for spinning it on the wall.
-           setRotation([0, 0, newRotationZ]);
-       } else if (rotateState === 3) {
+       if (rotateState === 1) { // Begin
            baseRotation.current = rotation[2];
+       } else if (rotateState === 2) { // Active
+           const newRotationZ = baseRotation.current - rotationFactor;
+           setRotation([0, 0, newRotationZ]);
        }
   };
 
