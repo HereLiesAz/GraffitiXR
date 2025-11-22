@@ -22,7 +22,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.hereliesaz.aznavrail.AzNavRail
+//import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.HelpScreen
@@ -185,55 +185,55 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
             isVisible = gestureInProgress
         )
 
-        Box(modifier = Modifier.zIndex(2f)) {
-            AzNavRail {
-                azSettings(isLoading = uiState.isLoading,
-                    packRailButtons = true
-                )
-
-                azMenuItem(id = "ar", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-
-                azMenuItem(id = "trace_image", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
-                azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
-
-                if (uiState.editorMode == EditorMode.AR) {
-                    azRailItem(id = "capture", text = "Capture", onClick = viewModel::onCaptureForRefinementClicked)
-                    azRailItem(id = "refine_target", text = "Refine Target", onClick = { /* TODO */ })
-                }
-                azDivider()
-                if (uiState.editorMode == EditorMode.STATIC) {
-                    azRailItem(id = "background", text = "Background") {
-                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                }
-                azRailItem(id = "overlay", text = "Image") {
-                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-
-
-
-                if (uiState.overlayImageUri != null) {
-                     azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
-                     azRailItem(id = "line_drawing", text = "Outline", onClick = viewModel::onLineDrawingClicked)
-                }
-
-                azDivider()
-                azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
-                azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
-                azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
-                azRailItem(id = "color_balance", text = "Balance") { showColorBalanceDialog = true }
-                azRailItem(id = "blend_mode", text = "Blend Mode", onClick = viewModel::onCycleBlendMode)
-                azDivider()
-                azRailItem(id = "export", text = "Export", onClick = viewModel::onSaveClicked)
-                azRailItem(id = "save_project", text = "Save") {
-                    showSaveProjectDialog = true
-                }
-                azRailItem(id = "project_library", text = "Library") {
-                    showProjectLibrary = true
-                }
-                azRailItem(id = "mark_progress", text = "Mark Progress", onClick = viewModel::onMarkProgressToggled)
-            }
-        }
+//        Box(modifier = Modifier.zIndex(2f)) {
+//            AzNavRail {
+//                azSettings(isLoading = uiState.isLoading,
+//                    packRailButtons = true
+//                )
+//
+//                azMenuItem(id = "ar", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+//
+//                azMenuItem(id = "trace_image", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
+//                azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+//
+//                if (uiState.editorMode == EditorMode.AR) {
+//                    azRailItem(id = "capture", text = "Capture", onClick = viewModel::onCaptureForRefinementClicked)
+//                    azRailItem(id = "refine_target", text = "Refine Target", onClick = { /* TODO */ })
+//                }
+//                azDivider()
+//                if (uiState.editorMode == EditorMode.STATIC) {
+//                    azRailItem(id = "background", text = "Background") {
+//                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+//                    }
+//                }
+//                azRailItem(id = "overlay", text = "Image") {
+//                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+//                }
+//
+//
+//
+//                if (uiState.overlayImageUri != null) {
+//                     azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
+//                     azRailItem(id = "line_drawing", text = "Outline", onClick = viewModel::onLineDrawingClicked)
+//                }
+//
+//                azDivider()
+//                azRailItem(id = "opacity", text = "Opacity") { showSliderDialog = "Opacity" }
+//                azRailItem(id = "contrast", text = "Contrast") { showSliderDialog = "Contrast" }
+//                azRailItem(id = "saturation", text = "Saturation") { showSliderDialog = "Saturation" }
+//                azRailItem(id = "color_balance", text = "Balance") { showColorBalanceDialog = true }
+//                azRailItem(id = "blend_mode", text = "Blend Mode", onClick = viewModel::onCycleBlendMode)
+//                azDivider()
+//                azRailItem(id = "export", text = "Export", onClick = viewModel::onSaveClicked)
+//                azRailItem(id = "save_.project", text = "Save") {
+//                    showSaveProjectDialog = true
+//                }
+//                azRailItem(id = "project_library", text = "Library") {
+//                    showProjectLibrary = true
+//                }
+//                azRailItem(id = "mark_progress", text = "Mark Progress", onClick = viewModel::onMarkProgressToggled)
+//            }
+//        }
 
         if (uiState.isMarkingProgress) {
             DrawingCanvas(

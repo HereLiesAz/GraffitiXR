@@ -10,8 +10,7 @@ import com.hereliesaz.graffitixr.utils.TapFeedbackParceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
 
-@Parcelize
-enum class TargetCreationState : Parcelable {
+enum class TargetCreationState {
     IDLE,
     CREATING,
     SAVING,
@@ -63,6 +62,6 @@ data class UiState(
     val refinementImageUri: Uri? = null,
     val fingerprintJson: String? = null,
     val isMarkingProgress: Boolean = false,
-    val drawingPaths: @WriteWith<DrawingPathsParceler> List<List<Pair<Float, Float>>> = emptyList(),
+    val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
     val progressPercentage: Float = 0f
 ) : Parcelable

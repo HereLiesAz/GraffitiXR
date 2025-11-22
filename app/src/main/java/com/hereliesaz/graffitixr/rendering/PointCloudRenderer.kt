@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES20
+import android.util.Log
 import com.google.ar.core.PointCloud
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -51,6 +52,7 @@ class PointCloudRenderer {
         GLES20.glUseProgram(program)
 
         val points = pointCloud.points
+        Log.d("PointCloudRenderer", "Number of points: " + points.remaining())
         if (points.remaining() == 0) {
             return
         }

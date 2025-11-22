@@ -31,7 +31,6 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Log.d(TAG, "onSurfaceCreated")
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
-        arCoreManager.onSurfaceCreated()
         arCoreManager.backgroundRenderer.createOnGlThread()
         augmentedImageRenderer.createOnGlThread()
         arCoreManager.pointCloudRenderer.createOnGlThread()
