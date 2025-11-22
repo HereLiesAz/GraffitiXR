@@ -4,13 +4,11 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
-import com.hereliesaz.graffitixr.utils.BlendModeParceler
-import com.hereliesaz.graffitixr.utils.OffsetParceler
-import com.hereliesaz.graffitixr.utils.TapFeedbackParceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
 
-enum class TargetCreationState {
+@Parcelize
+enum class TargetCreationState : Parcelable {
     IDLE,
     CREATING,
     SAVING,
@@ -62,6 +60,6 @@ data class UiState(
     val refinementImageUri: Uri? = null,
     val fingerprintJson: String? = null,
     val isMarkingProgress: Boolean = false,
-    val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
+    val drawingPaths: @WriteWith<DrawingPathsParceler> List<List<Pair<Float, Float>>> = emptyList(),
     val progressPercentage: Float = 0f
 ) : Parcelable

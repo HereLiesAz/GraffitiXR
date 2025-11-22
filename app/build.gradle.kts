@@ -133,7 +133,7 @@ dependencies {
     implementation(libs.google.accompanist.permissions)
 
     // AzNavRail
-    // implementation(libs.az.nav.rail)
+    implementation(libs.az.nav.rail)
 
     // Background Remover
     implementation(libs.auto.background.remover)
