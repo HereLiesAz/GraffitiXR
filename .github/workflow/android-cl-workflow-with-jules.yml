@@ -4,11 +4,9 @@ name: Android CI with Jules AI Debugging
 on:
   workflow_dispatch: 
   push:
-     branches: 
-       - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-     - main
+    branches: [ "main" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
