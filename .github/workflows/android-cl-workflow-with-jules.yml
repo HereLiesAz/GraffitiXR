@@ -1,6 +1,5 @@
 name: Android CI with Jules AI Debugging
-- name: Android Builder
-  uses: b4s36t4/Android-Action@0.0.1
+
 on:
   workflow_dispatch: 
   push:
