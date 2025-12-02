@@ -29,11 +29,15 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     val displayRotationHelper = DisplayRotationHelper(activity)
     @Volatile
     private var sessionCreated = false
+    @Volatile
+    private var isResumed = false
 
     fun onSurfaceCreated() {
         Log.d(TAG, "onSurfaceCreated")
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(activity, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
+            activity.runOnUiThread {
+                Toast.makeText(activity, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
+            }
             return
         }
 
@@ -58,14 +62,31 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
                         }
                         sessionCreated = true
                         Log.d(TAG, "Session created and configured")
+
+                        if (isResumed) {
+                            try {
+                                Log.d(TAG, "Resuming session from onSurfaceCreated")
+                                session?.resume()
+                            } catch (e: CameraNotAvailableException) {
+                                activity.runOnUiThread {
+                                    Toast.makeText(activity, "Camera not available. Please restart the app.", Toast.LENGTH_LONG).show()
+                                }
+                                session = null
+                                return
+                            }
+                        }
                     }
                     else -> {
-                        Toast.makeText(activity, "ARCore installation required.", Toast.LENGTH_LONG).show()
+                        activity.runOnUiThread {
+                            Toast.makeText(activity, "ARCore installation required.", Toast.LENGTH_LONG).show()
+                        }
                         return
                     }
                 }
             } catch (e: Exception) {
-                Toast.makeText(activity, "Failed to create AR session: ${e.message}", Toast.LENGTH_LONG).show()
+                activity.runOnUiThread {
+                    Toast.makeText(activity, "Failed to create AR session: ${e.message}", Toast.LENGTH_LONG).show()
+                }
                 return
             }
         }
@@ -74,6 +95,7 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
         Log.d(TAG, "onResume")
+        isResumed = true
         if (!sessionCreated) {
             return
         }
@@ -81,7 +103,9 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
             Log.d(TAG, "Resuming session")
             session?.resume()
         } catch (e: CameraNotAvailableException) {
-            Toast.makeText(activity, "Camera not available. Please restart the app.", Toast.LENGTH_LONG).show()
+            activity.runOnUiThread {
+                Toast.makeText(activity, "Camera not available. Please restart the app.", Toast.LENGTH_LONG).show()
+            }
             session = null
             return
         }
@@ -91,6 +115,7 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     override fun onPause(owner: LifecycleOwner) {
         super.onPause(owner)
         Log.d(TAG, "onPause")
+        isResumed = false
         session?.pause()
         displayRotationHelper.onPause()
     }

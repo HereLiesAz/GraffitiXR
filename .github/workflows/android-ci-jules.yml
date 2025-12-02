@@ -1,4 +1,4 @@
-name: Android CI with Jules AI Debugging
+name: Android CI Jules
 
 on:
   workflow_dispatch: 
