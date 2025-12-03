@@ -16,12 +16,14 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
+import com.google.ar.core.exceptions.UnavailableException
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 
 class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
 
+    @Volatile
     var session: Session? = null
         private set
     val backgroundRenderer = BackgroundRenderer()
@@ -35,9 +37,7 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     fun onSurfaceCreated() {
         Log.d(TAG, "onSurfaceCreated")
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            activity.runOnUiThread {
-                Toast.makeText(activity, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
-            }
+            showToast("Camera permission is needed to run this application")
             return
         }
 
@@ -68,25 +68,24 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
                                 Log.d(TAG, "Resuming session from onSurfaceCreated")
                                 session?.resume()
                             } catch (e: CameraNotAvailableException) {
-                                activity.runOnUiThread {
-                                    Toast.makeText(activity, "Camera not available. Please restart the app.", Toast.LENGTH_LONG).show()
-                                }
+                                showToast("Camera not available. Please restart the app.")
                                 session = null
                                 return
                             }
                         }
                     }
                     else -> {
-                        activity.runOnUiThread {
-                            Toast.makeText(activity, "ARCore installation required.", Toast.LENGTH_LONG).show()
-                        }
+                        showToast("ARCore installation required.")
                         return
                     }
                 }
+            } catch (e: UnavailableException) {
+                Log.e(TAG, "Failed to create AR session", e)
+                showToast("Failed to create AR session: ${e.message}")
+                return
             } catch (e: Exception) {
-                activity.runOnUiThread {
-                    Toast.makeText(activity, "Failed to create AR session: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                Log.e(TAG, "Failed to create AR session (Unknown error)", e)
+                showToast("Failed to create AR session: ${e.message}")
                 return
             }
         }
@@ -95,6 +94,7 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
         Log.d(TAG, "onResume")
+        displayRotationHelper.onResume()
         isResumed = true
         if (!sessionCreated) {
             return
@@ -103,13 +103,10 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
             Log.d(TAG, "Resuming session")
             session?.resume()
         } catch (e: CameraNotAvailableException) {
-            activity.runOnUiThread {
-                Toast.makeText(activity, "Camera not available. Please restart the app.", Toast.LENGTH_LONG).show()
-            }
+            showToast("Camera not available. Please restart the app.")
             session = null
             return
         }
-        displayRotationHelper.onResume()
     }
 
     override fun onPause(owner: LifecycleOwner) {
@@ -165,6 +162,12 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
         config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
         session.configure(config)
         Log.d(TAG, "Session configured")
+    }
+
+    private fun showToast(message: String) {
+        activity.runOnUiThread {
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     companion object {
