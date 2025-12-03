@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.jetbrains.kotlin.compose)
     id("kotlin-parcelize")
+id("com.google.gms.google-services")
 }
 
 val localProperties = Properties().apply {
@@ -138,6 +139,8 @@ dependencies {
 
     // ARCore
     implementation(libs.arcore.client)
+    implementation 'com.google.ar:core:1.33.0'
+
 
     // CameraX
     implementation(libs.androidx.camera.core)
@@ -157,8 +160,8 @@ dependencies {
     // ML Kit
     implementation(libs.segmentation.selfie)
 
-
-
+implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
+implementation("com.google.firebase:firebase-analytics")
     // OpenCV
     implementation(libs.opencv)
 

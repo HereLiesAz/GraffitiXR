@@ -69,6 +69,17 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
                             it.cameraConfig = bestConfig
                         }
                         Log.d(TAG, "Session created and configured")
+
+                        if (isResumed) {
+                            try {
+                                Log.d(TAG, "Resuming session from onSurfaceCreated")
+                                session?.resume()
+                            } catch (e: CameraNotAvailableException) {
+                                showToast("Camera not available. Please restart the app.")
+                                session = null
+                                return
+                            }
+                        }
                     }
                 }
             } catch (e: UnavailableException) {
@@ -99,6 +110,7 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     override fun onPause(owner: LifecycleOwner) {
         super.onPause(owner)
         Log.d(TAG, "onPause")
+        isResumed = false
         session?.pause()
         displayRotationHelper.onPause()
     }
