@@ -37,11 +37,6 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var arCoreManager: ARCoreManager
     private val viewModel: MainViewModel by viewModels { MainViewModelFactory(arCoreManager) }
-    private var arCoreInstallRequested by mutableStateOf(false)
-    private var arCoreInstallPromptCount = 0
-    private val MAX_ARCORE_INSTALL_PROMPTS = 2
-
-
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,27 +67,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (arCoreInstallPromptCount < MAX_ARCORE_INSTALL_PROMPTS) {
-            maybeRequestArCoreInstallation()
-        }
-    }
-
-    private fun maybeRequestArCoreInstallation() {
-        try {
-            when (ArCoreApk.getInstance().requestInstall(this, !arCoreInstallRequested)) {
-                ArCoreApk.InstallStatus.INSTALLED -> {
-                }
-                ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
-                    arCoreInstallRequested = true
-                    arCoreInstallPromptCount++
-                }
-            }
-        } catch (e: UnavailableUserDeclinedInstallationException) {
-            Toast.makeText(this, "ARCore installation is required for AR features.", Toast.LENGTH_LONG).show()
-        }
-    }
 }
 
 @OptIn(ExperimentalPermissionsApi::class)

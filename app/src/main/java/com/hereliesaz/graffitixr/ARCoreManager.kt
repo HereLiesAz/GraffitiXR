@@ -29,23 +29,31 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     val backgroundRenderer = BackgroundRenderer()
     val pointCloudRenderer = PointCloudRenderer()
     val displayRotationHelper = DisplayRotationHelper(activity)
-    @Volatile
-    private var sessionCreated = false
-    @Volatile
-    private var isResumed = false
+    private var installRequested = false
 
     fun onSurfaceCreated() {
         Log.d(TAG, "onSurfaceCreated")
+    }
+
+    override fun onResume(owner: LifecycleOwner) {
+        super.onResume(owner)
+        Log.d(TAG, "onResume")
+        displayRotationHelper.onResume()
+
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            showToast("Camera permission is needed to run this application")
+            Log.d(TAG, "Camera permission not granted yet")
             return
         }
 
         if (session == null) {
-            Log.d(TAG, "Session is null, creating a new one")
+            var exception: Exception? = null
+            var message: String? = null
             try {
-                val installStatus = ArCoreApk.getInstance().requestInstall(activity, true)
-                when (installStatus) {
+                when (ArCoreApk.getInstance().requestInstall(activity, !installRequested)) {
+                    ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
+                        installRequested = true
+                        return
+                    }
                     ArCoreApk.InstallStatus.INSTALLED -> {
                         session = Session(activity)
                         session?.let {
@@ -60,7 +68,6 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
                             }
                             it.cameraConfig = bestConfig
                         }
-                        sessionCreated = true
                         Log.d(TAG, "Session created and configured")
 
                         if (isResumed) {
@@ -74,31 +81,22 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
                             }
                         }
                     }
-                    else -> {
-                        showToast("ARCore installation required.")
-                        return
-                    }
                 }
             } catch (e: UnavailableException) {
-                Log.e(TAG, "Failed to create AR session", e)
-                showToast("Failed to create AR session: ${e.message}")
-                return
+                exception = e
+                message = "Failed to create AR session"
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to create AR session (Unknown error)", e)
-                showToast("Failed to create AR session: ${e.message}")
+                exception = e
+                message = "Failed to create AR session (Unknown error)"
+            }
+
+            if (message != null) {
+                Log.e(TAG, message, exception)
+                showToast("$message: ${exception?.message}")
                 return
             }
         }
-    }
 
-    override fun onResume(owner: LifecycleOwner) {
-        super.onResume(owner)
-        Log.d(TAG, "onResume")
-        displayRotationHelper.onResume()
-        isResumed = true
-        if (!sessionCreated) {
-            return
-        }
         try {
             Log.d(TAG, "Resuming session")
             session?.resume()
@@ -118,8 +116,8 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     }
 
     fun onDrawFrame(width: Int, height: Int): Frame? {
-        if (!sessionCreated) {
-            Log.v(TAG, "onDrawFrame: Session not created")
+        if (session == null) {
+            Log.v(TAG, "onDrawFrame: Session is null")
             return null
         }
         session?.let {
@@ -170,18 +168,6 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
         config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
         session.configure(config)
         Log.d(TAG, "Session configured: UpdateMode=${config.updateMode}, PlaneFinding=${config.planeFindingMode}")
-    }
-
-    private fun showToast(message: String) {
-        activity.runOnUiThread {
-            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun showToast(message: String) {
-        activity.runOnUiThread {
-            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
-        }
     }
 
     private fun showToast(message: String) {
