@@ -13,7 +13,7 @@ class PointCloudRenderer {
         "attribute vec4 a_Position;" +
         "varying float v_Confidence;" +
         "void main() {" +
-        "   gl_Position = u_MvpMatrix * a_Position;" +
+        "   gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);" +
         "   gl_PointSize = 5.0;" +
         "   v_Confidence = a_Position.w;" +
         "}"
@@ -31,24 +31,39 @@ class PointCloudRenderer {
     private var vertexBuffer: FloatBuffer? = null
 
     fun createOnGlThread() {
-        val vertexShader = GLES20.glCreateShader(GLES20.GL_VERTEX_SHADER).also { shader ->
-            GLES20.glShaderSource(shader, vertexShaderCode)
-            GLES20.glCompileShader(shader)
-        }
-
-        val fragmentShader = GLES20.glCreateShader(GLES20.GL_FRAGMENT_SHADER).also { shader ->
-            GLES20.glShaderSource(shader, fragmentShaderCode)
-            GLES20.glCompileShader(shader)
-        }
+        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
+        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
 
         program = GLES20.glCreateProgram().also {
             GLES20.glAttachShader(it, vertexShader)
             GLES20.glAttachShader(it, fragmentShader)
             GLES20.glLinkProgram(it)
+            val linkStatus = IntArray(1)
+            GLES20.glGetProgramiv(it, GLES20.GL_LINK_STATUS, linkStatus, 0)
+            if (linkStatus[0] == 0) {
+                Log.e(TAG, "Could not link program: " + GLES20.glGetProgramInfoLog(it))
+                GLES20.glDeleteProgram(it)
+                program = 0
+            }
+        }
+    }
+
+    private fun loadShader(type: Int, shaderCode: String): Int {
+        return GLES20.glCreateShader(type).also { shader ->
+            GLES20.glShaderSource(shader, shaderCode)
+            GLES20.glCompileShader(shader)
+            val compileStatus = IntArray(1)
+            GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+            if (compileStatus[0] == 0) {
+                Log.e(TAG, "Could not compile shader $type: " + GLES20.glGetShaderInfoLog(shader))
+                GLES20.glDeleteShader(shader)
+                return 0
+            }
         }
     }
 
     fun draw(pointCloud: PointCloud, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
+        if (program == 0) return
         GLES20.glUseProgram(program)
 
         val points = pointCloud.points
@@ -80,5 +95,9 @@ class PointCloudRenderer {
         GLES20.glDrawArrays(GLES20.GL_POINTS, 0, points.remaining() / 4)
 
         GLES20.glDisableVertexAttribArray(positionHandle)
+    }
+
+    companion object {
+        private const val TAG = "PointCloudRenderer"
     }
 }
