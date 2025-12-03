@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.jetbrains.kotlin.compose)
     id("kotlin-parcelize")
+id("com.google.gms.google-services")
 }
 
 val localProperties = Properties().apply {
@@ -157,8 +158,8 @@ dependencies {
     // ML Kit
     implementation(libs.segmentation.selfie)
 
-id("com.google.gms.google-services") version "4.4.4" apply false
-
+implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
+implementation("com.google.firebase:firebase-analytics")
     // OpenCV
     implementation(libs.opencv)
 
