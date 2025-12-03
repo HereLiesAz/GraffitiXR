@@ -45,6 +45,12 @@ The user interacts with the application through a simple user interface. The mai
 -   **Documentation:** All new public code MUST be documented with exhaustive KDocs.
 -   **Testing:** New features should be accompanied by corresponding unit tests in `app/src/test/`.
 -   **Critical Dependencies:** The OpenCV dependency is **critical** for the AR fingerprinting feature and **must not be removed**.
+-   **Versioning:** The project follows a versioning scheme `a.b.c.d` (Major.Minor.Patch.Build).
+    -   `a` (Major): Managed by the user.
+    -   `b` (Minor): **MANDATORY** update by AI when fairly major features or refactorings are implemented.
+    -   `c` (Patch): **MANDATORY** update by AI for minor functionality and notable bugfixes.
+    -   `d` (Build): Managed programmatically by the CI system.
+    -   Update `version.properties` in the root directory accordingly.
 
 ### **AR Persistence (Fingerprinting)**
 A core feature is the ability to save an AR project and have the digital overlay reappear in the correct physical location when the project is reloaded. This is mission-critical for the app's professional use case.
