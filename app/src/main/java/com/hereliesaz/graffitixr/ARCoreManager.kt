@@ -184,6 +184,12 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
         }
     }
 
+    private fun showToast(message: String) {
+        activity.runOnUiThread {
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     companion object {
         private const val TAG = "ARCoreManager"
     }

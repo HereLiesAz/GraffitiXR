@@ -128,8 +128,4 @@ class PointCloudRenderer {
     companion object {
         private const val TAG = "PointCloudRenderer"
     }
-
-    companion object {
-        private const val TAG = "PointCloudRenderer"
-    }
 }

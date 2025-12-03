@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
-import android.util.Log
 import com.google.ar.core.Frame
 import com.google.ar.core.Coordinates2d
 import java.nio.ByteBuffer
@@ -41,7 +40,6 @@ class BackgroundRenderer {
     }
 
     fun createOnGlThread() {
-        Log.d(TAG, "createOnGlThread: Initializing background renderer texture")
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
         textureId = textures[0]
@@ -74,7 +72,6 @@ class BackgroundRenderer {
 
     fun draw(frame: Frame) {
         if (frame.hasDisplayGeometryChanged() || !uvCoordsInitialized) {
-            Log.d(TAG, "draw: Updating geometry coordinates. Initialized: $uvCoordsInitialized")
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadVertices,
@@ -98,7 +95,6 @@ class BackgroundRenderer {
     }
 
     companion object {
-        private const val TAG = "BackgroundRenderer"
         private const val VERTEX_SHADER = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;
