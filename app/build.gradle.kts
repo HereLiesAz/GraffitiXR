@@ -139,6 +139,8 @@ dependencies {
 
     // ARCore
     implementation(libs.arcore.client)
+    implementation 'com.google.ar:core:1.33.0'
+
 
     // CameraX
     implementation(libs.androidx.camera.core)
