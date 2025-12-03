@@ -47,12 +47,13 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        Log.d(TAG, "onDrawFrame")
+        // Log.d(TAG, "onDrawFrame") // Too spammy
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
         val frame: Frame = arCoreManager.onDrawFrame(surfaceWidth, surfaceHeight) ?: return
 
         if (frame.timestamp == 0L) {
+            Log.v(TAG, "onDrawFrame: Frame timestamp is 0")
             return
         }
 
@@ -67,11 +68,18 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
             arCoreManager.pointCloudRenderer.draw(pointCloud, viewMatrix, projectionMatrix)
         }
 
-        for (plane in frame.getUpdatedTrackables(Plane::class.java)) {
+        val planes = frame.getUpdatedTrackables(Plane::class.java)
+        if (planes.isNotEmpty()) {
+            Log.d(TAG, "Updated planes: ${planes.size}")
+        }
+        for (plane in planes) {
             planeRenderer.draw(plane, viewMatrix, projectionMatrix)
         }
 
         val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
+        if (updatedAugmentedImages.isNotEmpty()) {
+            Log.d(TAG, "Updated augmented images: ${updatedAugmentedImages.size}")
+        }
 
         for (augmentedImage in updatedAugmentedImages) {
             if (augmentedImage.trackingState == TrackingState.TRACKING) {

@@ -118,12 +118,20 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     }
 
     fun onDrawFrame(width: Int, height: Int): Frame? {
-        if (!sessionCreated) return null
+        if (!sessionCreated) {
+            Log.v(TAG, "onDrawFrame: Session not created")
+            return null
+        }
         session?.let {
             displayRotationHelper.updateSessionIfNeeded(it)
             it.setCameraTextureName(backgroundRenderer.textureId)
             return try {
-                it.update()
+                val frame = it.update()
+                val camera = frame.camera
+                if (camera.trackingState != com.google.ar.core.TrackingState.TRACKING) {
+                    Log.w(TAG, "Camera not tracking: ${camera.trackingState}, Reason: ${camera.trackingFailureReason}")
+                }
+                frame
             } catch (e: CameraNotAvailableException) {
                 Log.e(TAG, "Camera not available during onDrawFrame", e)
                 null
@@ -161,7 +169,13 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
         config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
         config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
         session.configure(config)
-        Log.d(TAG, "Session configured")
+        Log.d(TAG, "Session configured: UpdateMode=${config.updateMode}, PlaneFinding=${config.planeFindingMode}")
+    }
+
+    private fun showToast(message: String) {
+        activity.runOnUiThread {
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun showToast(message: String) {
