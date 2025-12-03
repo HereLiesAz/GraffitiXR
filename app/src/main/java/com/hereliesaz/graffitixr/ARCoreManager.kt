@@ -16,32 +16,44 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
+import com.google.ar.core.exceptions.UnavailableException
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 
 class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
 
+    @Volatile
     var session: Session? = null
         private set
     val backgroundRenderer = BackgroundRenderer()
     val pointCloudRenderer = PointCloudRenderer()
     val displayRotationHelper = DisplayRotationHelper(activity)
-    @Volatile
-    private var sessionCreated = false
+    private var installRequested = false
 
     fun onSurfaceCreated() {
         Log.d(TAG, "onSurfaceCreated")
+    }
+
+    override fun onResume(owner: LifecycleOwner) {
+        super.onResume(owner)
+        Log.d(TAG, "onResume")
+        displayRotationHelper.onResume()
+
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(activity, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
+            Log.d(TAG, "Camera permission not granted yet")
             return
         }
 
         if (session == null) {
-            Log.d(TAG, "Session is null, creating a new one")
+            var exception: Exception? = null
+            var message: String? = null
             try {
-                val installStatus = ArCoreApk.getInstance().requestInstall(activity, true)
-                when (installStatus) {
+                when (ArCoreApk.getInstance().requestInstall(activity, !installRequested)) {
+                    ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
+                        installRequested = true
+                        return
+                    }
                     ArCoreApk.InstallStatus.INSTALLED -> {
                         session = Session(activity)
                         session?.let {
@@ -56,36 +68,32 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
                             }
                             it.cameraConfig = bestConfig
                         }
-                        sessionCreated = true
                         Log.d(TAG, "Session created and configured")
                     }
-                    else -> {
-                        Toast.makeText(activity, "ARCore installation required.", Toast.LENGTH_LONG).show()
-                        return
-                    }
                 }
+            } catch (e: UnavailableException) {
+                exception = e
+                message = "Failed to create AR session"
             } catch (e: Exception) {
-                Toast.makeText(activity, "Failed to create AR session: ${e.message}", Toast.LENGTH_LONG).show()
+                exception = e
+                message = "Failed to create AR session (Unknown error)"
+            }
+
+            if (message != null) {
+                Log.e(TAG, message, exception)
+                showToast("$message: ${exception?.message}")
                 return
             }
         }
-    }
 
-    override fun onResume(owner: LifecycleOwner) {
-        super.onResume(owner)
-        Log.d(TAG, "onResume")
-        if (!sessionCreated) {
-            return
-        }
         try {
             Log.d(TAG, "Resuming session")
             session?.resume()
         } catch (e: CameraNotAvailableException) {
-            Toast.makeText(activity, "Camera not available. Please restart the app.", Toast.LENGTH_LONG).show()
+            showToast("Camera not available. Please restart the app.")
             session = null
             return
         }
-        displayRotationHelper.onResume()
     }
 
     override fun onPause(owner: LifecycleOwner) {
@@ -96,12 +104,20 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     }
 
     fun onDrawFrame(width: Int, height: Int): Frame? {
-        if (!sessionCreated) return null
+        if (session == null) {
+            Log.v(TAG, "onDrawFrame: Session is null")
+            return null
+        }
         session?.let {
             displayRotationHelper.updateSessionIfNeeded(it)
             it.setCameraTextureName(backgroundRenderer.textureId)
             return try {
-                it.update()
+                val frame = it.update()
+                val camera = frame.camera
+                if (camera.trackingState != com.google.ar.core.TrackingState.TRACKING) {
+                    Log.w(TAG, "Camera not tracking: ${camera.trackingState}, Reason: ${camera.trackingFailureReason}")
+                }
+                frame
             } catch (e: CameraNotAvailableException) {
                 Log.e(TAG, "Camera not available during onDrawFrame", e)
                 null
@@ -139,7 +155,13 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
         config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
         config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
         session.configure(config)
-        Log.d(TAG, "Session configured")
+        Log.d(TAG, "Session configured: UpdateMode=${config.updateMode}, PlaneFinding=${config.planeFindingMode}")
+    }
+
+    private fun showToast(message: String) {
+        activity.runOnUiThread {
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     companion object {

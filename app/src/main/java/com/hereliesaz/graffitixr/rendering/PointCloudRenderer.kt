@@ -13,8 +13,8 @@ class PointCloudRenderer {
         "attribute vec4 a_Position;" +
         "varying float v_Confidence;" +
         "void main() {" +
-        "   gl_Position = u_MvpMatrix * a_Position;" +
-        "   gl_PointSize = 5.0;" +
+        "   gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);" +
+        "   gl_PointSize = 20.0;" +
         "   v_Confidence = a_Position.w;" +
         "}"
 
@@ -22,7 +22,7 @@ class PointCloudRenderer {
         "precision mediump float;" +
         "varying float v_Confidence;" +
         "void main() {" +
-        "    gl_FragColor = vec4(1.0, 1.0, 0.0, v_Confidence);" +
+        "    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);" +
         "}"
 
     private var program: Int = 0
@@ -30,55 +30,102 @@ class PointCloudRenderer {
     private var mvpMatrixHandle: Int = 0
     private var vertexBuffer: FloatBuffer? = null
 
-    fun createOnGlThread() {
-        val vertexShader = GLES20.glCreateShader(GLES20.GL_VERTEX_SHADER).also { shader ->
-            GLES20.glShaderSource(shader, vertexShaderCode)
-            GLES20.glCompileShader(shader)
-        }
+    // Pre-allocate a small buffer to start with
+    private var vertexBufferSize = 1000 * 4 * 4 // 1000 points
 
-        val fragmentShader = GLES20.glCreateShader(GLES20.GL_FRAGMENT_SHADER).also { shader ->
-            GLES20.glShaderSource(shader, fragmentShaderCode)
-            GLES20.glCompileShader(shader)
+    init {
+        updateVertexBuffer(1000)
+    }
+
+    private fun updateVertexBuffer(numPoints: Int) {
+        if (vertexBuffer == null || vertexBuffer!!.capacity() < numPoints * 4) {
+            val bb = ByteBuffer.allocateDirect(numPoints * 4 * 4) // 4 floats per point, 4 bytes per float
+            bb.order(ByteOrder.nativeOrder())
+            vertexBuffer = bb.asFloatBuffer()
+            vertexBufferSize = numPoints * 4 * 4
         }
+    }
+
+    fun createOnGlThread() {
+        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
+        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
 
         program = GLES20.glCreateProgram().also {
             GLES20.glAttachShader(it, vertexShader)
             GLES20.glAttachShader(it, fragmentShader)
             GLES20.glLinkProgram(it)
+            val linkStatus = IntArray(1)
+            GLES20.glGetProgramiv(it, GLES20.GL_LINK_STATUS, linkStatus, 0)
+            if (linkStatus[0] == 0) {
+                Log.e(TAG, "Could not link program: " + GLES20.glGetProgramInfoLog(it))
+                GLES20.glDeleteProgram(it)
+                program = 0
+            }
+        }
+    }
+
+    private fun loadShader(type: Int, shaderCode: String): Int {
+        return GLES20.glCreateShader(type).also { shader ->
+            GLES20.glShaderSource(shader, shaderCode)
+            GLES20.glCompileShader(shader)
+            val compileStatus = IntArray(1)
+            GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+            if (compileStatus[0] == 0) {
+                Log.e(TAG, "Could not compile shader $type: " + GLES20.glGetShaderInfoLog(shader))
+                GLES20.glDeleteShader(shader)
+                return 0
+            }
         }
     }
 
     fun draw(pointCloud: PointCloud, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
-        GLES20.glUseProgram(program)
-
-        val points = pointCloud.points
-        Log.d("PointCloudRenderer", "Number of points: " + points.remaining())
-        if (points.remaining() == 0) {
+        if (program == 0) {
+            Log.w(TAG, "Program is 0, skipping draw")
             return
         }
 
-        vertexBuffer = ByteBuffer.allocateDirect(points.remaining() * 4).run {
-            order(ByteOrder.nativeOrder())
-            asFloatBuffer().apply {
-                put(points)
-                position(0)
-            }
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        GLES20.glDisable(GLES20.GL_BLEND)
+
+        GLES20.glUseProgram(program)
+
+        val points = pointCloud.points
+        val numPoints = points.remaining() / 4
+        Log.d(TAG, "Drawing $numPoints points")
+
+        if (numPoints == 0) {
+            return
         }
 
-        positionHandle = GLES20.glGetAttribLocation(program, "a_Position").also {
-            GLES20.glEnableVertexAttribArray(it)
-            GLES20.glVertexAttribPointer(it, 4, GLES20.GL_FLOAT, false, 16, vertexBuffer)
+        updateVertexBuffer(numPoints)
+        vertexBuffer?.let { buffer ->
+            buffer.clear()
+            buffer.put(points)
+            buffer.position(0)
+
+            positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
+            GLES20.glEnableVertexAttribArray(positionHandle)
+            GLES20.glVertexAttribPointer(positionHandle, 4, GLES20.GL_FLOAT, false, 16, buffer)
         }
 
         val mvpMatrix = FloatArray(16)
         android.opengl.Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
 
-        mvpMatrixHandle = GLES20.glGetUniformLocation(program, "u_MvpMatrix").also {
-            GLES20.glUniformMatrix4fv(it, 1, false, mvpMatrix, 0)
-        }
+        mvpMatrixHandle = GLES20.glGetUniformLocation(program, "u_MvpMatrix")
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
 
-        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, points.remaining() / 4)
+        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, numPoints)
 
         GLES20.glDisableVertexAttribArray(positionHandle)
+
+        // Check for GL errors
+        val error = GLES20.glGetError()
+        if (error != GLES20.GL_NO_ERROR) {
+            Log.e(TAG, "GL Error in draw: $error")
+        }
+    }
+
+    companion object {
+        private const val TAG = "PointCloudRenderer"
     }
 }
