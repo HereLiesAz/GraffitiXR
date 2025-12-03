@@ -18,6 +18,22 @@ val localProperties = Properties().apply {
     }
 }
 
+val versionProperties = Properties().apply {
+    val versionFile = rootProject.file("version.properties")
+    if (versionFile.exists()) {
+        versionFile.inputStream().use { load(it) }
+    }
+}
+
+val vMajor = versionProperties.getProperty("versionMajor", "1").toInt()
+val vMinor = versionProperties.getProperty("versionMinor", "0").toInt()
+val vPatch = versionProperties.getProperty("versionPatch", "0").toInt()
+val vBuild = if (project.hasProperty("versionBuild")) {
+    project.property("versionBuild").toString().toInt()
+} else {
+    versionProperties.getProperty("versionBuild", "0").toInt()
+}
+
 android {
 //    signingConfigs {
 //        create("release") {
@@ -38,8 +54,8 @@ android {
         applicationId = "com.hereliesaz.graffitixr"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = vMajor * 10000000 + vMinor * 100000 + vPatch * 1000 + vBuild
+        versionName = "$vMajor.$vMinor.$vPatch.$vBuild"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -25,6 +25,7 @@ class BackgroundRenderer {
     ).toBuffer()
 
     private val quadTexCoordsTransformed: FloatBuffer
+    private var uvCoordsInitialized = false
 
     private var program = 0
     private var positionHandle = 0
@@ -70,13 +71,14 @@ class BackgroundRenderer {
     }
 
     fun draw(frame: Frame) {
-        if (frame.hasDisplayGeometryChanged()) {
+        if (frame.hasDisplayGeometryChanged() || !uvCoordsInitialized) {
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadVertices,
                 Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoordsTransformed
             )
+            uvCoordsInitialized = true
         }
 
         GLES20.glDepthMask(false)
