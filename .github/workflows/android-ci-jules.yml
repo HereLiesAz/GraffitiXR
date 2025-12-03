@@ -58,7 +58,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/IDEaz-*-debug.apk
+          path: app/build/outputs/apk/debug/GraffitiXR-*-debug.apk
 
       # Update the release (or create it) without deleting it first to avoid downtime
       - name: Update Release
@@ -71,7 +71,7 @@ jobs:
           TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
           echo "Using tag: $TAG_NAME"
           
-          APK_FILE=$(ls app/build/outputs/apk/debug/IDEaz-*-debug.apk | head -n 1)
+          APK_FILE=$(ls app/build/outputs/apk/debug/GraffitiXR-*-debug.apk | head -n 1)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
@@ -111,7 +111,7 @@ jobs:
               console.log('Error reading build.log', e);
             }
             
-            const body = `@gemini-code-assist\n\nBuild failed on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}.\n\n**Log Output:**\n\`\`\`\n${logTail}\n\`\`\``;
+            const body = `@gemini-cli /jules please debug this build error\n\nBuild failed on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}.\n\n**Log Output:**\n\`\`\`\n${logTail}\n\`\`\``;
             
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
