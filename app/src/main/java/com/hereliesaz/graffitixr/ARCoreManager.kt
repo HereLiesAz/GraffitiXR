@@ -30,6 +30,7 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     val pointCloudRenderer = PointCloudRenderer()
     val displayRotationHelper = DisplayRotationHelper(activity)
     private var installRequested = false
+    private var isResumed = false
 
     fun onSurfaceCreated() {
         Log.d(TAG, "onSurfaceCreated")
@@ -37,6 +38,7 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
 
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
+        isResumed = true
         Log.d(TAG, "onResume")
         displayRotationHelper.onResume()
 
