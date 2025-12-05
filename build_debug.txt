@@ -1,0 +1,29 @@
+Starting Build 
+[SETUP] Creating temporary local build directory... 
+[SETUP] Copying source files... 
+[1/4] Installing dependencies... 
+[2/4] Compiling extension... 
+
+> antigravity-android-debugger@0.0.1 compile
+> tsc -p ./
+
+[3/4] Installing vsce... 
+
+added 314 packages, and audited 319 packages in 13s
+
+88 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+[4/4] Packaging VSIX... 
+Executing prepublish script 'npm run vscode:prepublish'...
+
+> antigravity-android-debugger@0.0.1 vscode:prepublish
+> npm run compile
+
+
+> antigravity-android-debugger@0.0.1 compile
+> tsc -p ./
+
+ ERROR  The specified icon 'extension/icon.png' wasn't found in the extension.
+[ERROR] Packaging failed. 
