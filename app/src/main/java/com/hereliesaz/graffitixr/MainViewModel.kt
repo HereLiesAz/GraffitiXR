@@ -459,11 +459,9 @@ class MainViewModel(
                     projectData.overlayImageUri?.let { uri ->
                         val bitmap = BitmapUtils.getBitmapFromUri(getApplication(), uri) ?: return@launch
                         val session = arCoreManager.session ?: return@launch
-                        val config = session.config
                         val database = AugmentedImageDatabase(session)
                         database.addImage("target", bitmap)
-                        config.augmentedImageDatabase = database
-                        session.configure(config)
+                        arCoreManager.updateAugmentedImageDatabase(database)
                     }
                     withContext(Dispatchers.Main) {
                         Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show()
