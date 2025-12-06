@@ -1,7 +1,7 @@
 {
   "project_info": {
     "project_number": "648018655932",
-    "project_id": "graffitixr-8b745",
+    "project_id": "{{PROJECT_ID}}",
     "storage_bucket": "graffitixr-8b745.firebasestorage.app"
   },
   "client": [
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          "current_key": "{{GOOGLE_SERVICES_API_KEY}}"
         }
       ],
       "services": {
