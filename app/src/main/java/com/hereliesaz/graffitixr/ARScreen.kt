@@ -24,7 +24,7 @@ fun ARScreen(arCoreManager: ARCoreManager) {
     val glSurfaceView = remember {
         GLSurfaceView(context).apply {
             tag = "GLSurfaceView"
-            setZOrderOnTop(true)
+            setZOrderMediaOverlay(true)
             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
             holder.setFormat(PixelFormat.TRANSLUCENT)
             setEGLContextClientVersion(2)
@@ -33,7 +33,7 @@ fun ARScreen(arCoreManager: ARCoreManager) {
         }
     }
 
-    // Use DisposableEffect to manage the lifecycle of the GLSurfaceView
+    // Use DisposableEffect to manage the lifecycle of the GLSurfaceViev
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {

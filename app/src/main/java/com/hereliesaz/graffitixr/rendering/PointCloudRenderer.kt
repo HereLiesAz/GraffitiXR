@@ -126,6 +126,9 @@ class PointCloudRenderer {
 
         GLES20.glDisableVertexAttribArray(positionHandle)
 
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+        GLES20.glEnable(GLES20.GL_BLEND)
+
         // Check for GL errors
         val error = GLES20.glGetError()
         if (error != GLES20.GL_NO_ERROR) {

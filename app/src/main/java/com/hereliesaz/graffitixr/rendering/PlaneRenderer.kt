@@ -28,6 +28,7 @@ class PlaneRenderer {
     private var positionHandle: Int = 0
     private var mvpMatrixHandle: Int = 0
     private var vertexBuffer: FloatBuffer? = null
+    private var drawnPolygons = 0
 
     fun createOnGlThread() {
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
@@ -82,6 +83,11 @@ class PlaneRenderer {
             return
         }
 
+        val vertices = FloatArray(polygon.remaining())
+        polygon.get(vertices)
+        polygon.rewind()
+        Log.d(TAG, "Constructing polygon with ${vertices.size / 2} vertices: ${vertices.contentToString()}")
+
         vertexBuffer = ByteBuffer.allocateDirect(polygon.remaining() * 4).run {
             order(ByteOrder.nativeOrder())
             asFloatBuffer().apply {
@@ -107,6 +113,8 @@ class PlaneRenderer {
         }
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, polygon.remaining() / 2)
+        drawnPolygons++
+        Log.d(TAG, "Drawn polygons: $drawnPolygons")
 
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisable(GLES20.GL_BLEND)
