@@ -71,17 +71,6 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
                             it.cameraConfig = bestConfig
                         }
                         Log.d(TAG, "Session created and configured")
-
-                        if (isResumed) {
-                            try {
-                                Log.d(TAG, "Resuming session from onSurfaceCreated")
-                                session?.resume()
-                            } catch (e: CameraNotAvailableException) {
-                                showToast("Camera not available. Please restart the app.")
-                                session = null
-                                return
-                            }
-                        }
                     }
                 }
             } catch (e: UnavailableException) {
@@ -120,6 +109,10 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     fun onDrawFrame(width: Int, height: Int): Frame? {
         if (session == null) {
             Log.v(TAG, "onDrawFrame: Session is null")
+            return null
+        }
+        if (!isResumed) {
+            Log.v(TAG, "onDrawFrame: Activity is paused, skipping frame update")
             return null
         }
         session?.let {
