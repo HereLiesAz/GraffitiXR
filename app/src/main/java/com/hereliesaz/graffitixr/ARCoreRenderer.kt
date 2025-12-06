@@ -88,12 +88,13 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
                     renderer.createOnGlThread()
                     trackedImages[augmentedImage.index] = Pair(augmentedImage, renderer)
                 }
-                val (image, renderer) = trackedImages[augmentedImage.index]!!
-                val projectionMatrix = FloatArray(16)
-                val viewMatrix = FloatArray(16)
-                frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
-                frame.camera.getViewMatrix(viewMatrix, 0)
-                renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ)
+                trackedImages[augmentedImage.index]?.let { (image, renderer) ->
+                    val projectionMatrix = FloatArray(16)
+                    val viewMatrix = FloatArray(16)
+                    frame.camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+                    frame.camera.getViewMatrix(viewMatrix, 0)
+                    renderer.draw(viewMatrix, projectionMatrix, image.centerPose, image.extentX, image.extentZ)
+                }
             }
         }
     }
