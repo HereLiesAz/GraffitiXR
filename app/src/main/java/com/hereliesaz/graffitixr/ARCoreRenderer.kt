@@ -30,7 +30,7 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Log.d(TAG, "onSurfaceCreated")
-        GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
         arCoreManager.onSurfaceCreated()
         arCoreManager.backgroundRenderer.createOnGlThread()
         augmentedImageRenderer.createOnGlThread()
@@ -69,6 +69,9 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
         }
 
         val planes = arCoreManager.session?.getAllTrackables(Plane::class.java) ?: emptyList()
+        if (planes.isNotEmpty()) {
+            Log.d(TAG, "Detected ${planes.size} planes")
+        }
         for (plane in planes) {
             if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
                 planeRenderer.draw(plane, viewMatrix, projectionMatrix)

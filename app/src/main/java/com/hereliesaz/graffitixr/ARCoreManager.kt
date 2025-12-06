@@ -188,7 +188,7 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
 
     private fun configureSession(session: Session) {
         val config = session.config
-        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+        config.updateMode = Config.UpdateMode.BLOCKING
         config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
         session.configure(config)
         Log.d(TAG, "Session configured: UpdateMode=${config.updateMode}, PlaneFinding=${config.planeFindingMode}")

@@ -3,8 +3,8 @@ package com.hereliesaz.graffitixr.rendering
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.util.Log
-import com.google.ar.core.Frame
 import com.google.ar.core.Coordinates2d
+import com.google.ar.core.Frame
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -31,6 +31,7 @@ class BackgroundRenderer {
     private var program = 0
     private var positionHandle = 0
     private var texCoordHandle = 0
+    private var samplerHandle = 0
     var textureId = -1
         private set
 
@@ -70,6 +71,7 @@ class BackgroundRenderer {
 
         positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
         texCoordHandle = GLES20.glGetAttribLocation(program, "a_TexCoord")
+        samplerHandle = GLES20.glGetUniformLocation(program, "s_Texture")
     }
 
     fun draw(frame: Frame) {
@@ -86,7 +88,11 @@ class BackgroundRenderer {
 
         GLES20.glDepthMask(false)
         GLES20.glUseProgram(program)
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
+        GLES20.glUniform1i(samplerHandle, 0)
+
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quadVertices)
         GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoordsTransformed)
         GLES20.glEnableVertexAttribArray(positionHandle)

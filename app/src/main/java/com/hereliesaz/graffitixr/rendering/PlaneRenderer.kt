@@ -21,15 +21,7 @@ class PlaneRenderer {
         "precision mediump float;" +
         "varying vec2 v_GridCoord;" +
         "void main() {" +
-        "    float grid_spacing = 0.1;" +
-        "    vec2 grid_coord = fract(v_GridCoord / grid_spacing);" +
-        "    float line_width = 0.02;" +
-        "    if (grid_coord.x < line_width || grid_coord.x > 1.0 - line_width ||" +
-        "        grid_coord.y < line_width || grid_coord.y > 1.0 - line_width) {" +
-        "        gl_FragColor = vec4(1.0, 1.0, 1.0, 0.5);" +
-        "    } else {" +
-        "        gl_FragColor = vec4(0.2, 0.4, 1.0, 0.2);" +
-        "    }" +
+        "   gl_FragColor = vec4(0.2, 0.4, 1.0, 0.5);" +
         "}"
 
     private var program: Int = 0
