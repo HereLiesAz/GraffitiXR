@@ -4,6 +4,9 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -38,6 +42,7 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
+import kotlinx.coroutines.delay
 
 @Composable
 fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
@@ -196,8 +201,7 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                 azMenuItem(id = "mockup", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
                 if (uiState.editorMode == EditorMode.AR) {
-                    azRailItem(id = "capture", text = "Capture", onClick = viewModel::onCaptureForRefinementClicked)
-                    azRailItem(id = "refine_target", text = "Refine Target", onClick = { /* TODO */ })
+                    azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCaptureForRefinementClicked)
                 }
                 azDivider()
                 if (uiState.editorMode == EditorMode.STATIC) {
@@ -320,5 +324,53 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                     .zIndex(3f)
             )
         }
+
+        if (uiState.isCapturingTarget) {
+            CaptureAnimation()
+        }
     }
+}
+
+@Composable
+private fun CaptureAnimation() {
+    var flashAlpha by remember { mutableStateOf(0f) }
+    var shutterAlpha by remember { mutableStateOf(0f) }
+
+    val animatedFlashAlpha by animateFloatAsState(
+        targetValue = flashAlpha,
+        animationSpec = tween(durationMillis = 200),
+        label = "Flash Animation"
+    )
+    val animatedShutterAlpha by animateFloatAsState(
+        targetValue = shutterAlpha,
+        animationSpec = tween(durationMillis = 300),
+        label = "Shutter Animation"
+    )
+
+    LaunchedEffect(Unit) {
+        // Shutter closes
+        shutterAlpha = 0.5f
+        delay(100)
+        // Flash
+        flashAlpha = 1f
+        delay(50)
+        flashAlpha = 0f
+        // Shutter opens
+        delay(150)
+        shutterAlpha = 0f
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = animatedShutterAlpha))
+            .zIndex(10f) // Make sure it's on top
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White.copy(alpha = animatedFlashAlpha))
+            .zIndex(11f) // Flash on top of shutter
+    )
 }

@@ -329,44 +329,62 @@ class MainViewModel(
     }
 
     fun onRefinementConfirm(cropRect: Rect) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val uri = uiState.value.refinementImageUri ?: return@launch
-                val context = getApplication<Application>().applicationContext
-                val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
+        viewModelScope.launch {
+            updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
+            delay(400) // Let the animation play
+            updateState(uiState.value.copy(isCapturingTarget = false), isUndoable = false)
 
-                val croppedBitmap = Bitmap.createBitmap(
-                    bitmap,
-                    cropRect.left.toInt(),
-                    cropRect.top.toInt(),
-                    cropRect.width.toInt(),
-                    cropRect.height.toInt()
-                )
+            withContext(Dispatchers.IO) {
+                try {
+                    val uri = uiState.value.refinementImageUri ?: return@withContext
+                    val context = getApplication<Application>().applicationContext
+                    val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@withContext
 
-                val session = arCoreManager.session ?: return@launch
-                val config = session.config
-                val grayMat = Mat()
-                Utils.bitmapToMat(croppedBitmap, grayMat)
-                Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
-                val orb = ORB.create()
-                val keypoints = MatOfKeyPoint()
-                val descriptors = Mat()
-                orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+                    val croppedBitmap = Bitmap.createBitmap(
+                        bitmap,
+                        cropRect.left.toInt(),
+                        cropRect.top.toInt(),
+                        cropRect.width.toInt(),
+                        cropRect.height.toInt()
+                    )
 
-                val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-                val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+                    val session = arCoreManager.session ?: return@withContext
+                    val grayMat = Mat()
+                    Utils.bitmapToMat(croppedBitmap, grayMat)
+                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                    val orb = ORB.create()
+                    val keypoints = MatOfKeyPoint()
+                    val descriptors = Mat()
+                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
 
-                val database = AugmentedImageDatabase(session)
-                database.addImage("target", croppedBitmap)
-                arCoreManager.updateAugmentedImageDatabase(database)
+                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
-                updateState(uiState.value.copy(fingerprintJson = fingerprintJson, refinementImageUri = null))
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
+                    val database = AugmentedImageDatabase(session)
+                    database.addImage("target", croppedBitmap)
+                    arCoreManager.updateAugmentedImageDatabase(database)
+
+                    updateState(
+                        uiState.value.copy(
+                            fingerprintJson = fingerprintJson,
+                            refinementImageUri = null
+                        )
+                    )
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            getApplication(),
+                            "Target created successfully",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            getApplication(),
+                            "Failed to create target: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             }
         }
@@ -491,55 +509,6 @@ class MainViewModel(
 
     fun onTargetCreationStateChanged(newState: TargetCreationState) {
         updateState(uiState.value.copy(targetCreationState = newState), isUndoable = false)
-    }
-
-    fun onCreateTargetClicked() {
-        viewModelScope.launch(Dispatchers.IO) {
-            withContext(Dispatchers.Main) {
-                Toast.makeText(getApplication(), "Creating target...", Toast.LENGTH_SHORT).show()
-            }
-            try {
-                onTargetCreationStateChanged(TargetCreationState.CREATING)
-                val bitmap = uiState.value.overlayImageUri?.let { uri ->
-                    BitmapUtils.getBitmapFromUri(getApplication(), uri)
-                }
-
-                if (bitmap != null) {
-                    val session = arCoreManager.session ?: return@launch
-                    val config = session.config
-                    val grayMat = Mat()
-                    Utils.bitmapToMat(bitmap, grayMat)
-                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
-                    val orb = ORB.create()
-                    val keypoints = MatOfKeyPoint()
-                    val descriptors = Mat()
-                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
-
-                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
-
-                    val database = AugmentedImageDatabase(session)
-                    database.addImage("target", bitmap)
-                    arCoreManager.updateAugmentedImageDatabase(database)
-
-                    updateState(uiState.value.copy(fingerprintJson = fingerprintJson))
-                    onTargetCreationStateChanged(TargetCreationState.SUCCESS)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    onTargetCreationStateChanged(TargetCreationState.ERROR)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "Failed to create target: No image selected", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                onTargetCreationStateChanged(TargetCreationState.ERROR)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
     }
 
     fun onNewProject() {
