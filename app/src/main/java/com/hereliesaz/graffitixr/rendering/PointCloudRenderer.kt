@@ -14,7 +14,7 @@ class PointCloudRenderer {
         "varying float v_Confidence;" +
         "void main() {" +
         "   gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);" +
-        "   gl_PointSize = 20.0;" +
+        "   gl_PointSize = 15.0;" +
         "   v_Confidence = a_Position.w;" +
         "}"
 
@@ -22,7 +22,11 @@ class PointCloudRenderer {
         "precision mediump float;" +
         "varying float v_Confidence;" +
         "void main() {" +
-        "    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);" +
+        "    vec2 coord = gl_PointCoord - vec2(0.5);" +
+        "    if (length(coord) > 0.5) {" +
+        "        discard;" +
+        "    }" +
+        "    gl_FragColor = vec4(0.0, 1.0, 1.0, 1.0);" +
         "}"
 
     private var program: Int = 0
