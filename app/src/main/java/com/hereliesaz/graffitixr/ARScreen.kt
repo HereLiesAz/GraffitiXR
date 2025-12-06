@@ -23,6 +23,7 @@ fun ARScreen(arCoreManager: ARCoreManager) {
     // Create and remember the GLSurfaceView instance
     val glSurfaceView = remember {
         GLSurfaceView(context).apply {
+            tag = "GLSurfaceView"
             setZOrderOnTop(true)
             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
             holder.setFormat(PixelFormat.TRANSLUCENT)
