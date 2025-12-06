@@ -171,7 +171,6 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                     ) {
                         ARScreen(arCoreManager = arCoreManager)
                     }
-                    EditorMode.HELP -> Box {}
                 }
             }
         }
