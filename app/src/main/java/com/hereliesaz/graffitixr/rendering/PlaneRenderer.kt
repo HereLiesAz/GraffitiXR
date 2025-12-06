@@ -56,21 +56,28 @@ class PlaneRenderer {
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {
-        return GLES20.glCreateShader(type).also { shader ->
-            GLES20.glShaderSource(shader, shaderCode)
-            GLES20.glCompileShader(shader)
-            val compileStatus = IntArray(1)
-            GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
-            if (compileStatus[0] == 0) {
-                Log.e(TAG, "Could not compile shader " + type + ": " + GLES20.glGetShaderInfoLog(shader))
-                GLES20.glDeleteShader(shader)
-                return 0
-            }
+        val shader = GLES20.glCreateShader(type)
+        if (shader == 0) {
+            Log.e(TAG, "Could not create shader of type $type")
+            return 0
         }
+        GLES20.glShaderSource(shader, shaderCode)
+        GLES20.glCompileShader(shader)
+        val compileStatus = IntArray(1)
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+        if (compileStatus[0] == 0) {
+            Log.e(TAG, "Could not compile shader $type: ${GLES20.glGetShaderInfoLog(shader)}")
+            GLES20.glDeleteShader(shader)
+            return 0
+        }
+        return shader
     }
 
     fun draw(plane: Plane, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
-        if (program == 0) return
+        if (program == 0) {
+            Log.e(TAG, "draw: Program is 0")
+            return
+        }
 
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
@@ -79,6 +86,7 @@ class PlaneRenderer {
 
         val polygon = plane.polygon
         if (polygon.remaining() == 0) {
+            Log.v(TAG, "draw: Plane polygon empty")
             return
         }
 
@@ -110,6 +118,11 @@ class PlaneRenderer {
 
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisable(GLES20.GL_BLEND)
+
+        val error = GLES20.glGetError()
+        if (error != GLES20.GL_NO_ERROR) {
+            Log.e(TAG, "GL Error in PlaneRenderer.draw: $error")
+        }
     }
 
     companion object {
