@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +39,7 @@ fun ARScreen(arCoreManager: ARCoreManager) {
 
     AndroidView(
         factory = { context ->
+            Log.d("ARScreen", "Creating GLSurfaceView") // Diagnostic log
             GLSurfaceView(context).apply {
                 setZOrderOnTop(true)
                 setEGLConfigChooser(8, 8, 8, 8, 16, 0)
