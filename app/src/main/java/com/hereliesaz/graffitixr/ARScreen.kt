@@ -2,13 +2,10 @@ package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -16,19 +13,32 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun ARScreen(arCoreManager: ARCoreManager) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     val renderer = remember {
         ARCoreRenderer(arCoreManager)
     }
 
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var glSurfaceView by remember { mutableStateOf<GLSurfaceView?>(null) }
+    // Create and remember the GLSurfaceView instance
+    val glSurfaceView = remember {
+        GLSurfaceView(context).apply {
+            setZOrderOnTop(true)
+            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            holder.setFormat(PixelFormat.TRANSLUCENT)
+            setEGLContextClientVersion(2)
+            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            setRenderer(renderer)
+        }
+    }
 
+    // Use DisposableEffect to manage the lifecycle of the GLSurfaceView
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                glSurfaceView?.onResume()
-            } else if (event == Lifecycle.Event.ON_PAUSE) {
-                glSurfaceView?.onPause()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> glSurfaceView.onResume()
+                Lifecycle.Event.ON_PAUSE -> glSurfaceView.onPause()
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -37,18 +47,6 @@ fun ARScreen(arCoreManager: ARCoreManager) {
         }
     }
 
-    AndroidView(
-        factory = { context ->
-            Log.d("ARScreen", "Creating GLSurfaceView") // Diagnostic log
-            GLSurfaceView(context).apply {
-                setZOrderOnTop(true)
-                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                holder.setFormat(PixelFormat.TRANSLUCENT)
-                setEGLContextClientVersion(2)
-                setRenderer(renderer)
-                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                glSurfaceView = this
-            }
-        }
-    )
+    // Use the remembered GLSurfaceView instance in the AndroidView
+    AndroidView({ glSurfaceView })
 }
