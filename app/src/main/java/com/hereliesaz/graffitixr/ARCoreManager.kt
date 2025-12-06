@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -15,11 +16,15 @@ import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
 import com.google.ar.core.exceptions.UnavailableException
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
+import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
 
@@ -31,6 +36,12 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
     val displayRotationHelper = DisplayRotationHelper(activity)
     private var installRequested = false
     private var isResumed = false
+    private var captureNextFrame = false
+
+    private val yuvToRgbConverter = YuvToRgbConverter(activity)
+
+    private val _frameBitmap = MutableSharedFlow<Bitmap>()
+    val frameBitmap = _frameBitmap.asSharedFlow()
 
     fun onSurfaceCreated() {
         Log.d(TAG, "onSurfaceCreated")
@@ -120,6 +131,20 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
             it.setCameraTextureName(backgroundRenderer.textureId)
             return try {
                 val frame = it.update()
+
+                if (captureNextFrame) {
+                    try {
+                        val image = frame.acquireCameraImage()
+                        val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                        yuvToRgbConverter.yuvToRgb(image, bitmap)
+                        image.close()
+                        _frameBitmap.tryEmit(bitmap)
+                    } catch (e: NotYetAvailableException) {
+                        // The image may not be available yet. We can try again on the next frame.
+                    }
+                    captureNextFrame = false
+                }
+
                 val camera = frame.camera
                 if (camera.trackingState != com.google.ar.core.TrackingState.TRACKING) {
                     Log.w(TAG, "Camera not tracking: ${camera.trackingState}, Reason: ${camera.trackingFailureReason}")
@@ -134,6 +159,10 @@ class ARCoreManager(private val activity: Activity) : DefaultLifecycleObserver {
             }
         }
         return null
+    }
+
+    fun captureNextFrame() {
+        captureNextFrame = true
     }
 
     fun updateAugmentedImageDatabase(database: AugmentedImageDatabase) {
