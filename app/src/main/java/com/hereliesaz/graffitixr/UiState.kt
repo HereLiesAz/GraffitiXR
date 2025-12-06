@@ -57,7 +57,6 @@ data class UiState(
     val showRotationAxisFeedback: Boolean = false,
     val showDoubleTapHint: Boolean = false,
     val tapFeedback: @WriteWith<TapFeedbackParceler> TapFeedback? = null,
-    val refinementImageUri: Uri? = null,
     val fingerprintJson: String? = null,
     val isMarkingProgress: Boolean = false,
     val drawingPaths: @WriteWith<DrawingPathsParceler> List<List<Pair<Float, Float>>> = emptyList(),

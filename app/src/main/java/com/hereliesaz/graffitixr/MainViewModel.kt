@@ -6,7 +6,6 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
@@ -28,6 +27,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -41,7 +42,6 @@ import java.io.FileOutputStream
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
-    object RequestCaptureForRefinement : CaptureEvent()
 }
 
 class MainViewModel(
@@ -70,7 +70,67 @@ class MainViewModel(
             completedOnboardingModes = completedModes,
             showOnboardingDialogForMode = if (!completedModes.contains(uiState.value.editorMode)) uiState.value.editorMode else null
         ), isUndoable = false)
+
+        // Listen for captured frames from ARCoreManager
+        arCoreManager.frameBitmap.onEach { bitmap ->
+            createTargetFromFrame(bitmap)
+        }.launchIn(viewModelScope)
     }
+
+    private fun createTargetFromFrame(bitmap: Bitmap) {
+        viewModelScope.launch {
+            // Trigger the capture animation
+            updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
+            delay(400) // Allow animation to play
+
+            // Perform the heavy processing on a background thread
+            withContext(Dispatchers.IO) {
+                try {
+                    val session = arCoreManager.session ?: return@withContext
+                    val grayMat = Mat()
+                    Utils.bitmapToMat(bitmap, grayMat)
+                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                    val orb = ORB.create()
+                    val keypoints = MatOfKeyPoint()
+                    val descriptors = Mat()
+                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+
+                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+
+                    val database = AugmentedImageDatabase(session)
+                    database.addImage("target", bitmap)
+                    arCoreManager.updateAugmentedImageDatabase(database)
+
+                    // Update state on the main thread
+                    withContext(Dispatchers.Main) {
+                        updateState(
+                            uiState.value.copy(
+                                fingerprintJson = fingerprintJson,
+                                isCapturingTarget = false // Turn off animation
+                            )
+                        )
+                        Toast.makeText(
+                            getApplication(),
+                            "Target created successfully",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } catch (e: Exception) {
+                    // Handle errors on the main thread
+                    withContext(Dispatchers.Main) {
+                        updateState(uiState.value.copy(isCapturingTarget = false)) // Turn off animation
+                        Toast.makeText(
+                            getApplication(),
+                            "Failed to create target: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        }
+    }
+
 
     fun onProgressUpdate(progress: Float) {
         updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
@@ -292,10 +352,9 @@ class MainViewModel(
         }
     }
 
-    fun onCaptureForRefinementClicked() {
-        viewModelScope.launch {
-            _captureEvent.emit(CaptureEvent.RequestCaptureForRefinement)
-        }
+    // This is the new, streamlined entry point for creating a target.
+    fun onCreateTargetClicked() {
+        arCoreManager.captureNextFrame()
     }
 
 
@@ -308,84 +367,6 @@ class MainViewModel(
             withContext(Dispatchers.Main) {
                 Toast.makeText(getApplication(), "Image saved to gallery", Toast.LENGTH_SHORT).show()
                 setLoading(false)
-            }
-        }
-    }
-
-    fun setRefinementBitmap(bitmap: Bitmap) {
-        val context = getApplication<Application>().applicationContext
-        val cachePath = File(context.cacheDir, "images")
-        cachePath.mkdirs()
-        val file = File(cachePath, "refinement_bitmap.png")
-        val fOut = FileOutputStream(file)
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
-        fOut.close()
-        val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-        updateState(uiState.value.copy(refinementImageUri = newUri))
-    }
-
-    fun onRefinementCancel() {
-        updateState(uiState.value.copy(refinementImageUri = null))
-    }
-
-    fun onRefinementConfirm(cropRect: Rect) {
-        viewModelScope.launch {
-            updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
-            delay(400) // Let the animation play
-            updateState(uiState.value.copy(isCapturingTarget = false), isUndoable = false)
-
-            withContext(Dispatchers.IO) {
-                try {
-                    val uri = uiState.value.refinementImageUri ?: return@withContext
-                    val context = getApplication<Application>().applicationContext
-                    val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@withContext
-
-                    val croppedBitmap = Bitmap.createBitmap(
-                        bitmap,
-                        cropRect.left.toInt(),
-                        cropRect.top.toInt(),
-                        cropRect.width.toInt(),
-                        cropRect.height.toInt()
-                    )
-
-                    val session = arCoreManager.session ?: return@withContext
-                    val grayMat = Mat()
-                    Utils.bitmapToMat(croppedBitmap, grayMat)
-                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
-                    val orb = ORB.create()
-                    val keypoints = MatOfKeyPoint()
-                    val descriptors = Mat()
-                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
-
-                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
-
-                    val database = AugmentedImageDatabase(session)
-                    database.addImage("target", croppedBitmap)
-                    arCoreManager.updateAugmentedImageDatabase(database)
-
-                    updateState(
-                        uiState.value.copy(
-                            fingerprintJson = fingerprintJson,
-                            refinementImageUri = null
-                        )
-                    )
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            getApplication(),
-                            "Target created successfully",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            getApplication(),
-                            "Failed to create target: ${e.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
             }
         }
     }
