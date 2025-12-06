@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES20
+import android.util.Log
 import com.google.ar.core.Plane
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -37,24 +38,43 @@ class PlaneRenderer {
     private var vertexBuffer: FloatBuffer? = null
 
     fun createOnGlThread() {
-        val vertexShader = GLES20.glCreateShader(GLES20.GL_VERTEX_SHADER).also { shader ->
-            GLES20.glShaderSource(shader, vertexShaderCode)
-            GLES20.glCompileShader(shader)
-        }
-
-        val fragmentShader = GLES20.glCreateShader(GLES20.GL_FRAGMENT_SHADER).also { shader ->
-            GLES20.glShaderSource(shader, fragmentShaderCode)
-            GLES20.glCompileShader(shader)
-        }
+        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
+        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
 
         program = GLES20.glCreateProgram().also {
             GLES20.glAttachShader(it, vertexShader)
             GLES20.glAttachShader(it, fragmentShader)
             GLES20.glLinkProgram(it)
+            val linkStatus = IntArray(1)
+            GLES20.glGetProgramiv(it, GLES20.GL_LINK_STATUS, linkStatus, 0)
+            if (linkStatus[0] == 0) {
+                Log.e(TAG, "Could not link program: " + GLES20.glGetProgramInfoLog(it))
+                GLES20.glDeleteProgram(it)
+                program = 0
+            }
+        }
+    }
+
+    private fun loadShader(type: Int, shaderCode: String): Int {
+        return GLES20.glCreateShader(type).also { shader ->
+            GLES20.glShaderSource(shader, shaderCode)
+            GLES20.glCompileShader(shader)
+            val compileStatus = IntArray(1)
+            GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+            if (compileStatus[0] == 0) {
+                Log.e(TAG, "Could not compile shader " + type + ": " + GLES20.glGetShaderInfoLog(shader))
+                GLES20.glDeleteShader(shader)
+                return 0
+            }
         }
     }
 
     fun draw(plane: Plane, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
+        if (program == 0) return
+
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        GLES20.glDisable(GLES20.GL_CULL_FACE)
         GLES20.glUseProgram(program)
 
         val polygon = plane.polygon
@@ -89,5 +109,10 @@ class PlaneRenderer {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, polygon.remaining() / 2)
 
         GLES20.glDisableVertexAttribArray(positionHandle)
+        GLES20.glDisable(GLES20.GL_BLEND)
+    }
+
+    companion object {
+        private const val TAG = "PlaneRenderer"
     }
 }
