@@ -74,6 +74,7 @@ class PlaneRenderer {
 
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        GLES20.glDisable(GLES20.GL_CULL_FACE)
         GLES20.glUseProgram(program)
 
         val polygon = plane.polygon

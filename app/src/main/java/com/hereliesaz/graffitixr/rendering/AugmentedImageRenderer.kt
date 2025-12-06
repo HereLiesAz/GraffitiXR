@@ -71,8 +71,11 @@ class AugmentedImageRenderer {
         android.opengl.Matrix.setIdentityM(scaleMatrix, 0)
         android.opengl.Matrix.scaleM(scaleMatrix, 0, width, 1.0f, height)
 
+        val modelXScale = FloatArray(16)
+        android.opengl.Matrix.multiplyMM(modelXScale, 0, modelMatrix, 0, scaleMatrix, 0)
+
         val modelViewMatrix = FloatArray(16)
-        android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, modelMatrix, 0, scaleMatrix, 0)
+        android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelXScale, 0)
 
         val mvpMatrix = FloatArray(16)
         android.opengl.Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, modelViewMatrix, 0)

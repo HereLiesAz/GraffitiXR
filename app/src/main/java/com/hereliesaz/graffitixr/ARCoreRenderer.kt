@@ -68,12 +68,11 @@ class ARCoreRenderer(private val arCoreManager: ARCoreManager) : GLSurfaceView.R
             arCoreManager.pointCloudRenderer.draw(pointCloud, viewMatrix, projectionMatrix)
         }
 
-        val planes = frame.getUpdatedTrackables(Plane::class.java)
-        if (planes.isNotEmpty()) {
-            Log.d(TAG, "Updated planes: ${planes.size}")
-        }
+        val planes = arCoreManager.session?.getAllTrackables(Plane::class.java) ?: emptyList()
         for (plane in planes) {
-            planeRenderer.draw(plane, viewMatrix, projectionMatrix)
+            if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
+                planeRenderer.draw(plane, viewMatrix, projectionMatrix)
+            }
         }
 
         val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
