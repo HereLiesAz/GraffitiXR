@@ -27,8 +27,8 @@ fun ARScreen(arCoreManager: ARCoreManager) {
             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
             holder.setFormat(PixelFormat.TRANSLUCENT)
             setEGLContextClientVersion(2)
+            setRenderer(renderer) // setRenderer must be called before setRenderMode
             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-            setRenderer(renderer)
         }
     }
 
