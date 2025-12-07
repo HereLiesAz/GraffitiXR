@@ -17,6 +17,7 @@ import java.nio.ByteBuffer
  * This class uses RenderScript to perform the YUV to RGB conversion, which is
  * much faster than doing it on the CPU.
  */
+@Suppress("DEPRECATION")
 class YuvToRgbConverter(context: Context) {
 
     private val rs = RenderScript.create(context)

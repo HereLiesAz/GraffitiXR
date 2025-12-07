@@ -159,8 +159,8 @@ dependencies {
     // ML Kit
     implementation(libs.segmentation.selfie)
 
-implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
-implementation("com.google.firebase:firebase-analytics")
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
     // OpenCV
     implementation(libs.opencv)
 
@@ -168,6 +168,8 @@ implementation("com.google.firebase:firebase-analytics")
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
