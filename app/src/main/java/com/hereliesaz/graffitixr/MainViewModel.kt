@@ -516,6 +516,16 @@ class MainViewModel(
         }
     }
 
+    fun setArPlanesDetected(detected: Boolean) {
+        if (uiState.value.isArPlanesDetected != detected) {
+            updateState(uiState.value.copy(isArPlanesDetected = detected), isUndoable = false)
+        }
+    }
+
+    fun onArImagePlaced() {
+        updateState(uiState.value.copy(arState = ArState.PLACED), isUndoable = false)
+    }
+
     fun onGestureStart() {
         // Overwrite the last state in the undo stack
         if (undoStack.isNotEmpty()) {
