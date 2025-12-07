@@ -142,23 +142,15 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                             gestureInProgress = false
                         }
                     )
-                    EditorMode.AR -> Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDragStart = {
-                                        viewModel.onGestureStart()
-                                        gestureInProgress = true
-                                    },
-                                    onDragEnd = {
-                                        viewModel.onGestureEnd()
-                                        gestureInProgress = false
-                                    }
-                                ) { _, _ -> }
-                            }
-                    ) {
-                        ARScreen(arCoreManager = arCoreManager)
+                    EditorMode.AR -> {
+                        ARScreen(
+                            arCoreManager = arCoreManager,
+                            uiState = uiState,
+                            onPlanesDetected = viewModel::setArPlanesDetected,
+                            onImagePlaced = viewModel::onArImagePlaced,
+                            onScaleChanged = viewModel::onArObjectScaleChanged,
+                            onRotationChanged = viewModel::onRotationZChanged
+                        )
                     }
                 }
             }
