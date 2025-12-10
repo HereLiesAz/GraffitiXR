@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -25,12 +24,14 @@ import androidx.compose.ui.unit.dp
 fun HelpScreen(onGetStarted: () -> Unit) {
     var currentStep by remember { mutableIntStateOf(0) }
 
-    val steps = listOf(
-        "Welcome" to "Welcome to GraffitiXR!\n\nThis app helps you visualize your artwork in the real world.",
-        "Step 1: Choose & Edit" to "Start by choosing an image from your gallery.\n\nUse the tools to remove the background, make it black and white, or increase contrast for better visibility.",
-        "Step 2: Create Fingerprint" to "In AR Mode, point your camera at the surface where you want your mural.\n\nTap 'Create Target' to generate a unique fingerprint of the surface.",
-        "Step 3: Position & Lock" to "Once the target is created, your image will appear.\n\nRotate and resize it to fit perfectly, then lock it into place to start tracing."
-    )
+    val steps = remember {
+        listOf(
+            "Welcome" to "Welcome to GraffitiXR!\n\nThis app helps you visualize your artwork in the real world.",
+            "Step 1: Choose & Edit" to "Start by choosing an image from your gallery.\n\nUse the tools to remove the background, make it black and white, or increase contrast for better visibility.",
+            "Step 2: Create Fingerprint" to "In AR Mode, point your camera at the surface where you want your mural.\n\nTap 'Create Target' to generate a unique fingerprint of the surface.",
+            "Step 3: Position & Lock" to "Once the target is created, your image will appear.\n\nRotate and resize it to fit perfectly, then lock it into place to start tracing."
+        )
+    }
 
     Column(
         modifier = Modifier
