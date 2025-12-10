@@ -29,7 +29,8 @@ fun OnboardingDialog(
     val title = "Welcome to ${editorMode.name} Mode!"
     val message = when (editorMode) {
         EditorMode.STATIC -> "In this mode, you can mockup your artwork on a static background image. Use the controls to adjust the size, position, and orientation of your artwork."
-        EditorMode.NON_AR -> "In this mode, you can overlay your artwork on the live camera feed. This is a great way to get a quick preview of your work in the real world."
+        EditorMode.GHOST -> "In this mode, you can overlay your artwork on the live camera feed. This is a great way to get a quick preview of your work in the real world."
+        EditorMode.TRACE -> "In this mode, your device acts as a lightbox. Place a piece of paper over the screen to trace your artwork. You can lock the screen to prevent accidental touches."
         EditorMode.AR -> "In this mode, you can use Augmented Reality to place your artwork in the real world. First, you'll need to create an image target by pointing your camera at a real-world object."
         EditorMode.HELP -> "This screen provides information about the different modes and how to use them. You can access this screen at any time by tapping the 'Help' button in the navigation rail."
     }

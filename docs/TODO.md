@@ -49,6 +49,9 @@ This document tracks the development status, future enhancements, and identified
     -   [x] **Curves Adjustment:** Implement a user interface for adjusting the image's tonal range using curves.
 -   **[x] Create a Project Library:**
     -   [x] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
+-   **[x] Improve UX Flow and Navigation:**
+    -   [x] Reorganize navigation rail items into logical groups (Project, Mode, Image, Adjustments).
+    -   [x] Implement a multi-step onboarding tutorial in HelpScreen.
 
 ---
 

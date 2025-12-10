@@ -18,7 +18,8 @@ import com.hereliesaz.graffitixr.EditorMode
 fun TitleOverlay(editorMode: EditorMode) {
     val title = when (editorMode) {
         EditorMode.STATIC -> "Mockup"
-        EditorMode.NON_AR -> "Trace Image"
+        EditorMode.GHOST -> "Ghost"
+        EditorMode.TRACE -> "Trace"
         EditorMode.AR -> "AR"
         EditorMode.HELP -> "Help"
     }

@@ -180,6 +180,10 @@ class MainViewModel(
         updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
     }
 
+    fun setTouchLocked(locked: Boolean) {
+        updateState(uiState.value.copy(isTouchLocked = locked), isUndoable = false)
+    }
+
     fun showTapFeedback(position: Offset, isSuccess: Boolean) {
         viewModelScope.launch {
             _tapFeedback.value = if (isSuccess) TapFeedback.Success(position) else TapFeedback.Failure(position)
