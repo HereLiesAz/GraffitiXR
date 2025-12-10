@@ -38,8 +38,8 @@ data class UiState(
     val processedImageUri: Uri? = null,
     val blendMode: @WriteWith<BlendModeParceler> BlendMode = BlendMode.SrcOver,
 
-    // CHANGED: Default axis is now Y (Spin), as this is most intuitive for AR planes
-    val activeRotationAxis: RotationAxis = RotationAxis.Y,
+    // CHANGED: Default is Z (Spin) because geometry is X-Y projected to X-Z
+    val activeRotationAxis: RotationAxis = RotationAxis.Z,
 
     val isToolbarVisible: Boolean = true,
     val isSettingsPanelVisible: Boolean = false,

@@ -25,7 +25,6 @@ fun ArView(
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = context as? Activity
 
-    // Initialize Renderer
     val renderer = remember {
         ArRenderer(
             context,
@@ -35,13 +34,11 @@ fun ArView(
         )
     }
 
-    // Connect Renderer to ViewModel so ViewModel can trigger "Capture Target"
     DisposableEffect(renderer) {
         viewModel.arRenderer = renderer
         onDispose { viewModel.arRenderer = null }
     }
 
-    // Sync UI State to Renderer
     renderer.opacity = uiState.opacity
     renderer.scale = uiState.arObjectScale
     renderer.rotationX = uiState.rotationX
@@ -51,17 +48,14 @@ fun ArView(
     renderer.colorBalanceG = uiState.colorBalanceG
     renderer.colorBalanceB = uiState.colorBalanceB
 
-    // Sync AR State
     if (uiState.arState != renderer.arState) {
         renderer.arState = uiState.arState
     }
 
-    // Load image
     if (uiState.overlayImageUri != null) {
         renderer.updateOverlayImage(uiState.overlayImageUri)
     }
 
-    // Create GL View
     val glSurfaceView = remember {
         GLSurfaceView(context).apply {
             preserveEGLContextOnPause = true
@@ -72,7 +66,6 @@ fun ArView(
         }
     }
 
-    // Lifecycle Management
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -99,7 +92,7 @@ fun ArView(
         factory = { glSurfaceView },
         modifier = Modifier
             .fillMaxSize()
-            // 1. Tap Detector (For placement and axis toggling)
+            // 1. Tap Logic
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
@@ -112,18 +105,13 @@ fun ArView(
                     }
                 )
             }
-            // 2. Transform Detector (Scale and Rotate)
-            // KEY FIX: We pass 'uiState.activeRotationAxis' as the key.
-            // This forces the block to restart when the axis changes,
-            // ensuring the closure captures the NEW axis.
+            // 2. Transform Logic
+            // KEY FIX: Restarts detection when axis changes
             .pointerInput(uiState.activeRotationAxis) {
                 detectTransformGestures { _, _, zoom, rotation ->
-                    // Scaling
                     viewModel.onArObjectScaleChanged(zoom)
 
-                    // Rotation
-                    // KEY FIX: Invert rotation sign (-rotation) to match finger direction
-                    // OpenGL rotates CCW for positive values. Fingers usually expect CW.
+                    // KEY FIX: Invert rotation for natural feel
                     val rotationDelta = -rotation
 
                     when (uiState.activeRotationAxis) {

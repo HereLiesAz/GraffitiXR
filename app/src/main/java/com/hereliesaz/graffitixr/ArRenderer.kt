@@ -102,10 +102,8 @@ class ArRenderer(
             displayRotationHelper.updateSessionIfNeeded(session!!)
             val frame = session!!.update()
 
-            // 1. Draw Background
             backgroundRenderer.draw(frame)
 
-            // 2. Handle Capture
             if (captureNextFrame) {
                 captureFrameForFingerprint(frame)
                 captureNextFrame = false
@@ -119,15 +117,12 @@ class ArRenderer(
             val viewmtx = FloatArray(16)
             camera.getViewMatrix(viewmtx, 0)
 
-            // If not tracking, we can't draw world objects
             if (camera.trackingState != TrackingState.TRACKING) return
 
-            // 3. Draw Point Cloud
             frame.acquirePointCloud().use { pointCloud ->
                 pointCloudRenderer.draw(pointCloud, viewmtx, projmtx)
             }
 
-            // 4. State Logic
             when (arState) {
                 ArState.SEARCHING -> {
                     val planes = session!!.getAllTrackables(Plane::class.java)
@@ -170,24 +165,26 @@ class ArRenderer(
 
         val modelMtx = pose.clone()
 
-        // 1. Uniform Scale
-        // CRITICAL FIX: Scale X and Z because the quad is on the floor (Y=0)
-        // Previous code scaled X and Y, leaving Z at 1.0, causing distortion.
-        Matrix.scaleM(modelMtx, 0, scale, 1f, scale)
+        // --- ORDER OF OPERATIONS (Applied Last to First on Vertices) ---
 
-        // 2. Rotation
-        // Apply rotations in order.
-        // Y is usually the "Spin" axis for a floor object.
-        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f) // Spin
-        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f) // Tilt Forward/Back
-        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f) // Tilt Left/Right
+        // 1. User Rotation (Global axes)
+        // Z is Spin (0,0,1), X is Tilt (1,0,0), Y is Twist (0,1,0)
+        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
+        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
+        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
 
-        // 3. Aspect Ratio Correction
+        // 2. Lay Flat Orientation
+        // Rotate -90 on X to lay the vertical X-Y plane flat onto the floor X-Z
+        Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
+
+        // 3. Uniform Scale
+        // Scale X and Y (Width/Height) uniformly
+        Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
+
+        // 4. Aspect Ratio Correction
         val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
-        // Scale X by aspect ratio to widen the image
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
 
-        // 4. Draw
         simpleQuadRenderer.draw(
             modelMtx, viewMtx, projMtx,
             bitmap, opacity, colorBalanceR, colorBalanceG, colorBalanceB

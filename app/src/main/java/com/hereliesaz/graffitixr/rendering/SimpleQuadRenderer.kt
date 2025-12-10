@@ -8,7 +8,7 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /**
- * Renders a texture on a quad.
+ * Renders a texture on a quad defined in the X-Y plane (Vertical).
  */
 class SimpleQuadRenderer {
     private var program = 0
@@ -40,12 +40,13 @@ class SimpleQuadRenderer {
         alphaUniform = GLES20.glGetUniformLocation(program, "u_Alpha")
         colorBalanceUniform = GLES20.glGetUniformLocation(program, "u_ColorBalance")
 
-        // Quad with center at 0,0,0
+        // Geometry: Vertical Quad (X-Y Plane). Z is 0.
+        // This ensures Scale(s, s, 1) scales both Width and Height uniformly.
         val vertices = floatArrayOf(
-            -0.5f, 0.0f, -0.5f,
-            -0.5f, 0.0f, 0.5f,
-            0.5f, 0.0f, 0.5f,
-            0.5f, 0.0f, -0.5f
+            -0.5f, -0.5f, 0.0f, // Bottom Left
+            -0.5f,  0.5f, 0.0f, // Top Left
+            0.5f,  0.5f, 0.0f, // Top Right
+            0.5f, -0.5f, 0.0f  // Bottom Right
         )
         val bb = ByteBuffer.allocateDirect(vertices.size * 4)
         bb.order(ByteOrder.nativeOrder())
@@ -53,11 +54,12 @@ class SimpleQuadRenderer {
         vertexBuffer!!.put(vertices)
         vertexBuffer!!.position(0)
 
+        // Texture Coords (Standard)
         val texCoords = floatArrayOf(
-            0.0f, 0.0f,
             0.0f, 1.0f,
-            1.0f, 1.0f,
-            1.0f, 0.0f
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            1.0f, 1.0f
         )
         val bbTex = ByteBuffer.allocateDirect(texCoords.size * 4)
         bbTex.order(ByteOrder.nativeOrder())
@@ -85,7 +87,7 @@ class SimpleQuadRenderer {
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
-        // MVP
+        // Calculate MVP
         val mvpMatrix = FloatArray(16)
         val modelViewMatrix = FloatArray(16)
         android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
