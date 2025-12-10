@@ -102,10 +102,11 @@ fun ArView(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
+                        // Toggle Axis
                         viewModel.onCycleRotationAxis()
                     },
                     onTap = { offset ->
-                        // Only process taps if searching for planes
+                        // Place Anchor (only if searching)
                         if (uiState.arState == ArState.SEARCHING) {
                             renderer.queueTap(offset.x, offset.y)
                         }
@@ -114,9 +115,12 @@ fun ArView(
             }
             .pointerInput(Unit) {
                 detectTransformGestures { _, _, zoom, rotation ->
+                    // 1. Uniform Scaling
+                    // The ViewModel multiplies the current scale by this zoom factor
                     viewModel.onArObjectScaleChanged(zoom)
 
-                    // Apply rotation based on the active axis
+                    // 2. Axis-Dependent Rotation
+                    // We route the rotation delta to the active axis
                     when (uiState.activeRotationAxis) {
                         RotationAxis.X -> viewModel.onRotationXChanged(rotation)
                         RotationAxis.Y -> viewModel.onRotationYChanged(rotation)

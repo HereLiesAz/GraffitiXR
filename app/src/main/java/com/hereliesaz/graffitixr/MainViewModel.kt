@@ -71,23 +71,18 @@ class MainViewModel(
         ), isUndoable = false)
     }
 
-    // --- AR Target Creation Logic (Merged V1/V2) ---
+    // --- AR Target Creation Logic ---
 
     fun onCreateTargetClicked() {
-        // 1. Show capture animation
         updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
-        // 2. Tell the renderer to grab the next frame from the GL thread
         arRenderer?.triggerCapture()
     }
 
     fun onFrameCaptured(bitmap: Bitmap) {
         viewModelScope.launch {
-            // Wait slightly for animation to finish
             delay(400)
-
             withContext(Dispatchers.IO) {
                 try {
-                    // A. Generate OpenCV Fingerprint (for saving/loading persistence)
                     val grayMat = Mat()
                     Utils.bitmapToMat(bitmap, grayMat)
                     Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
@@ -100,11 +95,8 @@ class MainViewModel(
                     val fingerprint = Fingerprint(keypoints.toList(), descriptors)
                     val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
-                    // B. Update ARCore Database (for live tracking)
-                    // Must be done on Main thread to safely interact with the Session in ArRenderer
                     withContext(Dispatchers.Main) {
                         arRenderer?.setAugmentedImageDatabase(bitmap)
-
                         updateState(
                             uiState.value.copy(
                                 fingerprintJson = fingerprintJson,
@@ -125,7 +117,64 @@ class MainViewModel(
         }
     }
 
-    // --- Core Editing Logic ---
+    // --- Logic & Transforms ---
+
+    fun onCycleRotationAxis() {
+        val currentAxis = uiState.value.activeRotationAxis
+        val nextAxis = when (currentAxis) {
+            RotationAxis.X -> RotationAxis.Y
+            RotationAxis.Y -> RotationAxis.Z
+            RotationAxis.Z -> RotationAxis.X
+        }
+
+        // Update state and show Toast
+        updateState(uiState.value.copy(
+            activeRotationAxis = nextAxis,
+            showRotationAxisFeedback = true
+        ))
+
+        Toast.makeText(getApplication(), "Rotation Axis: ${nextAxis.name}", Toast.LENGTH_SHORT).show()
+    }
+
+    fun onArObjectScaleChanged(scaleFactor: Float) {
+        val currentScale = uiState.value.arObjectScale
+        // Uniform scaling: new scale is previous scale * zoom factor
+        // We limit min/max scale to prevent objects disappearing or becoming massive
+        val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
+        updateState(uiState.value.copy(arObjectScale = newScale), isUndoable = false)
+    }
+
+    fun onRotationXChanged(delta: Float) {
+        updateState(uiState.value.copy(rotationX = uiState.value.rotationX + delta), isUndoable = false)
+    }
+
+    fun onRotationYChanged(delta: Float) {
+        updateState(uiState.value.copy(rotationY = uiState.value.rotationY + delta), isUndoable = false)
+    }
+
+    fun onRotationZChanged(delta: Float) {
+        val currentRotation = uiState.value.rotationZ
+        updateState(uiState.value.copy(rotationZ = currentRotation + delta), isUndoable = false)
+    }
+
+    fun onFeedbackShown() {
+        viewModelScope.launch {
+            delay(1000)
+            updateState(uiState.value.copy(showRotationAxisFeedback = false))
+        }
+    }
+
+    fun setArPlanesDetected(detected: Boolean) {
+        if (uiState.value.isArPlanesDetected != detected) {
+            updateState(uiState.value.copy(isArPlanesDetected = detected), isUndoable = false)
+        }
+    }
+
+    fun onArImagePlaced() {
+        updateState(uiState.value.copy(arState = ArState.PLACED), isUndoable = false)
+    }
+
+    // --- Core State Logic (Unchanged from previous V3) ---
 
     fun onProgressUpdate(progress: Float) {
         updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
@@ -147,16 +196,13 @@ class MainViewModel(
                 try {
                     val context = getApplication<Application>().applicationContext
                     val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
-
                     val resultBitmap = bitmap.removeBackground(context)
-
                     val cachePath = File(context.cacheDir, "images")
                     cachePath.mkdirs()
                     val file = File(cachePath, "background_removed_${System.currentTimeMillis()}.png")
                     val fOut = FileOutputStream(file)
                     resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
                     fOut.close()
-
                     val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
                     updateState(uiState.value.copy(backgroundRemovedImageUri = newUri, isLoading = false))
                 } catch (e: Exception) {
@@ -176,16 +222,13 @@ class MainViewModel(
             if (uri != null) {
                 val context = getApplication<Application>().applicationContext
                 val bitmap = BitmapUtils.getBitmapFromUri(context, uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch
-
                 val lineDrawingBitmap = convertToLineDrawing(bitmap)
-
                 val cachePath = File(context.cacheDir, "images")
                 cachePath.mkdirs()
                 val file = File(cachePath, "line_drawing_${System.currentTimeMillis()}.png")
                 val fOut = FileOutputStream(file)
                 lineDrawingBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
                 fOut.close()
-
                 val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
                 updateState(uiState.value.copy(overlayImageUri = newUri, isLoading = false))
             } else {
@@ -230,16 +273,6 @@ class MainViewModel(
 
     fun onOffsetChanged(offset: Offset) {
         updateState(uiState.value.copy(offset = uiState.value.offset + offset), isUndoable = false)
-    }
-
-    fun onRotationZChanged(rotationDelta: Float) {
-        val currentRotation = uiState.value.rotationZ
-        updateState(uiState.value.copy(rotationZ = currentRotation + rotationDelta), isUndoable = false)
-    }
-
-    fun onArObjectScaleChanged(scaleFactor: Float) {
-        val currentScale = uiState.value.arObjectScale
-        updateState(uiState.value.copy(arObjectScale = currentScale * scaleFactor), isUndoable = false)
     }
 
     fun onEditorModeChanged(mode: EditorMode) {
@@ -291,16 +324,13 @@ class MainViewModel(
             try {
                 val context = getApplication<Application>().applicationContext
                 val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
-
                 val resultBitmap = com.hereliesaz.graffitixr.utils.applyCurves(bitmap, points)
-
                 val cachePath = File(context.cacheDir, "images")
                 cachePath.mkdirs()
                 val file = File(cachePath, "curves_processed_${System.currentTimeMillis()}.png")
                 val fOut = FileOutputStream(file)
                 resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
                 fOut.close()
-
                 val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
                 updateState(uiState.value.copy(processedImageUri = newUri, isLoading = false))
             } catch (e: Exception) {
@@ -310,32 +340,8 @@ class MainViewModel(
         }
     }
 
-    fun onCycleRotationAxis() {
-        val currentAxis = uiState.value.activeRotationAxis
-        val nextAxis = when (currentAxis) {
-            RotationAxis.X -> RotationAxis.Y
-            RotationAxis.Y -> RotationAxis.Z
-            RotationAxis.Z -> RotationAxis.X
-        }
-        updateState(uiState.value.copy(
-            activeRotationAxis = nextAxis,
-            showRotationAxisFeedback = true
-        ))
-    }
-
-    fun onRotationXChanged(delta: Float) {
-        updateState(uiState.value.copy(rotationX = uiState.value.rotationX + delta), isUndoable = false)
-    }
-
-    fun onRotationYChanged(delta: Float) {
-        updateState(uiState.value.copy(rotationY = uiState.value.rotationY + delta), isUndoable = false)
-    }
-
-    fun onFeedbackShown() {
-        viewModelScope.launch {
-            delay(1000)
-            updateState(uiState.value.copy(showRotationAxisFeedback = false))
-        }
+    fun onCurvesPointsChanged(points: List<Offset>) {
+        updateState(uiState.value.copy(curvesPoints = points), isUndoable = false)
     }
 
     fun onSaveClicked() {
@@ -443,19 +449,6 @@ class MainViewModel(
 
                     withContext(Dispatchers.Main) {
                         Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show()
-
-                        // If we are already in AR mode, try to load the fingerprint image
-                        if (uiState.value.editorMode == EditorMode.AR && projectData.overlayImageUri != null) {
-                            // Note: In a real flow, you might want to ask the user to re-scan the target.
-                            // For now, if the overlay image IS the target, we could reload it.
-                            // However, usually the target image is distinct from the overlay.
-                            // Since V2 implementation assumes Overlay == Target creation source,
-                            // we can attempt to recreate the DB.
-                            val bitmap = BitmapUtils.getBitmapFromUri(getApplication(), projectData.overlayImageUri)
-                            if (bitmap != null) {
-                                arRenderer?.setAugmentedImageDatabase(bitmap)
-                            }
-                        }
                     }
                 }
             } catch (e: Exception) {
@@ -482,10 +475,6 @@ class MainViewModel(
         updateState(UiState(), isUndoable = false)
     }
 
-    fun onCurvesPointsChanged(points: List<Offset>) {
-        updateState(uiState.value.copy(curvesPoints = points), isUndoable = false)
-    }
-
     fun onUndoClicked() {
         if (undoStack.isNotEmpty()) {
             val lastState = undoStack.removeAt(undoStack.lastIndex)
@@ -500,16 +489,6 @@ class MainViewModel(
             undoStack.add(uiState.value)
             updateState(nextState, isUndoable = false)
         }
-    }
-
-    fun setArPlanesDetected(detected: Boolean) {
-        if (uiState.value.isArPlanesDetected != detected) {
-            updateState(uiState.value.copy(isArPlanesDetected = detected), isUndoable = false)
-        }
-    }
-
-    fun onArImagePlaced() {
-        updateState(uiState.value.copy(arState = ArState.PLACED), isUndoable = false)
     }
 
     fun onGestureStart() {
