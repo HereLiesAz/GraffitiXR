@@ -4,6 +4,17 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
+## **V1.6 Enhancements (Current)**
+
+-   **[x] UI Layout Reorganization:**
+    -   [x] Reorganized Navigation Rail: Moved adjustment items to "Image", created "Target" host for target-related items.
+    -   [x] Consolidate controls: Adjustments (Opacity, Contrast, Saturation) are now grouped in a bottom panel.
+-   **[x] Improved Adjustments UI:**
+    -   [x] Replaced adjustment sliders with rotatable Knobs.
+    -   [x] Implemented a transparent `AdjustmentsPanel` at the bottom of the screen.
+    -   [x] Added persistent Undo/Redo buttons alongside the adjustments.
+    -   [x] Ensure controls do not obscure the image (transparent background).
+
 ## **V1.5 Completed Features**
 
 -   **[x] Refactor from Vuforia Engine to ARCore:**
