@@ -1,15 +1,12 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Application
-import android.content.Context
 import android.content.SharedPreferences
-import android.graphics.Bitmap
 import androidx.lifecycle.SavedStateHandle
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -26,7 +23,6 @@ class MainViewModelTest {
     private lateinit var viewModel: MainViewModel
     private val application: Application = mockk(relaxed = true)
     private val savedStateHandle: SavedStateHandle = SavedStateHandle()
-    private val arCoreManager: ARCoreManager = mockk(relaxed = true)
     private val sharedPreferences: SharedPreferences = mockk(relaxed = true)
     private val editor: SharedPreferences.Editor = mockk(relaxed = true)
 
@@ -47,11 +43,8 @@ class MainViewModelTest {
         val tempDir = File.createTempFile("temp", "dir").parentFile
         every { application.filesDir } returns tempDir
 
-        // ARCoreManager mocks
-        // Return a flow that never emits so we avoid triggering OpenCV code
-        every { arCoreManager.frameBitmap } returns MutableSharedFlow<Bitmap>()
-
-        viewModel = MainViewModel(application, savedStateHandle, arCoreManager)
+        // Initialize ViewModel with the new constructor (no ARCoreManager)
+        viewModel = MainViewModel(application, savedStateHandle)
     }
 
     @After

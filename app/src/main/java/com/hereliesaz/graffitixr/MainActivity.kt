@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -27,22 +26,17 @@ import androidx.core.content.edit
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.google.ar.core.ArCoreApk
-import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.hereliesaz.graffitixr.composables.OnboardingScreen
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import org.opencv.android.OpenCVLoader
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var arCoreManager: ARCoreManager
-    private val viewModel: MainViewModel by viewModels { MainViewModelFactory(arCoreManager) }
+    private val viewModel: MainViewModel by viewModels { MainViewModelFactory() }
+
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        arCoreManager = ARCoreManager(this)
-        lifecycle.addObserver(arCoreManager)
 
         if (!OpenCVLoader.initLocal()) {
             Log.e("OpenCV", "Unable to load OpenCV!")
@@ -56,24 +50,21 @@ class MainActivity : ComponentActivity() {
         setContent {
             GraffitiXRTheme {
                 AppContent(
-                    viewModel = viewModel, 
-                    arCoreManager = arCoreManager,
+                    viewModel = viewModel,
                     onboardingShown = onboardingShown,
-                    onOnboardingDismiss = { 
+                    onOnboardingDismiss = {
                         prefs.edit { putBoolean("onboarding_shown", true) }
                     }
                 )
             }
         }
     }
-
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun AppContent(
-    viewModel: MainViewModel, 
-    arCoreManager: ARCoreManager, 
+    viewModel: MainViewModel,
     onboardingShown: Boolean,
     onOnboardingDismiss: () -> Unit
 ) {
@@ -84,8 +75,8 @@ fun AppContent(
         color = MaterialTheme.colorScheme.background
     ) {
         if (showOnboarding) {
-            OnboardingScreen(onDismiss = { 
-                showOnboarding = false 
+            OnboardingScreen(onDismiss = {
+                showOnboarding = false
                 onOnboardingDismiss()
             })
         } else {
@@ -94,7 +85,7 @@ fun AppContent(
             )
 
             if (cameraPermissionState.status.isGranted) {
-                MainScreen(viewModel = viewModel, arCoreManager = arCoreManager)
+                MainScreen(viewModel = viewModel)
             } else {
                 PermissionScreen(
                     onRequestPermission = {
@@ -124,8 +115,6 @@ fun PermissionScreen(onRequestPermission: () -> Unit) {
 @Composable
 fun PermissionScreenPreview() {
     GraffitiXRTheme {
-        PermissionScreen {
-
-        }
+        PermissionScreen { }
     }
 }

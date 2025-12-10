@@ -11,7 +11,6 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import com.google.ar.core.AugmentedImageDatabase
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.utils.BitmapUtils
@@ -27,8 +26,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -46,8 +43,7 @@ sealed class CaptureEvent {
 
 class MainViewModel(
     application: Application,
-    private val savedStateHandle: SavedStateHandle,
-    private val arCoreManager: ARCoreManager
+    private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
 
     private val onboardingManager = OnboardingManager(application)
@@ -64,32 +60,38 @@ class MainViewModel(
     private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
     val tapFeedback = _tapFeedback.asStateFlow()
 
+    // Reference to the active AR Renderer (injected by ArView)
+    var arRenderer: ArRenderer? = null
+
     init {
         val completedModes = onboardingManager.getCompletedModes()
         updateState(uiState.value.copy(
             completedOnboardingModes = completedModes,
             showOnboardingDialogForMode = if (!completedModes.contains(uiState.value.editorMode)) uiState.value.editorMode else null
         ), isUndoable = false)
-
-        // Listen for captured frames from ARCoreManager
-        arCoreManager.frameBitmap.onEach { bitmap ->
-            createTargetFromFrame(bitmap)
-        }.launchIn(viewModelScope)
     }
 
-    private fun createTargetFromFrame(bitmap: Bitmap) {
-        viewModelScope.launch {
-            // Trigger the capture animation
-            updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
-            delay(400) // Allow animation to play
+    // --- AR Target Creation Logic (Merged V1/V2) ---
 
-            // Perform the heavy processing on a background thread
+    fun onCreateTargetClicked() {
+        // 1. Show capture animation
+        updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
+        // 2. Tell the renderer to grab the next frame from the GL thread
+        arRenderer?.triggerCapture()
+    }
+
+    fun onFrameCaptured(bitmap: Bitmap) {
+        viewModelScope.launch {
+            // Wait slightly for animation to finish
+            delay(400)
+
             withContext(Dispatchers.IO) {
                 try {
-                    val session = arCoreManager.session ?: return@withContext
+                    // A. Generate OpenCV Fingerprint (for saving/loading persistence)
                     val grayMat = Mat()
                     Utils.bitmapToMat(bitmap, grayMat)
                     Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+
                     val orb = ORB.create()
                     val keypoints = MatOfKeyPoint()
                     val descriptors = Mat()
@@ -98,39 +100,32 @@ class MainViewModel(
                     val fingerprint = Fingerprint(keypoints.toList(), descriptors)
                     val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
-                    val database = AugmentedImageDatabase(session)
-                    database.addImage("target", bitmap)
-                    arCoreManager.updateAugmentedImageDatabase(database)
-
-                    // Update state on the main thread
+                    // B. Update ARCore Database (for live tracking)
+                    // Must be done on Main thread to safely interact with the Session in ArRenderer
                     withContext(Dispatchers.Main) {
+                        arRenderer?.setAugmentedImageDatabase(bitmap)
+
                         updateState(
                             uiState.value.copy(
                                 fingerprintJson = fingerprintJson,
-                                isCapturingTarget = false // Turn off animation
+                                isCapturingTarget = false,
+                                isArTargetCreated = true,
+                                arState = ArState.LOCKED
                             )
                         )
-                        Toast.makeText(
-                            getApplication(),
-                            "Target created successfully",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    // Handle errors on the main thread
                     withContext(Dispatchers.Main) {
-                        updateState(uiState.value.copy(isCapturingTarget = false)) // Turn off animation
-                        Toast.makeText(
-                            getApplication(),
-                            "Failed to create target: ${e.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        updateState(uiState.value.copy(isCapturingTarget = false))
+                        Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
             }
         }
     }
 
+    // --- Core Editing Logic ---
 
     fun onProgressUpdate(progress: Float) {
         updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
@@ -270,7 +265,6 @@ class MainViewModel(
         }
 
         if (mode == EditorMode.HELP) {
-            // After showing HELP onboarding, switch to a default mode like STATIC
             updateState(updatedState.copy(editorMode = EditorMode.STATIC))
         } else {
             updateState(updatedState)
@@ -281,7 +275,6 @@ class MainViewModel(
         onboardingManager.setDoubleTapHintSeen()
         updateState(uiState.value.copy(showDoubleTapHint = false))
     }
-
 
     fun onCurvesPointsChangeFinished() {
         viewModelScope.launch {
@@ -317,7 +310,6 @@ class MainViewModel(
         }
     }
 
-
     fun onCycleRotationAxis() {
         val currentAxis = uiState.value.activeRotationAxis
         val nextAxis = when (currentAxis) {
@@ -341,7 +333,7 @@ class MainViewModel(
 
     fun onFeedbackShown() {
         viewModelScope.launch {
-            delay(1000) // Keep feedback visible for 1 second
+            delay(1000)
             updateState(uiState.value.copy(showRotationAxisFeedback = false))
         }
     }
@@ -351,12 +343,6 @@ class MainViewModel(
             _captureEvent.emit(CaptureEvent.RequestCapture)
         }
     }
-
-    // This is the new, streamlined entry point for creating a target.
-    fun onCreateTargetClicked() {
-        arCoreManager.captureNextFrame()
-    }
-
 
     fun saveCapturedBitmap(bitmap: Bitmap) {
         viewModelScope.launch {
@@ -370,7 +356,6 @@ class MainViewModel(
             }
         }
     }
-
 
     fun onColorBalanceRChanged(value: Float) {
         updateState(uiState.value.copy(colorBalanceR = value), isUndoable = false)
@@ -395,7 +380,7 @@ class MainViewModel(
             BlendMode.Lighten -> BlendMode.SrcOver
             else -> BlendMode.SrcOver
         }
-        Toast.makeText(getApplication(), "Blend Mode: ${nextMode.toString()}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(getApplication(), "Blend Mode: ${nextMode}", Toast.LENGTH_SHORT).show()
         updateState(uiState.value.copy(blendMode = nextMode))
     }
 
@@ -455,15 +440,22 @@ class MainViewModel(
                         fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) },
                         drawingPaths = projectData.drawingPaths
                     ))
-                    projectData.overlayImageUri?.let { uri ->
-                        val bitmap = BitmapUtils.getBitmapFromUri(getApplication(), uri) ?: return@launch
-                        val session = arCoreManager.session ?: return@launch
-                        val database = AugmentedImageDatabase(session)
-                        database.addImage("target", bitmap)
-                        arCoreManager.updateAugmentedImageDatabase(database)
-                    }
+
                     withContext(Dispatchers.Main) {
                         Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show()
+
+                        // If we are already in AR mode, try to load the fingerprint image
+                        if (uiState.value.editorMode == EditorMode.AR && projectData.overlayImageUri != null) {
+                            // Note: In a real flow, you might want to ask the user to re-scan the target.
+                            // For now, if the overlay image IS the target, we could reload it.
+                            // However, usually the target image is distinct from the overlay.
+                            // Since V2 implementation assumes Overlay == Target creation source,
+                            // we can attempt to recreate the DB.
+                            val bitmap = BitmapUtils.getBitmapFromUri(getApplication(), projectData.overlayImageUri)
+                            if (bitmap != null) {
+                                arRenderer?.setAugmentedImageDatabase(bitmap)
+                            }
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -475,9 +467,7 @@ class MainViewModel(
         }
     }
 
-    fun getProjectList(): List<String> {
-        return projectManager.getProjectList()
-    }
+    fun getProjectList(): List<String> = projectManager.getProjectList()
 
     fun deleteProject(projectName: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -486,10 +476,6 @@ class MainViewModel(
                 Toast.makeText(getApplication(), "Project '$projectName' deleted", Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    fun onTargetCreationStateChanged(newState: TargetCreationState) {
-        updateState(uiState.value.copy(targetCreationState = newState), isUndoable = false)
     }
 
     fun onNewProject() {
@@ -527,7 +513,6 @@ class MainViewModel(
     }
 
     fun onGestureStart() {
-        // Overwrite the last state in the undo stack
         if (undoStack.isNotEmpty()) {
             undoStack[undoStack.lastIndex] = uiState.value
         } else {
@@ -536,9 +521,7 @@ class MainViewModel(
         redoStack.clear()
     }
 
-    fun onGestureEnd() {
-        // No action needed here as the state is already saved at the start
-    }
+    fun onGestureEnd() { }
 
     private fun updateState(newState: UiState, isUndoable: Boolean = true) {
         val currentState = savedStateHandle.get<UiState>("uiState") ?: UiState()

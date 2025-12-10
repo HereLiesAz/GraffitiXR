@@ -1,4 +1,3 @@
-
 import java.util.Properties
 
 plugins {
@@ -7,7 +6,7 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.jetbrains.kotlin.compose)
     id("kotlin-parcelize")
-id("com.google.gms.google-services")
+    id("com.google.gms.google-services")
 }
 
 val localProperties = Properties().apply {
@@ -27,7 +26,7 @@ val versionProperties = Properties().apply {
 }
 
 val vMajor = versionProperties.getProperty("versionMajor", "1").toInt()
-val vMinor = versionProperties.getProperty("versionMinor", "0").toInt()
+val vMinor = versionProperties.getProperty("versionMinor", "2").toInt()
 val vPatch = versionProperties.getProperty("versionPatch", "0").toInt()
 val vBuild = if (project.hasProperty("versionBuild")) {
     project.property("versionBuild").toString().toInt()
@@ -36,15 +35,6 @@ val vBuild = if (project.hasProperty("versionBuild")) {
 }
 
 android {
-//    signingConfigs {
-//        create("release") {
-//            keyAlias = localProperties.getProperty("keyAlias")
-//            keyPassword = localProperties.getProperty("keyPassword")
-//            storeFile = file(localProperties.getProperty("storeFile"))
-//            storePassword = localProperties.getProperty("storePassword")
-//        }
-//
-//    }
     buildFeatures {
         buildConfig = true
     }
@@ -58,7 +48,6 @@ android {
         versionCode = vMajor * 10000000 + vMinor * 100000 + vPatch * 1000 + vBuild
         versionName = "$vMajor.$vMinor.$vPatch.$vBuild"
 
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -66,12 +55,6 @@ android {
         multiDexEnabled = true
         ndk {
             abiFilters.add("arm64-v8a")
-        }
-
-        externalNativeBuild {
-            cmake {
-                arguments += "-DANDROID_STL=c++_shared"
-            }
         }
     }
 
@@ -99,21 +82,11 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-        prefab = true
     }
 
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
-
-    buildToolsVersion = "36.0.0"
-    ndkVersion = "26.1.10909125"
-
-    externalNativeBuild {
-        cmake {
-            path = file("CMakeLists.txt")
         }
     }
 }
@@ -140,7 +113,6 @@ dependencies {
     // ARCore
     implementation(libs.arcore.client)
 
-
     // CameraX
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
@@ -161,6 +133,7 @@ dependencies {
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+
     // OpenCV
     implementation(libs.opencv)
 
@@ -176,6 +149,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
-// Example: 'org.opencv:opencv-android:4.9.0'
 }

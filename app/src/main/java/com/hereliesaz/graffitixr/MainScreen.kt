@@ -7,7 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -23,7 +22,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -45,7 +43,7 @@ import com.hereliesaz.graffitixr.utils.captureWindow
 import kotlinx.coroutines.delay
 
 @Composable
-fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
+fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
@@ -144,13 +142,9 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                         }
                     )
                     EditorMode.AR -> {
-                        ARScreen(
-                            arCoreManager = arCoreManager,
-                            uiState = uiState,
-                            onPlanesDetected = viewModel::setArPlanesDetected,
-                            onImagePlaced = viewModel::onArImagePlaced,
-                            onScaleChanged = viewModel::onArObjectScaleChanged,
-                            onRotationChanged = viewModel::onRotationZChanged
+                        ArView(
+                            viewModel = viewModel,
+                            uiState = uiState
                         )
                     }
                 }
@@ -190,11 +184,9 @@ fun MainScreen(viewModel: MainViewModel, arCoreManager: ARCoreManager) {
                     overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
 
-
-
                 if (uiState.overlayImageUri != null) {
-                     azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
-                     azRailItem(id = "line_drawing", text = "Outline", onClick = viewModel::onLineDrawingClicked)
+                    azRailItem(id = "remove_bg", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
+                    azRailItem(id = "line_drawing", text = "Outline", onClick = viewModel::onLineDrawingClicked)
                 }
 
                 azDivider()
