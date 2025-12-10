@@ -66,6 +66,13 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
+## **V1.7 Features**
+
+-   **[x] Settings Screen:**
+    -   [x] Added a centralized Settings screen accessible from the Navigation Rail.
+    -   [x] Displays App Version and Permissions status.
+    -   [x] Implemented GitHub update check for experimental releases.
+
 ## **Project Backlog**
 
 All items completed. Ready for the next phase of development.

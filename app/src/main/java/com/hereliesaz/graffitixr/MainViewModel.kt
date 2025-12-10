@@ -563,6 +563,67 @@ class MainViewModel(
         }
     }
 
+    fun checkForUpdates() {
+        viewModelScope.launch {
+            updateState(uiState.value.copy(isCheckingForUpdate = true, updateStatusMessage = null), isUndoable = false)
+
+            withContext(Dispatchers.IO) {
+                try {
+                    val url = java.net.URL("https://api.github.com/repos/HereLiesAZ/GraffitiXR/releases")
+                    val connection = url.openConnection() as javax.net.ssl.HttpsURLConnection
+                    connection.requestMethod = "GET"
+                    connection.connectTimeout = 5000
+                    connection.readTimeout = 5000
+                    connection.setRequestProperty("User-Agent", "GraffitiXR-App")
+
+                    if (connection.responseCode == 200) {
+                        val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
+                        val response = StringBuilder()
+                        var line: String?
+                        while (reader.readLine().also { line = it } != null) {
+                            response.append(line)
+                        }
+                        reader.close()
+
+                        val json = Json { ignoreUnknownKeys = true }
+                        val releases = json.decodeFromString<List<com.hereliesaz.graffitixr.data.GithubRelease>>(response.toString())
+
+                        if (releases.isNotEmpty()) {
+                            val latestRelease = releases.firstOrNull()
+                            withContext(Dispatchers.Main) {
+                                if (latestRelease != null) {
+                                    val message = "Latest: ${latestRelease.tag_name}\n(${latestRelease.created_at.take(10)})"
+                                    updateState(uiState.value.copy(
+                                        isCheckingForUpdate = false,
+                                        updateStatusMessage = message
+                                    ), isUndoable = false)
+                                } else {
+                                    updateState(uiState.value.copy(
+                                        isCheckingForUpdate = false,
+                                        updateStatusMessage = "No releases found."
+                                    ), isUndoable = false)
+                                }
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "No releases found."), isUndoable = false)
+                            }
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "HTTP ${connection.responseCode}"), isUndoable = false)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    withContext(Dispatchers.Main) {
+                        updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "Error: ${e.message}"), isUndoable = false)
+                    }
+                }
+            }
+        }
+    }
+
     companion object {
         private const val MAX_UNDO_STACK_SIZE = 50
     }
