@@ -22,22 +22,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.model.AzButtonShape
+import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.GhostScreen
 import com.hereliesaz.graffitixr.composables.HelpScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
-import com.hereliesaz.graffitixr.composables.TraceScreen
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerEventPass
-import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
+import com.hereliesaz.graffitixr.composables.TraceScreen
 import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
@@ -185,14 +186,15 @@ fun MainScreen(viewModel: MainViewModel) {
             Box(modifier = Modifier.zIndex(2f)) {
                 AzNavRail {
                     azSettings(isLoading = uiState.isLoading,
-                        packRailButtons = true
+                        packRailButtons = true,
+                        defaultShape = AzButtonShape.RECTANGLE,
                     )
 
-                    azMenuHostItem(id = "mode_host", text = "Mode", route = "mode_host")
-                    azMenuSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-                    azMenuSubItem(id = "ghost_mode", hostId = "mode_host", text = "Ghost", onClick = { viewModel.onEditorModeChanged(EditorMode.GHOST) })
-                    azMenuSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
-                    azMenuSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+                    azRailHostItem(id = "mode_host", text = "Mode", route = "mode_host")
+                    azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+                    azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Ghost", onClick = { viewModel.onEditorModeChanged(EditorMode.GHOST) })
+                    azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
+                    azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
                     azRailHostItem(id = "project_host", text = "Project", route = "project_host")
                     azRailSubItem(id = "save_project", hostId = "project_host", text = "Save") {
@@ -219,26 +221,28 @@ fun MainScreen(viewModel: MainViewModel) {
                     azDivider()
 
                     // Image Host (now includes Adjustments)
-                    azRailHostItem(id = "image_host", text = "Image", route = "image_host")
+                    azRailHostItem(id = "overlay", text = "Image", route = "image_host")
+                    if (uiState.overlayImageUri != null){
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
                     if (uiState.editorMode == EditorMode.STATIC) {
-                        azRailSubItem(id = "background", hostId = "image_host", text = "Background") {
+                        azRailSubItem(id = "background", hostId = "overlay", text = "Background") {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
                     }
-                    azRailSubItem(id = "overlay", hostId = "image_host", text = "Image") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
+                    azDivider()
 
                     if (uiState.overlayImageUri != null) {
-                        azRailSubItem(id = "remove_bg", hostId = "image_host", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
-                        azRailSubItem(id = "line_drawing", hostId = "image_host", text = "Outline", onClick = viewModel::onLineDrawingClicked)
+                        azRailSubItem(id = "remove_bg", hostId = "overlay", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
+                        azRailSubItem(id = "line_drawing", hostId = "overlay", text = "Outline", onClick = viewModel::onLineDrawingClicked)
+                        azDivider()
 
                         // Moved Adjustment Items
-                        azRailSubItem(id = "opacity", hostId = "image_host", text = "Opacity") { showSliderDialog = "Opacity" }
-                        azRailSubItem(id = "contrast", hostId = "image_host", text = "Contrast") { showSliderDialog = "Contrast" }
-                        azRailSubItem(id = "saturation", hostId = "image_host", text = "Saturation") { showSliderDialog = "Saturation" }
-                        azRailSubItem(id = "color_balance", hostId = "image_host", text = "Balance") { showColorBalanceDialog = true }
-                        azRailSubItem(id = "blend_mode", hostId = "image_host", text = "Blend Mode", onClick = viewModel::onCycleBlendMode)
+                        azRailSubItem(id = "opacity", hostId = "overlay", text = "Opacity") { showSliderDialog = "Opacity" }
+                        azRailSubItem(id = "contrast", hostId = "overlay", text = "Contrast") { showSliderDialog = "Contrast" }
+                        azRailSubItem(id = "saturation", hostId = "overlay", text = "Saturation") { showSliderDialog = "Saturation" }
+                        azRailSubItem(id = "color_balance", hostId = "overlay", text = "Balance") { showColorBalanceDialog = true }
+                        azRailSubItem(id = "blend_mode", hostId = "overlay", text = "Blend", onClick = viewModel::onCycleBlendMode)
                     }
                 }
             }
