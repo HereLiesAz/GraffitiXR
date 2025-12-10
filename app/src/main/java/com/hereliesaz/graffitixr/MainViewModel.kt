@@ -184,8 +184,6 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 // 1. Apply Refinement Mask to ALL images
-                // This ensures that the user's masking (e.g. removing a tree) is respected
-                // across all the multi-angle shots.
                 val rawImages = uiState.value.capturedTargetImages
                 val paths = uiState.value.refinementPaths
 
@@ -209,19 +207,17 @@ class MainViewModel(
 
                 // 3. Update State & AR
                 withContext(Dispatchers.Main) {
-                    // Send the MASKED images to ARCore
                     arRenderer?.setAugmentedImageDatabase(maskedImages)
 
                     updateState(
                         uiState.value.copy(
                             fingerprintJson = fingerprintJson,
                             isCapturingTarget = false,
-                            // Store the MASKED images so saving the project saves the clean version
                             capturedTargetImages = maskedImages,
                             isArTargetCreated = true,
                             arState = ArState.LOCKED,
                             captureStep = CaptureStep.FRONT,
-                            refinementPaths = emptyList() // Clear UI paths, baked into bitmap
+                            refinementPaths = emptyList()
                         )
                     )
                     Toast.makeText(getApplication(), "Target finalized and locked!", Toast.LENGTH_SHORT).show()
@@ -246,8 +242,6 @@ class MainViewModel(
                     backgroundImageUri = uiState.value.backgroundImageUri,
                     overlayImageUri = uiState.value.overlayImageUri,
                     targetImageUris = savedTargetUris,
-                    // Note: we don't need to save refinementPaths if we bake them into the images
-                    // But saving them allows re-editing later if we wanted to support that feature.
                     refinementPaths = uiState.value.refinementPaths,
                     opacity = uiState.value.opacity,
                     contrast = uiState.value.contrast,
@@ -378,6 +372,11 @@ class MainViewModel(
             canUndo = undoStack.isNotEmpty(),
             canRedo = redoStack.isNotEmpty()
         )
+    }
+
+    // --- Method that caused Unresolved Reference Error ---
+    fun setTouchLocked(locked: Boolean) {
+        updateState(uiState.value.copy(isTouchLocked = locked), isUndoable = false)
     }
 
     fun onMarkProgressToggled() {

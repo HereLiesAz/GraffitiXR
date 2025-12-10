@@ -13,18 +13,13 @@ import kotlinx.serialization.encoding.encodeStructure
 
 object RefinementPathSerializer : KSerializer<RefinementPath> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("RefinementPath") {
-        element<List<com.hereliesaz.graffitixr.data.PairFloatFloatSerializer.SerializablePair>>("points")
+        element("points", ListSerializer(PairFloatFloatSerializer).descriptor)
         element<Boolean>("isEraser")
     }
 
     override fun serialize(encoder: Encoder, value: RefinementPath) {
-        // Convert Offset to Pair<Float, Float> for serialization using existing serializer structure or simple list
-        // Since we have OffsetSerializer, let's look at ProjectData. It used a specific way.
-        // Let's implement manually here for simplicity and robustness.
-
         encoder.encodeStructure(descriptor) {
             val pointList = value.points.map { it.x to it.y }
-            // Using a custom list serializer for points (x, y)
             encodeSerializableElement(descriptor, 0, ListSerializer(PairFloatFloatSerializer), pointList)
             encodeBooleanElement(descriptor, 1, value.isEraser)
         }

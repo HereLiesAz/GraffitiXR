@@ -6,6 +6,8 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
@@ -65,8 +67,14 @@ object PairFloatFloatSerializer : KSerializer<Pair<Float, Float>> {
     }
 }
 
+object NonNullableUriSerializer : KSerializer<Uri> {
+    override val descriptor = PrimitiveSerialDescriptor("Uri", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: Uri) = encoder.encodeString(value.toString())
+    override fun deserialize(decoder: Decoder): Uri = Uri.parse(decoder.decodeString())
+}
+
 object UriListSerializer : KSerializer<List<Uri>> {
-    private val serializer = ListSerializer(UriSerializer)
+    private val serializer = ListSerializer(NonNullableUriSerializer)
     override val descriptor = serializer.descriptor
     override fun serialize(encoder: Encoder, value: List<Uri>) = serializer.serialize(encoder, value)
     override fun deserialize(decoder: Decoder): List<Uri> = serializer.deserialize(decoder)
