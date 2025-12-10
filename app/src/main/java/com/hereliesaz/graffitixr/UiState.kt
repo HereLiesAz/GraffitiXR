@@ -37,7 +37,10 @@ data class UiState(
     val curvesPoints: List<@WriteWith<OffsetParceler> Offset> = emptyList(),
     val processedImageUri: Uri? = null,
     val blendMode: @WriteWith<BlendModeParceler> BlendMode = BlendMode.SrcOver,
-    val activeRotationAxis: RotationAxis = RotationAxis.X,
+
+    // CHANGED: Default axis is now Y (Spin), as this is most intuitive for AR planes
+    val activeRotationAxis: RotationAxis = RotationAxis.Y,
+
     val isToolbarVisible: Boolean = true,
     val isSettingsPanelVisible: Boolean = false,
     val isImageSelectionMode: Boolean = false,

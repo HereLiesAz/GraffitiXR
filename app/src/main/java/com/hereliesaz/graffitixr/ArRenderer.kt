@@ -36,7 +36,7 @@ class ArRenderer(
     private val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
     private val onFrameCaptured: (Bitmap) -> Unit,
-    private val onAnchorCreated: () -> Unit // NEW CALLBACK
+    private val onAnchorCreated: () -> Unit
 ) : GLSurfaceView.Renderer {
 
     // AR Session
@@ -130,7 +130,6 @@ class ArRenderer(
             // 4. State Logic
             when (arState) {
                 ArState.SEARCHING -> {
-                    // Draw Planes (Visible Cyan)
                     val planes = session!!.getAllTrackables(Plane::class.java)
                     var hasTrackingPlane = false
                     for (plane in planes) {
@@ -140,12 +139,9 @@ class ArRenderer(
                         }
                     }
                     onPlanesDetected(hasTrackingPlane)
-
-                    // Handle Tap
                     handleTap(frame)
                 }
                 ArState.LOCKED -> {
-                    // Augmented Image Tracking
                     val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
                     for (img in updatedAugmentedImages) {
                         if (img.trackingState == TrackingState.TRACKING && img.name == "target") {
@@ -174,16 +170,21 @@ class ArRenderer(
 
         val modelMtx = pose.clone()
 
-        // 1. Scale
-        Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
+        // 1. Uniform Scale
+        // CRITICAL FIX: Scale X and Z because the quad is on the floor (Y=0)
+        // Previous code scaled X and Y, leaving Z at 1.0, causing distortion.
+        Matrix.scaleM(modelMtx, 0, scale, 1f, scale)
 
-        // 2. Rotate
-        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
-        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
-        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
+        // 2. Rotation
+        // Apply rotations in order.
+        // Y is usually the "Spin" axis for a floor object.
+        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f) // Spin
+        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f) // Tilt Forward/Back
+        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f) // Tilt Left/Right
 
-        // 3. Aspect Ratio
+        // 3. Aspect Ratio Correction
         val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
+        // Scale X by aspect ratio to widen the image
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
 
         // 4. Draw
@@ -206,8 +207,6 @@ class ArRenderer(
 
                 arImagePose = poseMatrix
                 arState = ArState.PLACED
-
-                // IMPORTANT: Notify ViewModel that placement happened!
                 onAnchorCreated()
                 break
             }

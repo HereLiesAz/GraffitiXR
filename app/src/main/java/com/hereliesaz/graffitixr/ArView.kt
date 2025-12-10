@@ -99,32 +99,37 @@ fun ArView(
         factory = { glSurfaceView },
         modifier = Modifier
             .fillMaxSize()
+            // 1. Tap Detector (For placement and axis toggling)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
-                        // Toggle Axis
                         viewModel.onCycleRotationAxis()
                     },
                     onTap = { offset ->
-                        // Place Anchor (only if searching)
                         if (uiState.arState == ArState.SEARCHING) {
                             renderer.queueTap(offset.x, offset.y)
                         }
                     }
                 )
             }
-            .pointerInput(Unit) {
+            // 2. Transform Detector (Scale and Rotate)
+            // KEY FIX: We pass 'uiState.activeRotationAxis' as the key.
+            // This forces the block to restart when the axis changes,
+            // ensuring the closure captures the NEW axis.
+            .pointerInput(uiState.activeRotationAxis) {
                 detectTransformGestures { _, _, zoom, rotation ->
-                    // 1. Uniform Scaling
-                    // The ViewModel multiplies the current scale by this zoom factor
+                    // Scaling
                     viewModel.onArObjectScaleChanged(zoom)
 
-                    // 2. Axis-Dependent Rotation
-                    // We route the rotation delta to the active axis
+                    // Rotation
+                    // KEY FIX: Invert rotation sign (-rotation) to match finger direction
+                    // OpenGL rotates CCW for positive values. Fingers usually expect CW.
+                    val rotationDelta = -rotation
+
                     when (uiState.activeRotationAxis) {
-                        RotationAxis.X -> viewModel.onRotationXChanged(rotation)
-                        RotationAxis.Y -> viewModel.onRotationYChanged(rotation)
-                        RotationAxis.Z -> viewModel.onRotationZChanged(rotation)
+                        RotationAxis.X -> viewModel.onRotationXChanged(rotationDelta)
+                        RotationAxis.Y -> viewModel.onRotationYChanged(rotationDelta)
+                        RotationAxis.Z -> viewModel.onRotationZChanged(rotationDelta)
                     }
                 }
             }
