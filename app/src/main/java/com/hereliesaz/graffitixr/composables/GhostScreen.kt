@@ -4,44 +4,26 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
+import com.hereliesaz.graffitixr.RotationAxis
 import com.hereliesaz.graffitixr.UiState
 
-/**
- * A composable that displays a live camera feed with a movable, scalable, and adjustable image overlay.
- *
- * @param uiState The current UI state.
- * @param onScaleChanged A callback invoked when the user performs a pinch-to-zoom gesture.
- * @param onOffsetChanged A callback invoked when the user performs a pan/drag gesture.
- * @param modifier The modifier to be applied to the layout.
- */
 @Composable
 fun GhostScreen(
     uiState: UiState,
@@ -60,7 +42,6 @@ fun GhostScreen(
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // CameraX Preview
         AndroidView(
             factory = { ctx ->
                 val previewView = PreviewView(ctx)
@@ -83,35 +64,36 @@ fun GhostScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Interactive Overlay Image
         uiState.overlayImageUri?.let {
-            val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
-                onScaleChanged(zoomChange)
-                onOffsetChanged(offsetChange)
-                when (uiState.activeRotationAxis) {
-                    com.hereliesaz.graffitixr.RotationAxis.X -> onRotationXChanged(rotationChange)
-                    com.hereliesaz.graffitixr.RotationAxis.Y -> onRotationYChanged(rotationChange)
-                    com.hereliesaz.graffitixr.RotationAxis.Z -> onRotationZChanged(rotationChange)
-                }
-            }
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
+                        detectTransformGestures(
+                            onGesture = { _, pan, zoom, rotation ->
+                                onScaleChanged(zoom)
+                                onOffsetChanged(pan)
+                                when (uiState.activeRotationAxis) {
+                                    RotationAxis.X -> onRotationXChanged(rotation)
+                                    RotationAxis.Y -> onRotationYChanged(rotation)
+                                    RotationAxis.Z -> onRotationZChanged(rotation)
+                                }
+                            }
+                        )
+                    }
+                    .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = { onGestureStart() },
                             onDragEnd = { onGestureEnd() }
-                        ) { _, _ -> }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            onOffsetChanged(dragAmount)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                     }
             ) {
-                LaunchedEffect(transformState.isTransformInProgress) {
-                    if (transformState.isTransformInProgress) {
-                        onGestureStart()
-                    } else {
-                        onGestureEnd()
-                    }
-                }
                 AsyncImage(
                     model = it,
                     contentDescription = "Overlay Image",
@@ -126,11 +108,7 @@ fun GhostScreen(
                             rotationY = uiState.rotationY,
                             rotationZ = uiState.rotationZ,
                             alpha = uiState.opacity
-                        )
-                        .transformable(state = transformState, canPan = { true })
-                        .pointerInput(Unit) {
-                            detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
-                        },
+                        ),
                     colorFilter = ColorFilter.colorMatrix(
                         ColorMatrix().apply {
                             setToSaturation(uiState.saturation)

@@ -5,8 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -28,15 +27,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import coil.imageLoader
 import coil.request.ImageRequest
+import com.hereliesaz.graffitixr.RotationAxis
 import com.hereliesaz.graffitixr.UiState
 import kotlinx.coroutines.launch
 
-/**
- * A composable screen for the "Trace" mode (Lightbox).
- *
- * This screen displays the overlay image on a white background, allowing the device to be used
- * as a lightbox for tracing. It supports standard image manipulations.
- */
 @Composable
 fun TraceScreen(
     uiState: UiState,
@@ -79,9 +73,10 @@ fun TraceScreen(
     }
 
     // Lightbox background: White
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .background(Color.White)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
     ) {
         uiState.overlayImageUri?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -97,34 +92,36 @@ fun TraceScreen(
                 }
             }
 
-            val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
-                onScaleChanged(zoomChange)
-                onOffsetChanged(offsetChange)
-                when (uiState.activeRotationAxis) {
-                    com.hereliesaz.graffitixr.RotationAxis.X -> onRotationXChanged(rotationChange)
-                    com.hereliesaz.graffitixr.RotationAxis.Y -> onRotationYChanged(rotationChange)
-                    com.hereliesaz.graffitixr.RotationAxis.Z -> onRotationZChanged(rotationChange)
-                }
-            }
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
                     .pointerInput(Unit) {
+                        detectTransformGestures(
+                            onGesture = { _, pan, zoom, rotation ->
+                                onScaleChanged(zoom)
+                                onOffsetChanged(pan)
+                                when (uiState.activeRotationAxis) {
+                                    RotationAxis.X -> onRotationXChanged(rotation)
+                                    RotationAxis.Y -> onRotationYChanged(rotation)
+                                    RotationAxis.Z -> onRotationZChanged(rotation)
+                                }
+                            }
+                        )
+                    }
+                    .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = { onGestureStart() },
                             onDragEnd = { onGestureEnd() }
-                        ) { _, _ -> }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            onOffsetChanged(dragAmount)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                     }
             ) {
-                LaunchedEffect(transformState.isTransformInProgress) {
-                    if (transformState.isTransformInProgress) {
-                        onGestureStart()
-                    } else {
-                        onGestureEnd()
-                    }
-                }
                 imageBitmap?.let { bmp ->
                     Canvas(
                         modifier = Modifier
@@ -137,10 +134,6 @@ fun TraceScreen(
                                 rotationZ = uiState.rotationZ
                                 translationX = uiState.offset.x
                                 translationY = uiState.offset.y
-                            }
-                            .transformable(state = transformState)
-                            .pointerInput(Unit) {
-                                detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                             }
                     ) {
                         drawImage(
