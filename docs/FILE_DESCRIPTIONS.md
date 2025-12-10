@@ -2,25 +2,13 @@
 
 This file provides a brief but thorough description of what each non-ignored file in the project is supposed to do.
 
-## `.gitignore`
-
-Specifies intentionally untracked files to ignore.
-
 ## `AGENTS.md`
 
 Provides guidance for AI agents working with the codebase.
 
-## `BLUEPRINT.md`
-
-A technical specification document for the project.
-
 ## `README.md`
 
 The main README for the project.
-
-## `TODO.md`
-
-A roadmap and list of future work for the project.
 
 ## `app/CMakeLists.txt`
 
@@ -29,6 +17,10 @@ CMake script for building the native C++ code in the app module.
 ## `app/build.gradle.kts`
 
 Gradle build script for the main application module.
+
+## `app/google-services.json.template`
+
+Template for Google Services configuration.
 
 ## `app/libs/vuforia.aar`
 
@@ -66,9 +58,25 @@ The JNI implementation for the native functions.
 
 The application icon for the Google Play Store.
 
+## `app/src/main/java/com/hereliesaz/graffitixr/ARCameraScreen.kt`
+
+Screen for the AR camera view.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/ArRenderer.kt`
+
+Renderer for AR content.
+
 ## `app/src/main/java/com/hereliesaz/graffitixr/ArState.kt`
 
 Defines the state for the AR components of the application.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/ArView.kt`
+
+View component for AR.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/EditorMode.kt`
+
+Enum defining editor modes.
 
 ## `app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt`
 
@@ -86,33 +94,69 @@ The main ViewModel for the application, handling business logic and state.
 
 A factory for creating instances of the MainViewModel.
 
+## `app/src/main/java/com/hereliesaz/graffitixr/Parcelers.kt`
+
+Parcelable implementations.
+
 ## `app/src/main/java/com/hereliesaz/graffitixr/RotationAxis.kt`
 
 Defines the possible axes of rotation for gestures.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/TapFeedback.kt`
+
+Feedback for tap gestures.
 
 ## `app/src/main/java/com/hereliesaz/graffitixr/UiState.kt`
 
 Defines the UI state for the application.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/VuforiaJNI.kt`
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/AdjustmentsPanel.kt`
 
-The JNI bridge for communicating with the native Vuforia C++ code.
+UI panel for image adjustments.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/VuforiaManager.kt`
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/CurvesAdjustment.kt`
 
-Manages the lifecycle and state of the Vuforia engine.
+UI for curves adjustment.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/ImageTraceScreen.kt`
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/DrawingCanvas.kt`
 
-A composable screen for tracing images in non-AR mode.
+Canvas for drawing.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/GestureFeedback.kt`
+
+Visual feedback for gestures.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/GhostScreen.kt`
+
+Ghost screen composable.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/HelpScreen.kt`
+
+Help and tutorial screen.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/Knob.kt`
+
+Rotary knob UI component.
 
 ## `app/src/main/java/com/hereliesaz/graffitixr/composables/MockupScreen.kt`
 
 A composable screen for creating mockups on static images.
 
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/OnboardingScreen.kt`
+
+Screen for onboarding.
+
 ## `app/src/main/java/com/hereliesaz/graffitixr/composables/ProgressIndicator.kt`
 
 A composable for displaying a progress indicator.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/ProjectLibraryScreen.kt`
+
+Screen for managing projects.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/RefinementScreen.kt`
+
+Screen for refining selection.
 
 ## `app/src/main/java/com/hereliesaz/graffitixr/composables/RotationAxisFeedback.kt`
 
@@ -130,13 +174,37 @@ A composable that provides visual feedback for tap gestures.
 
 A composable for overlaying a title on the screen.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/VuforiaCameraScreen.kt`
+## `app/src/main/java/com/hereliesaz/graffitixr/composables/TraceScreen.kt`
 
-A composable that displays the camera feed from Vuforia.
+Screen for tracing mode.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/VuforiaRenderer.kt`
+## `app/src/main/java/com/hereliesaz/graffitixr/data/BlendModeSerializer.kt`
 
-A composable responsible for rendering the Vuforia camera view.
+Serializer for blend modes.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/data/Fingerprint.kt`
+
+Data class for AR fingerprint.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/data/FingerprintSerializer.kt`
+
+Serializer for fingerprint.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/data/GithubRelease.kt`
+
+Data class for GitHub release info.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/data/KeyPointSerializer.kt`
+
+Serializer for OpenCV KeyPoints.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/data/MatSerializer.kt`
+
+Serializer for OpenCV Mat.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/data/OffsetSerializer.kt`
+
+Serializer for Offset.
 
 ## `app/src/main/java/com/hereliesaz/graffitixr/data/ProjectData.kt`
 
@@ -154,6 +222,10 @@ A dialog for adjusting image properties with a slider.
 
 A dialog for adjusting the color balance of an image.
 
+## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/CurvesDialog.kt`
+
+Dialog for curves adjustment.
+
 ## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/DoubleTapHintDialog.kt`
 
 A dialog to hint to the user to double tap.
@@ -161,6 +233,42 @@ A dialog to hint to the user to double tap.
 ## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/OnboardingDialog.kt`
 
 A dialog for the application's onboarding flow.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/SaveProjectDialog.kt`
+
+Dialog for saving project.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/rendering/AugmentedImageRenderer.kt`
+
+Renders augmented images in AR.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/rendering/BackgroundRenderer.kt`
+
+Renders the camera background.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/rendering/HomographyHelper.kt`
+
+Helper for homography calculations.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/rendering/PlaneRenderer.kt`
+
+Renders AR planes.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/rendering/PointCloudRenderer.kt`
+
+Renders AR point clouds.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/rendering/ProjectedImageRenderer.kt`
+
+Renders the projected image.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/rendering/ShaderUtil.kt`
+
+Utilities for shader management.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/rendering/SimpleQuadRenderer.kt`
+
+Simple quad renderer.
 
 ## `app/src/main/java/com/hereliesaz/graffitixr/ui/theme/Color.kt`
 
@@ -174,9 +282,25 @@ Defines the overall theme for the application.
 
 Defines the typography for the application's theme.
 
+## `app/src/main/java/com/hereliesaz/graffitixr/utils/BitmapUtils.kt`
+
+Utilities for bitmap manipulation.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/utils/BlendModeParceler.kt`
+
+Parceler for blend modes.
+
 ## `app/src/main/java/com/hereliesaz/graffitixr/utils/Capture.kt`
 
 Utility functions for capturing the screen.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/utils/CurvesUtil.kt`
+
+Utilities for curve calculations.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/utils/DisplayRotationHelper.kt`
+
+Helper for display rotation.
 
 ## `app/src/main/java/com/hereliesaz/graffitixr/utils/ImageUtils.kt`
 
@@ -194,6 +318,14 @@ Manages the application's onboarding process.
 
 Custom parcelers for data classes used in the application.
 
+## `app/src/main/java/com/hereliesaz/graffitixr/utils/ProgressCalculator.kt`
+
+Calculates progress of image tracing.
+
+## `app/src/main/java/com/hereliesaz/graffitixr/utils/ProjectManager.kt`
+
+Manages project loading and saving.
+
 ## `app/src/main/java/com/hereliesaz/graffitixr/utils/RotationGestureDetector.kt`
 
 A custom gesture detector for handling rotation gestures.
@@ -206,145 +338,145 @@ Utility functions for working with OpenGL textures.
 
 General utility functions for the application.
 
-## `app/src/main/res/drawable/graffitixr_logo.webp`
+## `app/src/main/java/com/hereliesaz/graffitixr/utils/YuvToRgbConverter.kt`
 
-The logo for the application.
+Converts YUV to RGB.
 
 ## `app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
 
-The adaptive launcher icon for the application.
+Application resource file.
 
 ## `app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
 
-The round adaptive launcher icon for the application.
+Application resource file.
 
 ## `app/src/main/res/mipmap-hdpi/ic_launcher.webp`
 
-The high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-hdpi/ic_launcher_foreground.webp`
 
-The foreground for the high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-hdpi/ic_launcher_monochrome.webp`
 
-The monochrome high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-hdpi/ic_launcher_round.webp`
 
-The high-density round launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-mdpi/ic_launcher.webp`
 
-The medium-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-mdpi/ic_launcher_foreground.webp`
 
-The foreground for the medium-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-mdpi/ic_launcher_monochrome.webp`
 
-The monochrome medium-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-mdpi/ic_launcher_round.webp`
 
-The medium-density round launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xhdpi/ic_launcher.webp`
 
-The extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.webp`
 
-The foreground for the extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xhdpi/ic_launcher_monochrome.webp`
 
-The monochrome extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp`
 
-The extra-high-density round launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xxhdpi/ic_launcher.webp`
 
-The extra-extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.webp`
 
-The foreground for the extra-extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xxhdpi/ic_launcher_monochrome.webp`
 
-The monochrome extra-extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp`
 
-The extra-extra-high-density round launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp`
 
-The extra-extra-extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp`
 
-The foreground for the extra-extra-extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xxxhdpi/ic_launcher_monochrome.webp`
 
-The monochrome extra-extra-extra-high-density launcher icon.
+Application resource file.
 
 ## `app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp`
 
-The extra-extra-extra-high-density round launcher icon.
+Application resource file.
 
 ## `app/src/main/res/values/ic_launcher_background.xml`
 
-The background color for the launcher icon.
+Application resource file.
 
 ## `app/src/main/res/values/strings.xml`
 
-The string resources for the application.
+Application resource file.
 
 ## `app/src/main/res/values/themes.xml`
 
-The theme resources for the application.
+Application resource file.
 
 ## `app/src/main/res/xml/backup_rules.xml`
 
-The backup rules for the application.
+Application resource file.
 
 ## `app/src/main/res/xml/data_extraction_rules.xml`
 
-The data extraction rules for the application.
+Application resource file.
 
 ## `app/src/main/res/xml/provider_paths.xml`
 
-The provider paths for the application.
+Application resource file.
+
+## `app/src/test/java/com/hereliesaz/graffitixr/MainViewModelTest.kt`
+
+Unit tests for MainViewModel.
 
 ## `build.gradle.kts`
 
 The root Gradle build script for the project.
 
+## `docs/BLUEPRINT.md`
+
+Technical blueprint document.
+
 ## `docs/FILE_DESCRIPTIONS.md`
 
 This file.
 
+## `docs/TODO.md`
+
+Project roadmap and todo list.
+
 ## `gradle.properties`
 
 Project-wide Gradle settings.
-
-## `gradle/libs.versions.toml`
-
-The Gradle version catalog for managing dependencies.
-
-## `gradle/wrapper/gradle-wrapper.jar`
-
-The Gradle wrapper JAR file.
-
-## `gradle/wrapper/gradle-wrapper.properties`
-
-The Gradle wrapper properties file.
 
 ## `gradlew`
 
@@ -362,30 +494,8 @@ The Gradle settings script for the project.
 
 A script for setting up the Android NDK.
 
-## `vuforia.zip`
+## `version.properties`
 
-A zip file containing the Vuforia SDK.
+Version configuration properties.
 
-## `vuforia/CMakeLists.txt`
 
-CMake script for building the native C++ code in the vuforia module.
-
-## `vuforia/build.gradle.kts`
-
-Gradle build script for the vuforia module.
-
-## `vuforia/build`
-
-This directory and its contents are build artifacts for the vuforia module.
-
-## `vuforia/licenses`
-
-This directory and its contents are the Vuforia license.
-
-## `vuforia/samples`
-
-This directory and its contents are sample code for the Vuforia SDK.
-
-## `vuforia/sdk`
-
-This directory and its contents are the Vuforia SDK.

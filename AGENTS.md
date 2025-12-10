@@ -64,6 +64,6 @@ A core feature is the ability to save an AR project and have the digital overlay
 
 ## **3. Current Project Goals**
 
-Refer to `TODO.md` for the up-to-date project backlog. The next high-priority task is to enhance the user experience by creating an onboarding flow and adding more visual feedback for gestures.
+Refer to `TODO.md` for the up-to-date project backlog. Currently, all scheduled tasks have been completed. The focus is now on maintaining documentation accuracy and stability.
 
 ---
