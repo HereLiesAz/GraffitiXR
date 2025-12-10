@@ -39,6 +39,8 @@ import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.SettingsScreen
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
+import com.hereliesaz.graffitixr.composables.TargetCreationOverlay
+import com.hereliesaz.graffitixr.composables.TargetRefinementScreen
 import com.hereliesaz.graffitixr.composables.TraceScreen
 import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
@@ -188,6 +190,30 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        // New Overlay for Target Creation
+        if (uiState.isCapturingTarget) {
+            Box(modifier = Modifier.zIndex(5f)) {
+                if (uiState.captureStep == CaptureStep.REVIEW) {
+                    TargetRefinementScreen(
+                        targetImage = uiState.capturedTargetImages.firstOrNull(),
+                        keypoints = uiState.detectedKeypoints,
+                        paths = uiState.refinementPaths,
+                        isEraser = uiState.isRefinementEraser,
+                        onPathAdded = viewModel::onRefinementPathAdded,
+                        onModeChanged = viewModel::onRefinementModeChanged,
+                        onConfirm = viewModel::onConfirmTargetCreation
+                    )
+                } else {
+                    TargetCreationOverlay(
+                        step = uiState.captureStep,
+                        qualityWarning = uiState.qualityWarning,
+                        onCaptureClick = viewModel::onCaptureShutterClicked,
+                        onCancelClick = viewModel::onCancelCaptureClicked
+                    )
+                }
+            }
+        }
+
         GestureFeedback(
             uiState = uiState,
             modifier = Modifier
@@ -197,7 +223,8 @@ fun MainScreen(viewModel: MainViewModel) {
             isVisible = gestureInProgress
         )
 
-        if (!uiState.isTouchLocked) {
+        // Hide toolbar if capturing target
+        if (!uiState.isTouchLocked && !uiState.isCapturingTarget) {
             Box(modifier = Modifier.zIndex(2f)) {
                 AzNavRail {
                     azSettings(isLoading = uiState.isLoading,
@@ -265,21 +292,21 @@ fun MainScreen(viewModel: MainViewModel) {
         }
 
         if (uiState.isTouchLocked) {
-             Box(
-                 modifier = Modifier
-                     .fillMaxSize()
-                     .zIndex(100f)
-                     .background(Color.Transparent)
-                     .pointerInput(Unit) {
-                         awaitPointerEventScope {
-                             while (true) {
-                                 awaitPointerEvent(pass = PointerEventPass.Initial)
-                                 val event = awaitPointerEvent()
-                                 event.changes.forEach { it.consume() }
-                             }
-                         }
-                     }
-             )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(100f)
+                    .background(Color.Transparent)
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent(pass = PointerEventPass.Initial)
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+            )
         }
 
         if (uiState.isMarkingProgress) {
@@ -376,9 +403,10 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
-        if (uiState.isCapturingTarget) {
-            CaptureAnimation()
-        }
+        // Capture Animation (Flash)
+        // We reuse isCapturingTarget for the shutter effect, but since we have a dedicated overlay now,
+        // we might want to separate the flash effect or just let the overlay handle feedback.
+        // For now, let's keep it simple and maybe add a flash in the overlay or ViewModel logic.
     }
 }
 

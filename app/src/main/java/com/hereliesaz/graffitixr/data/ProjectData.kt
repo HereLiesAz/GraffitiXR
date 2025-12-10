@@ -2,13 +2,12 @@ package com.hereliesaz.graffitixr.data
 
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.graffitixr.data.UriSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 @Serializable
 data class ProjectData(
@@ -16,6 +15,13 @@ data class ProjectData(
     val backgroundImageUri: Uri?,
     @Serializable(with = UriSerializer::class)
     val overlayImageUri: Uri?,
+    // List of URIs for the captured target images (Front, Left, Right, etc.)
+    @Serializable(with = UriListSerializer::class)
+    val targetImageUris: List<Uri> = emptyList(),
+    // Saved mask paths
+    @Serializable(with = RefinementPathListSerializer::class)
+    val refinementPaths: List<RefinementPath> = emptyList(),
+
     val opacity: Float,
     val contrast: Float,
     val saturation: Float,
@@ -38,13 +44,10 @@ data class ProjectData(
 
 object DrawingPathsSerializer : KSerializer<List<List<Pair<Float, Float>>>> {
     private val listSerializer = ListSerializer(ListSerializer(PairFloatFloatSerializer))
-
     override val descriptor = listSerializer.descriptor
-
     override fun serialize(encoder: Encoder, value: List<List<Pair<Float, Float>>>) {
         listSerializer.serialize(encoder, value)
     }
-
     override fun deserialize(decoder: Decoder): List<List<Pair<Float, Float>>> {
         return listSerializer.deserialize(decoder)
     }
@@ -52,15 +55,26 @@ object DrawingPathsSerializer : KSerializer<List<List<Pair<Float, Float>>>> {
 
 object PairFloatFloatSerializer : KSerializer<Pair<Float, Float>> {
     override val descriptor = ListSerializer(Float.serializer()).descriptor
-
     override fun serialize(encoder: Encoder, value: Pair<Float, Float>) {
         val list = listOf(value.first, value.second)
         encoder.encodeSerializableValue(ListSerializer(Float.serializer()), list)
     }
-
     override fun deserialize(decoder: Decoder): Pair<Float, Float> {
         val list = decoder.decodeSerializableValue(ListSerializer(Float.serializer()))
         return Pair(list[0], list[1])
     }
 }
 
+object UriListSerializer : KSerializer<List<Uri>> {
+    private val serializer = ListSerializer(UriSerializer)
+    override val descriptor = serializer.descriptor
+    override fun serialize(encoder: Encoder, value: List<Uri>) = serializer.serialize(encoder, value)
+    override fun deserialize(decoder: Decoder): List<Uri> = serializer.deserialize(decoder)
+}
+
+object RefinementPathListSerializer : KSerializer<List<RefinementPath>> {
+    private val serializer = ListSerializer(RefinementPathSerializer)
+    override val descriptor = serializer.descriptor
+    override fun serialize(encoder: Encoder, value: List<RefinementPath>) = serializer.serialize(encoder, value)
+    override fun deserialize(decoder: Decoder): List<RefinementPath> = serializer.deserialize(decoder)
+}

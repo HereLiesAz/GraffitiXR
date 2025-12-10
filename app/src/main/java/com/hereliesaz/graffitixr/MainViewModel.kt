@@ -16,10 +16,15 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.ProjectData
+import com.hereliesaz.graffitixr.data.RefinementPath
 import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.ProjectManager
+import com.hereliesaz.graffitixr.utils.applyMaskToBitmap
+import com.hereliesaz.graffitixr.utils.calculateBlurMetric
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
+import com.hereliesaz.graffitixr.utils.detectFeaturesWithMask
+import com.hereliesaz.graffitixr.utils.estimateFeatureRichness
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import com.slowmac.autobackgroundremover.removeBackground
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +68,6 @@ class MainViewModel(
     private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
     val tapFeedback = _tapFeedback.asStateFlow()
 
-    // Reference to the active AR Renderer (injected by ArView)
     var arRenderer: ArRenderer? = null
 
     init {
@@ -77,332 +81,174 @@ class MainViewModel(
     // --- AR Target Creation Logic ---
 
     fun onCreateTargetClicked() {
-        updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
+        updateState(uiState.value.copy(
+            isCapturingTarget = true,
+            captureStep = CaptureStep.FRONT,
+            capturedTargetImages = emptyList(),
+            qualityWarning = null,
+            refinementPaths = emptyList()
+        ), isUndoable = false)
+    }
+
+    fun onCaptureShutterClicked() {
         arRenderer?.triggerCapture()
     }
 
+    fun onCancelCaptureClicked() {
+        updateState(uiState.value.copy(
+            isCapturingTarget = false,
+            capturedTargetImages = emptyList()
+        ), isUndoable = false)
+    }
+
     fun onFrameCaptured(bitmap: Bitmap) {
-        viewModelScope.launch {
-            delay(400)
-            withContext(Dispatchers.IO) {
-                try {
-                    val grayMat = Mat()
-                    Utils.bitmapToMat(bitmap, grayMat)
-                    Imgproc.cvtColor(grayMat, grayMat, Improc.COLOR_BGR2GRAY)
+        viewModelScope.launch(Dispatchers.IO) {
+            val blurScore = calculateBlurMetric(bitmap)
+            val features = estimateFeatureRichness(bitmap)
 
-                    val orb = ORB.create()
-                    val keypoints = MatOfKeyPoint()
-                    val descriptors = Mat()
-                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
-
-                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
-
-                    withContext(Dispatchers.Main) {
-                        arRenderer?.setAugmentedImageDatabase(bitmap)
-                        updateState(
-                            uiState.value.copy(
-                                fingerprintJson = fingerprintJson,
-                                isCapturingTarget = false,
-                                isArTargetCreated = true,
-                                arState = ArState.LOCKED
-                            )
-                        )
-                        Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        updateState(uiState.value.copy(isCapturingTarget = false))
-                        Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
+            if (blurScore < 100.0) {
+                withContext(Dispatchers.Main) {
+                    updateState(uiState.value.copy(qualityWarning = "Image too blurry. Hold steady!"), isUndoable = false)
                 }
+                return@launch
             }
-        }
-    }
 
-    // --- Logic & Transforms ---
-
-    fun onCycleRotationAxis() {
-        val currentAxis = uiState.value.activeRotationAxis
-        val nextAxis = when (currentAxis) {
-            RotationAxis.X -> RotationAxis.Y
-            RotationAxis.Y -> RotationAxis.Z
-            RotationAxis.Z -> RotationAxis.X
-        }
-
-        // Update state and show Toast
-        updateState(uiState.value.copy(
-            activeRotationAxis = nextAxis,
-            showRotationAxisFeedback = true
-        ))
-
-        Toast.makeText(getApplication(), "Rotation Axis: ${nextAxis.name}", Toast.LENGTH_SHORT).show()
-    }
-
-    fun onArObjectScaleChanged(scaleFactor: Float) {
-        val currentScale = uiState.value.arObjectScale
-        // Uniform scaling: new scale is previous scale * zoom factor
-        // We limit min/max scale to prevent objects disappearing or becoming massive
-        val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
-        updateState(uiState.value.copy(arObjectScale = newScale), isUndoable = false)
-    }
-
-    fun onRotationXChanged(delta: Float) {
-        updateState(uiState.value.copy(rotationX = uiState.value.rotationX + delta), isUndoable = false)
-    }
-
-    fun onRotationYChanged(delta: Float) {
-        updateState(uiState.value.copy(rotationY = uiState.value.rotationY + delta), isUndoable = false)
-    }
-
-    fun onRotationZChanged(delta: Float) {
-        val currentRotation = uiState.value.rotationZ
-        updateState(uiState.value.copy(rotationZ = currentRotation + delta), isUndoable = false)
-    }
-
-    fun onFeedbackShown() {
-        viewModelScope.launch {
-            delay(1000)
-            updateState(uiState.value.copy(showRotationAxisFeedback = false))
-        }
-    }
-
-    fun setArPlanesDetected(detected: Boolean) {
-        if (uiState.value.isArPlanesDetected != detected) {
-            updateState(uiState.value.copy(isArPlanesDetected = detected), isUndoable = false)
-        }
-    }
-
-    fun onArImagePlaced() {
-        updateState(uiState.value.copy(arState = ArState.PLACED), isUndoable = false)
-    }
-
-    // --- Core State Logic (Unchanged from previous V3) ---
-
-    fun onProgressUpdate(progress: Float) {
-        updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
-    }
-
-    fun setTouchLocked(locked: Boolean) {
-        updateState(uiState.value.copy(isTouchLocked = locked), isUndoable = false)
-    }
-
-    fun showTapFeedback(position: Offset, isSuccess: Boolean) {
-        viewModelScope.launch {
-            _tapFeedback.value = if (isSuccess) TapFeedback.Success(position) else TapFeedback.Failure(position)
-            delay(500)
-            _tapFeedback.value = null
-        }
-    }
-
-    fun onRemoveBackgroundClicked() {
-        viewModelScope.launch {
-            setLoading(true)
-            val uri = uiState.value.overlayImageUri
-            if (uri != null) {
-                try {
-                    val context = getApplication<Application>().applicationContext
-                    val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
-                    val resultBitmap = bitmap.removeBackground(context)
-                    val cachePath = File(context.cacheDir, "images")
-                    cachePath.mkdirs()
-                    val file = File(cachePath, "background_removed_${System.currentTimeMillis()}.png")
-                    val fOut = FileOutputStream(file)
-                    resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
-                    fOut.close()
-                    val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                    updateState(uiState.value.copy(backgroundRemovedImageUri = newUri, isLoading = false))
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    setLoading(false)
+            if (features < 200) {
+                withContext(Dispatchers.Main) {
+                    updateState(uiState.value.copy(qualityWarning = "Not enough detail."), isUndoable = false)
                 }
-            } else {
-                setLoading(false)
+                return@launch
             }
-        }
-    }
 
-    fun onLineDrawingClicked() {
-        viewModelScope.launch {
-            setLoading(true)
-            val uri = uiState.value.overlayImageUri
-            if (uri != null) {
-                val context = getApplication<Application>().applicationContext
-                val bitmap = BitmapUtils.getBitmapFromUri(context, uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch
-                val lineDrawingBitmap = convertToLineDrawing(bitmap)
-                val cachePath = File(context.cacheDir, "images")
-                cachePath.mkdirs()
-                val file = File(cachePath, "line_drawing_${System.currentTimeMillis()}.png")
-                val fOut = FileOutputStream(file)
-                lineDrawingBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
-                fOut.close()
-                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                updateState(uiState.value.copy(overlayImageUri = newUri, isLoading = false))
-            } else {
-                setLoading(false)
+            val currentImages = uiState.value.capturedTargetImages + bitmap
+            val nextStep = when (uiState.value.captureStep) {
+                CaptureStep.FRONT -> CaptureStep.LEFT
+                CaptureStep.LEFT -> CaptureStep.RIGHT
+                CaptureStep.RIGHT -> CaptureStep.UP
+                CaptureStep.UP -> CaptureStep.DOWN
+                CaptureStep.DOWN -> CaptureStep.REVIEW
+                else -> CaptureStep.REVIEW
             }
-        }
-    }
 
-    private fun setLoading(isLoading: Boolean) {
-        updateState(uiState.value.copy(isLoading = isLoading), isUndoable = false)
-    }
-
-    fun onBackgroundImageSelected(uri: Uri) {
-        updateState(uiState.value.copy(backgroundImageUri = uri))
-    }
-
-    fun onOverlayImageSelected(uri: Uri) {
-        val showHint = !onboardingManager.hasSeenDoubleTapHint()
-        updateState(uiState.value.copy(
-            overlayImageUri = uri,
-            backgroundRemovedImageUri = null,
-            showDoubleTapHint = showHint
-        ))
-    }
-
-    fun onOpacityChanged(opacity: Float) {
-        updateState(uiState.value.copy(opacity = opacity), isUndoable = false)
-    }
-
-    fun onContrastChanged(contrast: Float) {
-        updateState(uiState.value.copy(contrast = contrast), isUndoable = false)
-    }
-
-    fun onSaturationChanged(saturation: Float) {
-        updateState(uiState.value.copy(saturation = saturation), isUndoable = false)
-    }
-
-    fun onScaleChanged(scaleFactor: Float) {
-        val currentScale = uiState.value.scale
-        updateState(uiState.value.copy(scale = currentScale * scaleFactor), isUndoable = false)
-    }
-
-    fun onOffsetChanged(offset: Offset) {
-        updateState(uiState.value.copy(offset = uiState.value.offset + offset), isUndoable = false)
-    }
-
-    fun onEditorModeChanged(mode: EditorMode) {
-        val showOnboarding = !uiState.value.completedOnboardingModes.contains(mode)
-        updateState(
-            uiState.value.copy(
-                editorMode = mode,
-                showOnboardingDialogForMode = if (showOnboarding) mode else null
-            )
-        )
-    }
-
-    fun onOnboardingComplete(mode: EditorMode, dontShowAgain: Boolean) {
-        val updatedState = if (dontShowAgain) {
-            onboardingManager.completeMode(mode)
-            val updatedModes = onboardingManager.getCompletedModes()
-            uiState.value.copy(
-                completedOnboardingModes = updatedModes,
-                showOnboardingDialogForMode = null
-            )
-        } else {
-            uiState.value.copy(showOnboardingDialogForMode = null)
-        }
-
-        if (mode == EditorMode.HELP) {
-            updateState(updatedState.copy(editorMode = EditorMode.STATIC))
-        } else {
-            updateState(updatedState)
-        }
-    }
-
-    fun onDoubleTapHintDismissed() {
-        onboardingManager.setDoubleTapHintSeen()
-        updateState(uiState.value.copy(showDoubleTapHint = false))
-    }
-
-    fun onCurvesPointsChangeFinished() {
-        viewModelScope.launch {
-            val uri = uiState.value.overlayImageUri
-            if (uri != null) {
-                applyCurvesToOverlay(uri, uiState.value.curvesPoints)
-            }
-        }
-    }
-
-    private fun applyCurvesToOverlay(uri: Uri, points: List<Offset>) {
-        viewModelScope.launch {
-            setLoading(true)
-            try {
-                val context = getApplication<Application>().applicationContext
-                val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
-                val resultBitmap = com.hereliesaz.graffitixr.utils.applyCurves(bitmap, points)
-                val cachePath = File(context.cacheDir, "images")
-                cachePath.mkdirs()
-                val file = File(cachePath, "curves_processed_${System.currentTimeMillis()}.png")
-                val fOut = FileOutputStream(file)
-                resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
-                fOut.close()
-                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                updateState(uiState.value.copy(processedImageUri = newUri, isLoading = false))
-            } catch (e: Exception) {
-                e.printStackTrace()
-                setLoading(false)
-            }
-        }
-    }
-
-    fun onCurvesPointsChanged(points: List<Offset>) {
-        updateState(uiState.value.copy(curvesPoints = points), isUndoable = false)
-    }
-
-    fun onSaveClicked() {
-        viewModelScope.launch {
-            _captureEvent.emit(CaptureEvent.RequestCapture)
-        }
-    }
-
-    fun saveCapturedBitmap(bitmap: Bitmap) {
-        viewModelScope.launch {
-            setLoading(true)
-            withContext(Dispatchers.IO) {
-                saveBitmapToGallery(getApplication(), bitmap)
-            }
             withContext(Dispatchers.Main) {
-                Toast.makeText(getApplication(), "Image saved to gallery", Toast.LENGTH_SHORT).show()
-                setLoading(false)
+                updateState(uiState.value.copy(
+                    captureStep = nextStep,
+                    capturedTargetImages = currentImages,
+                    qualityWarning = null
+                ), isUndoable = false)
+
+                if (nextStep == CaptureStep.REVIEW) {
+                    startRefinement()
+                }
             }
         }
     }
 
-    fun onColorBalanceRChanged(value: Float) {
-        updateState(uiState.value.copy(colorBalanceR = value), isUndoable = false)
-    }
+    private fun startRefinement() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val primaryBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
+            val initialKeypoints = detectFeaturesWithMask(primaryBitmap, emptyList())
 
-    fun onColorBalanceGChanged(value: Float) {
-        updateState(uiState.value.copy(colorBalanceG = value), isUndoable = false)
-    }
-
-    fun onColorBalanceBChanged(value: Float) {
-        updateState(uiState.value.copy(colorBalanceB = value), isUndoable = false)
-    }
-
-    fun onCycleBlendMode() {
-        val currentMode = uiState.value.blendMode
-        val nextMode = when (currentMode) {
-            BlendMode.SrcOver -> BlendMode.Multiply
-            BlendMode.Multiply -> BlendMode.Screen
-            BlendMode.Screen -> BlendMode.Overlay
-            BlendMode.Overlay -> BlendMode.Darken
-            BlendMode.Darken -> BlendMode.Lighten
-            BlendMode.Lighten -> BlendMode.SrcOver
-            else -> BlendMode.SrcOver
+            withContext(Dispatchers.Main) {
+                updateState(uiState.value.copy(
+                    detectedKeypoints = initialKeypoints,
+                    refinementPaths = emptyList()
+                ), isUndoable = false)
+            }
         }
-        Toast.makeText(getApplication(), "Blend Mode: ${nextMode}", Toast.LENGTH_SHORT).show()
-        updateState(uiState.value.copy(blendMode = nextMode))
     }
+
+    fun onRefinementPathAdded(path: RefinementPath) {
+        val newPaths = uiState.value.refinementPaths + path
+        updateState(uiState.value.copy(refinementPaths = newPaths), isUndoable = false)
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val primaryBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
+            val updatedKeypoints = detectFeaturesWithMask(primaryBitmap, newPaths)
+
+            withContext(Dispatchers.Main) {
+                updateState(uiState.value.copy(detectedKeypoints = updatedKeypoints), isUndoable = false)
+            }
+        }
+    }
+
+    fun onRefinementModeChanged(isEraser: Boolean) {
+        updateState(uiState.value.copy(isRefinementEraser = isEraser), isUndoable = false)
+    }
+
+    fun onConfirmTargetCreation() {
+        finalizeTargetCreation()
+    }
+
+    private fun finalizeTargetCreation() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 1. Apply Refinement Mask to ALL images
+                // This ensures that the user's masking (e.g. removing a tree) is respected
+                // across all the multi-angle shots.
+                val rawImages = uiState.value.capturedTargetImages
+                val paths = uiState.value.refinementPaths
+
+                val maskedImages = rawImages.map { bitmap ->
+                    applyMaskToBitmap(bitmap, paths)
+                }
+
+                // 2. Generate Fingerprint from PRIMARY masked image
+                val primaryBitmap = maskedImages.first()
+                val grayMat = Mat()
+                Utils.bitmapToMat(primaryBitmap, grayMat)
+                Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+
+                val orb = ORB.create()
+                val keypoints = MatOfKeyPoint()
+                val descriptors = Mat()
+                orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+
+                val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+                val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+
+                // 3. Update State & AR
+                withContext(Dispatchers.Main) {
+                    // Send the MASKED images to ARCore
+                    arRenderer?.setAugmentedImageDatabase(maskedImages)
+
+                    updateState(
+                        uiState.value.copy(
+                            fingerprintJson = fingerprintJson,
+                            isCapturingTarget = false,
+                            // Store the MASKED images so saving the project saves the clean version
+                            capturedTargetImages = maskedImages,
+                            isArTargetCreated = true,
+                            arState = ArState.LOCKED,
+                            captureStep = CaptureStep.FRONT,
+                            refinementPaths = emptyList() // Clear UI paths, baked into bitmap
+                        )
+                    )
+                    Toast.makeText(getApplication(), "Target finalized and locked!", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("TargetCreation", "Finalize failed", e)
+                withContext(Dispatchers.Main) {
+                    updateState(uiState.value.copy(isCapturingTarget = false, qualityWarning = "Error creating target."))
+                }
+            }
+        }
+    }
+
+    // --- Project Persistence ---
 
     fun saveProject(projectName: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val savedTargetUris = projectManager.saveTargetImages(projectName, uiState.value.capturedTargetImages)
+
                 val projectData = ProjectData(
                     backgroundImageUri = uiState.value.backgroundImageUri,
                     overlayImageUri = uiState.value.overlayImageUri,
+                    targetImageUris = savedTargetUris,
+                    // Note: we don't need to save refinementPaths if we bake them into the images
+                    // But saving them allows re-editing later if we wanted to support that feature.
+                    refinementPaths = uiState.value.refinementPaths,
                     opacity = uiState.value.opacity,
                     contrast = uiState.value.contrast,
                     saturation = uiState.value.saturation,
@@ -435,26 +281,36 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 projectManager.loadProject(projectName)?.let { projectData ->
-                    updateState(uiState.value.copy(
-                        backgroundImageUri = projectData.backgroundImageUri,
-                        overlayImageUri = projectData.overlayImageUri,
-                        opacity = projectData.opacity,
-                        contrast = projectData.contrast,
-                        saturation = projectData.saturation,
-                        colorBalanceR = projectData.colorBalanceR,
-                        colorBalanceG = projectData.colorBalanceG,
-                        colorBalanceB = projectData.colorBalanceB,
-                        scale = projectData.scale,
-                        rotationZ = projectData.rotationZ,
-                        rotationX = projectData.rotationX,
-                        rotationY = projectData.rotationY,
-                        offset = projectData.offset,
-                        blendMode = projectData.blendMode,
-                        fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) },
-                        drawingPaths = projectData.drawingPaths
-                    ))
+                    val loadedBitmaps = projectManager.loadTargetBitmaps(projectData.targetImageUris)
 
                     withContext(Dispatchers.Main) {
+                        updateState(uiState.value.copy(
+                            backgroundImageUri = projectData.backgroundImageUri,
+                            overlayImageUri = projectData.overlayImageUri,
+                            capturedTargetImages = loadedBitmaps,
+                            refinementPaths = projectData.refinementPaths,
+                            opacity = projectData.opacity,
+                            contrast = projectData.contrast,
+                            saturation = projectData.saturation,
+                            colorBalanceR = projectData.colorBalanceR,
+                            colorBalanceG = projectData.colorBalanceG,
+                            colorBalanceB = projectData.colorBalanceB,
+                            scale = projectData.scale,
+                            rotationZ = projectData.rotationZ,
+                            rotationX = projectData.rotationX,
+                            rotationY = projectData.rotationY,
+                            offset = projectData.offset,
+                            blendMode = projectData.blendMode,
+                            fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) },
+                            drawingPaths = projectData.drawingPaths,
+                            isArTargetCreated = loadedBitmaps.isNotEmpty(),
+                            arState = if (loadedBitmaps.isNotEmpty()) ArState.LOCKED else ArState.SEARCHING
+                        ))
+
+                        if (loadedBitmaps.isNotEmpty()) {
+                            arRenderer?.setAugmentedImageDatabase(loadedBitmaps)
+                        }
+
                         Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -653,6 +509,256 @@ class MainViewModel(
         } catch (e: Exception) {
             Toast.makeText(getApplication(), "Failed to start download: ${e.message}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    fun onColorBalanceRChanged(value: Float) {
+        updateState(uiState.value.copy(colorBalanceR = value), isUndoable = false)
+    }
+
+    fun onColorBalanceGChanged(value: Float) {
+        updateState(uiState.value.copy(colorBalanceG = value), isUndoable = false)
+    }
+
+    fun onColorBalanceBChanged(value: Float) {
+        updateState(uiState.value.copy(colorBalanceB = value), isUndoable = false)
+    }
+
+    fun onCycleBlendMode() {
+        val currentMode = uiState.value.blendMode
+        val nextMode = when (currentMode) {
+            BlendMode.SrcOver -> BlendMode.Multiply
+            BlendMode.Multiply -> BlendMode.Screen
+            BlendMode.Screen -> BlendMode.Overlay
+            BlendMode.Overlay -> BlendMode.Darken
+            BlendMode.Darken -> BlendMode.Lighten
+            BlendMode.Lighten -> BlendMode.SrcOver
+            else -> BlendMode.SrcOver
+        }
+        updateState(uiState.value.copy(blendMode = nextMode))
+    }
+
+    fun onArObjectScaleChanged(scaleFactor: Float) {
+        val currentScale = uiState.value.arObjectScale
+        val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
+        updateState(uiState.value.copy(arObjectScale = newScale), isUndoable = false)
+    }
+
+    fun onRotationXChanged(delta: Float) {
+        updateState(uiState.value.copy(rotationX = uiState.value.rotationX + delta), isUndoable = false)
+    }
+
+    fun onRotationYChanged(delta: Float) {
+        updateState(uiState.value.copy(rotationY = uiState.value.rotationY + delta), isUndoable = false)
+    }
+
+    fun onRotationZChanged(delta: Float) {
+        val currentRotation = uiState.value.rotationZ
+        updateState(uiState.value.copy(rotationZ = currentRotation + delta), isUndoable = false)
+    }
+
+    fun onScaleChanged(scaleFactor: Float) {
+        val currentScale = uiState.value.scale
+        updateState(uiState.value.copy(scale = currentScale * scaleFactor), isUndoable = false)
+    }
+
+    fun onOffsetChanged(offset: Offset) {
+        updateState(uiState.value.copy(offset = uiState.value.offset + offset), isUndoable = false)
+    }
+
+    fun onOpacityChanged(opacity: Float) {
+        updateState(uiState.value.copy(opacity = opacity), isUndoable = false)
+    }
+
+    fun onContrastChanged(contrast: Float) {
+        updateState(uiState.value.copy(contrast = contrast), isUndoable = false)
+    }
+
+    fun onSaturationChanged(saturation: Float) {
+        updateState(uiState.value.copy(saturation = saturation), isUndoable = false)
+    }
+
+    fun onBackgroundImageSelected(uri: Uri) {
+        updateState(uiState.value.copy(backgroundImageUri = uri))
+    }
+
+    fun onOverlayImageSelected(uri: Uri) {
+        val showHint = !onboardingManager.hasSeenDoubleTapHint()
+        updateState(uiState.value.copy(
+            overlayImageUri = uri,
+            backgroundRemovedImageUri = null,
+            showDoubleTapHint = showHint
+        ))
+    }
+
+    fun onEditorModeChanged(mode: EditorMode) {
+        val showOnboarding = !uiState.value.completedOnboardingModes.contains(mode)
+        updateState(
+            uiState.value.copy(
+                editorMode = mode,
+                showOnboardingDialogForMode = if (showOnboarding) mode else null
+            )
+        )
+    }
+
+    fun onOnboardingComplete(mode: EditorMode, dontShowAgain: Boolean) {
+        val updatedState = if (dontShowAgain) {
+            onboardingManager.completeMode(mode)
+            val updatedModes = onboardingManager.getCompletedModes()
+            uiState.value.copy(
+                completedOnboardingModes = updatedModes,
+                showOnboardingDialogForMode = null
+            )
+        } else {
+            uiState.value.copy(showOnboardingDialogForMode = null)
+        }
+
+        if (mode == EditorMode.HELP) {
+            updateState(updatedState.copy(editorMode = EditorMode.STATIC))
+        } else {
+            updateState(updatedState)
+        }
+    }
+
+    fun onDoubleTapHintDismissed() {
+        onboardingManager.setDoubleTapHintSeen()
+        updateState(uiState.value.copy(showDoubleTapHint = false))
+    }
+
+    fun onFeedbackShown() {
+        viewModelScope.launch {
+            delay(1000)
+            updateState(uiState.value.copy(showRotationAxisFeedback = false))
+        }
+    }
+
+    fun onCycleRotationAxis() {
+        val currentAxis = uiState.value.activeRotationAxis
+        val nextAxis = when (currentAxis) {
+            RotationAxis.X -> RotationAxis.Y
+            RotationAxis.Y -> RotationAxis.Z
+            RotationAxis.Z -> RotationAxis.X
+        }
+        updateState(uiState.value.copy(
+            activeRotationAxis = nextAxis,
+            showRotationAxisFeedback = true
+        ))
+    }
+
+    fun onSaveClicked() {
+        viewModelScope.launch {
+            _captureEvent.emit(CaptureEvent.RequestCapture)
+        }
+    }
+
+    fun saveCapturedBitmap(bitmap: Bitmap) {
+        viewModelScope.launch {
+            setLoading(true)
+            withContext(Dispatchers.IO) {
+                saveBitmapToGallery(getApplication(), bitmap)
+            }
+            withContext(Dispatchers.Main) {
+                Toast.makeText(getApplication(), "Image saved to gallery", Toast.LENGTH_SHORT).show()
+                setLoading(false)
+            }
+        }
+    }
+
+    fun onRemoveBackgroundClicked() {
+        viewModelScope.launch {
+            setLoading(true)
+            val uri = uiState.value.overlayImageUri
+            if (uri != null) {
+                try {
+                    val context = getApplication<Application>().applicationContext
+                    val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
+                    val resultBitmap = bitmap.removeBackground(context)
+                    val cachePath = File(context.cacheDir, "images")
+                    cachePath.mkdirs()
+                    val file = File(cachePath, "background_removed_${System.currentTimeMillis()}.png")
+                    val fOut = FileOutputStream(file)
+                    resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                    fOut.close()
+                    val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                    updateState(uiState.value.copy(backgroundRemovedImageUri = newUri, isLoading = false))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    setLoading(false)
+                }
+            } else {
+                setLoading(false)
+            }
+        }
+    }
+
+    fun onLineDrawingClicked() {
+        viewModelScope.launch {
+            setLoading(true)
+            val uri = uiState.value.overlayImageUri
+            if (uri != null) {
+                val context = getApplication<Application>().applicationContext
+                val bitmap = BitmapUtils.getBitmapFromUri(context, uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch
+                val lineDrawingBitmap = convertToLineDrawing(bitmap)
+                val cachePath = File(context.cacheDir, "images")
+                cachePath.mkdirs()
+                val file = File(cachePath, "line_drawing_${System.currentTimeMillis()}.png")
+                val fOut = FileOutputStream(file)
+                lineDrawingBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                fOut.close()
+                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                updateState(uiState.value.copy(overlayImageUri = newUri, isLoading = false))
+            } else {
+                setLoading(false)
+            }
+        }
+    }
+
+    fun setArPlanesDetected(detected: Boolean) {
+        if (uiState.value.isArPlanesDetected != detected) {
+            updateState(uiState.value.copy(isArPlanesDetected = detected), isUndoable = false)
+        }
+    }
+
+    fun onArImagePlaced() {
+        updateState(uiState.value.copy(arState = ArState.PLACED), isUndoable = false)
+    }
+
+    fun onCurvesPointsChanged(points: List<Offset>) {
+        updateState(uiState.value.copy(curvesPoints = points), isUndoable = false)
+    }
+
+    fun onCurvesPointsChangeFinished() {
+        viewModelScope.launch {
+            val uri = uiState.value.overlayImageUri
+            if (uri != null) {
+                applyCurvesToOverlay(uri, uiState.value.curvesPoints)
+            }
+        }
+    }
+
+    private fun applyCurvesToOverlay(uri: Uri, points: List<Offset>) {
+        viewModelScope.launch {
+            setLoading(true)
+            try {
+                val context = getApplication<Application>().applicationContext
+                val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
+                val resultBitmap = com.hereliesaz.graffitixr.utils.applyCurves(bitmap, points)
+                val cachePath = File(context.cacheDir, "images")
+                cachePath.mkdirs()
+                val file = File(cachePath, "curves_processed_${System.currentTimeMillis()}.png")
+                val fOut = FileOutputStream(file)
+                resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+                fOut.close()
+                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                updateState(uiState.value.copy(processedImageUri = newUri, isLoading = false))
+            } catch (e: Exception) {
+                e.printStackTrace()
+                setLoading(false)
+            }
+        }
+    }
+
+    private fun setLoading(isLoading: Boolean) {
+        updateState(uiState.value.copy(isLoading = isLoading), isUndoable = false)
     }
 
     companion object {

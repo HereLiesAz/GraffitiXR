@@ -5,6 +5,9 @@ import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.data.GithubRelease
+import com.hereliesaz.graffitixr.data.RefinementPath
+import com.hereliesaz.graffitixr.utils.BlendModeParceler
+import com.hereliesaz.graffitixr.utils.OffsetParceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.RawValue
 import kotlinx.parcelize.WriteWith
@@ -16,6 +19,16 @@ enum class TargetCreationState : Parcelable {
     SAVING,
     SUCCESS,
     ERROR
+}
+
+@Parcelize
+enum class CaptureStep : Parcelable {
+    FRONT,
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
+    REVIEW
 }
 
 @Parcelize
@@ -40,7 +53,7 @@ data class UiState(
     val processedImageUri: Uri? = null,
     val blendMode: @WriteWith<BlendModeParceler> BlendMode = BlendMode.SrcOver,
 
-    // CHANGED: Default is Z (Spin) because geometry is X-Y projected to X-Z
+    // Default is Z (Spin) because geometry is X-Y projected to X-Z
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
 
     val isToolbarVisible: Boolean = true,
@@ -71,5 +84,15 @@ data class UiState(
 
     val updateStatusMessage: String? = null,
     val isCheckingForUpdate: Boolean = false,
-    val latestRelease: @RawValue GithubRelease? = null
+    val latestRelease: @RawValue GithubRelease? = null,
+
+    // Multi-step Capture State
+    val captureStep: CaptureStep = CaptureStep.FRONT,
+    val qualityWarning: String? = null,
+    val capturedTargetImages: List<@RawValue android.graphics.Bitmap> = emptyList(),
+
+    // Refinement State
+    val refinementPaths: List<RefinementPath> = emptyList(),
+    val isRefinementEraser: Boolean = false,
+    val detectedKeypoints: List<@WriteWith<OffsetParceler> Offset> = emptyList()
 ) : Parcelable

@@ -139,7 +139,8 @@ class ArRenderer(
                 ArState.LOCKED -> {
                     val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
                     for (img in updatedAugmentedImages) {
-                        if (img.trackingState == TrackingState.TRACKING && img.name == "target") {
+                        // Check if the tracked image is one of our targets (target_0, target_1, etc.)
+                        if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
                             val pose = img.centerPose
                             val poseMatrix = FloatArray(16)
                             pose.toMatrix(poseMatrix, 0)
@@ -226,12 +227,21 @@ class ArRenderer(
         captureNextFrame = true
     }
 
-    fun setAugmentedImageDatabase(bitmap: Bitmap) {
+    /**
+     * Updates the ARCore AugmentedImageDatabase with multiple images for robust tracking.
+     * Each image is added with a unique name (target_0, target_1, etc.).
+     */
+    fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
         val session = this.session ?: return
         session.pause()
         val config = session.config
         val database = AugmentedImageDatabase(session)
-        database.addImage("target", bitmap)
+
+        bitmaps.forEachIndexed { index, bitmap ->
+            // Add every image as a potential target
+            database.addImage("target_$index", bitmap)
+        }
+
         config.augmentedImageDatabase = database
         session.configure(config)
         session.resume()
