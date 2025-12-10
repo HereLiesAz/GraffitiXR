@@ -37,6 +37,7 @@ import com.hereliesaz.graffitixr.composables.HelpScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
+import com.hereliesaz.graffitixr.composables.SettingsScreen
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.composables.TraceScreen
 import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
@@ -55,6 +56,7 @@ fun MainScreen(viewModel: MainViewModel) {
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
     var showSaveProjectDialog by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel, context) {
@@ -244,6 +246,9 @@ fun MainScreen(viewModel: MainViewModel) {
                         azRailSubItem(id = "color_balance", hostId = "overlay", text = "Balance") { showColorBalanceDialog = true }
                         azRailSubItem(id = "blend_mode", hostId = "overlay", text = "Blend", onClick = viewModel::onCycleBlendMode)
                     }
+
+                    azDivider()
+                    azRailItem(id = "settings", text = "Settings", onClick = { showSettings = true })
                 }
             }
         }
@@ -280,6 +285,16 @@ fun MainScreen(viewModel: MainViewModel) {
                     viewModel.saveProject(projectName)
                     showSaveProjectDialog = false
                 }
+            )
+        }
+
+        if (showSettings) {
+            SettingsScreen(
+                currentVersion = BuildConfig.VERSION_NAME,
+                updateStatus = uiState.updateStatusMessage,
+                isCheckingForUpdate = uiState.isCheckingForUpdate,
+                onCheckForUpdates = viewModel::checkForUpdates,
+                onClose = { showSettings = false }
             )
         }
 
