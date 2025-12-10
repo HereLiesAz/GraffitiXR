@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -43,24 +45,26 @@ fun Knob(
     }
 
     val density = LocalDensity.current
+    val updatedValue by rememberUpdatedState(value)
+    val updatedOnValueChange by rememberUpdatedState(onValueChange)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    // Sensitivity: full range in 300dp drag
+                    val sensitivityPx = with(density) { 300.dp.toPx() }
+                    val sensitivity = (valueRange.endInclusive - valueRange.start) / sensitivityPx
+                    // Use updatedValue from state to avoid stale closure
+                    val newValue = (updatedValue - dragAmount.y * sensitivity).coerceIn(valueRange.start, valueRange.endInclusive)
+                    updatedOnValueChange(newValue)
+                }
+            }
     ) {
         Box(
-            modifier = Modifier
-                .size(60.dp)
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        // Sensitivity: full range in 300dp drag
-                        val sensitivityPx = with(density) { 300.dp.toPx() }
-                        val sensitivity = (valueRange.endInclusive - valueRange.start) / sensitivityPx
-                        val newValue = (value - dragAmount.y * sensitivity).coerceIn(valueRange.start, valueRange.endInclusive)
-                        onValueChange(newValue)
-                    }
-                }
+            modifier = Modifier.size(60.dp)
         ) {
             Canvas(modifier = Modifier.matchParentSize()) {
                 val center = Offset(size.width / 2, size.height / 2)
