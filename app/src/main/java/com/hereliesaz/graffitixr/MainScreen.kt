@@ -221,17 +221,15 @@ fun MainScreen(viewModel: MainViewModel) {
                     azDivider()
 
                     // Image Host (now includes Adjustments)
-                    azRailHostItem(id = "overlay", text = "Image", route = "image_host")
-                    if (uiState.overlayImageUri != null){
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
+                    azRailHostItem(id = "overlay", text = "Overlay", route = "overlay") {}
                     if (uiState.editorMode == EditorMode.STATIC) {
                         azRailSubItem(id = "background", hostId = "overlay", text = "Background") {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
                     }
-                    azDivider()
-
+                    azRailSubItem(id = "image", text = "Image", hostId = "overlay") {
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
                     if (uiState.overlayImageUri != null) {
                         azRailSubItem(id = "remove_bg", hostId = "overlay", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
                         azRailSubItem(id = "line_drawing", hostId = "overlay", text = "Outline", onClick = viewModel::onLineDrawingClicked)
