@@ -1,6 +1,11 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Activity
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -8,6 +13,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -61,6 +67,32 @@ fun MainScreen(viewModel: MainViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
 
+    // Vibration Logic
+    LaunchedEffect(viewModel, context) {
+        viewModel.feedbackEvent.collect { event ->
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vibratorManager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
+
+            if (vibrator.hasVibrator()) {
+                when (event) {
+                    is FeedbackEvent.VibrateSingle -> {
+                        vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+                    }
+                    is FeedbackEvent.VibrateDouble -> {
+                        val timing = longArrayOf(0, 50, 50, 50)
+                        val amplitude = intArrayOf(0, 255, 0, 255)
+                        vibrator.vibrate(VibrationEffect.createWaveform(timing, amplitude, -1))
+                    }
+                }
+            }
+        }
+    }
+
     LaunchedEffect(viewModel, context) {
         viewModel.captureEvent.collect { event ->
             when (event) {
@@ -85,7 +117,10 @@ fun MainScreen(viewModel: MainViewModel) {
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val screenHeight = maxHeight
+        val verticalMargin = screenHeight * 0.1f // 10% Margin
+
         if (showProjectLibrary) {
             ProjectLibraryScreen(
                 projects = viewModel.getProjectList(),
@@ -207,6 +242,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     TargetCreationOverlay(
                         step = uiState.captureStep,
                         qualityWarning = uiState.qualityWarning,
+                        captureFailureTimestamp = uiState.captureFailureTimestamp,
                         onCaptureClick = viewModel::onCaptureShutterClicked,
                         onCancelClick = viewModel::onCancelCaptureClicked
                     )
@@ -218,16 +254,21 @@ fun MainScreen(viewModel: MainViewModel) {
             uiState = uiState,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 16.dp)
+                .padding(top = verticalMargin + 16.dp)
                 .zIndex(3f),
             isVisible = gestureInProgress
         )
 
         // Hide toolbar if capturing target
         if (!uiState.isTouchLocked && !uiState.isCapturingTarget) {
-            Box(modifier = Modifier.zIndex(2f)) {
+            Box(
+                modifier = Modifier
+                    .zIndex(2f)
+                    .padding(vertical = verticalMargin) // Apply 10% Margin to NavRail
+            ) {
                 AzNavRail {
-                    azSettings(isLoading = uiState.isLoading,
+                    azSettings(
+                        isLoading = uiState.isLoading,
                         packRailButtons = true,
                         defaultShape = AzButtonShape.RECTANGLE,
                     )
@@ -237,15 +278,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Ghost", onClick = { viewModel.onEditorModeChanged(EditorMode.GHOST) })
                     azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
                     azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
-
-                    azRailHostItem(id = "project_host", text = "Project", route = "project_host")
-                    azRailSubItem(id = "save_project", hostId = "project_host", text = "Save") {
-                        showSaveProjectDialog = true
-                    }
-                    azRailSubItem(id = "project_library", hostId = "project_host", text = "Library") {
-                        showProjectLibrary = true
-                    }
-                    azRailSubItem(id = "export", hostId = "project_host", text = "Export", onClick = viewModel::onSaveClicked)
 
                     azDivider()
 
@@ -286,7 +318,14 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
 
                     azDivider()
-                    azRailItem(id = "settings", text = "Settings", onClick = { showSettings = true })
+
+                    // Settings Host (Moved Project items here)
+                    azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host")
+                    azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
+                    azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") { showSaveProjectDialog = true }
+                    azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") { showProjectLibrary = true }
+                    azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = viewModel::onSaveClicked)
+                    azRailSubItem(id = "app_about", hostId = "settings_host", text = "About") { showSettings = true }
                 }
             }
         }
@@ -364,6 +403,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 onRedo = viewModel::onRedoClicked,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .padding(bottom = verticalMargin) // Apply 10% Margin to Bottom Controls
                     .zIndex(3f)
             )
         }
@@ -383,7 +423,7 @@ fun MainScreen(viewModel: MainViewModel) {
             onFeedbackShown = viewModel::onFeedbackShown,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
+                .padding(bottom = verticalMargin + 32.dp) // Margin + Padding
                 .zIndex(4f)
         )
 
@@ -398,15 +438,14 @@ fun MainScreen(viewModel: MainViewModel) {
                 text = "Progress: %.2f%%".format(uiState.progressPercentage),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
+                    .padding(top = verticalMargin + 16.dp) // Margin + Padding
                     .zIndex(3f)
             )
         }
 
-        // Capture Animation (Flash)
-        // We reuse isCapturingTarget for the shutter effect, but since we have a dedicated overlay now,
-        // we might want to separate the flash effect or just let the overlay handle feedback.
-        // For now, let's keep it simple and maybe add a flash in the overlay or ViewModel logic.
+        if (uiState.isCapturingTarget) {
+            CaptureAnimation()
+        }
     }
 }
 

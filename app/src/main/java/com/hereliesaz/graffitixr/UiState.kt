@@ -6,7 +6,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.data.GithubRelease
 import com.hereliesaz.graffitixr.data.RefinementPath
-import com.hereliesaz.graffitixr.utils.BlendModeParceler
 import com.hereliesaz.graffitixr.utils.OffsetParceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.RawValue
@@ -89,6 +88,7 @@ data class UiState(
     // Multi-step Capture State
     val captureStep: CaptureStep = CaptureStep.FRONT,
     val qualityWarning: String? = null,
+    val captureFailureTimestamp: Long = 0L, // Used to trigger UI animations (red glow)
     val capturedTargetImages: List<@RawValue android.graphics.Bitmap> = emptyList(),
 
     // Refinement State

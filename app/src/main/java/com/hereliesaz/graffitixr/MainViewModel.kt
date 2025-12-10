@@ -49,6 +49,11 @@ sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
 }
 
+sealed class FeedbackEvent {
+    object VibrateSingle : FeedbackEvent()
+    object VibrateDouble : FeedbackEvent()
+}
+
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
@@ -64,6 +69,9 @@ class MainViewModel(
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
+
+    private val _feedbackEvent = MutableSharedFlow<FeedbackEvent>()
+    val feedbackEvent = _feedbackEvent.asSharedFlow()
 
     private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
     val tapFeedback = _tapFeedback.asStateFlow()
@@ -91,6 +99,9 @@ class MainViewModel(
     }
 
     fun onCaptureShutterClicked() {
+        viewModelScope.launch {
+            _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
+        }
         arRenderer?.triggerCapture()
     }
 
@@ -108,14 +119,14 @@ class MainViewModel(
 
             if (blurScore < 100.0) {
                 withContext(Dispatchers.Main) {
-                    updateState(uiState.value.copy(qualityWarning = "Image too blurry. Hold steady!"), isUndoable = false)
+                    triggerCaptureFailure("Image too blurry. Hold steady!")
                 }
                 return@launch
             }
 
             if (features < 200) {
                 withContext(Dispatchers.Main) {
-                    updateState(uiState.value.copy(qualityWarning = "Not enough detail."), isUndoable = false)
+                    triggerCaptureFailure("Not enough detail.")
                 }
                 return@launch
             }
@@ -142,6 +153,14 @@ class MainViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun triggerCaptureFailure(reason: String) {
+        _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
+        updateState(uiState.value.copy(
+            qualityWarning = reason,
+            captureFailureTimestamp = System.currentTimeMillis()
+        ), isUndoable = false)
     }
 
     private fun startRefinement() {
@@ -374,7 +393,6 @@ class MainViewModel(
         )
     }
 
-    // --- Method that caused Unresolved Reference Error ---
     fun setTouchLocked(locked: Boolean) {
         updateState(uiState.value.copy(isTouchLocked = locked), isUndoable = false)
     }
@@ -422,6 +440,10 @@ class MainViewModel(
     }
 
     fun checkForUpdates() {
+        // ... (Existing update logic) ...
+        // Keeping it concise as logic wasn't changed here, but assuming it exists
+        // If I need to provide full file, I will copy-paste previous logic.
+        // For robustness, pasting full function:
         viewModelScope.launch {
             updateState(uiState.value.copy(isCheckingForUpdate = true, updateStatusMessage = null), isUndoable = false)
 
