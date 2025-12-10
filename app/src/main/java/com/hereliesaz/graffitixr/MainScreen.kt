@@ -175,6 +175,18 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        if (showSettings) {
+            Box(modifier = Modifier.zIndex(1.5f)) {
+                SettingsScreen(
+                    currentVersion = BuildConfig.VERSION_NAME,
+                    updateStatus = uiState.updateStatusMessage,
+                    isCheckingForUpdate = uiState.isCheckingForUpdate,
+                    onCheckForUpdates = viewModel::checkForUpdates,
+                    onClose = { showSettings = false }
+                )
+            }
+        }
+
         GestureFeedback(
             uiState = uiState,
             modifier = Modifier

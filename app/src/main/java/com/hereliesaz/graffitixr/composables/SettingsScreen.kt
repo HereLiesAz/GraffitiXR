@@ -53,98 +53,105 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.8f))
+            .windowInsetsPadding(WindowInsets.systemBars)
             .clickable(enabled = true) {}, // Block clicks
-        contentAlignment = Alignment.Center
     ) {
-        Card(
+        Box(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .fillMaxHeight(0.8f),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                .fillMaxSize()
+                .padding(start = 88.dp), // Clear the navigation rail
+            contentAlignment = Alignment.Center
         ) {
-            Column(
+            Card(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
+                    .fillMaxWidth(0.9f)
+                    .fillMaxHeight(0.8f),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
                 ) {
-                    Text(
-                        text = "Settings",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close")
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Version Section
-                    item {
-                        SettingsSectionTitle("App Information")
-                        SettingsItem(
-                            label = "Version",
-                            value = currentVersion
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Settings",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
                         )
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close")
+                        }
                     }
 
-                    // Updates Section
-                    item {
-                        SettingsSectionTitle("Updates")
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = "Check for experimental updates", fontWeight = FontWeight.Medium)
-                                if (updateStatus != null) {
-                                    Text(
-                                        text = updateStatus,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Version Section
+                        item {
+                            SettingsSectionTitle("App Information")
+                            SettingsItem(
+                                label = "Version",
+                                value = currentVersion
+                            )
+                        }
+
+                        // Updates Section
+                        item {
+                            SettingsSectionTitle("Updates")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "Check for experimental updates", fontWeight = FontWeight.Medium)
+                                    if (updateStatus != null) {
+                                        Text(
+                                            text = updateStatus,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = onCheckForUpdates, enabled = !isCheckingForUpdate) {
+                                    if (isCheckingForUpdate) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Refresh, contentDescription = "Check for updates")
+                                    }
                                 }
                             }
-                            IconButton(onClick = onCheckForUpdates, enabled = !isCheckingForUpdate) {
-                                if (isCheckingForUpdate) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Icon(Icons.Default.Refresh, contentDescription = "Check for updates")
-                                }
+                        }
+
+                        // Permissions Section
+                        item {
+                            SettingsSectionTitle("Permissions")
+                            PermissionItem(name = "Camera Access", isGranted = cameraPermission)
+                            PermissionItem(name = "Photo Library Access", isGranted = storagePermission)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                 val notificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                                 PermissionItem(name = "Notifications", isGranted = notificationPermission)
                             }
                         }
                     }
 
-                    // Permissions Section
-                    item {
-                        SettingsSectionTitle("Permissions")
-                        PermissionItem(name = "Camera Access", isGranted = cameraPermission)
-                        PermissionItem(name = "Photo Library Access", isGranted = storagePermission)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                             val notificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                             PermissionItem(name = "Notifications", isGranted = notificationPermission)
-                        }
-                    }
+                    Text(
+                        text = "GraffitiXR © 2024",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp)
+                    )
                 }
-
-                Text(
-                    text = "GraffitiXR © 2024",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
-                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp)
-                )
             }
         }
     }
