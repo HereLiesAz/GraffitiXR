@@ -35,7 +35,8 @@ import javax.microedition.khronos.opengles.GL10
 class ArRenderer(
     private val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
-    private val onFrameCaptured: (Bitmap) -> Unit
+    private val onFrameCaptured: (Bitmap) -> Unit,
+    private val onAnchorCreated: () -> Unit // NEW CALLBACK
 ) : GLSurfaceView.Renderer {
 
     // AR Session
@@ -205,6 +206,9 @@ class ArRenderer(
 
                 arImagePose = poseMatrix
                 arState = ArState.PLACED
+
+                // IMPORTANT: Notify ViewModel that placement happened!
+                onAnchorCreated()
                 break
             }
         }

@@ -26,11 +26,13 @@ fun ArView(
     val activity = context as? Activity
 
     // Initialize Renderer
+    // IMPORTANT: Now wiring onAnchorCreated to the ViewModel
     val renderer = remember {
         ArRenderer(
             context,
             onPlanesDetected = { detected -> viewModel.setArPlanesDetected(detected) },
-            onFrameCaptured = { bitmap -> viewModel.onFrameCaptured(bitmap) }
+            onFrameCaptured = { bitmap -> viewModel.onFrameCaptured(bitmap) },
+            onAnchorCreated = { viewModel.onArImagePlaced() }
         )
     }
 
@@ -51,6 +53,7 @@ fun ArView(
     renderer.colorBalanceB = uiState.colorBalanceB
 
     // Sync AR State
+    // NOTE: This check prevents infinite loops but ensures synchronization
     if (uiState.arState != renderer.arState) {
         renderer.arState = uiState.arState
     }
@@ -100,6 +103,7 @@ fun ArView(
             .fillMaxSize()
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
+                    // Only process taps if searching for planes
                     if (uiState.arState == ArState.SEARCHING) {
                         renderer.queueTap(offset.x, offset.y)
                     }
