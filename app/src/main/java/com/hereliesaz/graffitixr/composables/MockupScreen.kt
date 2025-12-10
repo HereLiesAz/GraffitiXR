@@ -144,8 +144,13 @@ fun MockupScreen(
                                 translationY = uiState.offset.y
                             }
                     ) {
+                        // Calculate offset to center the image on the canvas
+                        val xOffset = (size.width - bmp.width) / 2f
+                        val yOffset = (size.height - bmp.height) / 2f
+
                         drawImage(
                             image = bmp.asImageBitmap(),
+                            topLeft = Offset(xOffset, yOffset),
                             alpha = uiState.opacity,
                             colorFilter = ColorFilter.colorMatrix(colorMatrix),
                             blendMode = uiState.blendMode
