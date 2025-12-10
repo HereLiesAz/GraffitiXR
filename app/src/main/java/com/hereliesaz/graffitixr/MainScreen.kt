@@ -35,9 +35,9 @@ import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.composables.TraceScreen
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
+import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
-import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
 import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
@@ -205,41 +205,42 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     azDivider()
 
-                    if (uiState.editorMode == EditorMode.AR) {
-                        azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
-                    }
-
                     if (uiState.editorMode == EditorMode.TRACE) {
                         azRailItem(id = "lock_trace", text = "Lock", onClick = { viewModel.setTouchLocked(true) })
                     }
 
+                    // Target Host
+                    azRailHostItem(id = "target_host", text = "Target", route = "target_host")
+                    if (uiState.editorMode == EditorMode.AR) {
+                        azRailSubItem(id = "create_target", hostId = "target_host", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
+                    }
+                    azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Mark Progress", onClick = viewModel::onMarkProgressToggled)
+
+                    azDivider()
+
+                    // Image Host (now includes Adjustments)
                     azRailHostItem(id = "image_host", text = "Image", route = "image_host")
-                if (uiState.editorMode == EditorMode.STATIC) {
-                    azRailSubItem(id = "background", hostId = "image_host", text = "Background") {
-                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    if (uiState.editorMode == EditorMode.STATIC) {
+                        azRailSubItem(id = "background", hostId = "image_host", text = "Background") {
+                            backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
+                    }
+                    azRailSubItem(id = "overlay", hostId = "image_host", text = "Image") {
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+
+                    if (uiState.overlayImageUri != null) {
+                        azRailSubItem(id = "remove_bg", hostId = "image_host", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
+                        azRailSubItem(id = "line_drawing", hostId = "image_host", text = "Outline", onClick = viewModel::onLineDrawingClicked)
+
+                        // Moved Adjustment Items
+                        azRailSubItem(id = "opacity", hostId = "image_host", text = "Opacity") { showSliderDialog = "Opacity" }
+                        azRailSubItem(id = "contrast", hostId = "image_host", text = "Contrast") { showSliderDialog = "Contrast" }
+                        azRailSubItem(id = "saturation", hostId = "image_host", text = "Saturation") { showSliderDialog = "Saturation" }
+                        azRailSubItem(id = "color_balance", hostId = "image_host", text = "Balance") { showColorBalanceDialog = true }
+                        azRailSubItem(id = "blend_mode", hostId = "image_host", text = "Blend Mode", onClick = viewModel::onCycleBlendMode)
                     }
                 }
-                azRailSubItem(id = "overlay", hostId = "image_host", text = "Image") {
-                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-
-                if (uiState.overlayImageUri != null) {
-                    azRailSubItem(id = "remove_bg", hostId = "image_host", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
-                    azRailSubItem(id = "line_drawing", hostId = "image_host", text = "Outline", onClick = viewModel::onLineDrawingClicked)
-                }
-
-                azDivider()
-
-                azRailHostItem(id = "adjustments_host", text = "Adjust", route = "adjustments_host")
-                azRailSubItem(id = "opacity", hostId = "adjustments_host", text = "Opacity") { showSliderDialog = "Opacity" }
-                azRailSubItem(id = "contrast", hostId = "adjustments_host", text = "Contrast") { showSliderDialog = "Contrast" }
-                azRailSubItem(id = "saturation", hostId = "adjustments_host", text = "Saturation") { showSliderDialog = "Saturation" }
-                azRailSubItem(id = "color_balance", hostId = "adjustments_host", text = "Balance") { showColorBalanceDialog = true }
-                azRailSubItem(id = "blend_mode", hostId = "adjustments_host", text = "Blend Mode", onClick = viewModel::onCycleBlendMode)
-
-                azDivider()
-
-                azRailItem(id = "mark_progress", text = "Mark Progress", onClick = viewModel::onMarkProgressToggled)
             }
         }
 
@@ -291,26 +292,21 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
-        when (showSliderDialog) {
-            "Opacity" -> AdjustmentSliderDialog(
-                title = "Opacity",
-                value = uiState.opacity,
-                onValueChange = viewModel::onOpacityChanged,
-                onDismissRequest = { showSliderDialog = null }
-            )
-            "Contrast" -> AdjustmentSliderDialog(
-                title = "Contrast",
-                value = uiState.contrast,
-                onValueChange = viewModel::onContrastChanged,
-                onDismissRequest = { showSliderDialog = null },
-                valueRange = 0f..2f
-            )
-            "Saturation" -> AdjustmentSliderDialog(
-                title = "Saturation",
-                value = uiState.saturation,
-                onValueChange = viewModel::onSaturationChanged,
-                onDismissRequest = { showSliderDialog = null },
-                valueRange = 0f..2f
+        // Adjustments Panel (Knobs and Undo/Redo)
+        if (uiState.overlayImageUri != null) {
+            val showKnobs = showSliderDialog == "Opacity" || showSliderDialog == "Contrast" || showSliderDialog == "Saturation"
+
+            AdjustmentsPanel(
+                uiState = uiState,
+                showKnobs = showKnobs,
+                onOpacityChange = viewModel::onOpacityChanged,
+                onContrastChange = viewModel::onContrastChanged,
+                onSaturationChange = viewModel::onSaturationChanged,
+                onUndo = viewModel::onUndoClicked,
+                onRedo = viewModel::onRedoClicked,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .zIndex(3f)
             )
         }
 
@@ -330,6 +326,7 @@ fun MainScreen(viewModel: MainViewModel) {
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp)
+                .zIndex(4f)
         )
 
         TapFeedbackEffect(feedback = tapFeedback)
