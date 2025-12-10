@@ -6,7 +6,8 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 enum class EditorMode : Parcelable {
     STATIC,
-    NON_AR,
+    GHOST,
+    TRACE,
     AR,
     HELP
 }

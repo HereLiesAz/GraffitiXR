@@ -3,7 +3,11 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.view.KeyEvent
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -33,6 +37,51 @@ import org.opencv.android.OpenCVLoader
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels { MainViewModelFactory() }
+    private var volUpPressed = false
+    private var volDownPressed = false
+    private val unlockHandler = Handler(Looper.getMainLooper())
+    private val unlockRunnable = Runnable {
+        viewModel.setTouchLocked(false)
+        Toast.makeText(this, "Screen Unlocked", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (event?.repeatCount == 0) {
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                volUpPressed = true
+                checkUnlock()
+                if (viewModel.uiState.value.isTouchLocked) return true
+            } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                volDownPressed = true
+                checkUnlock()
+                if (viewModel.uiState.value.isTouchLocked) return true
+            }
+        } else {
+            if (viewModel.uiState.value.isTouchLocked && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            volUpPressed = false
+            unlockHandler.removeCallbacks(unlockRunnable)
+            if (viewModel.uiState.value.isTouchLocked) return true
+        } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            volDownPressed = false
+            unlockHandler.removeCallbacks(unlockRunnable)
+            if (viewModel.uiState.value.isTouchLocked) return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun checkUnlock() {
+        if (volUpPressed && volDownPressed && viewModel.uiState.value.isTouchLocked) {
+            unlockHandler.postDelayed(unlockRunnable, 2000) // 2 seconds
+        }
+    }
 
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {

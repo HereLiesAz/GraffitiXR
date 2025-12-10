@@ -64,5 +64,6 @@ data class UiState(
     val isMarkingProgress: Boolean = false,
     val drawingPaths: @WriteWith<DrawingPathsParceler> List<List<Pair<Float, Float>>> = emptyList(),
     val progressPercentage: Float = 0f,
-    val isCapturingTarget: Boolean = false
+    val isCapturingTarget: Boolean = false,
+    val isTouchLocked: Boolean = false
 ) : Parcelable

@@ -28,10 +28,13 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
+import com.hereliesaz.graffitixr.composables.GhostScreen
 import com.hereliesaz.graffitixr.composables.HelpScreen
-import com.hereliesaz.graffitixr.composables.ImageTraceScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.composables.TraceScreen
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.dialogs.AdjustmentSliderDialog
@@ -124,7 +127,25 @@ fun MainScreen(viewModel: MainViewModel) {
                             gestureInProgress = false
                         }
                     )
-                    EditorMode.NON_AR -> ImageTraceScreen(
+                    EditorMode.TRACE -> TraceScreen(
+                        uiState = uiState,
+                        onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                        onScaleChanged = viewModel::onScaleChanged,
+                        onOffsetChanged = viewModel::onOffsetChanged,
+                        onRotationZChanged = viewModel::onRotationZChanged,
+                        onRotationXChanged = viewModel::onRotationXChanged,
+                        onRotationYChanged = viewModel::onRotationYChanged,
+                        onCycleRotationAxis = viewModel::onCycleRotationAxis,
+                        onGestureStart = {
+                            viewModel.onGestureStart()
+                            gestureInProgress = true
+                        },
+                        onGestureEnd = {
+                            viewModel.onGestureEnd()
+                            gestureInProgress = false
+                        }
+                    )
+                    EditorMode.GHOST -> GhostScreen(
                         uiState = uiState,
                         onScaleChanged = viewModel::onScaleChanged,
                         onOffsetChanged = viewModel::onOffsetChanged,
@@ -160,33 +181,39 @@ fun MainScreen(viewModel: MainViewModel) {
             isVisible = gestureInProgress
         )
 
-        Box(modifier = Modifier.zIndex(2f)) {
-            AzNavRail {
-                azSettings(isLoading = uiState.isLoading,
-                    packRailButtons = true
-                )
+        if (!uiState.isTouchLocked) {
+            Box(modifier = Modifier.zIndex(2f)) {
+                AzNavRail {
+                    azSettings(isLoading = uiState.isLoading,
+                        packRailButtons = true
+                    )
 
-                azMenuHostItem(id = "mode_host", text = "Mode", route = "mode_host")
-                azMenuSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-                azMenuSubItem(id = "trace_image", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.NON_AR) })
-                azMenuSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+                    azMenuHostItem(id = "mode_host", text = "Mode", route = "mode_host")
+                    azMenuSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+                    azMenuSubItem(id = "ghost_mode", hostId = "mode_host", text = "Ghost", onClick = { viewModel.onEditorModeChanged(EditorMode.GHOST) })
+                    azMenuSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
+                    azMenuSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
 
-                azRailHostItem(id = "project_host", text = "Project", route = "project_host")
-                azRailSubItem(id = "save_project", hostId = "project_host", text = "Save") {
-                    showSaveProjectDialog = true
-                }
-                azRailSubItem(id = "project_library", hostId = "project_host", text = "Library") {
-                    showProjectLibrary = true
-                }
-                azRailSubItem(id = "export", hostId = "project_host", text = "Export", onClick = viewModel::onSaveClicked)
+                    azRailHostItem(id = "project_host", text = "Project", route = "project_host")
+                    azRailSubItem(id = "save_project", hostId = "project_host", text = "Save") {
+                        showSaveProjectDialog = true
+                    }
+                    azRailSubItem(id = "project_library", hostId = "project_host", text = "Library") {
+                        showProjectLibrary = true
+                    }
+                    azRailSubItem(id = "export", hostId = "project_host", text = "Export", onClick = viewModel::onSaveClicked)
 
-                azDivider()
+                    azDivider()
 
-                if (uiState.editorMode == EditorMode.AR) {
-                    azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
-                }
+                    if (uiState.editorMode == EditorMode.AR) {
+                        azRailItem(id = "create_target", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
+                    }
 
-                azRailHostItem(id = "image_host", text = "Image", route = "image_host")
+                    if (uiState.editorMode == EditorMode.TRACE) {
+                        azRailItem(id = "lock_trace", text = "Lock", onClick = { viewModel.setTouchLocked(true) })
+                    }
+
+                    azRailHostItem(id = "image_host", text = "Image", route = "image_host")
                 if (uiState.editorMode == EditorMode.STATIC) {
                     azRailSubItem(id = "background", hostId = "image_host", text = "Background") {
                         backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -214,6 +241,24 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 azRailItem(id = "mark_progress", text = "Mark Progress", onClick = viewModel::onMarkProgressToggled)
             }
+        }
+
+        if (uiState.isTouchLocked) {
+             Box(
+                 modifier = Modifier
+                     .fillMaxSize()
+                     .zIndex(100f)
+                     .background(Color.Transparent)
+                     .pointerInput(Unit) {
+                         awaitPointerEventScope {
+                             while (true) {
+                                 awaitPointerEvent(pass = PointerEventPass.Initial)
+                                 val event = awaitPointerEvent()
+                                 event.changes.forEach { it.consume() }
+                             }
+                         }
+                     }
+             )
         }
 
         if (uiState.isMarkingProgress) {

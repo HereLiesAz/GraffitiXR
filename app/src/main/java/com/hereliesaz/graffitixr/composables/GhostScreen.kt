@@ -43,7 +43,7 @@ import com.hereliesaz.graffitixr.UiState
  * @param modifier The modifier to be applied to the layout.
  */
 @Composable
-fun ImageTraceScreen(
+fun GhostScreen(
     uiState: UiState,
     onScaleChanged: (Float) -> Unit,
     onOffsetChanged: (androidx.compose.ui.geometry.Offset) -> Unit,
