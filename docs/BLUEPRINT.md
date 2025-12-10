@@ -66,6 +66,7 @@ A well-organized package structure is employed:
 | **UI (Jetpack Compose)**  | `androidx.activity:activity-compose`     | Integration for Jetpack Compose within an Activity.                    |
 |                         | `androidx.compose.ui:ui`                 | Core Jetpack Compose UI library.                                       |
 |                         | `androidx.compose.material3:material3`   | Provides Material Design 3 components.                                 |
+| **Navigation**          | `com.github.HereLiesAz:AzNavRail`        | Provides the hierarchical navigation rail and menu structure.          |
 | **CameraX**             | `androidx.camera:camera-core`, etc.      | Provides a consistent API for camera access (used in non-AR modes).    |
 | **AR**                  | `com.google.ar:core`                    | The ARCore SDK for Android.                    |
 | **Computer Vision**     | `libs.opencv`                            | The OpenCV for Android library for computer vision tasks.              |
