@@ -44,7 +44,26 @@ jobs:
               per_page: 100
             });
 
-            const failures = checks.check_runs.filter(c => c.conclusion === 'failure' || c.conclusion === 'timed_out');
+            // Group by name and find the latest run for each job
+            const latestRunsMap = new Map();
+
+            for (const check of checks.check_runs) {
+                const name = check.name;
+                const currentLatest = latestRunsMap.get(name);
+
+                // If we haven't seen this job name yet, or this run started later than the stored one
+                if (!currentLatest || new Date(check.started_at) > new Date(currentLatest.started_at)) {
+                    latestRunsMap.set(name, check);
+                }
+            }
+
+            const latestRuns = Array.from(latestRunsMap.values());
+
+            // Log what we found for debugging
+            console.log("Latest check runs found:");
+            latestRuns.forEach(r => console.log(`- ${r.name}: ${r.status} (${r.conclusion}) [${r.started_at}]`));
+
+            const failures = latestRuns.filter(c => c.conclusion === 'failure' || c.conclusion === 'timed_out');
             if (failures.length > 0) {
               const names = failures.map(c => c.name).join(', ');
               core.setFailed(`The following checks failed: ${names}`);
@@ -52,7 +71,7 @@ jobs:
             }
 
             // Filter out self (this new run might show up as queued/in_progress)
-            const pending = checks.check_runs.filter(c =>
+            const pending = latestRuns.filter(c =>
                 (c.status === 'in_progress' || c.status === 'queued') &&
                 c.name !== 'release' && // This job name
                 !c.name.includes('Auto Release') // This workflow name
