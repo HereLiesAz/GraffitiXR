@@ -8,5 +8,11 @@ data class GithubRelease(
     val name: String,
     val prerelease: Boolean,
     val html_url: String,
-    val created_at: String
+    val created_at: String,
+    val assets: List<GithubAsset> = emptyList()
+)
+
+@Serializable
+data class GithubAsset(
+    val browser_download_url: String
 )

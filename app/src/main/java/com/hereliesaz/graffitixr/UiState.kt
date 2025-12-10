@@ -4,7 +4,9 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import com.hereliesaz.graffitixr.data.GithubRelease
 import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.RawValue
 import kotlinx.parcelize.WriteWith
 
 @Parcelize
@@ -68,5 +70,6 @@ data class UiState(
     val isTouchLocked: Boolean = false,
 
     val updateStatusMessage: String? = null,
-    val isCheckingForUpdate: Boolean = false
+    val isCheckingForUpdate: Boolean = false,
+    val latestRelease: @RawValue GithubRelease? = null
 ) : Parcelable

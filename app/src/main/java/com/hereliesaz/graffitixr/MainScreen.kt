@@ -182,6 +182,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     updateStatus = uiState.updateStatusMessage,
                     isCheckingForUpdate = uiState.isCheckingForUpdate,
                     onCheckForUpdates = viewModel::checkForUpdates,
+                    onInstallUpdate = viewModel::installLatestUpdate,
                     onClose = { showSettings = false }
                 )
             }
@@ -304,6 +305,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 updateStatus = uiState.updateStatusMessage,
                 isCheckingForUpdate = uiState.isCheckingForUpdate,
                 onCheckForUpdates = viewModel::checkForUpdates,
+                onInstallUpdate = viewModel::installLatestUpdate,
                 onClose = { showSettings = false }
             )
         }

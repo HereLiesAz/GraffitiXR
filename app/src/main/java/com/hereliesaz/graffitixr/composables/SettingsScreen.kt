@@ -1,11 +1,25 @@
 package com.hereliesaz.graffitixr.composables
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,11 +27,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +51,7 @@ fun SettingsScreen(
     updateStatus: String?,
     isCheckingForUpdate: Boolean,
     onCheckForUpdates: () -> Unit,
+    onInstallUpdate: () -> Unit,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
@@ -48,6 +70,14 @@ fun SettingsScreen(
     val storagePermission = remember {
         ContextCompat.checkSelfPermission(context, storagePermissionName) == PackageManager.PERMISSION_GRANTED
     }
+
+    val openAppSettings: () -> Unit = {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        val uri = Uri.fromParts("package", context.packageName, null)
+        intent.data = uri
+        context.startActivity(intent)
+    }
+
 
     Box(
         modifier = Modifier
@@ -113,13 +143,18 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                val isUpdateAvailable = updateStatus?.startsWith("New version") == true
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable(enabled = isUpdateAvailable, onClick = onInstallUpdate)
+                                ) {
                                     Text(text = "Check for experimental updates", fontWeight = FontWeight.Medium)
                                     if (updateStatus != null) {
                                         Text(
                                             text = updateStatus,
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.primary
+                                            color = if(isUpdateAvailable) MaterialTheme.colorScheme.primary else Color.Gray
                                         )
                                     }
                                 }
@@ -136,11 +171,11 @@ fun SettingsScreen(
                         // Permissions Section
                         item {
                             SettingsSectionTitle("Permissions")
-                            PermissionItem(name = "Camera Access", isGranted = cameraPermission)
-                            PermissionItem(name = "Photo Library Access", isGranted = storagePermission)
+                            PermissionItem(name = "Camera Access", isGranted = cameraPermission, onClick = openAppSettings)
+                            PermissionItem(name = "Photo Library Access", isGranted = storagePermission, onClick = openAppSettings)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                  val notificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                                 PermissionItem(name = "Notifications", isGranted = notificationPermission)
+                                 PermissionItem(name = "Notifications", isGranted = notificationPermission, onClick = openAppSettings)
                             }
                         }
                     }
@@ -149,7 +184,9 @@ fun SettingsScreen(
                         text = "GraffitiXR © 2024",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray,
-                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp)
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(top = 16.dp)
                     )
                 }
             }
@@ -170,7 +207,9 @@ fun SettingsSectionTitle(title: String) {
 @Composable
 fun SettingsItem(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(text = label, fontWeight = FontWeight.Medium)
@@ -179,9 +218,12 @@ fun SettingsItem(label: String, value: String) {
 }
 
 @Composable
-fun PermissionItem(name: String, isGranted: Boolean) {
+fun PermissionItem(name: String, isGranted: Boolean, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

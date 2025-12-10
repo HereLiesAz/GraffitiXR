@@ -1,8 +1,11 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Application
+import android.app.DownloadManager
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Environment
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
@@ -85,7 +88,7 @@ class MainViewModel(
                 try {
                     val grayMat = Mat()
                     Utils.bitmapToMat(bitmap, grayMat)
-                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                    Imgproc.cvtColor(grayMat, grayMat, Improc.COLOR_BGR2GRAY)
 
                     val orb = ORB.create()
                     val keypoints = MatOfKeyPoint()
@@ -592,10 +595,15 @@ class MainViewModel(
                             val latestRelease = releases.firstOrNull()
                             withContext(Dispatchers.Main) {
                                 if (latestRelease != null) {
-                                    val message = "Latest: ${latestRelease.tag_name}\n(${latestRelease.created_at.take(10)})"
+                                    val message = if (latestRelease.tag_name > BuildConfig.VERSION_NAME) {
+                                        "New version available: ${latestRelease.tag_name}"
+                                    } else {
+                                        "You have the latest version."
+                                    }
                                     updateState(uiState.value.copy(
                                         isCheckingForUpdate = false,
-                                        updateStatusMessage = message
+                                        updateStatusMessage = message,
+                                        latestRelease = latestRelease
                                     ), isUndoable = false)
                                 } else {
                                     updateState(uiState.value.copy(
@@ -621,6 +629,29 @@ class MainViewModel(
                     }
                 }
             }
+        }
+    }
+
+    fun installLatestUpdate() {
+        val release = uiState.value.latestRelease ?: return
+        val asset = release.assets.firstOrNull { it.browser_download_url.endsWith(".apk") } ?: return
+
+        val downloadUrl = asset.browser_download_url
+        val fileName = "GraffitiXR-${release.tag_name}.apk"
+
+        try {
+            val request = DownloadManager.Request(Uri.parse(downloadUrl))
+                .setTitle(fileName)
+                .setDescription("Downloading GraffitiXR Update")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+
+            val downloadManager = getApplication<Application>().getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            downloadManager.enqueue(request)
+
+            Toast.makeText(getApplication(), "Downloading update...", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(getApplication(), "Failed to start download: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
