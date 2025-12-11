@@ -2,6 +2,8 @@ package com.hereliesaz.graffitixr
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -24,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -235,8 +238,21 @@ fun MainScreen(viewModel: MainViewModel) {
         if (uiState.isCapturingTarget) {
             Box(modifier = Modifier.zIndex(5f)) {
                 if (uiState.captureStep == CaptureStep.REVIEW) {
+                    val uri = uiState.capturedTargetUris.firstOrNull()
+                    val imageBitmap by produceState<Bitmap?>(initialValue = null, uri) {
+                        uri?.let {
+                            value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                val source = ImageDecoder.createSource(context.contentResolver, it)
+                                ImageDecoder.decodeBitmap(source)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it)
+                            }
+                        }
+                    }
+
                     TargetRefinementScreen(
-                        targetImage = uiState.capturedTargetImages.firstOrNull(),
+                        targetImage = imageBitmap,
                         keypoints = uiState.detectedKeypoints,
                         paths = uiState.refinementPaths,
                         isEraser = uiState.isRefinementEraser,
