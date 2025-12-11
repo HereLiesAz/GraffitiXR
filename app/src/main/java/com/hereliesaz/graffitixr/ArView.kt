@@ -41,7 +41,10 @@ fun ArView(
 
     DisposableEffect(renderer) {
         viewModel.arRenderer = renderer
-        onDispose { viewModel.arRenderer = null }
+        onDispose {
+            viewModel.arRenderer = null
+            renderer.cleanup()
+        }
     }
 
     val fingerprintJson = uiState.fingerprintJson
