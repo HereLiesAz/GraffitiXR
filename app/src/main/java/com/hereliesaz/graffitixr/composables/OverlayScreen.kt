@@ -36,7 +36,7 @@ import com.hereliesaz.graffitixr.UiState
 import kotlinx.coroutines.launch
 
 @Composable
-fun GhostScreen(
+fun OverlayScreen(
     uiState: UiState,
     onScaleChanged: (Float) -> Unit,
     onOffsetChanged: (Offset) -> Unit,
@@ -56,6 +56,7 @@ fun GhostScreen(
     val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
         ColorMatrix().apply {
             setToSaturation(uiState.saturation)
+            // Use 0f..2f range for contrast as per previous adjustments
             val contrast = uiState.contrast
             val contrastMatrix = ColorMatrix(
                 floatArrayOf(
@@ -119,7 +120,10 @@ fun GhostScreen(
         )
 
         // Overlay Image
-        uiState.overlayImageUri?.let { uri ->
+        // Support processedImageUri (e.g. curves) if available
+        val imageUri = uiState.processedImageUri ?: uiState.overlayImageUri
+
+        imageUri?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
             LaunchedEffect(uri) {
@@ -140,13 +144,16 @@ fun GhostScreen(
                     .pointerInput(Unit) {
                         detectTransformGestures(
                             onGesture = { _, pan, zoom, rotation ->
+                                onGestureStart()
                                 onScaleChanged(zoom)
-                                onOffsetChanged(pan)
+                                // Invert rotation for natural feel
                                 when (uiState.activeRotationAxis) {
                                     RotationAxis.X -> onRotationXChanged(rotation)
                                     RotationAxis.Y -> onRotationYChanged(rotation)
-                                    RotationAxis.Z -> onRotationZChanged(rotation)
+                                    RotationAxis.Z -> onRotationZChanged(-rotation)
                                 }
+                                onOffsetChanged(pan)
+                                onGestureEnd()
                             }
                         )
                     }
