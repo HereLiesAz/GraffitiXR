@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -17,18 +16,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.RotationAxis
 import com.hereliesaz.graffitixr.UiState
+import com.hereliesaz.graffitixr.utils.detectTwoFingerTransformGestures
 import kotlinx.coroutines.launch
 
 @Composable
@@ -51,6 +54,7 @@ fun MockupScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
     val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
         ColorMatrix().apply {
@@ -116,31 +120,45 @@ fun MockupScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .onSizeChanged { containerSize = it }
                     .clipToBounds()
+                    // Layer 1: Double Tap
                     .pointerInput(Unit) {
-                        detectTransformGestures(
-                            onGesture = { _, pan, zoom, rotation ->
-                                onScaleChanged(zoom)
-                                onOffsetChanged(pan)
-                                when (uiState.activeRotationAxis) {
-                                    RotationAxis.X -> onRotationXChanged(rotation)
-                                    RotationAxis.Y -> onRotationYChanged(rotation)
-                                    RotationAxis.Z -> onRotationZChanged(rotation)
+                        detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                    }
+                    // Layer 2: Single Finger Drag (Image Only)
+                    .pointerInput(imageBitmap, containerSize, uiState.scale, uiState.offset) {
+                        detectDragGestures(
+                            onDragStart = { onGestureStart() },
+                            onDragEnd = { onGestureEnd() },
+                            onDrag = { change, dragAmount ->
+                                val bmp = imageBitmap ?: return@detectDragGestures
+                                val imgWidth = bmp.width * uiState.scale
+                                val imgHeight = bmp.height * uiState.scale
+                                val centerX = size.width / 2f + uiState.offset.x
+                                val centerY = size.height / 2f + uiState.offset.y
+                                val left = centerX - imgWidth / 2f
+                                val top = centerY - imgHeight / 2f
+                                val bounds = Rect(left, top, left + imgWidth, top + imgHeight)
+
+                                if (bounds.contains(change.position)) {
+                                    change.consume()
+                                    onOffsetChanged(dragAmount)
                                 }
                             }
                         )
                     }
+                    // Layer 3: Two Finger Transform
                     .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { onGestureStart() },
-                            onDragEnd = { onGestureEnd() }
-                        ) { change, dragAmount ->
-                            change.consume()
-                            onOffsetChanged(dragAmount)
+                        detectTwoFingerTransformGestures { _, pan, zoom, rotation ->
+                            onScaleChanged(zoom)
+                            onOffsetChanged(pan)
+                            when (uiState.activeRotationAxis) {
+                                RotationAxis.X -> onRotationXChanged(rotation)
+                                RotationAxis.Y -> onRotationYChanged(rotation)
+                                RotationAxis.Z -> onRotationZChanged(rotation)
+                            }
                         }
-                    }
-                    .pointerInput(Unit) {
-                        detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                     }
             ) {
                 imageBitmap?.let { bmp ->
@@ -157,7 +175,6 @@ fun MockupScreen(
                                 translationY = uiState.offset.y
                             }
                     ) {
-                        // Calculate offset to center the image on the canvas
                         val xOffset = (size.width - bmp.width) / 2f
                         val yOffset = (size.height - bmp.height) / 2f
 
