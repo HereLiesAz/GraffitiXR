@@ -183,31 +183,40 @@ jobs:
           # Calculate Version
           export BUILD_NUMBER=$(git rev-list --count HEAD)
 
-          MAJOR=$(grep 'major=' version.properties | cut -d'=' -f2)
-          MINOR=$(grep 'minor=' version.properties | cut -d'=' -f2)
-          PATCH=$(grep 'patch=' version.properties | cut -d'=' -f2)
+          # Use correct property names from version.properties
+          MAJOR=$(grep 'versionMajor=' version.properties | cut -d'=' -f2)
+          MINOR=$(grep 'versionMinor=' version.properties | cut -d'=' -f2)
+          PATCH=$(grep 'versionPatch=' version.properties | cut -d'=' -f2)
           VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
           TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
 
-          # Find APK
-          APK_FOUND=$(find downloaded_apk -name "GraffitiXR-*-debug.apk" | head -n 1)
+          # Dynamically Extract App Name from settings.gradle or settings.gradle.kts
+          if [ -f "settings.gradle.kts" ]; then
+             APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          elif [ -f "settings.gradle" ]; then
+             APP_NAME=$(grep 'rootProject.name' settings.gradle | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          else
+             APP_NAME="App" # Fallback if not found
+          fi
+          echo "Detected App Name: $APP_NAME"
+
+          # Find APK - default gradle build output is usually app-debug.apk
+          APK_FOUND=$(find downloaded_apk -name "*.apk" | head -n 1)
           if [ -z "$APK_FOUND" ]; then
             echo "Error: No APK file found in downloaded_apk/"
             ls -R downloaded_apk/
             exit 1
           fi
 
-          # Enforce naming convention
-          TARGET_NAME="IDEaz-${VERSION_NAME}-debug.apk"
+          # Enforce naming convention using dynamic APP_NAME
+          TARGET_NAME="${APP_NAME}-${VERSION_NAME}-debug.apk"
           echo "Renaming $APK_FOUND to $TARGET_NAME"
           mv "$APK_FOUND" "$TARGET_NAME"
 
           echo "APK_FILE=$TARGET_NAME" >> $GITHUB_ENV
-
-
 
       - name: Package Local Build Tools
         if: steps.verify.outputs.proceed == 'true'
