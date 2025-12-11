@@ -12,14 +12,41 @@ import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
 
-fun convertToLineDrawing(bitmap: Bitmap): Bitmap {
+fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
     val mat = Mat()
-    Utils.bitmapToMat(bitmap, mat)
-    Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2GRAY)
-    Imgproc.Canny(mat, mat, 50.0, 150.0)
-    val resultBitmap = Bitmap.createBitmap(mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888)
-    Utils.matToBitmap(mat, resultBitmap)
-    return resultBitmap
+    val grayMat = Mat()
+    val edges = Mat()
+    val colorChannel = Mat()
+    val rgbaMat = Mat()
+
+    try {
+        Utils.bitmapToMat(bitmap, mat)
+
+        Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
+        Imgproc.Canny(grayMat, edges, 50.0, 150.0)
+
+        val colorValue = if (isWhite) 255.0 else 0.0
+        colorChannel.create(edges.size(), org.opencv.core.CvType.CV_8UC1)
+        colorChannel.setTo(org.opencv.core.Scalar(colorValue))
+
+        val channels = java.util.ArrayList<Mat>()
+        channels.add(colorChannel) // R
+        channels.add(colorChannel) // G
+        channels.add(colorChannel) // B
+        channels.add(edges)        // A
+
+        org.opencv.core.Core.merge(channels, rgbaMat)
+
+        val resultBitmap = Bitmap.createBitmap(mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(rgbaMat, resultBitmap)
+        return resultBitmap
+    } finally {
+        mat.release()
+        grayMat.release()
+        edges.release()
+        colorChannel.release()
+        rgbaMat.release()
+    }
 }
 
 fun calculateBlurMetric(bitmap: Bitmap): Double {

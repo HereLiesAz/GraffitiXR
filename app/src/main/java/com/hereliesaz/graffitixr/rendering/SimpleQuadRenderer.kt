@@ -17,6 +17,7 @@ class SimpleQuadRenderer {
     private var modelViewProjectionUniform = 0
     private var textureUniform = 0
     private var alphaUniform = 0
+    private var brightnessUniform = 0
     private var colorBalanceUniform = 0
 
     private var vertexBuffer: FloatBuffer? = null
@@ -38,6 +39,7 @@ class SimpleQuadRenderer {
         modelViewProjectionUniform = GLES20.glGetUniformLocation(program, "u_ModelViewProjection")
         textureUniform = GLES20.glGetUniformLocation(program, "u_Texture")
         alphaUniform = GLES20.glGetUniformLocation(program, "u_Alpha")
+        brightnessUniform = GLES20.glGetUniformLocation(program, "u_Brightness")
         colorBalanceUniform = GLES20.glGetUniformLocation(program, "u_ColorBalance")
 
         // Geometry: Vertical Quad (X-Y Plane). Z is 0.
@@ -75,7 +77,7 @@ class SimpleQuadRenderer {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
     }
 
-    fun draw(modelMatrix: FloatArray, viewMatrix: FloatArray, projectionMatrix: FloatArray, bitmap: Bitmap, alpha: Float, colorR: Float, colorG: Float, colorB: Float) {
+    fun draw(modelMatrix: FloatArray, viewMatrix: FloatArray, projectionMatrix: FloatArray, bitmap: Bitmap, alpha: Float, brightness: Float, colorR: Float, colorG: Float, colorB: Float) {
         if (lastBitmap != bitmap) {
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
             GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
@@ -95,6 +97,7 @@ class SimpleQuadRenderer {
 
         GLES20.glUniformMatrix4fv(modelViewProjectionUniform, 1, false, mvpMatrix, 0)
         GLES20.glUniform1f(alphaUniform, alpha)
+        GLES20.glUniform1f(brightnessUniform, brightness)
         GLES20.glUniform3f(colorBalanceUniform, colorR, colorG, colorB)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
@@ -136,12 +139,14 @@ class SimpleQuadRenderer {
             precision mediump float;
             uniform sampler2D u_Texture;
             uniform float u_Alpha;
+            uniform float u_Brightness;
             uniform vec3 u_ColorBalance;
             varying vec2 v_TexCoord;
             void main() {
                 vec4 color = texture2D(u_Texture, v_TexCoord);
                 color.rgb *= u_ColorBalance;
-                gl_FragColor = vec4(color.rgb, color.a * u_Alpha);
+                color.rgb += u_Brightness;
+                gl_FragColor = vec4(clamp(color.rgb, 0.0, 1.0), color.a * u_Alpha);
             }
         """
     }

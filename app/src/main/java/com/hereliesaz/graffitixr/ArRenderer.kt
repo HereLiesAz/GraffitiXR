@@ -63,6 +63,7 @@ class ArRenderer(
 
     // Transforms
     var opacity: Float = 1.0f
+    var brightness: Float = 0f
     var scale: Float = 1.0f
     var rotationX: Float = 0f
     var rotationY: Float = 0f
@@ -188,7 +189,7 @@ class ArRenderer(
 
         simpleQuadRenderer.draw(
             modelMtx, viewMtx, projMtx,
-            bitmap, opacity, colorBalanceR, colorBalanceG, colorBalanceB
+            bitmap, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB
         )
     }
 

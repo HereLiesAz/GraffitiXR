@@ -39,9 +39,11 @@ fun UndoRedoRow(
 @Composable
 fun AdjustmentsKnobsRow(
     opacity: Float,
+    brightness: Float,
     contrast: Float,
     saturation: Float,
     onOpacityChange: (Float) -> Unit,
+    onBrightnessChange: (Float) -> Unit,
     onContrastChange: (Float) -> Unit,
     onSaturationChange: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -57,6 +59,13 @@ fun AdjustmentsKnobsRow(
             onValueChange = onOpacityChange,
             text = "Opacity",
             color = MaterialTheme.colorScheme.secondary
+        )
+        Knob(
+            value = brightness,
+            onValueChange = onBrightnessChange,
+            text = "Brightness",
+            color = MaterialTheme.colorScheme.onSurface,
+            valueRange = -1f..1f
         )
         Knob(
             value = contrast,
