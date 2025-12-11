@@ -40,7 +40,7 @@ import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
-import com.hereliesaz.graffitixr.composables.GhostScreen
+import com.hereliesaz.graffitixr.composables.OverlayScreen
 import com.hereliesaz.graffitixr.composables.HelpScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -191,7 +191,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             gestureInProgress = false
                         }
                     )
-                    EditorMode.GHOST -> GhostScreen(
+                    EditorMode.OVERLAY -> OverlayScreen(
                         uiState = uiState,
                         onScaleChanged = viewModel::onScaleChanged,
                         onOffsetChanged = viewModel::onOffsetChanged,
@@ -281,7 +281,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
                     azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Grid", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-                    azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.GHOST) })
+                    azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.OVERLAY) })
                     azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
                     azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
 

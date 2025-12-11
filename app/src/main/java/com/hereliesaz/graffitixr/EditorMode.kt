@@ -6,7 +6,7 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 enum class EditorMode : Parcelable {
     STATIC,
-    GHOST,
+    OVERLAY,
     TRACE,
     AR,
     HELP // Shows the Help/Onboarding screen
