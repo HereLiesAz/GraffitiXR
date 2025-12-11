@@ -183,7 +183,7 @@ jobs:
           # Calculate Version
           export BUILD_NUMBER=$(git rev-list --count HEAD)
 
-          # FIX: Grep for 'versionMajor' not 'major', etc.
+          # FIX: use correct property names from version.properties
           MAJOR=$(grep 'versionMajor=' version.properties | cut -d'=' -f2)
           MINOR=$(grep 'versionMinor=' version.properties | cut -d'=' -f2)
           PATCH=$(grep 'versionPatch=' version.properties | cut -d'=' -f2)
@@ -193,10 +193,8 @@ jobs:
           TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
 
-          # Find APK
-          # FIX: Search for ANY .apk file, since default name is app-debug.apk
+          # Find APK - default gradle build output is app-debug.apk
           APK_FOUND=$(find downloaded_apk -name "*.apk" | head -n 1)
-          
           if [ -z "$APK_FOUND" ]; then
             echo "Error: No APK file found in downloaded_apk/"
             ls -R downloaded_apk/
