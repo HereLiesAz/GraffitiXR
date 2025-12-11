@@ -18,13 +18,13 @@ import kotlin.math.abs
  * A smart gesture detector that handles both single-finger panning (restricted to bounds)
  * and multi-finger transformations (unrestricted).
  *
- * @param validBounds The bounds within which single-finger drags are allowed.
+ * @param getValidBounds A provider that returns the current bounds within which single-finger drags are allowed.
  * @param onGesture Callback for gesture events.
  * @param onGestureStart Callback when a valid gesture begins.
  * @param onGestureEnd Callback when the gesture ends.
  */
 suspend fun PointerInputScope.detectSmartOverlayGestures(
-    validBounds: Rect,
+    getValidBounds: () -> Rect,
     onGestureStart: () -> Unit,
     onGestureEnd: () -> Unit,
     onGesture: (centroid: Offset, pan: Offset, zoom: Float, rotation: Float) -> Unit
@@ -49,13 +49,14 @@ suspend fun PointerInputScope.detectSmartOverlayGestures(
 
             // LOGIC:
             // If 1 finger: Check if centroid (finger) is inside validBounds.
-            // If 2+ fingers: Always allow.
+            // If 2+ fingers: Always allow (Grace area).
             val isValidContext = if (downCount == 1) {
-                validBounds.contains(centroid)
+                getValidBounds().contains(centroid)
             } else {
-                true // Grace area allowed for multi-touch
+                true
             }
 
+            // If we haven't started a valid gesture yet, and we are invalid, skip.
             if (!isValidContext && !pastTouchSlop) {
                 continue
             }

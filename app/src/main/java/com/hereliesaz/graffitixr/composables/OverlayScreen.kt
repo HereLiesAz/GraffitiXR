@@ -5,7 +5,6 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -35,7 +35,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.RotationAxis
 import com.hereliesaz.graffitixr.UiState
-import com.hereliesaz.graffitixr.utils.detectTwoFingerTransformGestures
+import com.hereliesaz.graffitixr.utils.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 
 @Composable
@@ -56,6 +56,7 @@ fun OverlayScreen(
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     val coroutineScope = rememberCoroutineScope()
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    val currentUiState by rememberUpdatedState(uiState)
 
     val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
         ColorMatrix().apply {
@@ -145,38 +146,30 @@ fun OverlayScreen(
                     .pointerInput(Unit) {
                         detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                     }
-                    .pointerInput(imageBitmap, containerSize, uiState.scale, uiState.offset) {
-                        detectDragGestures(
-                            onDragStart = { onGestureStart() },
-                            onDragEnd = { onGestureEnd() },
-                            onDrag = { change, dragAmount ->
-                                val bmp = imageBitmap ?: return@detectDragGestures
-                                val imgWidth = bmp.width * uiState.scale
-                                val imgHeight = bmp.height * uiState.scale
-                                val centerX = size.width / 2f + uiState.offset.x
-                                val centerY = size.height / 2f + uiState.offset.y
+                    .pointerInput(imageBitmap) {
+                        val bmp = imageBitmap ?: return@pointerInput
+
+                        detectSmartOverlayGestures(
+                            getValidBounds = {
+                                val state = currentUiState
+                                val imgWidth = bmp.width * state.scale
+                                val imgHeight = bmp.height * state.scale
+                                val centerX = size.width / 2f + state.offset.x
+                                val centerY = size.height / 2f + state.offset.y
                                 val left = centerX - imgWidth / 2f
                                 val top = centerY - imgHeight / 2f
-                                val bounds = Rect(left, top, left + imgWidth, top + imgHeight)
-
-                                if (bounds.contains(change.position)) {
-                                    change.consume()
-                                    onOffsetChanged(dragAmount)
-                                }
-                            }
-                        )
-                    }
-                    .pointerInput(Unit) {
-                        detectTwoFingerTransformGestures { _, pan, zoom, rotation ->
-                            onGestureStart()
+                                Rect(left, top, left + imgWidth, top + imgHeight)
+                            },
+                            onGestureStart = onGestureStart,
+                            onGestureEnd = onGestureEnd
+                        ) { _, pan, zoom, rotation ->
                             onScaleChanged(zoom)
-                            when (uiState.activeRotationAxis) {
+                            onOffsetChanged(pan)
+                            when (currentUiState.activeRotationAxis) {
                                 RotationAxis.X -> onRotationXChanged(rotation)
                                 RotationAxis.Y -> onRotationYChanged(rotation)
                                 RotationAxis.Z -> onRotationZChanged(-rotation)
                             }
-                            onOffsetChanged(pan)
-                            onGestureEnd()
                         }
                     }
             ) {

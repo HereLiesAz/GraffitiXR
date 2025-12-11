@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -125,7 +126,7 @@ class MainViewModel(
                 captureStep = CaptureStep.REVIEW
             ), isUndoable = false)
         } else {
-             Toast.makeText(getApplication(), "No target captured to refine", Toast.LENGTH_SHORT).show()
+            Toast.makeText(getApplication(), "No target captured to refine", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -893,30 +894,29 @@ class MainViewModel(
                         val json = Json { ignoreUnknownKeys = true }
                         val releases = json.decodeFromString<List<GithubRelease>>(response.toString())
 
-                        if (releases.isNotEmpty()) {
-                            val latestRelease = releases.firstOrNull()
-                            withContext(Dispatchers.Main) {
-                                if (latestRelease != null) {
-                                    val message = if (latestRelease.tag_name > BuildConfig.VERSION_NAME) {
-                                        "New version available: ${latestRelease.tag_name}"
-                                    } else {
-                                        "You have the latest version."
-                                    }
-                                    updateState(uiState.value.copy(
-                                        isCheckingForUpdate = false,
-                                        updateStatusMessage = message,
-                                        latestRelease = latestRelease
-                                    ), isUndoable = false)
+                        // Filter for experimental (pre-release) builds ONLY
+                        val experimentalRelease = releases.firstOrNull { it.prerelease }
+
+                        withContext(Dispatchers.Main) {
+                            if (experimentalRelease != null) {
+                                // Since these are experimental, we assume any found pre-release is "newer" or at least relevant.
+                                // Comparing version strings of experimental builds can be tricky, so we just present it.
+                                val message = if (experimentalRelease.tag_name > BuildConfig.VERSION_NAME) {
+                                    "New experimental build: ${experimentalRelease.tag_name}"
                                 } else {
-                                    updateState(uiState.value.copy(
-                                        isCheckingForUpdate = false,
-                                        updateStatusMessage = "No releases found."
-                                    ), isUndoable = false)
+                                    "Latest experimental build installed."
                                 }
-                            }
-                        } else {
-                            withContext(Dispatchers.Main) {
-                                updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "No releases found."), isUndoable = false)
+
+                                updateState(uiState.value.copy(
+                                    isCheckingForUpdate = false,
+                                    updateStatusMessage = message,
+                                    latestRelease = experimentalRelease
+                                ), isUndoable = false)
+                            } else {
+                                updateState(uiState.value.copy(
+                                    isCheckingForUpdate = false,
+                                    updateStatusMessage = "No experimental builds found."
+                                ), isUndoable = false)
                             }
                         }
                     } else {
@@ -942,7 +942,7 @@ class MainViewModel(
         val fileName = "GraffitiXR-${release.tag_name}.apk"
 
         try {
-            val request = DownloadManager.Request(Uri.parse(downloadUrl))
+            val request = DownloadManager.Request(downloadUrl.toUri())
                 .setTitle(fileName)
                 .setDescription("Downloading GraffitiXR Update")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
