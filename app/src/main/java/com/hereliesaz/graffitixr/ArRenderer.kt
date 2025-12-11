@@ -24,10 +24,17 @@ import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
+import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.MatOfDMatch
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.features2d.DescriptorMatcher
+import org.opencv.features2d.ORB
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -36,7 +43,8 @@ class ArRenderer(
     private val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
     private val onFrameCaptured: (Bitmap) -> Unit,
-    private val onAnchorCreated: () -> Unit
+    private val onAnchorCreated: () -> Unit,
+    private val onProgressUpdated: (Float, Bitmap?) -> Unit
 ) : GLSurfaceView.Renderer {
 
     // AR Session
@@ -73,6 +81,74 @@ class ArRenderer(
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
 
+    private var originalDescriptors: Mat? = null
+    private var originalKeypointCount: Int = 0
+    private var lastAnalysisTime = 0L
+    private val ANALYSIS_INTERVAL_MS = 2000L
+
+    fun setFingerprint(fingerprint: Fingerprint) {
+        this.originalDescriptors = fingerprint.descriptors
+        this.originalKeypointCount = fingerprint.keypoints.size
+    }
+
+    private fun analyzeFrameAsync(frame: Frame) {
+        var image: android.media.Image? = null
+        try {
+            image = frame.acquireCameraImage()
+            val width = image.width
+            val height = image.height
+
+            // Allocate new bitmap for thread safety
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            yuvToRgbConverter.yuvToRgb(image, bitmap)
+
+            val mat = Mat()
+            org.opencv.android.Utils.bitmapToMat(bitmap, mat)
+
+            CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    val grayMat = Mat()
+                    org.opencv.imgproc.Imgproc.cvtColor(mat, grayMat, org.opencv.imgproc.Imgproc.COLOR_RGB2GRAY)
+
+                    val descriptors = Mat()
+                    val keypoints = MatOfKeyPoint()
+                    val orb = ORB.create()
+                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+
+                    if (descriptors.rows() > 0 && originalDescriptors != null) {
+                        val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+                        val matches = MatOfDMatch()
+                        matcher.match(descriptors, originalDescriptors, matches)
+
+                        val matchesList = matches.toList()
+                        val goodMatches = matchesList.filter { it.distance < 60 }.size
+
+                        val ratio = if (originalKeypointCount > 0) {
+                            goodMatches.toFloat() / originalKeypointCount.toFloat()
+                        } else {
+                            0f
+                        }
+                        val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
+
+                        // Pass the unique bitmap instance
+                        onProgressUpdated(progress, bitmap)
+                    }
+                    grayMat.release()
+                    descriptors.release()
+                    keypoints.release()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in analysis coroutine", e)
+                } finally {
+                    mat.release()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Analysis failed", e)
+        } finally {
+            image?.close()
+        }
+    }
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         try {
@@ -107,6 +183,11 @@ class ArRenderer(
             if (captureNextFrame) {
                 captureFrameForFingerprint(frame)
                 captureNextFrame = false
+            }
+
+            if (System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
+                lastAnalysisTime = System.currentTimeMillis()
+                analyzeFrameAsync(frame)
             }
 
             val camera = frame.camera

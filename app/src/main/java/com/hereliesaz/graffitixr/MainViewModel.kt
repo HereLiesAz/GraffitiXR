@@ -33,8 +33,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.resume
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
@@ -45,6 +47,11 @@ import java.io.FileOutputStream
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
+}
+
+sealed class FeedbackEvent {
+    object VibrateSingle : FeedbackEvent()
+    object VibrateDouble : FeedbackEvent()
 }
 
 class MainViewModel(
@@ -62,6 +69,9 @@ class MainViewModel(
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
+
+    private val _feedbackEvent = MutableSharedFlow<FeedbackEvent>()
+    val feedbackEvent = _feedbackEvent.asSharedFlow()
 
     private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
     val tapFeedback = _tapFeedback.asStateFlow()
@@ -86,6 +96,34 @@ class MainViewModel(
     }
 
     // --- AR Target Creation Logic ---
+
+    fun onCaptureShutterClicked() {
+        viewModelScope.launch {
+            _captureEvent.emit(CaptureEvent.RequestCapture)
+        }
+    }
+
+    fun onCancelCaptureClicked() {
+        updateState(uiState.value.copy(isCapturingTarget = false, targetCreationState = TargetCreationState.IDLE))
+    }
+
+    fun onRefinementPathAdded(path: com.hereliesaz.graffitixr.data.RefinementPath) {
+        val currentPaths = uiState.value.refinementPaths
+        updateState(uiState.value.copy(refinementPaths = currentPaths + path), isUndoable = false)
+    }
+
+    fun onRefinementModeChanged(isEraser: Boolean) {
+        updateState(uiState.value.copy(isRefinementEraser = isEraser), isUndoable = false)
+    }
+
+    fun onConfirmTargetCreation() {
+        updateState(uiState.value.copy(
+            isCapturingTarget = false,
+            targetCreationState = TargetCreationState.SUCCESS,
+            isArTargetCreated = true,
+            arState = ArState.LOCKED
+        ))
+    }
 
     fun onCreateTargetClicked() {
         updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
@@ -127,6 +165,56 @@ class MainViewModel(
                         Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
+            }
+        }
+    }
+
+    fun exportProjectToUri(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            setLoading(true)
+            try {
+                // Save target images to cache and get URIs
+                val savedTargetUris = uiState.value.capturedTargetImages.mapNotNull { bitmap ->
+                    saveBitmapToCache(bitmap)
+                }
+
+                val projectData = ProjectData(
+                    backgroundImageUri = uiState.value.backgroundImageUri,
+                    overlayImageUri = uiState.value.overlayImageUri,
+                    targetImageUris = savedTargetUris,
+                    refinementPaths = uiState.value.refinementPaths,
+                    opacity = uiState.value.opacity,
+                    contrast = uiState.value.contrast,
+                    saturation = uiState.value.saturation,
+                    colorBalanceR = uiState.value.colorBalanceR,
+                    colorBalanceG = uiState.value.colorBalanceG,
+                    colorBalanceB = uiState.value.colorBalanceB,
+                    scale = uiState.value.scale,
+                    rotationZ = uiState.value.rotationZ,
+                    rotationX = uiState.value.rotationX,
+                    rotationY = uiState.value.rotationY,
+                    offset = uiState.value.offset,
+                    blendMode = uiState.value.blendMode,
+                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
+                    drawingPaths = uiState.value.drawingPaths,
+                    progressPercentage = uiState.value.progressPercentage,
+                    evolutionImageUris = uiState.value.evolutionCaptureUris,
+                    gpsData = getGpsData(),
+                    sensorData = getSensorData()
+                )
+
+                projectManager.exportProjectToZip(uri, projectData)
+
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Project saved successfully", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error exporting project", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to save project", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                setLoading(false)
             }
         }
     }
@@ -190,7 +278,24 @@ class MainViewModel(
 
     // --- Core State Logic (Unchanged from previous V3) ---
 
-    fun onProgressUpdate(progress: Float) {
+    fun onProgressUpdate(progress: Float, bitmap: Bitmap? = null) {
+        val currentProgress = uiState.value.progressPercentage
+        val isSignificant = Math.abs(progress - currentProgress) > 5.0f
+
+        if (isSignificant && bitmap != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                val uri = saveBitmapToCache(bitmap, "evolution")
+                if (uri != null) {
+                    withContext(Dispatchers.Main) {
+                        val currentUris = uiState.value.evolutionCaptureUris
+                        updateState(uiState.value.copy(
+                            evolutionCaptureUris = currentUris + listOf(uri)
+                        ), isUndoable = false)
+                    }
+                }
+            }
+        }
+
         updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
     }
 
@@ -411,9 +516,16 @@ class MainViewModel(
     fun saveProject(projectName: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Save target images to cache and get URIs
+                val savedTargetUris = uiState.value.capturedTargetImages.mapNotNull { bitmap ->
+                    saveBitmapToCache(bitmap)
+                }
+
                 val projectData = ProjectData(
                     backgroundImageUri = uiState.value.backgroundImageUri,
                     overlayImageUri = uiState.value.overlayImageUri,
+                    targetImageUris = savedTargetUris,
+                    refinementPaths = uiState.value.refinementPaths,
                     opacity = uiState.value.opacity,
                     contrast = uiState.value.contrast,
                     saturation = uiState.value.saturation,
@@ -427,7 +539,11 @@ class MainViewModel(
                     offset = uiState.value.offset,
                     blendMode = uiState.value.blendMode,
                     fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
-                    drawingPaths = uiState.value.drawingPaths
+                    drawingPaths = uiState.value.drawingPaths,
+                    progressPercentage = uiState.value.progressPercentage,
+                    evolutionImageUris = uiState.value.evolutionCaptureUris,
+                    gpsData = getGpsData(),
+                    sensorData = getSensorData()
                 )
                 projectManager.saveProject(projectName, projectData)
                 withContext(Dispatchers.Main) {
@@ -439,6 +555,103 @@ class MainViewModel(
                     Toast.makeText(getApplication(), "Failed to save project", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    private suspend fun getSensorData(): com.hereliesaz.graffitixr.data.SensorData? {
+        return suspendCancellableCoroutine { cont ->
+            val sensorManager = getApplication<Application>().getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+            if (sensorManager == null) {
+                if (cont.isActive) cont.resume(null)
+                return@suspendCancellableCoroutine
+            }
+
+            val accelerometer = sensorManager.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+            val magnetometer = sensorManager.getDefaultSensor(android.hardware.Sensor.TYPE_MAGNETIC_FIELD)
+
+            if (accelerometer == null || magnetometer == null) {
+                if (cont.isActive) cont.resume(null)
+                return@suspendCancellableCoroutine
+            }
+
+            var gravity: FloatArray? = null
+            var geomagnetic: FloatArray? = null
+
+            val listener = object : android.hardware.SensorEventListener {
+                override fun onSensorChanged(event: android.hardware.SensorEvent?) {
+                    event ?: return
+                    if (event.sensor.type == android.hardware.Sensor.TYPE_ACCELEROMETER) {
+                        gravity = event.values.clone()
+                    }
+                    if (event.sensor.type == android.hardware.Sensor.TYPE_MAGNETIC_FIELD) {
+                        geomagnetic = event.values.clone()
+                    }
+                    if (gravity != null && geomagnetic != null) {
+                        val R = FloatArray(9)
+                        val I = FloatArray(9)
+                        if (android.hardware.SensorManager.getRotationMatrix(R, I, gravity, geomagnetic)) {
+                            val orientation = FloatArray(3)
+                            android.hardware.SensorManager.getOrientation(R, orientation)
+                            val sensorData = com.hereliesaz.graffitixr.data.SensorData(
+                                azimuth = orientation[0],
+                                pitch = orientation[1],
+                                roll = orientation[2]
+                            )
+                            sensorManager.unregisterListener(this)
+                            if (cont.isActive) cont.resume(sensorData)
+                        }
+                    }
+                }
+                override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+            }
+
+            sensorManager.registerListener(listener, accelerometer, android.hardware.SensorManager.SENSOR_DELAY_NORMAL)
+            sensorManager.registerListener(listener, magnetometer, android.hardware.SensorManager.SENSOR_DELAY_NORMAL)
+
+            // Timeout
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            handler.postDelayed({
+                sensorManager.unregisterListener(listener)
+                if (cont.isActive) cont.resume(null)
+            }, 1000)
+
+            cont.invokeOnCancellation {
+                sensorManager.unregisterListener(listener)
+                handler.removeCallbacksAndMessages(null)
+            }
+        }
+    }
+
+    private fun getGpsData(): com.hereliesaz.graffitixr.data.GpsData? {
+        try {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(getApplication(), android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                androidx.core.content.ContextCompat.checkSelfPermission(getApplication(), android.Manifest.permission.ACCESS_COARSE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return null
+            }
+            val locationManager = getApplication<Application>().getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            val location = locationManager?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                ?: locationManager?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+            return location?.let {
+                com.hereliesaz.graffitixr.data.GpsData(it.latitude, it.longitude, it.altitude, it.accuracy, it.time)
+            }
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
+    private fun saveBitmapToCache(bitmap: Bitmap, prefix: String = "target"): Uri? {
+        try {
+            val context = getApplication<Application>().applicationContext
+            val cachePath = File(context.cacheDir, "project_assets")
+            cachePath.mkdirs()
+            val file = File(cachePath, "${prefix}_${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.png")
+            val fOut = FileOutputStream(file)
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
+            fOut.close()
+            return FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
         }
     }
 
