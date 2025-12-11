@@ -43,7 +43,7 @@ class YuvToRgbConverter(context: Context) {
         val width = image.width
         val height = image.height
 
-        // Create the RenderScript allocations if they don't exist or the image dimensions have changed.
+        // Create the RenderScript allocations if they don\'t exist or the image dimensions have changed.
         if (yuvAllocation == null) {
             val yuvType = Type.Builder(rs, Element.U8(rs)).setX(width * height * 3 / 2)
             yuvAllocation = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT)
@@ -54,6 +54,8 @@ class YuvToRgbConverter(context: Context) {
             val rgbType = Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height)
             rgbAllocation = Allocation.createTyped(rs, rgbType.create(), Allocation.USAGE_SCRIPT)
         }
+
+        yuvBits?.rewind()
 
         // Copy the Y, U, and V planes into a single contiguous buffer.
         image.planes.forEachIndexed { i, plane ->
@@ -80,8 +82,8 @@ class YuvToRgbConverter(context: Context) {
             }
         }
 
-
-        yuvAllocation!!.copyFrom(yuvBits!!.array())
+        yuvBits?.rewind()
+        yuvAllocation!!.copyFrom(yuvBits)
 
         scriptYuvToRgb.setInput(yuvAllocation)
         scriptYuvToRgb.forEach(rgbAllocation)

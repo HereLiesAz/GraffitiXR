@@ -19,17 +19,18 @@ import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.NotYetAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
+import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
-import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
@@ -143,6 +144,8 @@ class ArRenderer(
                     }
                 }
             }
+        } catch (e: NotYetAvailableException) {
+            // Ignore NotYetAvailableException
         } catch (e: Exception) {
             Log.e(TAG, "Analysis failed", e)
         }
@@ -175,7 +178,7 @@ class ArRenderer(
         try {
             session!!.setCameraTextureName(backgroundRenderer.textureId)
             displayRotationHelper.updateSessionIfNeeded(session!!)
-            val frame = session!!.update()
+            val frame = session?.update() ?: return
 
             backgroundRenderer.draw(frame)
 
@@ -235,6 +238,8 @@ class ArRenderer(
                 }
             }
 
+        } catch (e: SessionPausedException) {
+            // Expected behavior, do nothing.
         } catch (t: Throwable) {
             Log.e(TAG, "Exception on the GL Thread", t)
         }

@@ -10,6 +10,7 @@ import com.hereliesaz.graffitixr.data.RefinementPath
 import com.hereliesaz.graffitixr.utils.BitmapListParceler
 import com.hereliesaz.graffitixr.utils.BlendModeParceler
 import com.hereliesaz.graffitixr.utils.DrawingPathsParceler
+import com.hereliesaz.graffitixr.utils.OffsetListParceler
 import com.hereliesaz.graffitixr.utils.OffsetParceler
 import com.hereliesaz.graffitixr.utils.TapFeedbackParceler
 import kotlinx.parcelize.Parcelize
@@ -54,7 +55,7 @@ data class UiState(
     val colorBalanceR: Float = 1f,
     val colorBalanceG: Float = 1f,
     val colorBalanceB: Float = 1f,
-    val curvesPoints: List<@WriteWith<OffsetParceler> Offset> = emptyList(),
+    val curvesPoints: @WriteWith<OffsetListParceler> List<Offset> = emptyList(),
     val processedImageUri: Uri? = null,
     val blendMode: @WriteWith<BlendModeParceler> BlendMode = BlendMode.SrcOver,
 
@@ -106,5 +107,5 @@ data class UiState(
     // Refinement State
     val refinementPaths: List<RefinementPath> = emptyList(),
     val isRefinementEraser: Boolean = false,
-    val detectedKeypoints: List<@WriteWith<OffsetParceler> Offset> = emptyList()
+    val detectedKeypoints: @WriteWith<OffsetListParceler> List<Offset> = emptyList()
 ) : Parcelable
