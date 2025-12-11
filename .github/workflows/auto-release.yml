@@ -183,9 +183,10 @@ jobs:
           # Calculate Version
           export BUILD_NUMBER=$(git rev-list --count HEAD)
 
-          MAJOR=$(grep 'major=' version.properties | cut -d'=' -f2)
-          MINOR=$(grep 'minor=' version.properties | cut -d'=' -f2)
-          PATCH=$(grep 'patch=' version.properties | cut -d'=' -f2)
+          # FIX: Grep for 'versionMajor' not 'major', etc.
+          MAJOR=$(grep 'versionMajor=' version.properties | cut -d'=' -f2)
+          MINOR=$(grep 'versionMinor=' version.properties | cut -d'=' -f2)
+          PATCH=$(grep 'versionPatch=' version.properties | cut -d'=' -f2)
           VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
@@ -193,7 +194,9 @@ jobs:
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
 
           # Find APK
-          APK_FOUND=$(find downloaded_apk -name "GraffitiXR-*-debug.apk" | head -n 1)
+          # FIX: Search for ANY .apk file, since default name is app-debug.apk
+          APK_FOUND=$(find downloaded_apk -name "*.apk" | head -n 1)
+          
           if [ -z "$APK_FOUND" ]; then
             echo "Error: No APK file found in downloaded_apk/"
             ls -R downloaded_apk/
@@ -206,8 +209,6 @@ jobs:
           mv "$APK_FOUND" "$TARGET_NAME"
 
           echo "APK_FILE=$TARGET_NAME" >> $GITHUB_ENV
-
-
 
       - name: Package Local Build Tools
         if: steps.verify.outputs.proceed == 'true'
