@@ -93,60 +93,58 @@ class ArRenderer(
     }
 
     private fun analyzeFrameAsync(frame: Frame) {
-        var image: android.media.Image? = null
         try {
-            image = frame.acquireCameraImage()
-            val width = image.width
-            val height = image.height
+            frame.acquireCameraImage().use { image ->
+                val width = image.width
+                val height = image.height
 
-            // Allocate new bitmap for thread safety
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            yuvToRgbConverter.yuvToRgb(image, bitmap)
+                // Allocate new bitmap for thread safety
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                yuvToRgbConverter.yuvToRgb(image, bitmap)
 
-            val mat = Mat()
-            org.opencv.android.Utils.bitmapToMat(bitmap, mat)
+                val mat = Mat()
+                org.opencv.android.Utils.bitmapToMat(bitmap, mat)
 
-            CoroutineScope(Dispatchers.Default).launch {
-                try {
-                    val grayMat = Mat()
-                    org.opencv.imgproc.Imgproc.cvtColor(mat, grayMat, org.opencv.imgproc.Imgproc.COLOR_RGB2GRAY)
+                CoroutineScope(Dispatchers.Default).launch {
+                    try {
+                        val grayMat = Mat()
+                        org.opencv.imgproc.Imgproc.cvtColor(mat, grayMat, org.opencv.imgproc.Imgproc.COLOR_RGB2GRAY)
 
-                    val descriptors = Mat()
-                    val keypoints = MatOfKeyPoint()
-                    val orb = ORB.create()
-                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+                        val descriptors = Mat()
+                        val keypoints = MatOfKeyPoint()
+                        val orb = ORB.create()
+                        orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
 
-                    if (descriptors.rows() > 0 && originalDescriptors != null) {
-                        val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
-                        val matches = MatOfDMatch()
-                        matcher.match(descriptors, originalDescriptors, matches)
+                        if (descriptors.rows() > 0 && originalDescriptors != null) {
+                            val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+                            val matches = MatOfDMatch()
+                            matcher.match(descriptors, originalDescriptors, matches)
 
-                        val matchesList = matches.toList()
-                        val goodMatches = matchesList.filter { it.distance < 60 }.size
+                            val matchesList = matches.toList()
+                            val goodMatches = matchesList.filter { it.distance < 60 }.size
 
-                        val ratio = if (originalKeypointCount > 0) {
-                            goodMatches.toFloat() / originalKeypointCount.toFloat()
-                        } else {
-                            0f
+                            val ratio = if (originalKeypointCount > 0) {
+                                goodMatches.toFloat() / originalKeypointCount.toFloat()
+                            } else {
+                                0f
+                            }
+                            val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
+
+                            // Pass the unique bitmap instance
+                            onProgressUpdated(progress, bitmap)
                         }
-                        val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
-
-                        // Pass the unique bitmap instance
-                        onProgressUpdated(progress, bitmap)
+                        grayMat.release()
+                        descriptors.release()
+                        keypoints.release()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error in analysis coroutine", e)
+                    } finally {
+                        mat.release()
                     }
-                    grayMat.release()
-                    descriptors.release()
-                    keypoints.release()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error in analysis coroutine", e)
-                } finally {
-                    mat.release()
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Analysis failed", e)
-        } finally {
-            image?.close()
         }
     }
 
@@ -295,11 +293,11 @@ class ArRenderer(
 
     private fun captureFrameForFingerprint(frame: Frame) {
         try {
-            val image = frame.acquireCameraImage()
-            val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-            yuvToRgbConverter.yuvToRgb(image, bitmap)
-            image.close()
-            onFrameCaptured(bitmap)
+            frame.acquireCameraImage().use { image ->
+                val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                yuvToRgbConverter.yuvToRgb(image, bitmap)
+                onFrameCaptured(bitmap)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Capture failed", e)
         }
