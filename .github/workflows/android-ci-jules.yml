@@ -18,8 +18,17 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      actions: write # Required to cancel other workflows
 
     steps:
+      - name: Cancel Active Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Cancelling any active or queued Auto Release runs..."
+          gh run list --workflow auto-release.yml --status in_progress --json databaseId --jq '.[].databaseId' | xargs -r -I {} gh run cancel {}
+          gh run list --workflow auto-release.yml --status queued --json databaseId --jq '.[].databaseId' | xargs -r -I {} gh run cancel {}
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
