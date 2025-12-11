@@ -168,7 +168,7 @@ fun OverlayScreen(
                             when (currentUiState.activeRotationAxis) {
                                 RotationAxis.X -> onRotationXChanged(rotation)
                                 RotationAxis.Y -> onRotationYChanged(rotation)
-                                RotationAxis.Z -> onRotationZChanged(-rotation)
+                                RotationAxis.Z -> onRotationZChanged(rotation) // Fixed: Removed negation
                             }
                         }
                     }
