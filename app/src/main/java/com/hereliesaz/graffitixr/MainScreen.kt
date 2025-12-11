@@ -14,6 +14,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -35,7 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
-import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
+import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
+import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.GhostScreen
@@ -48,7 +50,7 @@ import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.composables.TargetCreationOverlay
 import com.hereliesaz.graffitixr.composables.TargetRefinementScreen
 import com.hereliesaz.graffitixr.composables.TraceScreen
-import com.hereliesaz.graffitixr.dialogs.ColorBalanceDialog
+import com.hereliesaz.graffitixr.composables.UndoRedoRow
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
@@ -265,6 +267,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 modifier = Modifier
                     .zIndex(2f)
                     .padding(vertical = verticalMargin) // Apply 10% Margin to NavRail
+                    .fillMaxHeight()
             ) {
                 AzNavRail {
                     azSettings(
@@ -313,7 +316,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         azRailSubItem(id = "opacity", hostId = "overlay", text = "Opacity") { showSliderDialog = "Opacity" }
                         azRailSubItem(id = "contrast", hostId = "overlay", text = "Contrast") { showSliderDialog = "Contrast" }
                         azRailSubItem(id = "saturation", hostId = "overlay", text = "Saturation") { showSliderDialog = "Saturation" }
-                        azRailSubItem(id = "color_balance", hostId = "overlay", text = "Balance") { showColorBalanceDialog = true }
+                        azRailSubItem(id = "color_balance", hostId = "overlay", text = "Balance") { showColorBalanceDialog = !showColorBalanceDialog }
                         azRailSubItem(id = "blend_mode", hostId = "overlay", text = "Blend", onClick = viewModel::onCycleBlendMode)
                     }
 
@@ -376,36 +379,53 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
-        if (showColorBalanceDialog) {
-            ColorBalanceDialog(
-                title = "Color Balance",
-                valueR = uiState.colorBalanceR,
-                valueG = uiState.colorBalanceG,
-                valueB = uiState.colorBalanceB,
-                onValueRChange = viewModel::onColorBalanceRChanged,
-                onValueGChange = viewModel::onColorBalanceGChanged,
-                onValueBChange = viewModel::onColorBalanceBChanged,
-                onDismissRequest = { showColorBalanceDialog = false }
-            )
-        }
-
         // Adjustments Panel (Knobs and Undo/Redo)
         if (uiState.overlayImageUri != null) {
             val showKnobs = showSliderDialog == "Opacity" || showSliderDialog == "Contrast" || showSliderDialog == "Saturation"
 
-            AdjustmentsPanel(
-                uiState = uiState,
-                showKnobs = showKnobs,
-                onOpacityChange = viewModel::onOpacityChanged,
-                onContrastChange = viewModel::onContrastChanged,
-                onSaturationChange = viewModel::onSaturationChanged,
+            // Undo/Redo Buttons (15% from bottom)
+            UndoRedoRow(
+                canUndo = uiState.canUndo,
+                canRedo = uiState.canRedo,
                 onUndo = viewModel::onUndoClicked,
                 onRedo = viewModel::onRedoClicked,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = verticalMargin) // Apply 10% Margin to Bottom Controls
+                    .padding(bottom = screenHeight * 0.15f)
                     .zIndex(3f)
             )
+
+            // Adjustment Knobs (25% from bottom)
+            if (showKnobs) {
+                AdjustmentsKnobsRow(
+                    opacity = uiState.opacity,
+                    contrast = uiState.contrast,
+                    saturation = uiState.saturation,
+                    onOpacityChange = viewModel::onOpacityChanged,
+                    onContrastChange = viewModel::onContrastChanged,
+                    onSaturationChange = viewModel::onSaturationChanged,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = screenHeight * 0.25f)
+                        .zIndex(3f)
+                )
+            }
+
+            // Color Balance Knobs (40% from bottom)
+            if (showColorBalanceDialog) {
+                ColorBalanceKnobsRow(
+                    colorBalanceR = uiState.colorBalanceR,
+                    colorBalanceG = uiState.colorBalanceG,
+                    colorBalanceB = uiState.colorBalanceB,
+                    onColorBalanceRChange = viewModel::onColorBalanceRChanged,
+                    onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+                    onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = screenHeight * 0.40f)
+                        .zIndex(3f)
+                )
+            }
         }
 
         uiState.showOnboardingDialogForMode?.let { mode ->

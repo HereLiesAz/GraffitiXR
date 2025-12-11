@@ -41,7 +41,25 @@ data class ProjectData(
     @Serializable(with = FingerprintSerializer::class)
     val fingerprint: Fingerprint?,
     @Serializable(with = DrawingPathsSerializer::class)
-    val drawingPaths: List<List<Pair<Float, Float>>>
+    val drawingPaths: List<List<Pair<Float, Float>>>,
+    val gpsData: GpsData? = null,
+    val sensorData: SensorData? = null
+)
+
+@Serializable
+data class GpsData(
+    val latitude: Double,
+    val longitude: Double,
+    val altitude: Double,
+    val accuracy: Float,
+    val time: Long
+)
+
+@Serializable
+data class SensorData(
+    val azimuth: Float,
+    val pitch: Float,
+    val roll: Float
 )
 
 object DrawingPathsSerializer : KSerializer<List<List<Pair<Float, Float>>>> {
