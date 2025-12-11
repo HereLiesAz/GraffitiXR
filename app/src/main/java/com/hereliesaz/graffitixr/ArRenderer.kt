@@ -82,6 +82,13 @@ class ArRenderer(
     var colorBalanceG: Float = 1.0f
     var colorBalanceB: Float = 1.0f
 
+    // Reusable matrices to avoid per-frame allocation
+    private val projMtx = FloatArray(16)
+    private val viewMtx = FloatArray(16)
+    private val poseMatrix = FloatArray(16)
+    private val modelMtx = FloatArray(16)
+    private val anchorPoseMatrix = FloatArray(16)
+
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
 
     private var originalDescriptors: Mat? = null
@@ -89,40 +96,53 @@ class ArRenderer(
     private var lastAnalysisTime = 0L
     private val ANALYSIS_INTERVAL_MS = 2000L
 
+    // Reusable objects for analysis to avoid allocation churn
+    private var analysisBitmap: Bitmap? = null
+    private val analysisMat = Mat()
+    private val analysisGrayMat = Mat()
+    private val analysisKeypoints = MatOfKeyPoint()
+    private val analysisDescriptors = Mat()
+    private val analysisMatches = MatOfDMatch()
+
+    @Volatile
+    private var isAnalyzing = false
+
     fun setFingerprint(fingerprint: Fingerprint) {
         this.originalDescriptors = fingerprint.descriptors
         this.originalKeypointCount = fingerprint.keypoints.size
     }
 
     private fun analyzeFrameAsync(frame: Frame) {
+        if (isAnalyzing) return
+        isAnalyzing = true
+
         try {
             frame.acquireCameraImage().use { image ->
                 val width = image.width
                 val height = image.height
 
-                // Allocate new bitmap for thread safety
-                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                yuvToRgbConverter.yuvToRgb(image, bitmap)
+                // Reuse bitmap or create if size changed
+                if (analysisBitmap == null || analysisBitmap!!.width != width || analysisBitmap!!.height != height) {
+                    analysisBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                }
 
-                val mat = Mat()
-                org.opencv.android.Utils.bitmapToMat(bitmap, mat)
+                // We use a non-null assertion because we just ensured it's not null
+                val bitmap = analysisBitmap!!
+                yuvToRgbConverter.yuvToRgb(image, bitmap)
+                org.opencv.android.Utils.bitmapToMat(bitmap, analysisMat)
 
                 CoroutineScope(Dispatchers.Default).launch {
                     try {
-                        val grayMat = Mat()
-                        org.opencv.imgproc.Imgproc.cvtColor(mat, grayMat, org.opencv.imgproc.Imgproc.COLOR_RGB2GRAY)
+                        org.opencv.imgproc.Imgproc.cvtColor(analysisMat, analysisGrayMat, org.opencv.imgproc.Imgproc.COLOR_RGB2GRAY)
 
-                        val descriptors = Mat()
-                        val keypoints = MatOfKeyPoint()
                         val orb = ORB.create()
-                        orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+                        orb.detectAndCompute(analysisGrayMat, Mat(), analysisKeypoints, analysisDescriptors)
 
-                        if (descriptors.rows() > 0 && originalDescriptors != null) {
+                        if (analysisDescriptors.rows() > 0 && originalDescriptors != null) {
                             val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
-                            val matches = MatOfDMatch()
-                            matcher.match(descriptors, originalDescriptors, matches)
+                            matcher.match(analysisDescriptors, originalDescriptors, analysisMatches)
 
-                            val matchesList = matches.toList()
+                            val matchesList = analysisMatches.toList()
                             val goodMatches = matchesList.filter { it.distance < 60 }.size
 
                             val ratio = if (originalKeypointCount > 0) {
@@ -132,23 +152,23 @@ class ArRenderer(
                             }
                             val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
 
-                            // Pass the unique bitmap instance
-                            onProgressUpdated(progress, bitmap)
+                            // Create a copy only if we are sending it out
+                            val bitmapCopy = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, true)
+                            onProgressUpdated(progress, bitmapCopy)
                         }
-                        grayMat.release()
-                        descriptors.release()
-                        keypoints.release()
                     } catch (e: Exception) {
                         Log.e(TAG, "Error in analysis coroutine", e)
                     } finally {
-                        mat.release()
+                        isAnalyzing = false
                     }
                 }
             }
         } catch (e: NotYetAvailableException) {
             onTrackingFailure("Tracking lost. Move device to re-establish.")
+            isAnalyzing = false
         } catch (e: Exception) {
             Log.e(TAG, "Analysis failed", e)
+            isAnalyzing = false
         }
     }
 
@@ -201,13 +221,11 @@ class ArRenderer(
             }
 
             // Projection/View Matrices
-            val projmtx = FloatArray(16)
-            camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
-            val viewmtx = FloatArray(16)
-            camera.getViewMatrix(viewmtx, 0)
+            camera.getProjectionMatrix(projMtx, 0, 0.1f, 100.0f)
+            camera.getViewMatrix(viewMtx, 0)
 
             frame.acquirePointCloud().use { pointCloud ->
-                pointCloudRenderer.draw(pointCloud, viewmtx, projmtx)
+                pointCloudRenderer.draw(pointCloud, viewMtx, projMtx)
             }
 
             when (arState) {
@@ -216,7 +234,7 @@ class ArRenderer(
                     var hasTrackingPlane = false
                     for (plane in planes) {
                         if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                            planeRenderer.draw(plane, viewmtx, projmtx)
+                            planeRenderer.draw(plane, viewMtx, projMtx)
                             hasTrackingPlane = true
                         }
                     }
@@ -229,16 +247,15 @@ class ArRenderer(
                         // Check if the tracked image is one of our targets (target_0, target_1, etc.)
                         if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
                             val pose = img.centerPose
-                            val poseMatrix = FloatArray(16)
                             pose.toMatrix(poseMatrix, 0)
-                            arImagePose = poseMatrix
+                            arImagePose = poseMatrix.clone()
                             break
                         }
                     }
-                    drawArtwork(viewmtx, projmtx)
+                    drawArtwork(viewMtx, projMtx)
                 }
                 ArState.PLACED -> {
-                    drawArtwork(viewmtx, projmtx)
+                    drawArtwork(viewMtx, projMtx)
                 }
             }
 
@@ -253,7 +270,7 @@ class ArRenderer(
         val bitmap = overlayBitmap ?: return
         val pose = arImagePose ?: return
 
-        val modelMtx = pose.clone()
+        System.arraycopy(pose, 0, modelMtx, 0, 16)
 
         // --- ORDER OF OPERATIONS (Applied Last to First on Vertices) ---
 
@@ -289,10 +306,9 @@ class ArRenderer(
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
                 val anchor = hit.createAnchor()
-                val poseMatrix = FloatArray(16)
-                anchor.pose.toMatrix(poseMatrix, 0)
+                anchor.pose.toMatrix(anchorPoseMatrix, 0)
 
-                arImagePose = poseMatrix
+                arImagePose = anchorPoseMatrix.clone()
                 arState = ArState.PLACED
                 onAnchorCreated()
                 break
@@ -385,6 +401,23 @@ class ArRenderer(
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading overlay image", e)
             }
+        }
+    }
+
+    fun cleanup() {
+        try {
+            session?.close()
+            session = null
+
+            analysisBitmap = null
+
+            analysisMat.release()
+            analysisGrayMat.release()
+            analysisKeypoints.release()
+            analysisDescriptors.release()
+            analysisMatches.release()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cleaning up renderer resources", e)
         }
     }
 
