@@ -307,15 +307,15 @@ fun MainScreen(viewModel: MainViewModel) {
                         azRailItem(id = "lock_trace", text = "Lock", onClick = { viewModel.setTouchLocked(true) })
                     }
 
-                    // Target Host
-                    azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
+                    // Target Host - Only visible in AR Mode
                     if (uiState.editorMode == EditorMode.AR) {
+                        azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
                         azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", onClick = viewModel::onCreateTargetClicked)
-                    }
-                    azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", onClick = viewModel::onRefineTargetToggled)
-                    azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", onClick = viewModel::onMarkProgressToggled)
+                        azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", onClick = viewModel::onRefineTargetToggled)
+                        azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", onClick = viewModel::onMarkProgressToggled)
 
-                    azDivider()
+                        azDivider()
+                    }
 
                     // Image Host (now includes Adjustments)
                     azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
@@ -440,7 +440,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     colorBalanceG = uiState.colorBalanceG,
                     colorBalanceB = uiState.colorBalanceB,
                     onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                    onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+                    onColorBalanceGChange = viewModel::onColorBalanceGChanged, // Fixed type
                     onColorBalanceBChange = viewModel::onColorBalanceBChanged,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
