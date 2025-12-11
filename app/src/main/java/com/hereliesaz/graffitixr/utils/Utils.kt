@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.utils
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -9,42 +8,25 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.positionChanged
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
-import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
-import kotlinx.coroutines.tasks.await
 import kotlin.math.PI
 import kotlin.math.abs
 
-object BackgroundRemover {
-
-    suspend fun removeBackground(bitmap: Bitmap): Bitmap? {
-        val options = SubjectSegmenterOptions.Builder()
-            .enableForegroundBitmap()
-            .build()
-        val segmenter = SubjectSegmentation.getClient(options)
-
-        return try {
-            val image = InputImage.fromBitmap(bitmap, 0)
-            val result = segmenter.process(image).await()
-            result.foregroundBitmap
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        } finally {
-            segmenter.close()
-        }
-    }
-}
-
 /**
- * A customized transform gesture detector that ONLY triggers when 2 or more pointers are down.
- * This prevents single-finger panning from interfering with other gestures or background interactions.
+ * A smart gesture detector that handles both single-finger panning (restricted to bounds)
+ * and multi-finger transformations (unrestricted).
+ *
+ * @param validBounds The bounds within which single-finger drags are allowed.
+ * @param onGesture Callback for gesture events.
+ * @param onGestureStart Callback when a valid gesture begins.
+ * @param onGestureEnd Callback when the gesture ends.
  */
-suspend fun PointerInputScope.detectTwoFingerTransformGestures(
-    panZoomLock: Boolean = false,
+suspend fun PointerInputScope.detectSmartOverlayGestures(
+    validBounds: Rect,
+    onGestureStart: () -> Unit,
+    onGestureEnd: () -> Unit,
     onGesture: (centroid: Offset, pan: Offset, zoom: Float, rotation: Float) -> Unit
 ) {
     awaitEachGesture {
@@ -53,6 +35,7 @@ suspend fun PointerInputScope.detectTwoFingerTransformGestures(
         var pan = Offset.Zero
         var pastTouchSlop = false
         val touchSlop = viewConfiguration.touchSlop
+        var isGesturing = false
 
         awaitFirstDown(requireUnconsumed = false)
 
@@ -61,15 +44,23 @@ suspend fun PointerInputScope.detectTwoFingerTransformGestures(
             val canceled = event.changes.any { it.isConsumed }
             if (canceled) return@awaitEachGesture
 
-            // Key Change: Only process if 2 or more pointers are down
             val downCount = event.changes.count { it.pressed }
-            if (downCount < 2) {
-                // If we dropped to 1 pointer, we stop processing transforms here to avoid
-                // single-finger panning taking over unexpectedly.
-                // We just wait for the next event loop.
+            val centroid = event.calculateCentroid(useCurrent = false)
+
+            // LOGIC:
+            // If 1 finger: Check if centroid (finger) is inside validBounds.
+            // If 2+ fingers: Always allow.
+            val isValidContext = if (downCount == 1) {
+                validBounds.contains(centroid)
+            } else {
+                true // Grace area allowed for multi-touch
+            }
+
+            if (!isValidContext && !pastTouchSlop) {
                 continue
             }
 
+            // Calculate changes
             val zoomChange = event.calculateZoom()
             val rotationChange = event.calculateRotation()
             val panChange = event.calculatePan()
@@ -88,12 +79,16 @@ suspend fun PointerInputScope.detectTwoFingerTransformGestures(
                     rotationMotion > touchSlop ||
                     panMotion > touchSlop
                 ) {
-                    pastTouchSlop = true
+                    // Only lock in if the start was valid
+                    if (isValidContext) {
+                        pastTouchSlop = true
+                        onGestureStart()
+                        isGesturing = true
+                    }
                 }
             }
 
             if (pastTouchSlop) {
-                val centroid = event.calculateCentroid(useCurrent = false)
                 if (rotationChange != 0f ||
                     zoomChange != 1f ||
                     panChange != Offset.Zero
@@ -107,5 +102,9 @@ suspend fun PointerInputScope.detectTwoFingerTransformGestures(
                 }
             }
         } while (!canceled && event.changes.any { it.pressed })
+
+        if (isGesturing) {
+            onGestureEnd()
+        }
     }
 }
