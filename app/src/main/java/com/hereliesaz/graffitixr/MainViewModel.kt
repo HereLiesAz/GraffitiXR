@@ -99,8 +99,12 @@ class MainViewModel(
     // --- AR Target Creation Logic ---
 
     fun onCaptureShutterClicked() {
-        viewModelScope.launch {
-            _captureEvent.emit(CaptureEvent.RequestCapture)
+        if (uiState.value.isCapturingTarget && uiState.value.editorMode == EditorMode.AR) {
+            arRenderer?.triggerCapture()
+        } else {
+            viewModelScope.launch {
+                _captureEvent.emit(CaptureEvent.RequestCapture)
+            }
         }
     }
 
@@ -139,30 +143,32 @@ class MainViewModel(
 
     fun onCreateTargetClicked() {
         updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
-        arRenderer?.triggerCapture()
     }
 
     fun onFrameCaptured(bitmap: Bitmap) {
         viewModelScope.launch {
             delay(400)
             withContext(Dispatchers.IO) {
+                val grayMat = Mat()
+                val keypoints = MatOfKeyPoint()
+                val descriptors = Mat()
+
                 try {
-                    val grayMat = Mat()
                     Utils.bitmapToMat(bitmap, grayMat)
                     Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
 
                     val orb = ORB.create()
-                    val keypoints = MatOfKeyPoint()
-                    val descriptors = Mat()
                     orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
 
                     val fingerprint = Fingerprint(keypoints.toList(), descriptors)
                     val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
                     withContext(Dispatchers.Main) {
-                        arRenderer?.setAugmentedImageDatabase(listOf(bitmap))
+                        val newImages = uiState.value.capturedTargetImages + bitmap
+                        arRenderer?.setAugmentedImageDatabase(newImages)
                         updateState(
                             uiState.value.copy(
+                                capturedTargetImages = newImages,
                                 fingerprintJson = fingerprintJson,
                                 isCapturingTarget = false,
                                 isArTargetCreated = true,
@@ -176,6 +182,10 @@ class MainViewModel(
                         updateState(uiState.value.copy(isCapturingTarget = false))
                         Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
                     }
+                } finally {
+                    grayMat.release()
+                    keypoints.release()
+                    descriptors.release()
                 }
             }
         }

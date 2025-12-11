@@ -61,7 +61,7 @@ class ArRenderer(
     private val yuvToRgbConverter = YuvToRgbConverter(context)
 
     // Flags & State
-    private var captureNextFrame = false
+    @Volatile private var captureNextFrame = false
     private var viewportWidth = 0
     private var viewportHeight = 0
 
