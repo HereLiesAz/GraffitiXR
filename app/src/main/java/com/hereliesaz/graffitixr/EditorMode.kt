@@ -9,5 +9,5 @@ enum class EditorMode : Parcelable {
     GHOST,
     TRACE,
     AR,
-    HELP
+    HELP // Shows the Help/Onboarding screen
 }

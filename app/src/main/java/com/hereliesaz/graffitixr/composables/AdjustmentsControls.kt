@@ -37,6 +37,7 @@ fun UndoRedoRow(
 }
 
 @Composable
+// Renders all adjustment knobs in a single row
 fun AdjustmentsKnobsRow(
     opacity: Float,
     brightness: Float,
