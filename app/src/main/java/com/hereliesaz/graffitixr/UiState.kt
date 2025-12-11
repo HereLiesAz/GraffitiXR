@@ -91,6 +91,9 @@ data class UiState(
     val captureFailureTimestamp: Long = 0L, // Used to trigger UI animations (red glow)
     val capturedTargetImages: List<@RawValue android.graphics.Bitmap> = emptyList(),
 
+    // Evolution History
+    val evolutionCaptureUris: List<Uri> = emptyList(),
+
     // Refinement State
     val refinementPaths: List<RefinementPath> = emptyList(),
     val isRefinementEraser: Boolean = false,

@@ -22,9 +22,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.edit
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -118,6 +121,26 @@ fun AppContent(
     onOnboardingDismiss: () -> Unit
 ) {
     var showOnboarding by remember { mutableStateOf(!onboardingShown) }
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(uiState.editorMode, uiState.isTouchLocked) {
+        val activity = context as? android.app.Activity
+        activity?.let {
+            val window = it.window
+            if (uiState.editorMode == EditorMode.TRACE && uiState.isTouchLocked) {
+                window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                val params = window.attributes
+                params.screenBrightness = 1.0f
+                window.attributes = params
+            } else {
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                val params = window.attributes
+                params.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                window.attributes = params
+            }
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),

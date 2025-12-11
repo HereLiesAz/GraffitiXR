@@ -119,6 +119,10 @@ fun MainScreen(viewModel: MainViewModel) {
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
 
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri -> uri?.let { viewModel.exportProjectToUri(it) } }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val screenHeight = maxHeight
         val verticalMargin = screenHeight * 0.1f // 10% Margin
@@ -325,7 +329,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     // Settings Host (Moved Project items here)
                     azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host")
                     azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
-                    azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") { showSaveProjectDialog = true }
+                    azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") { createDocumentLauncher.launch("Project.gxr") }
                     azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") { showProjectLibrary = true }
                     azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = viewModel::onSaveClicked)
                     azRailSubItem(id = "app_about", hostId = "settings_host", text = "About") { showSettings = true }

@@ -3,10 +3,13 @@ package com.hereliesaz.graffitixr
 import android.app.Activity
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.gestures.detectTapGestures
+import com.hereliesaz.graffitixr.data.Fingerprint
+import kotlinx.serialization.json.Json
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -30,13 +33,31 @@ fun ArView(
             context,
             onPlanesDetected = { detected -> viewModel.setArPlanesDetected(detected) },
             onFrameCaptured = { bitmap -> viewModel.onFrameCaptured(bitmap) },
-            onAnchorCreated = { viewModel.onArImagePlaced() }
+            onAnchorCreated = { viewModel.onArImagePlaced() },
+            onProgressUpdated = { progress, bitmap -> viewModel.onProgressUpdate(progress, bitmap) }
         )
     }
 
     DisposableEffect(renderer) {
         viewModel.arRenderer = renderer
         onDispose { viewModel.arRenderer = null }
+    }
+
+    val fingerprintJson = uiState.fingerprintJson
+    val fingerprint = remember(fingerprintJson) {
+        if (fingerprintJson != null) {
+            try {
+                Json.decodeFromString<Fingerprint>(fingerprintJson)
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
+    LaunchedEffect(fingerprint) {
+        if (fingerprint != null) {
+            renderer.setFingerprint(fingerprint)
+        }
     }
 
     renderer.opacity = uiState.opacity

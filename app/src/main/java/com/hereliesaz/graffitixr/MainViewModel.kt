@@ -169,6 +169,56 @@ class MainViewModel(
         }
     }
 
+    fun exportProjectToUri(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            setLoading(true)
+            try {
+                // Save target images to cache and get URIs
+                val savedTargetUris = uiState.value.capturedTargetImages.mapNotNull { bitmap ->
+                    saveBitmapToCache(bitmap)
+                }
+
+                val projectData = ProjectData(
+                    backgroundImageUri = uiState.value.backgroundImageUri,
+                    overlayImageUri = uiState.value.overlayImageUri,
+                    targetImageUris = savedTargetUris,
+                    refinementPaths = uiState.value.refinementPaths,
+                    opacity = uiState.value.opacity,
+                    contrast = uiState.value.contrast,
+                    saturation = uiState.value.saturation,
+                    colorBalanceR = uiState.value.colorBalanceR,
+                    colorBalanceG = uiState.value.colorBalanceG,
+                    colorBalanceB = uiState.value.colorBalanceB,
+                    scale = uiState.value.scale,
+                    rotationZ = uiState.value.rotationZ,
+                    rotationX = uiState.value.rotationX,
+                    rotationY = uiState.value.rotationY,
+                    offset = uiState.value.offset,
+                    blendMode = uiState.value.blendMode,
+                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
+                    drawingPaths = uiState.value.drawingPaths,
+                    progressPercentage = uiState.value.progressPercentage,
+                    evolutionImageUris = uiState.value.evolutionCaptureUris,
+                    gpsData = getGpsData(),
+                    sensorData = getSensorData()
+                )
+
+                projectManager.exportProjectToZip(uri, projectData)
+
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Project saved successfully", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error exporting project", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to save project", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                setLoading(false)
+            }
+        }
+    }
+
     // --- Logic & Transforms ---
 
     fun onCycleRotationAxis() {
@@ -228,7 +278,24 @@ class MainViewModel(
 
     // --- Core State Logic (Unchanged from previous V3) ---
 
-    fun onProgressUpdate(progress: Float) {
+    fun onProgressUpdate(progress: Float, bitmap: Bitmap? = null) {
+        val currentProgress = uiState.value.progressPercentage
+        val isSignificant = Math.abs(progress - currentProgress) > 5.0f
+
+        if (isSignificant && bitmap != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                val uri = saveBitmapToCache(bitmap, "evolution")
+                if (uri != null) {
+                    withContext(Dispatchers.Main) {
+                        val currentUris = uiState.value.evolutionCaptureUris
+                        updateState(uiState.value.copy(
+                            evolutionCaptureUris = currentUris + listOf(uri)
+                        ), isUndoable = false)
+                    }
+                }
+            }
+        }
+
         updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
     }
 
@@ -473,6 +540,8 @@ class MainViewModel(
                     blendMode = uiState.value.blendMode,
                     fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
                     drawingPaths = uiState.value.drawingPaths,
+                    progressPercentage = uiState.value.progressPercentage,
+                    evolutionImageUris = uiState.value.evolutionCaptureUris,
                     gpsData = getGpsData(),
                     sensorData = getSensorData()
                 )
@@ -570,12 +639,12 @@ class MainViewModel(
         }
     }
 
-    private fun saveBitmapToCache(bitmap: Bitmap): Uri? {
+    private fun saveBitmapToCache(bitmap: Bitmap, prefix: String = "target"): Uri? {
         try {
             val context = getApplication<Application>().applicationContext
             val cachePath = File(context.cacheDir, "project_assets")
             cachePath.mkdirs()
-            val file = File(cachePath, "target_${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.png")
+            val file = File(cachePath, "${prefix}_${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.png")
             val fOut = FileOutputStream(file)
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
             fOut.close()
