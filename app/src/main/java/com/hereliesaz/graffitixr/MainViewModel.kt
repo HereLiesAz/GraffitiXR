@@ -25,6 +25,7 @@ import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
+import com.hereliesaz.graffitixr.utils.applyCurves
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -110,6 +111,17 @@ class MainViewModel(
     fun onRefinementPathAdded(path: com.hereliesaz.graffitixr.data.RefinementPath) {
         val currentPaths = uiState.value.refinementPaths
         updateState(uiState.value.copy(refinementPaths = currentPaths + path), isUndoable = false)
+    }
+
+    fun onRefineTargetToggled() {
+        if (uiState.value.capturedTargetImages.isNotEmpty()) {
+            updateState(uiState.value.copy(
+                isCapturingTarget = true,
+                captureStep = CaptureStep.REVIEW
+            ), isUndoable = false)
+        } else {
+             Toast.makeText(getApplication(), "No target captured to refine", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun onRefinementModeChanged(isEraser: Boolean) {
@@ -492,7 +504,7 @@ class MainViewModel(
             try {
                 val context = getApplication<Application>().applicationContext
                 val bitmap = BitmapUtils.getBitmapFromUri(context, uri) ?: return@launch
-                val resultBitmap = com.hereliesaz.graffitixr.utils.applyCurves(bitmap, points)
+                val resultBitmap = applyCurves(bitmap, points)
                 val cachePath = File(context.cacheDir, "images")
                 cachePath.mkdirs()
                 val file = File(cachePath, "curves_processed_${System.currentTimeMillis()}.png")
