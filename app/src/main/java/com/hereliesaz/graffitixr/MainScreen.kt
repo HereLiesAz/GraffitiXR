@@ -280,11 +280,11 @@ fun MainScreen(viewModel: MainViewModel) {
                         defaultShape = AzButtonShape.RECTANGLE,
                     )
 
-                    azRailHostItem(id = "mode_host", text = "Mode", route = "mode_host")
+                    azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
                     azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
                     azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Ghost", onClick = { viewModel.onEditorModeChanged(EditorMode.GHOST) })
-                    azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
                     azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+                    azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
 
                     azDivider()
 
@@ -295,9 +295,10 @@ fun MainScreen(viewModel: MainViewModel) {
                     // Target Host
                     azRailHostItem(id = "target_host", text = "Target", route = "target_host")
                     if (uiState.editorMode == EditorMode.AR) {
-                        azRailSubItem(id = "create_target", hostId = "target_host", text = "Create Target", onClick = viewModel::onCreateTargetClicked)
+                        azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", onClick = viewModel::onCreateTargetClicked)
                     }
-                    azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Mark Progress", onClick = viewModel::onMarkProgressToggled)
+                    azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", onClick = viewModel::onRefineTargetToggled)
+                    azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", onClick = viewModel::onMarkProgressToggled)
 
                     azDivider()
 
@@ -327,12 +328,11 @@ fun MainScreen(viewModel: MainViewModel) {
                     azDivider()
 
                     // Settings Host (Moved Project items here)
-                    azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host")
+                    azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){ showSettings = true }
                     azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
                     azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") { createDocumentLauncher.launch("Project.gxr") }
                     azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") { showProjectLibrary = true }
                     azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = viewModel::onSaveClicked)
-                    azRailSubItem(id = "app_about", hostId = "settings_host", text = "About") { showSettings = true }
                 }
             }
         }
