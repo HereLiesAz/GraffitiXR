@@ -142,6 +142,10 @@ class MainViewModel(
         ))
     }
 
+    fun onTrackingFailure(message: String) {
+        updateState(uiState.value.copy(qualityWarning = message), isUndoable = false)
+    }
+
     fun onCreateTargetClicked() {
         updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
     }

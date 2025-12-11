@@ -3,9 +3,6 @@ package com.hereliesaz.graffitixr
 import android.app.Activity
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.gestures.detectTapGestures
-import com.hereliesaz.graffitixr.data.Fingerprint
-import com.hereliesaz.graffitixr.data.FingerprintSerializer
-import kotlinx.serialization.json.Json
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -19,6 +16,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.hereliesaz.graffitixr.data.FingerprintSerializer
+import kotlinx.serialization.json.Json
 
 @Composable
 fun ArView(
@@ -35,7 +34,8 @@ fun ArView(
             onPlanesDetected = { detected -> viewModel.setArPlanesDetected(detected) },
             onFrameCaptured = { bitmap -> viewModel.onFrameCaptured(bitmap) },
             onAnchorCreated = { viewModel.onArImagePlaced() },
-            onProgressUpdated = { progress, bitmap -> viewModel.onProgressUpdate(progress, bitmap) }
+            onProgressUpdated = { progress, bitmap -> viewModel.onProgressUpdate(progress, bitmap) },
+            onTrackingFailure = { message -> viewModel.onTrackingFailure(message) }
         )
     }
 
