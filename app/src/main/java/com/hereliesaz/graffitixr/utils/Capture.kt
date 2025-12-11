@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.utils
 
 import android.app.Activity
 import android.content.ContentValues
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.Build
@@ -10,7 +11,6 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.view.PixelCopy
 import android.view.Window
-import android.widget.Toast
 
 fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
     val window: Window = activity.window
@@ -39,24 +39,24 @@ fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
     }
 }
 
-fun saveBitmapToGallery(activity: Activity, bitmap: Bitmap) {
+fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Boolean {
     val contentValues = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, "GraffitiXR_${System.currentTimeMillis()}.png")
         put(MediaStore.Images.Media.MIME_TYPE, "image/png")
         put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/GraffitiXR")
     }
 
-    val resolver = activity.contentResolver
-    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+    val resolver = context.contentResolver
+    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues) ?: return false
 
-    if (uri != null) {
-        resolver.openOutputStream(uri).use { outputStream ->
-            if (outputStream != null) {
+    return try {
+        resolver.openOutputStream(uri)?.let {
+            it.use { outputStream ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-                Toast.makeText(activity, "Image saved to gallery", Toast.LENGTH_SHORT).show()
             }
-        }
-    } else {
-        Toast.makeText(activity, "Failed to save image", Toast.LENGTH_SHORT).show()
+        } ?: false
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
     }
 }

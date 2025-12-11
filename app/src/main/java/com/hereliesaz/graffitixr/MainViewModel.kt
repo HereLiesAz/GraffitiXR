@@ -19,13 +19,13 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.GithubRelease
 import com.hereliesaz.graffitixr.data.ProjectData
+import com.hereliesaz.graffitixr.utils.BackgroundRemover
 import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.ProjectManager
+import com.hereliesaz.graffitixr.utils.applyCurves
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
-import com.hereliesaz.graffitixr.utils.BackgroundRemover
-import com.hereliesaz.graffitixr.utils.applyCurves
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -37,7 +37,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlin.coroutines.resume
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
@@ -45,6 +44,7 @@ import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.coroutines.resume
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
@@ -533,11 +533,12 @@ class MainViewModel(
     fun saveCapturedBitmap(bitmap: Bitmap) {
         viewModelScope.launch {
             setLoading(true)
-            withContext(Dispatchers.IO) {
+            val success = withContext(Dispatchers.IO) {
                 saveBitmapToGallery(getApplication(), bitmap)
             }
             withContext(Dispatchers.Main) {
-                Toast.makeText(getApplication(), "Image saved to gallery", Toast.LENGTH_SHORT).show()
+                val message = if (success) "Image saved to gallery" else "Failed to save image"
+                Toast.makeText(getApplication(), message, Toast.LENGTH_SHORT).show()
                 setLoading(false)
             }
         }
