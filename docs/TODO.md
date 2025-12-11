@@ -73,6 +73,14 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Displays App Version and Permissions status.
     -   [x] Implemented GitHub update check for experimental releases.
 
+## V1.9 Features (Current)
+
+-   **[x] Robust Bug Reporting:**
+    -   [x] Implement a global crash handler to catch uncaught exceptions.
+    -   [x] Create a `CrashActivity` to display error details to the user.
+    -   [x] Integrate with GitHub Issues to automatically pre-fill bug reports.
+    -   [x] Ensure bug reports trigger the "Jules" AI agent for automatic handling.
+
 ## **Project Backlog**
 
 All items completed. Ready for the next phase of development.

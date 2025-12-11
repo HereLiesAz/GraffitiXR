@@ -22,6 +22,7 @@
         android:required="false" />
 
     <application
+        android:name=".GraffitiApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android.fullBackupContent="@xml/backup_rules"
@@ -43,6 +44,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".CrashActivity"
+            android:exported="false"
+            android:theme="@style/Theme.GraffitiXR"
+            android:process=":crash" />
 
         <meta-data android:name="com.google.ar.core" android:value="optional" />
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="subject_segment" />
