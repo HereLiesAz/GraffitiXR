@@ -45,7 +45,8 @@ class ArRenderer(
     private val onPlanesDetected: (Boolean) -> Unit,
     private val onFrameCaptured: (Bitmap) -> Unit,
     private val onAnchorCreated: () -> Unit,
-    private val onProgressUpdated: (Float, Bitmap?) -> Unit
+    private val onProgressUpdated: (Float, Bitmap?) -> Unit,
+    private val onTrackingFailure: (String) -> Unit
 ) : GLSurfaceView.Renderer {
 
     // AR Session
@@ -145,7 +146,7 @@ class ArRenderer(
                 }
             }
         } catch (e: NotYetAvailableException) {
-            // Ignore NotYetAvailableException
+            onTrackingFailure("Tracking lost. Move device to re-establish.")
         } catch (e: Exception) {
             Log.e(TAG, "Analysis failed", e)
         }
@@ -194,13 +195,16 @@ class ArRenderer(
 
             val camera = frame.camera
 
+            if (camera.trackingState != TrackingState.TRACKING) {
+                onTrackingFailure("Tracking lost. Move device to re-establish.")
+                return
+            }
+
             // Projection/View Matrices
             val projmtx = FloatArray(16)
             camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
             val viewmtx = FloatArray(16)
             camera.getViewMatrix(viewmtx, 0)
-
-            if (camera.trackingState != TrackingState.TRACKING) return
 
             frame.acquirePointCloud().use { pointCloud ->
                 pointCloudRenderer.draw(pointCloud, viewmtx, projmtx)
@@ -239,7 +243,7 @@ class ArRenderer(
             }
 
         } catch (e: SessionPausedException) {
-            // Expected behavior, do nothing.
+            onTrackingFailure("AR session paused. Please wait.")
         } catch (t: Throwable) {
             Log.e(TAG, "Exception on the GL Thread", t)
         }

@@ -47,7 +47,7 @@ class YuvToRgbConverter(context: Context) {
         if (yuvAllocation == null) {
             val yuvType = Type.Builder(rs, Element.U8(rs)).setX(width * height * 3 / 2)
             yuvAllocation = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT)
-            yuvBits = ByteBuffer.allocateDirect(width * height * 3 / 2)
+            yuvBits = ByteBuffer.allocate(width * height * 3 / 2)
         }
 
         if (rgbAllocation == null || rgbAllocation!!.type.x != width || rgbAllocation!!.type.y != height) {
@@ -83,7 +83,7 @@ class YuvToRgbConverter(context: Context) {
         }
 
         yuvBits?.rewind()
-        yuvAllocation!!.copyFrom(yuvBits)
+        yuvAllocation!!.copyFrom(yuvBits!!.array())
 
         scriptYuvToRgb.setInput(yuvAllocation)
         scriptYuvToRgb.forEach(rgbAllocation)
