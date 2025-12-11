@@ -26,7 +26,11 @@ fun OnboardingDialog(
 ) {
     var dontShowAgain by remember { mutableStateOf(false) }
 
-    val title = "Welcome to ${editorMode.name} Mode!"
+    val title = when (editorMode) {
+        EditorMode.AR -> "Welcome to AR Grid Mode!"
+        else -> "Welcome to ${editorMode.name} Mode!"
+    }
+
     val message = when (editorMode) {
         EditorMode.STATIC -> "In this mode, you can mockup your artwork on a static background image. Use the controls to adjust the size, position, and orientation of your artwork."
         EditorMode.OVERLAY -> "In this mode, you can overlay your artwork on the live camera feed. This is a great way to get a quick preview of your work in the real world."

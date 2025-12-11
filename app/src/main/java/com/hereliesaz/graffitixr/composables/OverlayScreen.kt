@@ -1,26 +1,39 @@
 package com.hereliesaz.graffitixr.composables
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import coil.compose.AsyncImage
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.RotationAxis
 import com.hereliesaz.graffitixr.UiState
+import kotlinx.coroutines.launch
 
 @Composable
 fun OverlayScreen(
@@ -32,103 +45,159 @@ fun OverlayScreen(
     onRotationYChanged: (Float) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
-    onGestureEnd: () -> Unit
+    onGestureEnd: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val imageUri = uiState.overlayImageUri ?: uiState.processedImageUri
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    val coroutineScope = rememberCoroutineScope()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent) // See-through to camera or other app
-    ) {
-        if (imageUri != null) {
-            // Apply color adjustments
-            val colorMatrix = ColorMatrix().apply {
-                setToSaturation(uiState.saturation)
+    val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
+        ColorMatrix().apply {
+            setToSaturation(uiState.saturation)
+            // Use 0f..2f range for contrast as per previous adjustments
+            val contrast = uiState.contrast
+            val contrastMatrix = ColorMatrix(
+                floatArrayOf(
+                    contrast, 0f, 0f, 0f, (1 - contrast) * 128,
+                    0f, contrast, 0f, 0f, (1 - contrast) * 128,
+                    0f, 0f, contrast, 0f, (1 - contrast) * 128,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+
+            val b = uiState.brightness * 255f
+            val brightnessMatrix = ColorMatrix(
+                floatArrayOf(
+                    1f, 0f, 0f, 0f, b,
+                    0f, 1f, 0f, 0f, b,
+                    0f, 0f, 1f, 0f, b,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+
+            val colorBalanceMatrix = ColorMatrix(
+                floatArrayOf(
+                    uiState.colorBalanceR, 0f, 0f, 0f, 0f,
+                    0f, uiState.colorBalanceG, 0f, 0f, 0f,
+                    0f, 0f, uiState.colorBalanceB, 0f, 0f,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+            timesAssign(contrastMatrix)
+            timesAssign(brightnessMatrix)
+            timesAssign(colorBalanceMatrix)
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        // Camera Preview
+        AndroidView(
+            factory = { ctx ->
+                val previewView = PreviewView(ctx)
+                val executor = ContextCompat.getMainExecutor(ctx)
+                cameraProviderFuture.addListener({
+                    val cameraProvider = cameraProviderFuture.get()
+                    val preview = Preview.Builder().build().also {
+                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    }
+                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                    try {
+                        cameraProvider.unbindAll()
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }, executor)
+                previewView
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Overlay Image
+        // Support processedImageUri (e.g. curves) if available
+        val imageUri = uiState.processedImageUri ?: uiState.overlayImageUri
+
+        imageUri?.let { uri ->
+            var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+            LaunchedEffect(uri) {
+                coroutineScope.launch {
+                    val request = ImageRequest.Builder(context)
+                        .data(uri)
+                        .build()
+                    val result =
+                        (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    imageBitmap = result
+                }
             }
-            // Simple brightness/contrast approximation for ColorMatrix:
-            // This is a rough approximation; for precise control we'd use a custom shader or more complex matrix math.
-            // Brightness (offset): matrix[4, 9, 14]
-            // Contrast (scale): matrix[0, 6, 12]
-            val contrastScale = uiState.contrast
-            val brightnessOffset = uiState.brightness * 255f
 
-            val brightnessMatrix = floatArrayOf(
-                contrastScale, 0f, 0f, 0f, brightnessOffset,
-                0f, contrastScale, 0f, 0f, brightnessOffset,
-                0f, 0f, contrastScale, 0f, brightnessOffset,
-                0f, 0f, 0f, 1f, 0f
-            )
-            colorMatrix.timesAssign(ColorMatrix(brightnessMatrix))
-
-            val colorBalanceMatrix = floatArrayOf(
-                uiState.colorBalanceR, 0f, 0f, 0f, 0f,
-                0f, uiState.colorBalanceG, 0f, 0f, 0f,
-                0f, 0f, uiState.colorBalanceB, 0f, 0f,
-                0f, 0f, 0f, 1f, 0f
-            )
-            colorMatrix.timesAssign(ColorMatrix(colorBalanceMatrix))
-
-
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(imageUri)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = "Overlay Image",
-                contentScale = ContentScale.Fit, // Or FillBounds depending on preference
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(colorMatrix),
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .alpha(uiState.opacity)
-                    .graphicsLayer {
-                        scaleX = uiState.scale
-                        scaleY = uiState.scale
-                        rotationZ = uiState.rotationZ
-                        rotationX = uiState.rotationX
-                        rotationY = uiState.rotationY
-                        translationX = uiState.offset.x
-                        translationY = uiState.offset.y
-
-                        // Set blend mode
-                        this.blendMode = uiState.blendMode
-
-                        // Center pivot for rotations
-                        transformOrigin = TransformOrigin.Center
-                    }
+                    .clipToBounds()
                     .pointerInput(Unit) {
                         detectTransformGestures(
                             onGesture = { _, pan, zoom, rotation ->
                                 onGestureStart()
                                 onScaleChanged(zoom)
                                 // Invert rotation for natural feel
-                                if (uiState.activeRotationAxis == RotationAxis.Z) {
-                                     onRotationZChanged(-rotation)
+                                when (uiState.activeRotationAxis) {
+                                    RotationAxis.X -> onRotationXChanged(rotation)
+                                    RotationAxis.Y -> onRotationYChanged(rotation)
+                                    RotationAxis.Z -> onRotationZChanged(-rotation)
                                 }
                                 onOffsetChanged(pan)
-                                // X/Y rotation not easily mapped to 2D gestures without mode switching
-                                // We could use 2-finger vertical/horizontal drag for X/Y if Z is not active,
-                                // but standard transform gestures are usually pan/zoom/rotateZ.
-                                // For X/Y, we might need a dedicated mode or specialized gesture detector.
-                                if (uiState.activeRotationAxis == RotationAxis.X) {
-                                    // Map vertical pan to X rotation?
-                                    // This conflicts with pan.
-                                    // Typically handled by single finger drag in 3D apps, but we have pan.
-                                    // Let's stick to the buttons/sliders or a specific 'rotate' mode for X/Y in 2D view if needed.
-                                    // However, the prompt implies "Ghost Mode" (Overlay) is 2D over camera.
-                                    // 3D rotations on a 2D plane are just skewing/projection.
-                                }
                                 onGestureEnd()
                             }
                         )
                     }
-            )
-        } else {
-             // Placeholder or empty state
-             Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                 // Text("No Image Selected", color = Color.White)
-             }
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { onGestureStart() },
+                            onDragEnd = { onGestureEnd() }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            onOffsetChanged(dragAmount)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                    }
+            ) {
+                imageBitmap?.let { bmp ->
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = uiState.scale
+                                scaleY = uiState.scale
+                                rotationX = uiState.rotationX
+                                rotationY = uiState.rotationY
+                                rotationZ = uiState.rotationZ
+                                translationX = uiState.offset.x
+                                translationY = uiState.offset.y
+                            }
+                    ) {
+                        // Calculate offset to center the image on the canvas
+                        val xOffset = (size.width - bmp.width) / 2f
+                        val yOffset = (size.height - bmp.height) / 2f
+
+                        drawImage(
+                            image = bmp.asImageBitmap(),
+                            topLeft = Offset(xOffset, yOffset),
+                            alpha = uiState.opacity,
+                            colorFilter = ColorFilter.colorMatrix(colorMatrix),
+                            blendMode = uiState.blendMode
+                        )
+                    }
+                }
+            }
         }
     }
 }
