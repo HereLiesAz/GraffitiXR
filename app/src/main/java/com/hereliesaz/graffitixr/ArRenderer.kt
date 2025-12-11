@@ -93,58 +93,60 @@ class ArRenderer(
     }
 
     private fun analyzeFrameAsync(frame: Frame) {
+        var image: android.media.Image? = null
         try {
-            val image = frame.acquireCameraImage()
+            image = frame.acquireCameraImage()
             val width = image.width
             val height = image.height
 
-            // Create bitmap for potential capture
+            // Allocate new bitmap for thread safety
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             yuvToRgbConverter.yuvToRgb(image, bitmap)
 
-            val planes = image.planes
-            if (planes.isNotEmpty()) {
-                val yPlane = planes[0].buffer
-                val data = ByteArray(yPlane.remaining())
-                yPlane.get(data)
+            val mat = Mat()
+            org.opencv.android.Utils.bitmapToMat(bitmap, mat)
 
-                image.close()
+            CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    val grayMat = Mat()
+                    org.opencv.imgproc.Imgproc.cvtColor(mat, grayMat, org.opencv.imgproc.Imgproc.COLOR_RGB2GRAY)
 
-                CoroutineScope(Dispatchers.Default).launch {
-                    try {
-                        val yMat = Mat(height, width, CvType.CV_8UC1)
-                        yMat.put(0, 0, data)
+                    val descriptors = Mat()
+                    val keypoints = MatOfKeyPoint()
+                    val orb = ORB.create()
+                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
 
-                        val descriptors = Mat()
-                        val keypoints = MatOfKeyPoint()
-                        val orb = ORB.create()
-                        orb.detectAndCompute(yMat, Mat(), keypoints, descriptors)
+                    if (descriptors.rows() > 0 && originalDescriptors != null) {
+                        val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+                        val matches = MatOfDMatch()
+                        matcher.match(descriptors, originalDescriptors, matches)
 
-                        if (descriptors.rows() > 0 && originalDescriptors != null) {
-                            val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
-                            val matches = MatOfDMatch()
-                            matcher.match(descriptors, originalDescriptors, matches)
+                        val matchesList = matches.toList()
+                        val goodMatches = matchesList.filter { it.distance < 60 }.size
 
-                            val matchesList = matches.toList()
-                            val goodMatches = matchesList.filter { it.distance < 60 }.size
-
-                            val ratio = goodMatches.toFloat() / originalKeypointCount.toFloat()
-                            val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
-
-                            onProgressUpdated(progress, bitmap)
+                        val ratio = if (originalKeypointCount > 0) {
+                            goodMatches.toFloat() / originalKeypointCount.toFloat()
+                        } else {
+                            0f
                         }
-                        yMat.release()
-                        descriptors.release()
-                        keypoints.release()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error in analysis coroutine", e)
+                        val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
+
+                        // Pass the unique bitmap instance
+                        onProgressUpdated(progress, bitmap)
                     }
+                    grayMat.release()
+                    descriptors.release()
+                    keypoints.release()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in analysis coroutine", e)
+                } finally {
+                    mat.release()
                 }
-            } else {
-                image.close()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Analysis failed", e)
+        } finally {
+            image?.close()
         }
     }
 

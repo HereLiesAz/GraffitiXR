@@ -4,6 +4,7 @@ import android.app.Activity
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.gestures.detectTapGestures
 import com.hereliesaz.graffitixr.data.Fingerprint
+import com.hereliesaz.graffitixr.data.FingerprintSerializer
 import kotlinx.serialization.json.Json
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,7 +48,7 @@ fun ArView(
     val fingerprint = remember(fingerprintJson) {
         if (fingerprintJson != null) {
             try {
-                Json.decodeFromString<Fingerprint>(fingerprintJson)
+                Json.decodeFromString(FingerprintSerializer, fingerprintJson)
             } catch (e: Exception) {
                 null
             }

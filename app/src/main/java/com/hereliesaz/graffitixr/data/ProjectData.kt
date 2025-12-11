@@ -45,6 +45,9 @@ data class ProjectData(
     val fingerprint: Fingerprint?,
     @Serializable(with = DrawingPathsSerializer::class)
     val drawingPaths: List<List<Pair<Float, Float>>>,
+    val progressPercentage: Float = 0f,
+    @Serializable(with = UriListSerializer::class)
+    val evolutionImageUris: List<Uri> = emptyList(),
     val isLineDrawing: Boolean = false,
     val gpsData: GpsData? = null,
     val sensorData: SensorData? = null
