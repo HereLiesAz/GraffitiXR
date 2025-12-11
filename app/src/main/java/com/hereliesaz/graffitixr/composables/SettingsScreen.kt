@@ -168,7 +168,7 @@ fun SettingsScreen(
                             }
                         }
 
-                        // Permissions Section
+                        // Permissions Section (User can accept/revoke via App Settings)
                         item {
                             SettingsSectionTitle("Permissions")
                             PermissionItem(name = "Camera Access", isGranted = cameraPermission, onClick = openAppSettings)

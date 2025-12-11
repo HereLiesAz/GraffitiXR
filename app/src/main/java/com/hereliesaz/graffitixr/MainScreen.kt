@@ -40,7 +40,7 @@ import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
-import com.hereliesaz.graffitixr.composables.GhostScreen
+import com.hereliesaz.graffitixr.composables.OverlayScreen
 import com.hereliesaz.graffitixr.composables.HelpScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -125,7 +125,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val screenHeight = maxHeight
-        val verticalMargin = screenHeight * 0.1f // 10% Margin
 
         if (showProjectLibrary) {
             ProjectLibraryScreen(
@@ -192,7 +191,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             gestureInProgress = false
                         }
                     )
-                    EditorMode.GHOST -> GhostScreen(
+                    EditorMode.OVERLAY -> OverlayScreen(
                         uiState = uiState,
                         onScaleChanged = viewModel::onScaleChanged,
                         onOffsetChanged = viewModel::onOffsetChanged,
@@ -261,7 +260,7 @@ fun MainScreen(viewModel: MainViewModel) {
             uiState = uiState,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = verticalMargin + 16.dp)
+                .padding(top = 16.dp)
                 .zIndex(3f),
             isVisible = gestureInProgress
         )
@@ -271,7 +270,6 @@ fun MainScreen(viewModel: MainViewModel) {
             Box(
                 modifier = Modifier
                     .zIndex(2f)
-                    .padding(vertical = verticalMargin) // Apply 10% Margin to NavRail
                     .fillMaxHeight()
             ) {
                 AzNavRail {
@@ -282,8 +280,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     )
 
                     azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                    azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-                    azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Ghost", onClick = { viewModel.onEditorModeChanged(EditorMode.GHOST) })
+                    azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Grid", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
+                    azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.OVERLAY) })
                     azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
                     azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
 
@@ -304,37 +302,36 @@ fun MainScreen(viewModel: MainViewModel) {
                     azDivider()
 
                     // Image Host (now includes Adjustments)
-                    azRailHostItem(id = "overlay", text = "Overlay", route = "overlay") {}
+                    azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
                     if (uiState.editorMode == EditorMode.STATIC) {
-                        azRailSubItem(id = "background", hostId = "overlay", text = "Background") {
+                        azRailSubItem(id = "background", hostId = "design_host", text = "Background") {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
                     }
-                    azRailSubItem(id = "image", text = "Image", hostId = "overlay") {
+                    azRailSubItem(id = "image", text = "Image", hostId = "design_host") {
                         overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                     if (uiState.overlayImageUri != null) {
-                        azRailSubItem(id = "remove_bg", hostId = "overlay", text = "Remove\n Background", onClick = viewModel::onRemoveBackgroundClicked)
-                        azRailSubItem(id = "line_drawing", hostId = "overlay", text = "Outline", onClick = viewModel::onLineDrawingClicked)
+                        azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", onClick = viewModel::onRemoveBackgroundClicked)
+                        azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", onClick = viewModel::onLineDrawingClicked)
                         azDivider()
 
                         // Moved Adjustment Items
-                        azRailSubItem(id = "opacity", hostId = "overlay", text = "Opacity") { showSliderDialog = "Opacity" }
-                        azRailSubItem(id = "brightness", hostId = "overlay", text = "Brightness") { showSliderDialog = "Brightness" }
-                        azRailSubItem(id = "contrast", hostId = "overlay", text = "Contrast") { showSliderDialog = "Contrast" }
-                        azRailSubItem(id = "saturation", hostId = "overlay", text = "Saturation") { showSliderDialog = "Saturation" }
-                        azRailSubItem(id = "color_balance", hostId = "overlay", text = "Balance") { showColorBalanceDialog = !showColorBalanceDialog }
-                        azRailSubItem(id = "blend_mode", hostId = "overlay", text = "Blend", onClick = viewModel::onCycleBlendMode)
+                        // Clicking "Adjust" sets the state to show the unified knobs row defined below
+                        azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust") { showSliderDialog = "Adjust" }
+                        azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance") { showColorBalanceDialog = !showColorBalanceDialog }
+                        azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", onClick = viewModel::onCycleBlendMode)
                     }
 
                     azDivider()
 
-                    // Settings Host (Moved Project items here)
-                    azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){ showSettings = true }
-                    azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
-                    azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") { createDocumentLauncher.launch("Project.gxr") }
-                    azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") { showProjectLibrary = true }
-                    azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = viewModel::onSaveClicked)
+                    // Settings Host (Moved to Menu)
+                    azMenuHostItem(id = "settings_host", text = "Settings", route = "settings_host"){ showSettings = true }
+                    azMenuSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
+                    azMenuSubItem(id = "save_project", hostId = "settings_host", text = "Save") { createDocumentLauncher.launch("Project.gxr") }
+                    azMenuSubItem(id = "load_project", hostId = "settings_host", text = "Load") { showProjectLibrary = true }
+                    azMenuSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = viewModel::onSaveClicked)
+                    azMenuSubItem(id = "help", hostId = "settings_host", text = "Help", onClick = { viewModel.onEditorModeChanged(EditorMode.HELP) })
                 }
             }
         }
@@ -387,7 +384,8 @@ fun MainScreen(viewModel: MainViewModel) {
 
         // Adjustments Panel (Knobs and Undo/Redo)
         if (uiState.overlayImageUri != null) {
-            val showKnobs = showSliderDialog == "Opacity" || showSliderDialog == "Brightness" || showSliderDialog == "Contrast" || showSliderDialog == "Saturation"
+            // "Adjust" shows the unified panel with all knobs (Opacity, Brightness, Contrast, Saturation)
+            val showKnobs = showSliderDialog == "Adjust"
 
             // Undo/Redo Buttons (15% from bottom)
             UndoRedoRow(
@@ -451,7 +449,7 @@ fun MainScreen(viewModel: MainViewModel) {
             onFeedbackShown = viewModel::onFeedbackShown,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = verticalMargin + 32.dp) // Margin + Padding
+                .padding(bottom = 32.dp)
                 .zIndex(4f)
         )
 
@@ -466,7 +464,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 text = "Progress: %.2f%%".format(uiState.progressPercentage),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = verticalMargin + 16.dp) // Margin + Padding
+                    .padding(top = 16.dp)
                     .zIndex(3f)
             )
         }
