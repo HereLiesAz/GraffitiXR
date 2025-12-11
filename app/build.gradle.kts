@@ -125,10 +125,8 @@ dependencies {
     // AzNavRail
     implementation(libs.az.nav.rail)
 
-    // Background Remover
-    implementation(libs.auto.background.remover)
-
     // ML Kit
+    implementation(libs.mlkit.subject.segmentation)
     implementation(libs.segmentation.selfie)
 
     implementation(platform(libs.firebase.bom))

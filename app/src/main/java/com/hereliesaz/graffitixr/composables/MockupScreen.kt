@@ -37,6 +37,7 @@ fun MockupScreen(
     onBackgroundImageSelected: (Uri) -> Unit,
     onOverlayImageSelected: (Uri) -> Unit,
     onOpacityChanged: (Float) -> Unit,
+    onBrightnessChanged: (Float) -> Unit,
     onContrastChanged: (Float) -> Unit,
     onSaturationChanged: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
@@ -51,7 +52,7 @@ fun MockupScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
+    val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
         ColorMatrix().apply {
             setToSaturation(uiState.saturation)
             val contrast = uiState.contrast
@@ -63,6 +64,17 @@ fun MockupScreen(
                     0f, 0f, 0f, 1f, 0f
                 )
             )
+
+            val b = uiState.brightness * 255f
+            val brightnessMatrix = ColorMatrix(
+                floatArrayOf(
+                    1f, 0f, 0f, 0f, b,
+                    0f, 1f, 0f, 0f, b,
+                    0f, 0f, 1f, 0f, b,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+
             val colorBalanceMatrix = ColorMatrix(
                 floatArrayOf(
                     uiState.colorBalanceR, 0f, 0f, 0f, 0f,
@@ -72,6 +84,7 @@ fun MockupScreen(
                 )
             )
             timesAssign(contrastMatrix)
+            timesAssign(brightnessMatrix)
             timesAssign(colorBalanceMatrix)
         }
     }

@@ -17,6 +17,8 @@ data class ProjectData(
     val backgroundImageUri: Uri?,
     @Serializable(with = UriSerializer::class)
     val overlayImageUri: Uri?,
+    @Serializable(with = UriSerializer::class)
+    val originalOverlayImageUri: Uri? = null,
     // List of URIs for the captured target images (Front, Left, Right, etc.)
     @Serializable(with = UriListSerializer::class)
     val targetImageUris: List<Uri> = emptyList(),
@@ -25,6 +27,7 @@ data class ProjectData(
     val refinementPaths: List<RefinementPath> = emptyList(),
 
     val opacity: Float,
+    val brightness: Float = 0f,
     val contrast: Float,
     val saturation: Float,
     val colorBalanceR: Float,
@@ -42,9 +45,7 @@ data class ProjectData(
     val fingerprint: Fingerprint?,
     @Serializable(with = DrawingPathsSerializer::class)
     val drawingPaths: List<List<Pair<Float, Float>>>,
-    val progressPercentage: Float = 0f,
-    @Serializable(with = UriListSerializer::class)
-    val evolutionImageUris: List<Uri> = emptyList(),
+    val isLineDrawing: Boolean = false,
     val gpsData: GpsData? = null,
     val sensorData: SensorData? = null
 )

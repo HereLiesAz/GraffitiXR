@@ -156,6 +156,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
                         onOverlayImageSelected = viewModel::onOverlayImageSelected,
                         onOpacityChanged = viewModel::onOpacityChanged,
+                        onBrightnessChanged = viewModel::onBrightnessChanged,
                         onContrastChanged = viewModel::onContrastChanged,
                         onSaturationChanged = viewModel::onSaturationChanged,
                         onScaleChanged = viewModel::onScaleChanged,
@@ -319,6 +320,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         // Moved Adjustment Items
                         azRailSubItem(id = "opacity", hostId = "overlay", text = "Opacity") { showSliderDialog = "Opacity" }
+                        azRailSubItem(id = "brightness", hostId = "overlay", text = "Brightness") { showSliderDialog = "Brightness" }
                         azRailSubItem(id = "contrast", hostId = "overlay", text = "Contrast") { showSliderDialog = "Contrast" }
                         azRailSubItem(id = "saturation", hostId = "overlay", text = "Saturation") { showSliderDialog = "Saturation" }
                         azRailSubItem(id = "color_balance", hostId = "overlay", text = "Balance") { showColorBalanceDialog = !showColorBalanceDialog }
@@ -385,7 +387,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
         // Adjustments Panel (Knobs and Undo/Redo)
         if (uiState.overlayImageUri != null) {
-            val showKnobs = showSliderDialog == "Opacity" || showSliderDialog == "Contrast" || showSliderDialog == "Saturation"
+            val showKnobs = showSliderDialog == "Opacity" || showSliderDialog == "Brightness" || showSliderDialog == "Contrast" || showSliderDialog == "Saturation"
 
             // Undo/Redo Buttons (15% from bottom)
             UndoRedoRow(
@@ -403,9 +405,11 @@ fun MainScreen(viewModel: MainViewModel) {
             if (showKnobs) {
                 AdjustmentsKnobsRow(
                     opacity = uiState.opacity,
+                    brightness = uiState.brightness,
                     contrast = uiState.contrast,
                     saturation = uiState.saturation,
                     onOpacityChange = viewModel::onOpacityChanged,
+                    onBrightnessChange = viewModel::onBrightnessChanged,
                     onContrastChange = viewModel::onContrastChanged,
                     onSaturationChange = viewModel::onSaturationChanged,
                     modifier = Modifier
