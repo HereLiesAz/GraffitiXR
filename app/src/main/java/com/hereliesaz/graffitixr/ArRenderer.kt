@@ -34,6 +34,8 @@ import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.opencv.core.Core
+import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
@@ -103,6 +105,7 @@ class ArRenderer(
     private val eyePos = FloatArray(4)
     private val clipPos = FloatArray(4)
 
+    private val orb = ORB.create()
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
     private var lastAnalysisTime = 0L
@@ -115,61 +118,77 @@ class ArRenderer(
 
     private fun analyzeFrameAsync(frame: Frame) {
         try {
-            frame.acquireCameraImage().use { image ->
-                val width = image.width
-                val height = image.height
+            val image = frame.acquireCameraImage()
+            val rotation = getRotationDegrees()
 
-                val rawBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                yuvToRgbConverter.yuvToRgb(image, rawBitmap)
+            // Extract Y-plane (Grayscale) directly
+            val yBuffer = image.planes[0].buffer
+            val width = image.width
+            val height = image.height
+            val rowStride = image.planes[0].rowStride
 
-                // Fix Rotation (Sideways Issue)
-                val rotation = getRotationDegrees()
-                val bitmap = if (rotation != 0f) {
-                    val rotated = BitmapUtils.rotateBitmap(rawBitmap, rotation)
-                    rawBitmap.recycle()
-                    rotated
-                } else {
-                    rawBitmap
-                }
+            // Create wrapper Mat for Y plane. Buffer must be direct.
+            val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, rowStride.toLong())
 
-                val mat = Mat()
-                org.opencv.android.Utils.bitmapToMat(bitmap, mat)
+            // Deep copy to detach from Image/Camera resource
+            val processingMat = Mat()
+            yMat.copyTo(processingMat)
 
-                CoroutineScope(Dispatchers.Default).launch {
-                    try {
-                        val grayMat = Mat()
-                        org.opencv.imgproc.Imgproc.cvtColor(mat, grayMat, org.opencv.imgproc.Imgproc.COLOR_RGB2GRAY)
+            // Release camera resources immediately
+            yMat.release()
+            image.close()
 
-                        val descriptors = Mat()
-                        val keypoints = MatOfKeyPoint()
-                        val orb = ORB.create()
-                        orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
-
-                        if (descriptors.rows() > 0 && originalDescriptors != null) {
-                            val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
-                            val matches = MatOfDMatch()
-                            matcher.match(descriptors, originalDescriptors, matches)
-
-                            val matchesList = matches.toList()
-                            val goodMatches = matchesList.filter { it.distance < 60 }.size
-
-                            val ratio = if (originalKeypointCount > 0) {
-                                goodMatches.toFloat() / originalKeypointCount.toFloat()
-                            } else {
-                                0f
-                            }
-                            val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
-
-                            mainHandler.post { onProgressUpdated(progress, bitmap) }
+            CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    // Handle Rotation
+                    val rotatedMat = if (rotation != 0f) {
+                        val dst = Mat()
+                        val rotateCode = when (rotation) {
+                            90f -> Core.ROTATE_90_CLOCKWISE
+                            180f -> Core.ROTATE_180
+                            270f -> Core.ROTATE_90_COUNTERCLOCKWISE
+                            else -> -1
                         }
-                        grayMat.release()
-                        descriptors.release()
-                        keypoints.release()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error in analysis coroutine", e)
-                    } finally {
-                        mat.release()
+                        if (rotateCode != -1) {
+                            Core.rotate(processingMat, dst, rotateCode)
+                            processingMat.release()
+                            dst
+                        } else {
+                            processingMat
+                        }
+                    } else {
+                        processingMat
                     }
+
+                    // Run ORB (using rotatedMat which is already grayscale)
+                    val descriptors = Mat()
+                    val keypoints = MatOfKeyPoint()
+                    synchronized(orb) {
+                        orb.detectAndCompute(rotatedMat, Mat(), keypoints, descriptors)
+                    }
+
+                    if (descriptors.rows() > 0 && originalDescriptors != null) {
+                        val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+                        val matches = MatOfDMatch()
+                        matcher.match(descriptors, originalDescriptors, matches)
+
+                        val matchesList = matches.toList()
+                        val goodMatches = matchesList.filter { it.distance < 60 }.size
+
+                        val ratio = if (originalKeypointCount > 0) {
+                            goodMatches.toFloat() / originalKeypointCount.toFloat()
+                        } else {
+                            0f
+                        }
+                        val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
+
+                        mainHandler.post { onProgressUpdated(progress, null) }
+                    }
+                    descriptors.release()
+                    keypoints.release()
+                    rotatedMat.release()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in analysis coroutine", e)
                 }
             }
         } catch (e: NotYetAvailableException) {
