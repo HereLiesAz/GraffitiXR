@@ -105,6 +105,7 @@ class ArRenderer(
     private val eyePos = FloatArray(4)
     private val clipPos = FloatArray(4)
 
+    private val orb = ORB.create()
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
     private var lastAnalysisTime = 0L
@@ -162,8 +163,9 @@ class ArRenderer(
                     // Run ORB (using rotatedMat which is already grayscale)
                     val descriptors = Mat()
                     val keypoints = MatOfKeyPoint()
-                    val orb = ORB.create()
-                    orb.detectAndCompute(rotatedMat, Mat(), keypoints, descriptors)
+                    synchronized(orb) {
+                        orb.detectAndCompute(rotatedMat, Mat(), keypoints, descriptors)
+                    }
 
                     if (descriptors.rows() > 0 && originalDescriptors != null) {
                         val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)

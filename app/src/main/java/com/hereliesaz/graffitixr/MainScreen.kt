@@ -67,7 +67,9 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
@@ -272,7 +274,17 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
 
-                    val maskBitmap = uiState.targetMask
+                    val maskUri = uiState.targetMaskUri
+                    val maskBitmap by produceState<Bitmap?>(initialValue = null, maskUri) {
+                        if (maskUri != null) {
+                            value = withContext(Dispatchers.IO) {
+                                com.hereliesaz.graffitixr.utils.BitmapUtils.getBitmapFromUri(context, maskUri)
+                            }
+                        } else {
+                            value = null
+                        }
+                    }
+
                     TargetRefinementScreen(
                         targetImage = imageBitmap,
                         mask = maskBitmap,
