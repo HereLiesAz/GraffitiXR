@@ -377,7 +377,9 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     azDivider()
 
-                    azRailItem(id = "light", text = "Light", onClick = viewModel::onToggleFlashlight)
+                    if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
+                        azRailItem(id = "light", text = "Light", onClick = viewModel::onToggleFlashlight)
+                    }
                 }
             }
         }
