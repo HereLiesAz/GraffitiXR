@@ -119,6 +119,15 @@ fun OverlayScreen(
                 }, executor)
                 previewView
             },
+            onRelease = {
+                cameraProviderFuture.addListener({
+                    try {
+                        cameraProviderFuture.get().unbindAll()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }, ContextCompat.getMainExecutor(context))
+            },
             modifier = Modifier.fillMaxSize()
         )
 

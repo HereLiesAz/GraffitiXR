@@ -136,10 +136,13 @@ fun ArView(
                     }
                 )
             }
-            // 2. Transform Logic
+            // 2. Transform Logic (Single & Multi-touch)
             // KEY FIX: Restarts detection when axis changes
             .pointerInput(uiState.activeRotationAxis) {
-                detectTransformGestures { _, _, zoom, rotation ->
+                detectTransformGestures { _, pan, zoom, rotation ->
+                    // Pan (Single or Multi-touch)
+                    glSurfaceView.queueEvent { renderer.queuePan(pan.x, pan.y) }
+
                     viewModel.onArObjectScaleChanged(zoom)
 
                     // KEY FIX: Invert rotation for natural feel
