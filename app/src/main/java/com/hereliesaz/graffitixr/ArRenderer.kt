@@ -45,6 +45,7 @@ import org.opencv.features2d.DescriptorMatcher
 import org.opencv.features2d.ORB
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -60,8 +61,8 @@ class ArRenderer(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var wasTracking = false
 
-    // Critical: atomic flag to prevent frame processing during config updates
-    private val isConfiguring = AtomicBoolean(false)
+    // Lock to synchronize session access between GL thread and other threads (UI/IO)
+    private val sessionLock = ReentrantLock()
 
     // AR Session
     var session: Session? = null
@@ -238,90 +239,95 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        // Safety check: Skip frame if session is null or currently being reconfigured
-        if (session == null || isConfiguring.get()) return
+        if (!sessionLock.tryLock()) return
 
         try {
-            session!!.setCameraTextureName(backgroundRenderer.textureId)
-            displayRotationHelper.updateSessionIfNeeded(session!!)
-            val frame = session?.update() ?: return
+            // Safety check: Skip frame if session is null
+            if (session == null) return
 
-            backgroundRenderer.draw(frame)
+            try {
+                session!!.setCameraTextureName(backgroundRenderer.textureId)
+                displayRotationHelper.updateSessionIfNeeded(session!!)
+                val frame = session?.update() ?: return
 
-            var frameProcessed = false
+                backgroundRenderer.draw(frame)
 
-            if (captureNextFrame) {
-                captureFrameForFingerprint(frame)
-                captureNextFrame = false
-                frameProcessed = true
-            }
+                var frameProcessed = false
 
-            if (!frameProcessed && System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
-                lastAnalysisTime = System.currentTimeMillis()
-                analyzeFrameAsync(frame)
-            }
-
-            val camera = frame.camera
-
-            if (camera.trackingState == TrackingState.TRACKING) {
-                if (!wasTracking) {
-                    wasTracking = true
-                    mainHandler.post { onTrackingFailure(null) }
+                if (captureNextFrame) {
+                    captureFrameForFingerprint(frame)
+                    captureNextFrame = false
+                    frameProcessed = true
                 }
-            } else {
-                if (wasTracking) {
-                    wasTracking = false
-                    mainHandler.post { onTrackingFailure("Tracking lost. Point device at grid.") }
+
+                if (!frameProcessed && System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
+                    lastAnalysisTime = System.currentTimeMillis()
+                    analyzeFrameAsync(frame)
                 }
-                return
-            }
 
-            val projmtx = FloatArray(16)
-            camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
-            val viewmtx = FloatArray(16)
-            camera.getViewMatrix(viewmtx, 0)
+                val camera = frame.camera
 
-            frame.acquirePointCloud().use { pointCloud ->
-                pointCloudRenderer.draw(pointCloud, viewmtx, projmtx)
-            }
-
-            when (arState) {
-                ArState.SEARCHING -> {
-                    val planes = session!!.getAllTrackables(Plane::class.java)
-                    var hasTrackingPlane = false
-                    for (plane in planes) {
-                        if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                            planeRenderer.draw(plane, viewmtx, projmtx)
-                            hasTrackingPlane = true
-                        }
+                if (camera.trackingState == TrackingState.TRACKING) {
+                    if (!wasTracking) {
+                        wasTracking = true
+                        mainHandler.post { onTrackingFailure(null) }
                     }
-                    mainHandler.post { onPlanesDetected(hasTrackingPlane) }
-                    handleTap(frame)
-                }
-                ArState.LOCKED -> {
-                    handlePan(frame, viewmtx, projmtx)
-                    val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
-                    for (img in updatedAugmentedImages) {
-                        if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
-                            val pose = img.centerPose
-                            val poseMatrix = FloatArray(16)
-                            pose.toMatrix(poseMatrix, 0)
-                            arImagePose = poseMatrix
-                            break
-                        }
+                } else {
+                    if (wasTracking) {
+                        wasTracking = false
+                        mainHandler.post { onTrackingFailure("Tracking lost. Point device at grid.") }
                     }
-                    drawArtwork(viewmtx, projmtx)
+                    return
                 }
-                ArState.PLACED -> {
-                    handlePan(frame, viewmtx, projmtx)
-                    drawArtwork(viewmtx, projmtx)
-                }
-            }
 
-        } catch (e: SessionPausedException) {
-            mainHandler.post { onTrackingFailure("AR session paused. Please wait.") }
-        } catch (t: Throwable) {
-            Log.e(TAG, "Exception on the GL Thread", t)
+                val projmtx = FloatArray(16)
+                camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
+                val viewmtx = FloatArray(16)
+                camera.getViewMatrix(viewmtx, 0)
+
+                frame.acquirePointCloud().use { pointCloud ->
+                    pointCloudRenderer.draw(pointCloud, viewmtx, projmtx)
+                }
+
+                when (arState) {
+                    ArState.SEARCHING -> {
+                        val planes = session!!.getAllTrackables(Plane::class.java)
+                        var hasTrackingPlane = false
+                        for (plane in planes) {
+                            if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
+                                planeRenderer.draw(plane, viewmtx, projmtx)
+                                hasTrackingPlane = true
+                            }
+                        }
+                        mainHandler.post { onPlanesDetected(hasTrackingPlane) }
+                        handleTap(frame)
+                    }
+                    ArState.LOCKED -> {
+                        handlePan(frame, viewmtx, projmtx)
+                        val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
+                        for (img in updatedAugmentedImages) {
+                            if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
+                                val pose = img.centerPose
+                                val poseMatrix = FloatArray(16)
+                                pose.toMatrix(poseMatrix, 0)
+                                arImagePose = poseMatrix
+                                break
+                            }
+                        }
+                        drawArtwork(viewmtx, projmtx)
+                    }
+                    ArState.PLACED -> {
+                        handlePan(frame, viewmtx, projmtx)
+                        drawArtwork(viewmtx, projmtx)
+                    }
+                }
+            } catch (e: SessionPausedException) {
+                mainHandler.post { onTrackingFailure("AR session paused. Please wait.") }
+            } catch (t: Throwable) {
+                Log.e(TAG, "Exception on the GL Thread", t)
+            }
+        } finally {
+            sessionLock.unlock()
         }
     }
 
@@ -452,13 +458,16 @@ class ArRenderer(
     }
 
     fun setFlashlight(enabled: Boolean) {
-        val session = this.session ?: return
+        sessionLock.lock()
         try {
+            val session = this.session ?: return
             val config = session.config
             config.flashMode = if (enabled) Config.FlashMode.TORCH else Config.FlashMode.OFF
             session.configure(config)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to toggle flashlight", e)
+        } finally {
+            sessionLock.unlock()
         }
     }
 
@@ -467,9 +476,7 @@ class ArRenderer(
     }
 
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
-        // Halt GL drawing while we mess with the session
-        isConfiguring.set(true)
-
+        sessionLock.lock()
         try {
             val session = this.session ?: return
             session.pause() // Pause session
@@ -489,42 +496,52 @@ class ArRenderer(
         } catch(e: Exception) {
             Log.e(TAG, "Failed to set image database", e)
         } finally {
-            // Re-enable GL drawing
-            isConfiguring.set(false)
+            sessionLock.unlock()
         }
     }
 
     fun onResume(activity: Activity) {
-        if (session == null) {
-            try {
-                if (ArCoreApk.getInstance().requestInstall(activity, true) == ArCoreApk.InstallStatus.INSTALLED) {
-                    session = Session(context)
-                    val config = Config(session)
-                    config.updateMode = Config.UpdateMode.BLOCKING
-                    config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                    config.focusMode = Config.FocusMode.AUTO
-                    config.depthMode = Config.DepthMode.AUTOMATIC
-                    session!!.configure(config)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception creating session", e)
-            }
-        }
-
+        sessionLock.lock()
         try {
-            session?.resume()
-            displayRotationHelper.onResume()
-        } catch (e: CameraNotAvailableException) {
-            Log.e(TAG, "Camera not available")
+            if (session == null) {
+                try {
+                    if (ArCoreApk.getInstance().requestInstall(activity, true) == ArCoreApk.InstallStatus.INSTALLED) {
+                        session = Session(context)
+                        val config = Config(session)
+                        config.updateMode = Config.UpdateMode.BLOCKING
+                        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                        config.focusMode = Config.FocusMode.AUTO
+                        config.depthMode = Config.DepthMode.AUTOMATIC
+                        session!!.configure(config)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception creating session", e)
+                }
+            }
+
+            try {
+                session?.resume()
+                displayRotationHelper.onResume()
+            } catch (e: CameraNotAvailableException) {
+                Log.e(TAG, "Camera not available")
+            }
+        } finally {
+            sessionLock.unlock()
         }
     }
 
     fun onPause() {
-        displayRotationHelper.onPause()
-        session?.pause()
+        sessionLock.lock()
+        try {
+            displayRotationHelper.onPause()
+            session?.pause()
+        } finally {
+            sessionLock.unlock()
+        }
     }
 
     fun cleanup() {
+        sessionLock.lock()
         try {
             analysisScope.cancel()
             session?.close()
@@ -532,6 +549,7 @@ class ArRenderer(
             Log.e(TAG, "Error closing session", e)
         } finally {
             session = null
+            sessionLock.unlock()
         }
     }
 

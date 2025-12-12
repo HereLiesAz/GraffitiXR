@@ -635,11 +635,16 @@ class MainViewModel(
 
     fun onSaveClicked() {
         viewModelScope.launch {
+            updateState(uiState.value.copy(hideUiForCapture = true), isUndoable = false)
+            delay(200)
             _captureEvent.emit(CaptureEvent.RequestCapture)
         }
     }
 
     fun saveCapturedBitmap(bitmap: Bitmap) {
+        // Restore UI immediately
+        updateState(uiState.value.copy(hideUiForCapture = false), isUndoable = false)
+
         viewModelScope.launch {
             setLoading(true)
             val success = withContext(Dispatchers.IO) {
