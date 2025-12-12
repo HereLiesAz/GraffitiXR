@@ -110,6 +110,7 @@ data class UiState(
     val refinementPaths: List<RefinementPath> = emptyList(),
     val isRefinementEraser: Boolean = false,
     val detectedKeypoints: @WriteWith<OffsetListParceler> List<Offset> = emptyList(),
+    val targetMaskUri: Uri? = null,
 
     val augmentedImageDatabase: @RawValue AugmentedImageDatabase? = null
 ) : Parcelable

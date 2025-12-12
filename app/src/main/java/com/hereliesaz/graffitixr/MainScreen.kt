@@ -67,7 +67,9 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
 import com.hereliesaz.graffitixr.utils.captureWindow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
@@ -272,13 +274,29 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
 
+                    val maskUri = uiState.targetMaskUri
+                    val maskBitmap by produceState<Bitmap?>(initialValue = null, maskUri) {
+                        if (maskUri != null) {
+                            value = withContext(Dispatchers.IO) {
+                                com.hereliesaz.graffitixr.utils.BitmapUtils.getBitmapFromUri(context, maskUri)
+                            }
+                        } else {
+                            value = null
+                        }
+                    }
+
                     TargetRefinementScreen(
                         targetImage = imageBitmap,
+                        mask = maskBitmap,
                         keypoints = uiState.detectedKeypoints,
                         paths = uiState.refinementPaths,
                         isEraser = uiState.isRefinementEraser,
+                        canUndo = uiState.canUndo,
+                        canRedo = uiState.canRedo,
                         onPathAdded = viewModel::onRefinementPathAdded,
                         onModeChanged = viewModel::onRefinementModeChanged,
+                        onUndo = viewModel::onUndoClicked,
+                        onRedo = viewModel::onRedoClicked,
                         onConfirm = viewModel::onConfirmTargetCreation
                     )
                 } else {
@@ -371,7 +389,9 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     azDivider()
 
-                    azRailItem(id = "light", text = "Light", onClick = viewModel::onToggleFlashlight)
+                    if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
+                        azRailItem(id = "light", text = "Light", onClick = viewModel::onToggleFlashlight)
+                    }
                 }
             }
         }
