@@ -25,7 +25,7 @@ The application is structured into several distinct layers, each with a clear se
 *   **Modularity:** Each major component is designed as a self-contained unit.
 *   **Lifecycle-Awareness:** Components that interact with system resources, particularly the camera, are strictly bound to the Android Activity lifecycle.
 *   **Single Source of Truth:** The application's state is centralized within a shared ViewModel (`MainViewModel.kt`), using Kotlin StateFlow for reactive updates.
-*   **Persistence:** The application implements a robust auto-save mechanism that periodically persists the entire project state (including AR target data) to ensuring data safety.
+*   **Persistence:** The application implements a robust auto-save mechanism that periodically persists the entire project state (including AR target data), thereby ensuring data safety.
 
 ### **1.2. Core Technology Stack Selection & Justification**
 
