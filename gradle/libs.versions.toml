@@ -1,5 +1,5 @@
 [versions]
-agp = "8.13.1"
+agp = "8.13.2"
 kotlin = "2.2.21"
 coreKtx = "1.17.0"
 junit = "4.13.2"
@@ -20,7 +20,7 @@ opencv = "4.12.0"
 azNavRail = "4.47"
 kotlinxSerialization = "1.9.0"
 segmentationSelfie = "16.0.0-beta6"
-firebaseBom = "34.6.0"
+firebaseBom = "34.7.0"
 
 [libraries]
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
