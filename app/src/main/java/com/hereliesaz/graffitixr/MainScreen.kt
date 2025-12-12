@@ -319,14 +319,18 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     // Image Host (now includes Adjustments)
                     azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
+
+                    // Moved "Open" (Overlay) above "Wall" (Background)
+                    azRailSubItem(id = "image", text = "Open", hostId = "design_host") {
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+
                     if (uiState.editorMode == EditorMode.STATIC) {
-                        azRailSubItem(id = "background", hostId = "design_host", text = "Background") {
+                        azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
                     }
-                    azRailSubItem(id = "image", text = "Image", hostId = "design_host") {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
+
                     if (uiState.overlayImageUri != null) {
                         azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", onClick = viewModel::onRemoveBackgroundClicked)
                         azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", onClick = viewModel::onLineDrawingClicked)
@@ -440,7 +444,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     colorBalanceG = uiState.colorBalanceG,
                     colorBalanceB = uiState.colorBalanceB,
                     onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                    onColorBalanceGChange = viewModel::onColorBalanceGChanged, // Fixed type
+                    onColorBalanceGChange = viewModel::onColorBalanceGChanged,
                     onColorBalanceBChange = viewModel::onColorBalanceBChanged,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
