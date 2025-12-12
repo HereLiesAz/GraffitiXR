@@ -598,6 +598,22 @@ class MainViewModel(
         updateState(uiState.value.copy(blendMode = nextMode))
     }
 
+    fun onMagicClicked() {
+        val state = uiState.value
+        if (state.rotationX != 0f || state.rotationY != 0f || state.rotationZ != 0f) {
+            updateState(state.copy(rotationX = 0f, rotationY = 0f, rotationZ = 0f))
+            Toast.makeText(getApplication(), "Aligned Flat", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(getApplication(), "Auto-Aligning...", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun onToggleFlashlight() {
+        val newState = !uiState.value.isFlashlightOn
+        updateState(uiState.value.copy(isFlashlightOn = newState), isUndoable = false)
+        arRenderer?.setFlashlight(newState)
+    }
+
     fun saveProject(projectName: String) {
         viewModelScope.launch(Dispatchers.IO) {
             performSave(projectName, true)

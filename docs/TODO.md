@@ -81,6 +81,10 @@ This document tracks the development status, future enhancements, and identified
     -   [x] **Fix Camera Lag:** Resolved camera resource conflict when switching from Overlay to AR mode.
     -   [x] **Fix Grid Creation:** Resolved black screen issue in Refinement step by fixing FileProvider paths.
     -   [x] **Robust Auto-Save:** Implemented periodic auto-save to persist application state.
+    -   [x] **Grid Orientation:** Fixed sideways fingerprint grid issue by rotating captured frames.
+    -   [x] **Flashlight:** Added flashlight toggle for AR and Overlay modes.
+    -   [x] **Magic Align:** Added button to flatten image rotation.
+    -   [x] **UI Polish:** Updated Settings navigation, Undo/Redo styling, and Refinement visualization.
 
 ## V1.9 Features (Completed)
 

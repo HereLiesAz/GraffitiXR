@@ -28,6 +28,7 @@ import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
+import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
@@ -118,8 +119,12 @@ class ArRenderer(
                 val width = image.width
                 val height = image.height
 
-                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                yuvToRgbConverter.yuvToRgb(image, bitmap)
+                val rawBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                yuvToRgbConverter.yuvToRgb(image, rawBitmap)
+
+                // Fix Rotation (Sideways Issue)
+                val rotation = getRotationDegrees(rawBitmap)
+                val bitmap = if (rotation != 0f) BitmapUtils.rotateBitmap(rawBitmap, rotation) else rawBitmap
 
                 val mat = Mat()
                 org.opencv.android.Utils.bitmapToMat(bitmap, mat)
@@ -371,12 +376,34 @@ class ArRenderer(
     private fun captureFrameForFingerprint(frame: Frame) {
         try {
             frame.acquireCameraImage().use { image ->
-                val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                yuvToRgbConverter.yuvToRgb(image, bitmap)
+                val rawBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                yuvToRgbConverter.yuvToRgb(image, rawBitmap)
+
+                // Fix Rotation
+                val rotation = getRotationDegrees(rawBitmap)
+                val bitmap = if (rotation != 0f) BitmapUtils.rotateBitmap(rawBitmap, rotation) else rawBitmap
+
                 mainHandler.post { onFrameCaptured(bitmap) }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Capture failed", e)
+        }
+    }
+
+    private fun getRotationDegrees(bitmap: Bitmap): Float {
+        val isPortraitScreen = viewportWidth < viewportHeight
+        val isLandscapeBitmap = bitmap.width > bitmap.height
+        return if (isPortraitScreen && isLandscapeBitmap) 90f else 0f
+    }
+
+    fun setFlashlight(enabled: Boolean) {
+        val session = this.session ?: return
+        try {
+            val config = session.config
+            config.flashMode = if (enabled) Config.FlashMode.TORCH else Config.FlashMode.OFF
+            session.configure(config)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to toggle flashlight", e)
         }
     }
 

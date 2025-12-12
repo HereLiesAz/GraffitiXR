@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.composables
 
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -55,9 +56,20 @@ fun OverlayScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
     val coroutineScope = rememberCoroutineScope()
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val currentUiState by rememberUpdatedState(uiState)
+
+    LaunchedEffect(uiState.isFlashlightOn, camera) {
+        try {
+            if (camera?.cameraInfo?.hasFlashUnit() == true) {
+                camera?.cameraControl?.enableTorch(uiState.isFlashlightOn)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
         ColorMatrix().apply {
@@ -109,7 +121,7 @@ fun OverlayScreen(
                     val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                     try {
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
+                        camera = cameraProvider.bindToLifecycle(
                             lifecycleOwner,
                             cameraSelector,
                             preview
