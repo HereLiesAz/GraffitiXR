@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -223,13 +224,13 @@ class MainViewModel(
                     }
                 }
 
+                // Prepare Review Data on IO Thread
+                val reviewUri = frontImage?.let { saveBitmapToCache(it, "review_preview") }
+                val newUris = if (reviewUri != null) listOf(reviewUri) else emptyList()
+
                 withContext(Dispatchers.Main) {
                     // Feed ALL captured images to ARCore for robust tracking
                     arRenderer?.setAugmentedImageDatabase(newImages)
-
-                    // Generate a cache URI for the review screen (using Front image)
-                    val reviewUri = frontImage?.let { saveBitmapToCache(it, "review_preview") }
-                    val newUris = if (reviewUri != null) listOf(reviewUri) else emptyList()
 
                     updateState(
                         uiState.value.copy(
@@ -1003,7 +1004,7 @@ class MainViewModel(
         val fileName = "GraffitiXR-${release.tag_name}.apk"
 
         try {
-            val request = DownloadManager.Request(Uri.parse(downloadUrl))
+            val request = DownloadManager.Request(downloadUrl.toUri())
                 .setTitle(fileName)
                 .setDescription("Downloading GraffitiXR Update")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)

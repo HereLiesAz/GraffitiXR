@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,7 +28,6 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.hereliesaz.aznavrail.AzLoad
 
 @Composable
 fun SettingsScreen(
@@ -160,7 +159,7 @@ fun SettingsScreen(
                                 }
                                 IconButton(onClick = onCheckForUpdates, enabled = !isCheckingForUpdate) {
                                     if (isCheckingForUpdate) {
-                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                        AzLoad()
                                     } else {
                                         Icon(Icons.Default.Refresh, contentDescription = "Check for updates")
                                     }
@@ -174,8 +173,8 @@ fun SettingsScreen(
                             PermissionItem(name = "Camera Access", isGranted = cameraPermission, onClick = openAppSettings)
                             PermissionItem(name = "Photo Library Access", isGranted = storagePermission, onClick = openAppSettings)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                 val notificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                                 PermissionItem(name = "Notifications", isGranted = notificationPermission, onClick = openAppSettings)
+                                val notificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                                PermissionItem(name = "Notifications", isGranted = notificationPermission, onClick = openAppSettings)
                             }
                         }
                     }
