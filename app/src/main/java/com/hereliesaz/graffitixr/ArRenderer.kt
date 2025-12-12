@@ -96,6 +96,11 @@ class ArRenderer(
     private var pendingPanX = 0f
     private var pendingPanY = 0f
 
+    // Reusable arrays for projection to avoid allocation
+    private val worldPos = FloatArray(4)
+    private val eyePos = FloatArray(4)
+    private val clipPos = FloatArray(4)
+
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
     private var lastAnalysisTime = 0L
@@ -343,10 +348,12 @@ class ArRenderer(
     }
 
     private fun projectPoseToScreen(modelMtx: FloatArray, viewMtx: FloatArray, projMtx: FloatArray): Pair<Float, Float>? {
-        val worldPos = floatArrayOf(modelMtx[12], modelMtx[13], modelMtx[14], 1.0f)
-        val eyePos = FloatArray(4)
+        worldPos[0] = modelMtx[12]
+        worldPos[1] = modelMtx[13]
+        worldPos[2] = modelMtx[14]
+        worldPos[3] = 1.0f
+
         Matrix.multiplyMV(eyePos, 0, viewMtx, 0, worldPos, 0)
-        val clipPos = FloatArray(4)
         Matrix.multiplyMV(clipPos, 0, projMtx, 0, eyePos, 0)
 
         if (clipPos[3] == 0f) return null
