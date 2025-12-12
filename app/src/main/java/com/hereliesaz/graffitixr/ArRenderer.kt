@@ -535,6 +535,8 @@ class ArRenderer(
         try {
             displayRotationHelper.onPause()
             session?.pause()
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during onPause", e)
         } finally {
             sessionLock.unlock()
         }
