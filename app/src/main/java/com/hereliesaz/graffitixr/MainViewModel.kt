@@ -150,7 +150,9 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val bitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
             val paths = uiState.value.refinementPaths
-            val mask = uiState.value.targetMask
+            val maskUri = uiState.value.targetMaskUri
+            val mask = if (maskUri != null) BitmapUtils.getBitmapFromUri(getApplication(), maskUri) else null
+
             val keypoints = com.hereliesaz.graffitixr.utils.detectFeaturesWithMask(bitmap, paths, mask)
             withContext(Dispatchers.Main) {
                 updateState(uiState.value.copy(detectedKeypoints = keypoints), isUndoable = false)
@@ -177,7 +179,8 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val originalBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
             val refinementPaths = uiState.value.refinementPaths
-            val mask = uiState.value.targetMask
+            val maskUri = uiState.value.targetMaskUri
+            val mask = if (maskUri != null) BitmapUtils.getBitmapFromUri(getApplication(), maskUri) else null
 
             // Use ImageUtils to apply mask consistently
             val refinedBitmap = com.hereliesaz.graffitixr.utils.applyMaskToBitmap(originalBitmap, refinementPaths, mask)
@@ -278,6 +281,8 @@ class MainViewModel(
                                 canvas.drawBitmap(frontImage, 0f, 0f, null)
                                 canvas.drawBitmap(maskBitmap, 0f, 0f, paint)
 
+                                // Save mask to cache
+                                val maskUri = saveBitmapToCache(maskBitmap, "mask")
 
                                 val updatedImages = listOf(maskedBitmap) + newImages.drop(1)
                                 arRenderer?.setAugmentedImageDatabase(updatedImages)
@@ -286,7 +291,7 @@ class MainViewModel(
                                     updateState(
                                         uiState.value.copy(
                                             capturedTargetImages = newImages, // Keep original for review
-                                            targetMask = maskBitmap,
+                                            targetMaskUri = maskUri,
                                             captureStep = CaptureStep.REVIEW,
                                             targetCreationState = TargetCreationState.SUCCESS,
                                             isArTargetCreated = true,
@@ -295,6 +300,7 @@ class MainViewModel(
                                         )
                                     )
                                     Toast.makeText(getApplication(), "Grid created successfully", Toast.LENGTH_SHORT).show()
+                                    updateDetectedKeypoints()
                                 }
                             } else {
                                 // Fallback to original image if segmentation fails
@@ -310,6 +316,7 @@ class MainViewModel(
                                         )
                                     )
                                     Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
+                                    updateDetectedKeypoints()
                                 }
                             }
                         }
@@ -328,6 +335,7 @@ class MainViewModel(
                                 )
                             )
                             Toast.makeText(getApplication(), "Grid created (segmentation error)", Toast.LENGTH_SHORT).show()
+                            updateDetectedKeypoints()
                         }
                     }
             }
@@ -912,4 +920,3 @@ class MainViewModel(
 
     companion object { private const val MAX_UNDO_STACK_SIZE = 50 }
 }
-
