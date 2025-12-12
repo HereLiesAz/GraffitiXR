@@ -347,7 +347,7 @@ class ArRenderer(
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
 
-                    // Enable Depth for Occlusion and robustness
+                    // Explicitly ENABLE depth for robustness and occlusion
                     config.depthMode = Config.DepthMode.AUTOMATIC
 
                     session!!.configure(config)
@@ -368,6 +368,17 @@ class ArRenderer(
     fun onPause() {
         displayRotationHelper.onPause()
         session?.pause()
+    }
+
+    // Called by ArView.onDispose to clean up AR resources
+    fun cleanup() {
+        try {
+            session?.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error closing session", e)
+        } finally {
+            session = null
+        }
     }
 
     fun queueTap(x: Float, y: Float) {
