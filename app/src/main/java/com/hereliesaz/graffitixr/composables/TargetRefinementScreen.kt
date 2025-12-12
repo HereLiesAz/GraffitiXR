@@ -177,9 +177,16 @@ fun TargetRefinementScreen(
                     activeEraserPaths.forEach { rPath ->
                         val path = Path()
                         if (rPath.points.isNotEmpty()) {
-                            path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
-                            for (i in 1 until rPath.points.size) {
-                                path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
+                            val start = rPath.points.first()
+                            path.moveTo(start.x * imageWidth, start.y * imageHeight)
+
+                            if (rPath.points.size == 1) {
+                                // Draw a tiny line to ensure single taps render with Round Cap
+                                path.lineTo(start.x * imageWidth + 0.1f, start.y * imageHeight)
+                            } else {
+                                for (i in 1 until rPath.points.size) {
+                                    path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
+                                }
                             }
                         }
 
@@ -198,9 +205,15 @@ fun TargetRefinementScreen(
                 activeMaskPaths.forEach { rPath ->
                     val path = Path()
                     if (rPath.points.isNotEmpty()) {
-                        path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
-                        for (i in 1 until rPath.points.size) {
-                            path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
+                        val start = rPath.points.first()
+                        path.moveTo(start.x * imageWidth, start.y * imageHeight)
+
+                        if (rPath.points.size == 1) {
+                            path.lineTo(start.x * imageWidth + 0.1f, start.y * imageHeight)
+                        } else {
+                            for (i in 1 until rPath.points.size) {
+                                path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
+                            }
                         }
                     }
 
@@ -219,9 +232,15 @@ fun TargetRefinementScreen(
                 activeMaskPaths.forEach { rPath ->
                      val path = Path()
                      if (rPath.points.isNotEmpty()) {
-                        path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
-                        for (i in 1 until rPath.points.size) {
-                            path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
+                        val start = rPath.points.first()
+                        path.moveTo(start.x * imageWidth, start.y * imageHeight)
+
+                        if (rPath.points.size == 1) {
+                            path.lineTo(start.x * imageWidth + 0.1f, start.y * imageHeight)
+                        } else {
+                            for (i in 1 until rPath.points.size) {
+                                path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
+                            }
                         }
                      }
                      drawPath(path, Color.Red.copy(alpha = 0.2f), style = Stroke(width = 50f, cap = StrokeCap.Round, join = StrokeJoin.Round))

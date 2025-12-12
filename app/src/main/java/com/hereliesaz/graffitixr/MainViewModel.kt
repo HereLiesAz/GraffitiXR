@@ -811,6 +811,9 @@ class MainViewModel(
         } catch (e: Exception) { return null }
     }
 
+    /**
+     * Saves a bitmap to the app's cache directory.
+     */
     private fun saveBitmapToCache(bitmap: Bitmap, prefix: String = "target"): Uri? {
         try {
             val context = getApplication<Application>().applicationContext
