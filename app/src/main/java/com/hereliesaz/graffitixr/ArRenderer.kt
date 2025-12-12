@@ -7,6 +7,8 @@ import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -46,8 +48,12 @@ class ArRenderer(
     private val onFrameCaptured: (Bitmap) -> Unit,
     private val onAnchorCreated: () -> Unit,
     private val onProgressUpdated: (Float, Bitmap?) -> Unit,
-    private val onTrackingFailure: (String) -> Unit
+    private val onTrackingFailure: (String?) -> Unit
 ) : GLSurfaceView.Renderer {
+
+    // Helper for main thread posting to avoid JNI crashes
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var wasTracking = false
 
     // AR Session
     var session: Session? = null
@@ -132,8 +138,8 @@ class ArRenderer(
                             }
                             val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
 
-                            // Pass the unique bitmap instance
-                            onProgressUpdated(progress, bitmap)
+                            // Pass the unique bitmap instance on Main Thread
+                            mainHandler.post { onProgressUpdated(progress, bitmap) }
                         }
                         grayMat.release()
                         descriptors.release()
@@ -146,7 +152,10 @@ class ArRenderer(
                 }
             }
         } catch (e: NotYetAvailableException) {
-            onTrackingFailure("Tracking lost. Move device to re-establish.")
+            if (wasTracking) {
+                wasTracking = false
+                mainHandler.post { onTrackingFailure("Tracking lost. Move device to re-establish.") }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Analysis failed", e)
         }
@@ -195,8 +204,16 @@ class ArRenderer(
 
             val camera = frame.camera
 
-            if (camera.trackingState != TrackingState.TRACKING) {
-                onTrackingFailure("Tracking lost. Move device to re-establish.")
+            if (camera.trackingState == TrackingState.TRACKING) {
+                if (!wasTracking) {
+                    wasTracking = true
+                    mainHandler.post { onTrackingFailure(null) } // Clear warning
+                }
+            } else {
+                if (wasTracking) {
+                    wasTracking = false
+                    mainHandler.post { onTrackingFailure("Tracking lost. Point device at grid.") }
+                }
                 return
             }
 
@@ -220,13 +237,12 @@ class ArRenderer(
                             hasTrackingPlane = true
                         }
                     }
-                    onPlanesDetected(hasTrackingPlane)
+                    mainHandler.post { onPlanesDetected(hasTrackingPlane) }
                     handleTap(frame)
                 }
                 ArState.LOCKED -> {
                     val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
                     for (img in updatedAugmentedImages) {
-                        // Check if the tracked image is one of our targets (target_0, target_1, etc.)
                         if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
                             val pose = img.centerPose
                             val poseMatrix = FloatArray(16)
@@ -243,7 +259,7 @@ class ArRenderer(
             }
 
         } catch (e: SessionPausedException) {
-            onTrackingFailure("AR session paused. Please wait.")
+            mainHandler.post { onTrackingFailure("AR session paused. Please wait.") }
         } catch (t: Throwable) {
             Log.e(TAG, "Exception on the GL Thread", t)
         }
@@ -255,23 +271,12 @@ class ArRenderer(
 
         val modelMtx = pose.clone()
 
-        // --- ORDER OF OPERATIONS (Applied Last to First on Vertices) ---
-
-        // 1. User Rotation (Global axes)
-        // Z is Spin (0,0,1), X is Tilt (1,0,0), Y is Twist (0,1,0)
         Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
         Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
         Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
-
-        // 2. Lay Flat Orientation
-        // Rotate -90 on X to lay the vertical X-Y plane flat onto the floor X-Z
         Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
-
-        // 3. Uniform Scale
-        // Scale X and Y (Width/Height) uniformly
         Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
 
-        // 4. Aspect Ratio Correction
         val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
 
@@ -294,7 +299,7 @@ class ArRenderer(
 
                 arImagePose = poseMatrix
                 arState = ArState.PLACED
-                onAnchorCreated()
+                mainHandler.post { onAnchorCreated() }
                 break
             }
         }
@@ -305,7 +310,7 @@ class ArRenderer(
             frame.acquireCameraImage().use { image ->
                 val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                 yuvToRgbConverter.yuvToRgb(image, bitmap)
-                onFrameCaptured(bitmap)
+                mainHandler.post { onFrameCaptured(bitmap) }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Capture failed", e)
@@ -316,10 +321,6 @@ class ArRenderer(
         captureNextFrame = true
     }
 
-    /**
-     * Updates the ARCore AugmentedImageDatabase with multiple images for robust tracking.
-     * Each image is added with a unique name (target_0, target_1, etc.).
-     */
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
         val session = this.session ?: return
         session.pause()
@@ -327,7 +328,6 @@ class ArRenderer(
         val database = AugmentedImageDatabase(session)
 
         bitmaps.forEachIndexed { index, bitmap ->
-            // Add every image as a potential target
             database.addImage("target_$index", bitmap)
         }
 
@@ -370,7 +370,7 @@ class ArRenderer(
         session?.pause()
     }
 
-    // Called by ArView.onDispose to clean up AR resources
+    // Required by ArView.kt
     fun cleanup() {
         try {
             session?.close()

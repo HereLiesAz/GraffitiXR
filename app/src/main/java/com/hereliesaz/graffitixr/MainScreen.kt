@@ -11,14 +11,19 @@ import android.os.VibratorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +40,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.aznavrail.AzNavRail
@@ -72,7 +79,6 @@ fun MainScreen(viewModel: MainViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
 
-    // Vibration Logic
     LaunchedEffect(viewModel, context) {
         viewModel.feedbackEvent.collect { event ->
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -221,6 +227,19 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget) {
+            StatusOverlay(
+                qualityWarning = uiState.qualityWarning,
+                arState = uiState.arState,
+                isPlanesDetected = uiState.isArPlanesDetected,
+                isTargetCreated = uiState.isArTargetCreated,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 40.dp)
+                    .zIndex(10f)
+            )
+        }
+
         if (showSettings) {
             Box(modifier = Modifier.zIndex(1.5f)) {
                 SettingsScreen(
@@ -234,7 +253,6 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        // New Overlay for Target Creation
         if (uiState.isCapturingTarget) {
             Box(modifier = Modifier.zIndex(5f)) {
                 if (uiState.captureStep == CaptureStep.REVIEW) {
@@ -281,8 +299,8 @@ fun MainScreen(viewModel: MainViewModel) {
             isVisible = gestureInProgress
         )
 
-        // Hide toolbar if capturing target
-        if (!uiState.isTouchLocked && !uiState.isCapturingTarget) {
+        // Keep Rail mounted to support Global Loading Popup
+        if (!uiState.isTouchLocked) {
             Box(
                 modifier = Modifier
                     .zIndex(2f)
@@ -307,7 +325,6 @@ fun MainScreen(viewModel: MainViewModel) {
                         azRailItem(id = "lock_trace", text = "Lock", onClick = { viewModel.setTouchLocked(true) })
                     }
 
-                    // Target Host - Only visible in AR Mode
                     if (uiState.editorMode == EditorMode.AR) {
                         azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
                         azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", onClick = viewModel::onCreateTargetClicked)
@@ -317,10 +334,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         azDivider()
                     }
 
-                    // Image Host (now includes Adjustments)
                     azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
 
-                    // Moved "Open" (Overlay) above "Surface" (Background)
                     azRailSubItem(id = "image", text = "Open", hostId = "design_host") {
                         overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
@@ -336,8 +351,6 @@ fun MainScreen(viewModel: MainViewModel) {
                         azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", onClick = viewModel::onLineDrawingClicked)
                         azDivider()
 
-                        // Moved Adjustment Items
-                        // Clicking "Adjust" sets the state to show the unified knobs row defined below
                         azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust") { showSliderDialog = "Adjust" }
                         azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance") { showColorBalanceDialog = !showColorBalanceDialog }
                         azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", onClick = viewModel::onCycleBlendMode)
@@ -345,7 +358,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     azDivider()
 
-                    // Settings Host (Moved to Menu)
                     azMenuHostItem(id = "settings_host", text = "Settings", route = "settings_host"){ showSettings = true }
                     azMenuSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
                     azMenuSubItem(id = "save_project", hostId = "settings_host", text = "Save") { createDocumentLauncher.launch("Project.gxr") }
@@ -391,23 +403,9 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
-        if (showSettings) {
-            SettingsScreen(
-                currentVersion = BuildConfig.VERSION_NAME,
-                updateStatus = uiState.updateStatusMessage,
-                isCheckingForUpdate = uiState.isCheckingForUpdate,
-                onCheckForUpdates = viewModel::checkForUpdates,
-                onInstallUpdate = viewModel::installLatestUpdate,
-                onClose = { showSettings = false }
-            )
-        }
-
-        // Adjustments Panel (Knobs and Undo/Redo)
         if (uiState.overlayImageUri != null) {
-            // "Adjust" shows the unified panel with all knobs (Opacity, Brightness, Contrast, Saturation)
             val showKnobs = showSliderDialog == "Adjust"
 
-            // Undo/Redo Buttons (15% from bottom)
             UndoRedoRow(
                 canUndo = uiState.canUndo,
                 canRedo = uiState.canRedo,
@@ -419,7 +417,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     .zIndex(3f)
             )
 
-            // Adjustment Knobs (25% from bottom)
             if (showKnobs) {
                 AdjustmentsKnobsRow(
                     opacity = uiState.opacity,
@@ -437,7 +434,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
 
-            // Color Balance Knobs (40% from bottom)
             if (showColorBalanceDialog) {
                 ColorBalanceKnobsRow(
                     colorBalanceR = uiState.colorBalanceR,
@@ -496,6 +492,49 @@ fun MainScreen(viewModel: MainViewModel) {
 }
 
 @Composable
+fun StatusOverlay(
+    qualityWarning: String?,
+    arState: ArState,
+    isPlanesDetected: Boolean,
+    isTargetCreated: Boolean,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier
+    ) {
+        val backgroundColor = if (qualityWarning != null) Color.Red.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.5f)
+        val text = when {
+            qualityWarning != null -> qualityWarning
+            !isTargetCreated -> "Create a Grid to start."
+            arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."
+            arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."
+            arState == ArState.LOCKED -> "Looking for your Grid..."
+            arState == ArState.PLACED -> "Ready."
+            else -> ""
+        }
+
+        if (text.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .background(backgroundColor, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = text,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun CaptureAnimation() {
     var flashAlpha by remember { mutableFloatStateOf(0f) }
     var shutterAlpha by remember { mutableFloatStateOf(0f) }
@@ -512,14 +551,11 @@ private fun CaptureAnimation() {
     )
 
     LaunchedEffect(Unit) {
-        // Shutter closes
         shutterAlpha = 0.5f
         delay(100)
-        // Flash
         flashAlpha = 1f
         delay(50)
         flashAlpha = 0f
-        // Shutter opens
         delay(150)
         shutterAlpha = 0f
     }
@@ -528,13 +564,13 @@ private fun CaptureAnimation() {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = animatedShutterAlpha))
-            .zIndex(10f) // Make sure it's on top
+            .zIndex(10f)
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White.copy(alpha = animatedFlashAlpha))
-            .zIndex(11f) // Flash on top of shutter
+            .zIndex(11f)
     )
 }

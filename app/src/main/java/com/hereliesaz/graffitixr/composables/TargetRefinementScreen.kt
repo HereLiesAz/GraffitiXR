@@ -53,24 +53,27 @@ fun TargetRefinementScreen(
     onModeChanged: (Boolean) -> Unit,
     onConfirm: () -> Unit
 ) {
-    if (targetImage == null) return
-
-    var currentPath by remember { mutableStateOf<List<Offset>?>(null) }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
+        if (targetImage == null) {
+            // The global AzNavRail isLoading handles the spinner.
+            // We just show a text hint here if needed, or leave it black.
+            return@Box
+        }
+
+        var currentPath by remember { mutableStateOf<List<Offset>?>(null) }
+
         // Image and Drawing Area
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 80.dp) // Space for bottom bar
+                .padding(bottom = 80.dp)
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
-                            // Normalize coordinates
                             val normalizedStart = Offset(
                                 offset.x / size.width.toFloat(),
                                 offset.y / size.height.toFloat()
@@ -94,13 +97,11 @@ fun TargetRefinementScreen(
                 }
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                // 1. Draw Target Image
                 drawImage(
                     image = targetImage.asImageBitmap(),
                     dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
                 )
 
-                // 2. Draw Existing Mask Paths
                 paths.forEach { rPath ->
                     val path = Path()
                     if (rPath.points.isNotEmpty()) {
@@ -109,13 +110,6 @@ fun TargetRefinementScreen(
                             path.lineTo(rPath.points[i].x * size.width, rPath.points[i].y * size.height)
                         }
                     }
-
-                    // "Eraser" (Add) visually removes the red mask, so we don't draw it or draw clear?
-                    // To simplify visualization: Red = Masked out (Subtract). Clear = Active.
-                    // If we are painting a mask, we draw red.
-                    // If we are erasing a mask, we ideally clear the red pixels.
-                    // However, standard canvas doesn't support layer clearing easily without offscreen buffers.
-                    // A simple visual approximation: Draw Red for Mask, Draw Transparent/White for Eraser (on top).
 
                     val color = if (rPath.isEraser) Color.Green.copy(alpha = 0.3f) else Color.Red.copy(alpha = 0.5f)
 
@@ -130,7 +124,6 @@ fun TargetRefinementScreen(
                     )
                 }
 
-                // 3. Draw Current Stroke
                 currentPath?.let { points ->
                     val path = Path()
                     if (points.isNotEmpty()) {
@@ -151,7 +144,6 @@ fun TargetRefinementScreen(
                     )
                 }
 
-                // 4. Draw Keypoints
                 keypoints.forEach { normalizedOffset ->
                     drawCircle(
                         color = Color.Green,
@@ -165,7 +157,6 @@ fun TargetRefinementScreen(
             }
         }
 
-        // Top Instruction
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -182,7 +173,6 @@ fun TargetRefinementScreen(
             )
         }
 
-        // Bottom Controls
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -195,10 +185,9 @@ fun TargetRefinementScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Tool Toggle
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     IconButton(
-                        onClick = { onModeChanged(false) }, // Mask (Subtract)
+                        onClick = { onModeChanged(false) },
                         modifier = Modifier
                             .size(48.dp)
                             .background(if (!isEraser) Color.Red else Color.Gray, CircleShape)
@@ -208,7 +197,7 @@ fun TargetRefinementScreen(
                     }
 
                     IconButton(
-                        onClick = { onModeChanged(true) }, // Unmask (Add)
+                        onClick = { onModeChanged(true) },
                         modifier = Modifier
                             .size(48.dp)
                             .background(if (isEraser) Color.Green else Color.Gray, CircleShape)
