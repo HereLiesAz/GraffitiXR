@@ -25,6 +25,7 @@ The application is structured into several distinct layers, each with a clear se
 *   **Modularity:** Each major component is designed as a self-contained unit.
 *   **Lifecycle-Awareness:** Components that interact with system resources, particularly the camera, are strictly bound to the Android Activity lifecycle.
 *   **Single Source of Truth:** The application's state is centralized within a shared ViewModel (`MainViewModel.kt`), using Kotlin StateFlow for reactive updates.
+*   **Persistence:** The application implements a robust auto-save mechanism that periodically persists the entire project state (including AR target data) to ensuring data safety.
 
 ### **1.2. Core Technology Stack Selection & Justification**
 
@@ -106,6 +107,13 @@ The `ARScreen.kt` composable uses the `AndroidView` composable to embed a `GLSur
 *   `onSurfaceCreated()`: Initializes the `BackgroundRenderer` and `AugmentedImageRenderer`.
 *   `onSurfaceChanged()`: Sets the viewport and display rotation.
 *   `onDrawFrame()`: The heart of the rendering loop. It gets the latest ARCore `Frame`, draws the background camera image, and then iterates through any tracked `AugmentedImage`s, using the `AugmentedImageRenderer` to draw content on top of them.
+
+#### **Gesture Handling in AR**
+
+Gestures are handled by Jetpack Compose's `pointerInput` modifiers overlaid on the `GLSurfaceView`.
+*   **Single-Touch Drag:** Triggers a raycast against AR planes to move the content anchor.
+*   **Two-Finger Pan:** Also triggers the raycast-move logic, allowing flexible positioning.
+*   **Scale & Rotate:** Standard two-finger gestures modify the transformation matrix of the rendered content.
 
 ### **2.3. AR Persistence via OpenCV Fingerprinting**
 

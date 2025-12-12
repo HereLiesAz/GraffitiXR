@@ -119,6 +119,14 @@ fun OverlayScreen(
                 }, executor)
                 previewView
             },
+            onRelease = {
+                try {
+                    val cameraProvider = cameraProviderFuture.get()
+                    cameraProvider.unbindAll()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            },
             modifier = Modifier.fillMaxSize()
         )
 

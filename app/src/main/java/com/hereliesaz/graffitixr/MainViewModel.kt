@@ -94,6 +94,20 @@ class MainViewModel(
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
             ContextCompat.RECEIVER_EXPORTED
         )
+        startAutoSave()
+    }
+
+    private fun startAutoSave() {
+        viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                delay(30000)
+                try {
+                    performSave("autosave", false)
+                } catch (e: Exception) {
+                    Log.e("AutoSave", "Failed", e)
+                }
+            }
+        }
     }
 
     // --- AR Target Creation Logic ---
@@ -582,42 +596,58 @@ class MainViewModel(
 
     fun saveProject(projectName: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val savedTargetUris = uiState.value.capturedTargetImages.mapNotNull { bitmap ->
+            performSave(projectName, true)
+        }
+    }
+
+    private suspend fun performSave(projectName: String, showToast: Boolean) {
+        try {
+            val currentImages = uiState.value.capturedTargetImages
+            val currentUris = uiState.value.capturedTargetUris
+
+            val savedTargetUris = if (currentImages.isNotEmpty()) {
+                currentImages.mapNotNull { bitmap ->
                     saveBitmapToCache(bitmap)
                 }
-                val projectData = ProjectData(
-                    backgroundImageUri = uiState.value.backgroundImageUri,
-                    overlayImageUri = uiState.value.overlayImageUri,
-                    originalOverlayImageUri = uiState.value.originalOverlayImageUri,
-                    targetImageUris = savedTargetUris,
-                    refinementPaths = uiState.value.refinementPaths,
-                    opacity = uiState.value.opacity,
-                    brightness = uiState.value.brightness,
-                    contrast = uiState.value.contrast,
-                    saturation = uiState.value.saturation,
-                    colorBalanceR = uiState.value.colorBalanceR,
-                    colorBalanceG = uiState.value.colorBalanceG,
-                    colorBalanceB = uiState.value.colorBalanceB,
-                    scale = uiState.value.scale,
-                    rotationZ = uiState.value.rotationZ,
-                    rotationX = uiState.value.rotationX,
-                    rotationY = uiState.value.rotationY,
-                    offset = uiState.value.offset,
-                    blendMode = uiState.value.blendMode,
-                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
-                    drawingPaths = uiState.value.drawingPaths,
-                    progressPercentage = uiState.value.progressPercentage,
-                    evolutionImageUris = uiState.value.evolutionCaptureUris,
-                    gpsData = getGpsData(),
-                    sensorData = getSensorData()
-                )
-                projectManager.saveProject(projectName, projectData)
+            } else {
+                currentUris
+            }
+
+            val projectData = ProjectData(
+                backgroundImageUri = uiState.value.backgroundImageUri,
+                overlayImageUri = uiState.value.overlayImageUri,
+                originalOverlayImageUri = uiState.value.originalOverlayImageUri,
+                targetImageUris = savedTargetUris,
+                refinementPaths = uiState.value.refinementPaths,
+                opacity = uiState.value.opacity,
+                brightness = uiState.value.brightness,
+                contrast = uiState.value.contrast,
+                saturation = uiState.value.saturation,
+                colorBalanceR = uiState.value.colorBalanceR,
+                colorBalanceG = uiState.value.colorBalanceG,
+                colorBalanceB = uiState.value.colorBalanceB,
+                scale = uiState.value.scale,
+                rotationZ = uiState.value.rotationZ,
+                rotationX = uiState.value.rotationX,
+                rotationY = uiState.value.rotationY,
+                offset = uiState.value.offset,
+                blendMode = uiState.value.blendMode,
+                fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
+                drawingPaths = uiState.value.drawingPaths,
+                progressPercentage = uiState.value.progressPercentage,
+                evolutionImageUris = uiState.value.evolutionCaptureUris,
+                gpsData = getGpsData(),
+                sensorData = getSensorData()
+            )
+            projectManager.saveProject(projectName, projectData)
+            if (showToast) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Project '$projectName' saved", Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error saving project", e)
+            }
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error saving project", e)
+            if (showToast) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Failed to save project", Toast.LENGTH_SHORT).show()
                 }
@@ -693,7 +723,7 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 projectManager.loadProject(projectName)?.let { projectData ->
-                    updateState(uiState.value.copy(backgroundImageUri = projectData.backgroundImageUri, overlayImageUri = projectData.overlayImageUri, originalOverlayImageUri = projectData.originalOverlayImageUri ?: projectData.overlayImageUri, opacity = projectData.opacity, brightness = projectData.brightness, contrast = projectData.contrast, saturation = projectData.saturation, colorBalanceR = projectData.colorBalanceR, colorBalanceG = projectData.colorBalanceG, colorBalanceB = projectData.colorBalanceB, scale = projectData.scale, rotationZ = projectData.rotationZ, rotationX = projectData.rotationX, rotationY = projectData.rotationY, offset = projectData.offset, blendMode = projectData.blendMode, fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }, drawingPaths = projectData.drawingPaths, isLineDrawing = projectData.isLineDrawing))
+                    updateState(uiState.value.copy(backgroundImageUri = projectData.backgroundImageUri, overlayImageUri = projectData.overlayImageUri, originalOverlayImageUri = projectData.originalOverlayImageUri ?: projectData.overlayImageUri, opacity = projectData.opacity, brightness = projectData.brightness, contrast = projectData.contrast, saturation = projectData.saturation, colorBalanceR = projectData.colorBalanceR, colorBalanceG = projectData.colorBalanceG, colorBalanceB = projectData.colorBalanceB, scale = projectData.scale, rotationZ = projectData.rotationZ, rotationX = projectData.rotationX, rotationY = projectData.rotationY, offset = projectData.offset, blendMode = projectData.blendMode, fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }, drawingPaths = projectData.drawingPaths, isLineDrawing = projectData.isLineDrawing, capturedTargetUris = projectData.targetImageUris ?: emptyList()))
                     withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show() }
                 }
             } catch (e: Exception) { Log.e("MainViewModel", "Error loading project", e); withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Failed to load project", Toast.LENGTH_SHORT).show() } }

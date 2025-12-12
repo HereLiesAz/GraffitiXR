@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr
 
 import android.app.Activity
 import android.opengl.GLSurfaceView
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
@@ -136,10 +137,20 @@ fun ArView(
                     }
                 )
             }
-            // 2. Transform Logic
+            // 2. Drag Logic (Single Finger)
+            .pointerInput(Unit) {
+                detectDragGestures { change, _ ->
+                    change.consume()
+                    glSurfaceView.queueEvent { renderer.queueMove(change.position.x, change.position.y) }
+                }
+            }
+            // 3. Transform Logic (Two Finger)
             // KEY FIX: Restarts detection when axis changes
             .pointerInput(uiState.activeRotationAxis) {
-                detectTransformGestures { _, _, zoom, rotation ->
+                detectTransformGestures { centroid, _, zoom, rotation ->
+                    // Two-finger drag (Pan)
+                    glSurfaceView.queueEvent { renderer.queueMove(centroid.x, centroid.y) }
+
                     viewModel.onArObjectScaleChanged(zoom)
 
                     // KEY FIX: Invert rotation for natural feel

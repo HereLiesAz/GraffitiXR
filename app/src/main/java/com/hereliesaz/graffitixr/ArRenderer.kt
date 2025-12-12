@@ -92,6 +92,7 @@ class ArRenderer(
     var colorBalanceB: Float = 1.0f
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
+    @Volatile private var pendingMove: Pair<Float, Float>? = null
 
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
@@ -242,6 +243,7 @@ class ArRenderer(
                     handleTap(frame)
                 }
                 ArState.LOCKED -> {
+                    handleMove(frame)
                     val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
                     for (img in updatedAugmentedImages) {
                         if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
@@ -255,6 +257,7 @@ class ArRenderer(
                     drawArtwork(viewmtx, projmtx)
                 }
                 ArState.PLACED -> {
+                    handleMove(frame)
                     drawArtwork(viewmtx, projmtx)
                 }
             }
@@ -301,6 +304,23 @@ class ArRenderer(
                 arImagePose = poseMatrix
                 arState = ArState.PLACED
                 mainHandler.post { onAnchorCreated() }
+                break
+            }
+        }
+    }
+
+    private fun handleMove(frame: Frame) {
+        val move = pendingMove ?: return
+        pendingMove = null
+        val hitResult = frame.hitTest(move.first, move.second)
+
+        for (hit in hitResult) {
+            val trackable = hit.trackable
+            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                val poseMatrix = FloatArray(16)
+                hit.hitPose.toMatrix(poseMatrix, 0)
+                arImagePose = poseMatrix
+                arState = ArState.PLACED
                 break
             }
         }
@@ -392,6 +412,10 @@ class ArRenderer(
 
     fun queueTap(x: Float, y: Float) {
         tapQueue.offer(Pair(x, y))
+    }
+
+    fun queueMove(x: Float, y: Float) {
+        pendingMove = Pair(x, y)
     }
 
     fun updateOverlayImage(uri: Uri) {
