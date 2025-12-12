@@ -26,9 +26,11 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.data.RefinementPath
@@ -153,48 +155,39 @@ fun TargetRefinementScreen(
                 }
 
                 // C. Restore Paths (Eraser) -> Adds back from Base Image
-                // To do this, we draw the Base Image again, clipped to the path.
+                // We use BitmapShader to draw the image pixels along the stroke.
                 val activeEraserPaths = paths.filter { it.isEraser } +
                     (if (isEraser && currentPath != null) listOf(RefinementPath(currentPath!!, true)) else emptyList())
 
-                activeEraserPaths.forEach { rPath ->
-                    val path = Path()
-                    if (rPath.points.isNotEmpty()) {
-                        path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
-                        for (i in 1 until rPath.points.size) {
-                            path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
-                        }
+                if (activeEraserPaths.isNotEmpty()) {
+                    val paint = android.graphics.Paint().apply {
+                        shader = android.graphics.BitmapShader(targetImage, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeWidth = 50f
+                        strokeCap = android.graphics.Paint.Cap.ROUND
+                        strokeJoin = android.graphics.Paint.Join.ROUND
                     }
 
-                    // Stroke width implies area. Convert stroke to fill?
-                    // We want to restore an area defined by the stroke.
-                    // drawImage inside clipPath works for fill. For stroke, we rely on stroke width.
-                    // We can just draw the image with stroke? No.
-                    // We draw the image masked by the stroke.
-                    // Compose doesn't support "Draw Image Stroke".
-                    // Workaround: Draw path with SrcOver? No.
-                    // We want the PIXELS from image.
-                    // Draw path with BlendMode.SrcOver? Just draws color.
-                    // Draw path with BlendMode.Clear? No.
+                    val matrix = android.graphics.Matrix()
+                    val scaleX = imageWidth / targetImage.width
+                    val scaleY = imageHeight / targetImage.height
+                    matrix.setScale(scaleX, scaleY)
+                    paint.shader.setLocalMatrix(matrix)
 
-                    // Actually, simpler:
-                    // Just draw the path with Color.Green (Tint) and alpha.
-                    // And assume user understands Green = Keep.
-                    // Restoring pixels is nice but complex to render stroke-based restoration.
-                    // Wait! If I draw the path with a specific color, say White, using BlendMode.SrcOver.
-                    // Then...
-                    // If I want to restore pixels, I need to paint pixels.
+                    activeEraserPaths.forEach { rPath ->
+                        val path = Path()
+                        if (rPath.points.isNotEmpty()) {
+                            path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
+                            for (i in 1 until rPath.points.size) {
+                                path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
+                            }
+                        }
 
-                    // Let's stick to visual feedback via Tint.
-                    // Green = Include. Red = Exclude.
-                    // The underlying mask logic handles the actual inclusion/exclusion.
-                    // Here we just visualize.
+                        drawContext.canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
 
-                    // If I just draw Green on top, user sees Green line.
-                    // If they want to see what's under it...
-                    // The Dimmed Background is visible (0.3 alpha).
-                    // So they CAN see what they are restoring (dimly).
-                    // This is acceptable.
+                        // Green hint
+                        drawPath(path, Color.Green.copy(alpha = 0.2f), style = Stroke(width = 50f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    }
                 }
 
                 // D. Remove Paths (Mask) -> Removes from current result
@@ -221,9 +214,9 @@ fun TargetRefinementScreen(
 
                 drawContext.canvas.restore() // End Mask Layer
 
-                // 3. Draw Indicators (Outlines)
-                // Draw Green indicators for Restored paths
-                activeEraserPaths.forEach { rPath ->
+                // 3. Draw Indicators
+                // Red indicators for Masked paths (optional)
+                activeMaskPaths.forEach { rPath ->
                      val path = Path()
                      if (rPath.points.isNotEmpty()) {
                         path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
@@ -231,13 +224,8 @@ fun TargetRefinementScreen(
                             path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
                         }
                      }
-                     drawPath(path, Color.Green.copy(alpha = 0.4f), style = Stroke(width = 50f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                     drawPath(path, Color.Red.copy(alpha = 0.2f), style = Stroke(width = 50f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
-
-                // Draw Red indicators for Masked paths?
-                // The masked paths punched a hole to the dimmed bg.
-                // We can add a red rim or tint?
-                // Maybe redundant. The dimmed bg shows it's excluded.
 
                 // Draw Keypoints
                 keypoints.forEach { normalizedOffset ->
