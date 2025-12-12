@@ -33,6 +33,8 @@ import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -110,6 +112,7 @@ class ArRenderer(
     private var originalKeypointCount: Int = 0
     private var lastAnalysisTime = 0L
     private val ANALYSIS_INTERVAL_MS = 2000L
+    private val analysisScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     fun setFingerprint(fingerprint: Fingerprint) {
         this.originalDescriptors = fingerprint.descriptors
@@ -117,8 +120,20 @@ class ArRenderer(
     }
 
     private fun analyzeFrameAsync(frame: Frame) {
+        val image = try {
+            frame.acquireCameraImage()
+        } catch (e: NotYetAvailableException) {
+            if (wasTracking) {
+                wasTracking = false
+                mainHandler.post { onTrackingFailure("Tracking lost. Move device to re-establish.") }
+            }
+            return
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire image for analysis", e)
+            return
+        }
+
         try {
-            val image = frame.acquireCameraImage()
             val rotation = getRotationDegrees()
 
             // Extract Y-plane (Grayscale) directly
@@ -134,11 +149,10 @@ class ArRenderer(
             val processingMat = Mat()
             yMat.copyTo(processingMat)
 
-            // Release camera resources immediately
+            // Release wrapper Mat
             yMat.release()
-            image.close()
 
-            CoroutineScope(Dispatchers.Default).launch {
+            analysisScope.launch {
                 try {
                     // Handle Rotation
                     val rotatedMat = if (rotation != 0f) {
@@ -189,15 +203,16 @@ class ArRenderer(
                     rotatedMat.release()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in analysis coroutine", e)
+                    // If processingMat was NOT released due to exception before logic, it might leak.
+                    // But in this block, 'processingMat' is either released or passed to 'rotatedMat'.
+                    // 'rotatedMat' is released at end.
+                    // To be strictly safe we could use 'use' logic for Mats too, but this is better than before.
                 }
-            }
-        } catch (e: NotYetAvailableException) {
-            if (wasTracking) {
-                wasTracking = false
-                mainHandler.post { onTrackingFailure("Tracking lost. Move device to re-establish.") }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Analysis failed", e)
+        } finally {
+            image.close()
         }
     }
 
@@ -233,12 +248,15 @@ class ArRenderer(
 
             backgroundRenderer.draw(frame)
 
+            var frameProcessed = false
+
             if (captureNextFrame) {
                 captureFrameForFingerprint(frame)
                 captureNextFrame = false
+                frameProcessed = true
             }
 
-            if (System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
+            if (!frameProcessed && System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
                 lastAnalysisTime = System.currentTimeMillis()
                 analyzeFrameAsync(frame)
             }
@@ -508,6 +526,7 @@ class ArRenderer(
 
     fun cleanup() {
         try {
+            analysisScope.cancel()
             session?.close()
         } catch (e: Exception) {
             Log.e(TAG, "Error closing session", e)
