@@ -636,7 +636,7 @@ class MainViewModel(
     fun onSaveClicked() {
         viewModelScope.launch {
             updateState(uiState.value.copy(hideUiForCapture = true), isUndoable = false)
-            delay(200)
+            delay(300L)
             _captureEvent.emit(CaptureEvent.RequestCapture)
         }
     }
