@@ -123,8 +123,14 @@ class ArRenderer(
                 yuvToRgbConverter.yuvToRgb(image, rawBitmap)
 
                 // Fix Rotation (Sideways Issue)
-                val rotation = getRotationDegrees(rawBitmap)
-                val bitmap = if (rotation != 0f) BitmapUtils.rotateBitmap(rawBitmap, rotation) else rawBitmap
+                val rotation = getRotationDegrees()
+                val bitmap = if (rotation != 0f) {
+                    val rotated = BitmapUtils.rotateBitmap(rawBitmap, rotation)
+                    rawBitmap.recycle()
+                    rotated
+                } else {
+                    rawBitmap
+                }
 
                 val mat = Mat()
                 org.opencv.android.Utils.bitmapToMat(bitmap, mat)
@@ -380,8 +386,14 @@ class ArRenderer(
                 yuvToRgbConverter.yuvToRgb(image, rawBitmap)
 
                 // Fix Rotation
-                val rotation = getRotationDegrees(rawBitmap)
-                val bitmap = if (rotation != 0f) BitmapUtils.rotateBitmap(rawBitmap, rotation) else rawBitmap
+                val rotation = getRotationDegrees()
+                val bitmap = if (rotation != 0f) {
+                    val rotated = BitmapUtils.rotateBitmap(rawBitmap, rotation)
+                    rawBitmap.recycle()
+                    rotated
+                } else {
+                    rawBitmap
+                }
 
                 mainHandler.post { onFrameCaptured(bitmap) }
             }
@@ -390,10 +402,16 @@ class ArRenderer(
         }
     }
 
-    private fun getRotationDegrees(bitmap: Bitmap): Float {
-        val isPortraitScreen = viewportWidth < viewportHeight
-        val isLandscapeBitmap = bitmap.width > bitmap.height
-        return if (isPortraitScreen && isLandscapeBitmap) 90f else 0f
+    private fun getRotationDegrees(): Float {
+        val displayRotation = when (displayRotationHelper.rotation) {
+            android.view.Surface.ROTATION_0 -> 0
+            android.view.Surface.ROTATION_90 -> 90
+            android.view.Surface.ROTATION_180 -> 180
+            android.view.Surface.ROTATION_270 -> 270
+            else -> 0
+        }
+        val sensorOrientation = 90 // Typical back camera orientation
+        return ((sensorOrientation - displayRotation + 360) % 360).toFloat()
     }
 
     fun setFlashlight(enabled: Boolean) {

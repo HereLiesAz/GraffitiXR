@@ -102,7 +102,7 @@ class MainViewModel(
     private fun startAutoSave() {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                delay(30000)
+                delay(AUTO_SAVE_INTERVAL_MS)
                 try {
                     performSave("autosave", false)
                 } catch (e: CancellationException) {
@@ -604,7 +604,7 @@ class MainViewModel(
             updateState(state.copy(rotationX = 0f, rotationY = 0f, rotationZ = 0f))
             Toast.makeText(getApplication(), "Aligned Flat", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(getApplication(), "Auto-Aligning...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(getApplication(), "Already aligned", Toast.LENGTH_SHORT).show()
         }
     }
 

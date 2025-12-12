@@ -20,6 +20,8 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
         }
     }
 
+    val rotation: Int
+        get() = display?.rotation ?: 0
 
     fun onResume() {
         context.getSystemService(DisplayManager::class.java).registerDisplayListener(this, null)

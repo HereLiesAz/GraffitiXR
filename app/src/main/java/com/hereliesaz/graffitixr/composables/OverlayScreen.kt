@@ -67,7 +67,7 @@ fun OverlayScreen(
                 camera?.cameraControl?.enableTorch(uiState.isFlashlightOn)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("OverlayScreen", "Failed to set torch state to ${uiState.isFlashlightOn}", e)
         }
     }
 
