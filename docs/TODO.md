@@ -73,7 +73,16 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Displays App Version and Permissions status.
     -   [x] Implemented GitHub update check for experimental releases.
 
-## V1.9 Features (Current)
+## V1.10 Features (Current)
+
+-   **[x] Critical Bug Fixes & UX Enhancements:**
+    -   [x] **Fix AR Drag:** Implemented single-touch drag to place anchor in AR mode.
+    -   [x] **Two-Finger Drag:** Implemented global two-finger drag (pan) to move AR anchor.
+    -   [x] **Fix Camera Lag:** Resolved camera resource conflict when switching from Overlay to AR mode.
+    -   [x] **Fix Grid Creation:** Resolved black screen issue in Refinement step by fixing FileProvider paths.
+    -   [x] **Robust Auto-Save:** Implemented periodic auto-save to persist application state.
+
+## V1.9 Features (Completed)
 
 -   **[x] Robust Bug Reporting:**
     -   [x] Implement a global crash handler to catch uncaught exceptions.
