@@ -5,6 +5,10 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
@@ -26,13 +30,13 @@ import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.applyCurves
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -156,12 +160,54 @@ class MainViewModel(
     }
 
     fun onConfirmTargetCreation() {
-        updateState(uiState.value.copy(
-            isCapturingTarget = false,
-            targetCreationState = TargetCreationState.SUCCESS,
-            isArTargetCreated = true,
-            arState = ArState.LOCKED
-        ))
+        viewModelScope.launch(Dispatchers.IO) {
+            val originalBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
+            val refinementPaths = uiState.value.refinementPaths
+
+            val refinedBitmap = if (refinementPaths.isNotEmpty()) {
+                val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+                val canvas = Canvas(mutableBitmap)
+                val paint = Paint().apply {
+                    isAntiAlias = true
+                    style = Paint.Style.STROKE
+                    strokeWidth = 50f
+                    strokeCap = Paint.Cap.ROUND
+                    strokeJoin = Paint.Join.ROUND
+                }
+
+                val maskingPath = android.graphics.Path()
+                refinementPaths.forEach { rPath ->
+                    if (rPath.points.isNotEmpty()) {
+                        val firstPoint = rPath.points.first()
+                        maskingPath.moveTo(firstPoint.x * mutableBitmap.width, firstPoint.y * mutableBitmap.height)
+                        for (i in 1 until rPath.points.size) {
+                            val point = rPath.points[i]
+                            maskingPath.lineTo(point.x * mutableBitmap.width, point.y * mutableBitmap.height)
+                        }
+                    }
+                }
+
+                // Apply mask
+                paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+                canvas.drawPath(maskingPath, paint)
+                mutableBitmap
+            } else {
+                originalBitmap
+            }
+
+            arRenderer?.setAugmentedImageDatabase(listOf(refinedBitmap))
+
+            withContext(Dispatchers.Main) {
+                updateState(
+                    uiState.value.copy(
+                        isCapturingTarget = false,
+                        targetCreationState = TargetCreationState.SUCCESS,
+                        isArTargetCreated = true,
+                        arState = ArState.LOCKED
+                    )
+                )
+            }
+        }
     }
 
     // Accepting nullable String to clear warning
@@ -319,7 +365,7 @@ class MainViewModel(
             RotationAxis.Z -> RotationAxis.X
         }
         updateState(uiState.value.copy(activeRotationAxis = nextAxis, showRotationAxisFeedback = true))
-        Toast.makeText(getApplication(), "Rotation Axis: ${nextAxis.name}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(getApplication(), "Rotation Axis: ${'$'}{nextAxis.name}", Toast.LENGTH_SHORT).show()
     }
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
@@ -399,11 +445,11 @@ class MainViewModel(
                     if (resultBitmap != null) {
                         val cachePath = File(context.cacheDir, "images")
                         cachePath.mkdirs()
-                        val file = File(cachePath, "background_removed_${System.currentTimeMillis()}.png")
+                        val file = File(cachePath, "background_removed_${'$'}{System.currentTimeMillis()}.png")
                         val fOut = FileOutputStream(file)
                         resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
                         fOut.close()
-                        val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                        val newUri = FileProvider.getUriForFile(context, "${'$'}{context.packageName}.provider", file)
                         updateState(uiState.value.copy(overlayImageUri = newUri, backgroundRemovedImageUri = newUri, isLoading = false))
                     } else {
                         setLoading(false)
@@ -444,11 +490,11 @@ class MainViewModel(
                 val lineDrawingBitmap = convertToLineDrawing(bitmap, isWhite = true)
                 val cachePath = File(context.cacheDir, "images")
                 cachePath.mkdirs()
-                val file = File(cachePath, "line_drawing_${System.currentTimeMillis()}.png")
+                val file = File(cachePath, "line_drawing_${'$'}{System.currentTimeMillis()}.png")
                 val fOut = FileOutputStream(file)
                 lineDrawingBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
                 fOut.close()
-                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                val newUri = FileProvider.getUriForFile(context, "${'$'}{context.packageName}.provider", file)
                 updateState(uiState.value.copy(overlayImageUri = newUri, isLineDrawing = true, isLoading = false))
             } else {
                 setLoading(false)
@@ -534,11 +580,11 @@ class MainViewModel(
                 val resultBitmap = applyCurves(bitmap, points)
                 val cachePath = File(context.cacheDir, "images")
                 cachePath.mkdirs()
-                val file = File(cachePath, "curves_processed_${System.currentTimeMillis()}.png")
+                val file = File(cachePath, "curves_processed_${'$'}{System.currentTimeMillis()}.png")
                 val fOut = FileOutputStream(file)
                 resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
                 fOut.close()
-                val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                val newUri = FileProvider.getUriForFile(context, "${'$'}{context.packageName}.provider", file)
                 updateState(uiState.value.copy(processedImageUri = newUri, isLoading = false))
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -594,7 +640,7 @@ class MainViewModel(
             BlendMode.Lighten -> BlendMode.SrcOver
             else -> BlendMode.SrcOver
         }
-        Toast.makeText(getApplication(), "Blend Mode: ${nextMode}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(getApplication(), "Blend Mode: ${'$'}{nextMode}", Toast.LENGTH_SHORT).show()
         updateState(uiState.value.copy(blendMode = nextMode))
     }
 
@@ -666,7 +712,7 @@ class MainViewModel(
             projectManager.saveProject(projectName, projectData)
             if (showToast) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(getApplication(), "Project '$projectName' saved", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(getApplication(), "Project '${'$'}projectName' saved", Toast.LENGTH_SHORT).show()
                 }
             }
         } catch (e: Exception) {
@@ -735,11 +781,11 @@ class MainViewModel(
             val context = getApplication<Application>().applicationContext
             val cachePath = File(context.cacheDir, "project_assets")
             cachePath.mkdirs()
-            val file = File(cachePath, "${prefix}_${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.png")
+            val file = File(cachePath, "${'$'}{prefix}_${'$'}{System.currentTimeMillis()}_${'$'}{java.util.UUID.randomUUID()}.png")
             val fOut = FileOutputStream(file)
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut)
             fOut.close()
-            return FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+            return FileProvider.getUriForFile(context, "${'$'}{context.packageName}.provider", file)
         } catch (e: Exception) { e.printStackTrace(); return null }
     }
 
@@ -748,7 +794,7 @@ class MainViewModel(
             try {
                 projectManager.loadProject(projectName)?.let { projectData ->
                     updateState(uiState.value.copy(backgroundImageUri = projectData.backgroundImageUri, overlayImageUri = projectData.overlayImageUri, originalOverlayImageUri = projectData.originalOverlayImageUri ?: projectData.overlayImageUri, opacity = projectData.opacity, brightness = projectData.brightness, contrast = projectData.contrast, saturation = projectData.saturation, colorBalanceR = projectData.colorBalanceR, colorBalanceG = projectData.colorBalanceG, colorBalanceB = projectData.colorBalanceB, scale = projectData.scale, rotationZ = projectData.rotationZ, rotationX = projectData.rotationX, rotationY = projectData.rotationY, offset = projectData.offset, blendMode = projectData.blendMode, fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }, drawingPaths = projectData.drawingPaths, isLineDrawing = projectData.isLineDrawing, capturedTargetUris = projectData.targetImageUris ?: emptyList()))
-                    withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show() }
+                    withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '${'$'}projectName' loaded", Toast.LENGTH_SHORT).show() }
                 }
             } catch (e: Exception) { Log.e("MainViewModel", "Error loading project", e); withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Failed to load project", Toast.LENGTH_SHORT).show() } }
         }
@@ -757,7 +803,7 @@ class MainViewModel(
     fun getProjectList(): List<String> = projectManager.getProjectList()
 
     fun deleteProject(projectName: String) {
-        viewModelScope.launch(Dispatchers.IO) { projectManager.deleteProject(projectName); withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '$projectName' deleted", Toast.LENGTH_SHORT).show() } }
+        viewModelScope.launch(Dispatchers.IO) { projectManager.deleteProject(projectName); withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '${'$'}projectName' deleted", Toast.LENGTH_SHORT).show() } }
     }
 
     fun onNewProject() { updateState(UiState(), isUndoable = false) }
@@ -814,14 +860,14 @@ class MainViewModel(
                         val experimentalRelease = releases.firstOrNull { it.prerelease }
                         withContext(Dispatchers.Main) {
                             if (experimentalRelease != null) {
-                                val message = if (experimentalRelease.tag_name > BuildConfig.VERSION_NAME) "New experimental build: ${experimentalRelease.tag_name}" else "Latest experimental build installed."
+                                val message = if (experimentalRelease.tag_name > BuildConfig.VERSION_NAME) "New experimental build: ${'$'}{experimentalRelease.tag_name}" else "Latest experimental build installed."
                                 updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = message, latestRelease = experimentalRelease), isUndoable = false)
                             } else {
                                 updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "No experimental builds found."), isUndoable = false)
                             }
                         }
-                    } else { withContext(Dispatchers.Main) { updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "HTTP ${connection.responseCode}"), isUndoable = false) } }
-                } catch (e: Exception) { e.printStackTrace(); withContext(Dispatchers.Main) { updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "Error: ${e.message}"), isUndoable = false) } }
+                    } else { withContext(Dispatchers.Main) { updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "HTTP ${'$'}{connection.responseCode}"), isUndoable = false) } }
+                } catch (e: Exception) { e.printStackTrace(); withContext(Dispatchers.Main) { updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "Error: ${'$'}{e.message}"), isUndoable = false) } }
             }
         }
     }
@@ -829,13 +875,13 @@ class MainViewModel(
     fun installLatestUpdate() {
         val release = uiState.value.latestRelease ?: return
         val asset = release.assets.firstOrNull { it.browser_download_url.endsWith(".apk") } ?: return
-        val downloadUrl = asset.browser_download_url; val fileName = "GraffitiXR-${release.tag_name}.apk"
+        val downloadUrl = asset.browser_download_url; val fileName = "GraffitiXR-${'$'}{release.tag_name}.apk"
         try {
             val request = DownloadManager.Request(Uri.parse(downloadUrl)).setTitle(fileName).setDescription("Downloading GraffitiXR Update").setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED).setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
             val downloadManager = getApplication<Application>().getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             downloadManager.enqueue(request)
             Toast.makeText(getApplication(), "Downloading update...", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) { Toast.makeText(getApplication(), "Failed to start download: ${e.message}", Toast.LENGTH_LONG).show() }
+        } catch (e: Exception) { Toast.makeText(getApplication(), "Failed to start download: ${'$'}{e.message}", Toast.LENGTH_LONG).show() }
     }
 
     companion object { private const val MAX_UNDO_STACK_SIZE = 50 }
