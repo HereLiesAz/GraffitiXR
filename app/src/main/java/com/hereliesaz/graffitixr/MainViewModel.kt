@@ -102,7 +102,7 @@ class MainViewModel(
     private fun startAutoSave() {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                delay(30000)
+                delay(AUTO_SAVE_INTERVAL_MS)
                 try {
                     performSave("autosave", false)
                 } catch (e: CancellationException) {
