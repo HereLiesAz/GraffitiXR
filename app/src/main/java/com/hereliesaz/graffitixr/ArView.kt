@@ -39,6 +39,16 @@ fun ArView(
         )
     }
 
+    val glSurfaceView = remember {
+        GLSurfaceView(context).apply {
+            preserveEGLContextOnPause = true
+            setEGLContextClientVersion(2)
+            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            setRenderer(renderer)
+            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        }
+    }
+
     DisposableEffect(renderer) {
         viewModel.arRenderer = renderer
         onDispose {
@@ -59,8 +69,14 @@ fun ArView(
     }
 
     LaunchedEffect(fingerprint) {
-        if (fingerprint != null) {
-            renderer.setFingerprint(fingerprint)
+        fingerprint?.let {
+            glSurfaceView.queueEvent { renderer.setFingerprint(it) }
+        }
+    }
+
+    LaunchedEffect(uiState.capturedTargetImages) {
+        if(uiState.capturedTargetImages.isNotEmpty()) {
+            glSurfaceView.queueEvent { renderer.setAugmentedImageDatabase(uiState.capturedTargetImages) }
         }
     }
 
@@ -81,28 +97,18 @@ fun ArView(
         renderer.updateOverlayImage(uiState.overlayImageUri)
     }
 
-    val glSurfaceView = remember {
-        GLSurfaceView(context).apply {
-            preserveEGLContextOnPause = true
-            setEGLContextClientVersion(2)
-            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-            setRenderer(renderer)
-            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-        }
-    }
-
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     if (activity != null) {
-                        renderer.onResume(activity)
+                        glSurfaceView.queueEvent { renderer.onResume(activity) }
                         glSurfaceView.onResume()
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     glSurfaceView.onPause()
-                    renderer.onPause()
+                    glSurfaceView.queueEvent { renderer.onPause() }
                 }
                 else -> {}
             }
@@ -125,7 +131,7 @@ fun ArView(
                     },
                     onTap = { offset ->
                         if (uiState.arState == ArState.SEARCHING) {
-                            renderer.queueTap(offset.x, offset.y)
+                            glSurfaceView.queueEvent { renderer.queueTap(offset.x, offset.y) }
                         }
                     }
                 )

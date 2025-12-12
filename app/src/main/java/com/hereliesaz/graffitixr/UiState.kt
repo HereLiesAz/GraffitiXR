@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import com.google.ar.core.AugmentedImageDatabase
 import com.hereliesaz.graffitixr.data.GithubRelease
 import com.hereliesaz.graffitixr.data.RefinementPath
 import com.hereliesaz.graffitixr.utils.BitmapListParceler
@@ -107,5 +108,7 @@ data class UiState(
     // Refinement State
     val refinementPaths: List<RefinementPath> = emptyList(),
     val isRefinementEraser: Boolean = false,
-    val detectedKeypoints: @WriteWith<OffsetListParceler> List<Offset> = emptyList()
+    val detectedKeypoints: @WriteWith<OffsetListParceler> List<Offset> = emptyList(),
+
+    val augmentedImageDatabase: @RawValue AugmentedImageDatabase? = null
 ) : Parcelable

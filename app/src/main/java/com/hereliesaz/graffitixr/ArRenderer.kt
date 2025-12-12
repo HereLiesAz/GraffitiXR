@@ -90,6 +90,7 @@ class ArRenderer(
     private val anchorPoseMatrix = FloatArray(16)
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
+    private val pendingDatabaseBitmaps = ConcurrentLinkedQueue<List<Bitmap>>()
 
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
@@ -195,6 +196,11 @@ class ArRenderer(
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
         if (session == null) return
+
+        // Handle pending database configuration
+        pendingDatabaseBitmaps.poll()?.let {
+            configureAugmentedImageDatabase(it)
+        }
 
         try {
             session!!.setCameraTextureName(backgroundRenderer.textureId)
@@ -333,24 +339,34 @@ class ArRenderer(
     }
 
     /**
-     * Updates the ARCore AugmentedImageDatabase with multiple images for robust tracking.
-     * Each image is added with a unique name (target_0, target_1, etc.).
+     * Queues the update of the ARCore AugmentedImageDatabase.
+     * The actual configuration happens on the GL thread to avoid race conditions.
      */
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
+        pendingDatabaseBitmaps.offer(bitmaps)
+    }
+
+    private fun configureAugmentedImageDatabase(bitmaps: List<Bitmap>) {
         val session = this.session ?: return
-        session.pause()
-        val config = session.config
-        val database = AugmentedImageDatabase(session)
+        try {
+            session.pause()
+            val config = session.config
+            val database = AugmentedImageDatabase(session)
 
-        bitmaps.forEachIndexed { index, bitmap ->
-            // Add every image as a potential target
-            database.addImage("target_$index", bitmap)
+            bitmaps.forEachIndexed { index, bitmap ->
+                database.addImage("target_$index", bitmap)
+            }
+
+            config.augmentedImageDatabase = database
+            if (session.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                config.depthMode = Config.DepthMode.AUTOMATIC
+            }
+            session.configure(config)
+            session.resume()
+            arState = ArState.LOCKED
+        } catch (e: Exception) {
+            Log.e(TAG, "Error configuring augmented image database", e)
         }
-
-        config.augmentedImageDatabase = database
-        session.configure(config)
-        session.resume()
-        arState = ArState.LOCKED
     }
 
     fun onResume(activity: Activity) {
@@ -362,6 +378,9 @@ class ArRenderer(
                     config.updateMode = Config.UpdateMode.BLOCKING
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
+                    if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                        config.depthMode = Config.DepthMode.AUTOMATIC
+                    }
                     session!!.configure(config)
                 }
             } catch (e: Exception) {
