@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.composables
 
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -30,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import android.util.Log
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -54,9 +56,20 @@ fun OverlayScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
     val coroutineScope = rememberCoroutineScope()
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val currentUiState by rememberUpdatedState(uiState)
+
+    LaunchedEffect(uiState.isFlashlightOn, camera) {
+        try {
+            if (camera?.cameraInfo?.hasFlashUnit() == true) {
+                camera?.cameraControl?.enableTorch(uiState.isFlashlightOn)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
         ColorMatrix().apply {
@@ -108,7 +121,7 @@ fun OverlayScreen(
                     val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                     try {
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
+                        camera = cameraProvider.bindToLifecycle(
                             lifecycleOwner,
                             cameraSelector,
                             preview
@@ -118,6 +131,15 @@ fun OverlayScreen(
                     }
                 }, executor)
                 previewView
+            },
+            onRelease = {
+                cameraProviderFuture.addListener({
+                    try {
+                        cameraProviderFuture.get().unbindAll()
+                    } catch (e: Exception) {
+                        Log.e("OverlayScreen", "Failed to unbind camera provider", e)
+                    }
+                }, ContextCompat.getMainExecutor(context))
             },
             modifier = Modifier.fillMaxSize()
         )
