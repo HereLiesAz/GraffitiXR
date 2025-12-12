@@ -272,13 +272,19 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
 
+                    val maskBitmap = uiState.targetMask
                     TargetRefinementScreen(
                         targetImage = imageBitmap,
+                        mask = maskBitmap,
                         keypoints = uiState.detectedKeypoints,
                         paths = uiState.refinementPaths,
                         isEraser = uiState.isRefinementEraser,
+                        canUndo = uiState.canUndo,
+                        canRedo = uiState.canRedo,
                         onPathAdded = viewModel::onRefinementPathAdded,
                         onModeChanged = viewModel::onRefinementModeChanged,
+                        onUndo = viewModel::onUndoClicked,
+                        onRedo = viewModel::onRedoClicked,
                         onConfirm = viewModel::onConfirmTargetCreation
                     )
                 } else {
@@ -371,7 +377,9 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     azDivider()
 
-                    azRailItem(id = "light", text = "Light", onClick = viewModel::onToggleFlashlight)
+                    if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
+                        azRailItem(id = "light", text = "Light", onClick = viewModel::onToggleFlashlight)
+                    }
                 }
             }
         }
