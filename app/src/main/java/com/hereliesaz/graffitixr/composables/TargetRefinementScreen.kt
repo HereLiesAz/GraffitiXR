@@ -5,40 +5,32 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.data.RefinementPath
@@ -46,43 +38,74 @@ import com.hereliesaz.graffitixr.data.RefinementPath
 @Composable
 fun TargetRefinementScreen(
     targetImage: Bitmap?,
+    mask: Bitmap?,
     keypoints: List<Offset>,
     paths: List<RefinementPath>,
     isEraser: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
     onPathAdded: (RefinementPath) -> Unit,
     onModeChanged: (Boolean) -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    if (targetImage == null) return
+
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var currentPath by remember { mutableStateOf<List<Offset>?>(null) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.8f)) // Transparency fallback
+            .background(Color.Black.copy(alpha = 0.9f))
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(1f, 10f)
+                    val rad = 0f
+                    val cos = kotlin.math.cos(rad)
+                    val sin = kotlin.math.sin(rad)
+                    val newPanX = pan.x * cos - pan.y * sin
+                    val newPanY = pan.x * sin + pan.y * cos
+                    val rotatedPan = Offset(newPanX, newPanY)
+                    offset += rotatedPan
+                }
+            }
     ) {
-        if (targetImage == null) {
-            // Global loading spinner (AzNavRail) handles this visual state
-            return@Box
-        }
-
-        var currentPath by remember { mutableStateOf<List<Offset>?>(null) }
-
-        // Image and Drawing Area
-        Box(
+        // Drawing Canvas
+        Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 80.dp)
-                .pointerInput(Unit) {
+                .clipToBounds()
+                .pointerInput(scale, offset) {
                     detectDragGestures(
-                        onDragStart = { offset ->
-                            val normalizedStart = Offset(
-                                offset.x / size.width.toFloat(),
-                                offset.y / size.height.toFloat()
-                            )
-                            currentPath = listOf(normalizedStart)
+                        onDragStart = { touchOffset ->
+                            val imageWidth = size.width
+                            val imageHeight = size.height
+
+                            val imageX = (touchOffset.x - offset.x) / scale
+                            val imageY = (touchOffset.y - offset.y) / scale
+
+                            if (imageX in 0f..imageWidth.toFloat() && imageY in 0f..imageHeight.toFloat()) {
+                                val normalizedStart = Offset(
+                                    imageX / imageWidth.toFloat(),
+                                    imageY / imageHeight.toFloat()
+                                )
+                                currentPath = listOf(normalizedStart)
+                            }
                         },
                         onDrag = { change, _ ->
+                            val touchOffset = change.position
+                            val imageWidth = size.width
+                            val imageHeight = size.height
+
+                            val imageX = (touchOffset.x - offset.x) / scale
+                            val imageY = (touchOffset.y - offset.y) / scale
+
                             val normalizedPoint = Offset(
-                                change.position.x / size.width.toFloat(),
-                                change.position.y / size.height.toFloat()
+                                imageX / imageWidth.toFloat(),
+                                imageY / imageHeight.toFloat()
                             )
                             currentPath = currentPath?.plus(normalizedPoint)
                         },
@@ -95,67 +118,130 @@ fun TargetRefinementScreen(
                     )
                 }
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            val imageWidth = size.width
+            val imageHeight = size.height
+            val imageSize = androidx.compose.ui.unit.IntSize(imageWidth.toInt(), imageHeight.toInt())
+
+            withTransform({
+                translate(left = offset.x, top = offset.y)
+                scale(scale, scale, pivot = Offset.Zero)
+            }) {
+                val imageBitmap = targetImage.asImageBitmap()
+
+                // 1. Draw Dimmed Background (Shows what is excluded)
                 drawImage(
-                    image = targetImage.asImageBitmap(),
-                    dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
+                    image = imageBitmap,
+                    dstSize = imageSize,
+                    alpha = 0.3f
                 )
 
-                paths.forEach { rPath ->
+                // 2. Bright Foreground with Masking
+                // Create a layer to apply the compound mask (Auto + Paths)
+                drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f, 0f, imageWidth, imageHeight), Paint())
+
+                // A. Base Image (Full Bright)
+                drawImage(
+                    image = imageBitmap,
+                    dstSize = imageSize
+                )
+
+                // B. Apply Auto Mask (DstIn) -> Only keeps parts where AutoMask is opaque
+                if (mask != null) {
+                    drawImage(
+                        image = mask.asImageBitmap(),
+                        dstSize = imageSize,
+                        blendMode = BlendMode.DstIn
+                    )
+                }
+
+                // C. Restore Paths (Eraser) -> Adds back from Base Image
+                // We use BitmapShader to draw the image pixels along the stroke.
+                val activeEraserPaths = paths.filter { it.isEraser } +
+                    (if (isEraser && currentPath != null) listOf(RefinementPath(currentPath!!, true)) else emptyList())
+
+                if (activeEraserPaths.isNotEmpty()) {
+                    val paint = android.graphics.Paint().apply {
+                        shader = android.graphics.BitmapShader(targetImage, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeWidth = 50f
+                        strokeCap = android.graphics.Paint.Cap.ROUND
+                        strokeJoin = android.graphics.Paint.Join.ROUND
+                    }
+
+                    val matrix = android.graphics.Matrix()
+                    val scaleX = imageWidth / targetImage.width
+                    val scaleY = imageHeight / targetImage.height
+                    matrix.setScale(scaleX, scaleY)
+                    paint.shader.setLocalMatrix(matrix)
+
+                    activeEraserPaths.forEach { rPath ->
+                        val path = Path()
+                        if (rPath.points.isNotEmpty()) {
+                            path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
+                            for (i in 1 until rPath.points.size) {
+                                path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
+                            }
+                        }
+
+                        drawContext.canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
+
+                        // Green hint
+                        drawPath(path, Color.Green.copy(alpha = 0.2f), style = Stroke(width = 50f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    }
+                }
+
+                // D. Remove Paths (Mask) -> Removes from current result
+                // We use Clear blend mode to punch holes in the layer.
+                val activeMaskPaths = paths.filter { !it.isEraser } +
+                    (if (!isEraser && currentPath != null) listOf(RefinementPath(currentPath!!, false)) else emptyList())
+
+                activeMaskPaths.forEach { rPath ->
                     val path = Path()
                     if (rPath.points.isNotEmpty()) {
-                        path.moveTo(rPath.points.first().x * size.width, rPath.points.first().y * size.height)
+                        path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
                         for (i in 1 until rPath.points.size) {
-                            path.lineTo(rPath.points[i].x * size.width, rPath.points[i].y * size.height)
+                            path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
                         }
                     }
 
-                    val color = if (rPath.isEraser) Color.Green.copy(alpha = 0.3f) else Color.Red.copy(alpha = 0.5f)
-
                     drawPath(
                         path = path,
-                        color = color,
-                        style = Stroke(
-                            width = 50f,
-                            cap = StrokeCap.Round,
-                            join = StrokeJoin.Round
-                        )
+                        color = Color.Transparent,
+                        style = Stroke(width = 50f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        blendMode = BlendMode.Clear
                     )
                 }
 
-                currentPath?.let { points ->
-                    val path = Path()
-                    if (points.isNotEmpty()) {
-                        path.moveTo(points.first().x * size.width, points.first().y * size.height)
-                        for (i in 1 until points.size) {
-                            path.lineTo(points[i].x * size.width, points[i].y * size.height)
+                drawContext.canvas.restore() // End Mask Layer
+
+                // 3. Draw Indicators
+                // Red indicators for Masked paths (optional)
+                activeMaskPaths.forEach { rPath ->
+                     val path = Path()
+                     if (rPath.points.isNotEmpty()) {
+                        path.moveTo(rPath.points.first().x * imageWidth, rPath.points.first().y * imageHeight)
+                        for (i in 1 until rPath.points.size) {
+                            path.lineTo(rPath.points[i].x * imageWidth, rPath.points[i].y * imageHeight)
                         }
-                    }
-                    val color = if (isEraser) Color.Green.copy(alpha = 0.3f) else Color.Red.copy(alpha = 0.5f)
-                    drawPath(
-                        path = path,
-                        color = color,
-                        style = Stroke(
-                            width = 50f,
-                            cap = StrokeCap.Round,
-                            join = StrokeJoin.Round
-                        )
-                    )
+                     }
+                     drawPath(path, Color.Red.copy(alpha = 0.2f), style = Stroke(width = 50f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
 
+                // Draw Keypoints
                 keypoints.forEach { normalizedOffset ->
                     drawCircle(
                         color = Color.Yellow,
-                        radius = 8f,
+                        radius = 8f / scale,
                         center = Offset(
-                            normalizedOffset.x * size.width,
-                            normalizedOffset.y * size.height
+                            normalizedOffset.x * imageWidth,
+                            normalizedOffset.y * imageHeight
                         )
                     )
                 }
             }
         }
 
+        // Instructions
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -165,13 +251,14 @@ fun TargetRefinementScreen(
                 .padding(8.dp)
         ) {
             Text(
-                text = "Refine Target: Paint Red to IGNORE areas.",
+                text = if (isEraser) "ADD (+): Restore areas (Green)" else "REMOVE (-): Mask out areas",
                 color = Color.White,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.align(Alignment.Center)
             )
         }
 
+        // Bottom Controls
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -184,25 +271,41 @@ fun TargetRefinementScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Tools Row: [Undo] [-] [+] [Redo]
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Undo
+                    IconButton(onClick = onUndo, enabled = canUndo) {
+                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = if(canUndo) Color.White else Color.Gray)
+                    }
+
+                    // Remove (Mask / Red)
                     IconButton(
                         onClick = { onModeChanged(false) },
                         modifier = Modifier
                             .size(48.dp)
-                            .background(if (!isEraser) Color.Red else Color.Gray, CircleShape)
+                            .background(if (!isEraser) Color.Red else Color.DarkGray, CircleShape)
                             .border(2.dp, Color.White, CircleShape)
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Mask", tint = Color.White)
+                        Icon(Icons.Default.Remove, contentDescription = "Remove (Mask)", tint = Color.White)
                     }
 
+                    // Add (Unmask / Green)
                     IconButton(
                         onClick = { onModeChanged(true) },
                         modifier = Modifier
                             .size(48.dp)
-                            .background(if (isEraser) Color.Green else Color.Gray, CircleShape)
+                            .background(if (isEraser) Color.Green else Color.DarkGray, CircleShape)
                             .border(2.dp, Color.White, CircleShape)
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = "Unmask", tint = Color.White)
+                        Icon(Icons.Default.Add, contentDescription = "Add (Restore)", tint = Color.White)
+                    }
+
+                    // Redo
+                    IconButton(onClick = onRedo, enabled = canRedo) {
+                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = if(canRedo) Color.White else Color.Gray)
                     }
                 }
 
