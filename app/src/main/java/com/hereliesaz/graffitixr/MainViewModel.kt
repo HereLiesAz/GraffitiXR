@@ -142,7 +142,20 @@ class MainViewModel(
 
     fun onRefinementPathAdded(path: com.hereliesaz.graffitixr.data.RefinementPath) {
         val currentPaths = uiState.value.refinementPaths
-        updateState(uiState.value.copy(refinementPaths = currentPaths + path), isUndoable = false)
+        updateState(uiState.value.copy(refinementPaths = currentPaths + path), isUndoable = true)
+        updateDetectedKeypoints()
+    }
+
+    private fun updateDetectedKeypoints() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val bitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
+            val paths = uiState.value.refinementPaths
+            val mask = uiState.value.targetMask
+            val keypoints = com.hereliesaz.graffitixr.utils.detectFeaturesWithMask(bitmap, paths, mask)
+            withContext(Dispatchers.Main) {
+                updateState(uiState.value.copy(detectedKeypoints = keypoints), isUndoable = false)
+            }
+        }
     }
 
     fun onRefineTargetToggled() {
@@ -164,39 +177,17 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val originalBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
             val refinementPaths = uiState.value.refinementPaths
+            val mask = uiState.value.targetMask
 
-            val refinedBitmap = if (refinementPaths.isNotEmpty()) {
-                val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
-                val canvas = Canvas(mutableBitmap)
-                val paint = Paint().apply {
-                    isAntiAlias = true
-                    style = Paint.Style.STROKE
-                    strokeWidth = 50f
-                    strokeCap = Paint.Cap.ROUND
-                    strokeJoin = Paint.Join.ROUND
-                }
+            // Use ImageUtils to apply mask consistently
+            val refinedBitmap = com.hereliesaz.graffitixr.utils.applyMaskToBitmap(originalBitmap, refinementPaths, mask)
 
-                val maskingPath = android.graphics.Path()
-                refinementPaths.forEach { rPath ->
-                    if (rPath.points.isNotEmpty()) {
-                        val firstPoint = rPath.points.first()
-                        maskingPath.moveTo(firstPoint.x * mutableBitmap.width, firstPoint.y * mutableBitmap.height)
-                        for (i in 1 until rPath.points.size) {
-                            val point = rPath.points[i]
-                            maskingPath.lineTo(point.x * mutableBitmap.width, point.y * mutableBitmap.height)
-                        }
-                    }
-                }
-
-                // Apply mask
-                paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
-                canvas.drawPath(maskingPath, paint)
-                mutableBitmap
-            } else {
-                originalBitmap
-            }
+            // Generate Fingerprint for persistence (OpenCV ORB)
+            val fingerprint = com.hereliesaz.graffitixr.utils.generateFingerprint(originalBitmap, refinementPaths, mask)
+            val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
             arRenderer?.setAugmentedImageDatabase(listOf(refinedBitmap))
+            arRenderer?.setFingerprint(fingerprint)
 
             withContext(Dispatchers.Main) {
                 updateState(
@@ -204,7 +195,8 @@ class MainViewModel(
                         isCapturingTarget = false,
                         targetCreationState = TargetCreationState.SUCCESS,
                         isArTargetCreated = true,
-                        arState = ArState.LOCKED
+                        arState = ArState.LOCKED,
+                        fingerprintJson = fingerprintJson
                     )
                 )
             }
@@ -229,26 +221,8 @@ class MainViewModel(
         val newImages = currentImages + bitmap
         val currentStep = uiState.value.captureStep
 
-        val nextStep = when (currentStep) {
-            CaptureStep.FRONT -> CaptureStep.LEFT
-            CaptureStep.LEFT -> CaptureStep.RIGHT
-            CaptureStep.RIGHT -> CaptureStep.UP
-            CaptureStep.UP -> CaptureStep.DOWN
-            CaptureStep.DOWN -> CaptureStep.REVIEW
-            CaptureStep.REVIEW -> CaptureStep.REVIEW
-        }
-
-        if (nextStep != CaptureStep.REVIEW) {
-            updateState(uiState.value.copy(
-                capturedTargetImages = newImages,
-                captureStep = nextStep
-            ), isUndoable = false)
-
-            viewModelScope.launch {
-                _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
-            }
-            return
-        }
+        // Immediate utilization: Go straight to Review/Segmentation after first capture
+        val nextStep = CaptureStep.REVIEW
 
         // Finalize (Review Step)
         updateState(uiState.value.copy(
@@ -312,6 +286,7 @@ class MainViewModel(
                                     updateState(
                                         uiState.value.copy(
                                             capturedTargetImages = newImages, // Keep original for review
+                                            targetMask = maskBitmap,
                                             captureStep = CaptureStep.REVIEW,
                                             targetCreationState = TargetCreationState.SUCCESS,
                                             isArTargetCreated = true,
