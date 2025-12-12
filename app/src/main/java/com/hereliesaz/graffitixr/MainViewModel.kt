@@ -256,6 +256,7 @@ class MainViewModel(
                 val segmenter = SubjectSegmentation.getClient(segmenterOptions)
                 val inputImage = InputImage.fromBitmap(frontImage, 0)
 
+                // ML Kit Segmentation Call
                 segmenter.process(inputImage)
                     .addOnSuccessListener { result ->
                         viewModelScope.launch(Dispatchers.IO) {
