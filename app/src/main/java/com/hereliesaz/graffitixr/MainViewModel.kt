@@ -13,7 +13,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -472,26 +471,36 @@ class MainViewModel(
     }
 
     fun onEditorModeChanged(mode: EditorMode) {
-        val showOnboarding = !uiState.value.completedOnboardingModes.contains(mode)
-        updateState(
-            uiState.value.copy(
-                editorMode = mode,
-                showOnboardingDialogForMode = if (showOnboarding) mode else null
-            )
-        )
-    }
-
-    fun onOnboardingComplete(mode: EditorMode, dontShowAgain: Boolean) {
-        val updatedState = if (dontShowAgain) {
-            onboardingManager.completeMode(mode)
-            val updatedModes = onboardingManager.getCompletedModes()
-            uiState.value.copy(
-                completedOnboardingModes = updatedModes,
-                showOnboardingDialogForMode = null
+        if (mode == EditorMode.HELP) {
+            // Reset onboarding history when Help is clicked
+            onboardingManager.resetOnboarding()
+            updateState(
+                uiState.value.copy(
+                    completedOnboardingModes = emptySet(),
+                    editorMode = mode,
+                    showOnboardingDialogForMode = null
+                )
             )
         } else {
-            uiState.value.copy(showOnboardingDialogForMode = null)
+            val showOnboarding = !uiState.value.completedOnboardingModes.contains(mode)
+            updateState(
+                uiState.value.copy(
+                    editorMode = mode,
+                    showOnboardingDialogForMode = if (showOnboarding) mode else null
+                )
+            )
         }
+    }
+
+    fun onOnboardingComplete(mode: EditorMode) {
+        // Always mark as completed (checkbox removed)
+        onboardingManager.completeMode(mode)
+        val updatedModes = onboardingManager.getCompletedModes()
+
+        val updatedState = uiState.value.copy(
+            completedOnboardingModes = updatedModes,
+            showOnboardingDialogForMode = null
+        )
 
         if (mode == EditorMode.HELP) {
             updateState(updatedState.copy(editorMode = EditorMode.STATIC))
@@ -899,8 +908,6 @@ class MainViewModel(
 
                         withContext(Dispatchers.Main) {
                             if (experimentalRelease != null) {
-                                // Since these are experimental, we assume any found pre-release is "newer" or at least relevant.
-                                // Comparing version strings of experimental builds can be tricky, so we just present it.
                                 val message = if (experimentalRelease.tag_name > BuildConfig.VERSION_NAME) {
                                     "New experimental build: ${experimentalRelease.tag_name}"
                                 } else {
@@ -942,7 +949,7 @@ class MainViewModel(
         val fileName = "GraffitiXR-${release.tag_name}.apk"
 
         try {
-            val request = DownloadManager.Request(downloadUrl.toUri())
+            val request = DownloadManager.Request(Uri.parse(downloadUrl))
                 .setTitle(fileName)
                 .setDescription("Downloading GraffitiXR Update")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)

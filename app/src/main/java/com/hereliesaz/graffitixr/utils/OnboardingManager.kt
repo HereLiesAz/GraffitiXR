@@ -18,6 +18,14 @@ class OnboardingManager(context: Context) {
         prefs.edit().putBoolean(mode.name, true).apply()
     }
 
+    fun resetOnboarding() {
+        val editor = prefs.edit()
+        EditorMode.values().forEach {
+            editor.remove(it.name)
+        }
+        editor.apply()
+    }
+
     fun hasSeenDoubleTapHint(): Boolean {
         return prefs.getBoolean("seen_double_tap_hint", false)
     }

@@ -320,13 +320,13 @@ fun MainScreen(viewModel: MainViewModel) {
                     // Image Host (now includes Adjustments)
                     azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
 
-                    // Moved "Open" (Overlay) above "Wall" (Background)
+                    // Moved "Open" (Overlay) above "Surface" (Background)
                     azRailSubItem(id = "image", text = "Open", hostId = "design_host") {
                         overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
 
                     if (uiState.editorMode == EditorMode.STATIC) {
-                        azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
+                        azRailSubItem(id = "background", hostId = "design_host", text = "Surface") {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
                     }
@@ -457,8 +457,8 @@ fun MainScreen(viewModel: MainViewModel) {
         uiState.showOnboardingDialogForMode?.let { mode ->
             OnboardingDialog(
                 editorMode = mode,
-                onDismissRequest = { dontShowAgain ->
-                    viewModel.onOnboardingComplete(mode, dontShowAgain)
+                onDismiss = {
+                    viewModel.onOnboardingComplete(mode)
                 }
             )
         }
