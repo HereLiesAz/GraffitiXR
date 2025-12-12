@@ -227,6 +227,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Status Overlay
         if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget) {
             StatusOverlay(
                 qualityWarning = uiState.qualityWarning,
@@ -299,11 +300,12 @@ fun MainScreen(viewModel: MainViewModel) {
             isVisible = gestureInProgress
         )
 
-        // Keep Rail mounted to support Global Loading Popup
+        // Always show the Rail (handling loading), even in capture mode
+        // Z-Index raised to 6f to be above Capture/Refinement screens (5f)
         if (!uiState.isTouchLocked) {
             Box(
                 modifier = Modifier
-                    .zIndex(2f)
+                    .zIndex(6f)
                     .fillMaxHeight()
             ) {
                 AzNavRail {

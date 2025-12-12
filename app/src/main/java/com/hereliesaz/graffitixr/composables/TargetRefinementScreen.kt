@@ -56,11 +56,10 @@ fun TargetRefinementScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color.Black.copy(alpha = 0.8f)) // Transparency fallback
     ) {
         if (targetImage == null) {
-            // The global AzNavRail isLoading handles the spinner.
-            // We just show a text hint here if needed, or leave it black.
+            // Global loading spinner (AzNavRail) handles this visual state
             return@Box
         }
 

@@ -39,6 +39,7 @@ import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.DescriptorMatcher
 import org.opencv.features2d.ORB
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -51,9 +52,11 @@ class ArRenderer(
     private val onTrackingFailure: (String?) -> Unit
 ) : GLSurfaceView.Renderer {
 
-    // Helper for main thread posting to avoid JNI crashes
     private val mainHandler = Handler(Looper.getMainLooper())
     private var wasTracking = false
+
+    // Critical: atomic flag to prevent frame processing during config updates
+    private val isConfiguring = AtomicBoolean(false)
 
     // AR Session
     var session: Session? = null
@@ -106,7 +109,6 @@ class ArRenderer(
                 val width = image.width
                 val height = image.height
 
-                // Allocate new bitmap for thread safety
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 yuvToRgbConverter.yuvToRgb(image, bitmap)
 
@@ -138,7 +140,6 @@ class ArRenderer(
                             }
                             val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
 
-                            // Pass the unique bitmap instance on Main Thread
                             mainHandler.post { onProgressUpdated(progress, bitmap) }
                         }
                         grayMat.release()
@@ -183,7 +184,8 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        if (session == null) return
+        // Safety check: Skip frame if session is null or currently being reconfigured
+        if (session == null || isConfiguring.get()) return
 
         try {
             session!!.setCameraTextureName(backgroundRenderer.textureId)
@@ -207,7 +209,7 @@ class ArRenderer(
             if (camera.trackingState == TrackingState.TRACKING) {
                 if (!wasTracking) {
                     wasTracking = true
-                    mainHandler.post { onTrackingFailure(null) } // Clear warning
+                    mainHandler.post { onTrackingFailure(null) }
                 }
             } else {
                 if (wasTracking) {
@@ -217,7 +219,6 @@ class ArRenderer(
                 return
             }
 
-            // Projection/View Matrices
             val projmtx = FloatArray(16)
             camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
             val viewmtx = FloatArray(16)
@@ -322,19 +323,31 @@ class ArRenderer(
     }
 
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
-        val session = this.session ?: return
-        session.pause()
-        val config = session.config
-        val database = AugmentedImageDatabase(session)
+        // Halt GL drawing while we mess with the session
+        isConfiguring.set(true)
 
-        bitmaps.forEachIndexed { index, bitmap ->
-            database.addImage("target_$index", bitmap)
+        try {
+            val session = this.session ?: return
+            session.pause() // Pause session
+
+            val config = session.config
+            val database = AugmentedImageDatabase(session)
+
+            bitmaps.forEachIndexed { index, bitmap ->
+                database.addImage("target_$index", bitmap)
+            }
+
+            config.augmentedImageDatabase = database
+            session.configure(config)
+            session.resume() // Resume session
+
+            arState = ArState.LOCKED
+        } catch(e: Exception) {
+            Log.e(TAG, "Failed to set image database", e)
+        } finally {
+            // Re-enable GL drawing
+            isConfiguring.set(false)
         }
-
-        config.augmentedImageDatabase = database
-        session.configure(config)
-        session.resume()
-        arState = ArState.LOCKED
     }
 
     fun onResume(activity: Activity) {
@@ -346,10 +359,7 @@ class ArRenderer(
                     config.updateMode = Config.UpdateMode.BLOCKING
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
-
-                    // Explicitly ENABLE depth for robustness and occlusion
                     config.depthMode = Config.DepthMode.AUTOMATIC
-
                     session!!.configure(config)
                 }
             } catch (e: Exception) {
@@ -370,7 +380,6 @@ class ArRenderer(
         session?.pause()
     }
 
-    // Required by ArView.kt
     fun cleanup() {
         try {
             session?.close()
