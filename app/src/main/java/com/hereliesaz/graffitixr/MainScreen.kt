@@ -272,13 +272,19 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
 
+                    val maskBitmap = uiState.targetMask
                     TargetRefinementScreen(
                         targetImage = imageBitmap,
+                        mask = maskBitmap,
                         keypoints = uiState.detectedKeypoints,
                         paths = uiState.refinementPaths,
                         isEraser = uiState.isRefinementEraser,
+                        canUndo = uiState.canUndo,
+                        canRedo = uiState.canRedo,
                         onPathAdded = viewModel::onRefinementPathAdded,
                         onModeChanged = viewModel::onRefinementModeChanged,
+                        onUndo = viewModel::onUndoClicked,
+                        onRedo = viewModel::onRedoClicked,
                         onConfirm = viewModel::onConfirmTargetCreation
                     )
                 } else {
