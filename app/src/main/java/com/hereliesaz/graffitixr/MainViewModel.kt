@@ -110,7 +110,12 @@ class MainViewModel(
     }
 
     fun onCancelCaptureClicked() {
-        updateState(uiState.value.copy(isCapturingTarget = false, targetCreationState = TargetCreationState.IDLE))
+        updateState(uiState.value.copy(
+            isCapturingTarget = false,
+            targetCreationState = TargetCreationState.IDLE,
+            captureStep = CaptureStep.FRONT,
+            capturedTargetImages = emptyList()
+        ))
     }
 
     fun onRefinementPathAdded(path: com.hereliesaz.graffitixr.data.RefinementPath) {
@@ -147,50 +152,99 @@ class MainViewModel(
     }
 
     fun onCreateTargetClicked() {
-        updateState(uiState.value.copy(isCapturingTarget = true), isUndoable = false)
+        updateState(uiState.value.copy(
+            isCapturingTarget = true,
+            captureStep = CaptureStep.FRONT,
+            capturedTargetImages = emptyList()
+        ), isUndoable = false)
     }
 
     fun onFrameCaptured(bitmap: Bitmap) {
+        // 1. Add the new bitmap to the list
+        val currentImages = uiState.value.capturedTargetImages
+        val newImages = currentImages + bitmap
+        val currentStep = uiState.value.captureStep
+
+        // 2. Determine next step
+        val nextStep = when (currentStep) {
+            CaptureStep.FRONT -> CaptureStep.LEFT
+            CaptureStep.LEFT -> CaptureStep.RIGHT
+            CaptureStep.RIGHT -> CaptureStep.UP
+            CaptureStep.UP -> CaptureStep.DOWN
+            CaptureStep.DOWN -> CaptureStep.REVIEW
+            CaptureStep.REVIEW -> CaptureStep.REVIEW // Should not happen via capture button
+        }
+
+        // 3. If we are NOT finished, just update the UI state
+        if (nextStep != CaptureStep.REVIEW) {
+            updateState(uiState.value.copy(
+                capturedTargetImages = newImages,
+                captureStep = nextStep
+            ), isUndoable = false)
+
+            // Provide feedback
+            viewModelScope.launch {
+                _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
+            }
+            return
+        }
+
+        // 4. If we ARE finished (Transitioning to REVIEW), process the grid.
+        updateState(uiState.value.copy(
+            capturedTargetImages = newImages,
+            isLoading = true
+        ), isUndoable = false)
+
         viewModelScope.launch {
-            delay(400)
+            _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
+
             withContext(Dispatchers.IO) {
-                val grayMat = Mat()
-                val keypoints = MatOfKeyPoint()
-                val descriptors = Mat()
+                // Generate Fingerprint from the FRONT image (index 0)
+                val frontImage = newImages.firstOrNull()
+                var fingerprintJson: String? = null
 
-                try {
-                    Utils.bitmapToMat(bitmap, grayMat)
-                    Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                if (frontImage != null) {
+                    val grayMat = Mat()
+                    val keypoints = MatOfKeyPoint()
+                    val descriptors = Mat()
+                    try {
+                        Utils.bitmapToMat(frontImage, grayMat)
+                        Imgproc.cvtColor(grayMat, grayMat, Imgproc.COLOR_BGR2GRAY)
+                        val orb = ORB.create()
+                        orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+                        val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+                        fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        grayMat.release()
+                        keypoints.release()
+                        descriptors.release()
+                    }
+                }
 
-                    val orb = ORB.create()
-                    orb.detectAndCompute(grayMat, Mat(), keypoints, descriptors)
+                withContext(Dispatchers.Main) {
+                    // Feed ALL captured images to ARCore for robust tracking
+                    arRenderer?.setAugmentedImageDatabase(newImages)
 
-                    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-                    val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+                    // Generate a cache URI for the review screen (using Front image)
+                    val reviewUri = frontImage?.let { saveBitmapToCache(it, "review_preview") }
+                    val newUris = if (reviewUri != null) listOf(reviewUri) else emptyList()
 
-                    withContext(Dispatchers.Main) {
-                        val newImages = uiState.value.capturedTargetImages + bitmap
-                        arRenderer?.setAugmentedImageDatabase(newImages)
-                        updateState(
-                            uiState.value.copy(
-                                capturedTargetImages = newImages,
-                                fingerprintJson = fingerprintJson,
-                                isCapturingTarget = false,
-                                isArTargetCreated = true,
-                                arState = ArState.LOCKED
-                            )
+                    updateState(
+                        uiState.value.copy(
+                            capturedTargetImages = newImages,
+                            capturedTargetUris = newUris,
+                            fingerprintJson = fingerprintJson,
+                            captureStep = CaptureStep.REVIEW,
+                            // Note: We stay in "isCapturingTarget = true" so the Refinement Screen shows
+                            targetCreationState = TargetCreationState.SUCCESS,
+                            isArTargetCreated = true,
+                            arState = ArState.LOCKED,
+                            isLoading = false
                         )
-                        Toast.makeText(getApplication(), "Target created successfully", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        updateState(uiState.value.copy(isCapturingTarget = false))
-                        Toast.makeText(getApplication(), "Failed to create target: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-                } finally {
-                    grayMat.release()
-                    keypoints.release()
-                    descriptors.release()
+                    )
+                    Toast.makeText(getApplication(), "Grid created successfully", Toast.LENGTH_SHORT).show()
                 }
             }
         }
