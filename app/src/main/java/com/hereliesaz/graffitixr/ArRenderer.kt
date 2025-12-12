@@ -92,6 +92,7 @@ class ArRenderer(
     var colorBalanceB: Float = 1.0f
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
+    private val panQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
 
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
@@ -242,6 +243,7 @@ class ArRenderer(
                     handleTap(frame)
                 }
                 ArState.LOCKED -> {
+                    handlePan(frame, viewmtx, projmtx)
                     val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
                     for (img in updatedAugmentedImages) {
                         if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
@@ -255,6 +257,7 @@ class ArRenderer(
                     drawArtwork(viewmtx, projmtx)
                 }
                 ArState.PLACED -> {
+                    handlePan(frame, viewmtx, projmtx)
                     drawArtwork(viewmtx, projmtx)
                 }
             }
@@ -304,6 +307,54 @@ class ArRenderer(
                 break
             }
         }
+    }
+
+    private fun handlePan(frame: Frame, viewMtx: FloatArray, projMtx: FloatArray) {
+        var dx = 0f
+        var dy = 0f
+        while (!panQueue.isEmpty()) {
+            val pan = panQueue.poll() ?: break
+            dx += pan.first
+            dy += pan.second
+        }
+
+        if (dx == 0f && dy == 0f) return
+
+        val pose = arImagePose ?: return
+        val screenPos = projectPoseToScreen(pose, viewMtx, projMtx) ?: return
+
+        val newX = screenPos.first + dx
+        val newY = screenPos.second + dy
+
+        val hitResult = frame.hitTest(newX, newY)
+        for (hit in hitResult) {
+            val trackable = hit.trackable
+            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                val poseMatrix = FloatArray(16)
+                hit.hitPose.toMatrix(poseMatrix, 0)
+                arImagePose = poseMatrix
+                arState = ArState.PLACED
+                break
+            }
+        }
+    }
+
+    private fun projectPoseToScreen(modelMtx: FloatArray, viewMtx: FloatArray, projMtx: FloatArray): Pair<Float, Float>? {
+        val worldPos = floatArrayOf(modelMtx[12], modelMtx[13], modelMtx[14], 1.0f)
+        val eyePos = FloatArray(4)
+        Matrix.multiplyMV(eyePos, 0, viewMtx, 0, worldPos, 0)
+        val clipPos = FloatArray(4)
+        Matrix.multiplyMV(clipPos, 0, projMtx, 0, eyePos, 0)
+
+        if (clipPos[3] == 0f) return null
+
+        val ndcX = clipPos[0] / clipPos[3]
+        val ndcY = clipPos[1] / clipPos[3]
+
+        val screenX = (ndcX + 1f) / 2f * viewportWidth
+        val screenY = (1f - ndcY) / 2f * viewportHeight
+
+        return Pair(screenX, screenY)
     }
 
     private fun captureFrameForFingerprint(frame: Frame) {
@@ -392,6 +443,10 @@ class ArRenderer(
 
     fun queueTap(x: Float, y: Float) {
         tapQueue.offer(Pair(x, y))
+    }
+
+    fun queuePan(dx: Float, dy: Float) {
+        panQueue.offer(Pair(dx, dy))
     }
 
     fun updateOverlayImage(uri: Uri) {
