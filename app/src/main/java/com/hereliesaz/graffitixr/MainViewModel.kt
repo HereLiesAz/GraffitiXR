@@ -32,7 +32,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -94,6 +96,22 @@ class MainViewModel(
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
             ContextCompat.RECEIVER_EXPORTED
         )
+        startAutoSave()
+    }
+
+    private fun startAutoSave() {
+        viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(30000)
+                try {
+                    performSave("autosave", false)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("AutoSave", "Failed", e)
+                }
+            }
+        }
     }
 
     // --- AR Target Creation Logic ---
@@ -580,44 +598,77 @@ class MainViewModel(
         updateState(uiState.value.copy(blendMode = nextMode))
     }
 
+    fun onMagicClicked() {
+        val state = uiState.value
+        if (state.rotationX != 0f || state.rotationY != 0f || state.rotationZ != 0f) {
+            updateState(state.copy(rotationX = 0f, rotationY = 0f, rotationZ = 0f))
+            Toast.makeText(getApplication(), "Aligned Flat", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(getApplication(), "Already aligned", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun onToggleFlashlight() {
+        val newState = !uiState.value.isFlashlightOn
+        updateState(uiState.value.copy(isFlashlightOn = newState), isUndoable = false)
+        arRenderer?.setFlashlight(newState)
+    }
+
     fun saveProject(projectName: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val savedTargetUris = uiState.value.capturedTargetImages.mapNotNull { bitmap ->
+            performSave(projectName, true)
+        }
+    }
+
+    private suspend fun performSave(projectName: String, showToast: Boolean) {
+        val snapshot = uiState.value
+        try {
+            val currentImages = snapshot.capturedTargetImages
+            val currentUris = snapshot.capturedTargetUris
+
+            val savedTargetUris = if (currentImages.isNotEmpty()) {
+                currentImages.mapNotNull { bitmap ->
                     saveBitmapToCache(bitmap)
                 }
-                val projectData = ProjectData(
-                    backgroundImageUri = uiState.value.backgroundImageUri,
-                    overlayImageUri = uiState.value.overlayImageUri,
-                    originalOverlayImageUri = uiState.value.originalOverlayImageUri,
-                    targetImageUris = savedTargetUris,
-                    refinementPaths = uiState.value.refinementPaths,
-                    opacity = uiState.value.opacity,
-                    brightness = uiState.value.brightness,
-                    contrast = uiState.value.contrast,
-                    saturation = uiState.value.saturation,
-                    colorBalanceR = uiState.value.colorBalanceR,
-                    colorBalanceG = uiState.value.colorBalanceG,
-                    colorBalanceB = uiState.value.colorBalanceB,
-                    scale = uiState.value.scale,
-                    rotationZ = uiState.value.rotationZ,
-                    rotationX = uiState.value.rotationX,
-                    rotationY = uiState.value.rotationY,
-                    offset = uiState.value.offset,
-                    blendMode = uiState.value.blendMode,
-                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
-                    drawingPaths = uiState.value.drawingPaths,
-                    progressPercentage = uiState.value.progressPercentage,
-                    evolutionImageUris = uiState.value.evolutionCaptureUris,
-                    gpsData = getGpsData(),
-                    sensorData = getSensorData()
-                )
-                projectManager.saveProject(projectName, projectData)
+            } else {
+                currentUris
+            }
+
+            val projectData = ProjectData(
+                backgroundImageUri = snapshot.backgroundImageUri,
+                overlayImageUri = snapshot.overlayImageUri,
+                originalOverlayImageUri = snapshot.originalOverlayImageUri,
+                targetImageUris = savedTargetUris,
+                refinementPaths = snapshot.refinementPaths,
+                opacity = snapshot.opacity,
+                brightness = snapshot.brightness,
+                contrast = snapshot.contrast,
+                saturation = snapshot.saturation,
+                colorBalanceR = snapshot.colorBalanceR,
+                colorBalanceG = snapshot.colorBalanceG,
+                colorBalanceB = snapshot.colorBalanceB,
+                scale = snapshot.scale,
+                rotationZ = snapshot.rotationZ,
+                rotationX = snapshot.rotationX,
+                rotationY = snapshot.rotationY,
+                offset = snapshot.offset,
+                blendMode = snapshot.blendMode,
+                fingerprint = snapshot.fingerprintJson?.let { Json.decodeFromString(Fingerprint.serializer(), it) },
+                drawingPaths = snapshot.drawingPaths,
+                progressPercentage = snapshot.progressPercentage,
+                evolutionImageUris = snapshot.evolutionCaptureUris,
+                gpsData = getGpsData(),
+                sensorData = getSensorData()
+            )
+            projectManager.saveProject(projectName, projectData)
+            if (showToast) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Project '$projectName' saved", Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error saving project", e)
+            }
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error saving project", e)
+            if (showToast) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Failed to save project", Toast.LENGTH_SHORT).show()
                 }
@@ -693,7 +744,7 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 projectManager.loadProject(projectName)?.let { projectData ->
-                    updateState(uiState.value.copy(backgroundImageUri = projectData.backgroundImageUri, overlayImageUri = projectData.overlayImageUri, originalOverlayImageUri = projectData.originalOverlayImageUri ?: projectData.overlayImageUri, opacity = projectData.opacity, brightness = projectData.brightness, contrast = projectData.contrast, saturation = projectData.saturation, colorBalanceR = projectData.colorBalanceR, colorBalanceG = projectData.colorBalanceG, colorBalanceB = projectData.colorBalanceB, scale = projectData.scale, rotationZ = projectData.rotationZ, rotationX = projectData.rotationX, rotationY = projectData.rotationY, offset = projectData.offset, blendMode = projectData.blendMode, fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }, drawingPaths = projectData.drawingPaths, isLineDrawing = projectData.isLineDrawing))
+                    updateState(uiState.value.copy(backgroundImageUri = projectData.backgroundImageUri, overlayImageUri = projectData.overlayImageUri, originalOverlayImageUri = projectData.originalOverlayImageUri ?: projectData.overlayImageUri, opacity = projectData.opacity, brightness = projectData.brightness, contrast = projectData.contrast, saturation = projectData.saturation, colorBalanceR = projectData.colorBalanceR, colorBalanceG = projectData.colorBalanceG, colorBalanceB = projectData.colorBalanceB, scale = projectData.scale, rotationZ = projectData.rotationZ, rotationX = projectData.rotationX, rotationY = projectData.rotationY, offset = projectData.offset, blendMode = projectData.blendMode, fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }, drawingPaths = projectData.drawingPaths, isLineDrawing = projectData.isLineDrawing, capturedTargetUris = projectData.targetImageUris ?: emptyList()))
                     withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show() }
                 }
             } catch (e: Exception) { Log.e("MainViewModel", "Error loading project", e); withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Failed to load project", Toast.LENGTH_SHORT).show() } }

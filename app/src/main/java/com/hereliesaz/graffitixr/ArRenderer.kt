@@ -28,6 +28,7 @@ import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
+import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
@@ -92,6 +93,15 @@ class ArRenderer(
     var colorBalanceB: Float = 1.0f
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
+    private val panLock = Any()
+    private var pendingPanX = 0f
+    private var pendingPanY = 0f
+
+    // Reusable arrays for projection to avoid allocation.
+    // NOTE: These are not thread-safe and must only be used on the GL thread (handlePan).
+    private val worldPos = FloatArray(4)
+    private val eyePos = FloatArray(4)
+    private val clipPos = FloatArray(4)
 
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
@@ -109,8 +119,18 @@ class ArRenderer(
                 val width = image.width
                 val height = image.height
 
-                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                yuvToRgbConverter.yuvToRgb(image, bitmap)
+                val rawBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                yuvToRgbConverter.yuvToRgb(image, rawBitmap)
+
+                // Fix Rotation (Sideways Issue)
+                val rotation = getRotationDegrees()
+                val bitmap = if (rotation != 0f) {
+                    val rotated = BitmapUtils.rotateBitmap(rawBitmap, rotation)
+                    rawBitmap.recycle()
+                    rotated
+                } else {
+                    rawBitmap
+                }
 
                 val mat = Mat()
                 org.opencv.android.Utils.bitmapToMat(bitmap, mat)
@@ -242,6 +262,7 @@ class ArRenderer(
                     handleTap(frame)
                 }
                 ArState.LOCKED -> {
+                    handlePan(frame, viewmtx, projmtx)
                     val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
                     for (img in updatedAugmentedImages) {
                         if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
@@ -255,6 +276,7 @@ class ArRenderer(
                     drawArtwork(viewmtx, projmtx)
                 }
                 ArState.PLACED -> {
+                    handlePan(frame, viewmtx, projmtx)
                     drawArtwork(viewmtx, projmtx)
                 }
             }
@@ -306,15 +328,100 @@ class ArRenderer(
         }
     }
 
+    private fun handlePan(frame: Frame, viewMtx: FloatArray, projMtx: FloatArray) {
+        var dx = 0f
+        var dy = 0f
+        synchronized(panLock) {
+            dx = pendingPanX
+            dy = pendingPanY
+            pendingPanX = 0f
+            pendingPanY = 0f
+        }
+
+        if (dx == 0f && dy == 0f) return
+
+        val pose = arImagePose ?: return
+        val screenPos = projectPoseToScreen(pose, viewMtx, projMtx) ?: return
+
+        val newX = screenPos.first + dx
+        val newY = screenPos.second + dy
+
+        val hitResult = frame.hitTest(newX, newY)
+        for (hit in hitResult) {
+            val trackable = hit.trackable
+            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                val poseMatrix = FloatArray(16)
+                hit.hitPose.toMatrix(poseMatrix, 0)
+                arImagePose = poseMatrix
+                arState = ArState.PLACED
+                break
+            }
+        }
+    }
+
+    private fun projectPoseToScreen(modelMtx: FloatArray, viewMtx: FloatArray, projMtx: FloatArray): Pair<Float, Float>? {
+        worldPos[0] = modelMtx[12]
+        worldPos[1] = modelMtx[13]
+        worldPos[2] = modelMtx[14]
+        worldPos[3] = 1.0f
+
+        Matrix.multiplyMV(eyePos, 0, viewMtx, 0, worldPos, 0)
+        Matrix.multiplyMV(clipPos, 0, projMtx, 0, eyePos, 0)
+
+        if (clipPos[3] == 0f) return null
+
+        val ndcX = clipPos[0] / clipPos[3]
+        val ndcY = clipPos[1] / clipPos[3]
+
+        val screenX = (ndcX + 1f) / 2f * viewportWidth
+        val screenY = (1f - ndcY) / 2f * viewportHeight
+
+        return Pair(screenX, screenY)
+    }
+
     private fun captureFrameForFingerprint(frame: Frame) {
         try {
             frame.acquireCameraImage().use { image ->
-                val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                yuvToRgbConverter.yuvToRgb(image, bitmap)
+                val rawBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                yuvToRgbConverter.yuvToRgb(image, rawBitmap)
+
+                // Fix Rotation
+                val rotation = getRotationDegrees()
+                val bitmap = if (rotation != 0f) {
+                    val rotated = BitmapUtils.rotateBitmap(rawBitmap, rotation)
+                    rawBitmap.recycle()
+                    rotated
+                } else {
+                    rawBitmap
+                }
+
                 mainHandler.post { onFrameCaptured(bitmap) }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Capture failed", e)
+        }
+    }
+
+    private fun getRotationDegrees(): Float {
+        val displayRotation = when (displayRotationHelper.rotation) {
+            android.view.Surface.ROTATION_0 -> 0
+            android.view.Surface.ROTATION_90 -> 90
+            android.view.Surface.ROTATION_180 -> 180
+            android.view.Surface.ROTATION_270 -> 270
+            else -> 0
+        }
+        val sensorOrientation = 90 // Typical back camera orientation
+        return ((sensorOrientation - displayRotation + 360) % 360).toFloat()
+    }
+
+    fun setFlashlight(enabled: Boolean) {
+        val session = this.session ?: return
+        try {
+            val config = session.config
+            config.flashMode = if (enabled) Config.FlashMode.TORCH else Config.FlashMode.OFF
+            session.configure(config)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to toggle flashlight", e)
         }
     }
 
@@ -392,6 +499,13 @@ class ArRenderer(
 
     fun queueTap(x: Float, y: Float) {
         tapQueue.offer(Pair(x, y))
+    }
+
+    fun queuePan(dx: Float, dy: Float) {
+        synchronized(panLock) {
+            pendingPanX += dx
+            pendingPanY += dy
+        }
     }
 
     fun updateOverlayImage(uri: Uri) {
