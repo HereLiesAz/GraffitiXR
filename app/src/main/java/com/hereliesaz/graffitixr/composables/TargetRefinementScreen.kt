@@ -145,8 +145,8 @@ fun TargetRefinementScreen(
 
                 keypoints.forEach { normalizedOffset ->
                     drawCircle(
-                        color = Color.Green,
-                        radius = 5f,
+                        color = Color.Yellow,
+                        radius = 8f,
                         center = Offset(
                             normalizedOffset.x * size.width,
                             normalizedOffset.y * size.height

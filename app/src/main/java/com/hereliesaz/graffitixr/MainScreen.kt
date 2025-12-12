@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -360,12 +362,16 @@ fun MainScreen(viewModel: MainViewModel) {
 
                     azDivider()
 
-                    azMenuHostItem(id = "settings_host", text = "Settings", route = "settings_host"){ showSettings = true }
-                    azMenuSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
-                    azMenuSubItem(id = "save_project", hostId = "settings_host", text = "Save") { createDocumentLauncher.launch("Project.gxr") }
-                    azMenuSubItem(id = "load_project", hostId = "settings_host", text = "Load") { showProjectLibrary = true }
-                    azMenuSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = viewModel::onSaveClicked)
-                    azMenuSubItem(id = "help", hostId = "settings_host", text = "Help", onClick = { viewModel.onEditorModeChanged(EditorMode.HELP) })
+                    azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){ showSettings = true }
+                    azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
+                    azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") { createDocumentLauncher.launch("Project.gxr") }
+                    azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") { showProjectLibrary = true }
+                    azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = viewModel::onSaveClicked)
+                    azRailSubItem(id = "help", hostId = "settings_host", text = "Help", onClick = { viewModel.onEditorModeChanged(EditorMode.HELP) })
+
+                    azDivider()
+
+                    azRailItem(id = "light", text = "Light", onClick = viewModel::onToggleFlashlight)
                 }
             }
         }
@@ -413,6 +419,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 canRedo = uiState.canRedo,
                 onUndo = viewModel::onUndoClicked,
                 onRedo = viewModel::onRedoClicked,
+                onMagicClicked = viewModel::onMagicClicked,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = screenHeight * 0.15f)
