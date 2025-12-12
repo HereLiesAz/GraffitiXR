@@ -105,9 +105,8 @@ class MainViewModel(
                 delay(30000)
                 try {
                     performSave("autosave", false)
-                } catch (e: CancellationException) {
-                    throw e
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     Log.e("AutoSave", "Failed", e)
                 }
             }

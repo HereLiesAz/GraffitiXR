@@ -96,7 +96,8 @@ class ArRenderer(
     private var pendingPanX = 0f
     private var pendingPanY = 0f
 
-    // Reusable arrays for projection to avoid allocation
+    // Reusable arrays for projection to avoid allocation.
+    // NOTE: These are not thread-safe and must only be used on the GL thread (handlePan).
     private val worldPos = FloatArray(4)
     private val eyePos = FloatArray(4)
     private val clipPos = FloatArray(4)
