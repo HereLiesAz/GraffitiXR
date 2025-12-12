@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -99,7 +100,7 @@ class MainViewModel(
 
     private fun startAutoSave() {
         viewModelScope.launch(Dispatchers.IO) {
-            while (true) {
+            while (isActive) {
                 delay(30000)
                 try {
                     performSave("autosave", false)
@@ -601,9 +602,10 @@ class MainViewModel(
     }
 
     private suspend fun performSave(projectName: String, showToast: Boolean) {
+        val snapshot = uiState.value
         try {
-            val currentImages = uiState.value.capturedTargetImages
-            val currentUris = uiState.value.capturedTargetUris
+            val currentImages = snapshot.capturedTargetImages
+            val currentUris = snapshot.capturedTargetUris
 
             val savedTargetUris = if (currentImages.isNotEmpty()) {
                 currentImages.mapNotNull { bitmap ->
@@ -614,28 +616,28 @@ class MainViewModel(
             }
 
             val projectData = ProjectData(
-                backgroundImageUri = uiState.value.backgroundImageUri,
-                overlayImageUri = uiState.value.overlayImageUri,
-                originalOverlayImageUri = uiState.value.originalOverlayImageUri,
+                backgroundImageUri = snapshot.backgroundImageUri,
+                overlayImageUri = snapshot.overlayImageUri,
+                originalOverlayImageUri = snapshot.originalOverlayImageUri,
                 targetImageUris = savedTargetUris,
-                refinementPaths = uiState.value.refinementPaths,
-                opacity = uiState.value.opacity,
-                brightness = uiState.value.brightness,
-                contrast = uiState.value.contrast,
-                saturation = uiState.value.saturation,
-                colorBalanceR = uiState.value.colorBalanceR,
-                colorBalanceG = uiState.value.colorBalanceG,
-                colorBalanceB = uiState.value.colorBalanceB,
-                scale = uiState.value.scale,
-                rotationZ = uiState.value.rotationZ,
-                rotationX = uiState.value.rotationX,
-                rotationY = uiState.value.rotationY,
-                offset = uiState.value.offset,
-                blendMode = uiState.value.blendMode,
-                fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
-                drawingPaths = uiState.value.drawingPaths,
-                progressPercentage = uiState.value.progressPercentage,
-                evolutionImageUris = uiState.value.evolutionCaptureUris,
+                refinementPaths = snapshot.refinementPaths,
+                opacity = snapshot.opacity,
+                brightness = snapshot.brightness,
+                contrast = snapshot.contrast,
+                saturation = snapshot.saturation,
+                colorBalanceR = snapshot.colorBalanceR,
+                colorBalanceG = snapshot.colorBalanceG,
+                colorBalanceB = snapshot.colorBalanceB,
+                scale = snapshot.scale,
+                rotationZ = snapshot.rotationZ,
+                rotationX = snapshot.rotationX,
+                rotationY = snapshot.rotationY,
+                offset = snapshot.offset,
+                blendMode = snapshot.blendMode,
+                fingerprint = snapshot.fingerprintJson?.let { Json.decodeFromString(it) },
+                drawingPaths = snapshot.drawingPaths,
+                progressPercentage = snapshot.progressPercentage,
+                evolutionImageUris = snapshot.evolutionCaptureUris,
                 gpsData = getGpsData(),
                 sensorData = getSensorData()
             )

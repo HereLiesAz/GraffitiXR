@@ -92,7 +92,9 @@ class ArRenderer(
     var colorBalanceB: Float = 1.0f
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
-    private val panQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
+    private val panLock = Any()
+    private var pendingPanX = 0f
+    private var pendingPanY = 0f
 
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
@@ -312,10 +314,11 @@ class ArRenderer(
     private fun handlePan(frame: Frame, viewMtx: FloatArray, projMtx: FloatArray) {
         var dx = 0f
         var dy = 0f
-        while (!panQueue.isEmpty()) {
-            val pan = panQueue.poll() ?: break
-            dx += pan.first
-            dy += pan.second
+        synchronized(panLock) {
+            dx = pendingPanX
+            dy = pendingPanY
+            pendingPanX = 0f
+            pendingPanY = 0f
         }
 
         if (dx == 0f && dy == 0f) return
@@ -446,7 +449,10 @@ class ArRenderer(
     }
 
     fun queuePan(dx: Float, dy: Float) {
-        panQueue.offer(Pair(dx, dy))
+        synchronized(panLock) {
+            pendingPanX += dx
+            pendingPanY += dy
+        }
     }
 
     fun updateOverlayImage(uri: Uri) {
