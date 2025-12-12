@@ -1,4 +1,8 @@
 import java.util.Properties
+import java.io.ByteArrayOutputStream
+import java.io.File
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
 
 plugins {
     alias(libs.plugins.android.application)
@@ -27,12 +31,76 @@ val versionProperties = Properties().apply {
 
 val vMajor = versionProperties.getProperty("versionMajor", "1").toInt()
 val vMinor = versionProperties.getProperty("versionMinor", "2").toInt()
-val vPatch = versionProperties.getProperty("versionPatch", "0").toInt()
-val vBuild = if (project.hasProperty("versionBuild")) {
-    project.property("versionBuild").toString().toInt()
-} else {
-    versionProperties.getProperty("versionBuild", "0").toInt()
+val defaultPatch = versionProperties.getProperty("versionPatch", "0").toInt()
+val defaultBuild = versionProperties.getProperty("versionBuild", "0").toInt()
+
+abstract class BuildVersionValueSource : ValueSource<Int, BuildVersionValueSource.Parameters> {
+    interface Parameters : ValueSourceParameters {
+        @get:Input
+        val workingDir: Property<String>
+    }
+
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    override fun obtain(): Int {
+        return try {
+            val output = ByteArrayOutputStream()
+            execOperations.exec {
+                workingDir = File(parameters.workingDir.get())
+                commandLine("git", "rev-list", "--count", "HEAD")
+                standardOutput = output
+            }
+            String(output.toByteArray()).trim().toInt()
+        } catch (e: Exception) {
+            -1
+        }
+    }
 }
+
+abstract class PatchVersionValueSource : ValueSource<Int, PatchVersionValueSource.Parameters> {
+    interface Parameters : ValueSourceParameters {
+        @get:Input
+        val workingDir: Property<String>
+    }
+
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    override fun obtain(): Int {
+        return try {
+            val blameOutput = ByteArrayOutputStream()
+            execOperations.exec {
+                workingDir = File(parameters.workingDir.get())
+                commandLine("sh", "-c", "git blame -L '/versionMinor=/',+1 version.properties | awk '{print $1}' | tr -d '^'")
+                standardOutput = blameOutput
+            }
+            val commitHash = String(blameOutput.toByteArray()).trim()
+
+            if (commitHash.isNotEmpty()) {
+                val countOutput = ByteArrayOutputStream()
+                execOperations.exec {
+                    workingDir = File(parameters.workingDir.get())
+                    commandLine("git", "rev-list", "--count", "$commitHash..HEAD")
+                    standardOutput = countOutput
+                }
+                String(countOutput.toByteArray()).trim().toInt()
+            } else {
+                -1
+            }
+        } catch (e: Exception) {
+            -1
+        }
+    }
+}
+
+val vBuild = providers.of(BuildVersionValueSource::class) {
+    parameters.workingDir.set(rootProject.rootDir.absolutePath)
+}.getOrElse(defaultBuild).let { if (it == -1) defaultBuild else it }
+
+val vPatch = providers.of(PatchVersionValueSource::class) {
+    parameters.workingDir.set(rootProject.rootDir.absolutePath)
+}.getOrElse(defaultPatch).let { if (it == -1) defaultPatch else it }
 
 android {
     buildFeatures {
