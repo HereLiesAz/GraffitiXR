@@ -232,7 +232,7 @@ fun MainScreen(viewModel: MainViewModel) {
         }
 
         // Status Overlay
-        if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget) {
+        if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
             StatusOverlay(
                 qualityWarning = uiState.qualityWarning,
                 arState = uiState.arState,
@@ -311,18 +311,20 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        GestureFeedback(
-            uiState = uiState,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 16.dp)
-                .zIndex(3f),
-            isVisible = gestureInProgress
-        )
+        if (!uiState.hideUiForCapture) {
+            GestureFeedback(
+                uiState = uiState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .zIndex(3f),
+                isVisible = gestureInProgress
+            )
+        }
 
         // Always show the Rail (handling loading), even in capture mode
         // Z-Index raised to 6f to be above Capture/Refinement screens (5f)
-        if (!uiState.isTouchLocked) {
+        if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
             Box(
                 modifier = Modifier
                     .zIndex(6f)
@@ -431,7 +433,7 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
-        if (uiState.overlayImageUri != null) {
+        if (uiState.overlayImageUri != null && !uiState.hideUiForCapture) {
             val showKnobs = showSliderDialog == "Adjust"
 
             UndoRedoRow(
@@ -488,30 +490,32 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
-        RotationAxisFeedback(
-            axis = uiState.activeRotationAxis,
-            visible = uiState.showRotationAxisFeedback,
-            onFeedbackShown = viewModel::onFeedbackShown,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
-                .zIndex(4f)
-        )
-
-        TapFeedbackEffect(feedback = tapFeedback)
-
-        if (uiState.showDoubleTapHint) {
-            DoubleTapHintDialog(onDismissRequest = viewModel::onDoubleTapHintDismissed)
-        }
-
-        if (uiState.isMarkingProgress) {
-            Text(
-                text = "Progress: %.2f%%".format(uiState.progressPercentage),
+        if (!uiState.hideUiForCapture) {
+            RotationAxisFeedback(
+                axis = uiState.activeRotationAxis,
+                visible = uiState.showRotationAxisFeedback,
+                onFeedbackShown = viewModel::onFeedbackShown,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
-                    .zIndex(3f)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp)
+                    .zIndex(4f)
             )
+
+            TapFeedbackEffect(feedback = tapFeedback)
+
+            if (uiState.showDoubleTapHint) {
+                DoubleTapHintDialog(onDismissRequest = viewModel::onDoubleTapHintDismissed)
+            }
+
+            if (uiState.isMarkingProgress) {
+                Text(
+                    text = "Progress: %.2f%%".format(uiState.progressPercentage),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                        .zIndex(3f)
+                )
+            }
         }
 
         if (uiState.isCapturingTarget) {
