@@ -270,8 +270,11 @@ class MainViewModel(
                 }
 
                 // --- Automatic Subject Segmentation ---
+                val subjectOptions = SubjectSegmenterOptions.SubjectResultOptions.Builder()
+                    .enableConfidenceMask()
+                    .build()
                 val segmenterOptions = SubjectSegmenterOptions.Builder()
-                    .enableMultipleSubjects()
+                    .enableMultipleSubjects(subjectOptions) // Pass true to enable the feature
                     .build()
                 val segmenter = SubjectSegmentation.getClient(segmenterOptions)
                 val inputImage = InputImage.fromBitmap(frontImage, 0)
@@ -279,14 +282,28 @@ class MainViewModel(
                 segmenter.process(inputImage)
                     .addOnSuccessListener { result ->
                         viewModelScope.launch(Dispatchers.IO) {
-                            if (result.subjectMasks.isNotEmpty()) {
-                                val mask = result.subjectMasks[0]
-                                val maskedBitmap = createBitmap(mask.width, mask.height)
+                            val subject = result.subjects.firstOrNull()
+
+                            if (subject != null) {
+                                // Create a bitmap from the subject mask to apply it to the original image.
+                                val maskBitmap = createBitmap(subject.width, subject.height, Bitmap.Config.ARGB_8888)
+                                val buffer = subject.confidenceMask
+                                if (buffer != null) { // Safely handle nullable buffer
+                                    buffer.rewind()
+                                    maskBitmap.copyPixelsFromBuffer(buffer)
+                                }
+
+
+                                // Create a new bitmap to hold the segmented subject.
+                                val maskedBitmap = createBitmap(frontImage.width, frontImage.height, Bitmap.Config.ARGB_8888)
                                 val canvas = Canvas(maskedBitmap)
                                 val paint = Paint()
                                 paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+
+                                // Draw the original image, then the mask to extract the subject.
                                 canvas.drawBitmap(frontImage, 0f, 0f, null)
-                                canvas.drawBitmap(mask.mask, 0f, 0f, paint)
+                                canvas.drawBitmap(maskBitmap, 0f, 0f, paint)
+
 
                                 val updatedImages = listOf(maskedBitmap) + newImages.drop(1)
                                 arRenderer?.setAugmentedImageDatabase(updatedImages)
@@ -721,8 +738,7 @@ class MainViewModel(
             val projectData = ProjectData(
                 backgroundImageUri = snapshot.backgroundImageUri,
                 overlayImageUri = snapshot.overlayImageUri,
-                originalOverlayImageUri = snapshot.originalOverlayImageUri,
-                targetImageUris = savedTargetUris,
+                originalOverlayImageUri = snapshot.originalOverlayImageUri,targetImageUris = savedTargetUris,
                 refinementPaths = snapshot.refinementPaths,
                 opacity = snapshot.opacity,
                 brightness = snapshot.brightness,
@@ -868,7 +884,7 @@ class MainViewModel(
             if (allPaths.isEmpty()) { updateState(uiState.value.copy(progressPercentage = 0f), isUndoable = false); return@launch }
             val (width, height) = BitmapUtils.getBitmapDimensions(getApplication(), overlayImageUri)
             if (width == 0 || height == 0) return@launch
-            val progressBitmap = createBitmap(width, height)
+            val progressBitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val composePaths = allPaths.map { pointList -> androidx.compose.ui.graphics.Path().apply { if (pointList.isNotEmpty()) { moveTo(pointList.first().first, pointList.first().second); for (i in 1 until pointList.size) lineTo(pointList[i].first, pointList[i].second) } } }
             val totalColoredPixels = com.hereliesaz.graffitixr.utils.calculateProgress(composePaths, progressBitmap)
             val progress = (totalColoredPixels.toFloat() / (width * height).toFloat()) * 100
@@ -921,3 +937,4 @@ class MainViewModel(
 
     companion object { private const val MAX_UNDO_STACK_SIZE = 50 }
 }
+
