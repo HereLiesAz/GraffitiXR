@@ -105,8 +105,9 @@ class MainViewModel(
                 delay(30000)
                 try {
                     performSave("autosave", false)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    if (e is CancellationException) throw e
                     Log.e("AutoSave", "Failed", e)
                 }
             }
@@ -636,7 +637,7 @@ class MainViewModel(
                 rotationY = snapshot.rotationY,
                 offset = snapshot.offset,
                 blendMode = snapshot.blendMode,
-                fingerprint = snapshot.fingerprintJson?.let { Json.decodeFromString(it) },
+                fingerprint = snapshot.fingerprintJson?.let { Json.decodeFromString(Fingerprint.serializer(), it) },
                 drawingPaths = snapshot.drawingPaths,
                 progressPercentage = snapshot.progressPercentage,
                 evolutionImageUris = snapshot.evolutionCaptureUris,

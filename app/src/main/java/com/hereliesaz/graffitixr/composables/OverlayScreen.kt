@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import android.util.Log
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -124,7 +125,7 @@ fun OverlayScreen(
                     try {
                         cameraProviderFuture.get().unbindAll()
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Log.e("OverlayScreen", "Failed to unbind camera provider", e)
                     }
                 }, ContextCompat.getMainExecutor(context))
             },
