@@ -122,13 +122,13 @@ fun ArView(
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     if (activity != null) {
-                        glSurfaceView.queueEvent { renderer.onResume(activity) }
+                        renderer.onResume(activity)
                         glSurfaceView.onResume()
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
+                    renderer.onPause()
                     glSurfaceView.onPause()
-                    glSurfaceView.queueEvent { renderer.onPause() }
                 }
                 else -> {}
             }
