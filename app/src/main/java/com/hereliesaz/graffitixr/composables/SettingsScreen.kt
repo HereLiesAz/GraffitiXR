@@ -180,7 +180,7 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        text = "GraffitiXR © 2024",
+                        text = "GraffitiXR © 2025",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray,
                         modifier = Modifier

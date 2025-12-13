@@ -635,11 +635,16 @@ class MainViewModel(
 
     fun onSaveClicked() {
         viewModelScope.launch {
+            updateState(uiState.value.copy(hideUiForCapture = true), isUndoable = false)
+            delay(200)
             _captureEvent.emit(CaptureEvent.RequestCapture)
         }
     }
 
     fun saveCapturedBitmap(bitmap: Bitmap) {
+        // Restore UI immediately
+        updateState(uiState.value.copy(hideUiForCapture = false), isUndoable = false)
+
         viewModelScope.launch {
             setLoading(true)
             val success = withContext(Dispatchers.IO) {
@@ -898,7 +903,28 @@ class MainViewModel(
                         val experimentalRelease = releases.firstOrNull { it.prerelease }
                         withContext(Dispatchers.Main) {
                             if (experimentalRelease != null) {
-                                val message = if (experimentalRelease.tag_name > BuildConfig.VERSION_NAME) "New experimental build: ${experimentalRelease.tag_name}" else "Latest experimental build installed."
+                                val apkAsset = experimentalRelease.assets.firstOrNull {
+                                    it.browser_download_url.endsWith(".apk")
+                                }
+
+                                var updateAvailable = false
+                                var versionString = experimentalRelease.tag_name
+
+                                if (apkAsset != null) {
+                                    val regex = Regex("""GraffitiXR-(\d+\.\d+\.\d+\.\d+)-debug\.apk""")
+                                    val match = regex.find(apkAsset.browser_download_url.substringAfterLast("/"))
+                                    if (match != null) {
+                                        val remoteVersion = match.groupValues[1]
+                                        versionString = remoteVersion
+                                        updateAvailable = isNewerVersion(BuildConfig.VERSION_NAME, remoteVersion)
+                                    } else {
+                                        updateAvailable = experimentalRelease.tag_name > BuildConfig.VERSION_NAME
+                                    }
+                                } else {
+                                    updateAvailable = experimentalRelease.tag_name > BuildConfig.VERSION_NAME
+                                }
+
+                                val message = if (updateAvailable) "New experimental build: $versionString" else "Latest experimental build installed."
                                 updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = message, latestRelease = experimentalRelease), isUndoable = false)
                             } else {
                                 updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "No experimental builds found."), isUndoable = false)
@@ -908,6 +934,19 @@ class MainViewModel(
                 } catch (e: Exception) { e.printStackTrace(); withContext(Dispatchers.Main) { updateState(uiState.value.copy(isCheckingForUpdate = false, updateStatusMessage = "Error: ${e.message}"), isUndoable = false) } }
             }
         }
+    }
+
+    private fun isNewerVersion(current: String, remote: String): Boolean {
+        val v1 = current.split(".").map { it.toIntOrNull() ?: 0 }
+        val v2 = remote.split(".").map { it.toIntOrNull() ?: 0 }
+        val length = kotlin.math.max(v1.size, v2.size)
+        for (i in 0 until length) {
+            val p1 = if (i < v1.size) v1[i] else 0
+            val p2 = if (i < v2.size) v2[i] else 0
+            if (p2 > p1) return true
+            if (p1 > p2) return false
+        }
+        return false
     }
 
     fun installLatestUpdate() {
