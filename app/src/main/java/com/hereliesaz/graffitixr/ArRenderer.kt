@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.RectF
 import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
@@ -48,13 +49,20 @@ import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
+/**
+ * Custom GLSurfaceView.Renderer that handles the ARCore session and OpenGL ES rendering.
+ *
+ * Updates:
+ * - Calculates screen-space bounding box of the artwork and sends to ViewModel.
+ */
 class ArRenderer(
     private val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
     private val onFrameCaptured: (Bitmap) -> Unit,
     private val onAnchorCreated: () -> Unit,
     private val onProgressUpdated: (Float, Bitmap?) -> Unit,
-    private val onTrackingFailure: (String?) -> Unit
+    private val onTrackingFailure: (String?) -> Unit,
+    private val onBoundsUpdated: (RectF) -> Unit // New callback for bounds
 ) : GLSurfaceView.Renderer {
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -103,11 +111,18 @@ class ArRenderer(
     private var pendingPanX = 0f
     private var pendingPanY = 0f
 
+    // Reusable matrices for calculations
+    private val worldPos = FloatArray(4)
+    private val eyePos = FloatArray(4)
+    private val clipPos = FloatArray(4)
+    private val viewMtx = FloatArray(16)
+    private val projMtx = FloatArray(16)
+
     private val orb = ORB.create()
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
     private var lastAnalysisTime = 0L
-    private val ANALYSIS_INTERVAL_MS = 1500L // Restored Constant
+    private val ANALYSIS_INTERVAL_MS = 1500L
     private val analysisScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     fun setFingerprint(fingerprint: Fingerprint) {
@@ -115,9 +130,6 @@ class ArRenderer(
         this.originalKeypointCount = fingerprint.keypoints.size
     }
 
-    /**
-     * Stores images to be added to the database ONLY when the session is (re)created.
-     */
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
         this.initialAugmentedImages = bitmaps
     }
@@ -204,19 +216,16 @@ class ArRenderer(
         displayRotationHelper.updateSessionIfNeeded(session!!)
         backgroundRenderer.draw(frame)
 
-        // Capture Logic
         if (captureNextFrame) {
             captureFrameForFingerprint(frame)
             captureNextFrame = false
         }
 
-        // OpenCV Logic (Progress)
         if (System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
             lastAnalysisTime = System.currentTimeMillis()
             analyzeFrameAsync(frame)
         }
 
-        // Tracking Check
         val camera = frame.camera
         if (camera.trackingState == TrackingState.TRACKING) {
             if (!wasTracking) {
@@ -231,13 +240,10 @@ class ArRenderer(
             return
         }
 
-        val projmtx = FloatArray(16)
-        camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
-        val viewmtx = FloatArray(16)
-        camera.getViewMatrix(viewmtx, 0)
+        camera.getProjectionMatrix(projMtx, 0, 0.1f, 100.0f)
+        camera.getViewMatrix(viewMtx, 0)
 
-        // --- Anchor Logic (The Flip) ---
-        // 1. If we are searching and have images in DB, look for them
+        // --- Anchor Logic ---
         if (activeAnchor == null && arState != ArState.PLACED) {
             val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
             for (img in updatedAugmentedImages) {
@@ -250,24 +256,22 @@ class ArRenderer(
             }
         }
 
-        // 2. If we have an anchor, stick to it
         if (activeAnchor != null) {
             if (activeAnchor!!.trackingState == TrackingState.TRACKING) {
                 val pose = activeAnchor!!.pose
                 val poseMatrix = FloatArray(16)
                 pose.toMatrix(poseMatrix, 0)
                 arImagePose = poseMatrix
-                handlePan(frame, viewmtx, projmtx)
+                handlePan(frame, viewMtx, projMtx)
             }
         }
 
-        // 3. If no anchor, allow Tap-to-Place (Standard Manual Creation)
         if (activeAnchor == null) {
             val planes = session!!.getAllTrackables(Plane::class.java)
             var hasPlane = false
             for (plane in planes) {
                 if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                    planeRenderer.draw(plane, viewmtx, projmtx)
+                    planeRenderer.draw(plane, viewMtx, projMtx)
                     hasPlane = true
                 }
             }
@@ -276,8 +280,66 @@ class ArRenderer(
         }
 
         if (arImagePose != null) {
-            drawArtwork(viewmtx, projmtx)
+            drawArtwork(viewMtx, projMtx)
+            calculateAndReportBounds(viewMtx, projMtx)
         }
+    }
+
+    /**
+     * Projects the 4 corners of the quad to screen space and reports the bounding box.
+     */
+    private fun calculateAndReportBounds(viewMtx: FloatArray, projMtx: FloatArray) {
+        val pose = arImagePose ?: return
+        val modelMtx = pose.clone()
+
+        // Apply same transforms as drawArtwork
+        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
+        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
+        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
+        Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
+        Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
+        val aspectRatio = if (overlayBitmap != null && overlayBitmap!!.height > 0) overlayBitmap!!.width.toFloat() / overlayBitmap!!.height.toFloat() else 1f
+        Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
+
+        // Quad corners in local space (-0.5 to 0.5)
+        val corners = listOf(
+            floatArrayOf(-0.5f, -0.5f, 0f, 1f),
+            floatArrayOf(-0.5f, 0.5f, 0f, 1f),
+            floatArrayOf(0.5f, 0.5f, 0f, 1f),
+            floatArrayOf(0.5f, -0.5f, 0f, 1f)
+        )
+
+        var minX = Float.MAX_VALUE
+        var minY = Float.MAX_VALUE
+        var maxX = Float.MIN_VALUE
+        var maxY = Float.MIN_VALUE
+
+        val tempVec = FloatArray(4)
+        val resVec = FloatArray(4)
+
+        for (corner in corners) {
+            // Model -> World -> View -> Clip
+            Matrix.multiplyMV(tempVec, 0, modelMtx, 0, corner, 0) // World
+            Matrix.multiplyMV(resVec, 0, viewMtx, 0, tempVec, 0) // View
+            Matrix.multiplyMV(tempVec, 0, projMtx, 0, resVec, 0) // Clip
+
+            if (tempVec[3] != 0f) {
+                // NDC -> Screen
+                val ndcX = tempVec[0] / tempVec[3]
+                val ndcY = tempVec[1] / tempVec[3]
+
+                val screenX = (ndcX + 1f) / 2f * viewportWidth
+                val screenY = (1f - ndcY) / 2f * viewportHeight
+
+                minX = minOf(minX, screenX)
+                minY = minOf(minY, screenY)
+                maxX = maxOf(maxX, screenX)
+                maxY = maxOf(maxY, screenY)
+            }
+        }
+
+        val bounds = RectF(minX, minY, maxX, maxY)
+        mainHandler.post { onBoundsUpdated(bounds) }
     }
 
     private fun drawArtwork(viewMtx: FloatArray, projMtx: FloatArray) {
@@ -324,6 +386,48 @@ class ArRenderer(
             pendingPanX = 0f
             pendingPanY = 0f
         }
+
+        if (dx == 0f && dy == 0f) return
+
+        val pose = arImagePose ?: return
+        val screenPos = projectPoseToScreen(pose, viewMtx, projMtx) ?: return
+
+        val newX = screenPos.first + dx
+        val newY = screenPos.second + dy
+
+        val hitResult = frame.hitTest(newX, newY)
+        for (hit in hitResult) {
+            val trackable = hit.trackable
+            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                activeAnchor?.detach()
+                activeAnchor = hit.createAnchor()
+
+                val poseMatrix = FloatArray(16)
+                hit.hitPose.toMatrix(poseMatrix, 0)
+                arImagePose = poseMatrix
+                break
+            }
+        }
+    }
+
+    private fun projectPoseToScreen(modelMtx: FloatArray, viewMtx: FloatArray, projMtx: FloatArray): Pair<Float, Float>? {
+        worldPos[0] = modelMtx[12]
+        worldPos[1] = modelMtx[13]
+        worldPos[2] = modelMtx[14]
+        worldPos[3] = 1.0f
+
+        Matrix.multiplyMV(eyePos, 0, viewMtx, 0, worldPos, 0)
+        Matrix.multiplyMV(clipPos, 0, projMtx, 0, eyePos, 0)
+
+        if (clipPos[3] == 0f) return null
+
+        val ndcX = clipPos[0] / clipPos[3]
+        val ndcY = clipPos[1] / clipPos[3]
+
+        val screenX = (ndcX + 1f) / 2f * viewportWidth
+        val screenY = (1f - ndcY) / 2f * viewportHeight
+
+        return Pair(screenX, screenY)
     }
 
     private fun captureFrameForFingerprint(frame: Frame) {
@@ -465,14 +569,11 @@ class ArRenderer(
                     config.updateMode = Config.UpdateMode.BLOCKING
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
-
-                    // 1. Enable Depth if supported
                     if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                         config.depthMode = Config.DepthMode.AUTOMATIC
                         isDepthSupported = true
                     }
 
-                    // 2. Configure Augmented Images (Lazy Load from 'initialAugmentedImages')
                     initialAugmentedImages?.let { images ->
                         if (images.isNotEmpty()) {
                             val database = AugmentedImageDatabase(session)

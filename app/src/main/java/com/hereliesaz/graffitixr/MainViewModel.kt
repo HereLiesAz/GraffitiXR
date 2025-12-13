@@ -5,6 +5,7 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.graphics.RectF
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
@@ -19,6 +20,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.common.moduleinstall.ModuleInstall
+import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
@@ -81,6 +83,10 @@ class MainViewModel(
     private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
     val tapFeedback = _tapFeedback.asStateFlow()
 
+    // Holds the screen-space bounds of the AR object for gesture hit-testing
+    private val _artworkBounds = MutableStateFlow<RectF?>(null)
+    val artworkBounds = _artworkBounds.asStateFlow()
+
     var arRenderer: ArRenderer? = null
 
     init {
@@ -112,6 +118,22 @@ class MainViewModel(
                     Log.e("AutoSave", "Failed", e)
                 }
             }
+        }
+    }
+
+    /**
+     * Updates the screen-space bounding box of the AR artwork.
+     * Called from ArRenderer on the GL thread, so we post to the Flow.
+     */
+    fun updateArtworkBounds(bounds: RectF) {
+        // Only emit if significantly different to reduce state churn
+        val current = _artworkBounds.value
+        if (current == null ||
+            abs(current.left - bounds.left) > 10 ||
+            abs(current.top - bounds.top) > 10 ||
+            abs(current.right - bounds.right) > 10 ||
+            abs(current.bottom - bounds.bottom) > 10) {
+            _artworkBounds.value = bounds
         }
     }
 
@@ -179,24 +201,21 @@ class MainViewModel(
                 val maskUri = uiState.value.targetMaskUri
                 val mask = if (maskUri != null) BitmapUtils.getBitmapFromUri(getApplication(), maskUri) else null
 
-                // Generate Fingerprint for persistence (OpenCV)
+                val refinedBitmap = com.hereliesaz.graffitixr.utils.applyMaskToBitmap(originalBitmap, refinementPaths, mask)
+
                 val fingerprint = com.hereliesaz.graffitixr.utils.generateFingerprint(originalBitmap, refinementPaths, mask)
 
-                // Don't crash if bad
                 if (fingerprint.keypoints.isEmpty() || fingerprint.descriptors.empty()) {
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(getApplication(), "No trackable features found. Try a surface with more detail.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(getApplication(), "No features found. Try a more detailed surface.", Toast.LENGTH_LONG).show()
                     }
                     return@launch
                 }
 
                 val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
-                // IMPORTANT: We do NOT update the AR session here.
-                // We just save the data. The Anchor is already placed by the user.
-                // Next time the project loads, ArRenderer will pick up the 'originalBitmap' for recognition.
-
-                arRenderer?.setFingerprint(fingerprint) // Used for progress tracking only
+                arRenderer?.setAugmentedImageDatabase(listOf(originalBitmap))
+                arRenderer?.setFingerprint(fingerprint)
 
                 withContext(Dispatchers.Main) {
                     updateState(
@@ -204,7 +223,7 @@ class MainViewModel(
                             isCapturingTarget = false,
                             targetCreationState = TargetCreationState.SUCCESS,
                             isArTargetCreated = true,
-                            arState = ArState.PLACED, // STAY PLACED (User anchor)
+                            arState = ArState.SEARCHING,
                             fingerprintJson = fingerprintJson
                         )
                     )
@@ -213,6 +232,13 @@ class MainViewModel(
                 Log.e("MainViewModel", "Error confirming target creation", e)
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Target confirmation failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    updateState(
+                        uiState.value.copy(
+                            isCapturingTarget = false,
+                            targetCreationState = TargetCreationState.ERROR,
+                            arState = ArState.SEARCHING
+                        )
+                    )
                 }
             }
         }
@@ -275,11 +301,42 @@ class MainViewModel(
                 .build()
             val segmenter = SubjectSegmentation.getClient(segmenterOptions)
 
-            // Module install check logic omitted for brevity, assuming installed or checking...
-            // (Same as before)
+            val areModulesAvailable = try {
+                withContext(Dispatchers.IO) {
+                    com.google.android.gms.tasks.Tasks.await(
+                        moduleInstallClient.areModulesAvailable(segmenter)
+                    ).areModulesAvailable()
+                }
+            } catch (e: Exception) { false }
+
+            if (!areModulesAvailable) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Downloading AI models... Please wait.", Toast.LENGTH_LONG).show()
+                }
+                try {
+                    withContext(Dispatchers.IO) {
+                        val request = ModuleInstallRequest.newBuilder()
+                            .addApi(segmenter)
+                            .build()
+                        com.google.android.gms.tasks.Tasks.await(
+                            moduleInstallClient.installModules(request)
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainViewModel", "Failed to request module install", e)
+                }
+            }
 
             withContext(Dispatchers.IO) {
-                val frontImage = images.firstOrNull() ?: return@withContext
+                val frontImage = images.firstOrNull()
+                if (frontImage == null) {
+                    withContext(Dispatchers.Main) {
+                        updateState(uiState.value.copy(isLoading = false))
+                        Toast.makeText(getApplication(), "Failed to create grid", Toast.LENGTH_SHORT).show()
+                    }
+                    return@withContext
+                }
+
                 val inputImage = InputImage.fromBitmap(frontImage, 0)
 
                 segmenter.process(inputImage)
@@ -294,8 +351,6 @@ class MainViewModel(
                                     val height = subject.height
                                     val maskBitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
                                     val buffer = subject.confidenceMask
-
-                                    // CRITICAL FIX: Convert FloatBuffer manually
                                     if (buffer != null) {
                                         buffer.rewind()
                                         val pixels = IntArray(width * height)
@@ -311,6 +366,8 @@ class MainViewModel(
                                     maskUri = saveBitmapToCache(maskBitmap, "mask")
                                 }
 
+                                arRenderer?.setAugmentedImageDatabase(images)
+
                                 withContext(Dispatchers.Main) {
                                     updateState(
                                         uiState.value.copy(
@@ -319,12 +376,15 @@ class MainViewModel(
                                             captureStep = CaptureStep.REVIEW,
                                             targetCreationState = TargetCreationState.SUCCESS,
                                             isArTargetCreated = true,
+                                            arState = ArState.SEARCHING,
                                             isLoading = false
                                         )
                                     )
+                                    Toast.makeText(getApplication(), "Grid created successfully", Toast.LENGTH_SHORT).show()
                                     updateDetectedKeypoints()
                                 }
                             } catch (e: Exception) {
+                                Log.e("MainViewModel", "Error processing segmentation result", e)
                                 withContext(Dispatchers.Main) {
                                     handleTargetCreationFailure(e)
                                 }
@@ -332,17 +392,20 @@ class MainViewModel(
                         }
                     }
                     .addOnFailureListener { e ->
+                        Log.e("MainViewModel", "Segmentation failed", e)
+                        arRenderer?.setAugmentedImageDatabase(images)
                         viewModelScope.launch(Dispatchers.Main) {
-                            // Fallback if ML Kit fails
                             updateState(
                                 uiState.value.copy(
                                     capturedTargetImages = images,
                                     captureStep = CaptureStep.REVIEW,
                                     targetCreationState = TargetCreationState.SUCCESS,
                                     isArTargetCreated = true,
+                                    arState = ArState.SEARCHING,
                                     isLoading = false
                                 )
                             )
+                            Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
                             updateDetectedKeypoints()
                         }
                     }
@@ -375,7 +438,7 @@ class MainViewModel(
                 val projectData = ProjectData(
                     backgroundImageUri = uiState.value.backgroundImageUri,
                     overlayImageUri = uiState.value.overlayImageUri,
-                    targetImageUris = savedTargetUris, // Save RAW images for next session tracking
+                    targetImageUris = savedTargetUris,
                     refinementPaths = uiState.value.refinementPaths,
                     opacity = uiState.value.opacity,
                     contrast = uiState.value.contrast,
@@ -849,11 +912,6 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 projectManager.loadProject(projectName)?.let { projectData ->
-                    // WE NEED TO PASS THE TARGET IMAGES TO AR RENDERER HERE
-                    // BUT ViewModel can't access Renderer if it's not active.
-                    // The Renderer pulls from UiState when it initializes (MainScreen -> ArView -> ArRenderer).
-                    // So just updating UiState with 'capturedTargetUris' is sufficient for the NEXT ArView creation.
-
                     updateState(uiState.value.copy(backgroundImageUri = projectData.backgroundImageUri, overlayImageUri = projectData.overlayImageUri, originalOverlayImageUri = projectData.originalOverlayImageUri ?: projectData.overlayImageUri, opacity = projectData.opacity, brightness = projectData.brightness, contrast = projectData.contrast, saturation = projectData.saturation, colorBalanceR = projectData.colorBalanceR, colorBalanceG = projectData.colorBalanceG, colorBalanceB = projectData.colorBalanceB, scale = projectData.scale, rotationZ = projectData.rotationZ, rotationX = projectData.rotationX, rotationY = projectData.rotationY, offset = projectData.offset, blendMode = projectData.blendMode, fingerprintJson = projectData.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }, drawingPaths = projectData.drawingPaths, isLineDrawing = projectData.isLineDrawing, capturedTargetUris = projectData.targetImageUris ?: emptyList()))
                     withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '$projectName' loaded", Toast.LENGTH_SHORT).show() }
                 }

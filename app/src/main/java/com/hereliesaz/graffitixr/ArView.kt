@@ -2,15 +2,23 @@ package com.hereliesaz.graffitixr
 
 import android.app.Activity
 import android.opengl.GLSurfaceView
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateRotation
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -18,20 +26,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.data.FingerprintSerializer
 import kotlinx.serialization.json.Json
+import kotlin.math.abs
 
-/**
- * A Composable that hosts the ARCore view using a [GLSurfaceView].
- *
- * It bridges the gap between Jetpack Compose and the legacy Android View system (OpenGL).
- * It also handles:
- * 1.  Lifecycle management for the AR session.
- * 2.  Initialization of the [ArRenderer].
- * 3.  Connecting Compose gestures (Tap, Pan, Zoom, Rotate) to the Renderer.
- * 4.  Synchronizing state (e.g., opacity, scale) from [UiState] to the Renderer.
- *
- * @param viewModel The MainViewModel to dispatch events to.
- * @param uiState The current UI state to render.
- */
 @Composable
 fun ArView(
     viewModel: MainViewModel,
@@ -40,8 +36,8 @@ fun ArView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = context as? Activity
+    val artworkBounds by viewModel.artworkBounds.collectAsState()
 
-    // Initialize the custom OpenGL Renderer
     val renderer = remember {
         ArRenderer(
             context,
@@ -49,11 +45,11 @@ fun ArView(
             onFrameCaptured = { bitmap -> viewModel.onFrameCaptured(bitmap) },
             onAnchorCreated = { viewModel.onArImagePlaced() },
             onProgressUpdated = { progress, bitmap -> viewModel.onProgressUpdate(progress, bitmap) },
-            onTrackingFailure = { message -> viewModel.onTrackingFailure(message) }
+            onTrackingFailure = { message -> viewModel.onTrackingFailure(message) },
+            onBoundsUpdated = { bounds -> viewModel.updateArtworkBounds(bounds) }
         )
     }
 
-    // Initialize the GLSurfaceView
     val glSurfaceView = remember {
         GLSurfaceView(context).apply {
             preserveEGLContextOnPause = true
@@ -64,7 +60,6 @@ fun ArView(
         }
     }
 
-    // Inject renderer into ViewModel for direct commands (like capture)
     DisposableEffect(renderer) {
         viewModel.arRenderer = renderer
         onDispose {
@@ -73,7 +68,6 @@ fun ArView(
         }
     }
 
-    // Deserialize and set fingerprint if available
     val fingerprintJson = uiState.fingerprintJson
     val fingerprint = remember(fingerprintJson) {
         if (fingerprintJson != null) {
@@ -91,14 +85,12 @@ fun ArView(
         }
     }
 
-    // Load Augmented Images for tracking
     LaunchedEffect(uiState.capturedTargetImages) {
         if(uiState.capturedTargetImages.isNotEmpty()) {
             glSurfaceView.queueEvent { renderer.setAugmentedImageDatabase(uiState.capturedTargetImages) }
         }
     }
 
-    // Sync UI State to Renderer properties
     renderer.opacity = uiState.opacity
     renderer.scale = uiState.arObjectScale
     renderer.rotationX = uiState.rotationX
@@ -116,7 +108,6 @@ fun ArView(
         renderer.updateOverlayImage(uiState.overlayImageUri)
     }
 
-    // Handle Lifecycle (Resume/Pause AR Session)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -156,23 +147,88 @@ fun ArView(
                     }
                 )
             }
-            // 2. Transform Logic (Single & Multi-touch)
-            // KEY FIX: Restarts detection when axis changes
+            // 2. Advanced Transform Logic with Hit Testing
             .pointerInput(uiState.activeRotationAxis) {
-                detectTransformGestures { _, pan, zoom, rotation ->
-                    // Pan (Single or Multi-touch)
-                    glSurfaceView.queueEvent { renderer.queuePan(pan.x, pan.y) }
+                awaitEachGesture {
+                    var rotation = 0f
+                    var zoom = 1f
+                    var pan = androidx.compose.ui.geometry.Offset.Zero
+                    var pastTouchSlop = false
+                    val touchSlop = viewConfiguration.touchSlop
 
-                    viewModel.onArObjectScaleChanged(zoom)
+                    // Wait for initial down
+                    val down = awaitFirstDown(requireUnconsumed = false)
 
-                    // KEY FIX: Invert rotation for natural feel
-                    val rotationDelta = -rotation
+                    // Determine if drag is allowed at start
+                    // 1 finger: must be inside bounds
+                    // 2+ fingers: always allowed
+                    // Note: 'down' only gives us the first pointer.
+                    // If a second pointer comes down, the gesture continues.
 
-                    when (uiState.activeRotationAxis) {
-                        RotationAxis.X -> viewModel.onRotationXChanged(rotationDelta)
-                        RotationAxis.Y -> viewModel.onRotationYChanged(rotationDelta)
-                        RotationAxis.Z -> viewModel.onRotationZChanged(rotationDelta)
-                    }
+                    val bounds = artworkBounds
+                    val startPoint = down.position
+                    val isStartOnObject = bounds?.contains(startPoint.x, startPoint.y) == true
+
+                    // We don't block here yet because user might add a second finger.
+
+                    do {
+                        val event = awaitPointerEvent()
+                        val canceled = event.changes.any { it.isConsumed }
+                        if (canceled) break
+
+                        val pointerCount = event.changes.size
+
+                        // Rule Check:
+                        // If 1 pointer -> Must have started on object
+                        // If 2+ pointers -> Allowed
+                        val isGestureAllowed = (pointerCount == 1 && isStartOnObject) || (pointerCount >= 2)
+
+                        if (isGestureAllowed) {
+                            val zoomChange = event.calculateZoom()
+                            val rotationChange = event.calculateRotation()
+                            val panChange = event.calculatePan()
+
+                            if (!pastTouchSlop) {
+                                zoom *= zoomChange
+                                rotation += rotationChange
+                                pan += panChange
+
+                                val centroidSize = event.calculateCentroid(useCurrent = false)
+                                val zoomMotion = abs(1 - zoom) * centroidSize.getDistance()
+                                val rotationMotion = abs(rotation * kotlin.math.PI.toFloat() * centroidSize.getDistance() / 180f)
+                                val panMotion = pan.getDistance()
+
+                                if (zoomMotion > touchSlop ||
+                                    rotationMotion > touchSlop ||
+                                    panMotion > touchSlop
+                                ) {
+                                    pastTouchSlop = true
+                                }
+                            }
+
+                            if (pastTouchSlop) {
+                                if (panChange != androidx.compose.ui.geometry.Offset.Zero) {
+                                    glSurfaceView.queueEvent { renderer.queuePan(panChange.x, panChange.y) }
+                                }
+                                if (zoomChange != 1f) {
+                                    viewModel.onArObjectScaleChanged(zoomChange)
+                                }
+                                if (rotationChange != 0f) {
+                                    val rotationDelta = -rotationChange
+                                    when (uiState.activeRotationAxis) {
+                                        RotationAxis.X -> viewModel.onRotationXChanged(rotationDelta)
+                                        RotationAxis.Y -> viewModel.onRotationYChanged(rotationDelta)
+                                        RotationAxis.Z -> viewModel.onRotationZChanged(rotationDelta)
+                                    }
+                                }
+                                event.changes.forEach {
+                                    if (it.positionChanged()) {
+                                        it.consume()
+                                    }
+                                }
+                            }
+                        }
+                    } while (!canceled && event.changes.any { it.pressed })
                 }
             }
     )
