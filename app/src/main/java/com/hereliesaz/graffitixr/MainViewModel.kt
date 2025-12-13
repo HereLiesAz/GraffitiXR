@@ -342,20 +342,19 @@ class MainViewModel(
                         }
                     }
                     .addOnFailureListener {
-                        // Fallback to original image on error
-                        arRenderer?.setAugmentedImageDatabase(newImages)
+                        // On catastrophic failure, reset to searching so planes are still found
                         viewModelScope.launch(Dispatchers.Main) {
                             updateState(
                                 uiState.value.copy(
-                                    captureStep = CaptureStep.REVIEW,
-                                    targetCreationState = TargetCreationState.SUCCESS,
-                                    isArTargetCreated = true,
-                                    arState = ArState.LOCKED,
+                                    isCapturingTarget = false,
+                                    targetCreationState = TargetCreationState.IDLE,
+                                    captureStep = CaptureStep.FRONT,
+                                    capturedTargetImages = emptyList(),
+                                    arState = ArState.SEARCHING,
                                     isLoading = false
                                 )
                             )
-                            Toast.makeText(getApplication(), "Grid created (segmentation error)", Toast.LENGTH_SHORT).show()
-                            updateDetectedKeypoints()
+                            Toast.makeText(getApplication(), "Target creation failed. Try again.", Toast.LENGTH_SHORT).show()
                         }
                     }
             }
