@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr
 
 import android.Manifest
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,39 +15,34 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.hereliesaz.graffitixr.composables.OnboardingScreen
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import org.opencv.android.OpenCVLoader
 
 /**
  * The single Activity for the GraffitiXR application.
- *
- * It serves as the entry point and container for the Jetpack Compose UI.
- * Key responsibilities:
- * 1.  Initializing OpenCV (`OpenCVLoader.initLocal()`).
- * 2.  Hosting the [MainScreen] composable.
- * 3.  Handling volume key events for a hidden "Unlock" feature.
- * 4.  Managing initial permissions request (Camera).
- * 5.  Keeping the screen on during Trace mode.
  */
 class MainActivity : ComponentActivity() {
 
@@ -61,9 +57,6 @@ class MainActivity : ComponentActivity() {
         Toast.makeText(this, "Screen Unlocked", Toast.LENGTH_SHORT).show()
     }
 
-    /**
-     * Intercepts key down events to handle volume button combos.
-     */
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (event?.repeatCount == 0) {
             if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
@@ -83,9 +76,6 @@ class MainActivity : ComponentActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    /**
-     * Intercepts key up events to handle volume button combos.
-     */
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             volUpPressed = false
@@ -101,7 +91,7 @@ class MainActivity : ComponentActivity() {
 
     private fun checkUnlock() {
         if (volUpPressed && volDownPressed && viewModel.uiState.value.isTouchLocked) {
-            unlockHandler.postDelayed(unlockRunnable, 2000) // 2 seconds
+            unlockHandler.postDelayed(unlockRunnable, 2000)
         }
     }
 
@@ -109,7 +99,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize OpenCV for AR Fingerprinting
         if (!OpenCVLoader.initLocal()) {
             Log.e("OpenCV", "Unable to load OpenCV!")
         } else {
@@ -133,10 +122,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * The top-level Composable for the application content.
- * Manages the high-level state of onboarding and permissions before showing the MainScreen.
- */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun AppContent(
@@ -145,8 +130,8 @@ fun AppContent(
     onOnboardingDismiss: () -> Unit
 ) {
     var showOnboarding by remember { mutableStateOf(!onboardingShown) }
-    val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
 
     // Keep screen on if in Trace mode and locked
     LaunchedEffect(uiState.editorMode, uiState.isTouchLocked) {
@@ -177,16 +162,29 @@ fun AppContent(
                 onOnboardingDismiss()
             })
         } else {
-            val cameraPermissionState = rememberPermissionState(
-                permission = Manifest.permission.CAMERA
+            // Determine required permissions based on API level
+            val permissions = mutableListOf(Manifest.permission.CAMERA)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+
+            val permissionState = rememberMultiplePermissionsState(
+                permissions = permissions
             )
 
-            if (cameraPermissionState.status.isGranted) {
+            // Check if Camera (essential) is granted. Others are optional but requested together.
+            val cameraGranted = permissionState.permissions.find { it.permission == Manifest.permission.CAMERA }?.status?.isGranted == true
+
+            if (cameraGranted) {
                 MainScreen(viewModel = viewModel)
             } else {
                 PermissionScreen(
                     onRequestPermission = {
-                        cameraPermissionState.launchPermissionRequest()
+                        permissionState.launchMultiplePermissionRequest()
                     }
                 )
             }
@@ -197,13 +195,19 @@ fun AppContent(
 @Composable
 fun PermissionScreen(onRequestPermission: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(text = "Camera permission is required for this app.")
+        Text(
+            text = "GraffitiXR needs access to your Camera to function.\n\nWe also request Photo Library access to load your designs and Notification access for updates.",
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
         Button(onClick = onRequestPermission) {
-            Text(text = "Grant Permission")
+            Text(text = "Grant Permissions")
         }
     }
 }

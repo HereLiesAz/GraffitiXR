@@ -88,6 +88,9 @@ fun MainScreen(viewModel: MainViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
 
+    // Automation State
+    var hasSelectedModeOnce by remember { mutableStateOf(false) }
+
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
         viewModel.feedbackEvent.collect { event ->
@@ -144,6 +147,25 @@ fun MainScreen(viewModel: MainViewModel) {
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri -> uri?.let { viewModel.exportProjectToUri(it) } }
 
+    // Helper for automation
+    fun onModeSelected(mode: EditorMode) {
+        viewModel.onEditorModeChanged(mode)
+
+        // Hide adjustment knobs when switching modes/tools
+        showSliderDialog = null
+        showColorBalanceDialog = false
+
+        if (!hasSelectedModeOnce) {
+            hasSelectedModeOnce = true
+            // Auto-launch image picker
+            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            // If AR, auto-launch target capture
+            if (mode == EditorMode.AR) {
+                viewModel.onCreateTargetClicked()
+            }
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Black
@@ -179,7 +201,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     contentAlignment = Alignment.Center
                 ) {
                     when (uiState.editorMode) {
-                        EditorMode.HELP -> HelpScreen(onGetStarted = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
+                        EditorMode.HELP -> HelpScreen(onGetStarted = { onModeSelected(EditorMode.STATIC) })
                         EditorMode.STATIC -> MockupScreen(
                             uiState = uiState,
                             onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
@@ -276,7 +298,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
             }
 
-            // --- AR TARGET CREATION FLOW INTEGRATION ---
+            // --- AR TARGET CREATION FLOW ---
             if (uiState.isCapturingTarget) {
                 Box(modifier = Modifier.zIndex(5f)) {
                     if (uiState.captureStep == CaptureStep.REVIEW) {
@@ -294,7 +316,6 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
 
                         val maskUri = uiState.targetMaskUri
-                        // Asynchronous loading for mask bitmap
                         val maskBitmap by produceState<Bitmap?>(initialValue = null, maskUri) {
                             if (maskUri != null) {
                                 value = withContext(Dispatchers.IO) {
@@ -314,7 +335,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             canUndo = uiState.canUndo,
                             canRedo = uiState.canRedo,
                             onPathAdded = viewModel::onRefinementPathAdded,
-                            onModeChanged = viewModel::onRefinementModeChanged,
+                            onModeChanged = { viewModel.onRefinementModeChanged(!it) },
                             onUndo = viewModel::onUndoClicked,
                             onRedo = viewModel::onRedoClicked,
                             onConfirm = viewModel::onConfirmTargetCreation
@@ -330,9 +351,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 }
             }
-            // -----------------------------------------------
 
-            // Gesture Feedback Visualization
+            // Gesture Feedback
             if (!uiState.hideUiForCapture) {
                 GestureFeedback(
                     uiState = uiState,
@@ -359,22 +379,34 @@ fun MainScreen(viewModel: MainViewModel) {
                         )
 
                         azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                        azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { viewModel.onEditorModeChanged(EditorMode.AR) })
-                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { viewModel.onEditorModeChanged(EditorMode.OVERLAY) })
-                        azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { viewModel.onEditorModeChanged(EditorMode.STATIC) })
-                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { viewModel.onEditorModeChanged(EditorMode.TRACE) })
+                        azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { onModeSelected(EditorMode.AR) })
+                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
+                        azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { onModeSelected(EditorMode.STATIC) })
+                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { onModeSelected(EditorMode.TRACE) })
 
                         azDivider()
 
                         if (uiState.editorMode == EditorMode.TRACE) {
-                            azRailItem(id = "lock_trace", text = "Lock", onClick = { viewModel.setTouchLocked(true) })
+                            azRailItem(id = "lock_trace", text = "Lock", onClick = {
+                                viewModel.setTouchLocked(true)
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
                         }
 
                         if (uiState.editorMode == EditorMode.AR) {
                             azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
-                            azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", onClick = viewModel::onCreateTargetClicked)
-                            azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", onClick = viewModel::onRefineTargetToggled)
-                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", onClick = viewModel::onMarkProgressToggled)
+                            azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", onClick = {
+                                viewModel.onCreateTargetClicked()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
+                            azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", onClick = {
+                                viewModel.onRefineTargetToggled()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
+                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", onClick = {
+                                viewModel.onMarkProgressToggled()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
 
                             azDivider()
                         }
@@ -382,33 +414,68 @@ fun MainScreen(viewModel: MainViewModel) {
                         azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
 
                         azRailSubItem(id = "image", text = "Open", hostId = "design_host") {
+                            showSliderDialog = null; showColorBalanceDialog = false
                             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
 
                         if (uiState.editorMode == EditorMode.STATIC) {
-                            azRailSubItem(id = "background", hostId = "design_host", text = "Surface") {
+                            azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
+                                showSliderDialog = null; showColorBalanceDialog = false
                                 backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             }
                         }
 
                         if (uiState.overlayImageUri != null) {
-                            azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", onClick = viewModel::onRemoveBackgroundClicked)
-                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", onClick = viewModel::onLineDrawingClicked)
+                            azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", onClick = {
+                                viewModel.onRemoveBackgroundClicked()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
+                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", onClick = {
+                                viewModel.onLineDrawingClicked()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
                             azDivider()
 
-                            azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust") { showSliderDialog = "Adjust" }
-                            azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance") { showColorBalanceDialog = !showColorBalanceDialog }
-                            azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", onClick = viewModel::onCycleBlendMode)
+                            azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust") {
+                                showSliderDialog = "Adjust"
+                                showColorBalanceDialog = false
+                            }
+                            azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance") {
+                                showColorBalanceDialog = !showColorBalanceDialog
+                                showSliderDialog = null
+                            }
+                            azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", onClick = {
+                                viewModel.onCycleBlendMode()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
                         }
 
                         azDivider()
 
-                        azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){ showSettings = true }
-                        azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = viewModel::onNewProject)
-                        azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") { createDocumentLauncher.launch("Project.gxr") }
-                        azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") { showProjectLibrary = true }
-                        azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = viewModel::onSaveClicked)
-                        azRailSubItem(id = "help", hostId = "settings_host", text = "Help", onClick = { viewModel.onEditorModeChanged(EditorMode.HELP) })
+                        azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){
+                            showSettings = true
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        }
+                        azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = {
+                            viewModel.onNewProject()
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        })
+                        azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") {
+                            createDocumentLauncher.launch("Project.gxr")
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        }
+                        azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") {
+                            showProjectLibrary = true
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        }
+                        azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = {
+                            viewModel.onSaveClicked()
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        })
+                        azRailSubItem(id = "help", hostId = "settings_host", text = "Help", onClick = {
+                            viewModel.onEditorModeChanged(EditorMode.HELP)
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        })
 
                         azDivider()
 
@@ -469,7 +536,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     onMagicClicked = viewModel::onMagicClicked,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = screenHeight * 0.15f)
+                        .padding(start = 100.dp, bottom = screenHeight * 0.075f) // Moved down and shifted right
                         .zIndex(3f)
                 )
 
