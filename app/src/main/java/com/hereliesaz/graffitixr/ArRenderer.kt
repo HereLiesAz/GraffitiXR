@@ -182,7 +182,7 @@ class ArRenderer(
             yMat.release()
             image.close()
 
-            CoroutineScope(Dispatchers.Default).launch {
+            analysisScope.launch {
                 try {
                     // Reconstruct Mat from ByteArray
                     val processingMat = Mat(height, width, CvType.CV_8UC1)
@@ -546,7 +546,7 @@ class ArRenderer(
                         config.updateMode = Config.UpdateMode.BLOCKING
                         config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                         config.focusMode = Config.FocusMode.AUTO
-                        config.depthMode = Config.DepthMode.AUTOMATIC
+                        config.depthMode = Config.DepthMode.DISABLED
                         session!!.configure(config)
                     }
                 } catch (e: Exception) {
