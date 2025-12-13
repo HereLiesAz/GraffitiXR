@@ -150,10 +150,11 @@ class ArRenderer(
             val processingMat = Mat()
             yMat.copyTo(processingMat)
 
-            // Release wrapper Mat
+            // Release camera resources immediately
             yMat.release()
+            image.close()
 
-            analysisScope.launch {
+            CoroutineScope(Dispatchers.Default).launch {
                 try {
                     // Handle Rotation
                     val rotatedMat = if (rotation != 0f) {
