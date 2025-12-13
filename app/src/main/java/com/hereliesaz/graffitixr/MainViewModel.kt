@@ -54,15 +54,36 @@ import java.nio.FloatBuffer
 import kotlin.coroutines.resume
 import kotlin.math.abs
 
+/**
+ * Events related to screen capture requests.
+ */
 sealed class CaptureEvent {
+    /**
+     * Signal to capture the current screen content.
+     */
     object RequestCapture : CaptureEvent()
 }
 
+/**
+ * Events related to haptic or visual feedback.
+ */
 sealed class FeedbackEvent {
     object VibrateSingle : FeedbackEvent()
     object VibrateDouble : FeedbackEvent()
 }
 
+/**
+ * The primary ViewModel for the GraffitiXR application.
+ *
+ * This class is responsible for:
+ * 1.  Managing the global UI state (`UiState`).
+ * 2.  Handling user interactions and business logic.
+ * 3.  Coordinating between the UI, AR system (`ArRenderer`), and Data Layer (`ProjectManager`).
+ * 4.  Executing background tasks like image processing, network requests (updates), and auto-saving.
+ *
+ * @param application The Android Application context.
+ * @param savedStateHandle Handle for saving state across process death.
+ */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
@@ -71,30 +92,49 @@ class MainViewModel(
     private val onboardingManager = OnboardingManager(application)
     private val projectManager = ProjectManager(application)
 
+    // Undo/Redo stacks
     private val undoStack = mutableListOf<UiState>()
     private val redoStack = mutableListOf<UiState>()
 
+    /**
+     * The single source of truth for the UI state.
+     * Observes changes to 'uiState' in the SavedStateHandle.
+     */
     val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
+    /**
+     * Flow of capture events to be handled by the UI (e.g., PixelCopy).
+     */
     val captureEvent = _captureEvent.asSharedFlow()
 
     private val _feedbackEvent = MutableSharedFlow<FeedbackEvent>()
+    /**
+     * Flow of feedback events (haptics).
+     */
     val feedbackEvent = _feedbackEvent.asSharedFlow()
 
     private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
+    /**
+     * State for visual tap feedback (ripples).
+     */
     val tapFeedback = _tapFeedback.asStateFlow()
 
-    // Reference to the active AR Renderer (injected by ArView)
+    /**
+     * Reference to the active AR Renderer.
+     * Injected by the [ArView] composable when the AR surface is created.
+     */
     var arRenderer: ArRenderer? = null
 
     init {
+        // Initialize onboarding state
         val completedModes = onboardingManager.getCompletedModes()
         updateState(uiState.value.copy(
             completedOnboardingModes = completedModes,
             showOnboardingDialogForMode = if (!completedModes.contains(uiState.value.editorMode)) uiState.value.editorMode else null
         ), isUndoable = false)
 
+        // Register receiver for APK download completion
         val receiver = ApkInstallReceiver()
         ContextCompat.registerReceiver(
             application,
@@ -105,6 +145,9 @@ class MainViewModel(
         startAutoSave()
     }
 
+    /**
+     * Starts a coroutine loop that triggers an auto-save every 30 seconds.
+     */
     private fun startAutoSave() {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
@@ -122,6 +165,10 @@ class MainViewModel(
 
     // --- AR Target Creation Logic ---
 
+    /**
+     * Called when the camera shutter button is clicked.
+     * Triggers AR frame capture if in AR mode, otherwise requests a standard screenshot.
+     */
     fun onCaptureShutterClicked() {
         if (uiState.value.isCapturingTarget && uiState.value.editorMode == EditorMode.AR) {
             arRenderer?.triggerCapture()
@@ -132,6 +179,9 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Cancels the AR target creation process and resets the state.
+     */
     fun onCancelCaptureClicked() {
         updateState(uiState.value.copy(
             isCapturingTarget = false,
@@ -141,12 +191,20 @@ class MainViewModel(
         ))
     }
 
+    /**
+     * Adds a new refinement path (mask) to the current AR target.
+     * @param path The vector path to add.
+     */
     fun onRefinementPathAdded(path: com.hereliesaz.graffitixr.data.RefinementPath) {
         val currentPaths = uiState.value.refinementPaths
         updateState(uiState.value.copy(refinementPaths = currentPaths + path), isUndoable = true)
         updateDetectedKeypoints()
     }
 
+    /**
+     * Updates the list of detected keypoints based on the current target image and mask.
+     * Runs on a background thread using OpenCV.
+     */
     private fun updateDetectedKeypoints() {
         viewModelScope.launch(Dispatchers.IO) {
             val bitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
@@ -161,6 +219,9 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Toggles the refinement mode for the captured target.
+     */
     fun onRefineTargetToggled() {
         if (uiState.value.capturedTargetImages.isNotEmpty()) {
             updateState(uiState.value.copy(
@@ -172,10 +233,17 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Changes the tool used in refinement mode (Eraser vs. Pencil).
+     */
     fun onRefinementModeChanged(isEraser: Boolean) {
         updateState(uiState.value.copy(isRefinementEraser = isEraser), isUndoable = false)
     }
 
+    /**
+     * Finalizes the target creation process.
+     * Generates the final masked bitmap, computes the fingerprint, and updates the AR session.
+     */
     fun onConfirmTargetCreation() {
         viewModelScope.launch(Dispatchers.IO) {
             val originalBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
@@ -207,11 +275,17 @@ class MainViewModel(
         }
     }
 
-    // Accepting nullable String to clear warning
+    /**
+     * Called when AR tracking fails or recovers.
+     * @param message The warning message, or null if tracking is healthy.
+     */
     fun onTrackingFailure(message: String?) {
         updateState(uiState.value.copy(qualityWarning = message), isUndoable = false)
     }
 
+    /**
+     * Initiates the AR target creation flow.
+     */
     fun onCreateTargetClicked() {
         updateState(uiState.value.copy(
             isCapturingTarget = true,
@@ -220,6 +294,10 @@ class MainViewModel(
         ), isUndoable = false)
     }
 
+    /**
+     * Callback from ArRenderer when a frame is captured for the target.
+     * Triggers ML Kit segmentation.
+     */
     fun onFrameCaptured(bitmap: Bitmap) {
         val currentImages = uiState.value.capturedTargetImages
         val newImages = currentImages + bitmap
@@ -362,9 +440,9 @@ class MainViewModel(
     }
 
 
-    // ... (Remainder of file is identical to previous version: transforms, core logic, save, updates) ...
-    // To save space, assume standard boilerplate methods (exportProjectToUri, onCycleRotationAxis, etc.) follow here.
-
+    /**
+     * Exports the current project state to a ZIP file at the specified URI.
+     */
     fun exportProjectToUri(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             setLoading(true)
@@ -411,6 +489,9 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Cycles through the active rotation axis (X -> Y -> Z).
+     */
     fun onCycleRotationAxis() {
         val currentAxis = uiState.value.activeRotationAxis
         val nextAxis = when (currentAxis) {
@@ -422,6 +503,10 @@ class MainViewModel(
         Toast.makeText(getApplication(), "Rotation Axis: ${nextAxis.name}", Toast.LENGTH_SHORT).show()
     }
 
+    /**
+     * Scales the AR object.
+     * @param scaleFactor Multiplier for the current scale.
+     */
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
         val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
@@ -441,6 +526,9 @@ class MainViewModel(
         updateState(uiState.value.copy(rotationZ = currentRotation + delta), isUndoable = false)
     }
 
+    /**
+     * Hides the rotation axis feedback after a delay.
+     */
     fun onFeedbackShown() {
         viewModelScope.launch {
             delay(1000)
@@ -448,16 +536,25 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Updates the AR plane detection status.
+     */
     fun setArPlanesDetected(detected: Boolean) {
         if (uiState.value.isArPlanesDetected != detected) {
             updateState(uiState.value.copy(isArPlanesDetected = detected), isUndoable = false)
         }
     }
 
+    /**
+     * Called when the AR object is successfully placed in the world.
+     */
     fun onArImagePlaced() {
         updateState(uiState.value.copy(arState = ArState.PLACED), isUndoable = false)
     }
 
+    /**
+     * Updates the project progress based on AR tracking analysis.
+     */
     fun onProgressUpdate(progress: Float, bitmap: Bitmap? = null) {
         val currentProgress = uiState.value.progressPercentage
         val isSignificant = abs(progress - currentProgress) > 5.0f
@@ -479,6 +576,9 @@ class MainViewModel(
         updateState(uiState.value.copy(isTouchLocked = locked), isUndoable = false)
     }
 
+    /**
+     * Triggers a visual feedback effect for a tap interaction.
+     */
     fun showTapFeedback(position: Offset, isSuccess: Boolean) {
         viewModelScope.launch {
             _tapFeedback.value = if (isSuccess) TapFeedback.Success(position) else TapFeedback.Failure(position)
@@ -487,6 +587,9 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Removes the background from the current overlay image using ML Kit.
+     */
     fun onRemoveBackgroundClicked() {
         viewModelScope.launch {
             setLoading(true)
@@ -523,6 +626,9 @@ class MainViewModel(
         updateState(uiState.value.copy(brightness = brightness), isUndoable = false)
     }
 
+    /**
+     * Toggles the "Line Drawing" effect for the overlay image.
+     */
     fun onLineDrawingClicked() {
         viewModelScope.launch {
             setLoading(true)
@@ -616,6 +722,10 @@ class MainViewModel(
         updateState(uiState.value.copy(showDoubleTapHint = false))
     }
 
+    /**
+     * Called when the user finishes adjusting the curves points.
+     * Triggers the image processing on the background thread.
+     */
     fun onCurvesPointsChangeFinished() {
         viewModelScope.launch {
             val uri = uiState.value.overlayImageUri
@@ -703,6 +813,9 @@ class MainViewModel(
         updateState(uiState.value.copy(blendMode = nextMode))
     }
 
+    /**
+     * Resets rotation or snaps AR object to target.
+     */
     fun onMagicClicked() {
         val state = uiState.value
         if (state.rotationX != 0f || state.rotationY != 0f || state.rotationZ != 0f) {
@@ -902,6 +1015,9 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Checks for application updates via the GitHub API.
+     */
     fun checkForUpdates() {
         viewModelScope.launch {
             updateState(uiState.value.copy(isCheckingForUpdate = true, updateStatusMessage = null), isUndoable = false)

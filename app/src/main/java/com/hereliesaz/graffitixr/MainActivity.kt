@@ -37,9 +37,22 @@ import com.hereliesaz.graffitixr.composables.OnboardingScreen
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import org.opencv.android.OpenCVLoader
 
+/**
+ * The single Activity for the GraffitiXR application.
+ *
+ * It serves as the entry point and container for the Jetpack Compose UI.
+ * Key responsibilities:
+ * 1.  Initializing OpenCV (`OpenCVLoader.initLocal()`).
+ * 2.  Hosting the [MainScreen] composable.
+ * 3.  Handling volume key events for a hidden "Unlock" feature.
+ * 4.  Managing initial permissions request (Camera).
+ * 5.  Keeping the screen on during Trace mode.
+ */
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels { MainViewModelFactory() }
+
+    // Hidden "Cheat Code" state for unlocking touch
     private var volUpPressed = false
     private var volDownPressed = false
     private val unlockHandler = Handler(Looper.getMainLooper())
@@ -48,6 +61,9 @@ class MainActivity : ComponentActivity() {
         Toast.makeText(this, "Screen Unlocked", Toast.LENGTH_SHORT).show()
     }
 
+    /**
+     * Intercepts key down events to handle volume button combos.
+     */
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (event?.repeatCount == 0) {
             if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
@@ -67,6 +83,9 @@ class MainActivity : ComponentActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
+    /**
+     * Intercepts key up events to handle volume button combos.
+     */
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             volUpPressed = false
@@ -90,6 +109,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Initialize OpenCV for AR Fingerprinting
         if (!OpenCVLoader.initLocal()) {
             Log.e("OpenCV", "Unable to load OpenCV!")
         } else {
@@ -113,6 +133,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * The top-level Composable for the application content.
+ * Manages the high-level state of onboarding and permissions before showing the MainScreen.
+ */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun AppContent(
@@ -124,6 +148,7 @@ fun AppContent(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
+    // Keep screen on if in Trace mode and locked
     LaunchedEffect(uiState.editorMode, uiState.isTouchLocked) {
         val activity = context as? android.app.Activity
         activity?.let {

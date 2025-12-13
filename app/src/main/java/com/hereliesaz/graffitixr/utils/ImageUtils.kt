@@ -13,6 +13,13 @@ import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
 
+/**
+ * Converts a bitmap to a line drawing (edge detection).
+ *
+ * @param bitmap The source bitmap.
+ * @param isWhite If true, the lines will be white on a transparent background.
+ * @return A new bitmap containing the edge data as an alpha channel.
+ */
 fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
     val mat = Mat()
     val grayMat = Mat()
@@ -50,6 +57,10 @@ fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
     }
 }
 
+/**
+ * Calculates a blur metric using the variance of the Laplacian.
+ * Higher values indicate sharper images.
+ */
 fun calculateBlurMetric(bitmap: Bitmap): Double {
     val mat = Mat()
     Utils.bitmapToMat(bitmap, mat)
@@ -67,6 +78,10 @@ fun calculateBlurMetric(bitmap: Bitmap): Double {
     return variance
 }
 
+/**
+ * Estimates the number of features detectable by ORB in the image.
+ * Useful for assessing if an image is a good candidate for AR tracking.
+ */
 fun estimateFeatureRichness(bitmap: Bitmap): Int {
     val mat = Mat()
     Utils.bitmapToMat(bitmap, mat)
@@ -80,6 +95,10 @@ fun estimateFeatureRichness(bitmap: Bitmap): Int {
     return keypoints.rows()
 }
 
+/**
+ * Detects features in the bitmap, respecting the provided refinement masks.
+ * Returns the keypoints as normalized offsets (0..1).
+ */
 fun detectFeaturesWithMask(bitmap: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): List<androidx.compose.ui.geometry.Offset> {
     val mat = Mat()
     Utils.bitmapToMat(bitmap, mat)
@@ -98,6 +117,10 @@ fun detectFeaturesWithMask(bitmap: Bitmap, refinementPaths: List<RefinementPath>
     }
 }
 
+/**
+ * Creates an OpenCV Mask (CV_8UC1) from the refinement paths and an optional auto-generated mask.
+ * White pixels in the mask indicate areas to process; black pixels are ignored.
+ */
 fun createMaskMatFromPaths(width: Int, height: Int, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Mat {
     val maskBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(maskBitmap)
@@ -138,6 +161,10 @@ fun createMaskMatFromPaths(width: Int, height: Int, refinementPaths: List<Refine
     return maskMat
 }
 
+/**
+ * Applies the mask defined by refinement paths to the source bitmap.
+ * The result is a bitmap where masked-out areas are transparent.
+ */
 fun applyMaskToBitmap(source: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Bitmap {
     val mat = Mat()
     Utils.bitmapToMat(source, mat)
@@ -146,7 +173,7 @@ fun applyMaskToBitmap(source: Bitmap, refinementPaths: List<RefinementPath>, aut
 
     val resultMat = Mat()
     resultMat.create(mat.size(), mat.type())
-    resultMat.setTo(org.opencv.core.Scalar(0.0, 0.0, 0.0, 255.0))
+    resultMat.setTo(org.opencv.core.Scalar(0.0, 0.0, 0.0, 255.0)) // Transparent
 
     mat.copyTo(resultMat, maskMat)
 
@@ -156,6 +183,10 @@ fun applyMaskToBitmap(source: Bitmap, refinementPaths: List<RefinementPath>, aut
     return finalBitmap
 }
 
+/**
+ * Generates the unique [Fingerprint] (Keypoints + Descriptors) for the given bitmap and mask.
+ * This fingerprint is used for persistence and identifying the target in future sessions.
+ */
 fun generateFingerprint(bitmap: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Fingerprint {
     val mat = Mat()
     Utils.bitmapToMat(bitmap, mat)
