@@ -4,7 +4,17 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
-## **V1.6 Enhancements (Current)**
+## **V1.11 Documentation Overhaul (Current)**
+
+-   **[x] Comprehensive Documentation:**
+    -   [x] Create `docs/` folder structure.
+    -   [x] Create `AGENT_GUIDE.md`, `UI_UX.md`, `auth.md`, `conduct.md`, `data_layer.md`, `fauxpas.md`, `misc.md`, `performance.md`, `screens.md`, `task_flow.md`, `testing.md`, `workflow.md`.
+    -   [x] Update `AGENTS.md` with index and strict rules.
+    -   [x] Add KDocs to critical files (`MainViewModel`, `UiState`, `ArRenderer`, `MainActivity`, `ProjectManager`, `ArView`).
+
+---
+
+## **V1.6 Enhancements (Completed)**
 
 -   **[x] UI Layout Reorganization:**
     -   [x] Reorganized Navigation Rail: Moved adjustment items to "Image", created "Target" host for target-related items.
