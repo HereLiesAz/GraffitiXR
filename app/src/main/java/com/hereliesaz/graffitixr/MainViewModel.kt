@@ -35,6 +35,9 @@ import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.applyCurves
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
+import com.google.android.gms.common.moduleinstall.ModuleInstall
+import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
+import com.google.mlkit.common.MlKitException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -348,6 +351,45 @@ class MainViewModel(
         viewModelScope.launch {
             _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
 
+            // Ensure ML Kit module is installed
+            val moduleInstallClient = ModuleInstall.getClient(getApplication())
+            val subjectOptions = SubjectSegmenterOptions.SubjectResultOptions.Builder()
+                .enableConfidenceMask()
+                .build()
+            val segmenterOptions = SubjectSegmenterOptions.Builder()
+                .enableMultipleSubjects(subjectOptions)
+                .build()
+            val segmenter = SubjectSegmentation.getClient(segmenterOptions)
+
+            val areModulesAvailable = try {
+                 withContext(Dispatchers.IO) {
+                     com.google.android.gms.tasks.Tasks.await(
+                         moduleInstallClient.areModulesAvailable(segmenter)
+                     ).areModulesAvailable()
+                 }
+            } catch (e: Exception) {
+                false
+            }
+
+            if (!areModulesAvailable) {
+                withContext(Dispatchers.Main) {
+                     Toast.makeText(getApplication(), "Downloading AI models... Please wait.", Toast.LENGTH_LONG).show()
+                }
+                try {
+                    withContext(Dispatchers.IO) {
+                         val request = ModuleInstallRequest.newBuilder()
+                             .addApi(segmenter)
+                             .build()
+                         com.google.android.gms.tasks.Tasks.await(
+                             moduleInstallClient.installModules(request)
+                         )
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainViewModel", "Failed to request module install", e)
+                     // Proceed anyway, maybe it just finished or we can fallback
+                }
+            }
+
             withContext(Dispatchers.IO) {
                 // Use the Front image (index 0) for the primary mask and refinement
                 val frontImage = images.firstOrNull()
@@ -359,14 +401,6 @@ class MainViewModel(
                     return@withContext
                 }
 
-                // --- Automatic Subject Segmentation ---
-                val subjectOptions = SubjectSegmenterOptions.SubjectResultOptions.Builder()
-                    .enableConfidenceMask()
-                    .build()
-                val segmenterOptions = SubjectSegmenterOptions.Builder()
-                    .enableMultipleSubjects(subjectOptions)
-                    .build()
-                val segmenter = SubjectSegmentation.getClient(segmenterOptions)
                 val inputImage = InputImage.fromBitmap(frontImage, 0)
 
                 // ML Kit Segmentation Call
@@ -431,22 +465,30 @@ class MainViewModel(
                     }
                     .addOnFailureListener { e ->
                         Log.e("MainViewModel", "Segmentation failed", e)
-                        // Fallback: If segmentation fails, still use the images for tracking
-                        // but without a mask.
-                        arRenderer?.setAugmentedImageDatabase(images)
-                        viewModelScope.launch(Dispatchers.Main) {
-                             updateState(
-                                uiState.value.copy(
-                                    capturedTargetImages = images,
-                                    captureStep = CaptureStep.REVIEW,
-                                    targetCreationState = TargetCreationState.SUCCESS,
-                                    isArTargetCreated = true,
-                                    arState = ArState.LOCKED,
-                                    isLoading = false
+
+                        if (e is MlKitException && e.errorCode == MlKitException.UNAVAILABLE) {
+                             viewModelScope.launch(Dispatchers.Main) {
+                                 Toast.makeText(getApplication(), "AI Model downloading... Try again shortly.", Toast.LENGTH_LONG).show()
+                                 handleTargetCreationFailure(e)
+                             }
+                        } else {
+                            // Fallback: If segmentation fails, still use the images for tracking
+                            // but without a mask.
+                            arRenderer?.setAugmentedImageDatabase(images)
+                            viewModelScope.launch(Dispatchers.Main) {
+                                updateState(
+                                    uiState.value.copy(
+                                        capturedTargetImages = images,
+                                        captureStep = CaptureStep.REVIEW,
+                                        targetCreationState = TargetCreationState.SUCCESS,
+                                        isArTargetCreated = true,
+                                        arState = ArState.LOCKED,
+                                        isLoading = false
+                                    )
                                 )
-                            )
-                            Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
-                            updateDetectedKeypoints()
+                                Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
+                                updateDetectedKeypoints()
+                            }
                         }
                     }
             }

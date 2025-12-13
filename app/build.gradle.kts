@@ -196,6 +196,7 @@ dependencies {
     // ML Kit
     implementation(libs.mlkit.subject.segmentation)
     implementation(libs.segmentation.selfie)
+    implementation(libs.play.services.base)
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)

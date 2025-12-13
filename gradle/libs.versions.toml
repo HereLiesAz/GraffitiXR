@@ -21,6 +21,7 @@ azNavRail = "4.47"
 kotlinxSerialization = "1.9.0"
 segmentationSelfie = "16.0.0-beta6"
 firebaseBom = "34.7.0"
+playServicesBase = "18.5.0"
 
 [libraries]
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
@@ -60,6 +61,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 opencv-android = { module = "org.opencv:opencv-android", version.ref = "opencv" }
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
+play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
