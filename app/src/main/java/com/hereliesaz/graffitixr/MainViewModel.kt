@@ -309,27 +309,48 @@ class MainViewModel(
 
     /**
      * Callback from ArRenderer when a frame is captured for the target.
-     * Triggers ML Kit segmentation.
+     * Manages the 5-step capture workflow and triggers processing when complete.
      */
     fun onFrameCaptured(bitmap: Bitmap) {
         val currentImages = uiState.value.capturedTargetImages
         val newImages = currentImages + bitmap
         val currentStep = uiState.value.captureStep
 
-        // Immediate utilization: Go straight to Review/Segmentation after first capture
-        val nextStep = CaptureStep.REVIEW
+        val nextStep = when (currentStep) {
+            CaptureStep.FRONT -> CaptureStep.LEFT
+            CaptureStep.LEFT -> CaptureStep.RIGHT
+            CaptureStep.RIGHT -> CaptureStep.UP
+            CaptureStep.UP -> CaptureStep.DOWN
+            CaptureStep.DOWN -> CaptureStep.REVIEW
+            CaptureStep.REVIEW -> CaptureStep.REVIEW
+        }
 
-        // Finalize (Review Step)
-        updateState(uiState.value.copy(
-            capturedTargetImages = newImages,
-            isLoading = true
-        ), isUndoable = false)
+        viewModelScope.launch {
+            _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
+        }
 
+        if (nextStep != CaptureStep.REVIEW) {
+            updateState(uiState.value.copy(
+                capturedTargetImages = newImages,
+                captureStep = nextStep
+            ), isUndoable = false)
+        } else {
+            // All steps completed, begin processing
+            updateState(uiState.value.copy(
+                capturedTargetImages = newImages,
+                isLoading = true
+            ), isUndoable = false)
+            processCapturedTargets(newImages)
+        }
+    }
+
+    private fun processCapturedTargets(images: List<Bitmap>) {
         viewModelScope.launch {
             _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
 
             withContext(Dispatchers.IO) {
-                val frontImage = newImages.firstOrNull()
+                // Use the Front image (index 0) for the primary mask and refinement
+                val frontImage = images.firstOrNull()
                 if (frontImage == null) {
                     withContext(Dispatchers.Main) {
                         updateState(uiState.value.copy(isLoading = false))
@@ -343,7 +364,7 @@ class MainViewModel(
                     .enableConfidenceMask()
                     .build()
                 val segmenterOptions = SubjectSegmenterOptions.Builder()
-                    .enableMultipleSubjects(subjectOptions) // Pass true to enable the feature
+                    .enableMultipleSubjects(subjectOptions)
                     .build()
                 val segmenter = SubjectSegmentation.getClient(segmenterOptions)
                 val inputImage = InputImage.fromBitmap(frontImage, 0)
@@ -354,6 +375,7 @@ class MainViewModel(
                         viewModelScope.launch(Dispatchers.IO) {
                             try {
                                 val subject = result.subjects.firstOrNull()
+                                var maskUri: Uri? = null
 
                                 if (subject != null) {
                                     // Create a bitmap from the subject mask to apply it to the original image.
@@ -365,108 +387,84 @@ class MainViewModel(
                                         buffer.rewind()
                                         // Manually convert FloatBuffer to pixels (Fix for UnsupportedBufferException)
                                         val pixels = IntArray(width * height)
-                                        // Read floats into a temporary array if possible, or iterate
-                                        // FloatBuffer doesn't expose a float[] array usually if it's direct.
-                                        // But we can use get().
                                         for (i in 0 until width * height) {
                                             if (buffer.hasRemaining()) {
                                                 val confidence = buffer.get()
                                                 val alpha = (confidence * 255).toInt().coerceIn(0, 255)
                                                 // Create a white pixel with variable alpha.
-                                                // Color doesn't strictly matter for DST_IN mode, but Alpha does.
                                                 pixels[i] = (alpha shl 24) or 0x00FFFFFF
                                             }
                                         }
                                         maskBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
                                     }
 
-                                    // Create a new bitmap to hold the segmented subject.
-                                    val maskedBitmap = createBitmap(frontImage.width, frontImage.height, Bitmap.Config.ARGB_8888)
-                                    val canvas = Canvas(maskedBitmap)
-                                    val paint = Paint()
-                                    paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+                                    // Save mask to cache for refinement logic
+                                    maskUri = saveBitmapToCache(maskBitmap, "mask")
+                                }
 
-                                    // Draw the original image (Dest)
-                                    canvas.drawBitmap(frontImage, 0f, 0f, null)
-                                    // Draw the mask (Source) using DST_IN (Keep Dest where Source is opaque)
-                                    // Apply offset from Subject detection
-                                    canvas.drawBitmap(maskBitmap, subject.startX.toFloat(), subject.startY.toFloat(), paint)
+                                // Robustness: Pass ALL captured images to ARCore
+                                // This provides a multi-angle sample set for better tracking.
+                                arRenderer?.setAugmentedImageDatabase(images)
 
-                                    // Save mask to cache
-                                    val maskUri = saveBitmapToCache(maskBitmap, "mask")
-
-                                    val updatedImages = listOf(maskedBitmap) + newImages.drop(1)
-                                    arRenderer?.setAugmentedImageDatabase(updatedImages)
-
-                                    withContext(Dispatchers.Main) {
-                                        updateState(
-                                            uiState.value.copy(
-                                                capturedTargetImages = newImages, // Keep original for review
-                                                targetMaskUri = maskUri,
-                                                captureStep = CaptureStep.REVIEW,
-                                                targetCreationState = TargetCreationState.SUCCESS,
-                                                isArTargetCreated = true,
-                                                arState = ArState.LOCKED,
-                                                isLoading = false
-                                            )
+                                withContext(Dispatchers.Main) {
+                                    updateState(
+                                        uiState.value.copy(
+                                            capturedTargetImages = images,
+                                            targetMaskUri = maskUri,
+                                            captureStep = CaptureStep.REVIEW,
+                                            targetCreationState = TargetCreationState.SUCCESS,
+                                            isArTargetCreated = true,
+                                            arState = ArState.LOCKED,
+                                            isLoading = false
                                         )
-                                        Toast.makeText(getApplication(), "Grid created successfully", Toast.LENGTH_SHORT).show()
-                                        updateDetectedKeypoints()
-                                    }
-                                } else {
-                                    // Fallback to original image if segmentation fails
-                                    arRenderer?.setAugmentedImageDatabase(newImages)
-                                    withContext(Dispatchers.Main) {
-                                        updateState(
-                                            uiState.value.copy(
-                                                captureStep = CaptureStep.REVIEW,
-                                                targetCreationState = TargetCreationState.SUCCESS,
-                                                isArTargetCreated = true,
-                                                arState = ArState.LOCKED,
-                                                isLoading = false
-                                            )
-                                        )
-                                        Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
-                                        updateDetectedKeypoints()
-                                    }
+                                    )
+                                    Toast.makeText(getApplication(), "Grid created successfully", Toast.LENGTH_SHORT).show()
+                                    updateDetectedKeypoints()
                                 }
                             } catch (e: Exception) {
                                 Log.e("MainViewModel", "Error processing segmentation result", e)
                                 withContext(Dispatchers.Main) {
-                                    updateState(
-                                        uiState.value.copy(
-                                            isCapturingTarget = false,
-                                            targetCreationState = TargetCreationState.IDLE,
-                                            captureStep = CaptureStep.FRONT,
-                                            capturedTargetImages = emptyList(),
-                                            arState = ArState.SEARCHING,
-                                            isLoading = false
-                                        )
-                                    )
-                                    Toast.makeText(getApplication(), "Target creation failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                    handleTargetCreationFailure(e)
                                 }
                             }
                         }
                     }
                     .addOnFailureListener { e ->
                         Log.e("MainViewModel", "Segmentation failed", e)
-                        // On catastrophic failure, reset to searching so planes are still found
+                        // Fallback: If segmentation fails, still use the images for tracking
+                        // but without a mask.
+                        arRenderer?.setAugmentedImageDatabase(images)
                         viewModelScope.launch(Dispatchers.Main) {
-                            updateState(
+                             updateState(
                                 uiState.value.copy(
-                                    isCapturingTarget = false,
-                                    targetCreationState = TargetCreationState.IDLE,
-                                    captureStep = CaptureStep.FRONT,
-                                    capturedTargetImages = emptyList(),
-                                    arState = ArState.SEARCHING,
+                                    capturedTargetImages = images,
+                                    captureStep = CaptureStep.REVIEW,
+                                    targetCreationState = TargetCreationState.SUCCESS,
+                                    isArTargetCreated = true,
+                                    arState = ArState.LOCKED,
                                     isLoading = false
                                 )
                             )
-                            Toast.makeText(getApplication(), "Segmentation failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
+                            updateDetectedKeypoints()
                         }
                     }
             }
         }
+    }
+
+    private fun handleTargetCreationFailure(e: Exception) {
+        updateState(
+            uiState.value.copy(
+                isCapturingTarget = false,
+                targetCreationState = TargetCreationState.IDLE,
+                captureStep = CaptureStep.FRONT,
+                capturedTargetImages = emptyList(),
+                arState = ArState.SEARCHING,
+                isLoading = false
+            )
+        )
+        Toast.makeText(getApplication(), "Target creation failed: ${e.message}", Toast.LENGTH_LONG).show()
     }
 
 

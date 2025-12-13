@@ -171,16 +171,23 @@ class ArRenderer(
             // Create wrapper Mat for Y plane. Buffer must be direct.
             val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, rowStride.toLong())
 
-            // Deep copy to detach from Image/Camera resource
-            val processingMat = Mat()
-            yMat.copyTo(processingMat)
+            // Copy to ByteArray to detach from native memory and Image resource safely
+            val tempMat = Mat()
+            yMat.copyTo(tempMat)
+            val data = ByteArray((tempMat.total() * tempMat.channels()).toInt())
+            tempMat.get(0, 0, data)
 
-            // Release camera resources immediately
+            // Release resources
+            tempMat.release()
             yMat.release()
             image.close()
 
             CoroutineScope(Dispatchers.Default).launch {
                 try {
+                    // Reconstruct Mat from ByteArray
+                    val processingMat = Mat(height, width, CvType.CV_8UC1)
+                    processingMat.put(0, 0, data)
+
                     // Handle Rotation
                     val rotatedMat = if (rotation != 0f) {
                         val dst = Mat()
