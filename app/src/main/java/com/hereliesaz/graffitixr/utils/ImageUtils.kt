@@ -4,8 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
-import com.hereliesaz.graffitixr.data.RefinementPath
+import android.util.Log
 import com.hereliesaz.graffitixr.data.Fingerprint
+import com.hereliesaz.graffitixr.data.RefinementPath
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
@@ -156,25 +157,45 @@ fun applyMaskToBitmap(source: Bitmap, refinementPaths: List<RefinementPath>, aut
     return finalBitmap
 }
 
+fun resizeBitmapForArCore(bitmap: Bitmap, maxSize: Int = 1024): Bitmap {
+    val maxDimension = maxOf(bitmap.width, bitmap.height)
+    if (maxDimension <= maxSize) return bitmap
+
+    val scale = maxSize.toFloat() / maxDimension
+    val newWidth = (bitmap.width * scale).toInt()
+    val newHeight = (bitmap.height * scale).toInt()
+
+    return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+}
+
 fun generateFingerprint(bitmap: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Fingerprint {
-    val mat = Mat()
-    Utils.bitmapToMat(bitmap, mat)
-    val grayMat = Mat()
-    Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
+    try {
+        val mat = Mat()
+        Utils.bitmapToMat(bitmap, mat)
+        val grayMat = Mat()
+        Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
 
-    val maskMat = createMaskMatFromPaths(bitmap.width, bitmap.height, refinementPaths, autoMask)
+        val maskMat = createMaskMatFromPaths(bitmap.width, bitmap.height, refinementPaths, autoMask)
 
-    val orb = ORB.create()
-    val keypoints = MatOfKeyPoint()
-    val descriptors = Mat()
-    orb.detectAndCompute(grayMat, maskMat, keypoints, descriptors)
+        val orb = ORB.create()
+        val keypoints = MatOfKeyPoint()
+        val descriptors = Mat()
+        orb.detectAndCompute(grayMat, maskMat, keypoints, descriptors)
 
-    mat.release()
-    grayMat.release()
-    maskMat.release()
+        if (descriptors.rows() == 0) {
+            Log.w("ImageUtils", "No descriptors generated for fingerprint")
+        }
 
-    val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-    keypoints.release()
+        mat.release()
+        grayMat.release()
+        maskMat.release()
 
-    return fingerprint
+        val fingerprint = Fingerprint(keypoints.toList(), descriptors)
+        keypoints.release()
+
+        return fingerprint
+    } catch (e: Exception) {
+        Log.e("ImageUtils", "Error generating fingerprint", e)
+        throw e
+    }
 }

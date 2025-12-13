@@ -50,7 +50,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.FloatBuffer
 import kotlin.coroutines.resume
 import kotlin.math.abs
 
@@ -178,31 +177,45 @@ class MainViewModel(
 
     fun onConfirmTargetCreation() {
         viewModelScope.launch(Dispatchers.IO) {
-            val originalBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
-            val refinementPaths = uiState.value.refinementPaths
-            val maskUri = uiState.value.targetMaskUri
-            val mask = if (maskUri != null) BitmapUtils.getBitmapFromUri(getApplication(), maskUri) else null
+            try {
+                val originalBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
+                val refinementPaths = uiState.value.refinementPaths
+                val maskUri = uiState.value.targetMaskUri
+                val mask = if (maskUri != null) BitmapUtils.getBitmapFromUri(getApplication(), maskUri) else null
 
-            // Use ImageUtils to apply mask consistently
-            val refinedBitmap = com.hereliesaz.graffitixr.utils.applyMaskToBitmap(originalBitmap, refinementPaths, mask)
+                // Use ImageUtils to apply mask consistently
+                val refinedBitmap = com.hereliesaz.graffitixr.utils.applyMaskToBitmap(originalBitmap, refinementPaths, mask)
 
-            // Generate Fingerprint for persistence (OpenCV ORB)
-            val fingerprint = com.hereliesaz.graffitixr.utils.generateFingerprint(originalBitmap, refinementPaths, mask)
-            val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
+                // Generate Fingerprint for persistence (OpenCV ORB)
+                val fingerprint = com.hereliesaz.graffitixr.utils.generateFingerprint(originalBitmap, refinementPaths, mask)
+                val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
-            arRenderer?.setAugmentedImageDatabase(listOf(refinedBitmap))
-            arRenderer?.setFingerprint(fingerprint)
+                arRenderer?.setAugmentedImageDatabase(listOf(refinedBitmap))
+                arRenderer?.setFingerprint(fingerprint)
 
-            withContext(Dispatchers.Main) {
-                updateState(
-                    uiState.value.copy(
-                        isCapturingTarget = false,
-                        targetCreationState = TargetCreationState.SUCCESS,
-                        isArTargetCreated = true,
-                        arState = ArState.LOCKED,
-                        fingerprintJson = fingerprintJson
+                withContext(Dispatchers.Main) {
+                    updateState(
+                        uiState.value.copy(
+                            isCapturingTarget = false,
+                            targetCreationState = TargetCreationState.SUCCESS,
+                            isArTargetCreated = true,
+                            arState = ArState.LOCKED,
+                            fingerprintJson = fingerprintJson
+                        )
                     )
-                )
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error confirming target creation", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Target confirmation failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    updateState(
+                        uiState.value.copy(
+                            isCapturingTarget = false,
+                            targetCreationState = TargetCreationState.ERROR,
+                            arState = ArState.SEARCHING
+                        )
+                    )
+                }
             }
         }
     }
@@ -261,87 +274,104 @@ class MainViewModel(
                 segmenter.process(inputImage)
                     .addOnSuccessListener { result ->
                         viewModelScope.launch(Dispatchers.IO) {
-                            val subject = result.subjects.firstOrNull()
+                            try {
+                                val subject = result.subjects.firstOrNull()
 
-                            if (subject != null) {
-                                // Create a bitmap from the subject mask to apply it to the original image.
-                                val width = subject.width
-                                val height = subject.height
-                                val maskBitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                                val buffer = subject.confidenceMask
-                                if (buffer != null) { // Safely handle nullable buffer
-                                    buffer.rewind()
-                                    // Manually convert FloatBuffer to pixels (Fix for UnsupportedBufferException)
-                                    val pixels = IntArray(width * height)
-                                    // Read floats into a temporary array if possible, or iterate
-                                    // FloatBuffer doesn't expose a float[] array usually if it's direct.
-                                    // But we can use get().
-                                    for (i in 0 until width * height) {
-                                        if (buffer.hasRemaining()) {
-                                            val confidence = buffer.get()
-                                            val alpha = (confidence * 255).toInt().coerceIn(0, 255)
-                                            // Create a white pixel with variable alpha.
-                                            // Color doesn't strictly matter for DST_IN mode, but Alpha does.
-                                            pixels[i] = (alpha shl 24) or 0x00FFFFFF
+                                if (subject != null) {
+                                    // Create a bitmap from the subject mask to apply it to the original image.
+                                    val width = subject.width
+                                    val height = subject.height
+                                    val maskBitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                    val buffer = subject.confidenceMask
+                                    if (buffer != null) { // Safely handle nullable buffer
+                                        buffer.rewind()
+                                        // Manually convert FloatBuffer to pixels (Fix for UnsupportedBufferException)
+                                        val pixels = IntArray(width * height)
+                                        // Read floats into a temporary array if possible, or iterate
+                                        // FloatBuffer doesn't expose a float[] array usually if it's direct.
+                                        // But we can use get().
+                                        for (i in 0 until width * height) {
+                                            if (buffer.hasRemaining()) {
+                                                val confidence = buffer.get()
+                                                val alpha = (confidence * 255).toInt().coerceIn(0, 255)
+                                                // Create a white pixel with variable alpha.
+                                                // Color doesn't strictly matter for DST_IN mode, but Alpha does.
+                                                pixels[i] = (alpha shl 24) or 0x00FFFFFF
+                                            }
                                         }
+                                        maskBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
                                     }
-                                    maskBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+
+                                    // Create a new bitmap to hold the segmented subject.
+                                    val maskedBitmap = createBitmap(frontImage.width, frontImage.height, Bitmap.Config.ARGB_8888)
+                                    val canvas = Canvas(maskedBitmap)
+                                    val paint = Paint()
+                                    paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+
+                                    // Draw the original image (Dest)
+                                    canvas.drawBitmap(frontImage, 0f, 0f, null)
+                                    // Draw the mask (Source) using DST_IN (Keep Dest where Source is opaque)
+                                    // Apply offset from Subject detection
+                                    canvas.drawBitmap(maskBitmap, subject.startX.toFloat(), subject.startY.toFloat(), paint)
+
+                                    // Save mask to cache
+                                    val maskUri = saveBitmapToCache(maskBitmap, "mask")
+
+                                    val updatedImages = listOf(maskedBitmap) + newImages.drop(1)
+                                    arRenderer?.setAugmentedImageDatabase(updatedImages)
+
+                                    withContext(Dispatchers.Main) {
+                                        updateState(
+                                            uiState.value.copy(
+                                                capturedTargetImages = newImages, // Keep original for review
+                                                targetMaskUri = maskUri,
+                                                captureStep = CaptureStep.REVIEW,
+                                                targetCreationState = TargetCreationState.SUCCESS,
+                                                isArTargetCreated = true,
+                                                arState = ArState.LOCKED,
+                                                isLoading = false
+                                            )
+                                        )
+                                        Toast.makeText(getApplication(), "Grid created successfully", Toast.LENGTH_SHORT).show()
+                                        updateDetectedKeypoints()
+                                    }
+                                } else {
+                                    // Fallback to original image if segmentation fails
+                                    arRenderer?.setAugmentedImageDatabase(newImages)
+                                    withContext(Dispatchers.Main) {
+                                        updateState(
+                                            uiState.value.copy(
+                                                captureStep = CaptureStep.REVIEW,
+                                                targetCreationState = TargetCreationState.SUCCESS,
+                                                isArTargetCreated = true,
+                                                arState = ArState.LOCKED,
+                                                isLoading = false
+                                            )
+                                        )
+                                        Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
+                                        updateDetectedKeypoints()
+                                    }
                                 }
-
-
-                                // Create a new bitmap to hold the segmented subject.
-                                val maskedBitmap = createBitmap(frontImage.width, frontImage.height, Bitmap.Config.ARGB_8888)
-                                val canvas = Canvas(maskedBitmap)
-                                val paint = Paint()
-                                paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-
-                                // Draw the original image (Dest)
-                                canvas.drawBitmap(frontImage, 0f, 0f, null)
-                                // Draw the mask (Source) using DST_IN (Keep Dest where Source is opaque)
-                                // Apply offset from Subject detection
-                                canvas.drawBitmap(maskBitmap, subject.startX.toFloat(), subject.startY.toFloat(), paint)
-
-                                // Save mask to cache
-                                val maskUri = saveBitmapToCache(maskBitmap, "mask")
-
-                                val updatedImages = listOf(maskedBitmap) + newImages.drop(1)
-                                arRenderer?.setAugmentedImageDatabase(updatedImages)
-
+                            } catch (e: Exception) {
+                                Log.e("MainViewModel", "Error processing segmentation result", e)
                                 withContext(Dispatchers.Main) {
                                     updateState(
                                         uiState.value.copy(
-                                            capturedTargetImages = newImages, // Keep original for review
-                                            targetMaskUri = maskUri,
-                                            captureStep = CaptureStep.REVIEW,
-                                            targetCreationState = TargetCreationState.SUCCESS,
-                                            isArTargetCreated = true,
-                                            arState = ArState.LOCKED,
+                                            isCapturingTarget = false,
+                                            targetCreationState = TargetCreationState.IDLE,
+                                            captureStep = CaptureStep.FRONT,
+                                            capturedTargetImages = emptyList(),
+                                            arState = ArState.SEARCHING,
                                             isLoading = false
                                         )
                                     )
-                                    Toast.makeText(getApplication(), "Grid created successfully", Toast.LENGTH_SHORT).show()
-                                    updateDetectedKeypoints()
-                                }
-                            } else {
-                                // Fallback to original image if segmentation fails
-                                arRenderer?.setAugmentedImageDatabase(newImages)
-                                withContext(Dispatchers.Main) {
-                                    updateState(
-                                        uiState.value.copy(
-                                            captureStep = CaptureStep.REVIEW,
-                                            targetCreationState = TargetCreationState.SUCCESS,
-                                            isArTargetCreated = true,
-                                            arState = ArState.LOCKED,
-                                            isLoading = false
-                                        )
-                                    )
-                                    Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
-                                    updateDetectedKeypoints()
+                                    Toast.makeText(getApplication(), "Target creation failed: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
                             }
                         }
                     }
-                    .addOnFailureListener {
+                    .addOnFailureListener { e ->
+                        Log.e("MainViewModel", "Segmentation failed", e)
                         // On catastrophic failure, reset to searching so planes are still found
                         viewModelScope.launch(Dispatchers.Main) {
                             updateState(
@@ -354,7 +384,7 @@ class MainViewModel(
                                     isLoading = false
                                 )
                             )
-                            Toast.makeText(getApplication(), "Target creation failed. Try again.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(getApplication(), "Segmentation failed: ${e.message}", Toast.LENGTH_LONG).show()
                         }
                     }
             }
