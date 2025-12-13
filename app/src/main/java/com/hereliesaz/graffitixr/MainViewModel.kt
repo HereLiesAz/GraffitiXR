@@ -50,6 +50,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.FloatBuffer
 import kotlin.coroutines.resume
 import kotlin.math.abs
 
@@ -264,11 +265,27 @@ class MainViewModel(
 
                             if (subject != null) {
                                 // Create a bitmap from the subject mask to apply it to the original image.
-                                val maskBitmap = createBitmap(subject.width, subject.height, Bitmap.Config.ARGB_8888)
+                                val width = subject.width
+                                val height = subject.height
+                                val maskBitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
                                 val buffer = subject.confidenceMask
                                 if (buffer != null) { // Safely handle nullable buffer
                                     buffer.rewind()
-                                    maskBitmap.copyPixelsFromBuffer(buffer)
+                                    // Manually convert FloatBuffer to pixels (Fix for UnsupportedBufferException)
+                                    val pixels = IntArray(width * height)
+                                    // Read floats into a temporary array if possible, or iterate
+                                    // FloatBuffer doesn't expose a float[] array usually if it's direct.
+                                    // But we can use get().
+                                    for (i in 0 until width * height) {
+                                        if (buffer.hasRemaining()) {
+                                            val confidence = buffer.get()
+                                            val alpha = (confidence * 255).toInt().coerceIn(0, 255)
+                                            // Create a white pixel with variable alpha.
+                                            // Color doesn't strictly matter for DST_IN mode, but Alpha does.
+                                            pixels[i] = (alpha shl 24) or 0x00FFFFFF
+                                        }
+                                    }
+                                    maskBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
                                 }
 
 
@@ -276,11 +293,13 @@ class MainViewModel(
                                 val maskedBitmap = createBitmap(frontImage.width, frontImage.height, Bitmap.Config.ARGB_8888)
                                 val canvas = Canvas(maskedBitmap)
                                 val paint = Paint()
-                                paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+                                paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
 
-                                // Draw the original image, then the mask to extract the subject.
+                                // Draw the original image (Dest)
                                 canvas.drawBitmap(frontImage, 0f, 0f, null)
-                                canvas.drawBitmap(maskBitmap, 0f, 0f, paint)
+                                // Draw the mask (Source) using DST_IN (Keep Dest where Source is opaque)
+                                // Apply offset from Subject detection
+                                canvas.drawBitmap(maskBitmap, subject.startX.toFloat(), subject.startY.toFloat(), paint)
 
                                 // Save mask to cache
                                 val maskUri = saveBitmapToCache(maskBitmap, "mask")
