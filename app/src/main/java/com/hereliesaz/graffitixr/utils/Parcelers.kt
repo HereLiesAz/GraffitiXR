@@ -1,26 +1,11 @@
 package com.hereliesaz.graffitixr.utils
 
-import android.graphics.Bitmap
 import android.os.Parcel
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.TapFeedback
 import kotlinx.parcelize.Parceler
 
-object BitmapListParceler : Parceler<List<Bitmap>> {
-    override fun create(parcel: Parcel): List<Bitmap> {
-        val list = mutableListOf<Bitmap>()
-        parcel.readTypedList(list, Bitmap.CREATOR)
-        return list
-    }
-
-    override fun List<Bitmap>.write(parcel: Parcel, flags: Int) {
-        parcel.writeInt(size)
-        forEach { bitmap ->
-            parcel.writeParcelable(bitmap, flags)
-        }
-    }
-}
 
 object OffsetParceler : Parceler<Offset> {
     override fun create(parcel: Parcel): Offset {

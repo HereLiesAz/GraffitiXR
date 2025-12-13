@@ -8,12 +8,12 @@ import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.AugmentedImageDatabase
 import com.hereliesaz.graffitixr.data.GithubRelease
 import com.hereliesaz.graffitixr.data.RefinementPath
-import com.hereliesaz.graffitixr.utils.BitmapListParceler
 import com.hereliesaz.graffitixr.utils.BlendModeParceler
 import com.hereliesaz.graffitixr.utils.DrawingPathsParceler
 import com.hereliesaz.graffitixr.utils.OffsetListParceler
 import com.hereliesaz.graffitixr.utils.OffsetParceler
 import com.hereliesaz.graffitixr.utils.TapFeedbackParceler
+import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.RawValue
 import kotlinx.parcelize.WriteWith
@@ -102,7 +102,8 @@ data class UiState(
     val qualityWarning: String? = null,
     val captureFailureTimestamp: Long = 0L, // Used to trigger UI animations (red glow)
     val capturedTargetUris: List<Uri> = emptyList(),
-    val capturedTargetImages: @WriteWith<BitmapListParceler> List<Bitmap> = emptyList(),
+    @IgnoredOnParcel
+    val capturedTargetImages: List<Bitmap> = emptyList(),
 
     // Evolution History
     val evolutionCaptureUris: List<Uri> = emptyList(),
