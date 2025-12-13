@@ -5,10 +5,6 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.IntentFilter
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
@@ -22,6 +18,8 @@ import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.common.moduleinstall.ModuleInstall
+import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
@@ -35,9 +33,6 @@ import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.applyCurves
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
-import com.google.android.gms.common.moduleinstall.ModuleInstall
-import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
-import com.google.mlkit.common.MlKitException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -56,36 +51,15 @@ import java.io.FileOutputStream
 import kotlin.coroutines.resume
 import kotlin.math.abs
 
-/**
- * Events related to screen capture requests.
- */
 sealed class CaptureEvent {
-    /**
-     * Signal to capture the current screen content.
-     */
     object RequestCapture : CaptureEvent()
 }
 
-/**
- * Events related to haptic or visual feedback.
- */
 sealed class FeedbackEvent {
     object VibrateSingle : FeedbackEvent()
     object VibrateDouble : FeedbackEvent()
 }
 
-/**
- * The primary ViewModel for the GraffitiXR application.
- *
- * This class is responsible for:
- * 1.  Managing the global UI state (`UiState`).
- * 2.  Handling user interactions and business logic.
- * 3.  Coordinating between the UI, AR system (`ArRenderer`), and Data Layer (`ProjectManager`).
- * 4.  Executing background tasks like image processing, network requests (updates), and auto-saving.
- *
- * @param application The Android Application context.
- * @param savedStateHandle Handle for saving state across process death.
- */
 class MainViewModel(
     application: Application,
     private val savedStateHandle: SavedStateHandle
@@ -94,49 +68,29 @@ class MainViewModel(
     private val onboardingManager = OnboardingManager(application)
     private val projectManager = ProjectManager(application)
 
-    // Undo/Redo stacks
     private val undoStack = mutableListOf<UiState>()
     private val redoStack = mutableListOf<UiState>()
 
-    /**
-     * The single source of truth for the UI state.
-     * Observes changes to 'uiState' in the SavedStateHandle.
-     */
     val uiState: StateFlow<UiState> = savedStateHandle.getStateFlow("uiState", UiState())
 
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
-    /**
-     * Flow of capture events to be handled by the UI (e.g., PixelCopy).
-     */
     val captureEvent = _captureEvent.asSharedFlow()
 
     private val _feedbackEvent = MutableSharedFlow<FeedbackEvent>()
-    /**
-     * Flow of feedback events (haptics).
-     */
     val feedbackEvent = _feedbackEvent.asSharedFlow()
 
     private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
-    /**
-     * State for visual tap feedback (ripples).
-     */
     val tapFeedback = _tapFeedback.asStateFlow()
 
-    /**
-     * Reference to the active AR Renderer.
-     * Injected by the [ArView] composable when the AR surface is created.
-     */
     var arRenderer: ArRenderer? = null
 
     init {
-        // Initialize onboarding state
         val completedModes = onboardingManager.getCompletedModes()
         updateState(uiState.value.copy(
             completedOnboardingModes = completedModes,
             showOnboardingDialogForMode = if (!completedModes.contains(uiState.value.editorMode)) uiState.value.editorMode else null
         ), isUndoable = false)
 
-        // Register receiver for APK download completion
         val receiver = ApkInstallReceiver()
         ContextCompat.registerReceiver(
             application,
@@ -147,9 +101,6 @@ class MainViewModel(
         startAutoSave()
     }
 
-    /**
-     * Starts a coroutine loop that triggers an auto-save every 30 seconds.
-     */
     private fun startAutoSave() {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
@@ -167,10 +118,6 @@ class MainViewModel(
 
     // --- AR Target Creation Logic ---
 
-    /**
-     * Called when the camera shutter button is clicked.
-     * Triggers AR frame capture if in AR mode, otherwise requests a standard screenshot.
-     */
     fun onCaptureShutterClicked() {
         if (uiState.value.isCapturingTarget && uiState.value.editorMode == EditorMode.AR) {
             arRenderer?.triggerCapture()
@@ -181,9 +128,6 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Cancels the AR target creation process and resets the state.
-     */
     fun onCancelCaptureClicked() {
         updateState(uiState.value.copy(
             isCapturingTarget = false,
@@ -193,20 +137,12 @@ class MainViewModel(
         ))
     }
 
-    /**
-     * Adds a new refinement path (mask) to the current AR target.
-     * @param path The vector path to add.
-     */
     fun onRefinementPathAdded(path: com.hereliesaz.graffitixr.data.RefinementPath) {
         val currentPaths = uiState.value.refinementPaths
         updateState(uiState.value.copy(refinementPaths = currentPaths + path), isUndoable = true)
         updateDetectedKeypoints()
     }
 
-    /**
-     * Updates the list of detected keypoints based on the current target image and mask.
-     * Runs on a background thread using OpenCV.
-     */
     private fun updateDetectedKeypoints() {
         viewModelScope.launch(Dispatchers.IO) {
             val bitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
@@ -221,9 +157,6 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Toggles the refinement mode for the captured target.
-     */
     fun onRefineTargetToggled() {
         if (uiState.value.capturedTargetImages.isNotEmpty()) {
             updateState(uiState.value.copy(
@@ -235,17 +168,10 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Changes the tool used in refinement mode (Eraser vs. Pencil).
-     */
     fun onRefinementModeChanged(isEraser: Boolean) {
         updateState(uiState.value.copy(isRefinementEraser = isEraser), isUndoable = false)
     }
 
-    /**
-     * Finalizes the target creation process.
-     * Generates the final masked bitmap, computes the fingerprint, and updates the AR session.
-     */
     fun onConfirmTargetCreation() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -254,13 +180,22 @@ class MainViewModel(
                 val maskUri = uiState.value.targetMaskUri
                 val mask = if (maskUri != null) BitmapUtils.getBitmapFromUri(getApplication(), maskUri) else null
 
-                // Use ImageUtils to apply mask consistently
+                // Apply the final mask
                 val refinedBitmap = com.hereliesaz.graffitixr.utils.applyMaskToBitmap(originalBitmap, refinementPaths, mask)
 
-                // Generate Fingerprint for persistence (OpenCV ORB)
+                // Generate Fingerprint
                 val fingerprint = com.hereliesaz.graffitixr.utils.generateFingerprint(originalBitmap, refinementPaths, mask)
+
+                if (fingerprint.keypoints.isEmpty() || fingerprint.descriptors.empty()) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "No features found. Try a more detailed surface.", Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
+
                 val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
+                // Update AR Renderer
                 arRenderer?.setAugmentedImageDatabase(listOf(refinedBitmap))
                 arRenderer?.setFingerprint(fingerprint)
 
@@ -270,7 +205,7 @@ class MainViewModel(
                             isCapturingTarget = false,
                             targetCreationState = TargetCreationState.SUCCESS,
                             isArTargetCreated = true,
-                            arState = ArState.LOCKED,
+                            arState = ArState.SEARCHING, // Start SEARCHING for the anchor
                             fingerprintJson = fingerprintJson
                         )
                     )
@@ -291,17 +226,10 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Called when AR tracking fails or recovers.
-     * @param message The warning message, or null if tracking is healthy.
-     */
     fun onTrackingFailure(message: String?) {
         updateState(uiState.value.copy(qualityWarning = message), isUndoable = false)
     }
 
-    /**
-     * Initiates the AR target creation flow.
-     */
     fun onCreateTargetClicked() {
         updateState(uiState.value.copy(
             isCapturingTarget = true,
@@ -310,10 +238,6 @@ class MainViewModel(
         ), isUndoable = false)
     }
 
-    /**
-     * Callback from ArRenderer when a frame is captured for the target.
-     * Manages the 5-step capture workflow and triggers processing when complete.
-     */
     fun onFrameCaptured(bitmap: Bitmap) {
         val currentImages = uiState.value.capturedTargetImages
         val newImages = currentImages + bitmap
@@ -338,7 +262,6 @@ class MainViewModel(
                 captureStep = nextStep
             ), isUndoable = false)
         } else {
-            // All steps completed, begin processing
             updateState(uiState.value.copy(
                 capturedTargetImages = newImages,
                 isLoading = true
@@ -351,7 +274,6 @@ class MainViewModel(
         viewModelScope.launch {
             _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
 
-            // Ensure ML Kit module is installed
             val moduleInstallClient = ModuleInstall.getClient(getApplication())
             val subjectOptions = SubjectSegmenterOptions.SubjectResultOptions.Builder()
                 .enableConfidenceMask()
@@ -362,36 +284,32 @@ class MainViewModel(
             val segmenter = SubjectSegmentation.getClient(segmenterOptions)
 
             val areModulesAvailable = try {
-                 withContext(Dispatchers.IO) {
-                     com.google.android.gms.tasks.Tasks.await(
-                         moduleInstallClient.areModulesAvailable(segmenter)
-                     ).areModulesAvailable()
-                 }
-            } catch (e: Exception) {
-                false
-            }
+                withContext(Dispatchers.IO) {
+                    com.google.android.gms.tasks.Tasks.await(
+                        moduleInstallClient.areModulesAvailable(segmenter)
+                    ).areModulesAvailable()
+                }
+            } catch (e: Exception) { false }
 
             if (!areModulesAvailable) {
                 withContext(Dispatchers.Main) {
-                     Toast.makeText(getApplication(), "Downloading AI models... Please wait.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(getApplication(), "Downloading AI models... Please wait.", Toast.LENGTH_LONG).show()
                 }
                 try {
                     withContext(Dispatchers.IO) {
-                         val request = ModuleInstallRequest.newBuilder()
-                             .addApi(segmenter)
-                             .build()
-                         com.google.android.gms.tasks.Tasks.await(
-                             moduleInstallClient.installModules(request)
-                         )
+                        val request = ModuleInstallRequest.newBuilder()
+                            .addApi(segmenter)
+                            .build()
+                        com.google.android.gms.tasks.Tasks.await(
+                            moduleInstallClient.installModules(request)
+                        )
                     }
                 } catch (e: Exception) {
                     Log.e("MainViewModel", "Failed to request module install", e)
-                     // Proceed anyway, maybe it just finished or we can fallback
                 }
             }
 
             withContext(Dispatchers.IO) {
-                // Use the Front image (index 0) for the primary mask and refinement
                 val frontImage = images.firstOrNull()
                 if (frontImage == null) {
                     withContext(Dispatchers.Main) {
@@ -403,7 +321,6 @@ class MainViewModel(
 
                 val inputImage = InputImage.fromBitmap(frontImage, 0)
 
-                // ML Kit Segmentation Call
                 segmenter.process(inputImage)
                     .addOnSuccessListener { result ->
                         viewModelScope.launch(Dispatchers.IO) {
@@ -412,32 +329,25 @@ class MainViewModel(
                                 var maskUri: Uri? = null
 
                                 if (subject != null) {
-                                    // Create a bitmap from the subject mask to apply it to the original image.
                                     val width = subject.width
                                     val height = subject.height
                                     val maskBitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
                                     val buffer = subject.confidenceMask
-                                    if (buffer != null) { // Safely handle nullable buffer
+                                    if (buffer != null) {
                                         buffer.rewind()
-                                        // Manually convert FloatBuffer to pixels (Fix for UnsupportedBufferException)
                                         val pixels = IntArray(width * height)
                                         for (i in 0 until width * height) {
                                             if (buffer.hasRemaining()) {
                                                 val confidence = buffer.get()
                                                 val alpha = (confidence * 255).toInt().coerceIn(0, 255)
-                                                // Create a white pixel with variable alpha.
                                                 pixels[i] = (alpha shl 24) or 0x00FFFFFF
                                             }
                                         }
                                         maskBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
                                     }
-
-                                    // Save mask to cache for refinement logic
                                     maskUri = saveBitmapToCache(maskBitmap, "mask")
                                 }
 
-                                // Robustness: Pass ALL captured images to ARCore
-                                // This provides a multi-angle sample set for better tracking.
                                 arRenderer?.setAugmentedImageDatabase(images)
 
                                 withContext(Dispatchers.Main) {
@@ -448,7 +358,7 @@ class MainViewModel(
                                             captureStep = CaptureStep.REVIEW,
                                             targetCreationState = TargetCreationState.SUCCESS,
                                             isArTargetCreated = true,
-                                            arState = ArState.LOCKED,
+                                            arState = ArState.SEARCHING, // Searching for anchor
                                             isLoading = false
                                         )
                                     )
@@ -465,30 +375,20 @@ class MainViewModel(
                     }
                     .addOnFailureListener { e ->
                         Log.e("MainViewModel", "Segmentation failed", e)
-
-                        if (e is MlKitException && e.errorCode == MlKitException.UNAVAILABLE) {
-                             viewModelScope.launch(Dispatchers.Main) {
-                                 Toast.makeText(getApplication(), "AI Model downloading... Try again shortly.", Toast.LENGTH_LONG).show()
-                                 handleTargetCreationFailure(e)
-                             }
-                        } else {
-                            // Fallback: If segmentation fails, still use the images for tracking
-                            // but without a mask.
-                            arRenderer?.setAugmentedImageDatabase(images)
-                            viewModelScope.launch(Dispatchers.Main) {
-                                updateState(
-                                    uiState.value.copy(
-                                        capturedTargetImages = images,
-                                        captureStep = CaptureStep.REVIEW,
-                                        targetCreationState = TargetCreationState.SUCCESS,
-                                        isArTargetCreated = true,
-                                        arState = ArState.LOCKED,
-                                        isLoading = false
-                                    )
+                        arRenderer?.setAugmentedImageDatabase(images)
+                        viewModelScope.launch(Dispatchers.Main) {
+                            updateState(
+                                uiState.value.copy(
+                                    capturedTargetImages = images,
+                                    captureStep = CaptureStep.REVIEW,
+                                    targetCreationState = TargetCreationState.SUCCESS,
+                                    isArTargetCreated = true,
+                                    arState = ArState.SEARCHING,
+                                    isLoading = false
                                 )
-                                Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
-                                updateDetectedKeypoints()
-                            }
+                            )
+                            Toast.makeText(getApplication(), "Grid created (segmentation failed)", Toast.LENGTH_SHORT).show()
+                            updateDetectedKeypoints()
                         }
                     }
             }
@@ -510,9 +410,6 @@ class MainViewModel(
     }
 
 
-    /**
-     * Exports the current project state to a ZIP file at the specified URI.
-     */
     fun exportProjectToUri(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             setLoading(true)
@@ -559,9 +456,6 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Cycles through the active rotation axis (X -> Y -> Z).
-     */
     fun onCycleRotationAxis() {
         val currentAxis = uiState.value.activeRotationAxis
         val nextAxis = when (currentAxis) {
@@ -573,10 +467,6 @@ class MainViewModel(
         Toast.makeText(getApplication(), "Rotation Axis: ${nextAxis.name}", Toast.LENGTH_SHORT).show()
     }
 
-    /**
-     * Scales the AR object.
-     * @param scaleFactor Multiplier for the current scale.
-     */
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
         val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
@@ -596,9 +486,6 @@ class MainViewModel(
         updateState(uiState.value.copy(rotationZ = currentRotation + delta), isUndoable = false)
     }
 
-    /**
-     * Hides the rotation axis feedback after a delay.
-     */
     fun onFeedbackShown() {
         viewModelScope.launch {
             delay(1000)
@@ -606,25 +493,16 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Updates the AR plane detection status.
-     */
     fun setArPlanesDetected(detected: Boolean) {
         if (uiState.value.isArPlanesDetected != detected) {
             updateState(uiState.value.copy(isArPlanesDetected = detected), isUndoable = false)
         }
     }
 
-    /**
-     * Called when the AR object is successfully placed in the world.
-     */
     fun onArImagePlaced() {
-        updateState(uiState.value.copy(arState = ArState.PLACED), isUndoable = false)
+        updateState(uiState.value.copy(arState = ArState.LOCKED), isUndoable = false)
     }
 
-    /**
-     * Updates the project progress based on AR tracking analysis.
-     */
     fun onProgressUpdate(progress: Float, bitmap: Bitmap? = null) {
         val currentProgress = uiState.value.progressPercentage
         val isSignificant = abs(progress - currentProgress) > 5.0f
@@ -646,9 +524,6 @@ class MainViewModel(
         updateState(uiState.value.copy(isTouchLocked = locked), isUndoable = false)
     }
 
-    /**
-     * Triggers a visual feedback effect for a tap interaction.
-     */
     fun showTapFeedback(position: Offset, isSuccess: Boolean) {
         viewModelScope.launch {
             _tapFeedback.value = if (isSuccess) TapFeedback.Success(position) else TapFeedback.Failure(position)
@@ -657,9 +532,6 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Removes the background from the current overlay image using ML Kit.
-     */
     fun onRemoveBackgroundClicked() {
         viewModelScope.launch {
             setLoading(true)
@@ -696,9 +568,6 @@ class MainViewModel(
         updateState(uiState.value.copy(brightness = brightness), isUndoable = false)
     }
 
-    /**
-     * Toggles the "Line Drawing" effect for the overlay image.
-     */
     fun onLineDrawingClicked() {
         viewModelScope.launch {
             setLoading(true)
@@ -792,10 +661,6 @@ class MainViewModel(
         updateState(uiState.value.copy(showDoubleTapHint = false))
     }
 
-    /**
-     * Called when the user finishes adjusting the curves points.
-     * Triggers the image processing on the background thread.
-     */
     fun onCurvesPointsChangeFinished() {
         viewModelScope.launch {
             val uri = uiState.value.overlayImageUri
@@ -840,7 +705,6 @@ class MainViewModel(
     }
 
     fun saveCapturedBitmap(bitmap: Bitmap) {
-        // Restore UI immediately
         updateState(uiState.value.copy(hideUiForCapture = false), isUndoable = false)
 
         viewModelScope.launch {
@@ -883,19 +747,15 @@ class MainViewModel(
         updateState(uiState.value.copy(blendMode = nextMode))
     }
 
-    /**
-     * Resets rotation or snaps AR object to target.
-     */
     fun onMagicClicked() {
         val state = uiState.value
         if (state.rotationX != 0f || state.rotationY != 0f || state.rotationZ != 0f) {
             updateState(state.copy(rotationX = 0f, rotationY = 0f, rotationZ = 0f))
             Toast.makeText(getApplication(), "Aligned Flat", Toast.LENGTH_SHORT).show()
         } else if (state.arState == ArState.PLACED) {
-            updateState(state.copy(arState = ArState.LOCKED))
-            Toast.makeText(getApplication(), "Snapped to Target", Toast.LENGTH_SHORT).show()
+            Toast.makeText(getApplication(), "Already Anchored", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(getApplication(), "Already aligned", Toast.LENGTH_SHORT).show()
+            Toast.makeText(getApplication(), "Point at target to anchor", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1017,9 +877,6 @@ class MainViewModel(
         } catch (e: Exception) { return null }
     }
 
-    /**
-     * Saves a bitmap to the app's cache directory.
-     */
     private fun saveBitmapToCache(bitmap: Bitmap, prefix: String = "target"): Uri? {
         try {
             val context = getApplication<Application>().applicationContext
@@ -1085,9 +942,6 @@ class MainViewModel(
         }
     }
 
-    /**
-     * Checks for application updates via the GitHub API.
-     */
     fun checkForUpdates() {
         viewModelScope.launch {
             updateState(uiState.value.copy(isCheckingForUpdate = true, updateStatusMessage = null), isUndoable = false)

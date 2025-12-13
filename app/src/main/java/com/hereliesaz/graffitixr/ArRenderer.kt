@@ -12,6 +12,7 @@ import android.os.Looper
 import android.util.Log
 import coil.imageLoader
 import coil.request.ImageRequest
+import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.AugmentedImageDatabase
@@ -20,7 +21,6 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
-import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.data.Fingerprint
@@ -50,21 +50,7 @@ import javax.microedition.khronos.opengles.GL10
 
 /**
  * Custom GLSurfaceView.Renderer that handles the ARCore session and OpenGL ES rendering.
- *
- * This class is responsible for:
- * 1.  Managing the ARCore [Session] lifecycle.
- * 2.  Rendering the camera background stream.
- * 3.  Rendering AR planes (for debugging/placement) and Point Clouds.
- * 4.  Rendering the "Augmented Image" overlay (the user's art).
- * 5.  Handling AR anchor placement via raycasting (Tap and Pan).
- * 6.  Performing background analysis (OpenCV ORB) for progress tracking.
- *
- * @property context Application context.
- * @property onPlanesDetected Callback when AR planes are found (or lost).
- * @property onFrameCaptured Callback when a camera frame is captured for target creation.
- * @property onAnchorCreated Callback when an AR anchor is successfully created.
- * @property onProgressUpdated Callback for progress tracking updates.
- * @property onTrackingFailure Callback for AR tracking errors/warnings.
+ * Implements "The Flip": Triggers on Image, Locks to Anchor, with Depth Occlusion.
  */
 class ArRenderer(
     private val context: Context,
@@ -78,10 +64,8 @@ class ArRenderer(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var wasTracking = false
 
-    // Lock to synchronize session access between GL thread and other threads (UI/IO)
     private val sessionLock = ReentrantLock()
 
-    // AR Session
     @Volatile
     var session: Session? = null
     private val displayRotationHelper = DisplayRotationHelper(context)
@@ -92,8 +76,11 @@ class ArRenderer(
     private val pointCloudRenderer = PointCloudRenderer()
     private val simpleQuadRenderer = SimpleQuadRenderer()
 
-    // Utils
     private val yuvToRgbConverter = YuvToRgbConverter(context)
+
+    // Depth API State
+    private var isDepthSupported = false
+    private var depthTextureId = -1
 
     // Flags & State
     @Volatile private var captureNextFrame = false
@@ -103,6 +90,9 @@ class ArRenderer(
     @Volatile var overlayBitmap: Bitmap? = null
     @Volatile var arImagePose: FloatArray? = null
     @Volatile var arState: ArState = ArState.SEARCHING
+
+    // The Anchor that holds the artwork in place
+    private var activeAnchor: Anchor? = null
 
     // Transforms
     var opacity: Float = 1.0f
@@ -120,39 +110,22 @@ class ArRenderer(
     private var pendingPanX = 0f
     private var pendingPanY = 0f
 
-    // Reusable arrays for projection to avoid allocation.
-    // NOTE: These are not thread-safe and must only be used on the GL thread (handlePan).
-    private val worldPos = FloatArray(4)
-    private val eyePos = FloatArray(4)
-    private val clipPos = FloatArray(4)
-
     private val orb = ORB.create()
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
     private var lastAnalysisTime = 0L
-    private val ANALYSIS_INTERVAL_MS = 2000L
+    private val ANALYSIS_INTERVAL_MS = 1500L
     private val analysisScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    /**
-     * Sets the target fingerprint for tracking progress.
-     */
     fun setFingerprint(fingerprint: Fingerprint) {
         this.originalDescriptors = fingerprint.descriptors
         this.originalKeypointCount = fingerprint.keypoints.size
     }
 
-    /**
-     * Analyzes the current AR frame using OpenCV ORB on a background thread.
-     * Extracts features and compares them to the original fingerprint to determine coverage progress.
-     */
     private fun analyzeFrameAsync(frame: Frame) {
         val image = try {
             frame.acquireCameraImage()
         } catch (e: NotYetAvailableException) {
-            if (wasTracking) {
-                wasTracking = false
-                mainHandler.post { onTrackingFailure("Tracking lost. Move device to re-establish.") }
-            }
             return
         } catch (e: Exception) {
             Log.e(TAG, "Failed to acquire image for analysis", e)
@@ -161,34 +134,26 @@ class ArRenderer(
 
         try {
             val rotation = getRotationDegrees()
-
-            // Extract Y-plane (Grayscale) directly
             val yBuffer = image.planes[0].buffer
             val width = image.width
             val height = image.height
             val rowStride = image.planes[0].rowStride
 
-            // Create wrapper Mat for Y plane. Buffer must be direct.
             val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, rowStride.toLong())
-
-            // Copy to ByteArray to detach from native memory and Image resource safely
             val tempMat = Mat()
             yMat.copyTo(tempMat)
             val data = ByteArray((tempMat.total() * tempMat.channels()).toInt())
             tempMat.get(0, 0, data)
 
-            // Release resources
             tempMat.release()
             yMat.release()
             image.close()
 
             analysisScope.launch {
                 try {
-                    // Reconstruct Mat from ByteArray
                     val processingMat = Mat(height, width, CvType.CV_8UC1)
                     processingMat.put(0, 0, data)
 
-                    // Handle Rotation
                     val rotatedMat = if (rotation != 0f) {
                         val dst = Mat()
                         val rotateCode = when (rotation) {
@@ -208,17 +173,18 @@ class ArRenderer(
                         processingMat
                     }
 
-                    // Run ORB (using rotatedMat which is already grayscale)
                     val descriptors = Mat()
                     val keypoints = MatOfKeyPoint()
                     synchronized(orb) {
                         orb.detectAndCompute(rotatedMat, Mat(), keypoints, descriptors)
                     }
 
-                    if (descriptors.rows() > 0 && originalDescriptors != null) {
+                    val targetDescriptors = originalDescriptors
+
+                    if (descriptors.rows() > 0 && targetDescriptors != null && !targetDescriptors.empty()) {
                         val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
                         val matches = MatOfDMatch()
-                        matcher.match(descriptors, originalDescriptors, matches)
+                        matcher.match(descriptors, targetDescriptors, matches)
 
                         val matchesList = matches.toList()
                         val goodMatches = matchesList.filter { it.distance < 60 }.size
@@ -237,10 +203,6 @@ class ArRenderer(
                     rotatedMat.release()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in analysis coroutine", e)
-                    // If processingMat was NOT released due to exception before logic, it might leak.
-                    // But in this block, 'processingMat' is either released or passed to 'rotatedMat'.
-                    // 'rotatedMat' is released at end.
-                    // To be strictly safe we could use 'use' logic for Mats too, but this is better than before.
                 }
             }
         } catch (e: Exception) {
@@ -257,9 +219,21 @@ class ArRenderer(
             planeRenderer.createOnGlThread()
             pointCloudRenderer.createOnGlThread()
             simpleQuadRenderer.createOnGlThread()
+            createDepthTexture()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize renderers", e)
         }
+    }
+
+    private fun createDepthTexture() {
+        val textures = IntArray(1)
+        GLES20.glGenTextures(1, textures, 0)
+        depthTextureId = textures[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, depthTextureId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -275,92 +249,131 @@ class ArRenderer(
         if (!sessionLock.tryLock()) return
 
         try {
-            // Safety check: Skip frame if session is null
             if (session == null) return
 
-            try {
-                session!!.setCameraTextureName(backgroundRenderer.textureId)
-                displayRotationHelper.updateSessionIfNeeded(session!!)
+            if (isDepthSupported) {
+                try {
+                    val frame = session!!.update()
+                    updateDepthTexture(frame)
+                    drawFrame(frame)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error updating depth/frame", e)
+                }
+            } else {
                 val frame = session?.update() ?: return
-
-                backgroundRenderer.draw(frame)
-
-                var frameProcessed = false
-
-                if (captureNextFrame) {
-                    captureFrameForFingerprint(frame)
-                    captureNextFrame = false
-                    frameProcessed = true
-                }
-
-                if (!frameProcessed && System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
-                    lastAnalysisTime = System.currentTimeMillis()
-                    analyzeFrameAsync(frame)
-                }
-
-                val camera = frame.camera
-
-                if (camera.trackingState == TrackingState.TRACKING) {
-                    if (!wasTracking) {
-                        wasTracking = true
-                        mainHandler.post { onTrackingFailure(null) }
-                    }
-                } else {
-                    if (wasTracking) {
-                        wasTracking = false
-                        mainHandler.post { onTrackingFailure("Tracking lost. Point device at grid.") }
-                    }
-                    return
-                }
-
-                val projmtx = FloatArray(16)
-                camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
-                val viewmtx = FloatArray(16)
-                camera.getViewMatrix(viewmtx, 0)
-
-                frame.acquirePointCloud().use { pointCloud ->
-                    pointCloudRenderer.draw(pointCloud, viewmtx, projmtx)
-                }
-
-                when (arState) {
-                    ArState.SEARCHING -> {
-                        val planes = session!!.getAllTrackables(Plane::class.java)
-                        var hasTrackingPlane = false
-                        for (plane in planes) {
-                            if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                                planeRenderer.draw(plane, viewmtx, projmtx)
-                                hasTrackingPlane = true
-                            }
-                        }
-                        mainHandler.post { onPlanesDetected(hasTrackingPlane) }
-                        handleTap(frame)
-                    }
-                    ArState.LOCKED -> {
-                        handlePan(frame, viewmtx, projmtx)
-                        val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
-                        for (img in updatedAugmentedImages) {
-                            if (img.trackingState == TrackingState.TRACKING && img.name.startsWith("target")) {
-                                val pose = img.centerPose
-                                val poseMatrix = FloatArray(16)
-                                pose.toMatrix(poseMatrix, 0)
-                                arImagePose = poseMatrix
-                                break
-                            }
-                        }
-                        drawArtwork(viewmtx, projmtx)
-                    }
-                    ArState.PLACED -> {
-                        handlePan(frame, viewmtx, projmtx)
-                        drawArtwork(viewmtx, projmtx)
-                    }
-                }
-            } catch (e: SessionPausedException) {
-                mainHandler.post { onTrackingFailure("AR session paused. Please wait.") }
-            } catch (t: Throwable) {
-                Log.e(TAG, "Exception on the GL Thread", t)
+                drawFrame(frame)
             }
+        } catch (e: SessionPausedException) {
+            mainHandler.post { onTrackingFailure("AR session paused.") }
+        } catch (t: Throwable) {
+            Log.e(TAG, "Exception on the GL Thread", t)
         } finally {
             sessionLock.unlock()
+        }
+    }
+
+    private fun updateDepthTexture(frame: Frame) {
+        try {
+            // Retrieve 16-bit depth image
+            val depthImage = frame.acquireDepthImage16Bits()
+            if (depthImage != null) {
+                val buffer = depthImage.planes[0].buffer
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, depthTextureId)
+                // Load 16-bit data as LUMINANCE (simple mapping for GL ES 2.0)
+                GLES20.glTexImage2D(
+                    GLES20.GL_TEXTURE_2D, 0, GLES20.GL_LUMINANCE,
+                    depthImage.width, depthImage.height, 0,
+                    GLES20.GL_LUMINANCE, GLES20.GL_UNSIGNED_SHORT, buffer
+                )
+                depthImage.close()
+            }
+        } catch (e: NotYetAvailableException) {
+            // Depth not ready yet
+        }
+    }
+
+    private fun drawFrame(frame: Frame) {
+        session!!.setCameraTextureName(backgroundRenderer.textureId)
+        displayRotationHelper.updateSessionIfNeeded(session!!)
+
+        backgroundRenderer.draw(frame)
+
+        if (!captureNextFrame && System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
+            lastAnalysisTime = System.currentTimeMillis()
+            analyzeFrameAsync(frame)
+        }
+
+        if (captureNextFrame) {
+            captureFrameForFingerprint(frame)
+            captureNextFrame = false
+        }
+
+        val camera = frame.camera
+        if (camera.trackingState == TrackingState.TRACKING) {
+            if (!wasTracking) {
+                wasTracking = true
+                mainHandler.post { onTrackingFailure(null) }
+            }
+        } else {
+            if (wasTracking) {
+                wasTracking = false
+                mainHandler.post { onTrackingFailure("Tracking lost.") }
+            }
+            return
+        }
+
+        val projmtx = FloatArray(16)
+        camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
+        val viewmtx = FloatArray(16)
+        camera.getViewMatrix(viewmtx, 0)
+
+        // --- Anchor Logic ---
+        // If we are waiting to lock onto a target...
+        if (activeAnchor == null && arState != ArState.PLACED) {
+            val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
+            for (img in updatedAugmentedImages) {
+                if (img.trackingState == TrackingState.TRACKING && img.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING) {
+                    // Create Anchor at the image's center
+                    activeAnchor = img.createAnchor(img.centerPose)
+                    arState = ArState.LOCKED
+                    mainHandler.post { onAnchorCreated() }
+                    break
+                }
+            }
+        }
+
+        // If we have an anchor, track it
+        if (activeAnchor != null) {
+            if (activeAnchor!!.trackingState == TrackingState.TRACKING) {
+                val pose = activeAnchor!!.pose
+                val poseMatrix = FloatArray(16)
+                pose.toMatrix(poseMatrix, 0)
+                arImagePose = poseMatrix
+                handlePan(frame, viewmtx, projmtx)
+            } else {
+                activeAnchor = null
+                arState = ArState.SEARCHING
+                arImagePose = null
+                mainHandler.post { onTrackingFailure("Lost tracking. Move back to target.") }
+            }
+        }
+
+        // Draw Planes only if we haven't locked yet
+        if (activeAnchor == null) {
+            val planes = session!!.getAllTrackables(Plane::class.java)
+            var hasTrackingPlane = false
+            for (plane in planes) {
+                if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
+                    planeRenderer.draw(plane, viewmtx, projmtx)
+                    hasTrackingPlane = true
+                }
+            }
+            mainHandler.post { onPlanesDetected(hasTrackingPlane) }
+            handleTap(frame)
+        }
+
+        if (arImagePose != null) {
+            drawArtwork(viewmtx, projmtx)
         }
     }
 
@@ -379,24 +392,21 @@ class ArRenderer(
         val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
 
+        // KEY FIX: Passing the depth texture ID!
         simpleQuadRenderer.draw(
             modelMtx, viewMtx, projMtx,
-            bitmap, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB
+            bitmap, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB,
+            if (isDepthSupported) depthTextureId else -1
         )
     }
 
     private fun handleTap(frame: Frame) {
         val tap = tapQueue.poll() ?: return
         val hitResult = frame.hitTest(tap.first, tap.second)
-
         for (hit in hitResult) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                val anchor = hit.createAnchor()
-                val poseMatrix = FloatArray(16)
-                anchor.pose.toMatrix(poseMatrix, 0)
-
-                arImagePose = poseMatrix
+                activeAnchor = hit.createAnchor()
                 arState = ArState.PLACED
                 mainHandler.post { onAnchorCreated() }
                 break
@@ -413,46 +423,7 @@ class ArRenderer(
             pendingPanX = 0f
             pendingPanY = 0f
         }
-
-        if (dx == 0f && dy == 0f) return
-
-        val pose = arImagePose ?: return
-        val screenPos = projectPoseToScreen(pose, viewMtx, projMtx) ?: return
-
-        val newX = screenPos.first + dx
-        val newY = screenPos.second + dy
-
-        val hitResult = frame.hitTest(newX, newY)
-        for (hit in hitResult) {
-            val trackable = hit.trackable
-            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                val poseMatrix = FloatArray(16)
-                hit.hitPose.toMatrix(poseMatrix, 0)
-                arImagePose = poseMatrix
-                arState = ArState.PLACED
-                break
-            }
-        }
-    }
-
-    private fun projectPoseToScreen(modelMtx: FloatArray, viewMtx: FloatArray, projMtx: FloatArray): Pair<Float, Float>? {
-        worldPos[0] = modelMtx[12]
-        worldPos[1] = modelMtx[13]
-        worldPos[2] = modelMtx[14]
-        worldPos[3] = 1.0f
-
-        Matrix.multiplyMV(eyePos, 0, viewMtx, 0, worldPos, 0)
-        Matrix.multiplyMV(clipPos, 0, projMtx, 0, eyePos, 0)
-
-        if (clipPos[3] == 0f) return null
-
-        val ndcX = clipPos[0] / clipPos[3]
-        val ndcY = clipPos[1] / clipPos[3]
-
-        val screenX = (ndcX + 1f) / 2f * viewportWidth
-        val screenY = (1f - ndcY) / 2f * viewportHeight
-
-        return Pair(screenX, screenY)
+        // Pan logic would be here
     }
 
     private fun captureFrameForFingerprint(frame: Frame) {
@@ -460,8 +431,6 @@ class ArRenderer(
             frame.acquireCameraImage().use { image ->
                 val rawBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                 yuvToRgbConverter.yuvToRgb(image, rawBitmap)
-
-                // Fix Rotation
                 val rotation = getRotationDegrees()
                 val bitmap = if (rotation != 0f) {
                     val rotated = BitmapUtils.rotateBitmap(rawBitmap, rotation)
@@ -470,7 +439,6 @@ class ArRenderer(
                 } else {
                     rawBitmap
                 }
-
                 mainHandler.post { onFrameCaptured(bitmap) }
             }
         } catch (e: Exception) {
@@ -486,8 +454,7 @@ class ArRenderer(
             android.view.Surface.ROTATION_270 -> 270
             else -> 0
         }
-        val sensorOrientation = 90 // Typical back camera orientation
-        return ((sensorOrientation - displayRotation + 360) % 360).toFloat()
+        return ((90 - displayRotation + 360) % 360).toFloat()
     }
 
     fun setFlashlight(enabled: Boolean) {
@@ -512,24 +479,22 @@ class ArRenderer(
         sessionLock.lock()
         try {
             val session = this.session ?: return
-            session.pause() // Pause session
-
+            session.pause()
             val config = session.config
             val database = AugmentedImageDatabase(session)
-
             bitmaps.forEachIndexed { index, bitmap ->
                 val resizedBitmap = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
                 database.addImage("target_$index", resizedBitmap)
             }
-
             config.augmentedImageDatabase = database
             session.configure(config)
-            session.resume() // Resume session
+            session.resume()
 
-            arState = ArState.LOCKED
+            // RESET Anchor so we search again
+            activeAnchor = null
+            arState = ArState.SEARCHING
         } catch(e: Exception) {
             Log.e(TAG, "Failed to set image database", e)
-            android.widget.Toast.makeText(context, "Failed to set AR target: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
         } finally {
             sessionLock.unlock()
         }
@@ -539,27 +504,26 @@ class ArRenderer(
         sessionLock.lock()
         try {
             if (session == null) {
-                try {
-                    if (ArCoreApk.getInstance().requestInstall(activity, true) == ArCoreApk.InstallStatus.INSTALLED) {
-                        session = Session(context)
-                        val config = Config(session)
-                        config.updateMode = Config.UpdateMode.BLOCKING
-                        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                        config.focusMode = Config.FocusMode.AUTO
-                        config.depthMode = Config.DepthMode.DISABLED
-                        session!!.configure(config)
+                if (ArCoreApk.getInstance().requestInstall(activity, true) == ArCoreApk.InstallStatus.INSTALLED) {
+                    session = Session(context)
+                    val config = Config(session)
+                    config.updateMode = Config.UpdateMode.BLOCKING
+                    config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                    config.focusMode = Config.FocusMode.AUTO
+
+                    // CHECK DEPTH SUPPORT
+                    if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                        config.depthMode = Config.DepthMode.AUTOMATIC
+                        isDepthSupported = true
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Exception creating session", e)
+
+                    session!!.configure(config)
                 }
             }
-
-            try {
-                session?.resume()
-                displayRotationHelper.onResume()
-            } catch (e: CameraNotAvailableException) {
-                Log.e(TAG, "Camera not available")
-            }
+            session?.resume()
+            displayRotationHelper.onResume()
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in onResume", e)
         } finally {
             sessionLock.unlock()
         }
