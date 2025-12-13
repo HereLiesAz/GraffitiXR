@@ -51,6 +51,7 @@ import javax.microedition.khronos.opengles.GL10
 /**
  * Custom GLSurfaceView.Renderer that handles the ARCore session and OpenGL ES rendering.
  * Implements "The Flip": Triggers on Image, Locks to Anchor, with Depth Occlusion.
+ * * THREAD SAFETY UPDATE: All ARCore session configuration now happens on the GL Thread.
  */
 class ArRenderer(
     private val context: Context,
@@ -91,6 +92,10 @@ class ArRenderer(
     @Volatile var arImagePose: FloatArray? = null
     @Volatile var arState: ArState = ArState.SEARCHING
 
+    // Pending Configuration (Queued for GL Thread)
+    private var pendingAugmentedImages: List<Bitmap>? = null
+    private var pendingFingerprint: Fingerprint? = null
+
     // The Anchor that holds the artwork in place
     private var activeAnchor: Anchor? = null
 
@@ -117,9 +122,75 @@ class ArRenderer(
     private val ANALYSIS_INTERVAL_MS = 1500L
     private val analysisScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+    /**
+     * Queues the fingerprint to be set on the GL Thread.
+     */
     fun setFingerprint(fingerprint: Fingerprint) {
-        this.originalDescriptors = fingerprint.descriptors
-        this.originalKeypointCount = fingerprint.keypoints.size
+        sessionLock.lock()
+        try {
+            this.pendingFingerprint = fingerprint
+        } finally {
+            sessionLock.unlock()
+        }
+    }
+
+    /**
+     * Queues the augmented image database update to be processed on the GL Thread.
+     * This prevents JNI threading errors and frame stalling.
+     */
+    fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
+        sessionLock.lock()
+        try {
+            // Just store it. The GL thread will pick it up.
+            this.pendingAugmentedImages = bitmaps
+        } finally {
+            sessionLock.unlock()
+        }
+    }
+
+    // --- Private Helper to Apply Config on GL Thread ---
+    private fun applyPendingConfiguration() {
+        // Check if we have pending updates
+        val newImages = pendingAugmentedImages
+        val newFingerprint = pendingFingerprint
+
+        if (newImages == null && newFingerprint == null) return
+
+        try {
+            val session = this.session ?: return
+
+            // If we have new images, we must pause/configure/resume
+            if (newImages != null) {
+                session.pause()
+
+                val config = session.config
+                val database = AugmentedImageDatabase(session)
+
+                newImages.forEachIndexed { index, bitmap ->
+                    val resizedBitmap = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
+                    database.addImage("target_$index", resizedBitmap)
+                }
+
+                config.augmentedImageDatabase = database
+                session.configure(config)
+                session.resume()
+
+                // Reset State
+                activeAnchor = null
+                arState = ArState.SEARCHING
+                pendingAugmentedImages = null // Clear pending
+            }
+
+            // If we have a new fingerprint, just update the reference
+            if (newFingerprint != null) {
+                this.originalDescriptors = newFingerprint.descriptors
+                this.originalKeypointCount = newFingerprint.keypoints.size
+                pendingFingerprint = null // Clear pending
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error applying configuration on GL Thread", e)
+        }
     }
 
     private fun analyzeFrameAsync(frame: Frame) {
@@ -251,6 +322,9 @@ class ArRenderer(
         try {
             if (session == null) return
 
+            // 1. APPLY PENDING CONFIGURATION ON GL THREAD
+            applyPendingConfiguration()
+
             if (isDepthSupported) {
                 try {
                     val frame = session!!.update()
@@ -274,12 +348,10 @@ class ArRenderer(
 
     private fun updateDepthTexture(frame: Frame) {
         try {
-            // Retrieve 16-bit depth image
             val depthImage = frame.acquireDepthImage16Bits()
             if (depthImage != null) {
                 val buffer = depthImage.planes[0].buffer
                 GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, depthTextureId)
-                // Load 16-bit data as LUMINANCE (simple mapping for GL ES 2.0)
                 GLES20.glTexImage2D(
                     GLES20.GL_TEXTURE_2D, 0, GLES20.GL_LUMINANCE,
                     depthImage.width, depthImage.height, 0,
@@ -328,12 +400,10 @@ class ArRenderer(
         camera.getViewMatrix(viewmtx, 0)
 
         // --- Anchor Logic ---
-        // If we are waiting to lock onto a target...
         if (activeAnchor == null && arState != ArState.PLACED) {
             val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
             for (img in updatedAugmentedImages) {
                 if (img.trackingState == TrackingState.TRACKING && img.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING) {
-                    // Create Anchor at the image's center
                     activeAnchor = img.createAnchor(img.centerPose)
                     arState = ArState.LOCKED
                     mainHandler.post { onAnchorCreated() }
@@ -342,7 +412,6 @@ class ArRenderer(
             }
         }
 
-        // If we have an anchor, track it
         if (activeAnchor != null) {
             if (activeAnchor!!.trackingState == TrackingState.TRACKING) {
                 val pose = activeAnchor!!.pose
@@ -358,7 +427,6 @@ class ArRenderer(
             }
         }
 
-        // Draw Planes only if we haven't locked yet
         if (activeAnchor == null) {
             val planes = session!!.getAllTrackables(Plane::class.java)
             var hasTrackingPlane = false
@@ -392,7 +460,6 @@ class ArRenderer(
         val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
 
-        // KEY FIX: Passing the depth texture ID!
         simpleQuadRenderer.draw(
             modelMtx, viewMtx, projMtx,
             bitmap, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB,
@@ -423,7 +490,6 @@ class ArRenderer(
             pendingPanX = 0f
             pendingPanY = 0f
         }
-        // Pan logic would be here
     }
 
     private fun captureFrameForFingerprint(frame: Frame) {
@@ -475,31 +541,6 @@ class ArRenderer(
         captureNextFrame = true
     }
 
-    fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
-        sessionLock.lock()
-        try {
-            val session = this.session ?: return
-            session.pause()
-            val config = session.config
-            val database = AugmentedImageDatabase(session)
-            bitmaps.forEachIndexed { index, bitmap ->
-                val resizedBitmap = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                database.addImage("target_$index", resizedBitmap)
-            }
-            config.augmentedImageDatabase = database
-            session.configure(config)
-            session.resume()
-
-            // RESET Anchor so we search again
-            activeAnchor = null
-            arState = ArState.SEARCHING
-        } catch(e: Exception) {
-            Log.e(TAG, "Failed to set image database", e)
-        } finally {
-            sessionLock.unlock()
-        }
-    }
-
     fun onResume(activity: Activity) {
         sessionLock.lock()
         try {
@@ -510,13 +551,10 @@ class ArRenderer(
                     config.updateMode = Config.UpdateMode.BLOCKING
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
-
-                    // CHECK DEPTH SUPPORT
                     if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                         config.depthMode = Config.DepthMode.AUTOMATIC
                         isDepthSupported = true
                     }
-
                     session!!.configure(config)
                 }
             }
