@@ -48,6 +48,24 @@ import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
+/**
+ * Custom GLSurfaceView.Renderer that handles the ARCore session and OpenGL ES rendering.
+ *
+ * This class is responsible for:
+ * 1.  Managing the ARCore [Session] lifecycle.
+ * 2.  Rendering the camera background stream.
+ * 3.  Rendering AR planes (for debugging/placement) and Point Clouds.
+ * 4.  Rendering the "Augmented Image" overlay (the user's art).
+ * 5.  Handling AR anchor placement via raycasting (Tap and Pan).
+ * 6.  Performing background analysis (OpenCV ORB) for progress tracking.
+ *
+ * @property context Application context.
+ * @property onPlanesDetected Callback when AR planes are found (or lost).
+ * @property onFrameCaptured Callback when a camera frame is captured for target creation.
+ * @property onAnchorCreated Callback when an AR anchor is successfully created.
+ * @property onProgressUpdated Callback for progress tracking updates.
+ * @property onTrackingFailure Callback for AR tracking errors/warnings.
+ */
 class ArRenderer(
     private val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
@@ -64,6 +82,7 @@ class ArRenderer(
     private val sessionLock = ReentrantLock()
 
     // AR Session
+    @Volatile
     var session: Session? = null
     private val displayRotationHelper = DisplayRotationHelper(context)
 
@@ -114,11 +133,18 @@ class ArRenderer(
     private val ANALYSIS_INTERVAL_MS = 2000L
     private val analysisScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+    /**
+     * Sets the target fingerprint for tracking progress.
+     */
     fun setFingerprint(fingerprint: Fingerprint) {
         this.originalDescriptors = fingerprint.descriptors
         this.originalKeypointCount = fingerprint.keypoints.size
     }
 
+    /**
+     * Analyzes the current AR frame using OpenCV ORB on a background thread.
+     * Extracts features and compares them to the original fingerprint to determine coverage progress.
+     */
     private fun analyzeFrameAsync(frame: Frame) {
         val image = try {
             frame.acquireCameraImage()

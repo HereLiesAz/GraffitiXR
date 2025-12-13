@@ -13,6 +13,13 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import com.hereliesaz.graffitixr.utils.AnimatedGifEncoder
 
+/**
+ * Manages the persistence of project data, including saving, loading, and exporting.
+ *
+ * Handles both the JSON metadata ([ProjectData]) and the associated binary assets (images).
+ *
+ * @param context Application context used for file I/O and accessing ContentResolver.
+ */
 class ProjectManager(private val context: Context) {
     private val projectsDir = File(context.filesDir, "projects")
     private val targetsDir = File(context.filesDir, "targets")
@@ -22,12 +29,22 @@ class ProjectManager(private val context: Context) {
         if (!targetsDir.exists()) targetsDir.mkdirs()
     }
 
+    /**
+     * Saves the project metadata to a JSON file.
+     * @param projectName The name of the project (filename without extension).
+     * @param projectData The data object to serialize.
+     */
     fun saveProject(projectName: String, projectData: ProjectData) {
         val file = File(projectsDir, "$projectName.json")
         val jsonString = Json.encodeToString(ProjectData.serializer(), projectData)
         file.writeText(jsonString)
     }
 
+    /**
+     * Loads project metadata from a JSON file.
+     * @param projectName The name of the project to load.
+     * @return The [ProjectData] object, or null if the file doesn't exist.
+     */
     fun loadProject(projectName: String): ProjectData? {
         val file = File(projectsDir, "$projectName.json")
         return if (file.exists()) {
@@ -41,6 +58,10 @@ class ProjectManager(private val context: Context) {
     /**
      * Saves a list of bitmaps to internal storage and returns their URIs.
      * This ensures the robust target data persists across app restarts.
+     *
+     * @param projectName The name of the project these targets belong to.
+     * @param bitmaps The list of bitmaps to save.
+     * @return A list of URIs pointing to the saved files.
      */
     fun saveTargetImages(projectName: String, bitmaps: List<Bitmap>): List<Uri> {
         val projectTargetDir = File(targetsDir, projectName)
@@ -59,10 +80,16 @@ class ProjectManager(private val context: Context) {
         }
     }
 
+    /**
+     * Retrieves a list of all saved project names.
+     */
     fun getProjectList(): List<String> {
         return projectsDir.listFiles()?.map { it.nameWithoutExtension } ?: emptyList()
     }
 
+    /**
+     * Deletes a project and its associated target images.
+     */
     fun deleteProject(projectName: String) {
         val file = File(projectsDir, "$projectName.json")
         if (file.exists()) {
@@ -74,6 +101,13 @@ class ProjectManager(private val context: Context) {
         }
     }
 
+    /**
+     * Exports the entire project (JSON + Images) to a ZIP file.
+     * Also generates a GIF animation of the evolution history.
+     *
+     * @param uri The URI to write the ZIP file to (usually from a system picker).
+     * @param projectData The project data to export.
+     */
     fun exportProjectToZip(uri: Uri, projectData: ProjectData) {
         try {
             val outputStream = context.contentResolver.openOutputStream(uri) ?: return

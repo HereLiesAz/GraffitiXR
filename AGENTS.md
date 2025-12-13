@@ -1,5 +1,7 @@
 # AGENT INSTRUCTIONS for GraffitiXR
 
+**CRITICAL INSTRUCTION: The AI absolutely MUST get a PERFECT code review AND a passing build with tests, and MUST keep all documents and documentation up to date, BEFORE committing--WITHOUT exception.**
+
 This document provides technical guidance for AI agents working on the GraffitiXR Android application.
 
 ---
@@ -34,7 +36,7 @@ The user interacts with the application through a simple user interface. The mai
 
 ### **Key Files**
 -   `MainActivity.kt`: The single activity entry point. It handles permissions, initializes the ARCore session, and hosts the `MainScreen` composable.
--   `MainViewModel.kt`: The central logic hub. It manages all state changes and user events.
+-   **`MainViewModel.kt`**: The central logic hub. It manages all state changes and user events.
 -   `ARScreen.kt`: The composable for the AR experience.
 -   `ARCoreRenderer.kt`: The renderer for the AR experience.
 -   `ImageTraceScreen.kt`: The composable for the simple camera overlay mode (non-AR).
@@ -64,6 +66,25 @@ A core feature is the ability to save an AR project and have the digital overlay
 
 ## **3. Current Project Goals**
 
-Refer to `TODO.md` for the up-to-date project backlog. Currently, all scheduled tasks have been completed. The focus is now on maintaining documentation accuracy and stability.
+Refer to `TODO.md` in the `docs` folder for the up-to-date project backlog.
 
 ---
+
+## **4. Documentation Index**
+
+The files in the `docs` folder are an extension of this `AGENTS.md` file and are **every bit as important**. You must consult them for specific details.
+
+-   **`AGENT_GUIDE.md`**: Detailed behavioral guidelines and operational procedures for AI agents.
+-   **`TODO.md`**: The project roadmap and backlog.
+-   **`UI_UX.md`**: Details on the user interface, styling, gestures, and user experience patterns.
+-   **`auth.md`**: Authentication and authorization details (e.g., GitHub API integration).
+-   **`conduct.md`**: Code of conduct and ethical guidelines for development.
+-   **`data_layer.md`**: Documentation of the data persistence layer, including `ProjectData`, `Fingerprint`, and serialization.
+-   **`fauxpas.md`**: A list of common mistakes and forbidden actions (e.g., breaking the build, removing critical dependencies).
+-   **`file_descriptions.md`**: A catalog of key files in the repository and their purposes.
+-   **`misc.md`**: Miscellaneous information that doesn't fit elsewhere.
+-   **`performance.md`**: Performance considerations, optimization techniques (e.g., `ArRenderer`), and threading models.
+-   **`screens.md`**: Detailed breakdown of each application screen and its functionality.
+-   **`task_flow.md`**: How to manage tasks, use the `TODO.md` file, and prioritize work.
+-   **`testing.md`**: Guidelines for writing and running tests, including unit tests and manual verification.
+-   **`workflow.md`**: The development workflow, CI/CD pipelines, and release process.

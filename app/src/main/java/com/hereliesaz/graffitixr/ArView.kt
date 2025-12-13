@@ -19,6 +19,19 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.data.FingerprintSerializer
 import kotlinx.serialization.json.Json
 
+/**
+ * A Composable that hosts the ARCore view using a [GLSurfaceView].
+ *
+ * It bridges the gap between Jetpack Compose and the legacy Android View system (OpenGL).
+ * It also handles:
+ * 1.  Lifecycle management for the AR session.
+ * 2.  Initialization of the [ArRenderer].
+ * 3.  Connecting Compose gestures (Tap, Pan, Zoom, Rotate) to the Renderer.
+ * 4.  Synchronizing state (e.g., opacity, scale) from [UiState] to the Renderer.
+ *
+ * @param viewModel The MainViewModel to dispatch events to.
+ * @param uiState The current UI state to render.
+ */
 @Composable
 fun ArView(
     viewModel: MainViewModel,
@@ -28,6 +41,7 @@ fun ArView(
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = context as? Activity
 
+    // Initialize the custom OpenGL Renderer
     val renderer = remember {
         ArRenderer(
             context,
@@ -39,6 +53,7 @@ fun ArView(
         )
     }
 
+    // Initialize the GLSurfaceView
     val glSurfaceView = remember {
         GLSurfaceView(context).apply {
             preserveEGLContextOnPause = true
@@ -49,6 +64,7 @@ fun ArView(
         }
     }
 
+    // Inject renderer into ViewModel for direct commands (like capture)
     DisposableEffect(renderer) {
         viewModel.arRenderer = renderer
         onDispose {
@@ -57,6 +73,7 @@ fun ArView(
         }
     }
 
+    // Deserialize and set fingerprint if available
     val fingerprintJson = uiState.fingerprintJson
     val fingerprint = remember(fingerprintJson) {
         if (fingerprintJson != null) {
@@ -74,12 +91,14 @@ fun ArView(
         }
     }
 
+    // Load Augmented Images for tracking
     LaunchedEffect(uiState.capturedTargetImages) {
         if(uiState.capturedTargetImages.isNotEmpty()) {
             glSurfaceView.queueEvent { renderer.setAugmentedImageDatabase(uiState.capturedTargetImages) }
         }
     }
 
+    // Sync UI State to Renderer properties
     renderer.opacity = uiState.opacity
     renderer.scale = uiState.arObjectScale
     renderer.rotationX = uiState.rotationX
@@ -97,6 +116,7 @@ fun ArView(
         renderer.updateOverlayImage(uiState.overlayImageUri)
     }
 
+    // Handle Lifecycle (Resume/Pause AR Session)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
