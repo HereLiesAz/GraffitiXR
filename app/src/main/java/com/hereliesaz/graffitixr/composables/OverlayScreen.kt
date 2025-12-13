@@ -40,6 +40,30 @@ import com.hereliesaz.graffitixr.UiState
 import com.hereliesaz.graffitixr.utils.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 
+/**
+ * A Composable that displays the live camera feed with a 2D image overlay.
+ *
+ * This screen implements the "Trace" or "Overlay" mode, where the image is
+ * locked to the screen coordinates rather than anchored in the 3D world (AR).
+ * This is useful for devices without AR support or for simple tracing tasks.
+ *
+ * Features:
+ * 1.  Uses CameraX for the camera preview.
+ * 2.  Renders the user's selected image on a Canvas on top of the preview.
+ * 3.  Applies ColorMatrix filters (contrast, brightness, saturation, color balance).
+ * 4.  Handles multi-touch gestures (scale, rotate, pan) to manipulate the overlay.
+ *
+ * @param uiState The current UI state.
+ * @param onScaleChanged Callback for scale changes.
+ * @param onOffsetChanged Callback for position changes (pan).
+ * @param onRotationZChanged Callback for Z-axis rotation.
+ * @param onRotationXChanged Callback for X-axis rotation (simulated/3D transform).
+ * @param onRotationYChanged Callback for Y-axis rotation (simulated/3D transform).
+ * @param onCycleRotationAxis Callback to switch the active rotation axis.
+ * @param onGestureStart Callback when a gesture begins.
+ * @param onGestureEnd Callback when a gesture ends.
+ * @param modifier Composable modifier.
+ */
 @Composable
 fun OverlayScreen(
     uiState: UiState,
@@ -61,6 +85,7 @@ fun OverlayScreen(
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val currentUiState by rememberUpdatedState(uiState)
 
+    // Flashlight control logic
     LaunchedEffect(uiState.isFlashlightOn, camera) {
         try {
             if (camera?.cameraInfo?.hasFlashUnit() == true) {
@@ -71,6 +96,7 @@ fun OverlayScreen(
         }
     }
 
+    // Build the ColorMatrix based on slider values
     val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
         ColorMatrix().apply {
             setToSaturation(uiState.saturation)
@@ -109,6 +135,7 @@ fun OverlayScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
+        // CameraX Preview View
         AndroidView(
             factory = { ctx ->
                 val previewView = PreviewView(ctx)
@@ -133,6 +160,7 @@ fun OverlayScreen(
                 previewView
             },
             onRelease = {
+                // Ensure camera is released to avoid conflicts with AR mode
                 cameraProviderFuture.addListener({
                     try {
                         cameraProviderFuture.get().unbindAll()
@@ -149,6 +177,7 @@ fun OverlayScreen(
         imageUri?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
+            // Load the image asynchronously
             LaunchedEffect(uri) {
                 coroutineScope.launch {
                     val request = ImageRequest.Builder(context)
@@ -168,6 +197,7 @@ fun OverlayScreen(
                     .pointerInput(Unit) {
                         detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                     }
+                    // Handle gestures only when hitting the image bounds
                     .pointerInput(imageBitmap) {
                         val bmp = imageBitmap ?: return@pointerInput
 

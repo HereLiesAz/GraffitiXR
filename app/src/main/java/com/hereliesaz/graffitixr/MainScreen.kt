@@ -71,11 +71,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
+/**
+ * The top-level UI composable for the GraffitiXR application.
+ *
+ * This component acts as the root of the Compose UI tree and manages:
+ * 1.  Navigation between different [EditorMode]s (AR, Mockup, Trace, etc.).
+ * 2.  Global UI overlays (Navigation Rail, Settings, Status Messages).
+ * 3.  Event handling for global actions (Saving, Haptics).
+ * 4.  Composition of specific screens based on the current [UiState].
+ *
+ * @param viewModel The shared [MainViewModel] instance.
+ */
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
+
+    // UI Visibility States
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
@@ -83,6 +96,7 @@ fun MainScreen(viewModel: MainViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
 
+    // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
         viewModel.feedbackEvent.collect { event ->
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -108,6 +122,7 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
 
+    // Capture Event Handler (PixelCopy)
     LaunchedEffect(viewModel, context) {
         viewModel.captureEvent.collect { event ->
             when (event) {
@@ -124,6 +139,7 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
 
+    // Launchers for System Pickers
     val overlayImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onOverlayImageSelected(it) } }
@@ -155,6 +171,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
             )
         } else {
+            // Main Content Area (Z-Index 1)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -231,7 +248,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Status Overlay
+        // Status Overlay (AR Debug/Messages)
         if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
             StatusOverlay(
                 qualityWarning = uiState.qualityWarning,
@@ -245,6 +262,7 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
+        // Settings Dialog
         if (showSettings) {
             Box(modifier = Modifier.zIndex(1.5f)) {
                 SettingsScreen(
@@ -258,6 +276,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        // AR Target Creation Flow
         if (uiState.isCapturingTarget) {
             Box(modifier = Modifier.zIndex(5f)) {
                 if (uiState.captureStep == CaptureStep.REVIEW) {
@@ -311,6 +330,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Gesture Feedback Visualization
         if (!uiState.hideUiForCapture) {
             GestureFeedback(
                 uiState = uiState,
@@ -322,8 +342,7 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
-        // Always show the Rail (handling loading), even in capture mode
-        // Z-Index raised to 6f to be above Capture/Refinement screens (5f)
+        // Navigation Rail
         if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
             Box(
                 modifier = Modifier
@@ -398,6 +417,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Touch Lock Overlay
         if (uiState.isTouchLocked) {
             Box(
                 modifier = Modifier
@@ -416,6 +436,7 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
+        // Progress Drawing Canvas
         if (uiState.isMarkingProgress) {
             DrawingCanvas(
                 paths = uiState.drawingPaths,
@@ -423,6 +444,7 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
+        // Dialogs
         if (showSaveProjectDialog) {
             SaveProjectDialog(
                 onDismissRequest = { showSaveProjectDialog = false },
@@ -433,6 +455,7 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
+        // Adjustments Panels
         if (uiState.overlayImageUri != null && !uiState.hideUiForCapture) {
             val showKnobs = showSliderDialog == "Adjust"
 
@@ -481,6 +504,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Onboarding
         uiState.showOnboardingDialogForMode?.let { mode ->
             OnboardingDialog(
                 editorMode = mode,
@@ -490,6 +514,7 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
 
+        // Feedback Elements
         if (!uiState.hideUiForCapture) {
             RotationAxisFeedback(
                 axis = uiState.activeRotationAxis,

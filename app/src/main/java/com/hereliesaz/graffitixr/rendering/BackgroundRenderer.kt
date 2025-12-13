@@ -9,7 +9,13 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /**
- * Renders the video background from the camera.
+ * Renders the video background from the device camera.
+ *
+ * This renderer uses the `GL_TEXTURE_EXTERNAL_OES` texture target, which is required
+ * for Android camera preview streams. It draws a full-screen quad behind all other 3D content.
+ *
+ * It also handles the transformation of texture coordinates to account for screen rotation
+ * and aspect ratio differences between the camera sensor and the display.
  */
 class BackgroundRenderer {
     private lateinit var quadCoords: FloatBuffer
@@ -18,9 +24,17 @@ class BackgroundRenderer {
     private var program = 0
     private var positionHandle = 0
     private var texCoordHandle = 0
+
+    /**
+     * The OpenGL texture ID bound to the external camera stream.
+     */
     var textureId = -1
         private set
 
+    /**
+     * Initializes the OpenGL resources (textures, shaders, buffers).
+     * Must be called on the GL thread (e.g., in `onSurfaceCreated`).
+     */
     fun createOnGlThread() {
         // Generate the background texture.
         val textures = IntArray(1)
@@ -59,6 +73,10 @@ class BackgroundRenderer {
         texCoordHandle = GLES20.glGetAttribLocation(program, "a_TexCoord")
     }
 
+    /**
+     * Draws the camera background.
+     * @param frame The current AR frame, used to transform texture coordinates.
+     */
     fun draw(frame: Frame) {
         // If display rotation changed (also includes view size change), we need to re-query the texture
         // coordinates for the screen background, as they are tailored to the screen aspect ratio.
@@ -75,6 +93,7 @@ class BackgroundRenderer {
             return
         }
 
+        // Disable depth test to ensure background is always drawn "behind" everything
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDepthMask(false)
 

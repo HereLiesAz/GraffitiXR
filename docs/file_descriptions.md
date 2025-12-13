@@ -1,501 +1,173 @@
 # File Descriptions
 
-This file provides a brief but thorough description of what each non-ignored file in the project is supposed to do.
+This document provides a comprehensive catalog of the files in the GraffitiXR repository, detailing their purpose, responsibilities, and key relationships.
 
-## `AGENTS.md`
+## **Root Directory**
 
-Provides guidance for AI agents working with the codebase.
+### `AGENTS.md`
+**Critical.** The primary instruction manual for AI agents. It defines the project's "laws of physics," including strict commit rules, architectural overviews, and the index for this documentation folder. **Must be read first.**
 
-## `README.md`
+### `README.md`
+The user-facing documentation. Provides a high-level overview of the app, installation instructions, and feature highlights.
 
-The main README for the project.
+### `build.gradle.kts`
+The root-level Gradle build script. Configures the buildscript classpath (Android Gradle Plugin, Kotlin plugin) and clean tasks.
 
-## `app/CMakeLists.txt`
+### `settings.gradle.kts`
+Defines the project structure and included modules (`:app`). Configures plugin repositories (Google, Maven Central, Gradle Plugin Portal).
 
-CMake script for building the native C++ code in the app module.
+### `gradle.properties`
+Global Gradle configuration properties (e.g., JVM args, caching, AndroidX usage).
 
-## `app/build.gradle.kts`
+### `version.properties`
+**Dynamic Versioning.** Stores the `major` and `minor` version numbers. The build script reads this and calculates the `patch` (commits since last tag) and `build` (total commits) numbers dynamically.
 
-Gradle build script for the main application module.
+### `setup_ndk.sh`
+A utility script to help configure the Android NDK environment variable `ANDROID_NDK_HOME` if it's missing.
 
-## `app/google-services.json.template`
+## **Application Module (`app/`)**
 
-Template for Google Services configuration.
+### `app/build.gradle.kts`
+The app-module build script.
+-   **Plugins:** `com.android.application`, `kotlin-android`, `kotlin-parcelize`, `kotlinx-serialization`.
+-   **Config:** `minSdk`, `targetSdk`, `versionCode`/`versionName` calculation.
+-   **Dependencies:** Jetpack Compose, ARCore, CameraX, OpenCV, Coil, ML Kit, Coroutines.
 
-## `app/libs/vuforia.aar`
+### `app/google-services.json.template`
+**Secret Injection.** A template file for the Google Services configuration. The CI/CD pipeline uses `envsubst` to replace placeholders (e.g., `${GOOGLE_SERVICES_API_KEY}`) with real secrets before building.
 
-The Vuforia Augmented Reality library.
+### `app/proguard-rules.pro`
+ProGuard/R8 configuration rules. Essential for preserving code that is accessed via reflection or JNI (like OpenCV and ARCore classes) during release builds.
 
-## `app/proguard-rules.pro`
+## **Source Code (`app/src/main/java/com/hereliesaz/graffitixr/`)**
 
-Configuration for ProGuard to shrink, obfuscate, and optimize the app.
+### **Root Package**
 
-## `app/src/main/AndroidManifest.xml`
+#### `MainActivity.kt`
+The single `Activity` entry point.
+-   **Responsibilities:** Initializes OpenCV, handles runtime permissions (Camera), manages the global `MainViewModel`, and hosts the Compose UI content.
+-   **Key Features:** Implements a hidden "Unlock" mechanism via volume keys.
 
-The Android application manifest file.
+#### `MainViewModel.kt`
+**Core Logic.** The brain of the application.
+-   **State:** Manages `UiState` via `StateFlow`.
+-   **Logic:** Handles AR target creation, image processing triggers, auto-saving, project management, and user intents.
 
-## `app/src/main/assets/Astronaut.jpg`
+#### `MainViewModelFactory.kt`
+Boilerplate factory for dependency injection of the `Application` context into `MainViewModel`.
 
-An image asset of an astronaut.
+#### `UiState.kt`
+**Source of Truth.** An immutable, Parcelable data class that holds the entire state of the UI (slider values, modes, AR status, file URIs).
 
-## `app/src/main/assets/Lander.jpg`
+#### `ArRenderer.kt`
+**AR Engine.** A custom `GLSurfaceView.Renderer`.
+-   **Responsibilities:** Manages the ARCore `Session`, handles the render loop (`onDrawFrame`), performs background analysis (OpenCV ORB), and renders 3D content (planes, point clouds, overlay images).
 
-An image asset of a lander.
+#### `ArView.kt`
+**Compose Bridge.** A Composable that wraps `GLSurfaceView` and `ArRenderer`. It connects the Compose UI gestures (tap, pan, zoom) to the OpenGL renderer.
 
-## `app/src/main/assets/shaders/fragment_shader.glsl`
+#### `ArState.kt`
+Enum defining the high-level AR session state: `SEARCHING` (looking for planes), `LOCKED` (target found), `PLACED` (anchor set).
 
-The fragment shader for OpenGL rendering.
+#### `EditorMode.kt`
+Enum defining the application's operational modes: `STATIC` (Mockup), `OVERLAY` (Trace), `AR` (Augmented Reality), `HELP`, etc.
 
-## `app/src/main/assets/shaders/vertex_shader.glsl`
+#### `GraffitiApplication.kt`
+The `Application` subclass. Initializes global components like the `CrashHandler`.
 
-The vertex shader for OpenGL rendering.
+#### `CrashHandler.kt` & `CrashActivity.kt`
+**Error Reporting.** A custom uncaught exception handler that launches a dedicated Activity to display stack traces and facilitate GitHub issue reporting.
 
-## `app/src/main/cpp/GraffitiJNI.cpp`
+### **`composables/` Package**
 
-The JNI implementation for the native functions.
+#### `MainScreen.kt`
+The top-level Composable for the main UI. Switches content based on `uiState.editorMode`.
 
-## `app/src/main/ic_launcher-playstore.png`
+#### `ARScreen.kt` (Placeholder/Wrapper)
+Likely wraps `ArView` or handles the AR-specific UI overlay.
 
-The application icon for the Google Play Store.
+#### `OverlayScreen.kt`
+Implements the "Trace" mode using CameraX (`CameraPreview`). Allows 2D image overlay on a live camera feed without AR tracking.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/ARCameraScreen.kt`
+#### `MockupScreen.kt`
+Implements the "Mockup" mode. Displays a static background image and allows 4-point perspective warping of the overlay.
 
-Screen for the AR camera view.
+#### `SettingsScreen.kt`
+Displays app version, permissions, and handles the "Check for Updates" logic (GitHub API).
 
-## `app/src/main/java/com/hereliesaz/graffitixr/ArRenderer.kt`
+#### `HelpScreen.kt`
+A pager-based onboarding tutorial explaining the app's features.
 
-Renderer for AR content.
+#### `TargetRefinementScreen.kt`
+The UI for creating/editing the AR target mask. Visualizes OpenCV keypoints and allows painting/erasing the mask.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/ArState.kt`
+#### `AdjustmentsPanel.kt`
+The bottom sheet containing image controls (Opacity, Contrast, etc.). Uses custom `Knob` components.
 
-Defines the state for the AR components of the application.
+#### `Knob.kt`
+A custom rotary control Composable that mimics physical audio knobs.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/ArView.kt`
+### **`data/` Package**
 
-View component for AR.
+#### `ProjectData.kt`
+**Persistence Model.** The Serializable data class used for saving/loading projects. Mirrors the persistent fields of `UiState`.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/EditorMode.kt`
+#### `Fingerprint.kt`
+**AR Identity.** Stores the OpenCV `KeyPoint`s and `Descriptor`s that uniquely identify an AR target.
 
-Enum defining editor modes.
+#### `Serializers.kt`
+Custom `KSerializer` implementations for third-party types (OpenCV `Mat`, Android `Bitmap`, `BlendMode`) to support `kotlinx.serialization`.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt`
+#### `GithubRelease.kt`
+Data model for parsing GitHub API responses during update checks.
 
-The main activity of the application.
+### **`rendering/` Package**
 
-## `app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt`
+#### `BackgroundRenderer.kt`
+Renders the texture from the device camera onto a full-screen quad using a custom GLSL shader. Handles the `GL_TEXTURE_EXTERNAL_OES` target.
 
-The main Jetpack Compose screen for the application.
+#### `PlaneRenderer.kt`
+Visualizes detected AR planes as a grid of triangles. Essential for user feedback during the scanning phase.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/MainViewModel.kt`
+#### `PointCloudRenderer.kt`
+Visualizes raw 3D feature points detected by ARCore. Helpful for debugging tracking quality.
 
-The main ViewModel for the application, handling business logic and state.
+#### `SimpleQuadRenderer.kt`
+Renders the user's overlay image in 3D space. Handles transparency, color adjustments (brightness, contrast), and blending.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/MainViewModelFactory.kt`
+#### `ShaderUtil.kt`
+Helper utility for loading GLSL shader code, compiling shaders, and linking programs.
 
-A factory for creating instances of the MainViewModel.
+#### `AugmentedImageRenderer.kt`
+Handles the rendering logic specifically for ARCore's `AugmentedImage` trackables (centering the image on the physical target).
 
-## `app/src/main/java/com/hereliesaz/graffitixr/Parcelers.kt`
+### **`utils/` Package**
 
-Parcelable implementations.
+#### `ProjectManager.kt`
+**I/O Handler.** Manages reading/writing project JSON files and ZIP archives. Handles the export process.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/RotationAxis.kt`
+#### `BitmapUtils.kt`
+Utilities for loading, scaling, rotating, and saving Bitmaps.
 
-Defines the possible axes of rotation for gestures.
+#### `ImageUtils.kt`
+Advanced image processing helper (applying masks, cropping).
 
-## `app/src/main/java/com/hereliesaz/graffitixr/TapFeedback.kt`
+#### `BackgroundRemover.kt`
+Wrapper around ML Kit's Subject Segmentation API to remove backgrounds from images.
 
-Feedback for tap gestures.
+#### `YuvToRgbConverter.kt`
+Converts camera `Image` objects (YUV_420_888) to standard Android `Bitmap`s (ARGB_8888).
 
-## `app/src/main/java/com/hereliesaz/graffitixr/UiState.kt`
+#### `DisplayRotationHelper.kt`
+Helper class to track device display rotation and keep the ARCore session synced.
 
-Defines the UI state for the application.
+## **Resources (`app/src/main/res/`)**
 
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/AdjustmentsPanel.kt`
+### `xml/provider_paths.xml`
+Defines the file paths that `FileProvider` is allowed to share (e.g., `cache/images/`). Critical for sharing images to other apps or the internal crash reporter.
 
-UI panel for image adjustments.
+### `values/strings.xml`
+Contains all user-facing text strings.
 
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/CurvesAdjustment.kt`
-
-UI for curves adjustment.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/DrawingCanvas.kt`
-
-Canvas for drawing.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/GestureFeedback.kt`
-
-Visual feedback for gestures.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/GhostScreen.kt`
-
-Ghost screen composable.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/HelpScreen.kt`
-
-Help and tutorial screen.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/Knob.kt`
-
-Rotary knob UI component.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/MockupScreen.kt`
-
-A composable screen for creating mockups on static images.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/OnboardingScreen.kt`
-
-Screen for onboarding.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/ProgressIndicator.kt`
-
-A composable for displaying a progress indicator.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/ProjectLibraryScreen.kt`
-
-Screen for managing projects.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/RefinementScreen.kt`
-
-Screen for refining selection.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/RotationAxisFeedback.kt`
-
-A composable to provide visual feedback for the current rotation axis.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/SettingsScreen.kt`
-
-A composable screen for application settings.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/TapFeedbackEffect.kt`
-
-A composable that provides visual feedback for tap gestures.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/TitleOverlay.kt`
-
-A composable for overlaying a title on the screen.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/composables/TraceScreen.kt`
-
-Screen for tracing mode.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/BlendModeSerializer.kt`
-
-Serializer for blend modes.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/Fingerprint.kt`
-
-Data class for AR fingerprint.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/FingerprintSerializer.kt`
-
-Serializer for fingerprint.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/GithubRelease.kt`
-
-Data class for GitHub release info.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/KeyPointSerializer.kt`
-
-Serializer for OpenCV KeyPoints.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/MatSerializer.kt`
-
-Serializer for OpenCV Mat.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/OffsetSerializer.kt`
-
-Serializer for Offset.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/ProjectData.kt`
-
-A data class representing the state of a user's project.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/data/Serializers.kt`
-
-Custom serializers for data classes used in the application.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/AdjustmentSliderDialog.kt`
-
-A dialog for adjusting image properties with a slider.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/ColorBalanceDialog.kt`
-
-A dialog for adjusting the color balance of an image.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/CurvesDialog.kt`
-
-Dialog for curves adjustment.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/DoubleTapHintDialog.kt`
-
-A dialog to hint to the user to double tap.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/OnboardingDialog.kt`
-
-A dialog for the application's onboarding flow.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/dialogs/SaveProjectDialog.kt`
-
-Dialog for saving project.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/rendering/AugmentedImageRenderer.kt`
-
-Renders augmented images in AR.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/rendering/BackgroundRenderer.kt`
-
-Renders the camera background.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/rendering/HomographyHelper.kt`
-
-Helper for homography calculations.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/rendering/PlaneRenderer.kt`
-
-Renders AR planes.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/rendering/PointCloudRenderer.kt`
-
-Renders AR point clouds.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/rendering/ProjectedImageRenderer.kt`
-
-Renders the projected image.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/rendering/ShaderUtil.kt`
-
-Utilities for shader management.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/rendering/SimpleQuadRenderer.kt`
-
-Simple quad renderer.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/ui/theme/Color.kt`
-
-Defines the color palette for the application's theme.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/ui/theme/Theme.kt`
-
-Defines the overall theme for the application.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/ui/theme/Typography.kt`
-
-Defines the typography for the application's theme.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/BitmapUtils.kt`
-
-Utilities for bitmap manipulation.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/BlendModeParceler.kt`
-
-Parceler for blend modes.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/Capture.kt`
-
-Utility functions for capturing the screen.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/CurvesUtil.kt`
-
-Utilities for curve calculations.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/DisplayRotationHelper.kt`
-
-Helper for display rotation.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/ImageUtils.kt`
-
-Utility functions for working with images.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/MultiGestureDetector.kt`
-
-A custom gesture detector for handling multiple gestures simultaneously.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/OnboardingManager.kt`
-
-Manages the application's onboarding process.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/Parcelers.kt`
-
-Custom parcelers for data classes used in the application.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/ProgressCalculator.kt`
-
-Calculates progress of image tracing.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/ProjectManager.kt`
-
-Manages project loading and saving.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/RotationGestureDetector.kt`
-
-A custom gesture detector for handling rotation gestures.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/Texture.kt`
-
-Utility functions for working with OpenGL textures.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/Utils.kt`
-
-General utility functions for the application.
-
-## `app/src/main/java/com/hereliesaz/graffitixr/utils/YuvToRgbConverter.kt`
-
-Converts YUV to RGB.
-
-## `app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-hdpi/ic_launcher.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-hdpi/ic_launcher_foreground.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-hdpi/ic_launcher_monochrome.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-hdpi/ic_launcher_round.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-mdpi/ic_launcher.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-mdpi/ic_launcher_foreground.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-mdpi/ic_launcher_monochrome.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-mdpi/ic_launcher_round.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xhdpi/ic_launcher.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xhdpi/ic_launcher_monochrome.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xxhdpi/ic_launcher.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xxhdpi/ic_launcher_monochrome.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xxxhdpi/ic_launcher_monochrome.webp`
-
-Application resource file.
-
-## `app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp`
-
-Application resource file.
-
-## `app/src/main/res/values/ic_launcher_background.xml`
-
-Application resource file.
-
-## `app/src/main/res/values/strings.xml`
-
-Application resource file.
-
-## `app/src/main/res/values/themes.xml`
-
-Application resource file.
-
-## `app/src/main/res/xml/backup_rules.xml`
-
-Application resource file.
-
-## `app/src/main/res/xml/data_extraction_rules.xml`
-
-Application resource file.
-
-## `app/src/main/res/xml/provider_paths.xml`
-
-Application resource file.
-
-## `app/src/test/java/com/hereliesaz/graffitixr/MainViewModelTest.kt`
-
-Unit tests for MainViewModel.
-
-## `build.gradle.kts`
-
-The root Gradle build script for the project.
-
-## `docs/BLUEPRINT.md`
-
-Technical blueprint document.
-
-## `docs/FILE_DESCRIPTIONS.md`
-
-This file.
-
-## `docs/TODO.md`
-
-Project roadmap and todo list.
-
-## `gradle.properties`
-
-Project-wide Gradle settings.
-
-## `gradlew`
-
-The Gradle wrapper script for Linux and macOS.
-
-## `gradlew.bat`
-
-The Gradle wrapper script for Windows.
-
-## `settings.gradle.kts`
-
-The Gradle settings script for the project.
-
-## `setup_ndk.sh`
-
-A script for setting up the Android NDK.
-
-## `version.properties`
-
-Version configuration properties.
-
-
+### `raw/` or `assets/shaders/`
+Contains the GLSL shader source code (`.glsl`) for the renderers.

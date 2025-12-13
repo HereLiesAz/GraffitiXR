@@ -9,7 +9,16 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /**
- * Renders the detected AR planes.
+ * Renders detected AR planes to provide visual feedback to the user.
+ *
+ * It visualizes the planes as semi-transparent polygons with a solid outline.
+ * This helps the user understand where the AR system has detected surfaces.
+ *
+ * Key features:
+ * - Renders a filled polygon (GL_TRIANGLE_FAN) for the plane surface.
+ * - Renders a line loop (GL_LINE_LOOP) for the plane boundary.
+ * - Handles GL blending for transparency.
+ * - Converts 2D plane polygon vertices (X, Z) into 3D world coordinates (Y=0).
  */
 class PlaneRenderer {
     private var planeProgram = 0
@@ -24,6 +33,10 @@ class PlaneRenderer {
     private val modelViewMatrix = FloatArray(16)
     private val modelViewProjectionMatrix = FloatArray(16)
 
+    /**
+     * Initializes the OpenGL resources (shaders, program).
+     * Must be called on the GL thread.
+     */
     fun createOnGlThread() {
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER)
         val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER)
@@ -38,6 +51,10 @@ class PlaneRenderer {
         colorUniform = GLES20.glGetUniformLocation(planeProgram, "u_Color")
     }
 
+    /**
+     * Updates the vertex buffer with the polygon data from the ARCore Plane.
+     * Reallocates the buffer if the polygon grows larger than the current capacity.
+     */
     private fun updatePlaneData(plane: Plane) {
         val planePolygon = plane.polygon
         planePolygon.rewind()
@@ -53,6 +70,13 @@ class PlaneRenderer {
         vertexBuffer!!.flip()
     }
 
+    /**
+     * Draws a single AR plane.
+     *
+     * @param plane The ARCore plane to draw.
+     * @param viewMatrix The camera's view matrix.
+     * @param projectionMatrix The camera's projection matrix.
+     */
     fun draw(plane: Plane, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
         if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
             return

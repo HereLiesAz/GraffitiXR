@@ -8,7 +8,16 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /**
- * Renders a texture on a quad defined in the X-Y plane (Vertical).
+ * Renders a simple textured quad in 3D space.
+ *
+ * This is the primary renderer for the user's artwork in AR mode.
+ * It maps the user's selected image onto a quad centered at (0,0,0) in the model space.
+ *
+ * Capabilities:
+ * - Transparency/Opacity adjustment.
+ * - Brightness adjustment.
+ * - RGB Color Balance.
+ * - Updates the GPU texture when the [Bitmap] changes.
  */
 class SimpleQuadRenderer {
     private var program = 0
@@ -25,6 +34,9 @@ class SimpleQuadRenderer {
     private var textureId = -1
     private var lastBitmap: Bitmap? = null
 
+    /**
+     * Initializes the OpenGL resources. Must be called on the GL thread.
+     */
     fun createOnGlThread() {
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER)
         val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER)
@@ -44,6 +56,7 @@ class SimpleQuadRenderer {
 
         // Geometry: Vertical Quad (X-Y Plane). Z is 0.
         // This ensures Scale(s, s, 1) scales both Width and Height uniformly.
+        // Vertices go from -0.5 to +0.5 so that width=1.0 and height=1.0.
         val vertices = floatArrayOf(
             -0.5f, -0.5f, 0.0f, // Bottom Left
             -0.5f,  0.5f, 0.0f, // Top Left
@@ -77,6 +90,19 @@ class SimpleQuadRenderer {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
     }
 
+    /**
+     * Draws the textured quad.
+     *
+     * @param modelMatrix The Model matrix (position, rotation, scale).
+     * @param viewMatrix The View matrix (camera).
+     * @param projectionMatrix The Projection matrix (lens).
+     * @param bitmap The image to render. If changed since last frame, it uploads to GPU.
+     * @param alpha Global opacity multiplier (0..1).
+     * @param brightness Brightness offset (-1..1).
+     * @param colorR Red channel multiplier.
+     * @param colorG Green channel multiplier.
+     * @param colorB Blue channel multiplier.
+     */
     fun draw(modelMatrix: FloatArray, viewMatrix: FloatArray, projectionMatrix: FloatArray, bitmap: Bitmap, alpha: Float, brightness: Float, colorR: Float, colorG: Float, colorB: Float) {
         if (lastBitmap != bitmap) {
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)

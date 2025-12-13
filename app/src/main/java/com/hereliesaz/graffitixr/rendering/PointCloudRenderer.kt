@@ -7,7 +7,20 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
+/**
+ * Renders the 3D Point Cloud detected by ARCore.
+ *
+ * The Point Cloud consists of feature points that ARCore uses to track the environment.
+ * Visualizing these points is crucial for user feedback, letting them know that the
+ * system is successfully understanding the world geometry.
+ *
+ * Each point has:
+ * - X, Y, Z coordinates.
+ * - Confidence value (stored in the W component).
+ */
 class PointCloudRenderer {
+    // Vertex Shader: Projects points to screen space.
+    // Uses the W component (confidence) to potentially modulate size/color (though currently unused).
     private val vertexShaderCode =
         "uniform mat4 u_MvpMatrix;" +
         "attribute vec4 a_Position;" +
@@ -18,6 +31,7 @@ class PointCloudRenderer {
         "   v_Confidence = a_Position.w;" +
         "}"
 
+    // Fragment Shader: Renders circular points using gl_PointCoord.
     private val fragmentShaderCode =
         "precision mediump float;" +
         "varying float v_Confidence;" +
@@ -41,6 +55,9 @@ class PointCloudRenderer {
         updateVertexBuffer(1000)
     }
 
+    /**
+     * Resizes the vertex buffer to accommodate the new number of points.
+     */
     private fun updateVertexBuffer(numPoints: Int) {
         if (vertexBuffer == null || vertexBuffer!!.capacity() < numPoints * 4) {
             val bb = ByteBuffer.allocateDirect(numPoints * 4 * 4) // 4 floats per point, 4 bytes per float
@@ -50,6 +67,9 @@ class PointCloudRenderer {
         }
     }
 
+    /**
+     * Compiles and links the shaders on the GL thread.
+     */
     fun createOnGlThread() {
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
         val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
@@ -86,6 +106,13 @@ class PointCloudRenderer {
         return shader
     }
 
+    /**
+     * Draws the point cloud.
+     *
+     * @param pointCloud The ARCore PointCloud object containing the latest feature points.
+     * @param viewMatrix Camera View Matrix.
+     * @param projectionMatrix Camera Projection Matrix.
+     */
     fun draw(pointCloud: PointCloud, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
         if (program == 0) {
             Log.w(TAG, "Program is 0, skipping draw")
@@ -99,7 +126,9 @@ class PointCloudRenderer {
 
         val points = pointCloud.points
         val numPoints = points.remaining() / 4
-        Log.d(TAG, "Drawing $numPoints points")
+
+        // Log removed to avoid spamming logcat
+        // Log.d(TAG, "Drawing $numPoints points")
 
         if (numPoints == 0) {
             return
