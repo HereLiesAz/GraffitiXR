@@ -1,17 +1,15 @@
-uniform mat4 u_ModelViewProjection;
-uniform mat4 u_ModelView;
+uniform mat4 u_MVPMatrix;
+uniform mat3 u_HomographyMatrix;
 attribute vec4 a_Position;
-attribute vec2 a_TexCoord;
+attribute vec2 a_TexCoordinate;
 
-varying vec2 v_TexCoord;
-varying float v_ViewDepth;
+varying vec2 v_TexCoordinate;
 
 void main() {
-    gl_Position = u_ModelViewProjection * a_Position;
-    v_TexCoord = a_TexCoord;
+    // Transform texture coordinates by the homography matrix
+    vec3 warpedTexCoord = u_HomographyMatrix * vec3(a_TexCoordinate, 1.0);
+    // Perform perspective divide
+    v_TexCoordinate = warpedTexCoord.xy / warpedTexCoord.z;
 
-    // Calculate linear depth (Z-distance from camera)
-    // In OpenGL view space, camera looks down -Z, so depth is -Z.
-    vec4 viewPos = u_ModelView * a_Position;
-    v_ViewDepth = -viewPos.z;
+    gl_Position = u_MVPMatrix * a_Position;
 }

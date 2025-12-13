@@ -48,11 +48,6 @@ import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/**
- * Custom GLSurfaceView.Renderer that handles the ARCore session and OpenGL ES rendering.
- * Implements "The Flip": Triggers on Image, Locks to Anchor, with Depth Occlusion.
- * * THREAD SAFETY UPDATE: All ARCore session configuration now happens on the GL Thread.
- */
 class ArRenderer(
     private val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
@@ -64,11 +59,9 @@ class ArRenderer(
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var wasTracking = false
-
     private val sessionLock = ReentrantLock()
 
-    @Volatile
-    var session: Session? = null
+    @Volatile var session: Session? = null
     private val displayRotationHelper = DisplayRotationHelper(context)
 
     // Renderers
@@ -76,28 +69,23 @@ class ArRenderer(
     private val planeRenderer = PlaneRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
     private val simpleQuadRenderer = SimpleQuadRenderer()
-
     private val yuvToRgbConverter = YuvToRgbConverter(context)
 
-    // Depth API State
+    // Depth
     private var isDepthSupported = false
     private var depthTextureId = -1
 
-    // Flags & State
+    // State
     @Volatile private var captureNextFrame = false
     private var viewportWidth = 0
     private var viewportHeight = 0
-
     @Volatile var overlayBitmap: Bitmap? = null
     @Volatile var arImagePose: FloatArray? = null
     @Volatile var arState: ArState = ArState.SEARCHING
-
-    // Pending Configuration (Queued for GL Thread)
-    private var pendingAugmentedImages: List<Bitmap>? = null
-    private var pendingFingerprint: Fingerprint? = null
-
-    // The Anchor that holds the artwork in place
     private var activeAnchor: Anchor? = null
+
+    // Configuration for next init (Lazy Loading)
+    private var initialAugmentedImages: List<Bitmap>? = null
 
     // Transforms
     var opacity: Float = 1.0f
@@ -119,168 +107,19 @@ class ArRenderer(
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
     private var lastAnalysisTime = 0L
-    private val ANALYSIS_INTERVAL_MS = 1500L
+    private val ANALYSIS_INTERVAL_MS = 1500L // Restored Constant
     private val analysisScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    /**
-     * Queues the fingerprint to be set on the GL Thread.
-     */
     fun setFingerprint(fingerprint: Fingerprint) {
-        sessionLock.lock()
-        try {
-            this.pendingFingerprint = fingerprint
-        } finally {
-            sessionLock.unlock()
-        }
+        this.originalDescriptors = fingerprint.descriptors
+        this.originalKeypointCount = fingerprint.keypoints.size
     }
 
     /**
-     * Queues the augmented image database update to be processed on the GL Thread.
-     * This prevents JNI threading errors and frame stalling.
+     * Stores images to be added to the database ONLY when the session is (re)created.
      */
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
-        sessionLock.lock()
-        try {
-            // Just store it. The GL thread will pick it up.
-            this.pendingAugmentedImages = bitmaps
-        } finally {
-            sessionLock.unlock()
-        }
-    }
-
-    // --- Private Helper to Apply Config on GL Thread ---
-    private fun applyPendingConfiguration() {
-        // Check if we have pending updates
-        val newImages = pendingAugmentedImages
-        val newFingerprint = pendingFingerprint
-
-        if (newImages == null && newFingerprint == null) return
-
-        try {
-            val session = this.session ?: return
-
-            // If we have new images, we must pause/configure/resume
-            if (newImages != null) {
-                session.pause()
-
-                val config = session.config
-                val database = AugmentedImageDatabase(session)
-
-                newImages.forEachIndexed { index, bitmap ->
-                    val resizedBitmap = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                    database.addImage("target_$index", resizedBitmap)
-                }
-
-                config.augmentedImageDatabase = database
-                session.configure(config)
-                session.resume()
-
-                // Reset State
-                activeAnchor = null
-                arState = ArState.SEARCHING
-                pendingAugmentedImages = null // Clear pending
-            }
-
-            // If we have a new fingerprint, just update the reference
-            if (newFingerprint != null) {
-                this.originalDescriptors = newFingerprint.descriptors
-                this.originalKeypointCount = newFingerprint.keypoints.size
-                pendingFingerprint = null // Clear pending
-            }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error applying configuration on GL Thread", e)
-        }
-    }
-
-    private fun analyzeFrameAsync(frame: Frame) {
-        val image = try {
-            frame.acquireCameraImage()
-        } catch (e: NotYetAvailableException) {
-            return
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to acquire image for analysis", e)
-            return
-        }
-
-        try {
-            val rotation = getRotationDegrees()
-            val yBuffer = image.planes[0].buffer
-            val width = image.width
-            val height = image.height
-            val rowStride = image.planes[0].rowStride
-
-            val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, rowStride.toLong())
-            val tempMat = Mat()
-            yMat.copyTo(tempMat)
-            val data = ByteArray((tempMat.total() * tempMat.channels()).toInt())
-            tempMat.get(0, 0, data)
-
-            tempMat.release()
-            yMat.release()
-            image.close()
-
-            analysisScope.launch {
-                try {
-                    val processingMat = Mat(height, width, CvType.CV_8UC1)
-                    processingMat.put(0, 0, data)
-
-                    val rotatedMat = if (rotation != 0f) {
-                        val dst = Mat()
-                        val rotateCode = when (rotation) {
-                            90f -> Core.ROTATE_90_CLOCKWISE
-                            180f -> Core.ROTATE_180
-                            270f -> Core.ROTATE_90_COUNTERCLOCKWISE
-                            else -> -1
-                        }
-                        if (rotateCode != -1) {
-                            Core.rotate(processingMat, dst, rotateCode)
-                            processingMat.release()
-                            dst
-                        } else {
-                            processingMat
-                        }
-                    } else {
-                        processingMat
-                    }
-
-                    val descriptors = Mat()
-                    val keypoints = MatOfKeyPoint()
-                    synchronized(orb) {
-                        orb.detectAndCompute(rotatedMat, Mat(), keypoints, descriptors)
-                    }
-
-                    val targetDescriptors = originalDescriptors
-
-                    if (descriptors.rows() > 0 && targetDescriptors != null && !targetDescriptors.empty()) {
-                        val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
-                        val matches = MatOfDMatch()
-                        matcher.match(descriptors, targetDescriptors, matches)
-
-                        val matchesList = matches.toList()
-                        val goodMatches = matchesList.filter { it.distance < 60 }.size
-
-                        val ratio = if (originalKeypointCount > 0) {
-                            goodMatches.toFloat() / originalKeypointCount.toFloat()
-                        } else {
-                            0f
-                        }
-                        val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
-
-                        mainHandler.post { onProgressUpdated(progress, null) }
-                    }
-                    descriptors.release()
-                    keypoints.release()
-                    rotatedMat.release()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error in analysis coroutine", e)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Analysis failed", e)
-        } finally {
-            image.close()
-        }
+        this.initialAugmentedImages = bitmaps
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -316,14 +155,10 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-
         if (!sessionLock.tryLock()) return
 
         try {
             if (session == null) return
-
-            // 1. APPLY PENDING CONFIGURATION ON GL THREAD
-            applyPendingConfiguration()
 
             if (isDepthSupported) {
                 try {
@@ -331,16 +166,16 @@ class ArRenderer(
                     updateDepthTexture(frame)
                     drawFrame(frame)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error updating depth/frame", e)
+                    Log.e(TAG, "Error updating frame", e)
                 }
             } else {
                 val frame = session?.update() ?: return
                 drawFrame(frame)
             }
         } catch (e: SessionPausedException) {
-            mainHandler.post { onTrackingFailure("AR session paused.") }
+            // Paused
         } catch (t: Throwable) {
-            Log.e(TAG, "Exception on the GL Thread", t)
+            Log.e(TAG, "Exception on GL Thread", t)
         } finally {
             sessionLock.unlock()
         }
@@ -360,26 +195,28 @@ class ArRenderer(
                 depthImage.close()
             }
         } catch (e: NotYetAvailableException) {
-            // Depth not ready yet
+            // Ignore
         }
     }
 
     private fun drawFrame(frame: Frame) {
         session!!.setCameraTextureName(backgroundRenderer.textureId)
         displayRotationHelper.updateSessionIfNeeded(session!!)
-
         backgroundRenderer.draw(frame)
 
-        if (!captureNextFrame && System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
-            lastAnalysisTime = System.currentTimeMillis()
-            analyzeFrameAsync(frame)
-        }
-
+        // Capture Logic
         if (captureNextFrame) {
             captureFrameForFingerprint(frame)
             captureNextFrame = false
         }
 
+        // OpenCV Logic (Progress)
+        if (System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && originalDescriptors != null) {
+            lastAnalysisTime = System.currentTimeMillis()
+            analyzeFrameAsync(frame)
+        }
+
+        // Tracking Check
         val camera = frame.camera
         if (camera.trackingState == TrackingState.TRACKING) {
             if (!wasTracking) {
@@ -399,7 +236,8 @@ class ArRenderer(
         val viewmtx = FloatArray(16)
         camera.getViewMatrix(viewmtx, 0)
 
-        // --- Anchor Logic ---
+        // --- Anchor Logic (The Flip) ---
+        // 1. If we are searching and have images in DB, look for them
         if (activeAnchor == null && arState != ArState.PLACED) {
             val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
             for (img in updatedAugmentedImages) {
@@ -412,6 +250,7 @@ class ArRenderer(
             }
         }
 
+        // 2. If we have an anchor, stick to it
         if (activeAnchor != null) {
             if (activeAnchor!!.trackingState == TrackingState.TRACKING) {
                 val pose = activeAnchor!!.pose
@@ -419,24 +258,20 @@ class ArRenderer(
                 pose.toMatrix(poseMatrix, 0)
                 arImagePose = poseMatrix
                 handlePan(frame, viewmtx, projmtx)
-            } else {
-                activeAnchor = null
-                arState = ArState.SEARCHING
-                arImagePose = null
-                mainHandler.post { onTrackingFailure("Lost tracking. Move back to target.") }
             }
         }
 
+        // 3. If no anchor, allow Tap-to-Place (Standard Manual Creation)
         if (activeAnchor == null) {
             val planes = session!!.getAllTrackables(Plane::class.java)
-            var hasTrackingPlane = false
+            var hasPlane = false
             for (plane in planes) {
                 if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
                     planeRenderer.draw(plane, viewmtx, projmtx)
-                    hasTrackingPlane = true
+                    hasPlane = true
                 }
             }
-            mainHandler.post { onPlanesDetected(hasTrackingPlane) }
+            mainHandler.post { onPlanesDetected(hasPlane) }
             handleTap(frame)
         }
 
@@ -448,7 +283,6 @@ class ArRenderer(
     private fun drawArtwork(viewMtx: FloatArray, projMtx: FloatArray) {
         val bitmap = overlayBitmap ?: return
         val pose = arImagePose ?: return
-
         val modelMtx = pose.clone()
 
         Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
@@ -512,6 +346,86 @@ class ArRenderer(
         }
     }
 
+    private fun analyzeFrameAsync(frame: Frame) {
+        val image = try {
+            frame.acquireCameraImage()
+        } catch (e: NotYetAvailableException) {
+            return
+        } catch (e: Exception) {
+            return
+        }
+
+        try {
+            val rotation = getRotationDegrees()
+            val yBuffer = image.planes[0].buffer
+            val width = image.width
+            val height = image.height
+            val rowStride = image.planes[0].rowStride
+            val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, rowStride.toLong())
+            val tempMat = Mat()
+            yMat.copyTo(tempMat)
+            val data = ByteArray((tempMat.total() * tempMat.channels()).toInt())
+            tempMat.get(0, 0, data)
+            tempMat.release()
+            yMat.release()
+            image.close()
+
+            analysisScope.launch {
+                try {
+                    val processingMat = Mat(height, width, CvType.CV_8UC1)
+                    processingMat.put(0, 0, data)
+                    val rotatedMat = if (rotation != 0f) {
+                        val dst = Mat()
+                        val rotateCode = when (rotation) {
+                            90f -> Core.ROTATE_90_CLOCKWISE
+                            180f -> Core.ROTATE_180
+                            270f -> Core.ROTATE_90_COUNTERCLOCKWISE
+                            else -> -1
+                        }
+                        if (rotateCode != -1) {
+                            Core.rotate(processingMat, dst, rotateCode)
+                            processingMat.release()
+                            dst
+                        } else {
+                            processingMat
+                        }
+                    } else {
+                        processingMat
+                    }
+
+                    val descriptors = Mat()
+                    val keypoints = MatOfKeyPoint()
+                    synchronized(orb) {
+                        orb.detectAndCompute(rotatedMat, Mat(), keypoints, descriptors)
+                    }
+
+                    val targetDescriptors = originalDescriptors
+                    if (descriptors.rows() > 0 && targetDescriptors != null && !targetDescriptors.empty()) {
+                        val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+                        val matches = MatOfDMatch()
+                        matcher.match(descriptors, targetDescriptors, matches)
+                        val matchesList = matches.toList()
+                        val goodMatches = matchesList.filter { it.distance < 60 }.size
+                        val ratio = if (originalKeypointCount > 0) {
+                            goodMatches.toFloat() / originalKeypointCount.toFloat()
+                        } else {
+                            0f
+                        }
+                        val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
+                        mainHandler.post { onProgressUpdated(progress, null) }
+                    }
+                    descriptors.release()
+                    keypoints.release()
+                    rotatedMat.release()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Analysis error", e)
+                }
+            }
+        } catch (e: Exception) {
+            image.close()
+        }
+    }
+
     private fun getRotationDegrees(): Float {
         val displayRotation = when (displayRotationHelper.rotation) {
             android.view.Surface.ROTATION_0 -> 0
@@ -531,7 +445,7 @@ class ArRenderer(
             config.flashMode = if (enabled) Config.FlashMode.TORCH else Config.FlashMode.OFF
             session.configure(config)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to toggle flashlight", e)
+            Log.e(TAG, "Flashlight error", e)
         } finally {
             sessionLock.unlock()
         }
@@ -551,17 +465,32 @@ class ArRenderer(
                     config.updateMode = Config.UpdateMode.BLOCKING
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
+
+                    // 1. Enable Depth if supported
                     if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                         config.depthMode = Config.DepthMode.AUTOMATIC
                         isDepthSupported = true
                     }
+
+                    // 2. Configure Augmented Images (Lazy Load from 'initialAugmentedImages')
+                    initialAugmentedImages?.let { images ->
+                        if (images.isNotEmpty()) {
+                            val database = AugmentedImageDatabase(session)
+                            images.forEachIndexed { index, bitmap ->
+                                val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
+                                database.addImage("target_$index", resized)
+                            }
+                            config.augmentedImageDatabase = database
+                        }
+                    }
+
                     session!!.configure(config)
                 }
             }
             session?.resume()
             displayRotationHelper.onResume()
         } catch (e: Exception) {
-            Log.e(TAG, "Exception in onResume", e)
+            Log.e(TAG, "Resume error", e)
         } finally {
             sessionLock.unlock()
         }
@@ -573,7 +502,7 @@ class ArRenderer(
             displayRotationHelper.onPause()
             session?.pause()
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during onPause", e)
+            Log.e(TAG, "Pause error", e)
         } finally {
             sessionLock.unlock()
         }
@@ -585,7 +514,7 @@ class ArRenderer(
             analysisScope.cancel()
             session?.close()
         } catch (e: Exception) {
-            Log.e(TAG, "Error closing session", e)
+            Log.e(TAG, "Cleanup error", e)
         } finally {
             session = null
             sessionLock.unlock()
@@ -616,7 +545,7 @@ class ArRenderer(
                     overlayBitmap = drawable.bitmap
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error loading overlay image", e)
+                Log.e(TAG, "Overlay update error", e)
             }
         }
     }

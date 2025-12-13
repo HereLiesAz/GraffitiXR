@@ -4,17 +4,21 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
-
-    <uses-feature android:name="android.hardware.camera.ar" android:required="true" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />
-
-    <uses-feature android:name="com.google.ar.core.depth" android:required="false" />
     <uses-feature
         android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.ar"
         android:required="false" />
 
     <application
@@ -27,24 +31,28 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.GraffitiXR"
+        tools:replace="android:theme"
         tools:targetApi="31">
-
-        <meta-data android:name="com.google.ar.core" android:value="required" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:label="@string/app_name"
             android:theme="@style/Theme.GraffitiXR">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
         <activity
             android:name=".CrashActivity"
+            android:exported="false"
             android:theme="@style/Theme.GraffitiXR"
-            android:process=":crash_handler_process" />
+            android:process=":crash" />
+
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="subject_segment" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -58,9 +66,10 @@
 
         <receiver
             android:name=".ApkInstallReceiver"
+            android:enabled="true"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+                <action android:name="android.app.action.DOWNLOAD_COMPLETE" />
             </intent-filter>
         </receiver>
 
