@@ -9,7 +9,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.decodeStructure
 import kotlinx.serialization.encoding.encodeStructure
-import org.opencv.core.CvType
 import org.opencv.core.Mat
 
 object MatSerializer : KSerializer<Mat> {
@@ -21,7 +20,11 @@ object MatSerializer : KSerializer<Mat> {
     }
 
     override fun serialize(encoder: Encoder, value: Mat) {
-        val data = ByteArray(value.total().toInt() * value.elemSize().toInt())
+        val expectedSize = value.total().toInt() * value.elemSize().toInt()
+        if (expectedSize <= 0) {
+            throw IllegalArgumentException("Invalid Mat dimensions or type: rows=${value.rows()}, cols=${value.cols()}, type=${value.type()}")
+        }
+        val data = ByteArray(expectedSize)
         value.get(0, 0, data)
         encoder.encodeStructure(descriptor) {
             encodeIntElement(descriptor, 0, value.rows())
@@ -46,6 +49,13 @@ object MatSerializer : KSerializer<Mat> {
                     CompositeDecoder.DECODE_DONE -> break
                     else -> error("Unexpected index: $index")
                 }
+            }
+            if (rows <= 0 || cols <= 0) {
+                throw IllegalArgumentException("Invalid Mat dimensions: rows=$rows, cols=$cols")
+            }
+            val expectedSize = rows * cols * org.opencv.core.CvType.channels(type) * org.opencv.core.CvType.ELEM_SIZE(type).toInt()
+            if (data.size != expectedSize) {
+                throw IllegalArgumentException("Data size mismatch: expected $expectedSize, got ${data.size}")
             }
             Mat(rows, cols, type).apply {
                 put(0, 0, data)

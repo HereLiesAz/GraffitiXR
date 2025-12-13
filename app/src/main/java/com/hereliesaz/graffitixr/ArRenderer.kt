@@ -44,7 +44,6 @@ import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.DescriptorMatcher
 import org.opencv.features2d.ORB
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -512,7 +511,8 @@ class ArRenderer(
             val database = AugmentedImageDatabase(session)
 
             bitmaps.forEachIndexed { index, bitmap ->
-                database.addImage("target_$index", bitmap)
+                val resizedBitmap = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
+                database.addImage("target_$index", resizedBitmap)
             }
 
             config.augmentedImageDatabase = database
@@ -522,6 +522,7 @@ class ArRenderer(
             arState = ArState.LOCKED
         } catch(e: Exception) {
             Log.e(TAG, "Failed to set image database", e)
+            android.widget.Toast.makeText(context, "Failed to set AR target: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
         } finally {
             sessionLock.unlock()
         }
