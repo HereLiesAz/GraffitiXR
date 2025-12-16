@@ -22,6 +22,11 @@ kotlinxSerialization = "1.9.0"
 segmentationSelfie = "16.0.0-beta6"
 firebaseBom = "34.7.0"
 playServicesBase = "18.5.0"
+xrRuntime = "1.0.0-alpha09"
+xrScenecore = "1.0.0-alpha10"
+xrCompose = "1.0.0-alpha09"
+xrComposeMaterial3 = "1.0.0-alpha13"
+xrArcore = "1.0.0-alpha09"
 
 [libraries]
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
@@ -59,6 +64,11 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-xr-runtime = { group = "androidx.xr.runtime", name = "runtime", version.ref = "xrRuntime" }
+androidx-xr-scenecore = { group = "androidx.xr.scenecore", name = "scenecore", version.ref = "xrScenecore" }
+androidx-xr-compose = { group = "androidx.xr.compose", name = "compose", version.ref = "xrCompose" }
+androidx-xr-compose-material3 = { group = "androidx.xr.compose.material3", name = "material3", version.ref = "xrComposeMaterial3" }
+androidx-xr-arcore = { group = "androidx.xr.arcore", name = "arcore", version.ref = "xrArcore" }
 opencv-android = { module = "org.opencv:opencv-android", version.ref = "opencv" }
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
