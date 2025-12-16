@@ -107,7 +107,7 @@ android {
         buildConfig = true
     }
     namespace = "com.hereliesaz.graffitixr"
-    compileSdk = 36
+    compileSdk = 36 // Required for Android XR
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
@@ -188,6 +188,11 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     // AndroidXR
+    implementation(libs.androidx.xr.runtime)
+    implementation(libs.androidx.xr.scenecore)
+    implementation(libs.androidx.xr.compose)
+    implementation(libs.androidx.xr.compose.material3)
+    implementation(libs.androidx.xr.arcore)
     implementation(libs.google.accompanist.permissions)
 
     // AzNavRail
