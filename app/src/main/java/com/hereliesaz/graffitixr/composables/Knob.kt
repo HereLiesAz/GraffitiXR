@@ -21,6 +21,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
@@ -51,6 +57,23 @@ fun Knob(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
+            .semantics(mergeDescendants = true) {
+                contentDescription = text
+                stateDescription = "%.2f".format(value)
+                progressBarRangeInfo = ProgressBarRangeInfo(
+                    current = value,
+                    range = valueRange
+                )
+                setProgress { targetValue ->
+                    val newValue = targetValue.coerceIn(valueRange.start, valueRange.endInclusive)
+                    if (newValue == value) {
+                        false
+                    } else {
+                        updatedOnValueChange(newValue)
+                        true
+                    }
+                }
+            }
             .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
                     change.consume()
