@@ -118,6 +118,18 @@ class ArRenderer(
     private val viewMtx = FloatArray(16)
     private val projMtx = FloatArray(16)
 
+    // Bolt Optimization: Pre-allocated buffers to avoid allocations in onDrawFrame
+    private val calculationModelMatrix = FloatArray(16)
+    private val calculationPoseMatrix = FloatArray(16)
+    private val calculationTempVec = FloatArray(4)
+    private val calculationResVec = FloatArray(4)
+    private val boundsCorners = floatArrayOf(
+        -0.5f, -0.5f, 0f, 1f,
+        -0.5f, 0.5f, 0f, 1f,
+        0.5f, 0.5f, 0f, 1f,
+        0.5f, -0.5f, 0f, 1f
+    )
+
     private val orb = ORB.create()
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
@@ -259,9 +271,9 @@ class ArRenderer(
         if (activeAnchor != null) {
             if (activeAnchor!!.trackingState == TrackingState.TRACKING) {
                 val pose = activeAnchor!!.pose
-                val poseMatrix = FloatArray(16)
-                pose.toMatrix(poseMatrix, 0)
-                arImagePose = poseMatrix
+                // Bolt Optimization: Reuse matrix
+                pose.toMatrix(calculationPoseMatrix, 0)
+                arImagePose = calculationPoseMatrix
                 handlePan(frame, viewMtx, projMtx)
             }
         }
@@ -290,7 +302,9 @@ class ArRenderer(
      */
     private fun calculateAndReportBounds(viewMtx: FloatArray, projMtx: FloatArray) {
         val pose = arImagePose ?: return
-        val modelMtx = pose.clone()
+        // Bolt Optimization: Reuse matrix
+        System.arraycopy(pose, 0, calculationModelMatrix, 0, 16)
+        val modelMtx = calculationModelMatrix
 
         // Apply same transforms as drawArtwork
         Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
@@ -301,32 +315,24 @@ class ArRenderer(
         val aspectRatio = if (overlayBitmap != null && overlayBitmap!!.height > 0) overlayBitmap!!.width.toFloat() / overlayBitmap!!.height.toFloat() else 1f
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
 
-        // Quad corners in local space (-0.5 to 0.5)
-        val corners = listOf(
-            floatArrayOf(-0.5f, -0.5f, 0f, 1f),
-            floatArrayOf(-0.5f, 0.5f, 0f, 1f),
-            floatArrayOf(0.5f, 0.5f, 0f, 1f),
-            floatArrayOf(0.5f, -0.5f, 0f, 1f)
-        )
-
         var minX = Float.MAX_VALUE
         var minY = Float.MAX_VALUE
         var maxX = Float.MIN_VALUE
         var maxY = Float.MIN_VALUE
 
-        val tempVec = FloatArray(4)
-        val resVec = FloatArray(4)
-
-        for (corner in corners) {
+        // Bolt Optimization: Loop unrolled / flat array traversal to avoid allocations
+        for (i in 0 until 4) {
+            val offset = i * 4
             // Model -> World -> View -> Clip
-            Matrix.multiplyMV(tempVec, 0, modelMtx, 0, corner, 0) // World
-            Matrix.multiplyMV(resVec, 0, viewMtx, 0, tempVec, 0) // View
-            Matrix.multiplyMV(tempVec, 0, projMtx, 0, resVec, 0) // Clip
+            // Note: Matrix.multiplyMV takes offset for input vector, but we must use calculationTempVec from index 0
+            Matrix.multiplyMV(calculationTempVec, 0, modelMtx, 0, boundsCorners, offset) // World
+            Matrix.multiplyMV(calculationResVec, 0, viewMtx, 0, calculationTempVec, 0) // View
+            Matrix.multiplyMV(calculationTempVec, 0, projMtx, 0, calculationResVec, 0) // Clip
 
-            if (tempVec[3] != 0f) {
+            if (calculationTempVec[3] != 0f) {
                 // NDC -> Screen
-                val ndcX = tempVec[0] / tempVec[3]
-                val ndcY = tempVec[1] / tempVec[3]
+                val ndcX = calculationTempVec[0] / calculationTempVec[3]
+                val ndcY = calculationTempVec[1] / calculationTempVec[3]
 
                 val screenX = (ndcX + 1f) / 2f * viewportWidth
                 val screenY = (1f - ndcY) / 2f * viewportHeight
@@ -345,7 +351,9 @@ class ArRenderer(
     private fun drawArtwork(viewMtx: FloatArray, projMtx: FloatArray) {
         val bitmap = overlayBitmap ?: return
         val pose = arImagePose ?: return
-        val modelMtx = pose.clone()
+        // Bolt Optimization: Reuse matrix
+        System.arraycopy(pose, 0, calculationModelMatrix, 0, 16)
+        val modelMtx = calculationModelMatrix
 
         Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
         Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
@@ -402,9 +410,9 @@ class ArRenderer(
                 activeAnchor?.detach()
                 activeAnchor = hit.createAnchor()
 
-                val poseMatrix = FloatArray(16)
-                hit.hitPose.toMatrix(poseMatrix, 0)
-                arImagePose = poseMatrix
+                // Bolt Optimization: Reuse matrix
+                hit.hitPose.toMatrix(calculationPoseMatrix, 0)
+                arImagePose = calculationPoseMatrix
                 break
             }
         }
