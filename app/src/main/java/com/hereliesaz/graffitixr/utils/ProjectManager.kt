@@ -35,6 +35,7 @@ class ProjectManager(private val context: Context) {
      * @param projectData The data object to serialize.
      */
     fun saveProject(projectName: String, projectData: ProjectData) {
+        validateProjectName(projectName)
         val file = File(projectsDir, "$projectName.json")
         val jsonString = Json.encodeToString(ProjectData.serializer(), projectData)
         file.writeText(jsonString)
@@ -46,6 +47,7 @@ class ProjectManager(private val context: Context) {
      * @return The [ProjectData] object, or null if the file doesn't exist.
      */
     fun loadProject(projectName: String): ProjectData? {
+        validateProjectName(projectName)
         val file = File(projectsDir, "$projectName.json")
         return if (file.exists()) {
             val jsonString = file.readText()
@@ -64,6 +66,7 @@ class ProjectManager(private val context: Context) {
      * @return A list of URIs pointing to the saved files.
      */
     fun saveTargetImages(projectName: String, bitmaps: List<Bitmap>): List<Uri> {
+        validateProjectName(projectName)
         val projectTargetDir = File(targetsDir, projectName)
         if (!projectTargetDir.exists()) projectTargetDir.mkdirs()
 
@@ -91,6 +94,7 @@ class ProjectManager(private val context: Context) {
      * Deletes a project and its associated target images.
      */
     fun deleteProject(projectName: String) {
+        validateProjectName(projectName)
         val file = File(projectsDir, "$projectName.json")
         if (file.exists()) {
             file.delete()
@@ -98,6 +102,12 @@ class ProjectManager(private val context: Context) {
         val projectTargetDir = File(targetsDir, projectName)
         if (projectTargetDir.exists()) {
             projectTargetDir.deleteRecursively()
+        }
+    }
+
+    private fun validateProjectName(projectName: String) {
+        if (projectName.contains("..") || projectName.contains("/") || projectName.contains("\\")) {
+            throw SecurityException("Invalid project name: Path traversal characters detected")
         }
     }
 
