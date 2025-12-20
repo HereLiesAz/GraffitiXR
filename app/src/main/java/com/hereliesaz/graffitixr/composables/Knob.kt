@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.composables
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -19,8 +20,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -38,7 +41,8 @@ fun Knob(
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     modifier: Modifier = Modifier,
-    color: Color = Color.White
+    color: Color = Color.White,
+    defaultValue: Float = valueRange.start
 ) {
     // Mapping angle: 135 (bottom left) to 405 (bottom right)
     val minAngle = 135f
@@ -51,6 +55,7 @@ fun Knob(
     }
 
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
     val updatedValue by rememberUpdatedState(value)
     val updatedOnValueChange by rememberUpdatedState(onValueChange)
 
@@ -75,13 +80,28 @@ fun Knob(
                 }
             }
             .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        updatedOnValueChange(defaultValue)
+                    }
+                )
+            }
+            .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
                     change.consume()
                     // Sensitivity: full range in 300dp drag
                     val sensitivityPx = with(density) { 300.dp.toPx() }
                     val sensitivity = (valueRange.endInclusive - valueRange.start) / sensitivityPx
-                    // Use updatedValue from state to avoid stale closure
+
                     val newValue = (updatedValue - dragAmount.y * sensitivity).coerceIn(valueRange.start, valueRange.endInclusive)
+
+                    // Haptic feedback when crossing default value
+                    if ((updatedValue < defaultValue && newValue >= defaultValue) ||
+                        (updatedValue > defaultValue && newValue <= defaultValue)) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+
                     updatedOnValueChange(newValue)
                 }
             }

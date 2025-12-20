@@ -50,19 +50,25 @@ fun AdjustmentsPanel(
                     value = uiState.opacity,
                     onValueChange = onOpacityChange,
                     text = "Opacity",
-                    color = MaterialTheme.colorScheme.secondary
+                    color = MaterialTheme.colorScheme.secondary,
+                    valueRange = 0f..1f,
+                    defaultValue = 1f
                 )
                 Knob(
                     value = uiState.contrast,
                     onValueChange = onContrastChange,
                     text = "Contrast",
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = MaterialTheme.colorScheme.tertiary,
+                    valueRange = 0f..2f,
+                    defaultValue = 1f
                 )
                 Knob(
                     value = uiState.saturation,
                     onValueChange = onSaturationChange,
                     text = "Saturation",
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    valueRange = 0f..2f,
+                    defaultValue = 1f
                 )
             }
         }

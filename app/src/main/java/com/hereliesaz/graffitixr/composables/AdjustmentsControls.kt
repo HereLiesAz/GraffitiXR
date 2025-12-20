@@ -90,26 +90,33 @@ fun AdjustmentsKnobsRow(
             value = opacity,
             onValueChange = onOpacityChange,
             text = "Opacity",
-            color = MaterialTheme.colorScheme.secondary
+            color = MaterialTheme.colorScheme.secondary,
+            valueRange = 0f..1f,
+            defaultValue = 1f
         )
         Knob(
             value = brightness,
             onValueChange = onBrightnessChange,
             text = "Brightness",
             color = MaterialTheme.colorScheme.onSurface,
-            valueRange = -1f..1f
+            valueRange = -1f..1f,
+            defaultValue = 0f
         )
         Knob(
             value = contrast,
             onValueChange = onContrastChange,
             text = "Contrast",
-            color = MaterialTheme.colorScheme.tertiary
+            color = MaterialTheme.colorScheme.tertiary,
+            valueRange = 0f..2f,
+            defaultValue = 1f
         )
         Knob(
             value = saturation,
             onValueChange = onSaturationChange,
             text = "Saturation",
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
+            valueRange = 0f..2f,
+            defaultValue = 1f
         )
     }
 }
@@ -136,7 +143,8 @@ fun ColorBalanceKnobsRow(
             onValueChange = onColorBalanceRChange,
             text = "Red",
             color = Color.Red,
-            valueRange = 0f..2f
+            valueRange = 0f..2f,
+            defaultValue = 1f
         )
         // Green Knob
         Knob(
@@ -144,7 +152,8 @@ fun ColorBalanceKnobsRow(
             onValueChange = onColorBalanceGChange,
             text = "Green",
             color = Color.Green,
-            valueRange = 0f..2f
+            valueRange = 0f..2f,
+            defaultValue = 1f
         )
         // Blue Knob
         Knob(
@@ -152,7 +161,8 @@ fun ColorBalanceKnobsRow(
             onValueChange = onColorBalanceBChange,
             text = "Blue",
             color = Color.Blue,
-            valueRange = 0f..2f
+            valueRange = 0f..2f,
+            defaultValue = 1f
         )
     }
 }
