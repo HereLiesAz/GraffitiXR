@@ -32,6 +32,7 @@ import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
 import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -123,6 +124,13 @@ class ArRenderer(
     private val calculationPoseMatrix = FloatArray(16)
     private val calculationTempVec = FloatArray(4)
     private val calculationResVec = FloatArray(4)
+
+    // Bolt Optimization: Reusable RectF and state for bounds optimization to reduce allocations and UI updates
+    private val calculationBounds = RectF()
+    private val lastReportedBounds = RectF()
+    private var hasReportedBounds = false
+    private val BOUNDS_UPDATE_THRESHOLD = 2f // pixels
+
     private val boundsCorners = floatArrayOf(
         -0.5f, -0.5f, 0f, 1f,
         -0.5f, 0.5f, 0f, 1f,
@@ -344,8 +352,20 @@ class ArRenderer(
             }
         }
 
-        val bounds = RectF(minX, minY, maxX, maxY)
-        mainHandler.post { onBoundsUpdated(bounds) }
+        calculationBounds.set(minX, minY, maxX, maxY)
+
+        // Bolt Optimization: Only report bounds if they have changed significantly
+        if (!hasReportedBounds ||
+            abs(calculationBounds.left - lastReportedBounds.left) > BOUNDS_UPDATE_THRESHOLD ||
+            abs(calculationBounds.top - lastReportedBounds.top) > BOUNDS_UPDATE_THRESHOLD ||
+            abs(calculationBounds.right - lastReportedBounds.right) > BOUNDS_UPDATE_THRESHOLD ||
+            abs(calculationBounds.bottom - lastReportedBounds.bottom) > BOUNDS_UPDATE_THRESHOLD
+        ) {
+            hasReportedBounds = true
+            lastReportedBounds.set(calculationBounds)
+            val boundsToSend = RectF(calculationBounds)
+            mainHandler.post { onBoundsUpdated(boundsToSend) }
+        }
     }
 
     private fun drawArtwork(viewMtx: FloatArray, projMtx: FloatArray) {
