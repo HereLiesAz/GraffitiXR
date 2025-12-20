@@ -96,13 +96,6 @@ class MainViewModel(
             showOnboardingDialogForMode = if (!completedModes.contains(uiState.value.editorMode)) uiState.value.editorMode else null
         ), isUndoable = false)
 
-        val receiver = ApkInstallReceiver()
-        ContextCompat.registerReceiver(
-            application,
-            receiver,
-            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_EXPORTED
-        )
         startAutoSave()
     }
 
@@ -1032,7 +1025,11 @@ class MainViewModel(
         try {
             val request = DownloadManager.Request(downloadUrl.toUri()).setTitle(fileName).setDescription("Downloading GraffitiXR Update").setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED).setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
             val downloadManager = getApplication<Application>().getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            downloadManager.enqueue(request)
+            val downloadId = downloadManager.enqueue(request)
+            getApplication<Application>().getSharedPreferences("secure_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putLong("update_download_id", downloadId)
+                .apply()
             Toast.makeText(getApplication(), "Downloading update...", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) { Toast.makeText(getApplication(), "Failed to start download: ${e.message}", Toast.LENGTH_LONG).show() }
     }
