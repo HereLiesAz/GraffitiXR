@@ -12,6 +12,16 @@ class ApkInstallReceiver : BroadcastReceiver() {
         val downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
         if (downloadId == -1L) return
 
+        val prefs = context.getSharedPreferences("secure_prefs", Context.MODE_PRIVATE)
+        val expectedId = prefs.getLong("update_download_id", -1L)
+
+        if (downloadId != expectedId) {
+            return
+        }
+
+        // Clear the ID to prevent reuse
+        prefs.edit().remove("update_download_id").apply()
+
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val uri = downloadManager.getUriForDownloadedFile(downloadId)
 
