@@ -9,6 +9,7 @@ This document tracks the development status, future enhancements, and identified
 -   **[x] Integrate Android XR SDK:**
     -   [x] Add dependencies for `androidx.xr.runtime`, `scenecore`, `compose`, `arcore`.
     -   [x] Update build configuration to `compileSdk 36`.
+    -   [x] **Optimize AR Render Loop:** Throttle bounding box updates to reduce UI jank.
 
 ## **V1.11 Documentation Overhaul (Completed)**
 

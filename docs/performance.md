@@ -43,3 +43,8 @@ GraffitiXR is a high-performance AR application. Maintaining 60 FPS in AR mode i
 
 ### **Canvas Drawing**
 -   For custom drawing (like `TargetRefinementScreen`), minimize object creation in the `onDraw` block.
+
+### Cross-Thread Communication
+-   **Rule:** Throttle updates sent from the GL thread to the Main thread.
+-   **Solution:** Use dirty checks (e.g., `abs(new - old) > threshold`) to avoid posting `Runnable`s for unchanged data.
+-   **Reason:** Posting to the MainLooper every 16ms can clog the message queue and cause UI jank.
