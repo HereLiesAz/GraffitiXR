@@ -3,3 +3,7 @@
 ## 2024-05-21 - Accessible Custom Controls
 **Learning:** Custom gesture-based controls (like `Knob`) are invisible to screen readers unless they explicitly implement `semantics` with `progressBarRangeInfo` and `setProgress`.
 **Action:** Always wrap custom gesture components in a `semantics` modifier that exposes their state and allows programmatic adjustment.
+
+## 2024-05-24 - Contextual Icons in AR
+**Learning:** In AR/Camera overlays, static `contentDescription`s like "Direction" for dynamic indicators (arrows) are useless. They must describe the *action* required (e.g., "Move Left"), not just the visual symbol.
+**Action:** Use helper functions to map state (like `CaptureStep`) to descriptive action strings for accessibility services.

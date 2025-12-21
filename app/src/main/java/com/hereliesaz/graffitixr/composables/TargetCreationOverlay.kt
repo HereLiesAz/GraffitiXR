@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -86,12 +87,18 @@ fun TargetCreationOverlay(
                 )
                 if (qualityWarning != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = qualityWarning,
-                        color = Color.Red,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = qualityWarning,
+                            color = Color(0xFFFF5252), // Lighter red for visibility
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
@@ -107,9 +114,11 @@ fun TargetCreationOverlay(
 
             // Flashing Arrow Indicator
             val arrowIcon = getArrowForStep(step)
+            val arrowDescription = getArrowDescriptionForStep(step)
             if (arrowIcon != null) {
                 FlashingArrow(
                     icon = arrowIcon,
+                    contentDescription = arrowDescription,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
@@ -153,6 +162,7 @@ fun TargetCreationOverlay(
 @Composable
 fun FlashingArrow(
     icon: ImageVector,
+    contentDescription: String,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "ArrowFlash")
@@ -168,7 +178,7 @@ fun FlashingArrow(
 
     Icon(
         imageVector = icon,
-        contentDescription = "Direction",
+        contentDescription = contentDescription,
         tint = Color.Yellow.copy(alpha = alpha),
         modifier = modifier.size(120.dp)
     )
@@ -182,6 +192,17 @@ private fun getArrowForStep(step: CaptureStep): ImageVector? {
         CaptureStep.UP -> Icons.Default.ArrowUpward // Pointing Up
         CaptureStep.DOWN -> Icons.Default.ArrowDownward // Pointing Down
         CaptureStep.REVIEW -> null
+    }
+}
+
+private fun getArrowDescriptionForStep(step: CaptureStep): String {
+    return when (step) {
+        CaptureStep.FRONT -> ""
+        CaptureStep.LEFT -> "Move Left"
+        CaptureStep.RIGHT -> "Move Right"
+        CaptureStep.UP -> "Move Up"
+        CaptureStep.DOWN -> "Move Down"
+        CaptureStep.REVIEW -> ""
     }
 }
 
