@@ -300,28 +300,35 @@ class ArRenderer(
         }
 
         if (arImagePose != null) {
+            updateModelMatrix()
             drawArtwork(viewMtx, projMtx)
             calculateAndReportBounds(viewMtx, projMtx)
         }
+    }
+
+    private fun updateModelMatrix() {
+        val pose = arImagePose ?: return
+        // Bolt Optimization: Reuse matrix
+        System.arraycopy(pose, 0, calculationModelMatrix, 0, 16)
+        val modelMtx = calculationModelMatrix
+
+        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
+        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
+        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
+        Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
+        Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
+
+        val bitmap = overlayBitmap
+        val aspectRatio = if (bitmap != null && bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
+        Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
     }
 
     /**
      * Projects the 4 corners of the quad to screen space and reports the bounding box.
      */
     private fun calculateAndReportBounds(viewMtx: FloatArray, projMtx: FloatArray) {
-        val pose = arImagePose ?: return
-        // Bolt Optimization: Reuse matrix
-        System.arraycopy(pose, 0, calculationModelMatrix, 0, 16)
+        // Bolt Optimization: use pre-calculated calculationModelMatrix from updateModelMatrix()
         val modelMtx = calculationModelMatrix
-
-        // Apply same transforms as drawArtwork
-        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
-        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
-        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
-        Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
-        Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
-        val aspectRatio = if (overlayBitmap != null && overlayBitmap!!.height > 0) overlayBitmap!!.width.toFloat() / overlayBitmap!!.height.toFloat() else 1f
-        Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
 
         var minX = Float.MAX_VALUE
         var minY = Float.MAX_VALUE
@@ -370,22 +377,10 @@ class ArRenderer(
 
     private fun drawArtwork(viewMtx: FloatArray, projMtx: FloatArray) {
         val bitmap = overlayBitmap ?: return
-        val pose = arImagePose ?: return
-        // Bolt Optimization: Reuse matrix
-        System.arraycopy(pose, 0, calculationModelMatrix, 0, 16)
-        val modelMtx = calculationModelMatrix
-
-        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
-        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
-        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
-        Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
-        Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
-
-        val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
-        Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
+        // Bolt Optimization: use pre-calculated calculationModelMatrix from updateModelMatrix()
 
         simpleQuadRenderer.draw(
-            modelMtx, viewMtx, projMtx,
+            calculationModelMatrix, viewMtx, projMtx,
             bitmap, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB,
             if (isDepthSupported) depthTextureId else -1
         )

@@ -34,6 +34,10 @@ class SimpleQuadRenderer {
     private var textureId = -1
     private var lastBitmap: Bitmap? = null
 
+    // Bolt Optimization: Pre-allocate matrices to avoid allocation in draw()
+    private val mvpMatrix = FloatArray(16)
+    private val modelViewMatrix = FloatArray(16)
+
     fun createOnGlThread() {
         // Shaders with Depth Occlusion Logic
         val vertexShaderCode = """
@@ -163,8 +167,7 @@ class SimpleQuadRenderer {
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
-        val mvpMatrix = FloatArray(16)
-        val modelViewMatrix = FloatArray(16)
+        // Bolt Optimization: Use pre-allocated matrices
         android.opengl.Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
         android.opengl.Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, modelViewMatrix, 0)
 
