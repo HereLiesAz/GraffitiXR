@@ -77,6 +77,9 @@ class MainViewModel(
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
 
+    private val _requestImagePicker = MutableSharedFlow<Unit>()
+    val requestImagePicker = _requestImagePicker.asSharedFlow()
+
     private val _feedbackEvent = MutableSharedFlow<FeedbackEvent>()
     val feedbackEvent = _feedbackEvent.asSharedFlow()
 
@@ -134,7 +137,11 @@ class MainViewModel(
 
     fun onCaptureShutterClicked() {
         if (uiState.value.isCapturingTarget && uiState.value.editorMode == EditorMode.AR) {
-            arRenderer?.triggerCapture()
+            if (uiState.value.captureStep == CaptureStep.INSTRUCTION) {
+                updateState(uiState.value.copy(captureStep = CaptureStep.FRONT), isUndoable = false)
+            } else {
+                arRenderer?.triggerCapture()
+            }
         } else {
             viewModelScope.launch {
                 _captureEvent.emit(CaptureEvent.RequestCapture)
@@ -244,7 +251,7 @@ class MainViewModel(
     fun onCreateTargetClicked() {
         updateState(uiState.value.copy(
             isCapturingTarget = true,
-            captureStep = CaptureStep.FRONT,
+            captureStep = CaptureStep.INSTRUCTION,
             capturedTargetImages = emptyList()
         ), isUndoable = false)
     }
@@ -255,6 +262,7 @@ class MainViewModel(
         val currentStep = uiState.value.captureStep
 
         val nextStep = when (currentStep) {
+            CaptureStep.INSTRUCTION -> CaptureStep.FRONT
             CaptureStep.FRONT -> CaptureStep.LEFT
             CaptureStep.LEFT -> CaptureStep.RIGHT
             CaptureStep.RIGHT -> CaptureStep.UP
@@ -512,6 +520,11 @@ class MainViewModel(
 
     fun onArImagePlaced() {
         updateState(uiState.value.copy(arState = ArState.LOCKED), isUndoable = false)
+        if (uiState.value.overlayImageUri == null) {
+            viewModelScope.launch {
+                _requestImagePicker.emit(Unit)
+            }
+        }
     }
 
     fun onProgressUpdate(progress: Float, bitmap: Bitmap? = null) {
@@ -649,10 +662,10 @@ class MainViewModel(
     fun onEditorModeChanged(mode: EditorMode) {
         if (mode == EditorMode.HELP) {
             onboardingManager.resetOnboarding()
-            updateState(uiState.value.copy(completedOnboardingModes = emptySet(), editorMode = mode, showOnboardingDialogForMode = null))
+            updateState(uiState.value.copy(completedOnboardingModes = emptySet(), editorMode = mode, showOnboardingDialogForMode = null, activeRotationAxis = RotationAxis.Z))
         } else {
             val showOnboarding = !uiState.value.completedOnboardingModes.contains(mode)
-            updateState(uiState.value.copy(editorMode = mode, showOnboardingDialogForMode = if (showOnboarding) mode else null))
+            updateState(uiState.value.copy(editorMode = mode, showOnboardingDialogForMode = if (showOnboarding) mode else null, activeRotationAxis = RotationAxis.Z))
         }
     }
 

@@ -148,12 +148,21 @@ fun TargetCreationOverlay(
                     .background(glowColor.value, CircleShape)
                     .border(2.dp, Color.White, CircleShape)
             ) {
-                Icon(
-                    imageVector = Icons.Default.CameraAlt,
-                    contentDescription = "Capture",
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp)
-                )
+                if (step == CaptureStep.INSTRUCTION) {
+                    Text(
+                        text = "START",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Capture",
+                        tint = Color.White,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
             }
         }
     }
@@ -186,6 +195,7 @@ fun FlashingArrow(
 
 private fun getArrowForStep(step: CaptureStep): ImageVector? {
     return when (step) {
+        CaptureStep.INSTRUCTION -> null
         CaptureStep.FRONT -> null
         CaptureStep.LEFT -> Icons.Default.ArrowBack // Pointing Left
         CaptureStep.RIGHT -> Icons.Default.ArrowForward // Pointing Right
@@ -197,6 +207,7 @@ private fun getArrowForStep(step: CaptureStep): ImageVector? {
 
 private fun getArrowDescriptionForStep(step: CaptureStep): String {
     return when (step) {
+        CaptureStep.INSTRUCTION -> ""
         CaptureStep.FRONT -> ""
         CaptureStep.LEFT -> "Move Left"
         CaptureStep.RIGHT -> "Move Right"
@@ -208,6 +219,7 @@ private fun getArrowDescriptionForStep(step: CaptureStep): String {
 
 private fun getInstructionText(step: CaptureStep): String {
     return when (step) {
+        CaptureStep.INSTRUCTION -> "Move device slowly to scan surfaces.\nPress START when ready."
         CaptureStep.FRONT -> "Stand directly in front of the target surface."
         CaptureStep.LEFT -> "Take a step to the LEFT."
         CaptureStep.RIGHT -> "Take a step to the RIGHT."
