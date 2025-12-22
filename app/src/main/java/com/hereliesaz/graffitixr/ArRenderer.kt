@@ -45,7 +45,9 @@ import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.DescriptorMatcher
 import org.opencv.features2d.ORB
+import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -69,6 +71,8 @@ class ArRenderer(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var wasTracking = false
     private val sessionLock = ReentrantLock()
+    private val isAnalyzing = AtomicBoolean(false)
+    private var analysisBuffer: ByteArray? = null
 
     @Volatile var session: Session? = null
     private val displayRotationHelper = DisplayRotationHelper(context)
@@ -483,34 +487,52 @@ class ArRenderer(
     }
 
     private fun analyzeFrameAsync(frame: Frame) {
+        if (isAnalyzing.getAndSet(true)) return
+
         val image = try {
             frame.acquireCameraImage()
-        } catch (e: NotYetAvailableException) {
-            return
         } catch (e: Exception) {
+            isAnalyzing.set(false)
             return
         }
 
         try {
             val rotation = getRotationDegrees()
-            val yBuffer = image.planes[0].buffer
+            val plane = image.planes[0]
+            val buffer = plane.buffer
             val width = image.width
             val height = image.height
-            val rowStride = image.planes[0].rowStride
-            val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, rowStride.toLong())
-            val tempMat = Mat()
-            yMat.copyTo(tempMat)
-            val data = ByteArray((tempMat.total() * tempMat.channels()).toInt())
-            tempMat.get(0, 0, data)
-            tempMat.release()
-            yMat.release()
+            val rowStride = plane.rowStride
+
+            val requiredSize = width * height
+            if (analysisBuffer == null || analysisBuffer!!.size != requiredSize) {
+                analysisBuffer = ByteArray(requiredSize)
+            }
+            val data = analysisBuffer!!
+
+            buffer.rewind()
+            if (width == rowStride) {
+                buffer.get(data, 0, requiredSize)
+            } else {
+                for (row in 0 until height) {
+                    buffer.position(row * rowStride)
+                    buffer.get(data, row * width, width)
+                }
+            }
+
             image.close()
 
             analysisScope.launch {
+                var rawMat: Mat? = null
+                var rotatedMat: Mat? = null
+                var descriptors: Mat? = null
+                var keypoints: MatOfKeyPoint? = null
+
                 try {
-                    val processingMat = Mat(height, width, CvType.CV_8UC1)
-                    processingMat.put(0, 0, data)
-                    val rotatedMat = if (rotation != 0f) {
+                    rawMat = Mat(height, width, CvType.CV_8UC1)
+                    rawMat.put(0, 0, data)
+
+                    val finalMat = if (rotation != 0f) {
                         val dst = Mat()
                         val rotateCode = when (rotation) {
                             90f -> Core.ROTATE_90_CLOCKWISE
@@ -519,20 +541,22 @@ class ArRenderer(
                             else -> -1
                         }
                         if (rotateCode != -1) {
-                            Core.rotate(processingMat, dst, rotateCode)
-                            processingMat.release()
+                            Core.rotate(rawMat, dst, rotateCode)
+                            rawMat.release()
+                            rawMat = null
+                            rotatedMat = dst
                             dst
                         } else {
-                            processingMat
+                            rawMat
                         }
                     } else {
-                        processingMat
+                        rawMat
                     }
 
-                    val descriptors = Mat()
-                    val keypoints = MatOfKeyPoint()
+                    descriptors = Mat()
+                    keypoints = MatOfKeyPoint()
                     synchronized(orb) {
-                        orb.detectAndCompute(rotatedMat, Mat(), keypoints, descriptors)
+                        orb.detectAndCompute(finalMat, Mat(), keypoints, descriptors)
                     }
 
                     val targetDescriptors = originalDescriptors
@@ -550,15 +574,19 @@ class ArRenderer(
                         val progress = (1.0f - ratio).coerceIn(0f, 1f) * 100f
                         mainHandler.post { onProgressUpdated(progress, null) }
                     }
-                    descriptors.release()
-                    keypoints.release()
-                    rotatedMat.release()
                 } catch (e: Exception) {
                     Log.e(TAG, "Analysis error", e)
+                } finally {
+                    rawMat?.release()
+                    rotatedMat?.release()
+                    descriptors?.release()
+                    keypoints?.release()
+                    isAnalyzing.set(false)
                 }
             }
         } catch (e: Exception) {
             image.close()
+            isAnalyzing.set(false)
         }
     }
 
