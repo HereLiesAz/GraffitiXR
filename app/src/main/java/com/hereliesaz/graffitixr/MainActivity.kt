@@ -60,24 +60,18 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (event?.repeatCount == 0) {
-            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-                volUpPressed = true
-                checkUnlock()
-                if (viewModel.uiState.value.isTouchLocked) {
-                    viewModel.showUnlockInstructions()
-                    return true
-                }
-            } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-                volDownPressed = true
-                checkUnlock()
-                if (viewModel.uiState.value.isTouchLocked) {
-                    viewModel.showUnlockInstructions()
-                    return true
-                }
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            volUpPressed = true
+            checkUnlock()
+            if (viewModel.uiState.value.isTouchLocked) {
+                viewModel.showUnlockInstructions()
+                return true
             }
-        } else {
-            if (viewModel.uiState.value.isTouchLocked && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+        } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            volDownPressed = true
+            checkUnlock()
+            if (viewModel.uiState.value.isTouchLocked) {
+                viewModel.showUnlockInstructions()
                 return true
             }
         }

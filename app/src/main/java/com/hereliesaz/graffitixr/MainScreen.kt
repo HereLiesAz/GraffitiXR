@@ -366,7 +366,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
 
             // Gesture Feedback
-            if (!uiState.hideUiForCapture) {
+            if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
                 GestureFeedback(
                     uiState = uiState,
                     modifier = Modifier
@@ -398,13 +398,6 @@ fun MainScreen(viewModel: MainViewModel) {
                         azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { onModeSelected(EditorMode.TRACE) })
 
                         azDivider()
-
-                        if (uiState.editorMode == EditorMode.TRACE) {
-                            azRailItem(id = "lock_trace", text = "Lock", onClick = {
-                                viewModel.setTouchLocked(true)
-                                showSliderDialog = null; showColorBalanceDialog = false
-                            })
-                        }
 
                         if (uiState.editorMode == EditorMode.AR) {
                             azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
@@ -498,6 +491,13 @@ fun MainScreen(viewModel: MainViewModel) {
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
+
+                        if (uiState.editorMode == EditorMode.TRACE) {
+                            azRailItem(id = "lock_trace", text = "Lock", onClick = {
+                                viewModel.setTouchLocked(true)
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
+                        }
                     }
                 }
             }
@@ -560,7 +560,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
 
             // Adjustments Panels
-            if (uiState.overlayImageUri != null && !uiState.hideUiForCapture) {
+            if (uiState.overlayImageUri != null && !uiState.hideUiForCapture && !uiState.isTouchLocked) {
                 val showKnobs = showSliderDialog == "Adjust"
 
                 UndoRedoRow(
@@ -619,7 +619,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
 
             // Feedback Elements
-            if (!uiState.hideUiForCapture) {
+            if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
                 RotationAxisFeedback(
                     axis = uiState.activeRotationAxis,
                     visible = uiState.showRotationAxisFeedback,
