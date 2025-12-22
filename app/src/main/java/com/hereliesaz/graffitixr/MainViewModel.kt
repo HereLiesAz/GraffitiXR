@@ -662,10 +662,10 @@ class MainViewModel(
     fun onEditorModeChanged(mode: EditorMode) {
         if (mode == EditorMode.HELP) {
             onboardingManager.resetOnboarding()
-            updateState(uiState.value.copy(completedOnboardingModes = emptySet(), editorMode = mode, showOnboardingDialogForMode = null))
+            updateState(uiState.value.copy(completedOnboardingModes = emptySet(), editorMode = mode, showOnboardingDialogForMode = null, activeRotationAxis = RotationAxis.Z))
         } else {
             val showOnboarding = !uiState.value.completedOnboardingModes.contains(mode)
-            updateState(uiState.value.copy(editorMode = mode, showOnboardingDialogForMode = if (showOnboarding) mode else null))
+            updateState(uiState.value.copy(editorMode = mode, showOnboardingDialogForMode = if (showOnboarding) mode else null, activeRotationAxis = RotationAxis.Z))
         }
     }
 
