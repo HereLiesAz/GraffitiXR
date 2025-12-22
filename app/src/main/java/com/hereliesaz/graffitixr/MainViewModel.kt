@@ -166,10 +166,13 @@ class MainViewModel(
             TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
         }
 
+        val newScale = if (mode != TargetCreationMode.CAPTURE) 0.5f else uiState.value.arObjectScale
+
         updateState(uiState.value.copy(
             targetCreationMode = mode,
             captureStep = nextStep,
-            isGridGuideVisible = mode != TargetCreationMode.CAPTURE
+            isGridGuideVisible = mode != TargetCreationMode.CAPTURE,
+            arObjectScale = newScale
         ), isUndoable = false)
 
         if (mode != TargetCreationMode.CAPTURE) {

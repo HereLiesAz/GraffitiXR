@@ -195,8 +195,8 @@ fun ArView(
                         // Rule Check:
                         // If 1 pointer -> Allowed (Global drag to support robust moving even if bounds are flaky)
                         // If 2+ pointers -> Allowed
-                        // DISABLED if we are capturing target (grid creation), except for Tap which is separate.
-                        val isGestureAllowed = pointerCount >= 1 && !uiState.isCapturingTarget
+                        // Note: If capturing target, we only allow ZOOM.
+                        val isGestureAllowed = pointerCount >= 1
 
                         if (isGestureAllowed) {
                             val zoomChange = event.calculateZoom()
@@ -222,13 +222,18 @@ fun ArView(
                             }
 
                             if (pastTouchSlop) {
-                                if (panChange != androidx.compose.ui.geometry.Offset.Zero) {
+                                // Pan: Block if capturing target
+                                if (panChange != androidx.compose.ui.geometry.Offset.Zero && !uiState.isCapturingTarget) {
                                     glSurfaceView.queueEvent { renderer.queuePan(panChange.x, panChange.y) }
                                 }
+
+                                // Zoom: Allow always (as requested)
                                 if (zoomChange != 1f) {
                                     viewModel.onArObjectScaleChanged(zoomChange)
                                 }
-                                if (rotationChange != 0f) {
+
+                                // Rotation: Block if capturing target
+                                if (rotationChange != 0f && !uiState.isCapturingTarget) {
                                     val rotationDelta = -rotationChange
                                     when (uiState.activeRotationAxis) {
                                         RotationAxis.X -> viewModel.onRotationXChanged(rotationDelta)
