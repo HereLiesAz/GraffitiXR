@@ -202,13 +202,15 @@ class MainViewModel(
 
     fun onCancelCaptureClicked() {
         arRenderer?.showGuide = false
+        arRenderer?.resetAnchor()
         updateState(uiState.value.copy(
             isCapturingTarget = false,
             targetCreationState = TargetCreationState.IDLE,
             captureStep = CaptureStep.ADVICE,
             capturedTargetImages = emptyList(),
             targetCreationMode = TargetCreationMode.CAPTURE,
-            isGridGuideVisible = false
+            isGridGuideVisible = false,
+            arState = ArState.SEARCHING
         ))
     }
 
@@ -303,11 +305,13 @@ class MainViewModel(
     }
 
     fun onCreateTargetClicked() {
+        arRenderer?.resetAnchor()
         updateState(uiState.value.copy(
             isCapturingTarget = true,
             captureStep = CaptureStep.ADVICE,
             capturedTargetImages = emptyList(),
-            targetCreationMode = TargetCreationMode.CAPTURE
+            targetCreationMode = TargetCreationMode.CAPTURE,
+            arState = ArState.SEARCHING
         ), isUndoable = false)
     }
 

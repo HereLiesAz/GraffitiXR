@@ -655,6 +655,18 @@ class ArRenderer(
         }
     }
 
+    fun resetAnchor() {
+        sessionLock.lock()
+        try {
+            activeAnchor?.detach()
+            activeAnchor = null
+            arImagePose = null
+            arState = ArState.SEARCHING
+        } finally {
+            sessionLock.unlock()
+        }
+    }
+
     fun queueTap(x: Float, y: Float) {
         tapQueue.offer(Pair(x, y))
     }
