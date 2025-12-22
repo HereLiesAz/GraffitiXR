@@ -16,6 +16,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -508,15 +511,34 @@ fun MainScreen(viewModel: MainViewModel) {
                         .background(Color.Transparent)
                         .pointerInput(Unit) {
                             awaitPointerEventScope {
+                                var tapCount = 0
+                                var lastTapTime = 0L
                                 while (true) {
-                                    awaitPointerEvent(pass = PointerEventPass.Initial)
-                                    val event = awaitPointerEvent()
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Main)
+                                    val change = event.changes.firstOrNull()
+                                    if (change != null && change.changedToUp()) {
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastTapTime < 500) {
+                                            tapCount++
+                                        } else {
+                                            tapCount = 1
+                                        }
+                                        lastTapTime = now
+
+                                        if (tapCount == 4) {
+                                            viewModel.showUnlockInstructions()
+                                            tapCount = 0
+                                        }
+                                    }
                                     event.changes.forEach { it.consume() }
                                 }
                             }
                         }
                 )
             }
+
+            // Unlock Instructions
+            UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
 
             // Progress Drawing Canvas
             if (uiState.isMarkingProgress) {
@@ -721,4 +743,37 @@ private fun CaptureAnimation() {
             .background(Color.White.copy(alpha = animatedFlashAlpha))
             .zIndex(11f)
     )
+}
+
+@Composable
+fun UnlockInstructionsPopup(visible: Boolean) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(200f)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 120.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+            ) {
+                Text(
+                    text = "Press Volume Up & Down to unlock",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
 }

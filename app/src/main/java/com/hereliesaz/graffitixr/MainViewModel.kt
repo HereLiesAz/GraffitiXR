@@ -623,8 +623,25 @@ class MainViewModel(
         updateState(uiState.value.copy(progressPercentage = progress), isUndoable = false)
     }
 
+    private var unlockInstructionsJob: kotlinx.coroutines.Job? = null
+
+    fun showUnlockInstructions() {
+        unlockInstructionsJob?.cancel()
+        unlockInstructionsJob = viewModelScope.launch {
+            updateState(uiState.value.copy(showUnlockInstructions = true), isUndoable = false)
+            delay(3000)
+            updateState(uiState.value.copy(showUnlockInstructions = false), isUndoable = false)
+        }
+    }
+
     fun setTouchLocked(locked: Boolean) {
-        updateState(uiState.value.copy(isTouchLocked = locked), isUndoable = false)
+        if (locked) {
+            showUnlockInstructions()
+            updateState(uiState.value.copy(isTouchLocked = true), isUndoable = false)
+        } else {
+            unlockInstructionsJob?.cancel()
+            updateState(uiState.value.copy(isTouchLocked = false, showUnlockInstructions = false), isUndoable = false)
+        }
     }
 
     fun showTapFeedback(position: Offset, isSuccess: Boolean) {
