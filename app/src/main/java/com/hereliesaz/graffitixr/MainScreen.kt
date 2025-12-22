@@ -437,7 +437,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             azDivider()
 
                             azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust") {
-                                showSliderDialog = "Adjust"
+                                showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
                                 showColorBalanceDialog = false
                             }
                             azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance") {
@@ -480,7 +480,10 @@ fun MainScreen(viewModel: MainViewModel) {
                         azDivider()
 
                         if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
-                            azRailItem(id = "light", text = "Light", onClick = viewModel::onToggleFlashlight)
+                            azRailItem(id = "light", text = "Light", onClick = {
+                                viewModel.onToggleFlashlight()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            })
                         }
                     }
                 }

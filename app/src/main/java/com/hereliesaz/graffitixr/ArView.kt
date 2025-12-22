@@ -179,9 +179,9 @@ fun ArView(
                         val pointerCount = event.changes.size
 
                         // Rule Check:
-                        // If 1 pointer -> Must have started on object
+                        // If 1 pointer -> Allowed (Global drag to support robust moving even if bounds are flaky)
                         // If 2+ pointers -> Allowed
-                        val isGestureAllowed = (pointerCount == 1 && isStartOnObject) || (pointerCount >= 2)
+                        val isGestureAllowed = pointerCount >= 1
 
                         if (isGestureAllowed) {
                             val zoomChange = event.calculateZoom()
