@@ -170,7 +170,7 @@ data class UiState(
 
     val updateStatusMessage: String? = null,
     val isCheckingForUpdate: Boolean = false,
-    val latestRelease: @RawValue GithubRelease? = null,
+    val latestRelease: GithubRelease? = null,
     val isFlashlightOn: Boolean = false,
 
     // Multi-step Capture State
