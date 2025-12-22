@@ -44,3 +44,13 @@
 ## **6. Help/Onboarding (`HelpScreen.kt`)**
 -   **Type:** Full-screen Pager.
 -   **Content:** Step-by-step tutorial images and text explaining the app's modes.
+
+## **7. Target Creation Overlay (`TargetCreationOverlay.kt`)**
+-   **Context:** Overlaid on `ARScreen` during target creation.
+-   **Functionality:**
+    -   Guides the user through target creation steps.
+    -   **Modes:**
+        -   **Capture:** Standard 5-angle capture.
+        -   **Guided Grid:** User configures a grid (Rows x Cols) and aligns it with wall marks.
+        -   **Guided Points:** User aligns with 4 reference points.
+    -   Visualizes steps and instructions.

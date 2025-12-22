@@ -4,7 +4,16 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
-## **V1.12 Android XR Readiness (Current)**
+## **V1.13 Guided Target Creation (Current)**
+
+-   **[x] Guided Grid Creation:**
+    -   [x] Implement "Guided Grid" workflow for AR target creation.
+    -   [x] Add "Guided Points" (4 X's) workflow.
+    -   [x] Create UI for choosing between Capture, Grid, and Points.
+    -   [x] Implement dynamic grid generation and configuration (Rows x Cols).
+    -   [x] Allow re-positioning of the grid anchor during creation.
+
+## **V1.12 Android XR Readiness (Completed)**
 
 -   **[x] Integrate Android XR SDK:**
     -   [x] Add dependencies for `androidx.xr.runtime`, `scenecore`, `compose`, `arcore`.

@@ -29,11 +29,22 @@ enum class TargetCreationState : Parcelable {
     ERROR
 }
 
+@Parcelize
+enum class TargetCreationMode : Parcelable {
+    CAPTURE,
+    GUIDED_GRID,
+    GUIDED_POINTS
+}
+
 /**
  * Represents the specific step in the multi-angle capture process for AR targets.
  */
 @Parcelize
 enum class CaptureStep : Parcelable {
+    ADVICE,
+    CHOOSE_METHOD,
+    GRID_CONFIG,
+    GUIDED_CAPTURE,
     INSTRUCTION,
     FRONT,
     LEFT,
@@ -174,7 +185,11 @@ data class UiState(
     val isFlashlightOn: Boolean = false,
 
     // Multi-step Capture State
-    val captureStep: CaptureStep = CaptureStep.FRONT,
+    val targetCreationMode: TargetCreationMode = TargetCreationMode.CAPTURE,
+    val captureStep: CaptureStep = CaptureStep.ADVICE,
+    val gridRows: Int = 2,
+    val gridCols: Int = 2,
+    val isGridGuideVisible: Boolean = false,
     val qualityWarning: String? = null,
     val captureFailureTimestamp: Long = 0L, // Used to trigger UI animations (red glow)
     val capturedTargetUris: List<Uri> = emptyList(),
