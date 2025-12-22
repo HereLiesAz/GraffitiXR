@@ -20,6 +20,7 @@ import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
+import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
@@ -432,11 +433,21 @@ class ArRenderer(
         for (hit in hitResult) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                // Stabilize rotation: Preserve the current anchor's rotation to prevent unintended spinning while dragging.
+                // We only want to use the Translation from the new hit.
+                val currentPose = activeAnchor?.pose ?: hit.hitPose
+                val hitPose = hit.hitPose
+
+                val newPose = Pose(
+                    floatArrayOf(hitPose.tx(), hitPose.ty(), hitPose.tz()),
+                    floatArrayOf(currentPose.qx(), currentPose.qy(), currentPose.qz(), currentPose.qw())
+                )
+
                 activeAnchor?.detach()
-                activeAnchor = hit.createAnchor()
+                activeAnchor = trackable.createAnchor(newPose)
 
                 // Bolt Optimization: Reuse matrix
-                hit.hitPose.toMatrix(calculationPoseMatrix, 0)
+                newPose.toMatrix(calculationPoseMatrix, 0)
                 arImagePose = calculationPoseMatrix
                 break
             }
