@@ -177,6 +177,7 @@ data class UiState(
     val progressPercentage: Float = 0f,
     val isCapturingTarget: Boolean = false,
     val isTouchLocked: Boolean = false,
+    val showUnlockInstructions: Boolean = false,
     val hideUiForCapture: Boolean = false,
 
     val updateStatusMessage: String? = null,

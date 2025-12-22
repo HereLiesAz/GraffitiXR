@@ -51,25 +51,27 @@ class MainActivity : ComponentActivity() {
     // Hidden "Cheat Code" state for unlocking touch
     private var volUpPressed = false
     private var volDownPressed = false
-    private val unlockHandler = Handler(Looper.getMainLooper())
-    private val unlockRunnable = Runnable {
-        viewModel.setTouchLocked(false)
-        Toast.makeText(this, "Screen Unlocked", Toast.LENGTH_SHORT).show()
+
+    override fun onResume() {
+        super.onResume()
+        if (viewModel.uiState.value.isTouchLocked) {
+            viewModel.showUnlockInstructions()
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (event?.repeatCount == 0) {
-            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-                volUpPressed = true
-                checkUnlock()
-                if (viewModel.uiState.value.isTouchLocked) return true
-            } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-                volDownPressed = true
-                checkUnlock()
-                if (viewModel.uiState.value.isTouchLocked) return true
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            volUpPressed = true
+            checkUnlock()
+            if (viewModel.uiState.value.isTouchLocked) {
+                viewModel.showUnlockInstructions()
+                return true
             }
-        } else {
-            if (viewModel.uiState.value.isTouchLocked && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+        } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            volDownPressed = true
+            checkUnlock()
+            if (viewModel.uiState.value.isTouchLocked) {
+                viewModel.showUnlockInstructions()
                 return true
             }
         }
@@ -79,11 +81,9 @@ class MainActivity : ComponentActivity() {
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             volUpPressed = false
-            unlockHandler.removeCallbacks(unlockRunnable)
             if (viewModel.uiState.value.isTouchLocked) return true
         } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
             volDownPressed = false
-            unlockHandler.removeCallbacks(unlockRunnable)
             if (viewModel.uiState.value.isTouchLocked) return true
         }
         return super.onKeyUp(keyCode, event)
@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
 
     private fun checkUnlock() {
         if (volUpPressed && volDownPressed && viewModel.uiState.value.isTouchLocked) {
-            unlockHandler.postDelayed(unlockRunnable, 2000)
+            viewModel.setTouchLocked(false)
         }
     }
 

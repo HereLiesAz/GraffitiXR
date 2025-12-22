@@ -4,7 +4,14 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
-## **V1.13 Guided Target Creation (Current)**
+## **V1.14 UI/UX Enhancements (Current)**
+
+-   **[x] Trace Mode Improvements:**
+    -   [x] Simplified unlock gesture (Simultaneous Volume Up + Down).
+    -   [x] Added persistent, self-dismissing unlock instructions popup.
+    -   [x] Trigger instructions on lock, resume, volume press, and 4-tap gesture.
+
+## **V1.13 Guided Target Creation (Completed)**
 
 -   **[x] Guided Grid Creation:**
     -   [x] Implement "Guided Grid" workflow for AR target creation.
