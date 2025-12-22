@@ -62,14 +62,16 @@ class MainActivity : ComponentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             volUpPressed = true
-            checkUnlock()
+            if (checkUnlock()) return true
+
             if (viewModel.uiState.value.isTouchLocked) {
                 viewModel.showUnlockInstructions()
                 return true
             }
         } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
             volDownPressed = true
-            checkUnlock()
+            if (checkUnlock()) return true
+
             if (viewModel.uiState.value.isTouchLocked) {
                 viewModel.showUnlockInstructions()
                 return true
@@ -89,10 +91,12 @@ class MainActivity : ComponentActivity() {
         return super.onKeyUp(keyCode, event)
     }
 
-    private fun checkUnlock() {
+    private fun checkUnlock(): Boolean {
         if (volUpPressed && volDownPressed && viewModel.uiState.value.isTouchLocked) {
             viewModel.setTouchLocked(false)
+            return true
         }
+        return false
     }
 
     @OptIn(ExperimentalPermissionsApi::class)
