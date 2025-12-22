@@ -166,10 +166,13 @@ class MainViewModel(
             TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
         }
 
+        val newScale = if (mode != TargetCreationMode.CAPTURE) 0.5f else uiState.value.arObjectScale
+
         updateState(uiState.value.copy(
             targetCreationMode = mode,
             captureStep = nextStep,
-            isGridGuideVisible = mode != TargetCreationMode.CAPTURE
+            isGridGuideVisible = mode != TargetCreationMode.CAPTURE,
+            arObjectScale = newScale
         ), isUndoable = false)
 
         if (mode != TargetCreationMode.CAPTURE) {
@@ -202,13 +205,15 @@ class MainViewModel(
 
     fun onCancelCaptureClicked() {
         arRenderer?.showGuide = false
+        arRenderer?.resetAnchor()
         updateState(uiState.value.copy(
             isCapturingTarget = false,
             targetCreationState = TargetCreationState.IDLE,
             captureStep = CaptureStep.ADVICE,
             capturedTargetImages = emptyList(),
             targetCreationMode = TargetCreationMode.CAPTURE,
-            isGridGuideVisible = false
+            isGridGuideVisible = false,
+            arState = ArState.SEARCHING
         ))
     }
 
@@ -303,11 +308,13 @@ class MainViewModel(
     }
 
     fun onCreateTargetClicked() {
+        arRenderer?.resetAnchor()
         updateState(uiState.value.copy(
             isCapturingTarget = true,
             captureStep = CaptureStep.ADVICE,
             capturedTargetImages = emptyList(),
-            targetCreationMode = TargetCreationMode.CAPTURE
+            targetCreationMode = TargetCreationMode.CAPTURE,
+            arState = ArState.SEARCHING
         ), isUndoable = false)
     }
 

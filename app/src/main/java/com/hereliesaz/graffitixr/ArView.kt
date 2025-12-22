@@ -162,7 +162,7 @@ fun ArView(
                 )
             }
             // 2. Advanced Transform Logic with Hit Testing
-            .pointerInput(uiState.activeRotationAxis) {
+            .pointerInput(uiState.activeRotationAxis, uiState.isCapturingTarget) {
                 awaitEachGesture {
                     var rotation = 0f
                     var zoom = 1f
@@ -193,9 +193,10 @@ fun ArView(
                         val pointerCount = event.changes.size
 
                         // Rule Check:
-                        // If 1 pointer -> Allowed only if object is placed (to prevent accidental interaction during scanning)
-                        // If 2+ pointers -> Always allowed
-                        val isGestureAllowed = pointerCount >= 2 || (pointerCount == 1 && uiState.arState != ArState.SEARCHING)
+                        // If 1 pointer -> Allowed (Global drag to support robust moving even if bounds are flaky)
+                        // If 2+ pointers -> Allowed
+                        // Note: If capturing target, we only allow ZOOM.
+                        val isGestureAllowed = pointerCount >= 1
 
                         if (isGestureAllowed) {
                             val zoomChange = event.calculateZoom()
@@ -221,13 +222,18 @@ fun ArView(
                             }
 
                             if (pastTouchSlop) {
-                                if (panChange != androidx.compose.ui.geometry.Offset.Zero) {
+                                // Pan: Block if capturing target
+                                if (panChange != androidx.compose.ui.geometry.Offset.Zero && !uiState.isCapturingTarget) {
                                     glSurfaceView.queueEvent { renderer.queuePan(panChange.x, panChange.y) }
                                 }
+
+                                // Zoom: Allow always (as requested)
                                 if (zoomChange != 1f) {
                                     viewModel.onArObjectScaleChanged(zoomChange)
                                 }
-                                if (rotationChange != 0f) {
+
+                                // Rotation: Block if capturing target
+                                if (rotationChange != 0f && !uiState.isCapturingTarget) {
                                     val rotationDelta = -rotationChange
                                     when (uiState.activeRotationAxis) {
                                         RotationAxis.X -> viewModel.onRotationXChanged(rotationDelta)

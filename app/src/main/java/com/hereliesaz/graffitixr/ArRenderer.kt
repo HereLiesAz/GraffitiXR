@@ -20,7 +20,6 @@ import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
-import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
@@ -320,6 +319,7 @@ class ArRenderer(
         Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
         Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
         Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
+
         Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
 
         val bitmap = if (showGuide) guideBitmap else overlayBitmap
@@ -431,21 +431,11 @@ class ArRenderer(
         for (hit in hitResult) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                // Stabilize rotation: Preserve the current anchor's rotation to prevent unintended spinning while dragging.
-                // We only want to use the Translation from the new hit.
-                val currentPose = activeAnchor?.pose ?: hit.hitPose
-                val hitPose = hit.hitPose
-
-                val newPose = Pose(
-                    floatArrayOf(hitPose.tx(), hitPose.ty(), hitPose.tz()),
-                    floatArrayOf(currentPose.qx(), currentPose.qy(), currentPose.qz(), currentPose.qw())
-                )
-
                 activeAnchor?.detach()
-                activeAnchor = trackable.createAnchor(newPose)
+                activeAnchor = hit.createAnchor()
 
                 // Bolt Optimization: Reuse matrix
-                newPose.toMatrix(calculationPoseMatrix, 0)
+                hit.hitPose.toMatrix(calculationPoseMatrix, 0)
                 arImagePose = calculationPoseMatrix
                 break
             }
@@ -660,6 +650,18 @@ class ArRenderer(
             Log.e(TAG, "Cleanup error", e)
         } finally {
             session = null
+            sessionLock.unlock()
+        }
+    }
+
+    fun resetAnchor() {
+        sessionLock.lock()
+        try {
+            activeAnchor?.detach()
+            activeAnchor = null
+            arImagePose = null
+            arState = ArState.SEARCHING
+        } finally {
             sessionLock.unlock()
         }
     }

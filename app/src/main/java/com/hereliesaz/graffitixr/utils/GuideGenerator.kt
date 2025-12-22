@@ -19,20 +19,18 @@ object GuideGenerator {
             isAntiAlias = true
         }
 
-        // Draw border
-        canvas.drawRect(5f, 5f, width.toFloat() - 5f, height.toFloat() - 5f, paint)
-
-        // Draw rows
-        val rowHeight = height.toFloat() / rows
-        for (i in 1 until rows) {
-            val y = i * rowHeight
+        // Draw rows (lines)
+        // Partitions = lines + 1
+        val rowSpacing = height.toFloat() / (rows + 1)
+        for (i in 1..rows) {
+            val y = i * rowSpacing
             canvas.drawLine(0f, y, width.toFloat(), y, paint)
         }
 
-        // Draw cols
-        val colWidth = width.toFloat() / cols
-        for (i in 1 until cols) {
-            val x = i * colWidth
+        // Draw cols (lines)
+        val colSpacing = width.toFloat() / (cols + 1)
+        for (i in 1..cols) {
+            val x = i * colSpacing
             canvas.drawLine(x, 0f, x, height.toFloat(), paint)
         }
 
