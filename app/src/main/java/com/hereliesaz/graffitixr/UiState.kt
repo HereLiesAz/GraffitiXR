@@ -15,7 +15,6 @@ import com.hereliesaz.graffitixr.utils.OffsetParceler
 import com.hereliesaz.graffitixr.utils.TapFeedbackParceler
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
-import kotlinx.parcelize.RawValue
 import kotlinx.parcelize.WriteWith
 
 /**
@@ -171,7 +170,7 @@ data class UiState(
 
     val updateStatusMessage: String? = null,
     val isCheckingForUpdate: Boolean = false,
-    val latestRelease: @RawValue GithubRelease? = null,
+    val latestRelease: GithubRelease? = null,
     val isFlashlightOn: Boolean = false,
 
     // Multi-step Capture State
@@ -191,5 +190,6 @@ data class UiState(
     val detectedKeypoints: @WriteWith<OffsetListParceler> List<Offset> = emptyList(),
     val targetMaskUri: Uri? = null,
 
-    val augmentedImageDatabase: @RawValue AugmentedImageDatabase? = null
+    @IgnoredOnParcel
+    val augmentedImageDatabase: AugmentedImageDatabase? = null
 ) : Parcelable
