@@ -378,6 +378,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
 
             // Navigation Rail
+            // Hidden when locked to ensure a clean screen for tracing
             if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
                 Box(
                     modifier = Modifier
