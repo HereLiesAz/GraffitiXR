@@ -18,6 +18,13 @@
 -   **Requirement:** A physical Android device supporting ARCore.
 -   **Emulator:** The standard Android Emulator supports a "Virtual Scene" for ARCore, which is sufficient for basic logic checks but not for performance or camera quality tuning.
 
+### **Regression Checks**
+-   **AR Gestures (Drag, Pinch-Zoom, Twist-Rotate):**
+    -   Verify that the AR image can be dragged with one finger.
+    -   Verify that the AR image can be scaled (pinch) and rotated (twist) with two fingers.
+    -   Verify that two-finger drag also moves the image.
+    -   **Important:** This must be verified on every build affecting AR input logic to prevent regression.
+
 ### **Build Verification**
 -   **Command:** `./gradlew assembleDebug`
 -   **Mandatory:** Must pass before every commit.
