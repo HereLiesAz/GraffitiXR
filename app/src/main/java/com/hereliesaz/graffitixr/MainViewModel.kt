@@ -136,11 +136,21 @@ class MainViewModel(
     // --- AR Target Creation Logic ---
 
     fun onCaptureShutterClicked() {
-        if (uiState.value.isCapturingTarget && uiState.value.editorMode == EditorMode.AR) {
-            if (uiState.value.captureStep == CaptureStep.INSTRUCTION) {
-                updateState(uiState.value.copy(captureStep = CaptureStep.FRONT), isUndoable = false)
-            } else {
-                arRenderer?.triggerCapture()
+        val state = uiState.value
+        if (state.isCapturingTarget && state.editorMode == EditorMode.AR) {
+            when (state.captureStep) {
+                CaptureStep.INSTRUCTION -> {
+                    updateState(state.copy(captureStep = CaptureStep.FRONT), isUndoable = false)
+                }
+                CaptureStep.GRID_CONFIG -> {
+                    updateState(state.copy(captureStep = CaptureStep.GUIDED_CAPTURE), isUndoable = false)
+                }
+                CaptureStep.GUIDED_CAPTURE -> {
+                    arRenderer?.triggerCapture()
+                }
+                else -> {
+                    arRenderer?.triggerCapture()
+                }
             }
         } else {
             viewModelScope.launch {
@@ -149,12 +159,56 @@ class MainViewModel(
         }
     }
 
+    fun onTargetCreationMethodSelected(mode: TargetCreationMode) {
+        val nextStep = when (mode) {
+            TargetCreationMode.CAPTURE -> CaptureStep.FRONT
+            TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
+            TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
+        }
+
+        updateState(uiState.value.copy(
+            targetCreationMode = mode,
+            captureStep = nextStep,
+            isGridGuideVisible = mode != TargetCreationMode.CAPTURE
+        ), isUndoable = false)
+
+        if (mode != TargetCreationMode.CAPTURE) {
+            updateGuideOverlay()
+        } else {
+            arRenderer?.showGuide = false
+        }
+    }
+
+    fun onGridConfigChanged(rows: Int, cols: Int) {
+        updateState(uiState.value.copy(gridRows = rows, gridCols = cols), isUndoable = false)
+        updateGuideOverlay()
+    }
+
+    private fun updateGuideOverlay() {
+        val state = uiState.value
+        val bitmap = when (state.targetCreationMode) {
+            TargetCreationMode.GUIDED_GRID -> com.hereliesaz.graffitixr.utils.GuideGenerator.generateGrid(state.gridRows, state.gridCols)
+            TargetCreationMode.GUIDED_POINTS -> com.hereliesaz.graffitixr.utils.GuideGenerator.generateFourXs()
+            else -> null
+        }
+
+        if (bitmap != null) {
+            arRenderer?.guideBitmap = bitmap
+            arRenderer?.showGuide = true
+        } else {
+            arRenderer?.showGuide = false
+        }
+    }
+
     fun onCancelCaptureClicked() {
+        arRenderer?.showGuide = false
         updateState(uiState.value.copy(
             isCapturingTarget = false,
             targetCreationState = TargetCreationState.IDLE,
-            captureStep = CaptureStep.FRONT,
-            capturedTargetImages = emptyList()
+            captureStep = CaptureStep.ADVICE,
+            capturedTargetImages = emptyList(),
+            targetCreationMode = TargetCreationMode.CAPTURE,
+            isGridGuideVisible = false
         ))
     }
 
@@ -251,8 +305,9 @@ class MainViewModel(
     fun onCreateTargetClicked() {
         updateState(uiState.value.copy(
             isCapturingTarget = true,
-            captureStep = CaptureStep.INSTRUCTION,
-            capturedTargetImages = emptyList()
+            captureStep = CaptureStep.ADVICE,
+            capturedTargetImages = emptyList(),
+            targetCreationMode = TargetCreationMode.CAPTURE
         ), isUndoable = false)
     }
 
@@ -260,15 +315,22 @@ class MainViewModel(
         val currentImages = uiState.value.capturedTargetImages
         val newImages = currentImages + bitmap
         val currentStep = uiState.value.captureStep
+        val mode = uiState.value.targetCreationMode
 
-        val nextStep = when (currentStep) {
-            CaptureStep.INSTRUCTION -> CaptureStep.FRONT
-            CaptureStep.FRONT -> CaptureStep.LEFT
-            CaptureStep.LEFT -> CaptureStep.RIGHT
-            CaptureStep.RIGHT -> CaptureStep.UP
-            CaptureStep.UP -> CaptureStep.DOWN
-            CaptureStep.DOWN -> CaptureStep.REVIEW
-            CaptureStep.REVIEW -> CaptureStep.REVIEW
+        val nextStep = if (mode == TargetCreationMode.CAPTURE) {
+            when (currentStep) {
+                CaptureStep.INSTRUCTION -> CaptureStep.FRONT
+                CaptureStep.FRONT -> CaptureStep.LEFT
+                CaptureStep.LEFT -> CaptureStep.RIGHT
+                CaptureStep.RIGHT -> CaptureStep.UP
+                CaptureStep.UP -> CaptureStep.DOWN
+                CaptureStep.DOWN -> CaptureStep.REVIEW
+                CaptureStep.REVIEW -> CaptureStep.REVIEW
+                else -> CaptureStep.REVIEW
+            }
+        } else {
+            // For guided modes, 1 frame is enough
+            CaptureStep.REVIEW
         }
 
         viewModelScope.launch {
@@ -281,9 +343,12 @@ class MainViewModel(
                 captureStep = nextStep
             ), isUndoable = false)
         } else {
+            // Hide guide before processing
+            arRenderer?.showGuide = false
             updateState(uiState.value.copy(
                 capturedTargetImages = newImages,
-                isLoading = true
+                isLoading = true,
+                isGridGuideVisible = false
             ), isUndoable = false)
             processCapturedTargets(newImages)
         }
@@ -419,12 +484,14 @@ class MainViewModel(
             uiState.value.copy(
                 isCapturingTarget = false,
                 targetCreationState = TargetCreationState.IDLE,
-                captureStep = CaptureStep.FRONT,
+                captureStep = CaptureStep.ADVICE,
                 capturedTargetImages = emptyList(),
                 arState = ArState.SEARCHING,
-                isLoading = false
+                isLoading = false,
+                isGridGuideVisible = false
             )
         )
+        arRenderer?.showGuide = false
         Toast.makeText(getApplication(), "Target creation failed: ${e.message}", Toast.LENGTH_LONG).show()
     }
 
@@ -520,7 +587,12 @@ class MainViewModel(
 
     fun onArImagePlaced() {
         updateState(uiState.value.copy(arState = ArState.LOCKED), isUndoable = false)
-        if (uiState.value.overlayImageUri == null) {
+
+        if (uiState.value.isCapturingTarget) {
+            if (uiState.value.captureStep == CaptureStep.ADVICE) {
+                updateState(uiState.value.copy(captureStep = CaptureStep.CHOOSE_METHOD), isUndoable = false)
+            }
+        } else if (uiState.value.overlayImageUri == null) {
             viewModelScope.launch {
                 _requestImagePicker.emit(Unit)
             }

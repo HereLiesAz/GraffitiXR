@@ -89,6 +89,8 @@ class ArRenderer(
     private var viewportWidth = 0
     private var viewportHeight = 0
     @Volatile var overlayBitmap: Bitmap? = null
+    @Volatile var guideBitmap: Bitmap? = null
+    @Volatile var showGuide: Boolean = false
     @Volatile var arImagePose: FloatArray? = null
     @Volatile var arState: ArState = ArState.SEARCHING
     private var activeAnchor: Anchor? = null
@@ -106,6 +108,7 @@ class ArRenderer(
     var colorBalanceR: Float = 1.0f
     var colorBalanceG: Float = 1.0f
     var colorBalanceB: Float = 1.0f
+    var isAnchorReplacementAllowed: Boolean = false
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
     private val panLock = Any()
@@ -286,7 +289,7 @@ class ArRenderer(
             }
         }
 
-        if (activeAnchor == null) {
+        if (activeAnchor == null || isAnchorReplacementAllowed) {
             val planes = session!!.getAllTrackables(Plane::class.java)
             var hasPlane = false
             for (plane in planes) {
@@ -316,9 +319,11 @@ class ArRenderer(
         Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
         Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
         Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
-        Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
 
-        val bitmap = overlayBitmap
+        val activeScale = if (showGuide) 0.5f else scale
+        Matrix.scaleM(modelMtx, 0, activeScale, activeScale, 1f)
+
+        val bitmap = if (showGuide) guideBitmap else overlayBitmap
         val aspectRatio = if (bitmap != null && bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
     }
@@ -376,12 +381,16 @@ class ArRenderer(
     }
 
     private fun drawArtwork(viewMtx: FloatArray, projMtx: FloatArray) {
-        val bitmap = overlayBitmap ?: return
+        val bitmap = if (showGuide) guideBitmap else overlayBitmap
+        if (bitmap == null) return
         // Bolt Optimization: use pre-calculated calculationModelMatrix from updateModelMatrix()
+
+        // Force full opacity for guide
+        val drawOpacity = if (showGuide) 1.0f else opacity
 
         simpleQuadRenderer.draw(
             calculationModelMatrix, viewMtx, projMtx,
-            bitmap, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB,
+            bitmap, drawOpacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB,
             if (isDepthSupported) depthTextureId else -1
         )
     }
@@ -392,6 +401,7 @@ class ArRenderer(
         for (hit in hitResult) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                activeAnchor?.detach()
                 activeAnchor = hit.createAnchor()
                 arState = ArState.PLACED
                 mainHandler.post { onAnchorCreated() }

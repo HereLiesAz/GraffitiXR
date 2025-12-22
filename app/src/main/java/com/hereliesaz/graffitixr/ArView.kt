@@ -108,6 +108,20 @@ fun ArView(
         renderer.updateOverlayImage(uiState.overlayImageUri)
     }
 
+    renderer.isAnchorReplacementAllowed = uiState.isCapturingTarget
+
+    val guideBitmap = remember(uiState.targetCreationMode, uiState.gridRows, uiState.gridCols) {
+        if (uiState.targetCreationMode == TargetCreationMode.GUIDED_GRID) {
+            com.hereliesaz.graffitixr.utils.GuideGenerator.generateGrid(uiState.gridRows, uiState.gridCols)
+        } else if (uiState.targetCreationMode == TargetCreationMode.GUIDED_POINTS) {
+            com.hereliesaz.graffitixr.utils.GuideGenerator.generateFourXs()
+        } else {
+            null
+        }
+    }
+    renderer.guideBitmap = guideBitmap
+    renderer.showGuide = uiState.isGridGuideVisible
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -141,14 +155,14 @@ fun ArView(
                         viewModel.onCycleRotationAxis()
                     },
                     onTap = { offset ->
-                        if (uiState.arState == ArState.SEARCHING) {
+                        if (uiState.arState == ArState.SEARCHING || uiState.isCapturingTarget) {
                             glSurfaceView.queueEvent { renderer.queueTap(offset.x, offset.y) }
                         }
                     }
                 )
             }
             // 2. Advanced Transform Logic with Hit Testing
-            .pointerInput(uiState.activeRotationAxis) {
+            .pointerInput(uiState.activeRotationAxis, uiState.isCapturingTarget) {
                 awaitEachGesture {
                     var rotation = 0f
                     var zoom = 1f
@@ -181,7 +195,8 @@ fun ArView(
                         // Rule Check:
                         // If 1 pointer -> Allowed (Global drag to support robust moving even if bounds are flaky)
                         // If 2+ pointers -> Allowed
-                        val isGestureAllowed = pointerCount >= 1
+                        // DISABLED if we are capturing target (grid creation), except for Tap which is separate.
+                        val isGestureAllowed = pointerCount >= 1 && !uiState.isCapturingTarget
 
                         if (isGestureAllowed) {
                             val zoomChange = event.calculateZoom()
