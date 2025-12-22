@@ -7,3 +7,7 @@
 ## 2024-05-24 - Contextual Icons in AR
 **Learning:** In AR/Camera overlays, static `contentDescription`s like "Direction" for dynamic indicators (arrows) are useless. They must describe the *action* required (e.g., "Move Left"), not just the visual symbol.
 **Action:** Use helper functions to map state (like `CaptureStep`) to descriptive action strings for accessibility services.
+
+## 2025-12-22 - Formatted State Descriptions
+**Learning:** `stateDescription` in Compose `semantics` should be formatted for human consumption (e.g., "50%" not "0.50"). Generic components like `Knob` should expose a formatter lambda.
+**Action:** Add `valueFormatter: (T) -> String` parameters to custom control components to decouple internal values from accessible labels.

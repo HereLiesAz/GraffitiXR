@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 @Composable
 fun UndoRedoRow(
@@ -92,7 +93,8 @@ fun AdjustmentsKnobsRow(
             text = "Opacity",
             color = MaterialTheme.colorScheme.secondary,
             valueRange = 0f..1f,
-            defaultValue = 1f
+            defaultValue = 1f,
+            valueFormatter = { "${(it * 100).roundToInt()}%" }
         )
         Knob(
             value = brightness,
@@ -100,7 +102,8 @@ fun AdjustmentsKnobsRow(
             text = "Brightness",
             color = MaterialTheme.colorScheme.onSurface,
             valueRange = -1f..1f,
-            defaultValue = 0f
+            defaultValue = 0f,
+            valueFormatter = { "${(it * 100).roundToInt()}%" }
         )
         Knob(
             value = contrast,
@@ -108,7 +111,8 @@ fun AdjustmentsKnobsRow(
             text = "Contrast",
             color = MaterialTheme.colorScheme.tertiary,
             valueRange = 0f..2f,
-            defaultValue = 1f
+            defaultValue = 1f,
+            valueFormatter = { "${(it * 100).roundToInt()}%" }
         )
         Knob(
             value = saturation,
@@ -116,7 +120,8 @@ fun AdjustmentsKnobsRow(
             text = "Saturation",
             color = MaterialTheme.colorScheme.primary,
             valueRange = 0f..2f,
-            defaultValue = 1f
+            defaultValue = 1f,
+            valueFormatter = { "${(it * 100).roundToInt()}%" }
         )
     }
 }
@@ -144,7 +149,8 @@ fun ColorBalanceKnobsRow(
             text = "Red",
             color = Color.Red,
             valueRange = 0f..2f,
-            defaultValue = 1f
+            defaultValue = 1f,
+            valueFormatter = { "${(it * 100).roundToInt()}%" }
         )
         // Green Knob
         Knob(
@@ -153,7 +159,8 @@ fun ColorBalanceKnobsRow(
             text = "Green",
             color = Color.Green,
             valueRange = 0f..2f,
-            defaultValue = 1f
+            defaultValue = 1f,
+            valueFormatter = { "${(it * 100).roundToInt()}%" }
         )
         // Blue Knob
         Knob(
@@ -162,7 +169,8 @@ fun ColorBalanceKnobsRow(
             text = "Blue",
             color = Color.Blue,
             valueRange = 0f..2f,
-            defaultValue = 1f
+            defaultValue = 1f,
+            valueFormatter = { "${(it * 100).roundToInt()}%" }
         )
     }
 }
