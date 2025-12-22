@@ -53,7 +53,21 @@ object MatSerializer : KSerializer<Mat> {
             if (rows <= 0 || cols <= 0) {
                 throw IllegalArgumentException("Invalid Mat dimensions: rows=$rows, cols=$cols")
             }
-            val expectedSize = rows * cols * org.opencv.core.CvType.channels(type) * org.opencv.core.CvType.ELEM_SIZE(type).toInt()
+            // Sentinel Security: Prevent DoS/OOM via malformed dimensions
+            if (rows > 32768 || cols > 32768) {
+                throw IllegalArgumentException("Mat dimensions too large (max 32768): rows=$rows, cols=$cols")
+            }
+            // Sentinel Security: Check for integer overflow in size calculation
+            val totalElements = rows.toLong() * cols.toLong()
+            val elemSize = org.opencv.core.CvType.ELEM_SIZE(type).toLong()
+            val expectedSizeLong = totalElements * elemSize
+
+            if (expectedSizeLong > Int.MAX_VALUE) {
+                throw IllegalArgumentException("Mat byte size too large")
+            }
+
+            val expectedSize = expectedSizeLong.toInt()
+
             if (data.size != expectedSize) {
                 throw IllegalArgumentException("Data size mismatch: expected $expectedSize, got ${data.size}")
             }
