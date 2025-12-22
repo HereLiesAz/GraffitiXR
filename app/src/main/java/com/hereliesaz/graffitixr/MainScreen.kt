@@ -348,10 +348,15 @@ fun MainScreen(viewModel: MainViewModel) {
                     } else {
                         TargetCreationOverlay(
                             step = uiState.captureStep,
+                            targetCreationMode = uiState.targetCreationMode,
+                            gridRows = uiState.gridRows,
+                            gridCols = uiState.gridCols,
                             qualityWarning = uiState.qualityWarning,
                             captureFailureTimestamp = uiState.captureFailureTimestamp,
                             onCaptureClick = viewModel::onCaptureShutterClicked,
-                            onCancelClick = viewModel::onCancelCaptureClicked
+                            onCancelClick = viewModel::onCancelCaptureClicked,
+                            onMethodSelected = viewModel::onTargetCreationMethodSelected,
+                            onGridConfigChanged = viewModel::onGridConfigChanged
                         )
                     }
                 }

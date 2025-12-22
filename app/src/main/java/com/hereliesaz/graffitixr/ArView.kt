@@ -108,6 +108,20 @@ fun ArView(
         renderer.updateOverlayImage(uiState.overlayImageUri)
     }
 
+    renderer.isAnchorReplacementAllowed = uiState.isCapturingTarget
+
+    val guideBitmap = remember(uiState.targetCreationMode, uiState.gridRows, uiState.gridCols) {
+        if (uiState.targetCreationMode == TargetCreationMode.GUIDED_GRID) {
+            com.hereliesaz.graffitixr.utils.GuideGenerator.generateGrid(uiState.gridRows, uiState.gridCols)
+        } else if (uiState.targetCreationMode == TargetCreationMode.GUIDED_POINTS) {
+            com.hereliesaz.graffitixr.utils.GuideGenerator.generateFourXs()
+        } else {
+            null
+        }
+    }
+    renderer.guideBitmap = guideBitmap
+    renderer.showGuide = uiState.isGridGuideVisible
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -141,7 +155,7 @@ fun ArView(
                         viewModel.onCycleRotationAxis()
                     },
                     onTap = { offset ->
-                        if (uiState.arState == ArState.SEARCHING) {
+                        if (uiState.arState == ArState.SEARCHING || uiState.isCapturingTarget) {
                             glSurfaceView.queueEvent { renderer.queueTap(offset.x, offset.y) }
                         }
                     }
