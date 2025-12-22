@@ -162,7 +162,7 @@ fun ArView(
                 )
             }
             // 2. Advanced Transform Logic with Hit Testing
-            .pointerInput(uiState.activeRotationAxis, uiState.isCapturingTarget) {
+            .pointerInput(uiState.activeRotationAxis, uiState.isGridGuideVisible) {
                 awaitEachGesture {
                     var rotation = 0f
                     var zoom = 1f
@@ -222,8 +222,8 @@ fun ArView(
                             }
 
                             if (pastTouchSlop) {
-                                // Pan: Block if capturing target
-                                if (panChange != androidx.compose.ui.geometry.Offset.Zero && !uiState.isCapturingTarget) {
+                                // Pan: Block only if showing grid guide
+                                if (panChange != androidx.compose.ui.geometry.Offset.Zero && !uiState.isGridGuideVisible) {
                                     glSurfaceView.queueEvent { renderer.queuePan(panChange.x, panChange.y) }
                                 }
 
@@ -232,8 +232,8 @@ fun ArView(
                                     viewModel.onArObjectScaleChanged(zoomChange)
                                 }
 
-                                // Rotation: Block if capturing target
-                                if (rotationChange != 0f && !uiState.isCapturingTarget) {
+                                // Rotation: Block only if showing grid guide
+                                if (rotationChange != 0f && !uiState.isGridGuideVisible) {
                                     val rotationDelta = -rotationChange
                                     when (uiState.activeRotationAxis) {
                                         RotationAxis.X -> viewModel.onRotationXChanged(rotationDelta)
