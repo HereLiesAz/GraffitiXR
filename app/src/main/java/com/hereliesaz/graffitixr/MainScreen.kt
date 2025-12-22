@@ -147,6 +147,13 @@ fun MainScreen(viewModel: MainViewModel) {
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri -> uri?.let { viewModel.exportProjectToUri(it) } }
 
+    // Image Picker Request Handler
+    LaunchedEffect(viewModel) {
+        viewModel.requestImagePicker.collect {
+            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+    }
+
     // Helper for automation
     fun onModeSelected(mode: EditorMode) {
         viewModel.onEditorModeChanged(mode)
@@ -157,9 +164,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
         if (!hasSelectedModeOnce) {
             hasSelectedModeOnce = true
-            // Auto-launch image picker
-            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            // If AR, auto-launch target capture
+            // If AR, auto-launch target capture (which now starts with INSTRUCTION step)
             if (mode == EditorMode.AR) {
                 viewModel.onCreateTargetClicked()
             }

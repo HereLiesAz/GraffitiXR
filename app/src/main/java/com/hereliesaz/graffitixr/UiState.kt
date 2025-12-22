@@ -35,6 +35,7 @@ enum class TargetCreationState : Parcelable {
  */
 @Parcelize
 enum class CaptureStep : Parcelable {
+    INSTRUCTION,
     FRONT,
     LEFT,
     RIGHT,
