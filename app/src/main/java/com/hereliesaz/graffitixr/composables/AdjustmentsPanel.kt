@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.UiState
+import kotlin.math.roundToInt
 
 @Composable
 fun AdjustmentsPanel(
@@ -52,7 +53,8 @@ fun AdjustmentsPanel(
                     text = "Opacity",
                     color = MaterialTheme.colorScheme.secondary,
                     valueRange = 0f..1f,
-                    defaultValue = 1f
+                    defaultValue = 1f,
+                    valueFormatter = { "${(it * 100).roundToInt()}%" }
                 )
                 Knob(
                     value = uiState.contrast,
@@ -60,7 +62,8 @@ fun AdjustmentsPanel(
                     text = "Contrast",
                     color = MaterialTheme.colorScheme.tertiary,
                     valueRange = 0f..2f,
-                    defaultValue = 1f
+                    defaultValue = 1f,
+                    valueFormatter = { "${(it * 100).roundToInt()}%" }
                 )
                 Knob(
                     value = uiState.saturation,
@@ -68,7 +71,8 @@ fun AdjustmentsPanel(
                     text = "Saturation",
                     color = MaterialTheme.colorScheme.primary,
                     valueRange = 0f..2f,
-                    defaultValue = 1f
+                    defaultValue = 1f,
+                    valueFormatter = { "${(it * 100).roundToInt()}%" }
                 )
             }
         }

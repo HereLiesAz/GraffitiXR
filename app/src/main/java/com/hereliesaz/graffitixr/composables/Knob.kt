@@ -42,7 +42,8 @@ fun Knob(
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     modifier: Modifier = Modifier,
     color: Color = Color.White,
-    defaultValue: Float = valueRange.start
+    defaultValue: Float = valueRange.start,
+    valueFormatter: (Float) -> String = { "%.2f".format(it) }
 ) {
     // Mapping angle: 135 (bottom left) to 405 (bottom right)
     val minAngle = 135f
@@ -64,7 +65,7 @@ fun Knob(
         modifier = modifier
             .semantics(mergeDescendants = true) {
                 contentDescription = text
-                stateDescription = "%.2f".format(value)
+                stateDescription = valueFormatter(value)
                 progressBarRangeInfo = ProgressBarRangeInfo(
                     current = value,
                     range = valueRange
