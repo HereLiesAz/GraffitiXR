@@ -172,6 +172,10 @@ fun MainScreen(viewModel: MainViewModel) {
                 viewModel.onCreateTargetClicked()
             }
         }
+
+        if (mode == EditorMode.TRACE && uiState.overlayImageUri == null) {
+            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
     }
 
     Scaffold(
