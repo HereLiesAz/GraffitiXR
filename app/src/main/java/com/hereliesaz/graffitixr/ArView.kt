@@ -232,13 +232,17 @@ fun ArView(
                                     viewModel.onArObjectScaleChanged(zoomChange)
                                 }
 
-                                // Rotation: Block only if showing grid guide
-                                if (rotationChange != 0f && !uiState.isGridGuideVisible) {
+                                // Rotation: Block only if showing grid guide, unless creating Grid Target (Force Y)
+                                if (rotationChange != 0f) {
                                     val rotationDelta = -rotationChange
-                                    when (uiState.activeRotationAxis) {
-                                        RotationAxis.X -> viewModel.onRotationXChanged(rotationDelta)
-                                        RotationAxis.Y -> viewModel.onRotationYChanged(rotationDelta)
-                                        RotationAxis.Z -> viewModel.onRotationZChanged(rotationDelta)
+                                    if (uiState.targetCreationMode == TargetCreationMode.GUIDED_GRID && uiState.isGridGuideVisible) {
+                                        viewModel.onRotationYChanged(rotationDelta)
+                                    } else if (!uiState.isGridGuideVisible) {
+                                        when (uiState.activeRotationAxis) {
+                                            RotationAxis.X -> viewModel.onRotationXChanged(rotationDelta)
+                                            RotationAxis.Y -> viewModel.onRotationYChanged(rotationDelta)
+                                            RotationAxis.Z -> viewModel.onRotationZChanged(rotationDelta)
+                                        }
                                     }
                                 }
                                 event.changes.forEach {

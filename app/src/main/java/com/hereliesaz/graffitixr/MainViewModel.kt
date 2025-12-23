@@ -731,7 +731,7 @@ class MainViewModel(
 
     fun onOverlayImageSelected(uri: Uri) {
         val showHint = !onboardingManager.hasSeenDoubleTapHint()
-        updateState(uiState.value.copy(overlayImageUri = uri, originalOverlayImageUri = uri, backgroundRemovedImageUri = null, isLineDrawing = false, showDoubleTapHint = showHint))
+        updateState(uiState.value.copy(overlayImageUri = uri, originalOverlayImageUri = uri, backgroundRemovedImageUri = null, isLineDrawing = false, showDoubleTapHint = showHint, activeRotationAxis = RotationAxis.Y))
     }
 
     fun onOpacityChanged(opacity: Float) {
