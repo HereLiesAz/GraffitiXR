@@ -173,7 +173,10 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        if (mode == EditorMode.TRACE && uiState.overlayImageUri == null) {
+    }
+
+    LaunchedEffect(uiState.editorMode) {
+        if (uiState.editorMode == EditorMode.TRACE && uiState.overlayImageUri == null) {
             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
     }
