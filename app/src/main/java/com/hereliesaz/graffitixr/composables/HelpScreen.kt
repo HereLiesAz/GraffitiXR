@@ -1,5 +1,12 @@
 package com.hereliesaz.graffitixr.composables
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,21 +47,41 @@ fun HelpScreen(onGetStarted: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (currentStep < steps.size) {
-            Text(
-                text = steps[currentStep].first,
-                style = MaterialTheme.typography.headlineMedium,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = steps[currentStep].second,
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
-            )
-        } else {
-             // Fallback or completion state if needed, though button below handles exit
-             Text("Ready to go!", style = MaterialTheme.typography.headlineMedium)
+        AnimatedContent(
+            targetState = currentStep,
+            transitionSpec = {
+                if (targetState > initialState) {
+                    slideInHorizontally { width -> width } + fadeIn() togetherWith
+                        slideOutHorizontally { width -> -width } + fadeOut()
+                } else {
+                    slideInHorizontally { width -> -width } + fadeIn() togetherWith
+                        slideOutHorizontally { width -> width } + fadeOut()
+                }.using(
+                    SizeTransform(clip = false)
+                )
+            },
+            label = "Help Step Transition"
+        ) { stepIndex ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (stepIndex < steps.size) {
+                    Text(
+                        text = steps[stepIndex].first,
+                        style = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = steps[stepIndex].second,
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    // Fallback or completion state if needed, though button below handles exit
+                    Text("Ready to go!", style = MaterialTheme.typography.headlineMedium)
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -80,12 +107,13 @@ fun HelpScreen(onGetStarted: () -> Unit) {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Progress indicator
-        Text(
-            text = "${currentStep + 1} / ${steps.size}",
-            style = MaterialTheme.typography.bodySmall
+        PageIndicator(
+            pageCount = steps.size,
+            currentPage = currentStep,
+            onPageSelected = { currentStep = it }
         )
     }
 }
