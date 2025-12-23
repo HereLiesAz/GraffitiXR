@@ -183,7 +183,10 @@ class MainViewModel(
     }
 
     fun onGridConfigChanged(rows: Int, cols: Int) {
-        updateState(uiState.value.copy(gridRows = rows, gridCols = cols), isUndoable = false)
+        // Sentinel Security: Limit grid dimensions to prevent excessive resource usage (DoS)
+        val safeRows = rows.coerceIn(1, 10)
+        val safeCols = cols.coerceIn(1, 10)
+        updateState(uiState.value.copy(gridRows = safeRows, gridCols = safeCols), isUndoable = false)
         updateGuideOverlay()
     }
 
@@ -685,7 +688,9 @@ class MainViewModel(
     }
 
     fun onBrightnessChanged(brightness: Float) {
-        updateState(uiState.value.copy(brightness = brightness), isUndoable = false)
+        // Sentinel Security: Clamp brightness to valid range
+        val safeBrightness = brightness.coerceIn(-1f, 1f)
+        updateState(uiState.value.copy(brightness = safeBrightness), isUndoable = false)
     }
 
     fun onLineDrawingClicked() {
@@ -735,20 +740,28 @@ class MainViewModel(
     }
 
     fun onOpacityChanged(opacity: Float) {
-        updateState(uiState.value.copy(opacity = opacity), isUndoable = false)
+        // Sentinel Security: Clamp opacity to 0..1
+        val safeOpacity = opacity.coerceIn(0f, 1f)
+        updateState(uiState.value.copy(opacity = safeOpacity), isUndoable = false)
     }
 
     fun onContrastChanged(contrast: Float) {
-        updateState(uiState.value.copy(contrast = contrast), isUndoable = false)
+        // Sentinel Security: Clamp contrast to 0..2
+        val safeContrast = contrast.coerceIn(0f, 2f)
+        updateState(uiState.value.copy(contrast = safeContrast), isUndoable = false)
     }
 
     fun onSaturationChanged(saturation: Float) {
-        updateState(uiState.value.copy(saturation = saturation), isUndoable = false)
+        // Sentinel Security: Clamp saturation to 0..2
+        val safeSaturation = saturation.coerceIn(0f, 2f)
+        updateState(uiState.value.copy(saturation = safeSaturation), isUndoable = false)
     }
 
     fun onScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.scale
-        updateState(uiState.value.copy(scale = currentScale * scaleFactor), isUndoable = false)
+        // Sentinel Security: Prevent scale explosion or collapse
+        val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
+        updateState(uiState.value.copy(scale = newScale), isUndoable = false)
     }
 
     fun onOffsetChanged(offset: Offset) {
@@ -841,15 +854,21 @@ class MainViewModel(
     }
 
     fun onColorBalanceRChanged(value: Float) {
-        updateState(uiState.value.copy(colorBalanceR = value), isUndoable = false)
+        // Sentinel Security: Clamp color balance
+        val safeValue = value.coerceIn(0f, 2f)
+        updateState(uiState.value.copy(colorBalanceR = safeValue), isUndoable = false)
     }
 
     fun onColorBalanceGChanged(value: Float) {
-        updateState(uiState.value.copy(colorBalanceG = value), isUndoable = false)
+        // Sentinel Security: Clamp color balance
+        val safeValue = value.coerceIn(0f, 2f)
+        updateState(uiState.value.copy(colorBalanceG = safeValue), isUndoable = false)
     }
 
     fun onColorBalanceBChanged(value: Float) {
-        updateState(uiState.value.copy(colorBalanceB = value), isUndoable = false)
+        // Sentinel Security: Clamp color balance
+        val safeValue = value.coerceIn(0f, 2f)
+        updateState(uiState.value.copy(colorBalanceB = safeValue), isUndoable = false)
     }
 
     fun onCycleBlendMode() {
