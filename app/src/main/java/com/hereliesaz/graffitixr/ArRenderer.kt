@@ -128,6 +128,8 @@ class ArRenderer(
 
     // Bolt Optimization: Pre-allocated buffers to avoid allocations in onDrawFrame
     private val calculationModelMatrix = FloatArray(16)
+    private val calculationModelViewMatrix = FloatArray(16)
+    private val calculationMvpMatrix = FloatArray(16)
     private val calculationPoseMatrix = FloatArray(16)
     private val calculationTempVec = FloatArray(4)
     private val calculationResVec = FloatArray(4)
@@ -308,8 +310,12 @@ class ArRenderer(
 
         if (arImagePose != null) {
             updateModelMatrix()
-            drawArtwork(viewMtx, projMtx)
-            calculateAndReportBounds(viewMtx, projMtx)
+            // Bolt Optimization: Calculate MVP once per frame
+            Matrix.multiplyMM(calculationModelViewMatrix, 0, viewMtx, 0, calculationModelMatrix, 0)
+            Matrix.multiplyMM(calculationMvpMatrix, 0, projMtx, 0, calculationModelViewMatrix, 0)
+
+            drawArtwork(calculationMvpMatrix, calculationModelViewMatrix)
+            calculateAndReportBounds(calculationMvpMatrix)
         }
     }
 
@@ -334,10 +340,7 @@ class ArRenderer(
     /**
      * Projects the 4 corners of the quad to screen space and reports the bounding box.
      */
-    private fun calculateAndReportBounds(viewMtx: FloatArray, projMtx: FloatArray) {
-        // Bolt Optimization: use pre-calculated calculationModelMatrix from updateModelMatrix()
-        val modelMtx = calculationModelMatrix
-
+    private fun calculateAndReportBounds(mvpMtx: FloatArray) {
         var minX = Float.MAX_VALUE
         var minY = Float.MAX_VALUE
         var maxX = Float.MIN_VALUE
@@ -346,11 +349,9 @@ class ArRenderer(
         // Bolt Optimization: Loop unrolled / flat array traversal to avoid allocations
         for (i in 0 until 4) {
             val offset = i * 4
-            // Model -> World -> View -> Clip
+            // Clip = MVP * Object
             // Note: Matrix.multiplyMV takes offset for input vector, but we must use calculationTempVec from index 0
-            Matrix.multiplyMV(calculationTempVec, 0, modelMtx, 0, boundsCorners, offset) // World
-            Matrix.multiplyMV(calculationResVec, 0, viewMtx, 0, calculationTempVec, 0) // View
-            Matrix.multiplyMV(calculationTempVec, 0, projMtx, 0, calculationResVec, 0) // Clip
+            Matrix.multiplyMV(calculationTempVec, 0, mvpMtx, 0, boundsCorners, offset)
 
             if (calculationTempVec[3] != 0f) {
                 // NDC -> Screen
@@ -383,7 +384,7 @@ class ArRenderer(
         }
     }
 
-    private fun drawArtwork(viewMtx: FloatArray, projMtx: FloatArray) {
+    private fun drawArtwork(mvpMatrix: FloatArray, modelViewMatrix: FloatArray) {
         val bitmap = if (showGuide) guideBitmap else overlayBitmap
         if (bitmap == null) return
         // Bolt Optimization: use pre-calculated calculationModelMatrix from updateModelMatrix()
@@ -392,7 +393,7 @@ class ArRenderer(
         val drawOpacity = if (showGuide) 1.0f else opacity
 
         simpleQuadRenderer.draw(
-            calculationModelMatrix, viewMtx, projMtx,
+            mvpMatrix, modelViewMatrix,
             bitmap, drawOpacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB,
             if (isDepthSupported) depthTextureId else -1
         )
