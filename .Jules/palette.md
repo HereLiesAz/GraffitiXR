@@ -11,3 +11,7 @@
 ## 2025-12-22 - Formatted State Descriptions
 **Learning:** `stateDescription` in Compose `semantics` should be formatted for human consumption (e.g., "50%" not "0.50"). Generic components like `Knob` should expose a formatter lambda.
 **Action:** Add `valueFormatter: (T) -> String` parameters to custom control components to decouple internal values from accessible labels.
+
+## 2025-12-23 - Visual Progress Indicators
+**Learning:** For multi-step processes like onboarding, text counters ("1/4") are functional but lack affordance. Interactive dot indicators provide better context and navigation.
+**Action:** Replace text counters with clickable, accessible page indicators in wizard-style interfaces.
