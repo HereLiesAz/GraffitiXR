@@ -88,6 +88,10 @@ object PairFloatFloatSerializer : KSerializer<Pair<Float, Float>> {
     }
     override fun deserialize(decoder: Decoder): Pair<Float, Float> {
         val list = decoder.decodeSerializableValue(ListSerializer(Float.serializer()))
+        // Sentinel Security: Validate input size to prevent IndexOutOfBoundsException
+        if (list.size != 2) {
+            throw IllegalArgumentException("Invalid input for PairFloatFloatSerializer: Expected 2 elements, got ${list.size}")
+        }
         return Pair(list[0], list[1])
     }
 }
