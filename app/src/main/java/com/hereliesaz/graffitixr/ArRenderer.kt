@@ -72,6 +72,7 @@ class ArRenderer(
     private var wasTracking = false
     private val sessionLock = ReentrantLock()
     private val isAnalyzing = AtomicBoolean(false)
+    private val analysisLock = ReentrantLock()
     private var analysisBuffer: ByteArray? = null
 
     @Volatile var session: Session? = null
@@ -148,6 +149,15 @@ class ArRenderer(
     )
 
     private val orb = ORB.create()
+    // Bolt Optimization: Reusable OpenCV objects to avoid allocations in analysis loop
+    private val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+    private val analysisRawMat = Mat()
+    private val analysisRotatedMat = Mat()
+    private val analysisDescriptors = Mat()
+    private val analysisKeypoints = MatOfKeyPoint()
+    private val analysisMatches = MatOfDMatch()
+    private val analysisMask = Mat()
+
     private var originalDescriptors: Mat? = null
     private var originalKeypointCount: Int = 0
     private var lastAnalysisTime = 0L
@@ -524,17 +534,13 @@ class ArRenderer(
             image.close()
 
             analysisScope.launch {
-                var rawMat: Mat? = null
-                var rotatedMat: Mat? = null
-                var descriptors: Mat? = null
-                var keypoints: MatOfKeyPoint? = null
-
+                // Bolt Optimization: Lock to prevent race condition with cleanup
+                analysisLock.lock()
                 try {
-                    rawMat = Mat(height, width, CvType.CV_8UC1)
-                    rawMat.put(0, 0, data)
+                    analysisRawMat.create(height, width, CvType.CV_8UC1)
+                    analysisRawMat.put(0, 0, data)
 
                     val finalMat = if (rotation != 0f) {
-                        val dst = Mat()
                         val rotateCode = when (rotation) {
                             90f -> Core.ROTATE_90_CLOCKWISE
                             180f -> Core.ROTATE_180
@@ -542,31 +548,33 @@ class ArRenderer(
                             else -> -1
                         }
                         if (rotateCode != -1) {
-                            Core.rotate(rawMat, dst, rotateCode)
-                            rawMat.release()
-                            rawMat = null
-                            rotatedMat = dst
-                            dst
+                            Core.rotate(analysisRawMat, analysisRotatedMat, rotateCode)
+                            analysisRotatedMat
                         } else {
-                            rawMat
+                            analysisRawMat
                         }
                     } else {
-                        rawMat
+                        analysisRawMat
                     }
 
-                    descriptors = Mat()
-                    keypoints = MatOfKeyPoint()
+                    // Note: detectAndCompute will create/resize keypoints/descriptors as needed
                     synchronized(orb) {
-                        orb.detectAndCompute(finalMat, Mat(), keypoints, descriptors)
+                        orb.detectAndCompute(finalMat, analysisMask, analysisKeypoints, analysisDescriptors)
                     }
 
                     val targetDescriptors = originalDescriptors
-                    if (descriptors.rows() > 0 && targetDescriptors != null && !targetDescriptors.empty()) {
-                        val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
-                        val matches = MatOfDMatch()
-                        matcher.match(descriptors, targetDescriptors, matches)
-                        val matchesList = matches.toList()
-                        val goodMatches = matchesList.filter { it.distance < 60 }.size
+                    if (analysisDescriptors.rows() > 0 && targetDescriptors != null && !targetDescriptors.empty()) {
+                        matcher.match(analysisDescriptors, targetDescriptors, analysisMatches)
+
+                        // Bolt Optimization: iterate array to avoid list allocations
+                        val matchesArray = analysisMatches.toArray()
+                        var goodMatches = 0
+                        for (match in matchesArray) {
+                            if (match.distance < 60) {
+                                goodMatches++
+                            }
+                        }
+
                         val ratio = if (originalKeypointCount > 0) {
                             goodMatches.toFloat() / originalKeypointCount.toFloat()
                         } else {
@@ -578,10 +586,7 @@ class ArRenderer(
                 } catch (e: Exception) {
                     Log.e(TAG, "Analysis error", e)
                 } finally {
-                    rawMat?.release()
-                    rotatedMat?.release()
-                    descriptors?.release()
-                    keypoints?.release()
+                    analysisLock.unlock()
                     isAnalyzing.set(false)
                 }
             }
@@ -675,6 +680,20 @@ class ArRenderer(
         try {
             analysisScope.cancel()
             session?.close()
+
+            // Bolt Optimization: Lock to ensure analysis is not running before releasing
+            analysisLock.lock()
+            try {
+                analysisRawMat.release()
+                analysisRotatedMat.release()
+                analysisDescriptors.release()
+                analysisKeypoints.release()
+                analysisMatches.release()
+                analysisMask.release()
+                matcher.clear() // Release matcher resources (Java wrapper usually handles basic release via clear or finalize, but clear is safe)
+            } finally {
+                analysisLock.unlock()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Cleanup error", e)
         } finally {
