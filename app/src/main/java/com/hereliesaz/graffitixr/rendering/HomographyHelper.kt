@@ -21,7 +21,7 @@ object HomographyHelper {
         val viewMatrix = FloatArray(16)
         val projectionMatrix = FloatArray(16)
         camera.getViewMatrix(viewMatrix, 0)
-        camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+        camera.getProjectionMatrix(projectionMatrix, 0, 0.01f, 100.0f)
 
         val screenPoints = worldPoints.mapNotNull { worldPoint ->
             val worldPos = floatArrayOf(worldPoint[0], worldPoint[1], worldPoint[2], 1.0f)
