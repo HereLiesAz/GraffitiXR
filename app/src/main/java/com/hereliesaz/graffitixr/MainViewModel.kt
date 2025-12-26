@@ -565,7 +565,7 @@ class MainViewModel(
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
-        val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
+        val newScale = (currentScale * scaleFactor).coerceIn(0.01f, 10.0f)
         updateState(uiState.value.copy(arObjectScale = newScale), isUndoable = false)
     }
 
@@ -760,7 +760,7 @@ class MainViewModel(
     fun onScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.scale
         // Sentinel Security: Prevent scale explosion or collapse
-        val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
+        val newScale = (currentScale * scaleFactor).coerceIn(0.01f, 10.0f)
         updateState(uiState.value.copy(scale = newScale), isUndoable = false)
     }
 
