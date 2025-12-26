@@ -181,6 +181,44 @@ fun TargetCreationOverlay(
                 }
             }
 
+            // Ask GPS
+            if (step == CaptureStep.ASK_GPS) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Mark location with GPS?",
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "This helps with relocalization outdoors.",
+                        color = Color.LightGray,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Button(onClick = { onGpsDecision(true) }) {
+                            Text("Yes")
+                        }
+                        Button(
+                            onClick = { onGpsDecision(false) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                        ) {
+                            Text("No")
+                        }
+                    }
+                }
+            }
+
             // Grid Config (Number Selectors)
             if (step == CaptureStep.GRID_CONFIG) {
                 Column(

@@ -143,7 +143,7 @@ class MainViewModel(
                     updateState(state.copy(captureStep = CaptureStep.FRONT), isUndoable = false)
                 }
                 CaptureStep.GRID_CONFIG -> {
-                    updateState(state.copy(captureStep = CaptureStep.GUIDED_CAPTURE), isUndoable = false)
+                    updateState(state.copy(captureStep = CaptureStep.ASK_GPS), isUndoable = false)
                 }
                 CaptureStep.GUIDED_CAPTURE -> {
                     arRenderer?.triggerCapture()
@@ -161,10 +161,9 @@ class MainViewModel(
 
     fun onTargetCreationMethodSelected(mode: TargetCreationMode) {
         val nextStep = when (mode) {
-            TargetCreationMode.CAPTURE -> CaptureStep.FRONT
+            TargetCreationMode.CAPTURE -> CaptureStep.ASK_GPS
             TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
-            TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
-            TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.ASK_GPS
+            TargetCreationMode.GUIDED_POINTS -> CaptureStep.ASK_GPS
         }
 
         val newScale = if (mode != TargetCreationMode.CAPTURE && mode != TargetCreationMode.MULTI_POINT_CALIBRATION) 0.5f else uiState.value.arObjectScale
@@ -184,39 +183,27 @@ class MainViewModel(
     }
 
     fun onGpsDecision(enableGps: Boolean) {
+        val nextStep = if (enableGps) {
+            CaptureStep.CALIBRATION_POINT_1
+        } else {
+            if (uiState.value.targetCreationMode == TargetCreationMode.CAPTURE) CaptureStep.FRONT else CaptureStep.GUIDED_CAPTURE
+        }
+
         updateState(uiState.value.copy(
             isGpsMarkingEnabled = enableGps,
-            captureStep = CaptureStep.CALIBRATION_POINT_1
+            captureStep = nextStep
         ), isUndoable = false)
     }
 
     fun onCalibrationPointCaptured() {
         viewModelScope.launch {
             // Simulate waiting for stabilization and data collection
-            // In a real implementation, this would monitor AR confidence or sensor variance
             setLoading(true)
             _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
             delay(1500) // Wait for "stabilization"
             _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
             setLoading(false)
-
-            val nextStep = when (uiState.value.captureStep) {
-                CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
-                CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
-                CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
-                CaptureStep.CALIBRATION_POINT_4 -> {
-                    // Trigger final capture/anchor creation
-                    arRenderer?.triggerCapture()
-                    // Since we are not actually doing multi-point triangulation yet, we fall back to standard capture processing
-                    // but with the enhanced UX flow requested.
-                    CaptureStep.REVIEW
-                }
-                else -> CaptureStep.REVIEW
-            }
-
-            if (nextStep != CaptureStep.REVIEW) {
-                updateState(uiState.value.copy(captureStep = nextStep), isUndoable = false)
-            }
+            arRenderer?.triggerCapture()
         }
     }
 
@@ -365,20 +352,32 @@ class MainViewModel(
         val currentStep = uiState.value.captureStep
         val mode = uiState.value.targetCreationMode
 
-        val nextStep = if (mode == TargetCreationMode.CAPTURE) {
-            when (currentStep) {
-                CaptureStep.INSTRUCTION -> CaptureStep.FRONT
-                CaptureStep.FRONT -> CaptureStep.LEFT
-                CaptureStep.LEFT -> CaptureStep.RIGHT
-                CaptureStep.RIGHT -> CaptureStep.UP
-                CaptureStep.UP -> CaptureStep.DOWN
-                CaptureStep.DOWN -> CaptureStep.REVIEW
-                CaptureStep.REVIEW -> CaptureStep.REVIEW
+        var nextStep = CaptureStep.REVIEW
+
+        if (uiState.value.isGpsMarkingEnabled) {
+            nextStep = when (currentStep) {
+                CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
+                CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
+                CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
+                CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW
                 else -> CaptureStep.REVIEW
             }
         } else {
-            // For guided modes, 1 frame is enough
-            CaptureStep.REVIEW
+            nextStep = if (mode == TargetCreationMode.CAPTURE) {
+                when (currentStep) {
+                    CaptureStep.INSTRUCTION -> CaptureStep.FRONT
+                    CaptureStep.FRONT -> CaptureStep.LEFT
+                    CaptureStep.LEFT -> CaptureStep.RIGHT
+                    CaptureStep.RIGHT -> CaptureStep.UP
+                    CaptureStep.UP -> CaptureStep.DOWN
+                    CaptureStep.DOWN -> CaptureStep.REVIEW
+                    CaptureStep.REVIEW -> CaptureStep.REVIEW
+                    else -> CaptureStep.REVIEW
+                }
+            } else {
+                // For guided modes, 1 frame is enough
+                CaptureStep.REVIEW
+            }
         }
 
         viewModelScope.launch {
