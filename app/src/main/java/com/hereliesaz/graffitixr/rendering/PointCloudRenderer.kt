@@ -51,6 +51,9 @@ class PointCloudRenderer {
     // Pre-allocate a small buffer to start with
     private var vertexBufferSize = 1000 * 4 * 4 // 1000 points
 
+    // Bolt Optimization: Pre-allocate MVP matrix to avoid allocation in draw loop
+    private val mvpMatrix = FloatArray(16)
+
     init {
         updateVertexBuffer(1000)
     }
@@ -145,7 +148,7 @@ class PointCloudRenderer {
             GLES20.glVertexAttribPointer(positionHandle, 4, GLES20.GL_FLOAT, false, 16, buffer)
         }
 
-        val mvpMatrix = FloatArray(16)
+        // Bolt Optimization: Use pre-allocated MVP matrix
         android.opengl.Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
 
         mvpMatrixHandle = GLES20.glGetUniformLocation(program, "u_MvpMatrix")
