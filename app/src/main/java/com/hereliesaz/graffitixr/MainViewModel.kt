@@ -164,6 +164,7 @@ class MainViewModel(
             TargetCreationMode.CAPTURE -> CaptureStep.ASK_GPS
             TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
             TargetCreationMode.GUIDED_POINTS -> CaptureStep.ASK_GPS
+            else -> CaptureStep.ASK_GPS // Sentinel for future modes
         }
 
         val newScale = if (mode != TargetCreationMode.CAPTURE && mode != TargetCreationMode.MULTI_POINT_CALIBRATION) 0.5f else uiState.value.arObjectScale
