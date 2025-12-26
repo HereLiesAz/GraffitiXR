@@ -164,21 +164,59 @@ class MainViewModel(
             TargetCreationMode.CAPTURE -> CaptureStep.FRONT
             TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
             TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
+            TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.ASK_GPS
         }
 
-        val newScale = if (mode != TargetCreationMode.CAPTURE) 0.5f else uiState.value.arObjectScale
+        val newScale = if (mode != TargetCreationMode.CAPTURE && mode != TargetCreationMode.MULTI_POINT_CALIBRATION) 0.5f else uiState.value.arObjectScale
 
         updateState(uiState.value.copy(
             targetCreationMode = mode,
             captureStep = nextStep,
-            isGridGuideVisible = mode != TargetCreationMode.CAPTURE,
+            isGridGuideVisible = mode == TargetCreationMode.GUIDED_GRID || mode == TargetCreationMode.GUIDED_POINTS,
             arObjectScale = newScale
         ), isUndoable = false)
 
-        if (mode != TargetCreationMode.CAPTURE) {
+        if (mode == TargetCreationMode.GUIDED_GRID || mode == TargetCreationMode.GUIDED_POINTS) {
             updateGuideOverlay()
         } else {
             arRenderer?.showGuide = false
+        }
+    }
+
+    fun onGpsDecision(enableGps: Boolean) {
+        updateState(uiState.value.copy(
+            isGpsMarkingEnabled = enableGps,
+            captureStep = CaptureStep.CALIBRATION_POINT_1
+        ), isUndoable = false)
+    }
+
+    fun onCalibrationPointCaptured() {
+        viewModelScope.launch {
+            // Simulate waiting for stabilization and data collection
+            // In a real implementation, this would monitor AR confidence or sensor variance
+            setLoading(true)
+            _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
+            delay(1500) // Wait for "stabilization"
+            _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
+            setLoading(false)
+
+            val nextStep = when (uiState.value.captureStep) {
+                CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
+                CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
+                CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
+                CaptureStep.CALIBRATION_POINT_4 -> {
+                    // Trigger final capture/anchor creation
+                    arRenderer?.triggerCapture()
+                    // Since we are not actually doing multi-point triangulation yet, we fall back to standard capture processing
+                    // but with the enhanced UX flow requested.
+                    CaptureStep.REVIEW
+                }
+                else -> CaptureStep.REVIEW
+            }
+
+            if (nextStep != CaptureStep.REVIEW) {
+                updateState(uiState.value.copy(captureStep = nextStep), isUndoable = false)
+            }
         }
     }
 
