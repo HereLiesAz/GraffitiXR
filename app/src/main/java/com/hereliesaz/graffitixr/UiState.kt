@@ -51,7 +51,12 @@ enum class CaptureStep : Parcelable {
     RIGHT,
     UP,
     DOWN,
-    REVIEW
+    REVIEW,
+    ASK_GPS,
+    CALIBRATION_POINT_1,
+    CALIBRATION_POINT_2,
+    CALIBRATION_POINT_3,
+    CALIBRATION_POINT_4
 }
 
 /**
@@ -184,6 +189,7 @@ data class UiState(
     val isCheckingForUpdate: Boolean = false,
     val latestRelease: GithubRelease? = null,
     val isFlashlightOn: Boolean = false,
+    val isGpsMarkingEnabled: Boolean = false,
 
     // Multi-step Capture State
     val targetCreationMode: TargetCreationMode = TargetCreationMode.CAPTURE,
