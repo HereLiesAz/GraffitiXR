@@ -27,6 +27,10 @@ class ProjectedImageRenderer {
     private var vertexBuffer: FloatBuffer? = null
     private var texCoordBuffer: FloatBuffer? = null
     private var textureId = -1
+    private var lastBitmap: Bitmap? = null
+
+    // Bolt Optimization: Pre-allocate matrix array to avoid allocation in draw loop
+    private val homographyMatrix = FloatArray(9)
 
     fun createOnGlThread() {
         val vertexShader =
@@ -71,10 +75,18 @@ class ProjectedImageRenderer {
     }
 
     fun draw(bitmap: Bitmap, homography: Mat, alpha: Float, colorR: Float, colorG: Float, colorB: Float) {
-        loadTexture(bitmap)
+        // Bolt Optimization: Only upload texture if the bitmap reference changes
+        if (lastBitmap != bitmap) {
+            loadTexture(bitmap)
+            lastBitmap = bitmap
+        } else if (textureId == -1) {
+            // Edge case: textureId lost or not initialized
+            loadTexture(bitmap)
+        }
+
         GLES20.glUseProgram(program)
 
-        val homographyMatrix = FloatArray(9)
+        // Bolt Optimization: Use pre-allocated array
         homography.get(0, 0, homographyMatrix)
         GLES20.glUniformMatrix3fv(homographyUniform, 1, false, homographyMatrix, 0)
         GLES20.glUniform1f(alphaUniform, alpha)

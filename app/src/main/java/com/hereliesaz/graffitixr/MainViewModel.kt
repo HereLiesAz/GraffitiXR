@@ -167,7 +167,7 @@ class MainViewModel(
             else -> CaptureStep.ASK_GPS // Sentinel for future modes
         }
 
-        val newScale = if (mode != TargetCreationMode.CAPTURE) 0.5f else uiState.value.arObjectScale
+        val newScale = if (mode != TargetCreationMode.CAPTURE && mode != TargetCreationMode.MULTI_POINT_CALIBRATION) 0.5f else uiState.value.arObjectScale
 
         updateState(uiState.value.copy(
             targetCreationMode = mode,

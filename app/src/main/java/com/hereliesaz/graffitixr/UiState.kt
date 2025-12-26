@@ -33,7 +33,8 @@ enum class TargetCreationState : Parcelable {
 enum class TargetCreationMode : Parcelable {
     CAPTURE,
     GUIDED_GRID,
-    GUIDED_POINTS
+    GUIDED_POINTS,
+    MULTI_POINT_CALIBRATION
 }
 
 /**
