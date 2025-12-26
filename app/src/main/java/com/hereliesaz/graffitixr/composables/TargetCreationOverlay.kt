@@ -25,11 +25,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
@@ -398,15 +400,46 @@ fun MethodButton(text: String, onClick: () -> Unit) {
 
 @Composable
 fun NumberSelector(value: Int, onValueChange: (Int) -> Unit, label: String) {
+    val canDecrease = value > 1
+    val canIncrease = value < 10
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+        Text(
+            text = label,
+            color = Color.Gray,
+            style = MaterialTheme.typography.labelSmall
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { if (value > 1) onValueChange(value - 1) }) {
-                Icon(Icons.Default.Remove, "Decrease", tint = Color.White)
+            IconButton(
+                onClick = { if (canDecrease) onValueChange(value - 1) },
+                enabled = canDecrease
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Remove,
+                    contentDescription = "Decrease $label",
+                    tint = if (canDecrease) Color.White else Color.White.copy(alpha = 0.38f)
+                )
             }
-            Text("$value", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp), textAlign = TextAlign.Center)
-            IconButton(onClick = { if (value < 10) onValueChange(value + 1) }) {
-                Icon(Icons.Default.Add, "Increase", tint = Color.White)
+            Text(
+                text = "$value",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .width(32.dp)
+                    .semantics {
+                        contentDescription = "$value $label"
+                    },
+                textAlign = TextAlign.Center
+            )
+            IconButton(
+                onClick = { if (canIncrease) onValueChange(value + 1) },
+                enabled = canIncrease
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Increase $label",
+                    tint = if (canIncrease) Color.White else Color.White.copy(alpha = 0.38f)
+                )
             }
         }
     }
@@ -440,8 +473,8 @@ fun FlashingArrow(
 
 private fun getArrowForStep(step: CaptureStep): ImageVector? {
     return when (step) {
-        CaptureStep.LEFT -> Icons.Default.ArrowBack // Pointing Left
-        CaptureStep.RIGHT -> Icons.Default.ArrowForward // Pointing Right
+        CaptureStep.LEFT -> Icons.AutoMirrored.Filled.ArrowBack // Pointing Left
+        CaptureStep.RIGHT -> Icons.AutoMirrored.Filled.ArrowForward // Pointing Right
         CaptureStep.UP -> Icons.Default.ArrowUpward // Pointing Up
         CaptureStep.DOWN -> Icons.Default.ArrowDownward // Pointing Down
         else -> null
