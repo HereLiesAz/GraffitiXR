@@ -363,10 +363,17 @@ fun MainScreen(viewModel: MainViewModel) {
                             gridCols = uiState.gridCols,
                             qualityWarning = uiState.qualityWarning,
                             captureFailureTimestamp = uiState.captureFailureTimestamp,
-                            onCaptureClick = viewModel::onCaptureShutterClicked,
+                            onCaptureClick = {
+                                if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
+                                    viewModel.onCalibrationPointCaptured()
+                                } else {
+                                    viewModel.onCaptureShutterClicked()
+                                }
+                            },
                             onCancelClick = viewModel::onCancelCaptureClicked,
                             onMethodSelected = viewModel::onTargetCreationMethodSelected,
-                            onGridConfigChanged = viewModel::onGridConfigChanged
+                            onGridConfigChanged = viewModel::onGridConfigChanged,
+                            onGpsDecision = viewModel::onGpsDecision
                         )
                     }
                 }

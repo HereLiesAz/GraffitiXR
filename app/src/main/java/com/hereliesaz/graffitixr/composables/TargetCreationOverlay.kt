@@ -64,7 +64,8 @@ fun TargetCreationOverlay(
     onCaptureClick: () -> Unit,
     onCancelClick: () -> Unit,
     onMethodSelected: (TargetCreationMode) -> Unit = {},
-    onGridConfigChanged: (Int, Int) -> Unit = { _, _ -> }
+    onGridConfigChanged: (Int, Int) -> Unit = { _, _ -> },
+    onGpsDecision: (Boolean) -> Unit = {}
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
@@ -138,6 +139,44 @@ fun TargetCreationOverlay(
                     MethodButton(text = "Capture Existing Marks", onClick = { onMethodSelected(TargetCreationMode.CAPTURE) })
                     MethodButton(text = "Create Guided Grid", onClick = { onMethodSelected(TargetCreationMode.GUIDED_GRID) })
                     MethodButton(text = "Create Guided Points", onClick = { onMethodSelected(TargetCreationMode.GUIDED_POINTS) })
+                }
+            }
+
+            // Ask GPS
+            if (step == CaptureStep.ASK_GPS) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Mark location with GPS?",
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "This helps with relocalization outdoors.",
+                        color = Color.LightGray,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Button(onClick = { onGpsDecision(true) }) {
+                            Text("Yes")
+                        }
+                        Button(
+                            onClick = { onGpsDecision(false) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                        ) {
+                            Text("No")
+                        }
+                    }
                 }
             }
 
@@ -317,5 +356,10 @@ private fun getInstructionText(step: CaptureStep): String {
         CaptureStep.UP -> "Aim slightly DOWNWARD from above."
         CaptureStep.DOWN -> "Aim slightly UPWARD from below."
         CaptureStep.REVIEW -> "Processing..."
+        CaptureStep.ASK_GPS -> "Select GPS preference."
+        CaptureStep.CALIBRATION_POINT_1 -> "Hold phone flat against wall at Spot 1.\nWait for vibration."
+        CaptureStep.CALIBRATION_POINT_2 -> "Hold phone flat against wall at Spot 2.\nWait for vibration."
+        CaptureStep.CALIBRATION_POINT_3 -> "Hold phone flat against wall at Spot 3.\nWait for vibration."
+        CaptureStep.CALIBRATION_POINT_4 -> "Hold phone flat against wall at Spot 4.\nWait for vibration."
     }
 }

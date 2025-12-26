@@ -143,7 +143,7 @@ class MainViewModel(
                     updateState(state.copy(captureStep = CaptureStep.FRONT), isUndoable = false)
                 }
                 CaptureStep.GRID_CONFIG -> {
-                    updateState(state.copy(captureStep = CaptureStep.GUIDED_CAPTURE), isUndoable = false)
+                    updateState(state.copy(captureStep = CaptureStep.ASK_GPS), isUndoable = false)
                 }
                 CaptureStep.GUIDED_CAPTURE -> {
                     arRenderer?.triggerCapture()
@@ -161,9 +161,9 @@ class MainViewModel(
 
     fun onTargetCreationMethodSelected(mode: TargetCreationMode) {
         val nextStep = when (mode) {
-            TargetCreationMode.CAPTURE -> CaptureStep.FRONT
+            TargetCreationMode.CAPTURE -> CaptureStep.ASK_GPS
             TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
-            TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
+            TargetCreationMode.GUIDED_POINTS -> CaptureStep.ASK_GPS
         }
 
         val newScale = if (mode != TargetCreationMode.CAPTURE) 0.5f else uiState.value.arObjectScale
@@ -171,14 +171,39 @@ class MainViewModel(
         updateState(uiState.value.copy(
             targetCreationMode = mode,
             captureStep = nextStep,
-            isGridGuideVisible = mode != TargetCreationMode.CAPTURE,
+            isGridGuideVisible = mode == TargetCreationMode.GUIDED_GRID || mode == TargetCreationMode.GUIDED_POINTS,
             arObjectScale = newScale
         ), isUndoable = false)
 
-        if (mode != TargetCreationMode.CAPTURE) {
+        if (mode == TargetCreationMode.GUIDED_GRID || mode == TargetCreationMode.GUIDED_POINTS) {
             updateGuideOverlay()
         } else {
             arRenderer?.showGuide = false
+        }
+    }
+
+    fun onGpsDecision(enableGps: Boolean) {
+        val nextStep = if (enableGps) {
+            CaptureStep.CALIBRATION_POINT_1
+        } else {
+            if (uiState.value.targetCreationMode == TargetCreationMode.CAPTURE) CaptureStep.FRONT else CaptureStep.GUIDED_CAPTURE
+        }
+
+        updateState(uiState.value.copy(
+            isGpsMarkingEnabled = enableGps,
+            captureStep = nextStep
+        ), isUndoable = false)
+    }
+
+    fun onCalibrationPointCaptured() {
+        viewModelScope.launch {
+            // Simulate waiting for stabilization and data collection
+            setLoading(true)
+            _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
+            delay(1500) // Wait for "stabilization"
+            _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
+            setLoading(false)
+            arRenderer?.triggerCapture()
         }
     }
 
@@ -327,20 +352,32 @@ class MainViewModel(
         val currentStep = uiState.value.captureStep
         val mode = uiState.value.targetCreationMode
 
-        val nextStep = if (mode == TargetCreationMode.CAPTURE) {
-            when (currentStep) {
-                CaptureStep.INSTRUCTION -> CaptureStep.FRONT
-                CaptureStep.FRONT -> CaptureStep.LEFT
-                CaptureStep.LEFT -> CaptureStep.RIGHT
-                CaptureStep.RIGHT -> CaptureStep.UP
-                CaptureStep.UP -> CaptureStep.DOWN
-                CaptureStep.DOWN -> CaptureStep.REVIEW
-                CaptureStep.REVIEW -> CaptureStep.REVIEW
+        var nextStep = CaptureStep.REVIEW
+
+        if (uiState.value.isGpsMarkingEnabled) {
+            nextStep = when (currentStep) {
+                CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
+                CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
+                CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
+                CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW
                 else -> CaptureStep.REVIEW
             }
         } else {
-            // For guided modes, 1 frame is enough
-            CaptureStep.REVIEW
+            nextStep = if (mode == TargetCreationMode.CAPTURE) {
+                when (currentStep) {
+                    CaptureStep.INSTRUCTION -> CaptureStep.FRONT
+                    CaptureStep.FRONT -> CaptureStep.LEFT
+                    CaptureStep.LEFT -> CaptureStep.RIGHT
+                    CaptureStep.RIGHT -> CaptureStep.UP
+                    CaptureStep.UP -> CaptureStep.DOWN
+                    CaptureStep.DOWN -> CaptureStep.REVIEW
+                    CaptureStep.REVIEW -> CaptureStep.REVIEW
+                    else -> CaptureStep.REVIEW
+                }
+            } else {
+                // For guided modes, 1 frame is enough
+                CaptureStep.REVIEW
+            }
         }
 
         viewModelScope.launch {
@@ -565,7 +602,7 @@ class MainViewModel(
 
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
-        val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
+        val newScale = (currentScale * scaleFactor).coerceIn(0.01f, 10.0f)
         updateState(uiState.value.copy(arObjectScale = newScale), isUndoable = false)
     }
 
@@ -760,7 +797,7 @@ class MainViewModel(
     fun onScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.scale
         // Sentinel Security: Prevent scale explosion or collapse
-        val newScale = (currentScale * scaleFactor).coerceIn(0.1f, 10.0f)
+        val newScale = (currentScale * scaleFactor).coerceIn(0.01f, 10.0f)
         updateState(uiState.value.copy(scale = newScale), isUndoable = false)
     }
 
