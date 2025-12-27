@@ -279,7 +279,7 @@ class ArRenderer(
             return
         }
 
-        camera.getProjectionMatrix(projMtx, 0, 0.1f, 100.0f)
+        camera.getProjectionMatrix(projMtx, 0, 0.01f, 100.0f)
         camera.getViewMatrix(viewMtx, 0)
 
         // --- Anchor Logic ---
