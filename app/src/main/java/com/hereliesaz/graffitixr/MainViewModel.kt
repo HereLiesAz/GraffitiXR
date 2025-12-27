@@ -221,7 +221,7 @@ class MainViewModel(
             val snapshot = com.hereliesaz.graffitixr.data.CalibrationSnapshot(
                 gpsData = gps,
                 sensorData = sensors,
-                poseMatrix = null, // TODO: Implement pose retrieval from ArRenderer
+                poseMatrix = arRenderer?.arImagePose?.toList(),
                 timestamp = System.currentTimeMillis()
             )
 

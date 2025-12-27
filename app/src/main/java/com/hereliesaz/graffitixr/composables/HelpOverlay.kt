@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -51,7 +53,7 @@ object RailConstants {
 
 @Composable
 fun HelpOverlay(
-    railTop: Float, // The Y position of the Rail container in pixels
+    itemPositions: Map<String, Rect>,
     onDismiss: () -> Unit
 ) {
     var currentContext by remember { mutableStateOf(HelpContext.INTRO) }
@@ -70,8 +72,28 @@ fun HelpOverlay(
     // Design is immediately after Modes
     val designButtonY = modesButtonY + RailConstants.ItemHeight
 
-    // Settings is immediately after Design
-    val settingsButtonY = designButtonY + RailConstants.ItemHeight
+    // Probes:
+    // header_bottom -> Start of Modes
+    // mode_host_bottom -> End of Modes / Start of Design
+    // design_host_bottom -> End of Design / Start of Settings
+    // settings_host_bottom -> End of Settings
+
+    val p1 = itemPositions["header_bottom"]
+    val p2 = itemPositions["mode_host_bottom"]
+    val p3 = itemPositions["design_host_bottom"]
+    val p4 = itemPositions["settings_host_bottom"]
+
+    val modesRect = if (p1 != null && p2 != null) {
+        Rect(p1.left, p1.bottom, p1.right, p2.top)
+    } else Rect.Zero
+
+    val designRect = if (p2 != null && p3 != null) {
+        Rect(p2.left, p2.bottom, p2.right, p3.top)
+    } else Rect.Zero
+
+    val settingsRect = if (p3 != null && p4 != null) {
+        Rect(p3.left, p3.bottom, p3.right, p4.top)
+    } else Rect.Zero
 
     Box(
         modifier = Modifier
@@ -79,38 +101,15 @@ fun HelpOverlay(
             .zIndex(100f) // Ensure it's on top
     ) {
         // Transparent Detectors to intercept clicks over Rail areas
-        // Modes Button Detector
-        Box(
-            modifier = Modifier
-                .offset(y = modesButtonY)
-                .size(width = RailConstants.Width, height = RailConstants.ItemHeight)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { currentContext = HelpContext.MODES }
-        )
-
-        // Design Button Detector
-        Box(
-            modifier = Modifier
-                .offset(y = designButtonY)
-                .size(width = RailConstants.Width, height = RailConstants.ItemHeight)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { currentContext = HelpContext.DESIGN }
-        )
-
-        // Settings Button Detector
-        Box(
-            modifier = Modifier
-                .offset(y = settingsButtonY)
-                .size(width = RailConstants.Width, height = RailConstants.ItemHeight)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { currentContext = HelpContext.SETTINGS }
-        )
+        if (!modesRect.isEmpty) {
+            ClickableRect(rect = modesRect) { currentContext = HelpContext.MODES }
+        }
+        if (!designRect.isEmpty) {
+            ClickableRect(rect = designRect) { currentContext = HelpContext.DESIGN }
+        }
+        if (!settingsRect.isEmpty) {
+            ClickableRect(rect = settingsRect) { currentContext = HelpContext.SETTINGS }
+        }
 
         // Content Area
         // We remove the strict padding here to allow full screen placement
@@ -120,20 +119,41 @@ fun HelpOverlay(
         ) {
             when (currentContext) {
                 HelpContext.INTRO -> IntroHelp(
-                    modesY = modesButtonY,
-                    designY = designButtonY,
-                    settingsY = settingsButtonY
+                    modesRect = modesRect,
+                    designRect = designRect,
+                    settingsRect = settingsRect
                 )
-                HelpContext.MODES -> ModesHelp(modesY = modesButtonY)
-                HelpContext.DESIGN -> DesignHelp(designY = designButtonY)
-                HelpContext.SETTINGS -> SettingsHelp(settingsY = settingsButtonY, onGetStarted = onDismiss)
+                HelpContext.MODES -> ModesHelp(targetRect = modesRect)
+                HelpContext.DESIGN -> DesignHelp(targetRect = designRect)
+                HelpContext.SETTINGS -> SettingsHelp(targetRect = settingsRect, onGetStarted = onDismiss)
             }
         }
     }
 }
 
 @Composable
-fun IntroHelp(modesY: Dp, designY: Dp, settingsY: Dp) {
+fun ClickableRect(rect: Rect, onClick: () -> Unit) {
+    val density = LocalDensity.current
+    val topDp = with(density) { rect.top.toDp() }
+    val leftDp = with(density) { rect.left.toDp() }
+    val widthDp = with(density) { rect.width.toDp() }
+    val heightDp = with(density) { rect.height.toDp() }
+
+    Box(
+        modifier = Modifier
+            .offset(x = leftDp, y = topDp)
+            .width(widthDp)
+            .height(heightDp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+    )
+}
+
+@Composable
+fun IntroHelp(modesRect: Rect, designRect: Rect, settingsRect: Rect) {
     // Main Welcome Title
     Box(
         modifier = Modifier
@@ -157,40 +177,32 @@ fun IntroHelp(modesY: Dp, designY: Dp, settingsY: Dp) {
         }
     }
 
-    // Individual Callouts
-    HelpCallout(
-        targetY = modesY,
-        text = "CHOOSE MODE (AR, OVERLAY...)"
-    )
-
-    HelpCallout(
-        targetY = designY,
-        text = "DESIGN & EDIT TOOLS"
-    )
-
-    HelpCallout(
-        targetY = settingsY,
-        text = "PROJECT SETTINGS"
-    )
+    if (!modesRect.isEmpty) {
+        HelpCallout(targetRect = modesRect, text = "CHOOSE MODE")
+    }
+    if (!designRect.isEmpty) {
+        HelpCallout(targetRect = designRect, text = "DESIGN TOOLS")
+    }
+    if (!settingsRect.isEmpty) {
+        HelpCallout(targetRect = settingsRect, text = "SETTINGS")
+    }
 }
 
 @Composable
 fun HelpCallout(
-    targetY: Dp,
-    text: String,
-    railWidth: Dp = RailConstants.Width,
-    itemHeight: Dp = RailConstants.ItemHeight
+    targetRect: Rect,
+    text: String
 ) {
     val density = LocalDensity.current
-    val strokeWidth = 3.dp
+    val buttonCenterY = modesY + (RailConstants.ItemHeight / 2)
 
-    // Calculate the center Y of the target button
-    val buttonCenterY = targetY + (itemHeight / 2)
+    // Layout the text to the right of the button
+    val textLeftDp = with(density) { (targetRect.right + 60f).toDp() }
+    val textTopDp = with(density) { (targetRect.center.y - 12f).toDp() } // Approximate centering
 
-    // Layout the text to the right of the rail
     Box(
         modifier = Modifier
-            .offset(x = railWidth + 60.dp, y = buttonCenterY - 12.dp) // Align text vertically roughly center
+            .offset(x = textLeftDp, y = textTopDp)
     ) {
         Text(
             text = text,
@@ -202,25 +214,25 @@ fun HelpCallout(
 
     // Draw Arrow
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val targetYPx = with(density) { buttonCenterY.toPx() }
-        val startXPx = with(density) { (railWidth + 50.dp).toPx() } // Start near text
-        val endXPx = with(density) { railWidth.toPx() } // End at rail edge
+        val startX = targetRect.right + 50f // Near text
+        val endX = targetRect.right
+        val y = targetRect.center.y
 
         // Draw horizontal line
         drawLine(
             color = Color.Cyan,
-            start = Offset(startXPx, targetYPx),
-            end = Offset(endXPx, targetYPx),
-            strokeWidth = strokeWidth.toPx(),
+            start = Offset(startX, y),
+            end = Offset(endX, y),
+            strokeWidth = 3.dp.toPx(),
             cap = StrokeCap.Round
         )
 
-        // Draw Arrowhead at the rail end
+        // Draw Arrowhead
         val arrowSize = 15f
         val path = Path().apply {
-            moveTo(endXPx, targetYPx)
-            lineTo(endXPx + arrowSize, targetYPx - arrowSize)
-            lineTo(endXPx + arrowSize, targetYPx + arrowSize)
+            moveTo(endX, y)
+            lineTo(endX + arrowSize, y - arrowSize)
+            lineTo(endX + arrowSize, y + arrowSize)
             close()
         }
         drawPath(path, Color.Cyan)
@@ -228,14 +240,16 @@ fun HelpCallout(
 }
 
 @Composable
-fun ModesHelp(modesY: Dp) {
+fun ModesHelp(targetRect: Rect) {
+    if (targetRect.isEmpty) return
     val density = LocalDensity.current
-    val buttonCenterY = modesY + (RailConstants.ItemHeight / 2)
+    val topDp = with(density) { targetRect.top.toDp() }
+    val leftDp = with(density) { (targetRect.right + 40f).toDp() }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = RailConstants.Width + 40.dp, top = modesY),
+            .padding(start = leftDp, top = topDp),
         contentAlignment = Alignment.TopStart
     ) {
         Column {
@@ -248,30 +262,20 @@ fun ModesHelp(modesY: Dp) {
         }
     }
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val targetY = with(density) { buttonCenterY.toPx() }
-        val startX = with(density) { (RailConstants.Width + 30.dp).toPx() }
-        val endX = with(density) { RailConstants.Width.toPx() }
-
-        drawLine(
-            color = Color.Cyan,
-            start = Offset(startX, targetY),
-            end = Offset(endX, targetY),
-            strokeWidth = 5f,
-            cap = StrokeCap.Round
-        )
-    }
+    DrawSelectionIndicator(targetRect)
 }
 
 @Composable
-fun DesignHelp(designY: Dp) {
+fun DesignHelp(targetRect: Rect) {
+    if (targetRect.isEmpty) return
     val density = LocalDensity.current
-    val buttonCenterY = designY + (RailConstants.ItemHeight / 2)
+    val topDp = with(density) { targetRect.top.toDp() }
+    val leftDp = with(density) { (targetRect.right + 40f).toDp() }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = RailConstants.Width + 40.dp, top = designY),
+            .padding(start = leftDp, top = topDp),
         contentAlignment = Alignment.TopStart
     ) {
         Column {
@@ -284,30 +288,20 @@ fun DesignHelp(designY: Dp) {
         }
     }
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val targetY = with(density) { buttonCenterY.toPx() }
-        val startX = with(density) { (RailConstants.Width + 30.dp).toPx() }
-        val endX = with(density) { RailConstants.Width.toPx() }
-
-        drawLine(
-            color = Color.Cyan,
-            start = Offset(startX, targetY),
-            end = Offset(endX, targetY),
-            strokeWidth = 5f,
-            cap = StrokeCap.Round
-        )
-    }
+    DrawSelectionIndicator(targetRect)
 }
 
 @Composable
-fun SettingsHelp(settingsY: Dp, onGetStarted: () -> Unit) {
+fun SettingsHelp(targetRect: Rect, onGetStarted: () -> Unit) {
+    if (targetRect.isEmpty) return
     val density = LocalDensity.current
-    val buttonCenterY = settingsY + (RailConstants.ItemHeight / 2)
+    val topDp = with(density) { targetRect.top.toDp() }
+    val leftDp = with(density) { (targetRect.right + 40f).toDp() }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = RailConstants.Width + 40.dp, top = settingsY),
+            .padding(start = leftDp, top = topDp),
         contentAlignment = Alignment.TopStart
     ) {
         Column {
@@ -324,15 +318,20 @@ fun SettingsHelp(settingsY: Dp, onGetStarted: () -> Unit) {
         }
     }
 
+    DrawSelectionIndicator(targetRect)
+}
+
+@Composable
+fun DrawSelectionIndicator(targetRect: Rect) {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val targetY = with(density) { buttonCenterY.toPx() }
-        val startX = with(density) { (RailConstants.Width + 30.dp).toPx() }
-        val endX = with(density) { RailConstants.Width.toPx() }
+        val startX = targetRect.right + 30f
+        val endX = targetRect.right
+        val y = targetRect.center.y
 
         drawLine(
             color = Color.Cyan,
-            start = Offset(startX, targetY),
-            end = Offset(endX, targetY),
+            start = Offset(startX, y),
+            end = Offset(endX, y),
             strokeWidth = 5f,
             cap = StrokeCap.Round
         )
