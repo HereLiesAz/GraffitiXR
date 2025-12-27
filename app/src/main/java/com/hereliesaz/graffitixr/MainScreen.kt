@@ -55,7 +55,7 @@ import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
-import com.hereliesaz.graffitixr.composables.HelpScreen
+import com.hereliesaz.graffitixr.composables.HelpOverlay
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.OverlayScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -216,7 +216,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     contentAlignment = Alignment.Center
                 ) {
                     when (uiState.editorMode) {
-                        EditorMode.HELP -> HelpScreen(onGetStarted = { onModeSelected(EditorMode.STATIC) })
+                        EditorMode.HELP -> { /* Rendered as overlay */ }
                         EditorMode.STATIC -> MockupScreen(
                             uiState = uiState,
                             onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
@@ -671,6 +671,11 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier.align(Alignment.Center),
                     color = Color.White
                 )
+            }
+
+            // Help Mode Overlay
+            if (uiState.editorMode == EditorMode.HELP) {
+                HelpOverlay(onDismiss = { onModeSelected(EditorMode.STATIC) })
             }
         }
     }
