@@ -148,6 +148,9 @@ class MainViewModel(
                 CaptureStep.GUIDED_CAPTURE -> {
                     arRenderer?.triggerCapture()
                 }
+                CaptureStep.PHOTO_SEQUENCE -> {
+                    arRenderer?.triggerCapture()
+                }
                 else -> {
                     arRenderer?.triggerCapture()
                 }
@@ -164,6 +167,7 @@ class MainViewModel(
             TargetCreationMode.CAPTURE -> CaptureStep.ASK_GPS
             TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
             TargetCreationMode.GUIDED_POINTS -> CaptureStep.ASK_GPS
+            TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.PHOTO_SEQUENCE
             else -> CaptureStep.ASK_GPS // Sentinel for future modes
         }
 
@@ -184,10 +188,13 @@ class MainViewModel(
     }
 
     fun onGpsDecision(enableGps: Boolean) {
-        val nextStep = if (enableGps) {
+        val mode = uiState.value.targetCreationMode
+        val nextStep = if (mode == TargetCreationMode.MULTI_POINT_CALIBRATION) {
+             CaptureStep.CALIBRATION_POINT_1
+        } else if (enableGps) {
             CaptureStep.CALIBRATION_POINT_1
         } else {
-            if (uiState.value.targetCreationMode == TargetCreationMode.CAPTURE) CaptureStep.FRONT else CaptureStep.GUIDED_CAPTURE
+            if (mode == TargetCreationMode.CAPTURE) CaptureStep.FRONT else CaptureStep.GUIDED_CAPTURE
         }
 
         updateState(uiState.value.copy(
@@ -196,15 +203,51 @@ class MainViewModel(
         ), isUndoable = false)
     }
 
+    fun onPhotoSequenceFinished() {
+        updateState(uiState.value.copy(captureStep = CaptureStep.ASK_GPS), isUndoable = false)
+    }
+
     fun onCalibrationPointCaptured() {
         viewModelScope.launch {
             // Simulate waiting for stabilization and data collection
             setLoading(true)
             _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
-            delay(1500) // Wait for "stabilization"
+            delay(1000) // Wait for "stabilization"
+
+            // Capture Sensors and Pose (No image capture)
+            val gps = getGpsData()
+            val sensors = getSensorData()
+
+            val snapshot = com.hereliesaz.graffitixr.data.CalibrationSnapshot(
+                gpsData = gps,
+                sensorData = sensors,
+                poseMatrix = null, // TODO: Implement pose retrieval from ArRenderer
+                timestamp = System.currentTimeMillis()
+            )
+
+            val currentSnapshots = uiState.value.calibrationSnapshots + snapshot
+
+            // Auto-advance step
+            val currentStep = uiState.value.captureStep
+            val nextStep = when (currentStep) {
+                CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
+                CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
+                CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
+                CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW
+                else -> CaptureStep.REVIEW
+            }
+
             _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
             setLoading(false)
-            arRenderer?.triggerCapture()
+
+            updateState(uiState.value.copy(
+                calibrationSnapshots = currentSnapshots,
+                captureStep = nextStep
+            ), isUndoable = false)
+
+            if (nextStep == CaptureStep.REVIEW) {
+                 processCapturedTargets(uiState.value.capturedTargetImages)
+            }
         }
     }
 
@@ -355,8 +398,13 @@ class MainViewModel(
 
         var nextStep = CaptureStep.REVIEW
 
-        if (uiState.value.isGpsMarkingEnabled) {
-            nextStep = when (currentStep) {
+        // Special handling for PHOTO_SEQUENCE in Multi-Point Calibration
+        if (mode == TargetCreationMode.MULTI_POINT_CALIBRATION && currentStep == CaptureStep.PHOTO_SEQUENCE) {
+            // Stay in PHOTO_SEQUENCE, just add image. User must manually proceed.
+            nextStep = CaptureStep.PHOTO_SEQUENCE
+        } else if (uiState.value.isGpsMarkingEnabled && mode != TargetCreationMode.MULTI_POINT_CALIBRATION) {
+             // Logic for other modes with GPS enabled (if they exist)
+             nextStep = when (currentStep) {
                 CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
                 CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
                 CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
@@ -375,6 +423,9 @@ class MainViewModel(
                     CaptureStep.REVIEW -> CaptureStep.REVIEW
                     else -> CaptureStep.REVIEW
                 }
+            } else if (mode == TargetCreationMode.MULTI_POINT_CALIBRATION) {
+                 // Should not happen here for calibration points as they don't capture frames
+                 CaptureStep.REVIEW
             } else {
                 // For guided modes, 1 frame is enough
                 CaptureStep.REVIEW
@@ -385,7 +436,13 @@ class MainViewModel(
             _feedbackEvent.emit(FeedbackEvent.VibrateSingle)
         }
 
-        if (nextStep != CaptureStep.REVIEW) {
+        // If staying in same step (Photo Sequence), just update images
+        if (nextStep == CaptureStep.PHOTO_SEQUENCE) {
+             updateState(uiState.value.copy(
+                capturedTargetImages = newImages
+            ), isUndoable = false)
+             Toast.makeText(getApplication(), "Photo captured (${newImages.size})", Toast.LENGTH_SHORT).show()
+        } else if (nextStep != CaptureStep.REVIEW) {
             updateState(uiState.value.copy(
                 capturedTargetImages = newImages,
                 captureStep = nextStep
@@ -573,7 +630,8 @@ class MainViewModel(
                     progressPercentage = uiState.value.progressPercentage,
                     evolutionImageUris = uiState.value.evolutionCaptureUris,
                     gpsData = getGpsData(),
-                    sensorData = getSensorData()
+                    sensorData = getSensorData(),
+                    calibrationSnapshots = uiState.value.calibrationSnapshots
                 )
                 projectManager.exportProjectToZip(uri, projectData)
                 withContext(Dispatchers.Main) {
@@ -985,7 +1043,8 @@ class MainViewModel(
                 progressPercentage = snapshot.progressPercentage,
                 evolutionImageUris = snapshot.evolutionCaptureUris,
                 gpsData = getGpsData(),
-                sensorData = getSensorData()
+                sensorData = getSensorData(),
+                calibrationSnapshots = snapshot.calibrationSnapshots
             )
             projectManager.saveProject(projectName, projectData)
             if (showToast) {

@@ -67,7 +67,8 @@ fun TargetCreationOverlay(
     onCancelClick: () -> Unit,
     onMethodSelected: (TargetCreationMode) -> Unit = {},
     onGridConfigChanged: (Int, Int) -> Unit = { _, _ -> },
-    onGpsDecision: (Boolean) -> Unit = {}
+    onGpsDecision: (Boolean) -> Unit = {},
+    onFinishPhotoSequence: () -> Unit = {}
 ) {
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
@@ -183,158 +184,6 @@ fun TargetCreationOverlay(
                 }
             }
 
-            // Ask GPS
-            if (step == CaptureStep.ASK_GPS) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = "Mark location with GPS?",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "This helps with relocalization outdoors.",
-                        color = Color.LightGray,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Button(onClick = { onGpsDecision(true) }) {
-                            Text("Yes")
-                        }
-                        Button(
-                            onClick = { onGpsDecision(false) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                        ) {
-                            Text("No")
-                        }
-                    }
-                }
-            }
-
-            // Ask GPS
-            if (step == CaptureStep.ASK_GPS) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = "Mark location with GPS?",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "This helps with relocalization outdoors.",
-                        color = Color.LightGray,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Button(onClick = { onGpsDecision(true) }) {
-                            Text("Yes")
-                        }
-                        Button(
-                            onClick = { onGpsDecision(false) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                        ) {
-                            Text("No")
-                        }
-                    }
-                }
-            }
-
-            // Ask GPS
-            if (step == CaptureStep.ASK_GPS) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = "Mark location with GPS?",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "This helps with relocalization outdoors.",
-                        color = Color.LightGray,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Button(onClick = { onGpsDecision(true) }) {
-                            Text("Yes")
-                        }
-                        Button(
-                            onClick = { onGpsDecision(false) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                        ) {
-                            Text("No")
-                        }
-                    }
-                }
-            }
-
-            // Ask GPS
-            if (step == CaptureStep.ASK_GPS) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = "Mark location with GPS?",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "This helps with relocalization outdoors.",
-                        color = Color.LightGray,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Button(onClick = { onGpsDecision(true) }) {
-                            Text("Yes")
-                        }
-                        Button(
-                            onClick = { onGpsDecision(false) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                        ) {
-                            Text("No")
-                        }
-                    }
-                }
-            }
-
             // Grid Config (Number Selectors)
             if (step == CaptureStep.GRID_CONFIG) {
                 Column(
@@ -355,6 +204,18 @@ fun TargetCreationOverlay(
                         Text("X", color = Color.White, fontWeight = FontWeight.Bold)
                         NumberSelector(value = gridCols, onValueChange = { onGridConfigChanged(gridRows, it) }, label = "Cols")
                     }
+                }
+            }
+
+            // Photo Sequence Finish Button
+            if (step == CaptureStep.PHOTO_SEQUENCE) {
+                Button(
+                    onClick = onFinishPhotoSequence,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 32.dp, end = 32.dp)
+                ) {
+                    Text("Done")
                 }
             }
 
@@ -400,6 +261,7 @@ fun TargetCreationOverlay(
                          CaptureStep.GRID_CONFIG -> Icons.Default.Check
                          CaptureStep.GUIDED_CAPTURE -> Icons.Default.CameraAlt
                          CaptureStep.INSTRUCTION -> null // Uses text "START"
+                         CaptureStep.PHOTO_SEQUENCE -> Icons.Default.CameraAlt
                          else -> Icons.Default.CameraAlt
                     }
 
@@ -543,6 +405,7 @@ private fun getInstructionText(step: CaptureStep): String {
         CaptureStep.DOWN -> "Aim slightly UPWARD from below."
         CaptureStep.REVIEW -> "Processing..."
         CaptureStep.ASK_GPS -> "Select GPS preference."
+        CaptureStep.PHOTO_SEQUENCE -> "Take multiple photos of the area (min 3).\nMove around to capture different angles."
         CaptureStep.CALIBRATION_POINT_1 -> "Hold phone flat against wall at Spot 1.\nWait for vibration."
         CaptureStep.CALIBRATION_POINT_2 -> "Hold phone flat against wall at Spot 2.\nWait for vibration."
         CaptureStep.CALIBRATION_POINT_3 -> "Hold phone flat against wall at Spot 3.\nWait for vibration."
