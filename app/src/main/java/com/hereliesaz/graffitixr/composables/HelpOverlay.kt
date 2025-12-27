@@ -40,12 +40,37 @@ enum class HelpContext {
     SETTINGS
 }
 
+/**
+ * Constants for the Navigation Rail layout used for Help Overlay alignment.
+ * These match the visual style of the AzNavRail library.
+ */
+object RailConstants {
+    val Width = 80.dp
+    val HeaderHeight = 110.dp // Approximate height of Logo/Header area
+    val ItemHeight = 65.dp // Approximate height of a packed rail item
+    val DividerHeight = 0.dp // No divider in packed mode
+}
+
 @Composable
 fun HelpOverlay(
     itemPositions: Map<String, Rect>,
     onDismiss: () -> Unit
 ) {
     var currentContext by remember { mutableStateOf(HelpContext.INTRO) }
+    val density = LocalDensity.current
+
+    // Convert pixel railTop to DP
+    val railTopDp = with(density) { railTop.toDp() }
+
+    // Calculate dynamic positions relative to the screen top
+    // Since we force the rail to be packed in Help Mode (Modes, Design, Settings),
+    // we can predict their positions relative to the rail top.
+
+    // Modes is the first item after the header
+    val modesButtonY = railTopDp + RailConstants.HeaderHeight
+
+    // Design is immediately after Modes
+    val designButtonY = modesButtonY + RailConstants.ItemHeight
 
     // Probes:
     // header_bottom -> Start of Modes
@@ -87,6 +112,7 @@ fun HelpOverlay(
         }
 
         // Content Area
+        // We remove the strict padding here to allow full screen placement
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -168,6 +194,7 @@ fun HelpCallout(
     text: String
 ) {
     val density = LocalDensity.current
+    val buttonCenterY = modesY + (RailConstants.ItemHeight / 2)
 
     // Layout the text to the right of the button
     val textLeftDp = with(density) { (targetRect.right + 60f).toDp() }
