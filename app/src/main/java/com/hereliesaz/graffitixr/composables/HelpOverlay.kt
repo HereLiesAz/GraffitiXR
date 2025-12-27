@@ -113,6 +113,7 @@ fun HelpOverlay(
         )
 
         // Content Area
+        // We remove the strict padding here to allow full screen placement
         Box(
             modifier = Modifier
                 .fillMaxSize()
