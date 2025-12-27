@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.composables
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,7 +25,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -42,31 +39,39 @@ enum class HelpContext {
 }
 
 /**
- * Estimated metrics for the Navigation Rail layout.
- * Used to align help arrows dynamically.
+ * Constants for the Navigation Rail layout used for Help Overlay alignment.
+ * These match the visual style of the AzNavRail library.
  */
-object RailMetrics {
+object RailConstants {
     val Width = 80.dp
-    val HeaderHeight = 80.dp // App Icon/Name area
-    val ItemHeight = 60.dp // Standard height for text-based rail items
-    val DividerHeight = 16.dp // Padding/Divider space
+    val HeaderHeight = 110.dp // Approximate height of Logo/Header area
+    val ItemHeight = 65.dp // Approximate height of a packed rail item
+    val DividerHeight = 0.dp // No divider in packed mode
 }
 
 @Composable
 fun HelpOverlay(
+    railTop: Float, // The Y position of the Rail container in pixels
     onDismiss: () -> Unit
 ) {
     var currentContext by remember { mutableStateOf(HelpContext.INTRO) }
+    val density = LocalDensity.current
 
-    // Calculate dynamic positions based on RailMetrics
-    // Modes is the first item after header
-    val modesButtonY = RailMetrics.HeaderHeight
+    // Convert pixel railTop to DP
+    val railTopDp = with(density) { railTop.toDp() }
 
-    // Design is after Modes + Divider
-    val designButtonY = modesButtonY + RailMetrics.ItemHeight + RailMetrics.DividerHeight
+    // Calculate dynamic positions relative to the screen top
+    // Since we force the rail to be packed in Help Mode (Modes, Design, Settings),
+    // we can predict their positions relative to the rail top.
 
-    // Settings is after Design + Divider
-    val settingsButtonY = designButtonY + RailMetrics.ItemHeight + RailMetrics.DividerHeight
+    // Modes is the first item after the header
+    val modesButtonY = railTopDp + RailConstants.HeaderHeight
+
+    // Design is immediately after Modes
+    val designButtonY = modesButtonY + RailConstants.ItemHeight
+
+    // Settings is immediately after Design
+    val settingsButtonY = designButtonY + RailConstants.ItemHeight
 
     Box(
         modifier = Modifier
@@ -78,7 +83,7 @@ fun HelpOverlay(
         Box(
             modifier = Modifier
                 .offset(y = modesButtonY)
-                .size(width = RailMetrics.Width, height = RailMetrics.ItemHeight)
+                .size(width = RailConstants.Width, height = RailConstants.ItemHeight)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -89,7 +94,7 @@ fun HelpOverlay(
         Box(
             modifier = Modifier
                 .offset(y = designButtonY)
-                .size(width = RailMetrics.Width, height = RailMetrics.ItemHeight)
+                .size(width = RailConstants.Width, height = RailConstants.ItemHeight)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -100,7 +105,7 @@ fun HelpOverlay(
         Box(
             modifier = Modifier
                 .offset(y = settingsButtonY)
-                .size(width = RailMetrics.Width, height = RailMetrics.ItemHeight)
+                .size(width = RailConstants.Width, height = RailConstants.ItemHeight)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -155,17 +160,17 @@ fun IntroHelp(modesY: Dp, designY: Dp, settingsY: Dp) {
     // Individual Callouts
     HelpCallout(
         targetY = modesY,
-        text = "Choose Mode (AR, Overlay...)"
+        text = "CHOOSE MODE (AR, OVERLAY...)"
     )
 
     HelpCallout(
         targetY = designY,
-        text = "Design & Edit Tools"
+        text = "DESIGN & EDIT TOOLS"
     )
 
     HelpCallout(
         targetY = settingsY,
-        text = "Project Settings"
+        text = "PROJECT SETTINGS"
     )
 }
 
@@ -173,8 +178,8 @@ fun IntroHelp(modesY: Dp, designY: Dp, settingsY: Dp) {
 fun HelpCallout(
     targetY: Dp,
     text: String,
-    railWidth: Dp = RailMetrics.Width,
-    itemHeight: Dp = RailMetrics.ItemHeight
+    railWidth: Dp = RailConstants.Width,
+    itemHeight: Dp = RailConstants.ItemHeight
 ) {
     val density = LocalDensity.current
     val strokeWidth = 3.dp
@@ -225,12 +230,12 @@ fun HelpCallout(
 @Composable
 fun ModesHelp(modesY: Dp) {
     val density = LocalDensity.current
-    val buttonCenterY = modesY + (RailMetrics.ItemHeight / 2)
+    val buttonCenterY = modesY + (RailConstants.ItemHeight / 2)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = RailMetrics.Width + 40.dp, top = modesY),
+            .padding(start = RailConstants.Width + 40.dp, top = modesY),
         contentAlignment = Alignment.TopStart
     ) {
         Column {
@@ -245,8 +250,8 @@ fun ModesHelp(modesY: Dp) {
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val targetY = with(density) { buttonCenterY.toPx() }
-        val startX = with(density) { (RailMetrics.Width + 30.dp).toPx() }
-        val endX = with(density) { RailMetrics.Width.toPx() }
+        val startX = with(density) { (RailConstants.Width + 30.dp).toPx() }
+        val endX = with(density) { RailConstants.Width.toPx() }
 
         drawLine(
             color = Color.Cyan,
@@ -261,12 +266,12 @@ fun ModesHelp(modesY: Dp) {
 @Composable
 fun DesignHelp(designY: Dp) {
     val density = LocalDensity.current
-    val buttonCenterY = designY + (RailMetrics.ItemHeight / 2)
+    val buttonCenterY = designY + (RailConstants.ItemHeight / 2)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = RailMetrics.Width + 40.dp, top = designY),
+            .padding(start = RailConstants.Width + 40.dp, top = designY),
         contentAlignment = Alignment.TopStart
     ) {
         Column {
@@ -281,8 +286,8 @@ fun DesignHelp(designY: Dp) {
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val targetY = with(density) { buttonCenterY.toPx() }
-        val startX = with(density) { (RailMetrics.Width + 30.dp).toPx() }
-        val endX = with(density) { RailMetrics.Width.toPx() }
+        val startX = with(density) { (RailConstants.Width + 30.dp).toPx() }
+        val endX = with(density) { RailConstants.Width.toPx() }
 
         drawLine(
             color = Color.Cyan,
@@ -297,12 +302,12 @@ fun DesignHelp(designY: Dp) {
 @Composable
 fun SettingsHelp(settingsY: Dp, onGetStarted: () -> Unit) {
     val density = LocalDensity.current
-    val buttonCenterY = settingsY + (RailMetrics.ItemHeight / 2)
+    val buttonCenterY = settingsY + (RailConstants.ItemHeight / 2)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = RailMetrics.Width + 40.dp, top = settingsY),
+            .padding(start = RailConstants.Width + 40.dp, top = settingsY),
         contentAlignment = Alignment.TopStart
     ) {
         Column {
@@ -321,8 +326,8 @@ fun SettingsHelp(settingsY: Dp, onGetStarted: () -> Unit) {
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val targetY = with(density) { buttonCenterY.toPx() }
-        val startX = with(density) { (RailMetrics.Width + 30.dp).toPx() }
-        val endX = with(density) { RailMetrics.Width.toPx() }
+        val startX = with(density) { (RailConstants.Width + 30.dp).toPx() }
+        val endX = with(density) { RailConstants.Width.toPx() }
 
         drawLine(
             color = Color.Cyan,
