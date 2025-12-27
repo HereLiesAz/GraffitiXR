@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,12 +47,28 @@ fun HelpOverlay(
 ) {
     var currentContext by remember { mutableStateOf(HelpContext.INTRO) }
 
-    // Fallback if positions aren't ready (shouldn't happen if rail renders first)
-    val defaultRect = Rect(0f, 0f, 0f, 0f)
+    // Probes:
+    // header_bottom -> Start of Modes
+    // mode_host_bottom -> End of Modes / Start of Design
+    // design_host_bottom -> End of Design / Start of Settings
+    // settings_host_bottom -> End of Settings
 
-    val modesRect = itemPositions["mode_host"] ?: defaultRect
-    val designRect = itemPositions["design_host"] ?: defaultRect
-    val settingsRect = itemPositions["settings_host"] ?: defaultRect
+    val p1 = itemPositions["header_bottom"]
+    val p2 = itemPositions["mode_host_bottom"]
+    val p3 = itemPositions["design_host_bottom"]
+    val p4 = itemPositions["settings_host_bottom"]
+
+    val modesRect = if (p1 != null && p2 != null) {
+        Rect(p1.left, p1.bottom, p1.right, p2.top)
+    } else Rect.Zero
+
+    val designRect = if (p2 != null && p3 != null) {
+        Rect(p2.left, p2.bottom, p2.right, p3.top)
+    } else Rect.Zero
+
+    val settingsRect = if (p3 != null && p4 != null) {
+        Rect(p3.left, p3.bottom, p3.right, p4.top)
+    } else Rect.Zero
 
     Box(
         modifier = Modifier
@@ -59,7 +76,6 @@ fun HelpOverlay(
             .zIndex(100f) // Ensure it's on top
     ) {
         // Transparent Detectors to intercept clicks over Rail areas
-        // We use the exact bounds reported by the rail items
         if (!modesRect.isEmpty) {
             ClickableRect(rect = modesRect) { currentContext = HelpContext.MODES }
         }
