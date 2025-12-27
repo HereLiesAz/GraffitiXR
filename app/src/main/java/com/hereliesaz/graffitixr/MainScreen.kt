@@ -378,7 +378,8 @@ fun MainScreen(viewModel: MainViewModel) {
                             onCancelClick = viewModel::onCancelCaptureClicked,
                             onMethodSelected = viewModel::onTargetCreationMethodSelected,
                             onGridConfigChanged = viewModel::onGridConfigChanged,
-                            onGpsDecision = viewModel::onGpsDecision
+                            onGpsDecision = viewModel::onGpsDecision,
+                            onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
                         )
                     }
                 }

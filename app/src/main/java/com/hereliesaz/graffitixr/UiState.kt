@@ -57,7 +57,8 @@ enum class CaptureStep : Parcelable {
     CALIBRATION_POINT_1,
     CALIBRATION_POINT_2,
     CALIBRATION_POINT_3,
-    CALIBRATION_POINT_4
+    CALIBRATION_POINT_4,
+    PHOTO_SEQUENCE
 }
 
 /**
@@ -212,6 +213,9 @@ data class UiState(
     val isRefinementEraser: Boolean = false,
     val detectedKeypoints: @WriteWith<OffsetListParceler> List<Offset> = emptyList(),
     val targetMaskUri: Uri? = null,
+
+    // Calibration Snapshots (GPS + Sensor + Pose)
+    val calibrationSnapshots: List<com.hereliesaz.graffitixr.data.CalibrationSnapshot> = emptyList(),
 
     @IgnoredOnParcel
     val augmentedImageDatabase: AugmentedImageDatabase? = null
