@@ -1,7 +1,9 @@
 package com.hereliesaz.graffitixr.data
 
 import android.net.Uri
+import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
+import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -50,24 +52,38 @@ data class ProjectData(
     val evolutionImageUris: List<Uri> = emptyList(),
     val isLineDrawing: Boolean = false,
     val gpsData: GpsData? = null,
-    val sensorData: SensorData? = null
+    val sensorData: SensorData? = null,
+
+    // New field for Multi-Point Calibration Snapshots
+    val calibrationSnapshots: List<CalibrationSnapshot> = emptyList()
 )
 
 @Serializable
+@Parcelize
+data class CalibrationSnapshot(
+    val gpsData: GpsData?,
+    val sensorData: SensorData?,
+    val poseMatrix: List<Float>?, // Flattened 4x4 matrix
+    val timestamp: Long
+) : Parcelable
+
+@Serializable
+@Parcelize
 data class GpsData(
     val latitude: Double,
     val longitude: Double,
     val altitude: Double,
     val accuracy: Float,
     val time: Long
-)
+) : Parcelable
 
 @Serializable
+@Parcelize
 data class SensorData(
     val azimuth: Float,
     val pitch: Float,
     val roll: Float
-)
+) : Parcelable
 
 object DrawingPathsSerializer : KSerializer<List<List<Pair<Float, Float>>>> {
     private val listSerializer = ListSerializer(ListSerializer(PairFloatFloatSerializer))
