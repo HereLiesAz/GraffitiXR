@@ -40,6 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
@@ -49,16 +51,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.hereliesaz.aznavrail.AzNavRail
-import com.hereliesaz.aznavrail.model.AzButtonShape
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
+import com.hereliesaz.graffitixr.composables.CustomNavRail
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.HelpOverlay
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.OverlayScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.composables.RailItem
 import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
 import com.hereliesaz.graffitixr.composables.SettingsScreen
 import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
@@ -93,6 +97,10 @@ fun MainScreen(viewModel: MainViewModel) {
 
     // Automation State
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
+
+    // Dynamic Rail Position State for Help Overlay
+    var railItemPositions by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
+    var expandedHostId by remember { mutableStateOf<String?>(null) }
 
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
@@ -172,7 +180,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 viewModel.onCreateTargetClicked()
             }
         }
-
     }
 
     LaunchedEffect(uiState.editorMode) {
@@ -373,7 +380,8 @@ fun MainScreen(viewModel: MainViewModel) {
                             onCancelClick = viewModel::onCancelCaptureClicked,
                             onMethodSelected = viewModel::onTargetCreationMethodSelected,
                             onGridConfigChanged = viewModel::onGridConfigChanged,
-                            onGpsDecision = viewModel::onGpsDecision
+                            onGpsDecision = viewModel::onGpsDecision,
+                            onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
                         )
                     }
                 }
@@ -392,128 +400,134 @@ fun MainScreen(viewModel: MainViewModel) {
             }
 
             // Navigation Rail
-            // Hidden when locked to ensure a clean screen for tracing
             if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
-                Box(
-                    modifier = Modifier
-                        .zIndex(6f)
-                        .fillMaxHeight()
-                ) {
-                    AzNavRail {
-                        azSettings(
-                            isLoading = uiState.isLoading,
-                            packRailButtons = true,
-                            defaultShape = AzButtonShape.RECTANGLE,
+                Box(modifier = Modifier.zIndex(6f).fillMaxHeight()) {
+                    // Rebuild Rail Items based on State
+                    val railItems = remember(uiState.editorMode, uiState.overlayImageUri, uiState.isFlashlightOn) {
+                        val items = mutableListOf<RailItem>()
+
+                        // Modes
+                        val modeSubs = listOf(
+                            RailItem.Sub("ar", "AR Mode") { onModeSelected(EditorMode.AR) },
+                            RailItem.Sub("ghost_mode", "Overlay") { onModeSelected(EditorMode.OVERLAY) },
+                            RailItem.Sub("mockup", "Mockup") { onModeSelected(EditorMode.STATIC) },
+                            RailItem.Sub("trace_mode", "Trace") { onModeSelected(EditorMode.TRACE) }
                         )
+                        items.add(RailItem.Host("mode_host", "Modes", modeSubs))
 
-                        azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                        azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { onModeSelected(EditorMode.AR) })
-                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
-                        azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { onModeSelected(EditorMode.STATIC) })
-                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { onModeSelected(EditorMode.TRACE) })
-
-                        azDivider()
-
+                        // Grid (AR Only)
                         if (uiState.editorMode == EditorMode.AR) {
-                            azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
-                            azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", onClick = {
-                                viewModel.onCreateTargetClicked()
-                                showSliderDialog = null; showColorBalanceDialog = false
-                            })
-                            azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", onClick = {
-                                viewModel.onRefineTargetToggled()
-                                showSliderDialog = null; showColorBalanceDialog = false
-                            })
-                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", onClick = {
-                                viewModel.onMarkProgressToggled()
-                                showSliderDialog = null; showColorBalanceDialog = false
-                            })
-
-                            azDivider()
+                            val gridSubs = listOf(
+                                RailItem.Sub("create_target", "Create") {
+                                    viewModel.onCreateTargetClicked()
+                                    showSliderDialog = null; showColorBalanceDialog = false
+                                },
+                                RailItem.Sub("refine_target", "Refine") {
+                                    viewModel.onRefineTargetToggled()
+                                    showSliderDialog = null; showColorBalanceDialog = false
+                                },
+                                RailItem.Sub("mark_progress", "Update") {
+                                    viewModel.onMarkProgressToggled()
+                                    showSliderDialog = null; showColorBalanceDialog = false
+                                }
+                            )
+                            items.add(RailItem.Host("target_host", "Grid", gridSubs))
                         }
 
-                        azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
-
-                        azRailSubItem(id = "image", text = "Open", hostId = "design_host") {
+                        // Design
+                        val designSubs = mutableListOf<RailItem.Sub>()
+                        designSubs.add(RailItem.Sub("image", "Open") {
                             showSliderDialog = null; showColorBalanceDialog = false
                             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        }
+                        })
 
                         if (uiState.editorMode == EditorMode.STATIC) {
-                            azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
+                            designSubs.add(RailItem.Sub("background", "Wall") {
                                 showSliderDialog = null; showColorBalanceDialog = false
                                 backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                            }
+                            })
                         }
 
                         if (uiState.overlayImageUri != null) {
-                            azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", onClick = {
+                            designSubs.add(RailItem.Sub("isolate", "Isolate") {
                                 viewModel.onRemoveBackgroundClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", onClick = {
+                            designSubs.add(RailItem.Sub("line_drawing", "Outline") {
                                 viewModel.onLineDrawingClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azDivider()
 
-                            azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust") {
+                            // Adjust/Balance need logic to toggle dialogs
+                            designSubs.add(RailItem.Sub("adjust", "Adjust") {
                                 showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
                                 showColorBalanceDialog = false
-                            }
-                            azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance") {
+                            })
+                            designSubs.add(RailItem.Sub("color_balance", "Balance") {
                                 showColorBalanceDialog = !showColorBalanceDialog
                                 showSliderDialog = null
-                            }
-                            azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", onClick = {
+                            })
+                            designSubs.add(RailItem.Sub("blending", "Blending") {
                                 viewModel.onCycleBlendMode()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
+                        items.add(RailItem.Host("design_host", "Design", designSubs))
 
-                        azDivider()
+                        // Settings
+                        val settingsSubs = listOf(
+                            RailItem.Sub("new_project", "New") {
+                                viewModel.onNewProject()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            },
+                            RailItem.Sub("save_project", "Save") {
+                                createDocumentLauncher.launch("Project.gxr")
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            },
+                            RailItem.Sub("load_project", "Load") {
+                                showProjectLibrary = true
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            },
+                            RailItem.Sub("export_project", "Export") {
+                                viewModel.onSaveClicked()
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            },
+                            RailItem.Sub("help", "Help") {
+                                viewModel.onEditorModeChanged(EditorMode.HELP)
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            }
+                        )
+                        items.add(RailItem.Host("settings_host", "Settings", settingsSubs))
 
-                        azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){
-                            showSettings = true
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        }
-                        azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = {
-                            viewModel.onNewProject()
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        })
-                        azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") {
-                            createDocumentLauncher.launch("Project.gxr")
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        }
-                        azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") {
-                            showProjectLibrary = true
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        }
-                        azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = {
-                            viewModel.onSaveClicked()
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        })
-                        azRailSubItem(id = "help", hostId = "settings_host", text = "Help", onClick = {
-                            viewModel.onEditorModeChanged(EditorMode.HELP)
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        })
-
-                        azDivider()
-
+                        // Extras
                         if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
-                            azRailItem(id = "light", text = "Light", onClick = {
+                            items.add(RailItem.Leaf("light", "Light") {
                                 viewModel.onToggleFlashlight()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
 
                         if (uiState.editorMode == EditorMode.TRACE) {
-                            azRailItem(id = "lock_trace", text = "Lock", onClick = {
+                            items.add(RailItem.Leaf("lock_trace", "Lock") {
                                 viewModel.setTouchLocked(true)
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
+
+                        items
                     }
+
+                    CustomNavRail(
+                        items = railItems,
+                        expandedHostId = expandedHostId,
+                        onHostClick = { id ->
+                            expandedHostId = if (expandedHostId == id) null else id
+                            if (id == "settings_host") showSettings = true else showSettings = false
+                        },
+                        onItemPositioned = { id, rect ->
+                            railItemPositions = railItemPositions + (id to rect)
+                        }
+                    )
                 }
             }
 
@@ -675,7 +689,10 @@ fun MainScreen(viewModel: MainViewModel) {
 
             // Help Mode Overlay
             if (uiState.editorMode == EditorMode.HELP) {
-                HelpOverlay(onDismiss = { onModeSelected(EditorMode.STATIC) })
+                HelpOverlay(
+                    itemPositions = railItemPositions,
+                    onDismiss = { onModeSelected(EditorMode.STATIC) }
+                )
             }
         }
     }
