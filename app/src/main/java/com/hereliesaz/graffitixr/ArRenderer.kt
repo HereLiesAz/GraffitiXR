@@ -635,6 +635,11 @@ class ArRenderer(
                     config.updateMode = Config.UpdateMode.BLOCKING
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
+
+                    // Enable Local Anchor Persistence for Multi-Point Calibration
+                    // TODO: Enable this when API dependency resolves correctly.
+                    // config.anchorPersistenceMode = Config.AnchorPersistenceMode.LOCAL
+
                     if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                         config.depthMode = Config.DepthMode.AUTOMATIC
                         isDepthSupported = true

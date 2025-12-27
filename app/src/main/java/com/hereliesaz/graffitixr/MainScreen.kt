@@ -21,12 +21,18 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,10 +46,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -93,6 +105,13 @@ fun MainScreen(viewModel: MainViewModel) {
 
     // Automation State
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
+
+    // Dynamic Rail Position State for Help Overlay
+    var railTop by remember { mutableFloatStateOf(0f) }
+    var railItemPositions by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
+    val onProbePosition: (String, Rect) -> Unit = { id, rect ->
+        railItemPositions = railItemPositions + (id to rect)
+    }
 
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
@@ -172,7 +191,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 viewModel.onCreateTargetClicked()
             }
         }
-
     }
 
     LaunchedEffect(uiState.editorMode) {
@@ -373,7 +391,8 @@ fun MainScreen(viewModel: MainViewModel) {
                             onCancelClick = viewModel::onCancelCaptureClicked,
                             onMethodSelected = viewModel::onTargetCreationMethodSelected,
                             onGridConfigChanged = viewModel::onGridConfigChanged,
-                            onGpsDecision = viewModel::onGpsDecision
+                            onGpsDecision = viewModel::onGpsDecision,
+                            onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
                         )
                     }
                 }
@@ -392,12 +411,14 @@ fun MainScreen(viewModel: MainViewModel) {
             }
 
             // Navigation Rail
-            // Hidden when locked to ensure a clean screen for tracing
             if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
                 Box(
                     modifier = Modifier
                         .zIndex(6f)
                         .fillMaxHeight()
+                        .onGloballyPositioned { coordinates ->
+                            railTop = coordinates.positionInRoot().y
+                        }
                 ) {
                     AzNavRail {
                         azSettings(
@@ -406,8 +427,13 @@ fun MainScreen(viewModel: MainViewModel) {
                             defaultShape = AzButtonShape.RECTANGLE,
                         )
 
-                        azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                        azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { onModeSelected(EditorMode.AR) })
+                        if (uiState.editorMode == EditorMode.HELP) {
+                            azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
+                            azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
+                            azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host") {}
+                        } else {
+                            azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
+                            azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { onModeSelected(EditorMode.AR) })
                         azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
                         azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { onModeSelected(EditorMode.STATIC) })
                         azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { onModeSelected(EditorMode.TRACE) })
@@ -513,6 +539,12 @@ fun MainScreen(viewModel: MainViewModel) {
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
+                        } // End of else block
+                    }
+
+                    // Ghost Rail for Anchoring
+                    if (uiState.editorMode == EditorMode.HELP) {
+                        GhostRail(onProbePosition)
                     }
                 }
             }
@@ -675,7 +707,10 @@ fun MainScreen(viewModel: MainViewModel) {
 
             // Help Mode Overlay
             if (uiState.editorMode == EditorMode.HELP) {
-                HelpOverlay(onDismiss = { onModeSelected(EditorMode.STATIC) })
+                HelpOverlay(
+                    itemPositions = railItemPositions,
+                    onDismiss = { onModeSelected(EditorMode.STATIC) }
+                )
             }
         }
     }
@@ -795,5 +830,38 @@ fun UnlockInstructionsPopup(visible: Boolean) {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun GhostRail(onPosition: (String, Rect) -> Unit) {
+    NavigationRail(
+        containerColor = Color.Transparent,
+        contentColor = Color.Transparent,
+        modifier = Modifier.alpha(0f)
+    ) {
+        Spacer(Modifier.height(110.dp)) // Header guess based on RailConstants
+
+        NavigationRailItem(
+            selected = false,
+            onClick = {},
+            icon = { Box(Modifier.size(24.dp)) },
+            label = { Text("Modes") },
+            modifier = Modifier.onGloballyPositioned { onPosition("mode_host", it.boundsInRoot()) }
+        )
+        NavigationRailItem(
+            selected = false,
+            onClick = {},
+            icon = { Box(Modifier.size(24.dp)) },
+            label = { Text("Design") },
+            modifier = Modifier.onGloballyPositioned { onPosition("design_host", it.boundsInRoot()) }
+        )
+        NavigationRailItem(
+            selected = false,
+            onClick = {},
+            icon = { Box(Modifier.size(24.dp)) },
+            label = { Text("Settings") },
+            modifier = Modifier.onGloballyPositioned { onPosition("settings_host", it.boundsInRoot()) }
+        )
     }
 }
