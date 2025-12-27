@@ -32,6 +32,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.data.RefinementPath
 
@@ -78,6 +81,9 @@ fun TargetRefinementScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .clipToBounds()
+                .semantics {
+                    contentDescription = "Image Refinement Canvas. Use gestures to pan and zoom. Select tools below to edit mask."
+                }
                 .pointerInput(scale, offset) {
                     detectDragGestures(
                         onDragStart = { touchOffset ->
@@ -307,6 +313,9 @@ fun TargetRefinementScreen(
                             .size(48.dp)
                             .background(if (!isEraser) Color.Red else Color.DarkGray, CircleShape)
                             .border(2.dp, Color.White, CircleShape)
+                            .semantics {
+                                stateDescription = if (!isEraser) "Selected" else "Not selected"
+                            }
                     ) {
                         Icon(Icons.Default.Remove, contentDescription = "Remove (Mask)", tint = Color.White)
                     }
@@ -318,6 +327,9 @@ fun TargetRefinementScreen(
                             .size(48.dp)
                             .background(if (isEraser) Color.Green else Color.DarkGray, CircleShape)
                             .border(2.dp, Color.White, CircleShape)
+                            .semantics {
+                                stateDescription = if (isEraser) "Selected" else "Not selected"
+                            }
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Add (Restore)", tint = Color.White)
                     }

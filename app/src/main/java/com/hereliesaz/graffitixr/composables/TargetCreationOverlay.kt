@@ -30,7 +30,9 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -101,7 +103,10 @@ fun TargetCreationOverlay(
                     text = getInstructionText(step),
                     color = Color.White,
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.semantics {
+                        liveRegion = LiveRegionMode.Polite
+                    }
                 )
                 if (qualityWarning != null) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -292,7 +297,9 @@ fun MethodButton(text: String, onClick: () -> Unit) {
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth(0.7f)
+        modifier = Modifier.fillMaxWidth(0.7f).semantics {
+            contentDescription = "Select method: $text"
+        }
     ) {
         Text(text, color = Color.White, modifier = Modifier.padding(8.dp))
     }
