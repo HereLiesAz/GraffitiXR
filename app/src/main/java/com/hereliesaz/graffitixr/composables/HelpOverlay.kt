@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -87,13 +86,10 @@ fun HelpOverlay(
         Rect(p1.left, p1.bottom, p1.right, p2.top)
     } else Rect.Zero
 
-    val designRect = if (p2 != null && p3 != null) {
-        Rect(p2.left, p2.bottom, p2.right, p3.top)
-    } else Rect.Zero
-
-    val settingsRect = if (p3 != null && p4 != null) {
-        Rect(p3.left, p3.bottom, p3.right, p4.top)
-    } else Rect.Zero
+    // Fallback if positions aren't ready
+    val modesRect = itemPositions["mode_host"] ?: Rect.Zero
+    val designRect = itemPositions["design_host"] ?: Rect.Zero
+    val settingsRect = itemPositions["settings_host"] ?: Rect.Zero
 
     Box(
         modifier = Modifier
