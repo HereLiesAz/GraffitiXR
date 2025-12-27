@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,28 +46,10 @@ fun HelpOverlay(
 ) {
     var currentContext by remember { mutableStateOf(HelpContext.INTRO) }
 
-    // Probes:
-    // header_bottom -> Start of Modes
-    // mode_host_bottom -> End of Modes / Start of Design
-    // design_host_bottom -> End of Design / Start of Settings
-    // settings_host_bottom -> End of Settings
-
-    val p1 = itemPositions["header_bottom"]
-    val p2 = itemPositions["mode_host_bottom"]
-    val p3 = itemPositions["design_host_bottom"]
-    val p4 = itemPositions["settings_host_bottom"]
-
-    val modesRect = if (p1 != null && p2 != null) {
-        Rect(p1.left, p1.bottom, p1.right, p2.top)
-    } else Rect.Zero
-
-    val designRect = if (p2 != null && p3 != null) {
-        Rect(p2.left, p2.bottom, p2.right, p3.top)
-    } else Rect.Zero
-
-    val settingsRect = if (p3 != null && p4 != null) {
-        Rect(p3.left, p3.bottom, p3.right, p4.top)
-    } else Rect.Zero
+    // Fallback if positions aren't ready
+    val modesRect = itemPositions["mode_host"] ?: Rect.Zero
+    val designRect = itemPositions["design_host"] ?: Rect.Zero
+    val settingsRect = itemPositions["settings_host"] ?: Rect.Zero
 
     Box(
         modifier = Modifier
