@@ -41,17 +41,32 @@ enum class HelpContext {
     SETTINGS
 }
 
+/**
+ * Estimated metrics for the Navigation Rail layout.
+ * Used to align help arrows dynamically.
+ */
+object RailMetrics {
+    val Width = 80.dp
+    val HeaderHeight = 80.dp // App Icon/Name area
+    val ItemHeight = 60.dp // Standard height for text-based rail items
+    val DividerHeight = 16.dp // Padding/Divider space
+}
+
 @Composable
 fun HelpOverlay(
     onDismiss: () -> Unit
 ) {
     var currentContext by remember { mutableStateOf(HelpContext.INTRO) }
 
-    // Hardcoded estimated positions for the rail items (assuming ~80dp width rail)
-    // Adjust these Y offsets based on the visual layout of AzNavRail
-    val modesButtonY = 100.dp
-    val designButtonY = 250.dp // Approximate
-    val settingsButtonY = 400.dp // Approximate
+    // Calculate dynamic positions based on RailMetrics
+    // Modes is the first item after header
+    val modesButtonY = RailMetrics.HeaderHeight
+
+    // Design is after Modes + Divider
+    val designButtonY = modesButtonY + RailMetrics.ItemHeight + RailMetrics.DividerHeight
+
+    // Settings is after Design + Divider
+    val settingsButtonY = designButtonY + RailMetrics.ItemHeight + RailMetrics.DividerHeight
 
     Box(
         modifier = Modifier
@@ -63,7 +78,7 @@ fun HelpOverlay(
         Box(
             modifier = Modifier
                 .offset(y = modesButtonY)
-                .size(width = 80.dp, height = 60.dp)
+                .size(width = RailMetrics.Width, height = RailMetrics.ItemHeight)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -74,7 +89,7 @@ fun HelpOverlay(
         Box(
             modifier = Modifier
                 .offset(y = designButtonY)
-                .size(width = 80.dp, height = 60.dp)
+                .size(width = RailMetrics.Width, height = RailMetrics.ItemHeight)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -85,7 +100,7 @@ fun HelpOverlay(
         Box(
             modifier = Modifier
                 .offset(y = settingsButtonY)
-                .size(width = 80.dp, height = 60.dp)
+                .size(width = RailMetrics.Width, height = RailMetrics.ItemHeight)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -93,10 +108,10 @@ fun HelpOverlay(
         )
 
         // Content Area
+        // We remove the strict padding here to allow full screen placement
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 100.dp, end = 32.dp, top = 64.dp, bottom = 64.dp)
         ) {
             when (currentContext) {
                 HelpContext.INTRO -> IntroHelp(
@@ -114,97 +129,131 @@ fun HelpOverlay(
 
 @Composable
 fun IntroHelp(modesY: Dp, designY: Dp, settingsY: Dp) {
-    val density = LocalDensity.current
-    val strokeWidth = 4.dp
+    // Main Welcome Title
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 120.dp, top = 64.dp), // Offset from rail
+        contentAlignment = Alignment.TopStart
+    ) {
+        Column {
+            Text(
+                text = "WELCOME TO GRAFFITIXR!",
+                style = MaterialTheme.typography.headlineLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Tap the navigation buttons to learn more.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Gray
+            )
+        }
+    }
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+    // Individual Callouts
+    HelpCallout(
+        targetY = modesY,
+        text = "Choose Mode (AR, Overlay...)"
+    )
+
+    HelpCallout(
+        targetY = designY,
+        text = "Design & Edit Tools"
+    )
+
+    HelpCallout(
+        targetY = settingsY,
+        text = "Project Settings"
+    )
+}
+
+@Composable
+fun HelpCallout(
+    targetY: Dp,
+    text: String,
+    railWidth: Dp = RailMetrics.Width,
+    itemHeight: Dp = RailMetrics.ItemHeight
+) {
+    val density = LocalDensity.current
+    val strokeWidth = 3.dp
+
+    // Calculate the center Y of the target button
+    val buttonCenterY = targetY + (itemHeight / 2)
+
+    // Layout the text to the right of the rail
+    Box(
+        modifier = Modifier
+            .offset(x = railWidth + 60.dp, y = buttonCenterY - 12.dp) // Align text vertically roughly center
     ) {
         Text(
-            text = "Welcome to GraffitiXR!",
-            style = MaterialTheme.typography.headlineLarge,
-            color = Color.White,
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.Cyan,
             fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Use the Navigation Rail on the left to switch tools.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White
-        )
-        Spacer(modifier = Modifier.height(32.dp))
-        Text(
-            text = "Tap any button to see details.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.Gray
         )
     }
 
-    // Draw Arrows
+    // Draw Arrow
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val centerX = size.width / 2
-        val startY = size.height / 2 + 50f
+        val targetYPx = with(density) { buttonCenterY.toPx() }
+        val startXPx = with(density) { (railWidth + 50.dp).toPx() } // Start near text
+        val endXPx = with(density) { railWidth.toPx() } // End at rail edge
 
-        val modesTargetY = with(density) { modesY.toPx() } + 40f
-        val designTargetY = with(density) { designY.toPx() } + 40f
-        val settingsTargetY = with(density) { settingsY.toPx() } + 40f
+        // Draw horizontal line
+        drawLine(
+            color = Color.Cyan,
+            start = Offset(startXPx, targetYPx),
+            end = Offset(endXPx, targetYPx),
+            strokeWidth = strokeWidth.toPx(),
+            cap = StrokeCap.Round
+        )
 
-        // Helper to draw connector
-        fun drawConnector(targetY: Float) {
-            val path = Path().apply {
-                moveTo(centerX, startY)
-                lineTo(centerX, targetY)
-                lineTo(0f, targetY) // Point to rail
-            }
-
-            drawPath(
-                path = path,
-                color = Color.Cyan,
-                style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Square)
-            )
-
-            // Arrowhead
-            val arrowSize = 20f
-            drawPath(
-                path = Path().apply {
-                    moveTo(0f, targetY)
-                    lineTo(arrowSize, targetY - arrowSize)
-                    lineTo(arrowSize, targetY + arrowSize)
-                    close()
-                },
-                color = Color.Cyan
-            )
+        // Draw Arrowhead at the rail end
+        val arrowSize = 15f
+        val path = Path().apply {
+            moveTo(endXPx, targetYPx)
+            lineTo(endXPx + arrowSize, targetYPx - arrowSize)
+            lineTo(endXPx + arrowSize, targetYPx + arrowSize)
+            close()
         }
-
-        drawConnector(modesTargetY)
-        drawConnector(designTargetY)
-        drawConnector(settingsTargetY)
+        drawPath(path, Color.Cyan)
     }
 }
 
 @Composable
 fun ModesHelp(modesY: Dp) {
     val density = LocalDensity.current
+    val buttonCenterY = modesY + (RailMetrics.ItemHeight / 2)
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Spacer(modifier = Modifier.height(modesY))
-        Text("Modes Menu", style = MaterialTheme.typography.titleLarge, color = Color.Cyan)
-        Text("• AR Mode: View artwork on walls.", color = Color.White)
-        Text("• Overlay: Use a static photo background.", color = Color.White)
-        Text("• Mockup: Place art on a solid color.", color = Color.White)
-        Text("• Trace: Lock screen for physical tracing.", color = Color.White)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = RailMetrics.Width + 40.dp, top = modesY),
+        contentAlignment = Alignment.TopStart
+    ) {
+        Column {
+            Text("Modes Menu", style = MaterialTheme.typography.headlineMedium, color = Color.Cyan)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("• AR Mode: View artwork on walls.", color = Color.White)
+            Text("• Overlay: Use a static photo background.", color = Color.White)
+            Text("• Mockup: Place art on a solid color.", color = Color.White)
+            Text("• Trace: Lock screen for physical tracing.", color = Color.White)
+        }
     }
 
-    // Specific arrow pointing to Modes button
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val targetY = with(density) { modesY.toPx() } + 40f
+        val targetY = with(density) { buttonCenterY.toPx() }
+        val startX = with(density) { (RailMetrics.Width + 30.dp).toPx() }
+        val endX = with(density) { RailMetrics.Width.toPx() }
+
         drawLine(
             color = Color.Cyan,
-            start = Offset(200f, targetY),
-            end = Offset(0f, targetY),
-            strokeWidth = 5f
+            start = Offset(startX, targetY),
+            end = Offset(endX, targetY),
+            strokeWidth = 5f,
+            cap = StrokeCap.Round
         )
     }
 }
@@ -212,23 +261,35 @@ fun ModesHelp(modesY: Dp) {
 @Composable
 fun DesignHelp(designY: Dp) {
     val density = LocalDensity.current
+    val buttonCenterY = designY + (RailMetrics.ItemHeight / 2)
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Spacer(modifier = Modifier.height(designY))
-        Text("Design Tools", style = MaterialTheme.typography.titleLarge, color = Color.Cyan)
-        Text("• Open: Import images.", color = Color.White)
-        Text("• Isolate: Remove background (AI).", color = Color.White)
-        Text("• Outline: Convert to line art.", color = Color.White)
-        Text("• Adjust: Opacity, Scale, Color.", color = Color.White)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = RailMetrics.Width + 40.dp, top = designY),
+        contentAlignment = Alignment.TopStart
+    ) {
+        Column {
+            Text("Design Tools", style = MaterialTheme.typography.headlineMedium, color = Color.Cyan)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("• Open: Import images.", color = Color.White)
+            Text("• Isolate: Remove background (AI).", color = Color.White)
+            Text("• Outline: Convert to line art.", color = Color.White)
+            Text("• Adjust: Opacity, Scale, Color.", color = Color.White)
+        }
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val targetY = with(density) { designY.toPx() } + 40f
+        val targetY = with(density) { buttonCenterY.toPx() }
+        val startX = with(density) { (RailMetrics.Width + 30.dp).toPx() }
+        val endX = with(density) { RailMetrics.Width.toPx() }
+
         drawLine(
             color = Color.Cyan,
-            start = Offset(200f, targetY),
-            end = Offset(0f, targetY),
-            strokeWidth = 5f
+            start = Offset(startX, targetY),
+            end = Offset(endX, targetY),
+            strokeWidth = 5f,
+            cap = StrokeCap.Round
         )
     }
 }
@@ -236,27 +297,39 @@ fun DesignHelp(designY: Dp) {
 @Composable
 fun SettingsHelp(settingsY: Dp, onGetStarted: () -> Unit) {
     val density = LocalDensity.current
+    val buttonCenterY = settingsY + (RailMetrics.ItemHeight / 2)
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Spacer(modifier = Modifier.height(settingsY))
-        Text("Project & Settings", style = MaterialTheme.typography.titleLarge, color = Color.Cyan)
-        Text("• Save/Load Projects", color = Color.White)
-        Text("• Export to Zip", color = Color.White)
-        Text("• Help & Permissions", color = Color.White)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = RailMetrics.Width + 40.dp, top = settingsY),
+        contentAlignment = Alignment.TopStart
+    ) {
+        Column {
+            Text("Project & Settings", style = MaterialTheme.typography.headlineMedium, color = Color.Cyan)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("• Save/Load Projects", color = Color.White)
+            Text("• Export to Zip", color = Color.White)
+            Text("• Help & Permissions", color = Color.White)
 
-        Spacer(modifier = Modifier.height(32.dp))
-        Button(onClick = onGetStarted) {
-            Text("Got it, let's start!")
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(onClick = onGetStarted) {
+                Text("Got it, let's start!")
+            }
         }
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val targetY = with(density) { settingsY.toPx() } + 40f
+        val targetY = with(density) { buttonCenterY.toPx() }
+        val startX = with(density) { (RailMetrics.Width + 30.dp).toPx() }
+        val endX = with(density) { RailMetrics.Width.toPx() }
+
         drawLine(
             color = Color.Cyan,
-            start = Offset(200f, targetY),
-            end = Offset(0f, targetY),
-            strokeWidth = 5f
+            start = Offset(startX, targetY),
+            end = Offset(endX, targetY),
+            strokeWidth = 5f,
+            cap = StrokeCap.Round
         )
     }
 }
