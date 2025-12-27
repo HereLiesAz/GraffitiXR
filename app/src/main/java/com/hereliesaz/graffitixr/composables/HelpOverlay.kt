@@ -56,35 +56,6 @@ fun HelpOverlay(
     onDismiss: () -> Unit
 ) {
     var currentContext by remember { mutableStateOf(HelpContext.INTRO) }
-    val density = LocalDensity.current
-
-    // Convert pixel railTop to DP
-    val railTopDp = with(density) { railTop.toDp() }
-
-    // Calculate dynamic positions relative to the screen top
-    // Since we force the rail to be packed in Help Mode (Modes, Design, Settings),
-    // we can predict their positions relative to the rail top.
-
-    // Modes is the first item after the header
-    val modesButtonY = railTopDp + RailConstants.HeaderHeight
-
-    // Design is immediately after Modes
-    val designButtonY = modesButtonY + RailConstants.ItemHeight
-
-    // Probes:
-    // header_bottom -> Start of Modes
-    // mode_host_bottom -> End of Modes / Start of Design
-    // design_host_bottom -> End of Design / Start of Settings
-    // settings_host_bottom -> End of Settings
-
-    val p1 = itemPositions["header_bottom"]
-    val p2 = itemPositions["mode_host_bottom"]
-    val p3 = itemPositions["design_host_bottom"]
-    val p4 = itemPositions["settings_host_bottom"]
-
-    val modesRect = if (p1 != null && p2 != null) {
-        Rect(p1.left, p1.bottom, p1.right, p2.top)
-    } else Rect.Zero
 
     // Fallback if positions aren't ready
     val modesRect = itemPositions["mode_host"] ?: Rect.Zero
@@ -190,7 +161,6 @@ fun HelpCallout(
     text: String
 ) {
     val density = LocalDensity.current
-    val buttonCenterY = modesY + (RailConstants.ItemHeight / 2)
 
     // Layout the text to the right of the button
     val textLeftDp = with(density) { (targetRect.right + 60f).toDp() }
