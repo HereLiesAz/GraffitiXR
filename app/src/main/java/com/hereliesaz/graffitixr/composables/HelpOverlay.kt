@@ -108,5 +108,17 @@ fun HelpOverlay(
         ) {
             Icon(Icons.Filled.Close, contentDescription = "Close Help")
         }
+
+        // FAB to exit
+        FloatingActionButton(
+            onClick = onDismiss,
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.TopEnd)
+                .padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ) {
+            Icon(Icons.Filled.Close, contentDescription = "Close Help")
+        }
     }
 }
