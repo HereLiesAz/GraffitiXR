@@ -21,18 +21,12 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,28 +40,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
-import com.hereliesaz.graffitixr.composables.HelpOverlay
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.OverlayScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -105,39 +92,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
     // Automation State
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
-
-    // Dynamic Rail Position State for Help Overlay
-    var railTop by remember { mutableFloatStateOf(0f) }
-    var railItemPositions by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
-    val onProbePosition: (String, Rect) -> Unit = { id, rect ->
-        railItemPositions = railItemPositions + (id to rect)
-    }
-
-    // Fallback mechanism if dynamic anchoring fails (Help Overlay)
-    LaunchedEffect(railTop, uiState.editorMode) {
-        if (uiState.editorMode == EditorMode.HELP) {
-            // Give a small delay for the layout pass
-            delay(100)
-            if (railItemPositions.isEmpty() && railTop > 0f) {
-                // Calculate fallback positions based on RailConstants
-                val density = context.resources.displayMetrics.density
-                val widthPx = 80f * density // RailConstants.Width
-                val headerPx = 110f * density // RailConstants.HeaderHeight
-                val itemPx = 65f * density // RailConstants.ItemHeight
-
-                // Assuming items: Modes, Design, Settings
-                val modesRect = Rect(0f, railTop + headerPx, widthPx, railTop + headerPx + itemPx)
-                val designRect = Rect(0f, railTop + headerPx + itemPx, widthPx, railTop + headerPx + (itemPx * 2))
-                val settingsRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
-
-                railItemPositions = mapOf(
-                    "mode_host" to modesRect,
-                    "design_host" to designRect,
-                    "settings_host" to settingsRect
-                )
-            }
-        }
-    }
 
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
@@ -261,7 +215,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     contentAlignment = Alignment.Center
                 ) {
                     when (uiState.editorMode) {
-                        EditorMode.HELP -> { /* Rendered as overlay */ }
+                        EditorMode.HELP -> { /* Handled by AzNavRail Info Screen */ }
                         EditorMode.STATIC -> MockupScreen(
                             uiState = uiState,
                             onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
@@ -443,25 +397,18 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier
                         .zIndex(6f)
                         .fillMaxHeight()
-                        .onGloballyPositioned { coordinates ->
-                            railTop = coordinates.positionInRoot().y
-                        }
                 ) {
                     AzNavRail {
                         azSettings(
                             isLoading = uiState.isLoading,
                             packRailButtons = true,
                             defaultShape = AzButtonShape.RECTANGLE,
-                            onItemGloballyPositioned = onProbePosition
+                            infoScreen = uiState.editorMode == EditorMode.HELP,
+                            onDismissInfoScreen = { viewModel.onEditorModeChanged(EditorMode.STATIC) }
                         )
 
-                        if (uiState.editorMode == EditorMode.HELP) {
-                            azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                            azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
-                            azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host") {}
-                        } else {
-                            azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                            azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { onModeSelected(EditorMode.AR) })
+                        azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host", info = "• AR Mode: View artwork on walls.\n• Overlay: Use a static photo background.\n• Mockup: Place art on a solid color.\n• Trace: Lock screen for physical tracing.")
+                        azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { onModeSelected(EditorMode.AR) })
                         azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
                         azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { onModeSelected(EditorMode.STATIC) })
                         azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { onModeSelected(EditorMode.TRACE) })
@@ -486,7 +433,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             azDivider()
                         }
 
-                        azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
+                        azRailHostItem(id = "design_host", text = "Design", route = "design_host", info = "• Open: Import images.\n• Isolate: Remove background (AI).\n• Outline: Convert to line art.\n• Adjust: Opacity, Scale, Color.")
 
                         azRailSubItem(id = "image", text = "Open", hostId = "design_host") {
                             showSliderDialog = null; showColorBalanceDialog = false
@@ -527,7 +474,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         azDivider()
 
-                        azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){
+                        azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host", info = "• Save/Load Projects\n• Export to Zip\n• Help & Permissions"){
                             showSettings = true
                             showSliderDialog = null; showColorBalanceDialog = false
                         }
@@ -567,7 +514,6 @@ fun MainScreen(viewModel: MainViewModel) {
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
-                        } // End of else block
                     }
                 }
             }
@@ -728,14 +674,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
 
-            }
-
-            // Help Mode Overlay
-            if (uiState.editorMode == EditorMode.HELP) {
-                HelpOverlay(
-                    itemPositions = railItemPositions,
-                    onDismiss = { onModeSelected(EditorMode.STATIC) }
-                )
             }
         }
     }
