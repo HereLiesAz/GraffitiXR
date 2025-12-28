@@ -101,8 +101,9 @@ class PlaneRenderer {
         GLES20.glVertexAttribPointer(positionAttribute, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
         GLES20.glEnableVertexAttribArray(positionAttribute)
 
-        // 4. Draw Fill (Semi-transparent Cyan)
-        GLES20.glUniform4f(colorUniform, 0.0f, 1.0f, 1.0f, 0.2f)
+        // 4. Draw Fill (Semi-transparent Cyan with Grid)
+        // Set alpha to 1.0 because the shader handles the transparency mixing based on the grid
+        GLES20.glUniform4f(colorUniform, 0.0f, 1.0f, 1.0f, 1.0f)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, plane.polygon.limit() / 2)
 
         // 5. Draw Outline (Solid Cyan)
