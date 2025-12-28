@@ -18,7 +18,9 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
+import com.google.ar.core.Earth
 import com.google.ar.core.Frame
+import com.google.ar.core.GeospatialPose
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -636,6 +638,11 @@ class ArRenderer(
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
 
+                    // Enable Geospatial Mode
+                    if (session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)) {
+                        config.geospatialMode = Config.GeospatialMode.ENABLED
+                    }
+
                     // Enable Local Anchor Persistence for Multi-Point Calibration
                     // TODO: Enable this when API dependency resolves correctly.
                     // config.anchorPersistenceMode = Config.AnchorPersistenceMode.LOCAL
@@ -727,6 +734,36 @@ class ArRenderer(
         synchronized(panLock) {
             pendingPanX += dx
             pendingPanY += dy
+        }
+    }
+
+    fun createGeospatialAnchor(lat: Double, lng: Double, alt: Double, headingDegrees: Double) {
+        val session = this.session ?: return
+        val earth = session.earth ?: return
+
+        // Convert heading (degrees) to Quaternion (rotation around Y - Up)
+        // Heading is typically clockwise from North. GL rotation is CCW.
+        val angleRad = Math.toRadians(-headingDegrees)
+        val halfAngle = angleRad / 2.0
+        val qx = 0.0f
+        val qy = Math.sin(halfAngle).toFloat()
+        val qz = 0.0f
+        val qw = Math.cos(halfAngle).toFloat()
+
+        sessionLock.lock()
+        try {
+            if (earth.trackingState == TrackingState.TRACKING) {
+                activeAnchor?.detach()
+                activeAnchor = earth.createAnchor(lat, lng, alt, qx, qy, qz, qw)
+                arState = ArState.PLACED
+                mainHandler.post { onAnchorCreated() }
+            } else {
+                Log.w(TAG, "Earth not tracking, cannot create geospatial anchor.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create geospatial anchor", e)
+        } finally {
+            sessionLock.unlock()
         }
     }
 
