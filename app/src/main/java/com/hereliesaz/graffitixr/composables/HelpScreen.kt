@@ -43,7 +43,8 @@ fun HelpScreen(onGetStarted: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .padding(top = 100.dp), // Move content down below top 20% approximately (assuming ~500-800dp screen height, 100dp is ~15-20%) or user asked "below the top 20 %". Safe bet is creating space.
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
