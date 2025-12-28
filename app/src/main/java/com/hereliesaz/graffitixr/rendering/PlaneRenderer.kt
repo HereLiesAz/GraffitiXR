@@ -124,22 +124,36 @@ class PlaneRenderer {
     }
 
     companion object {
-        // Simple Vertex Shader
+        // Grid Vertex Shader
         private const val VERTEX_SHADER = """
             uniform mat4 u_ModelViewProjection;
             attribute vec2 a_Position;
+            varying vec2 v_TexCoord;
             void main() {
                // ARCore plane vertices are X, Z. Y is 0.
+               v_TexCoord = a_Position;
                gl_Position = u_ModelViewProjection * vec4(a_Position.x, 0.0, a_Position.y, 1.0);
             }
         """
 
-        // Simple Fragment Shader (Solid Color)
+        // Grid Fragment Shader
         private const val FRAGMENT_SHADER = """
             precision mediump float;
             uniform vec4 u_Color;
+            varying vec2 v_TexCoord;
             void main() {
-                gl_FragColor = u_Color;
+                // Grid logic
+                float gridWidth = 0.5; // Width of grid cells in meters
+                float lineThickness = 0.02; // Thickness of lines in meters
+
+                // Calculate grid lines
+                vec2 grid = step(gridWidth - lineThickness, mod(abs(v_TexCoord), gridWidth));
+                float isLine = max(grid.x, grid.y);
+
+                // Mix alpha: Higher alpha for lines, lower for fill
+                float alpha = mix(u_Color.a, 1.0, isLine);
+
+                gl_FragColor = vec4(u_Color.rgb, alpha * u_Color.a);
             }
         """
     }

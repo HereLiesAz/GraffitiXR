@@ -178,6 +178,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
 
+    // Constraint Layout (Required for Sceneform-EQR)
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
     // ARCore
     implementation(libs.arcore.client)
 
@@ -208,6 +211,10 @@ dependencies {
 
     // OpenCV
     implementation(libs.opencv)
+
+    // Sceneform-EQR
+    implementation("com.eqgis:eq-renderer:1.0.9")
+    implementation("com.eqgis:eq-slam:1.0.2")
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
