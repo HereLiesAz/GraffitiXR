@@ -577,6 +577,11 @@ fun MainScreen(viewModel: MainViewModel) {
                             viewModel.onEditorModeChanged(EditorMode.HELP)
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
+                        azRailSubItem(id = "experimental_map", hostId = "settings_host", text = "Map Space") {
+                            val intent = android.content.Intent(context, MappingActivity::class.java)
+                            context.startActivity(intent)
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        }
 
                         azDivider()
 

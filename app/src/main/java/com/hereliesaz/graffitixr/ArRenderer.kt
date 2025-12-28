@@ -568,12 +568,21 @@ class ArRenderer(
                     if (analysisDescriptors.rows() > 0 && targetDescriptors != null && !targetDescriptors.empty()) {
                         matcher.match(analysisDescriptors, targetDescriptors, analysisMatches)
 
-                        // Bolt Optimization: iterate array to avoid list allocations
-                        val matchesArray = analysisMatches.toArray()
+                        // Bolt Optimization: Read directly into float buffer to avoid creating DMatch objects and array
+                        val totalMatches = analysisMatches.rows()
                         var goodMatches = 0
-                        for (match in matchesArray) {
-                            if (match.distance < 60) {
-                                goodMatches++
+                        if (totalMatches > 0) {
+                            val count = totalMatches * 4
+                            // Allocating one float array is much cheaper than toArray() which allocates N DMatch objects
+                            val matchData = FloatArray(count)
+                            analysisMatches.get(0, 0, matchData)
+
+                            for (i in 0 until totalMatches) {
+                                // DMatch struct: queryIdx, trainIdx, imgIdx, distance
+                                val distance = matchData[i * 4 + 3]
+                                if (distance < 60) {
+                                    goodMatches++
+                                }
                             }
                         }
 
