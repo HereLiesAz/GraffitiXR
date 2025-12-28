@@ -1016,6 +1016,13 @@ class MainViewModel(
         arRenderer?.setFlashlight(newState)
     }
 
+    fun toggleImageLock() {
+        val newState = !uiState.value.isImageLocked
+        updateState(uiState.value.copy(isImageLocked = newState), isUndoable = false)
+        val message = if (newState) "Image Locked" else "Image Unlocked"
+        Toast.makeText(getApplication(), message, Toast.LENGTH_SHORT).show()
+    }
+
     fun saveProject(projectName: String) {
         viewModelScope.launch(Dispatchers.IO) {
             performSave(projectName, true)

@@ -175,15 +175,15 @@ fun MainScreen(viewModel: MainViewModel) {
                 val headerPx = 110f * density // RailConstants.HeaderHeight
                 val itemPx = 65f * density // RailConstants.ItemHeight
 
-                // Assuming items: Modes, Design, Settings
+                // Assuming items: Modes, Design, Project
                 val modesRect = Rect(0f, railTop + headerPx, widthPx, railTop + headerPx + itemPx)
                 val designRect = Rect(0f, railTop + headerPx + itemPx, widthPx, railTop + headerPx + (itemPx * 2))
-                val settingsRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
+                val projectRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
 
                 railItemPositions = mapOf(
                     "mode_host" to modesRect,
                     "design_host" to designRect,
-                    "settings_host" to settingsRect
+                    "project_host" to projectRect
                 )
             }
         }
@@ -320,54 +320,66 @@ fun MainScreen(viewModel: MainViewModel) {
                             onBrightnessChanged = viewModel::onBrightnessChanged,
                             onContrastChanged = viewModel::onContrastChanged,
                             onSaturationChanged = viewModel::onSaturationChanged,
-                            onScaleChanged = viewModel::onScaleChanged,
-                            onOffsetChanged = viewModel::onOffsetChanged,
-                            onRotationZChanged = viewModel::onRotationZChanged,
-                            onRotationXChanged = viewModel::onRotationXChanged,
-                            onRotationYChanged = viewModel::onRotationYChanged,
+                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
+                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
+                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
+                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
+                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                viewModel.onGestureStart()
-                                gestureInProgress = true
+                                if (!uiState.isImageLocked) {
+                                    viewModel.onGestureStart()
+                                    gestureInProgress = true
+                                }
                             },
                             onGestureEnd = {
-                                viewModel.onGestureEnd()
-                                gestureInProgress = false
+                                if (gestureInProgress) {
+                                    viewModel.onGestureEnd()
+                                    gestureInProgress = false
+                                }
                             }
                         )
                         EditorMode.TRACE -> TraceScreen(
                             uiState = uiState,
                             onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                            onScaleChanged = viewModel::onScaleChanged,
-                            onOffsetChanged = viewModel::onOffsetChanged,
-                            onRotationZChanged = viewModel::onRotationZChanged,
-                            onRotationXChanged = viewModel::onRotationXChanged,
-                            onRotationYChanged = viewModel::onRotationYChanged,
+                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
+                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
+                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
+                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
+                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                viewModel.onGestureStart()
-                                gestureInProgress = true
+                                if (!uiState.isImageLocked) {
+                                    viewModel.onGestureStart()
+                                    gestureInProgress = true
+                                }
                             },
                             onGestureEnd = {
-                                viewModel.onGestureEnd()
-                                gestureInProgress = false
+                                if (gestureInProgress) {
+                                    viewModel.onGestureEnd()
+                                    gestureInProgress = false
+                                }
                             }
                         )
                         EditorMode.OVERLAY -> OverlayScreen(
                             uiState = uiState,
-                            onScaleChanged = viewModel::onScaleChanged,
-                            onOffsetChanged = viewModel::onOffsetChanged,
-                            onRotationZChanged = viewModel::onRotationZChanged,
-                            onRotationXChanged = viewModel::onRotationXChanged,
-                            onRotationYChanged = viewModel::onRotationYChanged,
+                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
+                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
+                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
+                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
+                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                viewModel.onGestureStart()
-                                gestureInProgress = true
+                                if (!uiState.isImageLocked) {
+                                    viewModel.onGestureStart()
+                                    gestureInProgress = true
+                                }
                             },
                             onGestureEnd = {
-                                viewModel.onGestureEnd()
-                                gestureInProgress = false
+                                if (gestureInProgress) {
+                                    viewModel.onGestureEnd()
+                                    gestureInProgress = false
+                                }
                             }
                         )
                         EditorMode.AR -> {
@@ -578,6 +590,16 @@ fun MainScreen(viewModel: MainViewModel) {
                                 viewModel.onCycleBlendMode()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
+
+                            azRailSubToggle(
+                                id = "lock_image",
+                                hostId = "design_host",
+                                isChecked = uiState.isImageLocked,
+                                toggleOnText = "Locked",
+                                toggleOffText = "Unlocked",
+                                info = "Prevent accidental moves",
+                                onClick = { viewModel.toggleImageLock() }
+                            )
                         }
 
                         azDivider()
@@ -610,7 +632,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             val intent = android.content.Intent(context, MappingActivity::class.java)
                             context.startActivity(intent)
                             showSliderDialog = null; showColorBalanceDialog = false
-                        }
+                        })
 
                         azDivider()
 

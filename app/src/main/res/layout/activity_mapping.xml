@@ -19,7 +19,7 @@
         android:background="@android:color/transparent"
         android:contentDescription="Back"
         android:src="@android:drawable/ic_menu_close_clear_cancel"
-        android:tint="@android:color/white"
+        app:tint="@android:color/white"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 

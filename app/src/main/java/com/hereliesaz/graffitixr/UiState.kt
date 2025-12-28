@@ -115,6 +115,7 @@ enum class CaptureStep : Parcelable {
  * @property isCapturingTarget Whether the app is currently capturing frames for a target.
  * @property isTouchLocked Whether touch interactions are currently disabled.
  * @property hideUiForCapture Whether to hide the UI for a clean screenshot.
+ * @property isImageLocked Whether image adjustments (position, scale, rotation) are locked to prevent accidental changes.
  * @property updateStatusMessage Status message regarding the app update check.
  * @property isCheckingForUpdate Whether an update check is in progress.
  * @property latestRelease The latest available GitHub release, if any.
@@ -186,6 +187,7 @@ data class UiState(
     val isTouchLocked: Boolean = false,
     val showUnlockInstructions: Boolean = false,
     val hideUiForCapture: Boolean = false,
+    val isImageLocked: Boolean = false,
 
     val updateStatusMessage: String? = null,
     val isCheckingForUpdate: Boolean = false,
