@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,6 +71,18 @@ fun HelpOverlay(
             .fillMaxSize()
             .zIndex(100f) // Ensure it's on top
     ) {
+        // Exit FAB
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            FloatingActionButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = "Exit Help")
+            }
+        }
+
         // Transparent Detectors to intercept clicks over Rail areas
         if (!modesRect.isEmpty) {
             ClickableRect(rect = modesRect) { currentContext = HelpContext.MODES }
@@ -122,25 +138,30 @@ fun ClickableRect(rect: Rect, onClick: () -> Unit) {
 @Composable
 fun IntroHelp(modesRect: Rect, designRect: Rect, settingsRect: Rect) {
     // Main Welcome Title
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(start = 120.dp, top = 64.dp), // Offset from rail
-        contentAlignment = Alignment.TopStart
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Column {
-            Text(
-                text = "WELCOME TO GRAFFITIXR!",
-                style = MaterialTheme.typography.headlineLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Tap the navigation buttons to learn more.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.Gray
-            )
+        val topPadding = maxHeight * 0.25f // Below top 20%
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 120.dp, top = topPadding), // Offset from rail and top
+            contentAlignment = Alignment.TopStart
+        ) {
+            Column {
+                Text(
+                    text = "WELCOME TO GRAFFITIXR!",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Tap the navigation buttons to learn more.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.Gray
+                )
+            }
         }
     }
 

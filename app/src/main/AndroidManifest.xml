@@ -53,7 +53,17 @@
             android:theme="@style/Theme.GraffitiXR"
             android:process=":crash" />
 
-        <meta-data android:name="com.google.ar.core" android:value="optional" />
+        <activity
+            android:name=".MappingActivity"
+            android:exported="false"
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Theme.GraffitiXR" />
+
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="optional"
+            tools:replace="android:value" />
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="subject_segment" />
 
         <provider
