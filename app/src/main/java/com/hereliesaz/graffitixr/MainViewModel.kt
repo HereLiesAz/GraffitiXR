@@ -499,6 +499,22 @@ class MainViewModel(
             }
 
             withContext(Dispatchers.IO) {
+                // If we have calibration data, use it to create a geospatial anchor
+                val calibrationSnapshots = uiState.value.calibrationSnapshots
+                if (calibrationSnapshots.isNotEmpty()) {
+                    val avgLat = calibrationSnapshots.mapNotNull { it.gpsData?.latitude }.average()
+                    val avgLng = calibrationSnapshots.mapNotNull { it.gpsData?.longitude }.average()
+                    val avgAlt = calibrationSnapshots.mapNotNull { it.gpsData?.altitude }.average()
+
+                    // Convert azimuth (radians) to degrees
+                    val avgAzimuthRad = calibrationSnapshots.mapNotNull { it.sensorData?.azimuth?.toDouble() }.average()
+                    val avgAzimuthDeg = Math.toDegrees(avgAzimuthRad)
+
+                    if (!avgLat.isNaN() && !avgLng.isNaN() && !avgAlt.isNaN()) {
+                         arRenderer?.createGeospatialAnchor(avgLat, avgLng, avgAlt, avgAzimuthDeg)
+                    }
+                }
+
                 val frontImage = images.firstOrNull()
                 if (frontImage == null) {
                     withContext(Dispatchers.Main) {

@@ -113,6 +113,32 @@ fun MainScreen(viewModel: MainViewModel) {
         railItemPositions = railItemPositions + (id to rect)
     }
 
+    // Fallback mechanism if dynamic anchoring fails (Help Overlay)
+    LaunchedEffect(railTop, uiState.editorMode) {
+        if (uiState.editorMode == EditorMode.HELP) {
+            // Give a small delay for the layout pass
+            delay(100)
+            if (railItemPositions.isEmpty() && railTop > 0f) {
+                // Calculate fallback positions based on RailConstants
+                val density = context.resources.displayMetrics.density
+                val widthPx = 80f * density // RailConstants.Width
+                val headerPx = 110f * density // RailConstants.HeaderHeight
+                val itemPx = 65f * density // RailConstants.ItemHeight
+
+                // Assuming items: Modes, Design, Settings
+                val modesRect = Rect(0f, railTop + headerPx, widthPx, railTop + headerPx + itemPx)
+                val designRect = Rect(0f, railTop + headerPx + itemPx, widthPx, railTop + headerPx + (itemPx * 2))
+                val settingsRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
+
+                railItemPositions = mapOf(
+                    "mode_host" to modesRect,
+                    "design_host" to designRect,
+                    "settings_host" to settingsRect
+                )
+            }
+        }
+    }
+
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
         viewModel.feedbackEvent.collect { event ->
