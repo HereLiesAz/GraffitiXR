@@ -59,8 +59,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
@@ -125,15 +123,15 @@ fun MainScreen(viewModel: MainViewModel) {
                 val headerPx = 110f * density // RailConstants.HeaderHeight
                 val itemPx = 65f * density // RailConstants.ItemHeight
 
-                // Assuming items: Modes, Design, Settings
+                // Assuming items: Modes, Design, Project
                 val modesRect = Rect(0f, railTop + headerPx, widthPx, railTop + headerPx + itemPx)
                 val designRect = Rect(0f, railTop + headerPx + itemPx, widthPx, railTop + headerPx + (itemPx * 2))
-                val settingsRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
+                val projectRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
 
                 railItemPositions = mapOf(
                     "mode_host" to modesRect,
                     "design_host" to designRect,
-                    "settings_host" to settingsRect
+                    "project_host" to projectRect
                 )
             }
         }
@@ -270,54 +268,66 @@ fun MainScreen(viewModel: MainViewModel) {
                             onBrightnessChanged = viewModel::onBrightnessChanged,
                             onContrastChanged = viewModel::onContrastChanged,
                             onSaturationChanged = viewModel::onSaturationChanged,
-                            onScaleChanged = viewModel::onScaleChanged,
-                            onOffsetChanged = viewModel::onOffsetChanged,
-                            onRotationZChanged = viewModel::onRotationZChanged,
-                            onRotationXChanged = viewModel::onRotationXChanged,
-                            onRotationYChanged = viewModel::onRotationYChanged,
+                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
+                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
+                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
+                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
+                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                viewModel.onGestureStart()
-                                gestureInProgress = true
+                                if (!uiState.isImageLocked) {
+                                    viewModel.onGestureStart()
+                                    gestureInProgress = true
+                                }
                             },
                             onGestureEnd = {
-                                viewModel.onGestureEnd()
-                                gestureInProgress = false
+                                if (gestureInProgress) {
+                                    viewModel.onGestureEnd()
+                                    gestureInProgress = false
+                                }
                             }
                         )
                         EditorMode.TRACE -> TraceScreen(
                             uiState = uiState,
                             onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                            onScaleChanged = viewModel::onScaleChanged,
-                            onOffsetChanged = viewModel::onOffsetChanged,
-                            onRotationZChanged = viewModel::onRotationZChanged,
-                            onRotationXChanged = viewModel::onRotationXChanged,
-                            onRotationYChanged = viewModel::onRotationYChanged,
+                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
+                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
+                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
+                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
+                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                viewModel.onGestureStart()
-                                gestureInProgress = true
+                                if (!uiState.isImageLocked) {
+                                    viewModel.onGestureStart()
+                                    gestureInProgress = true
+                                }
                             },
                             onGestureEnd = {
-                                viewModel.onGestureEnd()
-                                gestureInProgress = false
+                                if (gestureInProgress) {
+                                    viewModel.onGestureEnd()
+                                    gestureInProgress = false
+                                }
                             }
                         )
                         EditorMode.OVERLAY -> OverlayScreen(
                             uiState = uiState,
-                            onScaleChanged = viewModel::onScaleChanged,
-                            onOffsetChanged = viewModel::onOffsetChanged,
-                            onRotationZChanged = viewModel::onRotationZChanged,
-                            onRotationXChanged = viewModel::onRotationXChanged,
-                            onRotationYChanged = viewModel::onRotationYChanged,
+                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
+                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
+                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
+                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
+                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                viewModel.onGestureStart()
-                                gestureInProgress = true
+                                if (!uiState.isImageLocked) {
+                                    viewModel.onGestureStart()
+                                    gestureInProgress = true
+                                }
                             },
                             onGestureEnd = {
-                                viewModel.onGestureEnd()
-                                gestureInProgress = false
+                                if (gestureInProgress) {
+                                    viewModel.onGestureEnd()
+                                    gestureInProgress = false
+                                }
                             }
                         )
                         EditorMode.AR -> {
@@ -458,27 +468,32 @@ fun MainScreen(viewModel: MainViewModel) {
                         if (uiState.editorMode == EditorMode.HELP) {
                             azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
                             azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
-                            azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host") {}
+                            azRailHostItem(id = "project_host", text = "Project", route = "project_host") {}
                         } else {
                             azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                            azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { onModeSelected(EditorMode.AR) })
-                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
-                        azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { onModeSelected(EditorMode.STATIC) })
-                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { onModeSelected(EditorMode.TRACE) })
+                            azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", info = "Project onto walls", onClick = { onModeSelected(EditorMode.AR) })
+                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", info = "Camera with static overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
+                        azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", info = "Place art on solid color", onClick = { onModeSelected(EditorMode.STATIC) })
+                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", info = "Lock screen for tracing", onClick = { onModeSelected(EditorMode.TRACE) })
 
                         azDivider()
 
                         if (uiState.editorMode == EditorMode.AR) {
                             azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
-                            azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", onClick = {
+                            azRailSubItem(id = "surveyor", hostId = "target_host", text = "Surveyor", info = "Map space for stability") {
+                                val intent = android.content.Intent(context, MappingActivity::class.java)
+                                context.startActivity(intent)
+                                showSliderDialog = null; showColorBalanceDialog = false
+                            }
+                            azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", info = "Start AR target creation", onClick = {
                                 viewModel.onCreateTargetClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", onClick = {
+                            azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", info = "Adjust target mask", onClick = {
                                 viewModel.onRefineTargetToggled()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", onClick = {
+                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", info = "Update tracking state", onClick = {
                                 viewModel.onMarkProgressToggled()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
@@ -488,66 +503,77 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
 
-                        azRailSubItem(id = "image", text = "Open", hostId = "design_host") {
+                        azRailSubItem(id = "image", text = "Open", hostId = "design_host", info = "Import overlay image") {
                             showSliderDialog = null; showColorBalanceDialog = false
                             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
 
                         if (uiState.editorMode == EditorMode.STATIC) {
-                            azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
+                            azRailSubItem(id = "background", hostId = "design_host", text = "Wall", info = "Import wall background") {
                                 showSliderDialog = null; showColorBalanceDialog = false
                                 backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             }
                         }
 
                         if (uiState.overlayImageUri != null) {
-                            azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", onClick = {
+                            azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", info = "Remove background with AI", onClick = {
                                 viewModel.onRemoveBackgroundClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", onClick = {
+                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", info = "Convert to outline", onClick = {
                                 viewModel.onLineDrawingClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                             azDivider()
 
-                            azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust") {
+                            azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust", info = "Tweak image properties") {
                                 showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
                                 showColorBalanceDialog = false
                             }
-                            azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance") {
+                            azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance", info = "Adjust RGB balance") {
                                 showColorBalanceDialog = !showColorBalanceDialog
                                 showSliderDialog = null
                             }
-                            azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", onClick = {
+                            azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", info = "Change blend mode", onClick = {
                                 viewModel.onCycleBlendMode()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
+
+                            azRailSubToggle(
+                                id = "lock_image",
+                                hostId = "design_host",
+                                isChecked = uiState.isImageLocked,
+                                toggleOnText = "Locked",
+                                toggleOffText = "Unlocked",
+                                info = "Prevent accidental moves",
+                                onClick = { viewModel.toggleImageLock() }
+                            )
                         }
 
                         azDivider()
 
-                        azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){
-                            showSettings = true
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        }
-                        azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = {
+                        azRailHostItem(id = "project_host", text = "Project", route = "project_host")
+                        azRailSubItem(id = "new_project", hostId = "project_host", text = "New", info = "Start fresh", onClick = {
                             viewModel.onNewProject()
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
-                        azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") {
+                        azRailSubItem(id = "save_project", hostId = "project_host", text = "Save", info = "Save to file") {
                             createDocumentLauncher.launch("Project.gxr")
                             showSliderDialog = null; showColorBalanceDialog = false
                         }
-                        azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") {
+                        azRailSubItem(id = "load_project", hostId = "project_host", text = "Load", info = "Load from file") {
                             showProjectLibrary = true
                             showSliderDialog = null; showColorBalanceDialog = false
                         }
-                        azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = {
+                        azRailSubItem(id = "export_project", hostId = "project_host", text = "Export", info = "Export as ZIP", onClick = {
                             viewModel.onSaveClicked()
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
-                        azRailSubItem(id = "help", hostId = "settings_host", text = "Help", onClick = {
+                        azRailSubItem(id = "settings", hostId = "project_host", text = "Settings", info = "App configuration", onClick = {
+                            showSettings = true
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        })
+                        azRailSubItem(id = "help", hostId = "project_host", text = "Help", info = "Show help overlay", onClick = {
                             viewModel.onEditorModeChanged(EditorMode.HELP)
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
@@ -555,14 +581,14 @@ fun MainScreen(viewModel: MainViewModel) {
                         azDivider()
 
                         if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
-                            azRailItem(id = "light", text = "Light", onClick = {
+                            azRailItem(id = "light", text = "Light", info = "Toggle flashlight", onClick = {
                                 viewModel.onToggleFlashlight()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
 
                         if (uiState.editorMode == EditorMode.TRACE) {
-                            azRailItem(id = "lock_trace", text = "Lock", onClick = {
+                            azRailItem(id = "lock_trace", text = "Lock", info = "Lock touch input", onClick = {
                                 viewModel.setTouchLocked(true)
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
