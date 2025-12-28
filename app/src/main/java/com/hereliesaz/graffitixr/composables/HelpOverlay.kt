@@ -64,7 +64,7 @@ fun HelpOverlay(
     // Fallback if positions aren't ready
     val modesRect = itemPositions["mode_host"] ?: Rect.Zero
     val designRect = itemPositions["design_host"] ?: Rect.Zero
-    val settingsRect = itemPositions["settings_host"] ?: Rect.Zero
+    val projectRect = itemPositions["project_host"] ?: Rect.Zero
 
     Box(
         modifier = Modifier
@@ -90,8 +90,8 @@ fun HelpOverlay(
         if (!designRect.isEmpty) {
             ClickableRect(rect = designRect) { currentContext = HelpContext.DESIGN }
         }
-        if (!settingsRect.isEmpty) {
-            ClickableRect(rect = settingsRect) { currentContext = HelpContext.SETTINGS }
+        if (!projectRect.isEmpty) {
+            ClickableRect(rect = projectRect) { currentContext = HelpContext.SETTINGS }
         }
 
         // Content Area
@@ -104,11 +104,11 @@ fun HelpOverlay(
                 HelpContext.INTRO -> IntroHelp(
                     modesRect = modesRect,
                     designRect = designRect,
-                    settingsRect = settingsRect
+                    settingsRect = projectRect
                 )
                 HelpContext.MODES -> ModesHelp(targetRect = modesRect)
                 HelpContext.DESIGN -> DesignHelp(targetRect = designRect)
-                HelpContext.SETTINGS -> SettingsHelp(targetRect = settingsRect, onGetStarted = onDismiss)
+                HelpContext.SETTINGS -> SettingsHelp(targetRect = projectRect, onGetStarted = onDismiss)
             }
         }
     }
