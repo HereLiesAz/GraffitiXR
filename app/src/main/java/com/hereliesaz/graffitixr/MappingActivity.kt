@@ -43,7 +43,7 @@ class MappingActivity : AppCompatActivity() {
 
         } catch (e: Exception) {
             statusText.text = "Error: ${e.message}"
-            e.printStackTrace()
+            android.util.Log.e("MappingActivity", "Error initializing Sceneform-EQR", e)
         }
     }
 
