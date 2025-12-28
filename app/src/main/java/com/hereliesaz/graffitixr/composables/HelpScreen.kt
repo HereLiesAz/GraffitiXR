@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.composables
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform 
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
