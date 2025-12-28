@@ -21,18 +21,12 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,14 +40,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,7 +55,6 @@ import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
-import com.hereliesaz.graffitixr.composables.HelpOverlay
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.OverlayScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -103,39 +92,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
     // Automation State
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
-
-    // Dynamic Rail Position State for Help Overlay
-    var railTop by remember { mutableFloatStateOf(0f) }
-    var railItemPositions by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
-    val onProbePosition: (String, Rect) -> Unit = { id, rect ->
-        railItemPositions = railItemPositions + (id to rect)
-    }
-
-    // Fallback mechanism if dynamic anchoring fails (Help Overlay)
-    LaunchedEffect(railTop, uiState.editorMode) {
-        if (uiState.editorMode == EditorMode.HELP) {
-            // Give a small delay for the layout pass
-            delay(100)
-            if (railItemPositions.isEmpty() && railTop > 0f) {
-                // Calculate fallback positions based on RailConstants
-                val density = context.resources.displayMetrics.density
-                val widthPx = 80f * density // RailConstants.Width
-                val headerPx = 110f * density // RailConstants.HeaderHeight
-                val itemPx = 65f * density // RailConstants.ItemHeight
-
-                // Assuming items: Modes, Design, Project
-                val modesRect = Rect(0f, railTop + headerPx, widthPx, railTop + headerPx + itemPx)
-                val designRect = Rect(0f, railTop + headerPx + itemPx, widthPx, railTop + headerPx + (itemPx * 2))
-                val projectRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
-
-                railItemPositions = mapOf(
-                    "mode_host" to modesRect,
-                    "design_host" to designRect,
-                    "project_host" to projectRect
-                )
-            }
-        }
-    }
 
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
@@ -259,7 +215,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     contentAlignment = Alignment.Center
                 ) {
                     when (uiState.editorMode) {
-                        EditorMode.HELP -> { /* Rendered as overlay */ }
+                        EditorMode.HELP -> { /* Handled by AzNavRail Info Screen */ }
                         EditorMode.STATIC -> MockupScreen(
                             uiState = uiState,
                             onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
@@ -268,66 +224,54 @@ fun MainScreen(viewModel: MainViewModel) {
                             onBrightnessChanged = viewModel::onBrightnessChanged,
                             onContrastChanged = viewModel::onContrastChanged,
                             onSaturationChanged = viewModel::onSaturationChanged,
-                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
-                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
-                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
-                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
-                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
+                            onScaleChanged = viewModel::onScaleChanged,
+                            onOffsetChanged = viewModel::onOffsetChanged,
+                            onRotationZChanged = viewModel::onRotationZChanged,
+                            onRotationXChanged = viewModel::onRotationXChanged,
+                            onRotationYChanged = viewModel::onRotationYChanged,
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                if (!uiState.isImageLocked) {
-                                    viewModel.onGestureStart()
-                                    gestureInProgress = true
-                                }
+                                viewModel.onGestureStart()
+                                gestureInProgress = true
                             },
                             onGestureEnd = {
-                                if (gestureInProgress) {
-                                    viewModel.onGestureEnd()
-                                    gestureInProgress = false
-                                }
+                                viewModel.onGestureEnd()
+                                gestureInProgress = false
                             }
                         )
                         EditorMode.TRACE -> TraceScreen(
                             uiState = uiState,
                             onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
-                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
-                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
-                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
-                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
+                            onScaleChanged = viewModel::onScaleChanged,
+                            onOffsetChanged = viewModel::onOffsetChanged,
+                            onRotationZChanged = viewModel::onRotationZChanged,
+                            onRotationXChanged = viewModel::onRotationXChanged,
+                            onRotationYChanged = viewModel::onRotationYChanged,
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                if (!uiState.isImageLocked) {
-                                    viewModel.onGestureStart()
-                                    gestureInProgress = true
-                                }
+                                viewModel.onGestureStart()
+                                gestureInProgress = true
                             },
                             onGestureEnd = {
-                                if (gestureInProgress) {
-                                    viewModel.onGestureEnd()
-                                    gestureInProgress = false
-                                }
+                                viewModel.onGestureEnd()
+                                gestureInProgress = false
                             }
                         )
                         EditorMode.OVERLAY -> OverlayScreen(
                             uiState = uiState,
-                            onScaleChanged = { if (!uiState.isImageLocked) viewModel.onScaleChanged(it) },
-                            onOffsetChanged = { if (!uiState.isImageLocked) viewModel.onOffsetChanged(it) },
-                            onRotationZChanged = { if (!uiState.isImageLocked) viewModel.onRotationZChanged(it) },
-                            onRotationXChanged = { if (!uiState.isImageLocked) viewModel.onRotationXChanged(it) },
-                            onRotationYChanged = { if (!uiState.isImageLocked) viewModel.onRotationYChanged(it) },
+                            onScaleChanged = viewModel::onScaleChanged,
+                            onOffsetChanged = viewModel::onOffsetChanged,
+                            onRotationZChanged = viewModel::onRotationZChanged,
+                            onRotationXChanged = viewModel::onRotationXChanged,
+                            onRotationYChanged = viewModel::onRotationYChanged,
                             onCycleRotationAxis = viewModel::onCycleRotationAxis,
                             onGestureStart = {
-                                if (!uiState.isImageLocked) {
-                                    viewModel.onGestureStart()
-                                    gestureInProgress = true
-                                }
+                                viewModel.onGestureStart()
+                                gestureInProgress = true
                             },
                             onGestureEnd = {
-                                if (gestureInProgress) {
-                                    viewModel.onGestureEnd()
-                                    gestureInProgress = false
-                                }
+                                viewModel.onGestureEnd()
+                                gestureInProgress = false
                             }
                         )
                         EditorMode.AR -> {
@@ -453,47 +397,35 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier
                         .zIndex(6f)
                         .fillMaxHeight()
-                        .onGloballyPositioned { coordinates ->
-                            railTop = coordinates.positionInRoot().y
-                        }
                 ) {
                     AzNavRail {
                         azSettings(
                             isLoading = uiState.isLoading,
                             packRailButtons = true,
                             defaultShape = AzButtonShape.RECTANGLE,
-                            onItemGloballyPositioned = onProbePosition
+                            infoScreen = uiState.editorMode == EditorMode.HELP,
+                            onDismissInfoScreen = { viewModel.onEditorModeChanged(EditorMode.STATIC) }
                         )
 
-                        if (uiState.editorMode == EditorMode.HELP) {
-                            azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                            azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
-                            azRailHostItem(id = "project_host", text = "Project", route = "project_host") {}
-                        } else {
-                            azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                            azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", info = "Project onto walls", onClick = { onModeSelected(EditorMode.AR) })
-                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", info = "Camera with static overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
-                        azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", info = "Place art on solid color", onClick = { onModeSelected(EditorMode.STATIC) })
-                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", info = "Lock screen for tracing", onClick = { onModeSelected(EditorMode.TRACE) })
+                        azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host", info = "• AR Mode: View artwork on walls.\n• Overlay: Use a static photo background.\n• Mockup: Place art on a solid color.\n• Trace: Lock screen for physical tracing.")
+                        azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", onClick = { onModeSelected(EditorMode.AR) })
+                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
+                        azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", onClick = { onModeSelected(EditorMode.STATIC) })
+                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", onClick = { onModeSelected(EditorMode.TRACE) })
 
                         azDivider()
 
                         if (uiState.editorMode == EditorMode.AR) {
                             azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
-                            azRailSubItem(id = "surveyor", hostId = "target_host", text = "Surveyor", info = "Map space for stability") {
-                                val intent = android.content.Intent(context, MappingActivity::class.java)
-                                context.startActivity(intent)
-                                showSliderDialog = null; showColorBalanceDialog = false
-                            }
-                            azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", info = "Start AR target creation", onClick = {
+                            azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", onClick = {
                                 viewModel.onCreateTargetClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", info = "Adjust target mask", onClick = {
+                            azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", onClick = {
                                 viewModel.onRefineTargetToggled()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", info = "Update tracking state", onClick = {
+                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", onClick = {
                                 viewModel.onMarkProgressToggled()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
@@ -501,104 +433,87 @@ fun MainScreen(viewModel: MainViewModel) {
                             azDivider()
                         }
 
-                        azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
+                        azRailHostItem(id = "design_host", text = "Design", route = "design_host", info = "• Open: Import images.\n• Isolate: Remove background (AI).\n• Outline: Convert to line art.\n• Adjust: Opacity, Scale, Color.")
 
-                        azRailSubItem(id = "image", text = "Open", hostId = "design_host", info = "Import overlay image") {
+                        azRailSubItem(id = "image", text = "Open", hostId = "design_host") {
                             showSliderDialog = null; showColorBalanceDialog = false
                             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
 
                         if (uiState.editorMode == EditorMode.STATIC) {
-                            azRailSubItem(id = "background", hostId = "design_host", text = "Wall", info = "Import wall background") {
+                            azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
                                 showSliderDialog = null; showColorBalanceDialog = false
                                 backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             }
                         }
 
                         if (uiState.overlayImageUri != null) {
-                            azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", info = "Remove background with AI", onClick = {
+                            azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", onClick = {
                                 viewModel.onRemoveBackgroundClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", info = "Convert to outline", onClick = {
+                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", onClick = {
                                 viewModel.onLineDrawingClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                             azDivider()
 
-                            azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust", info = "Tweak image properties") {
+                            azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust") {
                                 showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
                                 showColorBalanceDialog = false
                             }
-                            azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance", info = "Adjust RGB balance") {
+                            azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance") {
                                 showColorBalanceDialog = !showColorBalanceDialog
                                 showSliderDialog = null
                             }
-                            azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", info = "Change blend mode", onClick = {
+                            azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", onClick = {
                                 viewModel.onCycleBlendMode()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-
-                            azRailSubToggle(
-                                id = "lock_image",
-                                hostId = "design_host",
-                                isChecked = uiState.isImageLocked,
-                                toggleOnText = "Locked",
-                                toggleOffText = "Unlocked",
-                                info = "Prevent accidental moves",
-                                onClick = { viewModel.toggleImageLock() }
-                            )
                         }
 
                         azDivider()
 
-                        azRailHostItem(id = "project_host", text = "Project", route = "project_host")
-                        azRailSubItem(id = "new_project", hostId = "project_host", text = "New", info = "Start fresh", onClick = {
+                        azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host", info = "• Save/Load Projects\n• Export to Zip\n• Help & Permissions"){
+                            showSettings = true
+                            showSliderDialog = null; showColorBalanceDialog = false
+                        }
+                        azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", onClick = {
                             viewModel.onNewProject()
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
-                        azRailSubItem(id = "save_project", hostId = "project_host", text = "Save", info = "Save to file") {
+                        azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save") {
                             createDocumentLauncher.launch("Project.gxr")
                             showSliderDialog = null; showColorBalanceDialog = false
                         }
-                        azRailSubItem(id = "load_project", hostId = "project_host", text = "Load", info = "Load from file") {
+                        azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load") {
                             showProjectLibrary = true
                             showSliderDialog = null; showColorBalanceDialog = false
                         }
-                        azRailSubItem(id = "export_project", hostId = "project_host", text = "Export", info = "Export as ZIP", onClick = {
+                        azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", onClick = {
                             viewModel.onSaveClicked()
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
-                        azRailSubItem(id = "settings", hostId = "project_host", text = "Settings", info = "App configuration", onClick = {
-                            showSettings = true
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        })
-                        azRailSubItem(id = "help", hostId = "project_host", text = "Help", info = "Show help overlay", onClick = {
+                        azRailSubItem(id = "help", hostId = "settings_host", text = "Help", onClick = {
                             viewModel.onEditorModeChanged(EditorMode.HELP)
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
-                        azRailSubItem(id = "experimental_map", hostId = "settings_host", text = "Map Space") {
-                            val intent = android.content.Intent(context, MappingActivity::class.java)
-                            context.startActivity(intent)
-                            showSliderDialog = null; showColorBalanceDialog = false
-                        }
 
                         azDivider()
 
                         if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
-                            azRailItem(id = "light", text = "Light", info = "Toggle flashlight", onClick = {
+                            azRailItem(id = "light", text = "Light", onClick = {
                                 viewModel.onToggleFlashlight()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
 
                         if (uiState.editorMode == EditorMode.TRACE) {
-                            azRailItem(id = "lock_trace", text = "Lock", info = "Lock touch input", onClick = {
+                            azRailItem(id = "lock_trace", text = "Lock", onClick = {
                                 viewModel.setTouchLocked(true)
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
-                        } // End of else block
                     }
                 }
             }
@@ -759,14 +674,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
 
-            }
-
-            // Help Mode Overlay
-            if (uiState.editorMode == EditorMode.HELP) {
-                HelpOverlay(
-                    itemPositions = railItemPositions,
-                    onDismiss = { onModeSelected(EditorMode.STATIC) }
-                )
             }
         }
     }
