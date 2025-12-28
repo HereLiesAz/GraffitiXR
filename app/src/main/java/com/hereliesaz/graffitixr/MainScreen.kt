@@ -55,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -110,6 +111,57 @@ fun MainScreen(viewModel: MainViewModel) {
     val onProbePosition: (String, Rect) -> Unit = { id, rect ->
         railItemPositions = railItemPositions + (id to rect)
     }
+
+    // Pre-load strings to avoid Composable calls in lambdas
+    val strModes = stringResource(R.string.nav_modes)
+    val strArMode = stringResource(R.string.nav_ar_mode)
+    val strArModeInfo = stringResource(R.string.nav_ar_mode_info)
+    val strOverlay = stringResource(R.string.nav_overlay)
+    val strOverlayInfo = stringResource(R.string.nav_overlay_info)
+    val strMockup = stringResource(R.string.nav_mockup)
+    val strMockupInfo = stringResource(R.string.nav_mockup_info)
+    val strTrace = stringResource(R.string.nav_trace)
+    val strTraceInfo = stringResource(R.string.nav_trace_info)
+    val strGrid = stringResource(R.string.nav_grid)
+    val strSurveyor = stringResource(R.string.nav_surveyor)
+    val strSurveyorInfo = stringResource(R.string.nav_surveyor_info)
+    val strCreate = stringResource(R.string.nav_create)
+    val strCreateInfo = stringResource(R.string.nav_create_info)
+    val strRefine = stringResource(R.string.nav_refine)
+    val strRefineInfo = stringResource(R.string.nav_refine_info)
+    val strUpdate = stringResource(R.string.nav_update)
+    val strUpdateInfo = stringResource(R.string.nav_update_info)
+    val strDesign = stringResource(R.string.nav_design)
+    val strOpen = stringResource(R.string.nav_open)
+    val strOpenInfo = stringResource(R.string.nav_open_info)
+    val strWall = stringResource(R.string.nav_wall)
+    val strWallInfo = stringResource(R.string.nav_wall_info)
+    val strIsolate = stringResource(R.string.nav_isolate)
+    val strIsolateInfo = stringResource(R.string.nav_isolate_info)
+    val strOutline = stringResource(R.string.nav_outline)
+    val strOutlineInfo = stringResource(R.string.nav_outline_info)
+    val strAdjust = stringResource(R.string.nav_adjust)
+    val strAdjustInfo = stringResource(R.string.nav_adjust_info)
+    val strBalance = stringResource(R.string.nav_balance)
+    val strBalanceInfo = stringResource(R.string.nav_balance_info)
+    val strBlending = stringResource(R.string.nav_blending)
+    val strBlendingInfo = stringResource(R.string.nav_blending_info)
+    val strSettings = stringResource(R.string.nav_settings)
+    val strNew = stringResource(R.string.nav_new)
+    val strNewInfo = stringResource(R.string.nav_new_info)
+    val strSave = stringResource(R.string.nav_save)
+    val strSaveInfo = stringResource(R.string.nav_save_info)
+    val strLoad = stringResource(R.string.nav_load)
+    val strLoadInfo = stringResource(R.string.nav_load_info)
+    val strExport = stringResource(R.string.nav_export)
+    val strExportInfo = stringResource(R.string.nav_export_info)
+    val strHelp = stringResource(R.string.nav_help)
+    val strHelpInfo = stringResource(R.string.nav_help_info)
+    val strMapSpace = stringResource(R.string.nav_map_space)
+    val strLight = stringResource(R.string.nav_light)
+    val strLightInfo = stringResource(R.string.nav_light_info)
+    val strLock = stringResource(R.string.nav_lock)
+    val strLockInfo = stringResource(R.string.nav_lock_info)
 
     // Fallback mechanism if dynamic anchoring fails (Help Overlay)
     LaunchedEffect(railTop, uiState.editorMode) {
@@ -454,34 +506,34 @@ fun MainScreen(viewModel: MainViewModel) {
                         )
 
                         if (uiState.editorMode == EditorMode.HELP) {
-                            azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                            azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
-                            azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host") {}
+                            azRailHostItem(id = "mode_host", text = strModes, route = "mode_host")
+                            azRailHostItem(id = "design_host", text = strDesign, route = "design_host") {}
+                            azRailHostItem(id = "settings_host", text = strSettings, route = "settings_host") {}
                         } else {
-                            azRailHostItem(id = "mode_host", text = "Modes", route = "mode_host")
-                            azRailSubItem(id = "ar", hostId = "mode_host", text = "AR Mode", info = "Project onto walls", onClick = { onModeSelected(EditorMode.AR) })
-                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = "Overlay", info = "Camera with static overlay", onClick = { onModeSelected(EditorMode.OVERLAY) })
-                        azRailSubItem(id = "mockup", hostId = "mode_host", text = "Mockup", info = "Place art on solid color", onClick = { onModeSelected(EditorMode.STATIC) })
-                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = "Trace", info = "Lock screen for tracing", onClick = { onModeSelected(EditorMode.TRACE) })
+                            azRailHostItem(id = "mode_host", text = strModes, route = "mode_host")
+                            azRailSubItem(id = "ar", hostId = "mode_host", text = strArMode, info = strArModeInfo, onClick = { onModeSelected(EditorMode.AR) })
+                        azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = strOverlay, info = strOverlayInfo, onClick = { onModeSelected(EditorMode.OVERLAY) })
+                        azRailSubItem(id = "mockup", hostId = "mode_host", text = strMockup, info = strMockupInfo, onClick = { onModeSelected(EditorMode.STATIC) })
+                        azRailSubItem(id = "trace_mode", hostId = "mode_host", text = strTrace, info = strTraceInfo, onClick = { onModeSelected(EditorMode.TRACE) })
 
                         azDivider()
 
                         if (uiState.editorMode == EditorMode.AR) {
-                            azRailHostItem(id = "target_host", text = "Grid", route = "target_host")
-                            azRailSubItem(id = "surveyor", hostId = "target_host", text = "Surveyor", info = "Map space for stability") {
+                            azRailHostItem(id = "target_host", text = strGrid, route = "target_host")
+                            azRailSubItem(id = "surveyor", hostId = "target_host", text = strSurveyor, info = strSurveyorInfo) {
                                 val intent = android.content.Intent(context, MappingActivity::class.java)
                                 context.startActivity(intent)
                                 showSliderDialog = null; showColorBalanceDialog = false
                             }
-                            azRailSubItem(id = "create_target", hostId = "target_host", text = "Create", info = "Start AR target creation", onClick = {
+                            azRailSubItem(id = "create_target", hostId = "target_host", text = strCreate, info = strCreateInfo, onClick = {
                                 viewModel.onCreateTargetClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "refine_target", hostId = "target_host", text = "Refine", info = "Adjust target mask", onClick = {
+                            azRailSubItem(id = "refine_target", hostId = "target_host", text = strRefine, info = strRefineInfo, onClick = {
                                 viewModel.onRefineTargetToggled()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = "Update", info = "Update tracking state", onClick = {
+                            azRailSubItem(id = "mark_progress", hostId = "target_host", text = strUpdate, info = strUpdateInfo, onClick = {
                                 viewModel.onMarkProgressToggled()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
@@ -489,40 +541,40 @@ fun MainScreen(viewModel: MainViewModel) {
                             azDivider()
                         }
 
-                        azRailHostItem(id = "design_host", text = "Design", route = "design_host") {}
+                        azRailHostItem(id = "design_host", text = strDesign, route = "design_host") {}
 
-                        azRailSubItem(id = "image", text = "Open", hostId = "design_host", info = "Import overlay image") {
+                        azRailSubItem(id = "image", text = strOpen, hostId = "design_host", info = strOpenInfo) {
                             showSliderDialog = null; showColorBalanceDialog = false
                             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
 
                         if (uiState.editorMode == EditorMode.STATIC) {
-                            azRailSubItem(id = "background", hostId = "design_host", text = "Wall", info = "Import wall background") {
+                            azRailSubItem(id = "background", hostId = "design_host", text = strWall, info = strWallInfo) {
                                 showSliderDialog = null; showColorBalanceDialog = false
                                 backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             }
                         }
 
                         if (uiState.overlayImageUri != null) {
-                            azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", info = "Remove background with AI", onClick = {
+                            azRailSubItem(id = "isolate", hostId = "design_host", text = strIsolate, info = strIsolateInfo, onClick = {
                                 viewModel.onRemoveBackgroundClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
-                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = "Outline", info = "Convert to outline", onClick = {
+                            azRailSubItem(id = "line_drawing", hostId = "design_host", text = strOutline, info = strOutlineInfo, onClick = {
                                 viewModel.onLineDrawingClicked()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                             azDivider()
 
-                            azRailSubItem(id = "adjust", hostId = "design_host", text = "Adjust", info = "Tweak image properties") {
+                            azRailSubItem(id = "adjust", hostId = "design_host", text = strAdjust, info = strAdjustInfo) {
                                 showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
                                 showColorBalanceDialog = false
                             }
-                            azRailSubItem(id = "color_balance", hostId = "design_host", text = "Balance", info = "Adjust RGB balance") {
+                            azRailSubItem(id = "color_balance", hostId = "design_host", text = strBalance, info = strBalanceInfo) {
                                 showColorBalanceDialog = !showColorBalanceDialog
                                 showSliderDialog = null
                             }
-                            azRailSubItem(id = "blending", hostId = "design_host", text = "Blending", info = "Change blend mode", onClick = {
+                            azRailSubItem(id = "blending", hostId = "design_host", text = strBlending, info = strBlendingInfo, onClick = {
                                 viewModel.onCycleBlendMode()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
@@ -530,31 +582,31 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         azDivider()
 
-                        azRailHostItem(id = "settings_host", text = "Settings", route = "settings_host"){
+                        azRailHostItem(id = "settings_host", text = strSettings, route = "settings_host"){
                             showSettings = true
                             showSliderDialog = null; showColorBalanceDialog = false
                         }
-                        azRailSubItem(id = "new_project", hostId = "settings_host", text = "New", info = "Start fresh", onClick = {
+                        azRailSubItem(id = "new_project", hostId = "settings_host", text = strNew, info = strNewInfo, onClick = {
                             viewModel.onNewProject()
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
-                        azRailSubItem(id = "save_project", hostId = "settings_host", text = "Save", info = "Save to file") {
+                        azRailSubItem(id = "save_project", hostId = "settings_host", text = strSave, info = strSaveInfo) {
                             createDocumentLauncher.launch("Project.gxr")
                             showSliderDialog = null; showColorBalanceDialog = false
                         }
-                        azRailSubItem(id = "load_project", hostId = "settings_host", text = "Load", info = "Load from file") {
+                        azRailSubItem(id = "load_project", hostId = "settings_host", text = strLoad, info = strLoadInfo) {
                             showProjectLibrary = true
                             showSliderDialog = null; showColorBalanceDialog = false
                         }
-                        azRailSubItem(id = "export_project", hostId = "settings_host", text = "Export", info = "Export as ZIP", onClick = {
+                        azRailSubItem(id = "export_project", hostId = "settings_host", text = strExport, info = strExportInfo, onClick = {
                             viewModel.onSaveClicked()
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
-                        azRailSubItem(id = "help", hostId = "settings_host", text = "Help", info = "Show help overlay", onClick = {
+                        azRailSubItem(id = "help", hostId = "settings_host", text = strHelp, info = strHelpInfo, onClick = {
                             viewModel.onEditorModeChanged(EditorMode.HELP)
                             showSliderDialog = null; showColorBalanceDialog = false
                         })
-                        azRailSubItem(id = "experimental_map", hostId = "settings_host", text = "Map Space") {
+                        azRailSubItem(id = "experimental_map", hostId = "settings_host", text = strMapSpace) {
                             val intent = android.content.Intent(context, MappingActivity::class.java)
                             context.startActivity(intent)
                             showSliderDialog = null; showColorBalanceDialog = false
@@ -563,14 +615,14 @@ fun MainScreen(viewModel: MainViewModel) {
                         azDivider()
 
                         if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
-                            azRailItem(id = "light", text = "Light", info = "Toggle flashlight", onClick = {
+                            azRailItem(id = "light", text = strLight, info = strLightInfo, onClick = {
                                 viewModel.onToggleFlashlight()
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
                         }
 
                         if (uiState.editorMode == EditorMode.TRACE) {
-                            azRailItem(id = "lock_trace", text = "Lock", info = "Lock touch input", onClick = {
+                            azRailItem(id = "lock_trace", text = strLock, info = strLockInfo, onClick = {
                                 viewModel.setTouchLocked(true)
                                 showSliderDialog = null; showColorBalanceDialog = false
                             })
