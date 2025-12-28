@@ -181,15 +181,15 @@ fun MainScreen(viewModel: MainViewModel) {
                 val headerPx = 110f * density // RailConstants.HeaderHeight
                 val itemPx = 65f * density // RailConstants.ItemHeight
 
-                // Assuming items: Modes, Design, Settings
+                // Assuming items: Modes, Design, Project
                 val modesRect = Rect(0f, railTop + headerPx, widthPx, railTop + headerPx + itemPx)
                 val designRect = Rect(0f, railTop + headerPx + itemPx, widthPx, railTop + headerPx + (itemPx * 2))
-                val settingsRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
+                val projectRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
 
                 railItemPositions = mapOf(
                     "mode_host" to modesRect,
                     "design_host" to designRect,
-                    "settings_host" to settingsRect
+                    "project_host" to projectRect
                 )
             }
         }
@@ -581,6 +581,16 @@ fun MainScreen(viewModel: MainViewModel) {
                                 viewModel.onCycleBlendMode()
                                 resetDialogs()
                             })
+
+                            azRailSubToggle(
+                                id = "lock_image",
+                                hostId = "design_host",
+                                isChecked = uiState.isImageLocked,
+                                toggleOnText = "Locked",
+                                toggleOffText = "Unlocked",
+                                info = "Prevent accidental moves",
+                                onClick = { viewModel.toggleImageLock() }
+                            )
                         }
 
                         azDivider()
