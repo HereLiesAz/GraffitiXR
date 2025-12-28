@@ -573,11 +573,6 @@ fun MainScreen(viewModel: MainViewModel) {
                             viewModel.onEditorModeChanged(EditorMode.HELP)
                             resetDialogs()
                         })
-                        azRailSubItem(id = "experimental_map", hostId = "project_host", text = navStrings.mapSpace, info = "Map space for offline usage") {
-                            val intent = android.content.Intent(context, MappingActivity::class.java)
-                            context.startActivity(intent)
-                            resetDialogs()
-                        }
 
                         azDivider()
 
