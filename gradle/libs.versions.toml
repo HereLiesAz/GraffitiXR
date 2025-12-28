@@ -17,11 +17,12 @@ camerax = "1.5.2"
 accompanistPermissions = "0.37.3"
 mlkitSubjectSegmentation = "16.0.0-beta1"
 opencv = "4.12.0"
-azNavRail = "4.47"
+azNavRail = "5.4"
 kotlinxSerialization = "1.9.0"
 segmentationSelfie = "16.0.0-beta6"
 firebaseBom = "34.7.0"
 playServicesBase = "18.5.0"
+playServicesLocation = "21.0.1"
 xrRuntime = "1.0.0-alpha09"
 xrScenecore = "1.0.0-alpha10"
 xrCompose = "1.0.0-alpha09"
@@ -72,6 +73,7 @@ androidx-xr-arcore = { group = "androidx.xr.arcore", name = "arcore", version.re
 opencv-android = { module = "org.opencv:opencv-android", version.ref = "opencv" }
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
