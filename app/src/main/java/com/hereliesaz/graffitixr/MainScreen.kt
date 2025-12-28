@@ -229,12 +229,13 @@ fun MainScreen(viewModel: MainViewModel) {
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Black
     ) { innerPadding ->
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            val screenHeight = maxHeight
+        Box(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                val screenHeight = maxHeight
 
             if (showProjectLibrary) {
                 ProjectLibraryScreen(
@@ -725,6 +726,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier.align(Alignment.Center),
                     color = Color.White
                 )
+            }
+
             }
 
             // Help Mode Overlay
