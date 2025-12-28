@@ -12,6 +12,10 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven { setUrl("https://jitpack.io") }
+        maven {
+            setUrl("http://repo.eqgis.cn")
+            isAllowInsecureProtocol = true
+        }
     }
 }
 
