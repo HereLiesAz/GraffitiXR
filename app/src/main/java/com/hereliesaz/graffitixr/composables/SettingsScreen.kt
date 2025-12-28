@@ -40,6 +40,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -152,7 +156,12 @@ fun SettingsScreen(
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable(enabled = isUpdateAvailable, onClick = onInstallUpdate)
+                                        .clickable(
+                                            enabled = isUpdateAvailable,
+                                            onClick = onInstallUpdate,
+                                            role = Role.Button,
+                                            onClickLabel = "Install Update"
+                                        )
                                 ) {
                                     Text(text = "Check for experimental updates", fontWeight = FontWeight.Medium)
                                     if (updateStatus != null) {
@@ -224,18 +233,26 @@ fun SettingsItem(label: String, value: String) {
 
 @Composable
 fun PermissionItem(name: String, isGranted: Boolean, onClick: () -> Unit) {
+    val statusText = if (isGranted) "Granted" else "Denied"
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .clickable(
+                onClick = onClick,
+                role = Role.Button,
+                onClickLabel = "Open App Settings"
+            )
+            .padding(vertical = 8.dp)
+            .semantics(mergeDescendants = true) {
+                stateDescription = statusText
+            },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = name, fontWeight = FontWeight.Medium)
         Icon(
             imageVector = if (isGranted) Icons.Default.CheckCircle else Icons.Default.Error,
-            contentDescription = if (isGranted) "Granted" else "Denied",
+            contentDescription = null, // Handled by stateDescription
             tint = if (isGranted) Color.Green else Color.Red
         )
     }
