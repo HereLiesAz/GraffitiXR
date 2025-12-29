@@ -21,7 +21,6 @@ fun TitleOverlay(editorMode: EditorMode) {
         EditorMode.OVERLAY -> "Overlay"
         EditorMode.TRACE -> "Trace"
         EditorMode.AR -> "AR"
-        EditorMode.HELP -> "Help"
     }
 
     Box(
