@@ -69,7 +69,6 @@ import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
-import com.hereliesaz.graffitixr.composables.HelpOverlay
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.OverlayScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -110,13 +109,6 @@ fun MainScreen(viewModel: MainViewModel) {
     // Automation State
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
 
-    // Dynamic Rail Position State for Help Overlay
-    var railTop by remember { mutableFloatStateOf(0f) }
-    var railItemPositions by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
-    val onProbePosition: (String, Rect) -> Unit = { id, rect ->
-        railItemPositions = railItemPositions + (id to rect)
-    }
-
     // Helper to reset dialog states
     fun resetDialogs() {
         showSliderDialog = null
@@ -125,32 +117,6 @@ fun MainScreen(viewModel: MainViewModel) {
 
     // Pre-load strings to avoid Composable calls in lambdas
     val navStrings = rememberNavStrings()
-
-    // Fallback mechanism if dynamic anchoring fails (Help Overlay)
-    LaunchedEffect(railTop, uiState.editorMode) {
-        if (uiState.editorMode == EditorMode.HELP) {
-            // Give a small delay for the layout pass
-            delay(100)
-            if (railItemPositions.isEmpty() && railTop > 0f) {
-                // Calculate fallback positions based on RailConstants
-                val density = context.resources.displayMetrics.density
-                val widthPx = 80f * density // RailConstants.Width
-                val headerPx = 110f * density // RailConstants.HeaderHeight
-                val itemPx = 65f * density // RailConstants.ItemHeight
-
-                // Assuming items: Modes, Design, Project
-                val modesRect = Rect(0f, railTop + headerPx, widthPx, railTop + headerPx + itemPx)
-                val designRect = Rect(0f, railTop + headerPx + itemPx, widthPx, railTop + headerPx + (itemPx * 2))
-                val projectRect = Rect(0f, railTop + headerPx + (itemPx * 2), widthPx, railTop + headerPx + (itemPx * 3))
-
-                railItemPositions = mapOf(
-                    "mode_host" to modesRect,
-                    "design_host" to designRect,
-                    "project_host" to projectRect
-                )
-            }
-        }
-    }
 
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
@@ -471,9 +437,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier
                         .zIndex(6f)
                         .fillMaxHeight()
-                        .onGloballyPositioned { coordinates ->
-                            railTop = coordinates.positionInRoot().y
-                        }
                 ) {
                     AzNavRail(
                         currentDestination = currentRoute,
@@ -483,18 +446,13 @@ fun MainScreen(viewModel: MainViewModel) {
                             isLoading = uiState.isLoading,
                             packRailButtons = true,
                             defaultShape = AzButtonShape.RECTANGLE,
-                            enableRailDragging = true,
                             headerIconShape = AzHeaderIconShape.ROUNDED,
-                            onItemGloballyPositioned = onProbePosition
+                            infoScreen = uiState.editorMode == EditorMode.HELP,
+                            onDismissInfoScreen = { onModeSelected(EditorMode.STATIC) }
                         )
 
-                        if (uiState.editorMode == EditorMode.HELP) {
-                            azRailHostItem(id = "mode_host", text = navStrings.modes, route = "mode_host")
-                            azRailHostItem(id = "design_host", text = navStrings.design, route = "design_host") {}
-                            azRailHostItem(id = "project_host", text = navStrings.project, route = "project_host") {}
-                        } else {
-                            azRailHostItem(id = "mode_host", text = navStrings.modes, route = "mode_host")
-                            azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, route = "ar", onClick = { onModeSelected(EditorMode.AR) })
+                        azRailHostItem(id = "mode_host", text = navStrings.modes, route = "mode_host", info = "Switch between AR, Overlay, Mockup, and Trace modes.")
+                        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, route = "ar", onClick = { onModeSelected(EditorMode.AR) })
                         azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, route = "ghost_mode", onClick = { onModeSelected(EditorMode.OVERLAY) })
                         azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, route = "mockup", onClick = { onModeSelected(EditorMode.STATIC) })
                         azRailSubItem(id = "trace_mode", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, route = "trace_mode", onClick = { onModeSelected(EditorMode.TRACE) })
@@ -524,7 +482,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             azDivider()
                         }
 
-                        azRailHostItem(id = "design_host", text = navStrings.design, route = "design_host") {}
+                        azRailHostItem(id = "design_host", text = navStrings.design, route = "design_host", info = "Access tools to edit, adjust, and manipulate your project.")
 
                         azRailSubItem(id = "image", text = navStrings.open, hostId = "design_host", info = navStrings.openInfo, route = "image") {
                             resetDialogs()
@@ -576,7 +534,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         azDivider()
 
-                        azRailHostItem(id = "project_host", text = navStrings.project, route = "project_host") {}
+                        azRailHostItem(id = "project_host", text = navStrings.project, route = "project_host", info = "Save, load, export, and manage your projects.")
                         azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings", route = "settings_sub") {
                             showSettings = true
                             resetDialogs()
@@ -617,7 +575,6 @@ fun MainScreen(viewModel: MainViewModel) {
                                 resetDialogs()
                             })
                         }
-                        } // End of else block
                     }
                 }
             }
@@ -778,14 +735,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
 
-            }
-
-            // Help Mode Overlay
-            if (uiState.editorMode == EditorMode.HELP) {
-                HelpOverlay(
-                    itemPositions = railItemPositions,
-                    onDismiss = { onModeSelected(EditorMode.STATIC) }
-                )
             }
         }
     }
