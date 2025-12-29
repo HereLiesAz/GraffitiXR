@@ -25,6 +25,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -440,14 +444,6 @@ fun MainScreen(viewModel: MainViewModel) {
                             onDismissInfoScreen = { showInfoScreen = false }
                         )
 
-                        azRailItem(
-                            id = "info",
-                            text = "i",
-                            shape = AzButtonShape.CIRCLE,
-                            route = "help",
-                            onClick = { showInfoScreen = true }
-                        )
-
                         azRailHostItem(id = "mode_host", text = navStrings.modes, route = "mode_host")
                         azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, route = "ar", onClick = { onModeSelected(EditorMode.AR) })
                         azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, route = "ghost_mode", onClick = { onModeSelected(EditorMode.OVERLAY) })
@@ -534,6 +530,10 @@ fun MainScreen(viewModel: MainViewModel) {
                         azRailHostItem(id = "project_host", text = navStrings.project, route = "project_host")
                         azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings", route = "settings_sub") {
                             showSettings = true
+                            resetDialogs()
+                        }
+                        azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", info = "Show Help", route = "help_sub") {
+                            showInfoScreen = true
                             resetDialogs()
                         }
                         azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, route = "new_project", onClick = {
