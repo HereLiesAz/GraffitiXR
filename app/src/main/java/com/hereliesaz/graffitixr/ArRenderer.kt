@@ -102,6 +102,9 @@ class ArRenderer(
     @Volatile var arState: ArState = ArState.SEARCHING
     private var activeAnchor: Anchor? = null
 
+    // Bolt Optimization: Cached bitmap for capture to avoid repeated large allocations
+    private var cachedCaptureBitmap: Bitmap? = null
+
     // Configuration for next init (Lazy Loading)
     private var initialAugmentedImages: List<Bitmap>? = null
 
@@ -482,15 +485,26 @@ class ArRenderer(
     private fun captureFrameForFingerprint(frame: Frame) {
         try {
             frame.acquireCameraImage().use { image ->
-                val rawBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                val width = image.width
+                val height = image.height
+
+                // Bolt Optimization: Reuse bitmap for YUV conversion to avoid massive allocations
+                if (cachedCaptureBitmap == null || cachedCaptureBitmap!!.width != width || cachedCaptureBitmap!!.height != height) {
+                    cachedCaptureBitmap?.recycle()
+                    cachedCaptureBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                }
+
+                val rawBitmap = cachedCaptureBitmap!!
                 yuvToRgbConverter.yuvToRgb(image, rawBitmap)
+
                 val rotation = getRotationDegrees()
                 val bitmap = if (rotation != 0f) {
                     val rotated = BitmapUtils.rotateBitmap(rawBitmap, rotation)
-                    rawBitmap.recycle()
+                    // Note: rawBitmap is reused, so we don't recycle it here
                     rotated
                 } else {
-                    rawBitmap
+                    // Deep copy because rawBitmap is reused
+                    rawBitmap.copy(rawBitmap.config, true)
                 }
                 mainHandler.post { onFrameCaptured(bitmap) }
             }
@@ -715,6 +729,10 @@ class ArRenderer(
             } finally {
                 analysisLock.unlock()
             }
+            // Bolt Optimization: Recycle cached capture bitmap
+            cachedCaptureBitmap?.recycle()
+            cachedCaptureBitmap = null
+
         } catch (e: Exception) {
             Log.e(TAG, "Cleanup error", e)
         } finally {
