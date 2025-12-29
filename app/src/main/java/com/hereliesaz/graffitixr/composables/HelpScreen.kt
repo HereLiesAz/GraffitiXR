@@ -1,120 +1,100 @@
 package com.hereliesaz.graffitixr.composables
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun HelpScreen(onGetStarted: () -> Unit) {
-    var currentStep by remember { mutableIntStateOf(0) }
+fun HelpScreen() {
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val topSpacerHeight = screenHeight * 0.2f // Top 20%
 
-    val steps = remember {
-        listOf(
-            "Welcome" to "Welcome to GraffitiXR!\n\nThis app helps you visualize your artwork in the real world.",
-            "Step 1: Choose & Edit" to "Start by choosing an image from your gallery.\n\nUse the tools to remove the background, make it black and white, or increase contrast for better visibility.",
-            "Step 2: Create Fingerprint" to "In AR Mode, point your camera at the surface where you want your mural.\n\nTap 'Create Target' to generate a unique fingerprint of the surface.",
-            "Step 3: Position & Lock" to "Once the target is created, your image will appear.\n\nRotate and resize it to fit perfectly, then lock it into place to start tracing."
-        )
-    }
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .padding(top = 100.dp), // Move content down below top 20% approximately (assuming ~500-800dp screen height, 100dp is ~15-20%) or user asked "below the top 20 %". Safe bet is creating space.
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AnimatedContent(
-            targetState = currentStep,
-            transitionSpec = {
-                if (targetState > initialState) {
-                    slideInHorizontally { width -> width } + fadeIn() togetherWith
-                        slideOutHorizontally { width -> -width } + fadeOut()
-                } else {
-                    slideInHorizontally { width -> -width } + fadeIn() togetherWith
-                        slideOutHorizontally { width -> width } + fadeOut()
-                }.using(
-                    SizeTransform(clip = false)
-                )
-            },
-            label = "Help Step Transition"
-        ) { stepIndex ->
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (stepIndex < steps.size) {
-                    Text(
-                        text = steps[stepIndex].first,
-                        style = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = steps[stepIndex].second,
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center
-                    )
-                } else {
-                    // Fallback or completion state if needed, though button below handles exit
-                    Text("Ready to go!", style = MaterialTheme.typography.headlineMedium)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
         ) {
-            if (currentStep > 0) {
-                Button(onClick = { currentStep-- }) {
-                    Text("Back")
-                }
-            }
+            Spacer(modifier = Modifier.height(topSpacerHeight))
 
-            Button(onClick = {
-                if (currentStep < steps.size - 1) {
-                    currentStep++
-                } else {
-                    onGetStarted()
-                }
-            }) {
-                Text(if (currentStep < steps.size - 1) "Next" else "Get Started")
-            }
+            Text(
+                text = "Help & Information",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+
+            HelpItem(
+                title = "AR Mode",
+                description = "In this mode, you can use Augmented Reality to place your artwork in the real world. First, you'll need to create an image target by pointing your camera at a real-world object."
+            )
+
+            HelpItem(
+                title = "Overlay Mode",
+                description = "In this mode, you can overlay your artwork on the live camera feed. This is a great way to get a quick preview of your work in the real world."
+            )
+
+            HelpItem(
+                title = "Mockup Mode",
+                description = "In this mode, you can mockup your artwork on a static background image. Use the controls to adjust the size, position, and orientation of your artwork."
+            )
+
+            HelpItem(
+                title = "Trace Mode",
+                description = "In this mode, your device acts as a lightbox. Place a piece of paper over the screen to trace your artwork. You can lock the screen to prevent accidental touches."
+            )
+
+            Spacer(modifier = Modifier.height(100.dp)) // Bottom padding
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Progress indicator
-        PageIndicator(
-            pageCount = steps.size,
-            currentPage = currentStep,
-            onPageSelected = { currentStep = it }
-        )
+@Composable
+private fun HelpItem(title: String, description: String) {
+    Box(
+        modifier = Modifier
+            .padding(bottom = 24.dp) // Spacing between items
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.1f))
+            .padding(24.dp)
+    ) {
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.9f)
+            )
+        }
     }
 }
