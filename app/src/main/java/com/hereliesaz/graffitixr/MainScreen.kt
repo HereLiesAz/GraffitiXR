@@ -413,7 +413,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
 
             // Gesture Feedback
-            if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
+            if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
                 GestureFeedback(
                     uiState = uiState,
                     modifier = Modifier
@@ -422,6 +422,25 @@ fun MainScreen(viewModel: MainViewModel) {
                         .zIndex(3f),
                     isVisible = gestureInProgress
                 )
+
+                // Help Icon
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 16.dp, end = 16.dp)
+                        .zIndex(7f)
+                ) {
+                    IconButton(
+                        onClick = { showInfoScreen = true },
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = "Help",
+                            tint = Color.White
+                        )
+                    }
+                }
             }
 
             // Navigation Rail
