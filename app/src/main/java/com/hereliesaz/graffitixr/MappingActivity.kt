@@ -7,14 +7,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.eqgis.eqr.layout.SceneLayout
-import com.eqgis.eqr.core.Eqr
-// import com.eqgis.slam.SlamManager // Hypothetical class, need to verify
-// import com.eqgis.ar.ARPlugin // From sample code
+import com.eqgis.slam.core.SlamCore
 
 class MappingActivity : AppCompatActivity() {
 
     private lateinit var sceneLayout: SceneLayout
     private lateinit var statusText: TextView
+    private var slamCore: SlamCore? = null
+    private var isMapping = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,37 +26,71 @@ class MappingActivity : AppCompatActivity() {
         val backButton = findViewById<ImageButton>(R.id.btn_back)
         backButton.setOnClickListener { finish() }
 
+        val startButton = findViewById<Button>(R.id.btn_start_mapping)
+        startButton.setOnClickListener { startMapping() }
+
+        val stopButton = findViewById<Button>(R.id.btn_stop_mapping)
+        stopButton.setOnClickListener { stopMapping() }
+
         val saveButton = findViewById<Button>(R.id.btn_save_map)
-        saveButton.setOnClickListener {
-            Toast.makeText(this, "Map Save Not Implemented Yet", Toast.LENGTH_SHORT).show()
-        }
+        saveButton.setOnClickListener { saveMap() }
 
         try {
-            // Initialize Sceneform-EQR
             sceneLayout.init(this)
-
-            // TODO: Enable SLAM/Mapping features
-            // Since we don't have the SLAM sample code, we are initializing the basic AR scene first.
-            // Future Work: Inspect com.eqgis.eq-slam library for initialization methods.
-
-            statusText.text = "Mapping Mode: Basic AR Initialized"
-
+            statusText.text = "Surveyor Mode: Initialized"
         } catch (e: Exception) {
             statusText.text = "Error: ${e.message}"
             android.util.Log.e("MappingActivity", "Error initializing Sceneform-EQR", e)
         }
     }
 
+    private fun startMapping() {
+        if (isMapping) return
+        try {
+            if (slamCore == null) {
+                slamCore = SlamCore(this)
+                slamCore?.init()
+            }
+            sceneLayout.resume()
+            statusText.text = "Mapping Started"
+            isMapping = true
+            Toast.makeText(this, "Mapping Started", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            android.util.Log.e("MappingActivity", "Error starting mapping", e)
+            statusText.text = "Error starting mapping"
+        }
+    }
+
+    private fun stopMapping() {
+        if (!isMapping) return
+        sceneLayout.pause()
+        statusText.text = "Mapping Stopped"
+        isMapping = false
+        Toast.makeText(this, "Mapping Stopped", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun saveMap() {
+        // Map saving functionality is currently unavailable in the integrated version of eq-slam.
+        // Future updates may expose the required API for ORB-SLAM3 map persistence.
+        android.util.Log.w("MappingActivity", "Save Map requested but API not found.")
+        Toast.makeText(this, "Map Saving Not Supported in this version", Toast.LENGTH_LONG).show()
+    }
+
     override fun onResume() {
         super.onResume()
-        // SceneLayout might handle lifecycle internally or doesn't expose standard methods
+        if (isMapping) {
+            sceneLayout.resume()
+        }
     }
 
     override fun onPause() {
         super.onPause()
+        sceneLayout.pause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        sceneLayout.destroy()
+        slamCore?.dispose()
     }
 }

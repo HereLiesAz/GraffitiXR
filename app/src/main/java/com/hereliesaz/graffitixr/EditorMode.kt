@@ -8,6 +8,5 @@ enum class EditorMode : Parcelable {
     STATIC,
     OVERLAY,
     TRACE,
-    AR,
-    HELP // Shows the Help/Onboarding screen
+    AR
 }
