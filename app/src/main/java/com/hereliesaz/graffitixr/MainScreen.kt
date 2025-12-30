@@ -21,18 +21,15 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,16 +44,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,7 +62,6 @@ import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
-import com.hereliesaz.graffitixr.composables.HelpScreen
 import com.hereliesaz.graffitixr.composables.MockupScreen
 import com.hereliesaz.graffitixr.composables.OverlayScreen
 import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
@@ -106,6 +98,7 @@ fun MainScreen(viewModel: MainViewModel) {
     var showSaveProjectDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
+    var showInfoScreen by remember { mutableStateOf(false) }
 
     // Automation State
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
@@ -205,8 +198,9 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     // Calculate current route for NavRail highlighting
-    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget) {
+    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen) {
         when {
+            showInfoScreen -> "help"
             showSettings -> "settings_sub"
             showProjectLibrary -> "load_project"
             showSliderDialog == "Adjust" -> "adjust"
@@ -217,7 +211,6 @@ fun MainScreen(viewModel: MainViewModel) {
             uiState.editorMode == EditorMode.OVERLAY -> "ghost_mode"
             uiState.editorMode == EditorMode.STATIC -> "mockup"
             uiState.editorMode == EditorMode.TRACE -> "trace_mode"
-            uiState.editorMode == EditorMode.HELP -> "help"
             else -> null
         }
     }
@@ -274,7 +267,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
 
                     when (uiState.editorMode) {
-                        EditorMode.HELP -> HelpScreen()
                         EditorMode.STATIC -> MockupScreen(
                             uiState = uiState,
                             onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
@@ -448,15 +440,8 @@ fun MainScreen(viewModel: MainViewModel) {
                             packRailButtons = true,
                             defaultShape = AzButtonShape.RECTANGLE,
                             headerIconShape = AzHeaderIconShape.ROUNDED,
-                            // infoScreen is intentionally removed/false to use custom HelpScreen
-                        )
-
-                        azRailItem(
-                            id = "info",
-                            text = "i",
-                            shape = AzButtonShape.CIRCLE,
-                            route = "help",
-                            onClick = { viewModel.onEditorModeChanged(EditorMode.HELP) }
+                            infoScreen = showInfoScreen,
+                            onDismissInfoScreen = { showInfoScreen = false }
                         )
 
                         azRailHostItem(id = "mode_host", text = navStrings.modes, route = "mode_host")
@@ -547,6 +532,10 @@ fun MainScreen(viewModel: MainViewModel) {
                             showSettings = true
                             resetDialogs()
                         }
+                        azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", info = "Show Help", route = "help_sub") {
+                            showInfoScreen = true
+                            resetDialogs()
+                        }
                         azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, route = "new_project", onClick = {
                             viewModel.onNewProject()
                             resetDialogs()
@@ -563,8 +552,6 @@ fun MainScreen(viewModel: MainViewModel) {
                             viewModel.onSaveClicked()
                             resetDialogs()
                         })
-
-                        // Removed previous "help" item here
 
                         azDivider()
 
@@ -734,13 +721,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 CaptureAnimation()
             }
 
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = Color.White
-                )
-            }
-
+            // Removed manual CircularProgressIndicator because AzNavRail handles it via azSettings
             }
         }
     }

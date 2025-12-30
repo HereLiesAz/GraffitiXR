@@ -4,7 +4,18 @@ This document tracks the development status, future enhancements, and identified
 
 ---
 
-## **V1.14 UI/UX Enhancements (Current)**
+## **V1.15 AzNavRail Upgrade & Surveyor Mode (Current)**
+
+-   **[x] AzNavRail Upgrade:**
+    -   [x] Upgrade `AzNavRail` library to version 5.9.
+    -   [x] Refactor `MainScreen` to use native `infoScreen` and `isLoading` properties.
+    -   [x] Refactor `SaveProjectDialog` to use `AzTextBox`.
+-   **[x] Surveyor Mode (Mapping):**
+    -   [x] Implement `MappingActivity` UI with `SceneLayout` and controls.
+    -   [x] Initialize `SlamCore` for mapping sessions.
+    -   [ ] **Pending:** Implement `saveMap` functionality (API not currently exposed in v1.0.2).
+
+## **V1.14 UI/UX Enhancements (Completed)**
 
 -   **[x] Trace Mode Improvements:**
     -   [x] Simplified unlock gesture (Simultaneous Volume Up + Down).

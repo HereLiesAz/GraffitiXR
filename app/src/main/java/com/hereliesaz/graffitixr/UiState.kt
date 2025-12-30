@@ -134,7 +134,7 @@ enum class CaptureStep : Parcelable {
  */
 @Parcelize
 data class UiState(
-    val editorMode: EditorMode = EditorMode.HELP,
+    val editorMode: EditorMode = EditorMode.STATIC,
     val completedOnboardingModes: Set<EditorMode> = emptySet(),
     val showOnboardingDialogForMode: EditorMode? = null,
     val isLoading: Boolean = false,
