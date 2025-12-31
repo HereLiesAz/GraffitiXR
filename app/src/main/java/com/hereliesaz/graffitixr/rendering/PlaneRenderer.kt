@@ -59,8 +59,17 @@ class PlaneRenderer {
         val planePolygon = plane.polygon
         planePolygon.rewind()
 
-        if (vertexBuffer == null || vertexBuffer!!.capacity() < planePolygon.limit()) {
-            val bb = ByteBuffer.allocateDirect(planePolygon.limit() * 4)
+        val requiredCapacity = planePolygon.limit()
+
+        if (vertexBuffer == null || vertexBuffer!!.capacity() < requiredCapacity) {
+            // Bolt Optimization: Grow buffer geometrically to avoid frequent re-allocations as plane grows
+            val newCapacity = if (vertexBuffer != null) {
+                maxOf(requiredCapacity, vertexBuffer!!.capacity() * 2)
+            } else {
+                requiredCapacity
+            }
+
+            val bb = ByteBuffer.allocateDirect(newCapacity * 4)
             bb.order(ByteOrder.nativeOrder())
             vertexBuffer = bb.asFloatBuffer()
         }
