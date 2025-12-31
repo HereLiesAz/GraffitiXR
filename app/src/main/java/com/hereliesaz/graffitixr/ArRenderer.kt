@@ -506,7 +506,6 @@ class ArRenderer(
                     rotated
                 } else {
                     // Deep copy because rawBitmap is reused
-                    // Bolt Optimization: Ensure config is not null
                     rawBitmap.copy(rawBitmap.config ?: Bitmap.Config.ARGB_8888, true)
                 }
                 mainHandler.post { onFrameCaptured(bitmap) }
