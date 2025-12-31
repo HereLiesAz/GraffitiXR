@@ -124,6 +124,18 @@ android {
         ndk {
             abiFilters.add("arm64-v8a")
         }
+        externalNativeBuild {
+            cmake {
+                cppFlags("")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {
@@ -214,7 +226,7 @@ dependencies {
 
     // Sceneform-EQR
     implementation("com.eqgis:eq-renderer:1.0.9")
-    implementation("com.eqgis:eq-slam:1.0.2")
+    // implementation("com.eqgis:eq-slam:1.0.2")
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)

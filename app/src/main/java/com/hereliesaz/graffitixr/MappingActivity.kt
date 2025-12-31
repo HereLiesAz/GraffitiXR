@@ -7,13 +7,13 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.eqgis.eqr.layout.SceneLayout
-import com.eqgis.slam.core.SlamCore
+import com.hereliesaz.graffitixr.slam.SlamManager
 
 class MappingActivity : AppCompatActivity() {
 
     private lateinit var sceneLayout: SceneLayout
     private lateinit var statusText: TextView
-    private var slamCore: SlamCore? = null
+    private var slamManager: SlamManager? = null
     private var isMapping = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,9 +47,15 @@ class MappingActivity : AppCompatActivity() {
     private fun startMapping() {
         if (isMapping) return
         try {
-            if (slamCore == null) {
-                slamCore = SlamCore(this)
-                slamCore?.init()
+            if (slamManager == null) {
+                slamManager = SlamManager(this)
+                slamManager?.init()
+                // TODO: Connect camera stream from SceneLayout to slamManager.processFrame(...)
+                // Currently, SceneLayout (from eq-renderer) does not expose a public frame callback
+                // compatible with this custom SLAM implementation. To fully enable SLAM,
+                // you must either:
+                // 1. Modify SceneLayout (if source available) to emit frames.
+                // 2. Use a custom AR renderer that provides frame access (like ArRenderer).
             }
             sceneLayout.resume()
             statusText.text = "Mapping Started"
@@ -70,10 +76,8 @@ class MappingActivity : AppCompatActivity() {
     }
 
     private fun saveMap() {
-        // Map saving functionality is currently unavailable in the integrated version of eq-slam.
-        // Future updates may expose the required API for ORB-SLAM3 map persistence.
-        android.util.Log.w("MappingActivity", "Save Map requested but API not found.")
-        Toast.makeText(this, "Map Saving Not Supported in this version", Toast.LENGTH_LONG).show()
+        slamManager?.saveMap()
+        Toast.makeText(this, "Map Save Requested (Check Logs)", Toast.LENGTH_SHORT).show()
     }
 
     override fun onResume() {
@@ -91,6 +95,6 @@ class MappingActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         sceneLayout.destroy()
-        slamCore?.dispose()
+        slamManager?.dispose()
     }
 }
