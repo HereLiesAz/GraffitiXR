@@ -76,6 +76,8 @@ class ArRenderer(
     private val isAnalyzing = AtomicBoolean(false)
     private val analysisLock = ReentrantLock()
     private var analysisBuffer: ByteArray? = null
+    // Bolt Optimization: Reusable buffer for match data extraction to avoid allocations
+    private var analysisMatchData: FloatArray? = null
 
     @Volatile var session: Session? = null
     private val displayRotationHelper = DisplayRotationHelper(context)
@@ -587,8 +589,13 @@ class ArRenderer(
                         var goodMatches = 0
                         if (totalMatches > 0) {
                             val count = totalMatches * 4
-                            // Allocating one float array is much cheaper than toArray() which allocates N DMatch objects
-                            val matchData = FloatArray(count)
+
+                            // Bolt Optimization: Reuse float array
+                            if (analysisMatchData == null || analysisMatchData!!.size < count) {
+                                analysisMatchData = FloatArray(count)
+                            }
+                            val matchData = analysisMatchData!!
+
                             analysisMatches.get(0, 0, matchData)
 
                             for (i in 0 until totalMatches) {
