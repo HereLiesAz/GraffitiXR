@@ -504,7 +504,12 @@ class ArRenderer(
                     rotated
                 } else {
                     // Deep copy because rawBitmap is reused
-                    rawBitmap.copy(rawBitmap.config, true)
+                    val srcConfig = rawBitmap.config
+                    val targetConfig = when (srcConfig) {
+                        null, Bitmap.Config.HARDWARE -> Bitmap.Config.ARGB_8888
+                        else -> srcConfig
+                    }
+                    rawBitmap.copy(targetConfig, true)
                 }
                 mainHandler.post { onFrameCaptured(bitmap) }
             }
