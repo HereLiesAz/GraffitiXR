@@ -17,6 +17,7 @@ camerax = "1.5.2"
 accompanistPermissions = "0.37.3"
 mlkitSubjectSegmentation = "16.0.0-beta1"
 opencv = "4.12.0"
+# Bolt Fix: Downgraded to 5.7 as 5.9 is unavailable on JitPack (see memory/docs)
 azNavRail = "5.7"
 kotlinxSerialization = "1.9.0"
 segmentationSelfie = "16.0.0-beta6"
