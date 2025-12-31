@@ -7,7 +7,7 @@ This document tracks the development status, future enhancements, and identified
 ## **V1.15 AzNavRail Upgrade & Surveyor Mode (Current)**
 
 -   **[x] AzNavRail Upgrade:**
-    -   [x] Upgrade `AzNavRail` library to version 5.9.
+    -   [x] Upgrade `AzNavRail` library to version 5.7 (Version 5.9 unavailable).
     -   [x] Refactor `MainScreen` to use native `infoScreen` and `isLoading` properties.
     -   [x] Refactor `SaveProjectDialog` to use `AzTextBox`.
 -   **[x] Surveyor Mode (Mapping):**
