@@ -80,50 +80,66 @@ class PlaneRenderer {
     }
 
     /**
-     * Draws a single AR plane.
+     * Draws a collection of AR planes.
      *
-     * @param plane The ARCore plane to draw.
+     * @param planes The collection of ARCore planes to draw.
      * @param viewMatrix The camera's view matrix.
      * @param projectionMatrix The camera's projection matrix.
+     * @return True if at least one plane was drawn.
      */
-    fun draw(plane: Plane, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
-        if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
-            return
+    fun drawPlanes(planes: Collection<Plane>, viewMatrix: FloatArray, projectionMatrix: FloatArray): Boolean {
+        var hasDrawn = false
+        var isStateSet = false
+
+        for (plane in planes) {
+            if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
+                continue
+            }
+
+            if (!isStateSet) {
+                // Bolt Optimization: Set GL state once for all planes
+                GLES20.glUseProgram(planeProgram)
+                GLES20.glEnable(GLES20.GL_BLEND)
+                GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+                GLES20.glDepthMask(false) // Don't write to depth buffer for transparent planes
+                isStateSet = true
+            }
+
+            updatePlaneData(plane)
+
+            // 1. Calculate MVP Matrix
+            plane.centerPose.toMatrix(modelMatrix, 0)
+            Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
+            Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, modelViewMatrix, 0)
+
+            // 2. Set Matrix Uniform
+            GLES20.glUniformMatrix4fv(modelViewProjectionUniform, 1, false, modelViewProjectionMatrix, 0)
+
+            // 3. Set Attribute
+            GLES20.glVertexAttribPointer(positionAttribute, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
+            GLES20.glEnableVertexAttribArray(positionAttribute)
+
+            // 4. Draw Fill (Semi-transparent Cyan with Grid)
+            // Set alpha to 1.0 because the shader handles the transparency mixing based on the grid
+            GLES20.glUniform4f(colorUniform, 0.0f, 1.0f, 1.0f, 1.0f)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, plane.polygon.limit() / 2)
+
+            // 5. Draw Outline (Solid Cyan)
+            GLES20.glLineWidth(5.0f) // Thicker lines for visibility
+            GLES20.glUniform4f(colorUniform, 0.0f, 1.0f, 1.0f, 1.0f)
+            GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, plane.polygon.limit() / 2)
+
+            GLES20.glDisableVertexAttribArray(positionAttribute)
+            hasDrawn = true
         }
 
-        updatePlaneData(plane)
+        if (isStateSet) {
+            // Cleanup
+            GLES20.glDepthMask(true)
+            GLES20.glDisable(GLES20.GL_BLEND)
+        }
 
-        GLES20.glUseProgram(planeProgram)
-        GLES20.glEnable(GLES20.GL_BLEND)
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-        GLES20.glDepthMask(false) // Don't write to depth buffer for transparent planes
-
-        // 1. Calculate MVP Matrix
-        plane.centerPose.toMatrix(modelMatrix, 0)
-        Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
-        Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, modelViewMatrix, 0)
-
-        // 2. Set Matrix Uniform
-        GLES20.glUniformMatrix4fv(modelViewProjectionUniform, 1, false, modelViewProjectionMatrix, 0)
-
-        // 3. Set Attribute
-        GLES20.glVertexAttribPointer(positionAttribute, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
-        GLES20.glEnableVertexAttribArray(positionAttribute)
-
-        // 4. Draw Fill (Semi-transparent Cyan with Grid)
-        // Set alpha to 1.0 because the shader handles the transparency mixing based on the grid
-        GLES20.glUniform4f(colorUniform, 0.0f, 1.0f, 1.0f, 1.0f)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, plane.polygon.limit() / 2)
-
-        // 5. Draw Outline (Solid Cyan)
-        GLES20.glLineWidth(5.0f) // Thicker lines for visibility
-        GLES20.glUniform4f(colorUniform, 0.0f, 1.0f, 1.0f, 1.0f)
-        GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, plane.polygon.limit() / 2)
-
-        // Cleanup
-        GLES20.glDisableVertexAttribArray(positionAttribute)
-        GLES20.glDepthMask(true)
-        GLES20.glDisable(GLES20.GL_BLEND)
+        return hasDrawn
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {

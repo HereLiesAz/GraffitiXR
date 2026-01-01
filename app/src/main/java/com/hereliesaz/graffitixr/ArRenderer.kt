@@ -314,13 +314,8 @@ class ArRenderer(
 
         if (activeAnchor == null || isAnchorReplacementAllowed) {
             val planes = session!!.getAllTrackables(Plane::class.java)
-            var hasPlane = false
-            for (plane in planes) {
-                if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                    planeRenderer.draw(plane, viewMtx, projMtx)
-                    hasPlane = true
-                }
-            }
+            // Bolt Optimization: Draw all planes in one batch to minimize state changes
+            val hasPlane = planeRenderer.drawPlanes(planes, viewMtx, projMtx)
             mainHandler.post { onPlanesDetected(hasPlane) }
             handleTap(frame)
         }
