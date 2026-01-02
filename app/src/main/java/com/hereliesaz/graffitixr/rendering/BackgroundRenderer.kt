@@ -25,6 +25,7 @@ class BackgroundRenderer {
     private var program = 0
     private var positionHandle = 0
     private var texCoordHandle = 0
+    private var textureUniform = 0
 
     /**
      * The OpenGL texture ID bound to the external camera stream.
@@ -70,8 +71,17 @@ class BackgroundRenderer {
         GLES20.glLinkProgram(program)
         GLES20.glUseProgram(program)
 
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            val log = GLES20.glGetProgramInfoLog(program)
+            GLES20.glDeleteProgram(program)
+            throw RuntimeException("Program link failed: $log")
+        }
+
         positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
         texCoordHandle = GLES20.glGetAttribLocation(program, "a_TexCoord")
+        textureUniform = GLES20.glGetUniformLocation(program, "sTexture")
     }
 
     /**
@@ -104,6 +114,8 @@ class BackgroundRenderer {
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLES20.glUseProgram(program)
 
+        GLES20.glUniform1i(textureUniform, 0)
+
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quadCoords)
         GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoords)
 
@@ -123,6 +135,15 @@ class BackgroundRenderer {
         val shader = GLES20.glCreateShader(type)
         GLES20.glShaderSource(shader, shaderCode)
         GLES20.glCompileShader(shader)
+
+        val compiled = IntArray(1)
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compiled, 0)
+        if (compiled[0] == 0) {
+            val log = GLES20.glGetShaderInfoLog(shader)
+            GLES20.glDeleteShader(shader)
+            throw RuntimeException("Shader compilation failed: $log")
+        }
+
         return shader
     }
 
@@ -134,7 +155,7 @@ class BackgroundRenderer {
             +1.0f, +1.0f
         )
 
-        private const val VERTEX_SHADER = """
+        private val VERTEX_SHADER = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;
             varying vec2 v_TexCoord;
@@ -142,9 +163,9 @@ class BackgroundRenderer {
                gl_Position = a_Position;
                v_TexCoord = a_TexCoord;
             }
-        """
+        """.trimIndent()
 
-        private const val FRAGMENT_SHADER = """
+        private val FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
             precision mediump float;
             varying vec2 v_TexCoord;
@@ -152,6 +173,6 @@ class BackgroundRenderer {
             void main() {
                 gl_FragColor = texture2D(sTexture, v_TexCoord);
             }
-        """
+        """.trimIndent()
     }
 }
