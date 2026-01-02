@@ -92,6 +92,8 @@ class BackgroundRenderer {
         // If display rotation changed (also includes view size change), we need to re-query the texture
         // coordinates for the screen background, as they are tailored to the screen aspect ratio.
         if (frame.hasDisplayGeometryChanged() || !areTexCoordsInitialized) {
+            quadCoords.position(0)
+            quadTexCoords.position(0)
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadCoords,
@@ -116,10 +118,12 @@ class BackgroundRenderer {
 
         GLES20.glUniform1i(textureUniform, 0)
 
+        quadCoords.position(0)
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quadCoords)
-        GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoords)
-
         GLES20.glEnableVertexAttribArray(positionHandle)
+
+        quadTexCoords.position(0)
+        GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoords)
         GLES20.glEnableVertexAttribArray(texCoordHandle)
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
