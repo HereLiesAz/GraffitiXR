@@ -60,6 +60,7 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
+import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.MockupScreen
@@ -443,6 +444,17 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
             }
 
+            // Custom Help Overlay (replaces built-in AzNavRail help)
+            if (showInfoScreen) {
+                Box(modifier = Modifier.zIndex(8f)) {
+                    CustomHelpOverlay(
+                        uiState = uiState,
+                        navStrings = navStrings,
+                        onDismiss = { showInfoScreen = false }
+                    )
+                }
+            }
+
             // Navigation Rail
             if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
                 Box(
@@ -459,8 +471,8 @@ fun MainScreen(viewModel: MainViewModel) {
                             packRailButtons = true,
                             defaultShape = AzButtonShape.RECTANGLE,
                             headerIconShape = AzHeaderIconShape.ROUNDED,
-                            infoScreen = showInfoScreen,
-                            onDismissInfoScreen = { showInfoScreen = false }
+                            infoScreen = false, // Disabled built-in help
+                            onDismissInfoScreen = { /* No-op */ }
                         )
 
                         azRailHostItem(id = "mode_host", text = navStrings.modes, route = "mode_host")
