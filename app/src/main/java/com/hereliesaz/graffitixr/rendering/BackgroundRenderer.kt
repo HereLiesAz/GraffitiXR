@@ -50,17 +50,19 @@ class BackgroundRenderer {
         GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST)
 
         val numVertices = 4
-        if (!::quadCoords.isInitialized) {
-            val bbCoords = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4)
-            bbCoords.order(ByteOrder.nativeOrder())
-            quadCoords = bbCoords.asFloatBuffer()
-            quadCoords.put(QUAD_COORDS)
-            quadCoords.position(0)
+        // Always re-initialize buffers to handle context loss/recreation correctly
+        val bbCoords = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4)
+        bbCoords.order(ByteOrder.nativeOrder())
+        quadCoords = bbCoords.asFloatBuffer()
+        quadCoords.put(QUAD_COORDS)
+        quadCoords.position(0)
 
-            val bbTexCoords = ByteBuffer.allocateDirect(numVertices * 2 * 4)
-            bbTexCoords.order(ByteOrder.nativeOrder())
-            quadTexCoords = bbTexCoords.asFloatBuffer()
-        }
+        val bbTexCoords = ByteBuffer.allocateDirect(numVertices * 2 * 4)
+        bbTexCoords.order(ByteOrder.nativeOrder())
+        quadTexCoords = bbTexCoords.asFloatBuffer()
+
+        // Reset initialization flag
+        areTexCoordsInitialized = false
 
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER)
         val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER)
@@ -110,6 +112,7 @@ class BackgroundRenderer {
         // Disable depth test to ensure background is always drawn "behind" everything
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_BLEND)
+        GLES20.glDisable(GLES20.GL_CULL_FACE)
         GLES20.glDepthMask(false)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
