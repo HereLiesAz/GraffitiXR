@@ -20,10 +20,12 @@ import java.nio.FloatBuffer
 class BackgroundRenderer {
     private lateinit var quadCoords: FloatBuffer
     private lateinit var quadTexCoords: FloatBuffer
+    private var areTexCoordsInitialized = false
 
     private var program = 0
     private var positionHandle = 0
     private var texCoordHandle = 0
+    private var textureUniform = 0
 
     /**
      * The OpenGL texture ID bound to the external camera stream.
@@ -69,8 +71,17 @@ class BackgroundRenderer {
         GLES20.glLinkProgram(program)
         GLES20.glUseProgram(program)
 
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            val log = GLES20.glGetProgramInfoLog(program)
+            GLES20.glDeleteProgram(program)
+            throw RuntimeException("Program link failed: $log")
+        }
+
         positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
         texCoordHandle = GLES20.glGetAttribLocation(program, "a_TexCoord")
+        textureUniform = GLES20.glGetUniformLocation(program, "sTexture")
     }
 
     /**
@@ -80,13 +91,16 @@ class BackgroundRenderer {
     fun draw(frame: Frame) {
         // If display rotation changed (also includes view size change), we need to re-query the texture
         // coordinates for the screen background, as they are tailored to the screen aspect ratio.
-        if (frame.hasDisplayGeometryChanged()) {
+        if (frame.hasDisplayGeometryChanged() || !areTexCoordsInitialized) {
+            quadCoords.position(0)
+            quadTexCoords.position(0)
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadCoords,
                 Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoords
             )
+            areTexCoordsInitialized = true
         }
 
         if (frame.timestamp == 0L) {
@@ -95,15 +109,21 @@ class BackgroundRenderer {
 
         // Disable depth test to ensure background is always drawn "behind" everything
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        GLES20.glDisable(GLES20.GL_BLEND)
         GLES20.glDepthMask(false)
 
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLES20.glUseProgram(program)
 
-        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quadCoords)
-        GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoords)
+        GLES20.glUniform1i(textureUniform, 0)
 
+        quadCoords.position(0)
+        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quadCoords)
         GLES20.glEnableVertexAttribArray(positionHandle)
+
+        quadTexCoords.position(0)
+        GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoords)
         GLES20.glEnableVertexAttribArray(texCoordHandle)
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
@@ -119,6 +139,15 @@ class BackgroundRenderer {
         val shader = GLES20.glCreateShader(type)
         GLES20.glShaderSource(shader, shaderCode)
         GLES20.glCompileShader(shader)
+
+        val compiled = IntArray(1)
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compiled, 0)
+        if (compiled[0] == 0) {
+            val log = GLES20.glGetShaderInfoLog(shader)
+            GLES20.glDeleteShader(shader)
+            throw RuntimeException("Shader compilation failed: $log")
+        }
+
         return shader
     }
 
@@ -130,7 +159,7 @@ class BackgroundRenderer {
             +1.0f, +1.0f
         )
 
-        private const val VERTEX_SHADER = """
+        private val VERTEX_SHADER = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;
             varying vec2 v_TexCoord;
@@ -138,9 +167,9 @@ class BackgroundRenderer {
                gl_Position = a_Position;
                v_TexCoord = a_TexCoord;
             }
-        """
+        """.trimIndent()
 
-        private const val FRAGMENT_SHADER = """
+        private val FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
             precision mediump float;
             varying vec2 v_TexCoord;
@@ -148,6 +177,6 @@ class BackgroundRenderer {
             void main() {
                 gl_FragColor = texture2D(sTexture, v_TexCoord);
             }
-        """
+        """.trimIndent()
     }
 }
