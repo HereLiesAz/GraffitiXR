@@ -97,8 +97,10 @@ class BackgroundRenderer {
 
         // Disable depth test to ensure background is always drawn "behind" everything
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        GLES20.glDisable(GLES20.GL_BLEND)
         GLES20.glDepthMask(false)
 
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLES20.glUseProgram(program)
 

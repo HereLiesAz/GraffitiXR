@@ -218,6 +218,9 @@ class ArRenderer(
         try {
             if (session == null) return
 
+            session!!.setCameraTextureName(backgroundRenderer.textureId)
+            displayRotationHelper.updateSessionIfNeeded(session!!)
+
             if (isDepthSupported) {
                 try {
                     val frame = session!!.update()
@@ -258,8 +261,6 @@ class ArRenderer(
     }
 
     private fun drawFrame(frame: Frame) {
-        session!!.setCameraTextureName(backgroundRenderer.textureId)
-        displayRotationHelper.updateSessionIfNeeded(session!!)
         backgroundRenderer.draw(frame)
 
         if (captureNextFrame) {
