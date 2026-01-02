@@ -20,6 +20,7 @@ import java.nio.FloatBuffer
 class BackgroundRenderer {
     private lateinit var quadCoords: FloatBuffer
     private lateinit var quadTexCoords: FloatBuffer
+    private var areTexCoordsInitialized = false
 
     private var program = 0
     private var positionHandle = 0
@@ -80,13 +81,14 @@ class BackgroundRenderer {
     fun draw(frame: Frame) {
         // If display rotation changed (also includes view size change), we need to re-query the texture
         // coordinates for the screen background, as they are tailored to the screen aspect ratio.
-        if (frame.hasDisplayGeometryChanged()) {
+        if (frame.hasDisplayGeometryChanged() || !areTexCoordsInitialized) {
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadCoords,
                 Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoords
             )
+            areTexCoordsInitialized = true
         }
 
         if (frame.timestamp == 0L) {
@@ -95,8 +97,10 @@ class BackgroundRenderer {
 
         // Disable depth test to ensure background is always drawn "behind" everything
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        GLES20.glDisable(GLES20.GL_BLEND)
         GLES20.glDepthMask(false)
 
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLES20.glUseProgram(program)
 
