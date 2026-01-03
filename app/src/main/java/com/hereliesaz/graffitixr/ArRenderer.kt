@@ -80,6 +80,7 @@ class ArRenderer(
     private var analysisMatchData: FloatArray? = null
 
     @Volatile var session: Session? = null
+    @Volatile private var isSessionResumed = false
     private val displayRotationHelper = DisplayRotationHelper(context)
 
     // Renderers
@@ -219,7 +220,7 @@ class ArRenderer(
         if (!sessionLock.tryLock()) return
 
         try {
-            if (session == null) {
+            if (session == null || !isSessionResumed) {
                 // Log only once per second or something if session is null?
                 // For now, let's trust it won't spam too much if we are in activity
                 return
@@ -716,6 +717,7 @@ class ArRenderer(
                 }
             }
             session?.resume()
+            isSessionResumed = true
             displayRotationHelper.onResume()
         } catch (e: Exception) {
             Log.e(TAG, "Resume error", e)
@@ -728,6 +730,7 @@ class ArRenderer(
         Log.d(TAG, "onPause: pausing session")
         sessionLock.lock()
         try {
+            isSessionResumed = false
             displayRotationHelper.onPause()
             session?.pause()
         } catch (e: Exception) {
