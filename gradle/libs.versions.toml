@@ -1,6 +1,9 @@
 [versions]
 agp = "8.13.2"
-kotlin = "2.2.21"
+constraintlayout = "2.2.1"
+eqRenderer = "1.0.9"
+eqSlam = "1.0.2"
+kotlin = "2.3.0"
 coreKtx = "1.17.0"
 junit = "4.13.2"
 mockk = "1.14.7"
@@ -17,7 +20,7 @@ camerax = "1.5.2"
 accompanistPermissions = "0.37.3"
 mlkitSubjectSegmentation = "16.0.0-beta1"
 opencv = "4.12.0"
-azNavRail = "5.11"
+azNavRail = "5.18"
 kotlinxSerialization = "1.9.0"
 segmentationSelfie = "16.0.0-beta6"
 firebaseBom = "34.7.0"
@@ -30,6 +33,9 @@ xrComposeMaterial3 = "1.0.0-alpha13"
 xrArcore = "1.0.0-alpha09"
 
 [libraries]
+androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+eq-renderer = { module = "com.eqgis:eq-renderer", version.ref = "eqRenderer" }
+eq-slam = { module = "com.eqgis:eq-slam", version.ref = "eqSlam" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }

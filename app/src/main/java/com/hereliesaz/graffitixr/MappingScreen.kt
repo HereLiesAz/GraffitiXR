@@ -5,7 +5,6 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,17 +21,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.rememberNavController
 import com.eqgis.eqr.layout.SceneLayout
+import com.eqgis.eqr.slam.SlamCore
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.graffitixr.slam.SlamManager
 
 @Composable
 fun MappingScreen(
@@ -42,8 +41,8 @@ fun MappingScreen(
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // SLAM Manager State
-    var slamManager by remember { mutableStateOf<SlamManager?>(null) }
+    // SLAM Core State (using library class now)
+    var slamCore by remember { mutableStateOf<SlamCore?>(null) }
     var isMapping by remember { mutableStateOf(false) }
     var showInstructions by remember { mutableStateOf(true) }
 
@@ -57,9 +56,9 @@ fun MappingScreen(
     // SceneLayout Ref
     var sceneLayoutRef by remember { mutableStateOf<SceneLayout?>(null) }
 
-    // Initialize SlamManager once
-    if (slamManager == null && activity != null) {
-        slamManager = SlamManager(activity)
+    // Initialize SlamCore once
+    if (slamCore == null && activity != null) {
+        slamCore = SlamCore(activity)
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -68,13 +67,15 @@ fun MappingScreen(
                 Lifecycle.Event.ON_RESUME -> {
                     // Always resume the SceneLayout to show camera feed
                     sceneLayoutRef?.resume()
+                    // slamCore?.resume() // Uncomment if required by library API
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     sceneLayoutRef?.pause()
+                    // slamCore?.pause()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
                     sceneLayoutRef?.destroy()
-                    slamManager?.dispose()
+                    // slamCore?.dispose()
                 }
                 else -> {}
             }
@@ -89,6 +90,7 @@ fun MappingScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. AR Scene Layer (Background)
+        // We place this first so it is at the bottom of the Z-stack.
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -109,6 +111,7 @@ fun MappingScreen(
         )
 
         // 2. Nav Rail Layer
+        // Placed second to float above the camera feed.
         AzNavRail(
             navController = navController,
             currentDestination = "surveyor",
@@ -135,6 +138,7 @@ fun MappingScreen(
         }
 
         // 3. UI Overlay Layer (Instructions & Buttons)
+        // Placed last to float above everything (though rail handles its own z-index usually)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -157,14 +161,12 @@ fun MappingScreen(
                 }
             }
 
-            // Control Buttons - Positioned above bottom 20%
-            // Assuming screen height ~800dp, 20% is 160dp.
-            // We place them at 25% from bottom or fixed padding.
+            // Control Buttons
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(bottom = 200.dp), // Safely above bottom 20%
+                    .padding(bottom = 96.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
                 // Start Button
@@ -174,15 +176,16 @@ fun MappingScreen(
                     onClick = {
                         if (!isMapping) {
                             try {
-                                if (slamManager == null && activity != null) {
-                                    slamManager = SlamManager(activity)
+                                if (slamCore == null && activity != null) {
+                                    slamCore = SlamCore(activity)
                                 }
-                                slamManager?.init()
+                                slamCore?.init()
                                 isMapping = true
                                 currentInstruction = mappingInstruction
                                 Toast.makeText(context, "Mapping Started", Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
                                 android.util.Log.e("MappingScreen", "Start Error", e)
+                                Toast.makeText(context, "Start Failed: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
@@ -195,7 +198,7 @@ fun MappingScreen(
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
                         if (isMapping) {
-                            // slamManager?.pause() // Optional: native pause
+                            // slamCore?.stop() // Check API availability
                             isMapping = false
                             currentInstruction = saveInstruction
                             Toast.makeText(context, "Mapping Stopped", Toast.LENGTH_SHORT).show()
@@ -209,9 +212,14 @@ fun MappingScreen(
                     text = "Save",
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
-                        slamManager?.saveMap()
-                        currentInstruction = "Map Saved!\n$initialInstruction"
-                        Toast.makeText(context, "Map Save Requested", Toast.LENGTH_SHORT).show()
+                        try {
+                            slamCore?.saveMap()
+                            currentInstruction = "Map Saved!\n$initialInstruction"
+                            Toast.makeText(context, "Map Save Requested", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            android.util.Log.e("MappingScreen", "Save Error", e)
+                            Toast.makeText(context, "Save Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 )
             }

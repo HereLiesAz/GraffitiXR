@@ -1,8 +1,5 @@
-import java.util.Properties
 import java.io.ByteArrayOutputStream
-import java.io.File
-import javax.inject.Inject
-import org.gradle.process.ExecOperations
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -72,7 +69,7 @@ abstract class PatchVersionValueSource : ValueSource<Int, PatchVersionValueSourc
             val blameOutput = ByteArrayOutputStream()
             execOperations.exec {
                 workingDir = File(parameters.workingDir.get())
-                commandLine("sh", "-c", "git blame -L '/versionMinor=/',+1 version.properties | awk '{print $1}' | tr -d '^'")
+                commandLine("sh", "-c", "git blame -L '/versionMinor=/',+1 version.properties | awk '{print \$1}' | tr -d '^'")
                 standardOutput = blameOutput
             }
             val commitHash = String(blameOutput.toByteArray()).trim()
@@ -191,7 +188,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     // Constraint Layout (Required for Sceneform-EQR)
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation(libs.androidx.constraintlayout)
 
     // ARCore
     implementation(libs.arcore.client)
@@ -226,8 +223,8 @@ dependencies {
     implementation(libs.opencv)
 
     // Sceneform-EQR
-    implementation("com.eqgis:eq-renderer:1.0.9")
-    // implementation("com.eqgis:eq-slam:1.0.2")
+    implementation(libs.eq.renderer)
+    implementation(libs.eq.slam)
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
