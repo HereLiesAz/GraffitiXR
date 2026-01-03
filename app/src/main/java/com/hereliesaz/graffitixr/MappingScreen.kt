@@ -28,10 +28,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.rememberNavController
 import com.eqgis.eqr.layout.SceneLayout
-import com.eqgis.eqr.slam.SlamCore
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
+import com.hereliesaz.graffitixr.slam.SlamManager
 
 @Composable
 fun MappingScreen(
@@ -41,8 +41,8 @@ fun MappingScreen(
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // SLAM Core State (using library class now)
-    var slamCore by remember { mutableStateOf<SlamCore?>(null) }
+    // SLAM Manager State
+    var slamManager by remember { mutableStateOf<SlamManager?>(null) }
     var isMapping by remember { mutableStateOf(false) }
     var showInstructions by remember { mutableStateOf(true) }
 
@@ -56,9 +56,9 @@ fun MappingScreen(
     // SceneLayout Ref
     var sceneLayoutRef by remember { mutableStateOf<SceneLayout?>(null) }
 
-    // Initialize SlamCore once
-    if (slamCore == null && activity != null) {
-        slamCore = SlamCore(activity)
+    // Initialize SlamManager once
+    if (slamManager == null && activity != null) {
+        slamManager = SlamManager(activity)
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -67,15 +67,15 @@ fun MappingScreen(
                 Lifecycle.Event.ON_RESUME -> {
                     // Always resume the SceneLayout to show camera feed
                     sceneLayoutRef?.resume()
-                    // slamCore?.resume() // Uncomment if required by library API
+                    slamManager?.resume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     sceneLayoutRef?.pause()
-                    // slamCore?.pause()
+                    slamManager?.pause()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
                     sceneLayoutRef?.destroy()
-                    // slamCore?.dispose()
+                    slamManager?.dispose()
                 }
                 else -> {}
             }
@@ -176,10 +176,10 @@ fun MappingScreen(
                     onClick = {
                         if (!isMapping) {
                             try {
-                                if (slamCore == null && activity != null) {
-                                    slamCore = SlamCore(activity)
+                                if (slamManager == null && activity != null) {
+                                    slamManager = SlamManager(activity)
                                 }
-                                slamCore?.init()
+                                slamManager?.init()
                                 isMapping = true
                                 currentInstruction = mappingInstruction
                                 Toast.makeText(context, "Mapping Started", Toast.LENGTH_SHORT).show()
@@ -198,7 +198,7 @@ fun MappingScreen(
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
                         if (isMapping) {
-                            // slamCore?.stop() // Check API availability
+                            // slamManager?.stop() // SlamManager doesn't have stop(), maybe dispose() or pause()?
                             isMapping = false
                             currentInstruction = saveInstruction
                             Toast.makeText(context, "Mapping Stopped", Toast.LENGTH_SHORT).show()
@@ -213,7 +213,7 @@ fun MappingScreen(
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
                         try {
-                            slamCore?.saveMap()
+                            slamManager?.saveMap()
                             currentInstruction = "Map Saved!\n$initialInstruction"
                             Toast.makeText(context, "Map Save Requested", Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
