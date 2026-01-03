@@ -37,9 +37,11 @@ import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -80,6 +82,7 @@ class ArRenderer(
     private var analysisMatchData: FloatArray? = null
 
     @Volatile var session: Session? = null
+    @Volatile private var isSessionResumed = false
     private val displayRotationHelper = DisplayRotationHelper(context)
 
     // Renderers
@@ -109,6 +112,9 @@ class ArRenderer(
 
     // Configuration for next init (Lazy Loading)
     private var initialAugmentedImages: List<Bitmap>? = null
+
+    // Background job for configuring Augmented Images
+    private var configJob: Job? = null
 
     // Transforms
     var opacity: Float = 1.0f
@@ -181,6 +187,7 @@ class ArRenderer(
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        Log.d(TAG, "onSurfaceCreated: initializing renderers")
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         try {
             backgroundRenderer.createOnGlThread()
@@ -188,6 +195,7 @@ class ArRenderer(
             pointCloudRenderer.createOnGlThread()
             simpleQuadRenderer.createOnGlThread()
             createDepthTexture()
+            Log.d(TAG, "onSurfaceCreated: renderers initialized")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize renderers", e)
         }
@@ -205,6 +213,7 @@ class ArRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        Log.d(TAG, "onSurfaceChanged: width=$width, height=$height")
         viewportWidth = width
         viewportHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
@@ -216,7 +225,18 @@ class ArRenderer(
         if (!sessionLock.tryLock()) return
 
         try {
-            if (session == null) return
+            if (session == null || !isSessionResumed) {
+                // Log only once per second or something if session is null?
+                // For now, let's trust it won't spam too much if we are in activity
+                return
+            }
+
+            if (backgroundRenderer.textureId != -1) {
+                session!!.setCameraTextureName(backgroundRenderer.textureId)
+            } else {
+                Log.e(TAG, "onDrawFrame: Background renderer textureId is -1")
+            }
+            displayRotationHelper.updateSessionIfNeeded(session!!)
 
             if (isDepthSupported) {
                 try {
@@ -258,8 +278,9 @@ class ArRenderer(
     }
 
     private fun drawFrame(frame: Frame) {
-        session!!.setCameraTextureName(backgroundRenderer.textureId)
-        displayRotationHelper.updateSessionIfNeeded(session!!)
+        // Log frame details periodically?
+        // For verbose debug, let's log critical background renderer call
+        // backgroundRenderer.draw(frame) logs itself now.
         backgroundRenderer.draw(frame)
 
         if (captureNextFrame) {
@@ -276,11 +297,13 @@ class ArRenderer(
         if (camera.trackingState == TrackingState.TRACKING) {
             if (!wasTracking) {
                 wasTracking = true
+                Log.d(TAG, "Tracking started")
                 mainHandler.post { onTrackingFailure(null) }
             }
         } else {
             if (wasTracking) {
                 wasTracking = false
+                Log.d(TAG, "Tracking lost")
                 mainHandler.post { onTrackingFailure("Tracking lost.") }
             }
             return
@@ -658,6 +681,7 @@ class ArRenderer(
     }
 
     fun onResume(activity: Activity) {
+        Log.d(TAG, "onResume: resuming session")
         sessionLock.lock()
         try {
             if (session == null) {
@@ -670,7 +694,12 @@ class ArRenderer(
 
                     // Enable Geospatial Mode
                     if (session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)) {
-                        config.geospatialMode = Config.GeospatialMode.ENABLED
+                        try {
+                            config.geospatialMode = Config.GeospatialMode.ENABLED
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to enable Geospatial Mode: ${e.message}")
+                            config.geospatialMode = Config.GeospatialMode.DISABLED
+                        }
                     }
 
                     // Enable Local Anchor Persistence for Multi-Point Calibration
@@ -682,21 +711,51 @@ class ArRenderer(
                         isDepthSupported = true
                     }
 
+                    session!!.configure(config)
+                    Log.d(TAG, "onResume: Session configured")
+
                     initialAugmentedImages?.let { images ->
                         if (images.isNotEmpty()) {
-                            val database = AugmentedImageDatabase(session)
-                            images.forEachIndexed { index, bitmap ->
-                                val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                                database.addImage("target_$index", resized)
+                            // Process images in background to avoid ANR on main thread
+                            configJob = CoroutineScope(Dispatchers.Main).launch {
+                                val session = this@ArRenderer.session
+                                if (session == null) {
+                                    Log.w(TAG, "Session is null, skipping augmented image setup")
+                                    return@launch
+                                }
+
+                                val database = AugmentedImageDatabase(session)
+                                // Heavy resizing on IO thread
+                                withContext(Dispatchers.IO) {
+                                    images.forEachIndexed { index, bitmap ->
+                                        val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
+                                        database.addImage("target_$index", resized)
+                                    }
+                                }
+
+                                // Apply configuration back on Main/Session thread
+                                sessionLock.lock()
+                                try {
+                                    if (this@ArRenderer.session == session && isSessionResumed) {
+                                        val currentConfig = session.config
+                                        currentConfig.augmentedImageDatabase = database
+                                        session.configure(currentConfig)
+                                        Log.d(TAG, "onResume: AugmentedImageDatabase configured")
+                                    } else {
+                                        Log.w(TAG, "Session changed or paused, skipping config update")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to configure AugmentedImageDatabase", e)
+                                } finally {
+                                    sessionLock.unlock()
+                                }
                             }
-                            config.augmentedImageDatabase = database
                         }
                     }
-
-                    session!!.configure(config)
                 }
             }
             session?.resume()
+            isSessionResumed = true
             displayRotationHelper.onResume()
         } catch (e: Exception) {
             Log.e(TAG, "Resume error", e)
@@ -706,8 +765,12 @@ class ArRenderer(
     }
 
     fun onPause() {
+        Log.d(TAG, "onPause: pausing session")
         sessionLock.lock()
         try {
+            configJob?.cancel()
+            configJob = null
+            isSessionResumed = false
             displayRotationHelper.onPause()
             session?.pause()
         } catch (e: Exception) {
@@ -718,8 +781,11 @@ class ArRenderer(
     }
 
     fun cleanup() {
+        Log.d(TAG, "cleanup: closing session")
         sessionLock.lock()
         try {
+            configJob?.cancel()
+            configJob = null
             analysisScope.cancel()
             session?.close()
 
