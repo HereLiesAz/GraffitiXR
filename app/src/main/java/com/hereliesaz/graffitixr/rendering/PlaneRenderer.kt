@@ -91,6 +91,14 @@ class PlaneRenderer {
         var hasDrawn = false
         var isStateSet = false
 
+        // Calculate Camera Forward Vector in World Space
+        // ViewMatrix maps World -> Camera.
+        // Row 2 (indices 2, 6, 10) corresponds to the Camera's "Back" vector in World Space.
+        // So Forward is negation of that.
+        val camFwdX = -viewMatrix[2]
+        val camFwdY = -viewMatrix[6]
+        val camFwdZ = -viewMatrix[10]
+
         for (plane in planes) {
             if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
                 continue
@@ -112,6 +120,35 @@ class PlaneRenderer {
             Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
             Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, modelViewMatrix, 0)
 
+            // Calculate Plane Normal in World Space
+            // Y-axis of the ModelMatrix (Column 1: indices 4, 5, 6) is the Plane Normal.
+            val normX = modelMatrix[4]
+            val normY = modelMatrix[5]
+            val normZ = modelMatrix[6]
+
+            // Calculate Angle of Incidence (Dot Product)
+            val dot = camFwdX * normX + camFwdY * normY + camFwdZ * normZ
+            val absDot = kotlin.math.abs(dot)
+
+            // Determine Color based on orientation
+            // Green: Surface is parallel to the device screen (Face-on view).
+            // Pink: Surface is orthogonal to the device orientation (e.g. Floor when holding device vertically).
+            // Cyan: Surface matches device orientation but is not parallel (e.g. Side Wall when holding device vertically).
+            val (r, g, b) = if (absDot > 0.7f) {
+                Triple(0.0f, 1.0f, 0.0f) // Bright Green
+            } else {
+                // Check verticality of View and Normal
+                // 0.707 is approx sin(45 degrees)
+                val viewIsVertical = kotlin.math.abs(camFwdY) > 0.707f
+                val normIsVertical = kotlin.math.abs(normY) > 0.707f // Normal is Vertical means Plane is Horizontal
+
+                if (viewIsVertical != normIsVertical) {
+                    Triple(1.0f, 0.0f, 1.0f) // Bright Pink (Mismatch)
+                } else {
+                    Triple(0.0f, 1.0f, 1.0f) // Cyan (Match but not parallel)
+                }
+            }
+
             // 2. Set Matrix Uniform
             GLES20.glUniformMatrix4fv(modelViewProjectionUniform, 1, false, modelViewProjectionMatrix, 0)
 
@@ -119,14 +156,14 @@ class PlaneRenderer {
             GLES20.glVertexAttribPointer(positionAttribute, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
             GLES20.glEnableVertexAttribArray(positionAttribute)
 
-            // 4. Draw Fill (Semi-transparent Cyan with Grid)
-            // Set alpha to 1.0 because the shader handles the transparency mixing based on the grid
-            GLES20.glUniform4f(colorUniform, 0.0f, 1.0f, 1.0f, 1.0f)
+            // 4. Draw Fill (Grid Pattern)
+            // Use low alpha (0.0) for the fill so the grid lines (mixed to alpha 1.0 in shader) stand out against transparent background.
+            GLES20.glUniform4f(colorUniform, r, g, b, 0.0f)
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, plane.polygon.limit() / 2)
 
-            // 5. Draw Outline (Solid Cyan)
-            GLES20.glLineWidth(5.0f) // Thicker lines for visibility
-            GLES20.glUniform4f(colorUniform, 0.0f, 1.0f, 1.0f, 1.0f)
+            // 5. Draw Outline (Solid Color)
+            GLES20.glLineWidth(5.0f)
+            GLES20.glUniform4f(colorUniform, r, g, b, 1.0f)
             GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, plane.polygon.limit() / 2)
 
             GLES20.glDisableVertexAttribArray(positionAttribute)
