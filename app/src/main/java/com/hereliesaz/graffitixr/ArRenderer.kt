@@ -116,6 +116,9 @@ class ArRenderer(
     // Background job for configuring Augmented Images
     private var configJob: Job? = null
 
+    // Background job for resuming the session
+    private var resumeJob: Job? = null
+
     // Transforms
     var opacity: Float = 1.0f
     var brightness: Float = 0f
@@ -682,6 +685,13 @@ class ArRenderer(
 
     fun onResume(activity: Activity) {
         Log.d(TAG, "onResume: resuming session")
+
+        try {
+            displayRotationHelper.onResume()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to resume display helper", e)
+        }
+
         sessionLock.lock()
         try {
             if (session == null) {
@@ -758,18 +768,33 @@ class ArRenderer(
                     }
                 }
             }
-            session?.resume()
-            isSessionResumed = true
-            displayRotationHelper.onResume()
         } catch (e: Exception) {
-            Log.e(TAG, "Resume error", e)
+            Log.e(TAG, "Resume error (creation)", e)
+            return
         } finally {
             sessionLock.unlock()
+        }
+
+        resumeJob?.cancel()
+        resumeJob = CoroutineScope(Dispatchers.IO).launch {
+            sessionLock.lock()
+            try {
+                if (session != null && !isSessionResumed) {
+                    session!!.resume()
+                    isSessionResumed = true
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Resume error (session)", e)
+            } finally {
+                sessionLock.unlock()
+            }
         }
     }
 
     fun onPause() {
         Log.d(TAG, "onPause: pausing session")
+        resumeJob?.cancel()
+
         sessionLock.lock()
         try {
             configJob?.cancel()
