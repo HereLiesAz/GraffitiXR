@@ -37,9 +37,11 @@ import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -110,6 +112,9 @@ class ArRenderer(
 
     // Configuration for next init (Lazy Loading)
     private var initialAugmentedImages: List<Bitmap>? = null
+
+    // Background job for configuring Augmented Images
+    private var configJob: Job? = null
 
     // Transforms
     var opacity: Float = 1.0f
@@ -712,26 +717,37 @@ class ArRenderer(
                     initialAugmentedImages?.let { images ->
                         if (images.isNotEmpty()) {
                             // Process images in background to avoid ANR on main thread
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val session = this@ArRenderer.session ?: return@launch
-                                    val database = AugmentedImageDatabase(session)
+                            configJob = CoroutineScope(Dispatchers.Main).launch {
+                                val session = this@ArRenderer.session
+                                if (session == null) {
+                                    Log.w(TAG, "Session is null, skipping augmented image setup")
+                                    return@launch
+                                }
+
+                                val database = AugmentedImageDatabase(session)
+                                // Heavy resizing on IO thread
+                                withContext(Dispatchers.IO) {
                                     images.forEachIndexed { index, bitmap ->
                                         val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
                                         database.addImage("target_$index", resized)
                                     }
+                                }
 
-                                    // Re-configure session with the new database
-                                    // We must create a NEW config object because we can't modify the active one directly
-                                    // without re-calling configure(), and it's safer to start fresh or modify a copy.
-                                    // However, since we just configured it, we can try to reuse the same logic or just update.
-                                    // The safest way is to update the config on the session.
-                                    val currentConfig = session.config
-                                    currentConfig.augmentedImageDatabase = database
-                                    session.configure(currentConfig)
-                                    Log.d(TAG, "onResume: AugmentedImageDatabase configured in background")
+                                // Apply configuration back on Main/Session thread
+                                sessionLock.lock()
+                                try {
+                                    if (this@ArRenderer.session == session && isSessionResumed) {
+                                        val currentConfig = session.config
+                                        currentConfig.augmentedImageDatabase = database
+                                        session.configure(currentConfig)
+                                        Log.d(TAG, "onResume: AugmentedImageDatabase configured")
+                                    } else {
+                                        Log.w(TAG, "Session changed or paused, skipping config update")
+                                    }
                                 } catch (e: Exception) {
                                     Log.e(TAG, "Failed to configure AugmentedImageDatabase", e)
+                                } finally {
+                                    sessionLock.unlock()
                                 }
                             }
                         }
@@ -752,6 +768,8 @@ class ArRenderer(
         Log.d(TAG, "onPause: pausing session")
         sessionLock.lock()
         try {
+            configJob?.cancel()
+            configJob = null
             isSessionResumed = false
             displayRotationHelper.onPause()
             session?.pause()
@@ -766,6 +784,8 @@ class ArRenderer(
         Log.d(TAG, "cleanup: closing session")
         sessionLock.lock()
         try {
+            configJob?.cancel()
+            configJob = null
             analysisScope.cancel()
             session?.close()
 

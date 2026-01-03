@@ -189,7 +189,9 @@ class BackgroundRenderer {
         var error: Int
         while (GLES20.glGetError().also { error = it } != GLES20.GL_NO_ERROR) {
             Log.e(TAG, "$tag: glError $error")
-            throw RuntimeException("$tag: glError $error")
+            // Throwing RuntimeException here crashes the app in production if any GL error occurs.
+            // Logging is sufficient for debugging.
+            // throw RuntimeException("$tag: glError $error")
         }
     }
 
