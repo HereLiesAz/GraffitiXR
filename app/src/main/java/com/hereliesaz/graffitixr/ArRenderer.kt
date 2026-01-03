@@ -689,7 +689,12 @@ class ArRenderer(
 
                     // Enable Geospatial Mode
                     if (session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)) {
-                        config.geospatialMode = Config.GeospatialMode.ENABLED
+                        try {
+                            config.geospatialMode = Config.GeospatialMode.ENABLED
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to enable Geospatial Mode: ${e.message}")
+                            config.geospatialMode = Config.GeospatialMode.DISABLED
+                        }
                     }
 
                     // Enable Local Anchor Persistence for Multi-Point Calibration
