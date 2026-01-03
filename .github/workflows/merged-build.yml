@@ -176,12 +176,19 @@ jobs:
           # Check if release exists
           if gh release view $TAG_NAME > /dev/null 2>&1; then
              echo "Updating existing release..."
+
+             # Cleanup ALL existing assets to avoid conflicts and accumulation
+             gh release view "$TAG_NAME" --json assets --jq '.assets[].name' | while IFS= read -r asset; do
+               [ -n "$asset" ] && gh release delete-asset "$TAG_NAME" "$asset" -y || true
+             done
+
              gh release edit $TAG_NAME --prerelease \
                --title "Latest Debug Build ($TAG_NAME)" \
                --notes "Auto-build from commit $GITHUB_SHA" \
                --target $GITHUB_SHA
-             gh release upload $TAG_NAME "$APK_FILE" --clobber
-             [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
+
+             gh release upload $TAG_NAME "$APK_FILE"
+             [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS"
           else
              echo "Creating new release..."
              gh release create $TAG_NAME "$APK_FILE" --prerelease \
