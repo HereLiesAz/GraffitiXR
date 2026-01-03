@@ -187,8 +187,8 @@ jobs:
                --notes "Auto-build from commit $GITHUB_SHA" \
                --target $GITHUB_SHA
 
-             gh release upload $TAG_NAME "$APK_FILE"
-             [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS"
+             gh release upload $TAG_NAME "$APK_FILE" --clobber
+             [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
           else
              echo "Creating new release..."
              gh release create $TAG_NAME "$APK_FILE" --prerelease \

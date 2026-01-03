@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.util.Log
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
 import java.nio.ByteBuffer
@@ -21,6 +22,7 @@ class BackgroundRenderer {
     private lateinit var quadCoords: FloatBuffer
     private lateinit var quadTexCoords: FloatBuffer
     private var areTexCoordsInitialized = false
+    private var firstFrameLogged = false
 
     private var program = 0
     private var positionHandle = 0
@@ -38,10 +40,14 @@ class BackgroundRenderer {
      * Must be called on the GL thread (e.g., in `onSurfaceCreated`).
      */
     fun createOnGlThread() {
+        Log.d(TAG, "createOnGlThread: Initializing BackgroundRenderer")
+
         // Generate the background texture.
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
         textureId = textures[0]
+        Log.d(TAG, "createOnGlThread: Generated Texture ID $textureId (Expected: >0)")
+
         val textureTarget = GLES11Ext.GL_TEXTURE_EXTERNAL_OES
         GLES20.glBindTexture(textureTarget, textureId)
         GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
@@ -63,7 +69,9 @@ class BackgroundRenderer {
 
         // Reset initialization flag
         areTexCoordsInitialized = false
+        firstFrameLogged = false
 
+        Log.d(TAG, "createOnGlThread: Compiling shaders")
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER)
         val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER)
 
@@ -78,12 +86,16 @@ class BackgroundRenderer {
         if (linkStatus[0] == 0) {
             val log = GLES20.glGetProgramInfoLog(program)
             GLES20.glDeleteProgram(program)
+            Log.e(TAG, "Program link failed: $log")
             throw RuntimeException("Program link failed: $log")
         }
+        Log.d(TAG, "createOnGlThread: Program linked successfully. ID: $program")
 
         positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
         texCoordHandle = GLES20.glGetAttribLocation(program, "a_TexCoord")
         textureUniform = GLES20.glGetUniformLocation(program, "sTexture")
+
+        Log.d(TAG, "createOnGlThread: Handles - Pos: $positionHandle, Tex: $texCoordHandle, Uniform: $textureUniform")
 
         if (textureUniform == -1) {
             throw RuntimeException("Could not get uniform location for sTexture")
@@ -100,6 +112,7 @@ class BackgroundRenderer {
         // If display rotation changed (also includes view size change), we need to re-query the texture
         // coordinates for the screen background, as they are tailored to the screen aspect ratio.
         if (frame.hasDisplayGeometryChanged() || !areTexCoordsInitialized) {
+            Log.d(TAG, "draw: updating geometry. hasDisplayGeometryChanged=${frame.hasDisplayGeometryChanged()}, areTexCoordsInitialized=$areTexCoordsInitialized")
             quadCoords.position(0)
             quadTexCoords.position(0)
             frame.transformCoordinates2d(
@@ -112,7 +125,13 @@ class BackgroundRenderer {
         }
 
         if (frame.timestamp == 0L) {
+            Log.w(TAG, "draw: frame timestamp is 0, skipping")
             return
+        }
+
+        if (!firstFrameLogged) {
+            Log.d(TAG, "draw: First Frame drawing. TextureID: $textureId, Program: $program")
+            firstFrameLogged = true
         }
 
         // Disable depth test to ensure background is always drawn "behind" everything
@@ -159,6 +178,7 @@ class BackgroundRenderer {
         if (compiled[0] == 0) {
             val log = GLES20.glGetShaderInfoLog(shader)
             GLES20.glDeleteShader(shader)
+            Log.e(TAG, "Shader compilation failed: $log")
             throw RuntimeException("Shader compilation failed: $log")
         }
 
@@ -168,12 +188,13 @@ class BackgroundRenderer {
     private fun checkGLError(tag: String) {
         var error: Int
         while (GLES20.glGetError().also { error = it } != GLES20.GL_NO_ERROR) {
-            android.util.Log.e("BackgroundRenderer", "$tag: glError $error")
+            Log.e(TAG, "$tag: glError $error")
             throw RuntimeException("$tag: glError $error")
         }
     }
 
     companion object {
+        private const val TAG = "BackgroundRenderer"
         private val QUAD_COORDS = floatArrayOf(
             -1.0f, -1.0f,
             -1.0f, +1.0f,
