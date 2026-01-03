@@ -178,8 +178,8 @@ jobs:
              echo "Updating existing release..."
 
              # Cleanup ALL existing assets to avoid conflicts and accumulation
-             for asset in $(gh release view $TAG_NAME --json assets --jq '.assets[].name'); do
-               gh release delete-asset $TAG_NAME "$asset" -y || true
+             gh release view "$TAG_NAME" --json assets --jq '.assets[].name' | while IFS= read -r asset; do
+               [ -n "$asset" ] && gh release delete-asset "$TAG_NAME" "$asset" -y || true
              done
 
              gh release edit $TAG_NAME --prerelease \

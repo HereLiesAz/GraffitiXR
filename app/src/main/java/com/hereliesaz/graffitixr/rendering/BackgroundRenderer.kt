@@ -84,6 +84,12 @@ class BackgroundRenderer {
         positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
         texCoordHandle = GLES20.glGetAttribLocation(program, "a_TexCoord")
         textureUniform = GLES20.glGetUniformLocation(program, "sTexture")
+
+        if (textureUniform == -1) {
+            throw RuntimeException("Could not get uniform location for sTexture")
+        }
+
+        checkGLError("createOnGlThread")
     }
 
     /**
@@ -118,6 +124,7 @@ class BackgroundRenderer {
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLES20.glUseProgram(program)
+        checkGLError("After useProgram")
 
         GLES20.glUniform1i(textureUniform, 0)
 
@@ -128,14 +135,18 @@ class BackgroundRenderer {
         quadTexCoords.position(0)
         GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, quadTexCoords)
         GLES20.glEnableVertexAttribArray(texCoordHandle)
+        checkGLError("After attribs")
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        checkGLError("After drawArrays")
 
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisableVertexAttribArray(texCoordHandle)
 
         GLES20.glDepthMask(true)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glEnable(GLES20.GL_CULL_FACE)
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {
@@ -154,6 +165,14 @@ class BackgroundRenderer {
         return shader
     }
 
+    private fun checkGLError(tag: String) {
+        var error: Int
+        while (GLES20.glGetError().also { error = it } != GLES20.GL_NO_ERROR) {
+            android.util.Log.e("BackgroundRenderer", "$tag: glError $error")
+            throw RuntimeException("$tag: glError $error")
+        }
+    }
+
     companion object {
         private val QUAD_COORDS = floatArrayOf(
             -1.0f, -1.0f,
@@ -163,18 +182,18 @@ class BackgroundRenderer {
         )
 
         private val VERTEX_SHADER = """
-            attribute vec4 a_Position;
+            attribute vec2 a_Position;
             attribute vec2 a_TexCoord;
             varying vec2 v_TexCoord;
             void main() {
-               gl_Position = a_Position;
+               gl_Position = vec4(a_Position, 0.0, 1.0);
                v_TexCoord = a_TexCoord;
             }
         """.trimIndent()
 
         private val FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
-            precision mediump float;
+            precision highp float;
             varying vec2 v_TexCoord;
             uniform samplerExternalOES sTexture;
             void main() {

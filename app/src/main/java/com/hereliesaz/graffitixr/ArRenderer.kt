@@ -218,7 +218,9 @@ class ArRenderer(
         try {
             if (session == null) return
 
-            session!!.setCameraTextureName(backgroundRenderer.textureId)
+            if (backgroundRenderer.textureId != -1) {
+                session!!.setCameraTextureName(backgroundRenderer.textureId)
+            }
             displayRotationHelper.updateSessionIfNeeded(session!!)
 
             if (isDepthSupported) {
