@@ -96,6 +96,9 @@ fun MappingScreen(
                     try {
                         if (ctx is Activity) {
                             init(ctx)
+                            // Force resume immediately to start camera feed.
+                            // The LifecycleObserver might miss the initial ON_RESUME if added too late.
+                            this.resume()
                             sceneLayoutRef = this
                         }
                     } catch (e: Exception) {
