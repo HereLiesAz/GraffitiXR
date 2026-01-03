@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,23 +43,31 @@ fun MappingScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // SLAM Manager State
-    // We use remember to keep the reference, but we need to initialize it.
-    // Since SlamManager takes an Activity, and we are in a Composable,
-    // we should initialize it once we have the activity context.
     var slamManager by remember { mutableStateOf<SlamManager?>(null) }
     var isMapping by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf("Surveyor Mode: Initialized") }
+    var showInstructions by remember { mutableStateOf(true) }
+
+    // UI Messages
+    val initialInstruction = "1. Press 'Start' to begin surveying."
+    val mappingInstruction = "2. Move device slowly to scan area.\n   Press 'Stop' when finished."
+    val saveInstruction = "3. Press 'Save' to store the map."
+
+    var currentInstruction by remember { mutableStateOf(initialInstruction) }
 
     // SceneLayout Ref
     var sceneLayoutRef by remember { mutableStateOf<SceneLayout?>(null) }
+
+    // Initialize SlamManager once
+    if (slamManager == null && activity != null) {
+        slamManager = SlamManager(activity)
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    if (isMapping) {
-                        sceneLayoutRef?.resume()
-                    }
+                    // Always resume the SceneLayout to show camera feed
+                    sceneLayoutRef?.resume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     sceneLayoutRef?.pause()
@@ -76,11 +85,6 @@ fun MappingScreen(
         }
     }
 
-    // Initialize SlamManager once
-    if (slamManager == null && activity != null) {
-        slamManager = SlamManager(activity)
-    }
-
     val navController = rememberNavController()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -90,16 +94,14 @@ fun MappingScreen(
             factory = { ctx ->
                 SceneLayout(ctx).apply {
                     try {
-                        // SceneLayout requires Activity to init
                         if (ctx is Activity) {
                             init(ctx)
+                            // Force resume immediately to start camera feed.
+                            // The LifecycleObserver might miss the initial ON_RESUME if added too late.
+                            this.resume()
                             sceneLayoutRef = this
-                            statusMessage = "Surveyor Mode: Ready"
-                        } else {
-                            statusMessage = "Error: Context is not Activity"
                         }
                     } catch (e: Exception) {
-                        statusMessage = "Error: ${e.message}"
                         android.util.Log.e("MappingScreen", "Error initializing SceneLayout", e)
                     }
                 }
@@ -110,7 +112,7 @@ fun MappingScreen(
         AzNavRail(
             navController = navController,
             currentDestination = "surveyor",
-            isLandscape = false // Force rail mode or detect configuration
+            isLandscape = false
         ) {
             azSettings(
                 displayAppNameInHeader = true,
@@ -123,32 +125,46 @@ fun MappingScreen(
                 route = "back",
                 onClick = onExit
             )
+
+            azRailItem(
+                id = "help",
+                text = "Help",
+                route = "help",
+                onClick = { showInstructions = !showInstructions }
+            )
         }
 
-        // 3. UI Overlay Layer (Status & Buttons)
+        // 3. UI Overlay Layer (Instructions & Buttons)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 80.dp) // Offset for Rail
         ) {
-            // Status Text
-            Text(
-                text = statusMessage,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
-                    .background(Color(0x80000000))
-                    .padding(8.dp),
-                style = MaterialTheme.typography.bodyMedium
-            )
+            // Instructions Overlay
+            if (showInstructions) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(top = 16.dp, start = 16.dp)
+                        .background(Color(0x80000000))
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "SURVEYOR MODE\n\n$currentInstruction",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
 
-            // Control Buttons
+            // Control Buttons - Positioned above bottom 20%
+            // Assuming screen height ~800dp, 20% is 160dp.
+            // We place them at 25% from bottom or fixed padding.
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 200.dp), // Safely above bottom 20%
                 horizontalArrangement = Arrangement.Center
             ) {
                 // Start Button
@@ -162,17 +178,15 @@ fun MappingScreen(
                                     slamManager = SlamManager(activity)
                                 }
                                 slamManager?.init()
-                                sceneLayoutRef?.resume()
                                 isMapping = true
-                                statusMessage = "Mapping Started"
+                                currentInstruction = mappingInstruction
                                 Toast.makeText(context, "Mapping Started", Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
-                                statusMessage = "Error starting: ${e.message}"
                                 android.util.Log.e("MappingScreen", "Start Error", e)
                             }
                         }
                     },
-                    modifier = Modifier.padding(end = 8.dp)
+                    modifier = Modifier.padding(end = 16.dp)
                 )
 
                 // Stop Button
@@ -181,13 +195,13 @@ fun MappingScreen(
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
                         if (isMapping) {
-                            sceneLayoutRef?.pause()
+                            // slamManager?.pause() // Optional: native pause
                             isMapping = false
-                            statusMessage = "Mapping Stopped"
+                            currentInstruction = saveInstruction
                             Toast.makeText(context, "Mapping Stopped", Toast.LENGTH_SHORT).show()
                         }
                     },
-                    modifier = Modifier.padding(end = 8.dp)
+                    modifier = Modifier.padding(end = 16.dp)
                 )
 
                 // Save Button
@@ -196,6 +210,7 @@ fun MappingScreen(
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
                         slamManager?.saveMap()
+                        currentInstruction = "Map Saved!\n$initialInstruction"
                         Toast.makeText(context, "Map Save Requested", Toast.LENGTH_SHORT).show()
                     }
                 )
