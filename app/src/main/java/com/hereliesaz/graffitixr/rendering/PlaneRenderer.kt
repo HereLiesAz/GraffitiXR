@@ -206,7 +206,7 @@ class PlaneRenderer {
             varying vec2 v_TexCoord;
             void main() {
                 // Grid logic
-                float gridWidth = 0.5; // Width of grid cells in meters
+                float gridWidth = 0.1524; // Width of grid cells in meters (approx 6 inches)
                 float lineThickness = 0.02; // Thickness of lines in meters
 
                 // Calculate grid lines
@@ -216,7 +216,8 @@ class PlaneRenderer {
                 // Mix alpha: Higher alpha for lines, lower for fill
                 float alpha = mix(u_Color.a, 1.0, isLine);
 
-                gl_FragColor = vec4(u_Color.rgb, alpha * u_Color.a);
+                // Output color. Do NOT multiply alpha by u_Color.a again, as that zeros out the grid when fill is transparent.
+                gl_FragColor = vec4(u_Color.rgb, alpha);
             }
         """
     }
