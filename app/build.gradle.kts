@@ -217,6 +217,7 @@ dependencies {
     implementation(libs.mlkit.subject.segmentation)
     implementation(libs.segmentation.selfie)
     implementation(libs.play.services.base)
+    implementation(libs.play.services.location)
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)

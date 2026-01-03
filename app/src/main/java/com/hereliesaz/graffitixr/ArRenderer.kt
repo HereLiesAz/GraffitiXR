@@ -80,6 +80,7 @@ class ArRenderer(
     private var analysisMatchData: FloatArray? = null
 
     @Volatile var session: Session? = null
+    @Volatile private var isSessionResumed = false
     private val displayRotationHelper = DisplayRotationHelper(context)
 
     // Renderers
@@ -181,6 +182,7 @@ class ArRenderer(
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        Log.d(TAG, "onSurfaceCreated: initializing renderers")
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         try {
             backgroundRenderer.createOnGlThread()
@@ -188,6 +190,7 @@ class ArRenderer(
             pointCloudRenderer.createOnGlThread()
             simpleQuadRenderer.createOnGlThread()
             createDepthTexture()
+            Log.d(TAG, "onSurfaceCreated: renderers initialized")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize renderers", e)
         }
@@ -205,6 +208,7 @@ class ArRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        Log.d(TAG, "onSurfaceChanged: width=$width, height=$height")
         viewportWidth = width
         viewportHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
@@ -216,7 +220,18 @@ class ArRenderer(
         if (!sessionLock.tryLock()) return
 
         try {
-            if (session == null) return
+            if (session == null || !isSessionResumed) {
+                // Log only once per second or something if session is null?
+                // For now, let's trust it won't spam too much if we are in activity
+                return
+            }
+
+            if (backgroundRenderer.textureId != -1) {
+                session!!.setCameraTextureName(backgroundRenderer.textureId)
+            } else {
+                Log.e(TAG, "onDrawFrame: Background renderer textureId is -1")
+            }
+            displayRotationHelper.updateSessionIfNeeded(session!!)
 
             if (isDepthSupported) {
                 try {
@@ -258,8 +273,9 @@ class ArRenderer(
     }
 
     private fun drawFrame(frame: Frame) {
-        session!!.setCameraTextureName(backgroundRenderer.textureId)
-        displayRotationHelper.updateSessionIfNeeded(session!!)
+        // Log frame details periodically?
+        // For verbose debug, let's log critical background renderer call
+        // backgroundRenderer.draw(frame) logs itself now.
         backgroundRenderer.draw(frame)
 
         if (captureNextFrame) {
@@ -276,11 +292,13 @@ class ArRenderer(
         if (camera.trackingState == TrackingState.TRACKING) {
             if (!wasTracking) {
                 wasTracking = true
+                Log.d(TAG, "Tracking started")
                 mainHandler.post { onTrackingFailure(null) }
             }
         } else {
             if (wasTracking) {
                 wasTracking = false
+                Log.d(TAG, "Tracking lost")
                 mainHandler.post { onTrackingFailure("Tracking lost.") }
             }
             return
@@ -658,6 +676,7 @@ class ArRenderer(
     }
 
     fun onResume(activity: Activity) {
+        Log.d(TAG, "onResume: resuming session")
         sessionLock.lock()
         try {
             if (session == null) {
@@ -670,7 +689,12 @@ class ArRenderer(
 
                     // Enable Geospatial Mode
                     if (session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)) {
-                        config.geospatialMode = Config.GeospatialMode.ENABLED
+                        try {
+                            config.geospatialMode = Config.GeospatialMode.ENABLED
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to enable Geospatial Mode: ${e.message}")
+                            config.geospatialMode = Config.GeospatialMode.DISABLED
+                        }
                     }
 
                     // Enable Local Anchor Persistence for Multi-Point Calibration
@@ -694,9 +718,11 @@ class ArRenderer(
                     }
 
                     session!!.configure(config)
+                    Log.d(TAG, "onResume: Session configured")
                 }
             }
             session?.resume()
+            isSessionResumed = true
             displayRotationHelper.onResume()
         } catch (e: Exception) {
             Log.e(TAG, "Resume error", e)
@@ -706,8 +732,10 @@ class ArRenderer(
     }
 
     fun onPause() {
+        Log.d(TAG, "onPause: pausing session")
         sessionLock.lock()
         try {
+            isSessionResumed = false
             displayRotationHelper.onPause()
             session?.pause()
         } catch (e: Exception) {
@@ -718,6 +746,7 @@ class ArRenderer(
     }
 
     fun cleanup() {
+        Log.d(TAG, "cleanup: closing session")
         sessionLock.lock()
         try {
             analysisScope.cancel()
