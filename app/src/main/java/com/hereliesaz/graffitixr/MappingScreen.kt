@@ -58,6 +58,7 @@ fun MappingScreen(
 
     // Initialize SlamManager once
     if (slamManager == null && activity != null) {
+        android.util.Log.v("MappingScreen", "Initializing SlamManager")
         slamManager = SlamManager(activity)
     }
 
@@ -65,23 +66,29 @@ fun MappingScreen(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
+                    android.util.Log.v("MappingScreen", "Lifecycle: ON_RESUME")
                     // Always resume the SceneLayout to show camera feed
                     sceneLayoutRef?.resume()
                     slamManager?.resume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
+                    android.util.Log.v("MappingScreen", "Lifecycle: ON_PAUSE")
                     sceneLayoutRef?.pause()
                     slamManager?.pause()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
+                    android.util.Log.v("MappingScreen", "Lifecycle: ON_DESTROY")
                     sceneLayoutRef?.destroy()
                     slamManager?.dispose()
                 }
-                else -> {}
+                else -> {
+                    android.util.Log.v("MappingScreen", "Lifecycle: Other event ${event.name}")
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            android.util.Log.v("MappingScreen", "DisposableEffect: onDispose")
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
@@ -94,14 +101,19 @@ fun MappingScreen(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
+                android.util.Log.v("MappingScreen", "AndroidView: Factory called")
                 SceneLayout(ctx).apply {
                     try {
                         if (ctx is Activity) {
+                            android.util.Log.v("MappingScreen", "SceneLayout: Calling init(ctx)")
                             init(ctx)
                             // Force resume immediately to start camera feed.
                             // The LifecycleObserver might miss the initial ON_RESUME if added too late.
+                            android.util.Log.v("MappingScreen", "SceneLayout: Calling resume() immediately")
                             this.resume()
                             sceneLayoutRef = this
+                        } else {
+                            android.util.Log.e("MappingScreen", "Context is not an Activity, cannot init SceneLayout")
                         }
                     } catch (e: Exception) {
                         android.util.Log.e("MappingScreen", "Error initializing SceneLayout", e)
@@ -126,14 +138,20 @@ fun MappingScreen(
                 id = "back",
                 text = "Back",
                 route = "back",
-                onClick = onExit
+                onClick = {
+                    android.util.Log.v("MappingScreen", "Button: Back clicked")
+                    onExit()
+                }
             )
 
             azRailItem(
                 id = "help",
                 text = "Help",
                 route = "help",
-                onClick = { showInstructions = !showInstructions }
+                onClick = {
+                    android.util.Log.v("MappingScreen", "Button: Help clicked. Toggling showInstructions to ${!showInstructions}")
+                    showInstructions = !showInstructions
+                }
             )
         }
 
@@ -174,11 +192,14 @@ fun MappingScreen(
                     text = "Start",
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
+                        android.util.Log.v("MappingScreen", "Button: Start clicked")
                         if (!isMapping) {
                             try {
                                 if (slamManager == null && activity != null) {
+                                    android.util.Log.v("MappingScreen", "Re-initializing SlamManager")
                                     slamManager = SlamManager(activity)
                                 }
+                                android.util.Log.v("MappingScreen", "Calling slamManager.init()")
                                 slamManager?.init()
                                 isMapping = true
                                 currentInstruction = mappingInstruction
@@ -187,6 +208,8 @@ fun MappingScreen(
                                 android.util.Log.e("MappingScreen", "Start Error", e)
                                 Toast.makeText(context, "Start Failed: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
+                        } else {
+                            android.util.Log.v("MappingScreen", "Button: Start ignored (already mapping)")
                         }
                     },
                     modifier = Modifier.padding(end = 16.dp)
@@ -197,11 +220,15 @@ fun MappingScreen(
                     text = "Stop",
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
+                        android.util.Log.v("MappingScreen", "Button: Stop clicked")
                         if (isMapping) {
                             // slamManager?.stop() // SlamManager doesn't have stop(), maybe dispose() or pause()?
+                            android.util.Log.v("MappingScreen", "Setting isMapping = false")
                             isMapping = false
                             currentInstruction = saveInstruction
                             Toast.makeText(context, "Mapping Stopped", Toast.LENGTH_SHORT).show()
+                        } else {
+                            android.util.Log.v("MappingScreen", "Button: Stop ignored (not mapping)")
                         }
                     },
                     modifier = Modifier.padding(end = 16.dp)
@@ -212,7 +239,9 @@ fun MappingScreen(
                     text = "Save",
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
+                        android.util.Log.v("MappingScreen", "Button: Save clicked")
                         try {
+                            android.util.Log.v("MappingScreen", "Calling slamManager.saveMap()")
                             slamManager?.saveMap()
                             currentInstruction = "Map Saved!\n$initialInstruction"
                             Toast.makeText(context, "Map Save Requested", Toast.LENGTH_SHORT).show()
