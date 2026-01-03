@@ -1,7 +1,9 @@
 package com.hereliesaz.graffitixr
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.net.Uri
@@ -11,6 +13,7 @@ import android.opengl.Matrix
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.core.content.ContextCompat
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
@@ -18,9 +21,7 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
-import com.google.ar.core.Earth
 import com.google.ar.core.Frame
-import com.google.ar.core.GeospatialPose
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -34,7 +35,6 @@ import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
 import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
-import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,12 +49,12 @@ import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.DescriptorMatcher
 import org.opencv.features2d.ORB
-import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.abs
 
 /**
  * Custom GLSurfaceView.Renderer that handles the ARCore session and OpenGL ES rendering.
@@ -692,14 +692,18 @@ class ArRenderer(
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
 
-                    // Enable Geospatial Mode
-                    if (session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)) {
+                    // Enable Geospatial Mode only if permission is granted
+                    val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    if (hasFineLocation && session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)) {
                         try {
                             config.geospatialMode = Config.GeospatialMode.ENABLED
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed to enable Geospatial Mode: ${e.message}")
                             config.geospatialMode = Config.GeospatialMode.DISABLED
                         }
+                    } else {
+                        Log.d(TAG, "Geospatial mode disabled: permission=$hasFineLocation, supported=${session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)}")
+                        config.geospatialMode = Config.GeospatialMode.DISABLED
                     }
 
                     // Enable Local Anchor Persistence for Multi-Point Calibration
