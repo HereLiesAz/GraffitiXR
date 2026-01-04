@@ -192,11 +192,9 @@ fun UnwarpScreen(
             val startX = (pixelX - actualSrcWidth / 2).coerceIn(0, targetImage.width - actualSrcWidth)
             val startY = (pixelY - actualSrcHeight / 2).coerceIn(0, targetImage.height - actualSrcHeight)
 
-            // We render the crop manually or use a library. Simple way: Sub-bitmap
-            // To be safe against crashes, ensure dimensions > 0
+            // We render the crop using Canvas to avoid Bitmap allocation on every frame
             if (actualSrcWidth > 0 && actualSrcHeight > 0) {
                 // Determine placement of magnifier (avoid being under finger)
-                // Place it opposite to the touch
                 val magOffsetX = if (magnifierPosition.x < with(density) { screenWidth.toPx() } / 2) {
                     with(density) { (screenWidth.toPx() - magnifierSize - 50).toInt() }
                 } else {
@@ -213,28 +211,19 @@ fun UnwarpScreen(
                         .padding(2.dp) // Border
                         .clip(CircleShape)
                 ) {
-                    // Create crop on the fly (performance warning: usually better to use BitmapRegionDecoder or just Canvas scaling)
-                    // For Compose, we can use BitmapPainter with srcOffset/srcSize
-                    // But creating a small bitmap is easier for now given existing tools
-                     // Safe handling of bitmap creation without try-catch around composable
-                     val crop = try {
-                         Bitmap.createBitmap(targetImage, startX, startY, actualSrcWidth, actualSrcHeight)
-                     } catch (e: Exception) {
-                         null
-                     }
-                     if (crop != null) {
-                         Image(
-                             bitmap = crop.asImageBitmap(),
-                             contentDescription = "Zoom",
-                             modifier = Modifier.fillMaxSize(),
-                             contentScale = ContentScale.FillBounds
-                         )
-                         // Crosshair
-                         Canvas(modifier = Modifier.fillMaxSize()) {
-                             drawLine(Color.Cyan, Offset(size.width/2, 0f), Offset(size.width/2, size.height), strokeWidth = 2f)
-                             drawLine(Color.Cyan, Offset(0f, size.height/2), Offset(size.width, size.height/2), strokeWidth = 2f)
-                         }
-                     }
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        // Draw cropped image directly from source
+                        drawImage(
+                            image = targetImage.asImageBitmap(),
+                            srcOffset = IntOffset(startX, startY),
+                            srcSize = IntSize(actualSrcWidth, actualSrcHeight),
+                            dstSize = IntSize(size.width.toInt(), size.height.toInt())
+                        )
+
+                        // Crosshair
+                        drawLine(Color.Cyan, Offset(size.width/2, 0f), Offset(size.width/2, size.height), strokeWidth = 2f)
+                        drawLine(Color.Cyan, Offset(0f, size.height/2), Offset(size.width, size.height/2), strokeWidth = 2f)
+                    }
                 }
             }
         }

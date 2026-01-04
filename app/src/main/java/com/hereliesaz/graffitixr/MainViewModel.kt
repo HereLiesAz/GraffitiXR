@@ -1312,18 +1312,19 @@ class MainViewModel(
                 srcArray[4] = points[2].x * width; srcArray[5] = points[2].y * height
                 srcArray[6] = points[3].x * width; srcArray[7] = points[3].y * height
 
-                // Calculate Dimensions of Resulting Rect
-                val br = points[2]
-                val bl = points[3]
-                val tr = points[1]
-                val tl = points[0]
+                // Calculate Dimensions of Resulting Rect using Pixel Coordinates
+                // Points are normalized (0..1), so convert to pixels first for distance calc
+                val brX = points[2].x * width; val brY = points[2].y * height
+                val blX = points[3].x * width; val blY = points[3].y * height
+                val trX = points[1].x * width; val trY = points[1].y * height
+                val tlX = points[0].x * width; val tlY = points[0].y * height
 
-                val widthA = sqrt((br.x - bl.x).pow(2) + (br.y - bl.y).pow(2)) * width
-                val widthB = sqrt((tr.x - tl.x).pow(2) + (tr.y - tl.y).pow(2)) * width
+                val widthA = sqrt((brX - blX).pow(2) + (brY - blY).pow(2))
+                val widthB = sqrt((trX - tlX).pow(2) + (trY - tlY).pow(2))
                 val maxWidth = max(widthA, widthB)
 
-                val heightA = sqrt((tr.x - br.x).pow(2) + (tr.y - br.y).pow(2)) * height
-                val heightB = sqrt((tl.x - bl.x).pow(2) + (tl.y - bl.y).pow(2)) * height
+                val heightA = sqrt((trX - brX).pow(2) + (trY - brY).pow(2))
+                val heightB = sqrt((tlX - blX).pow(2) + (tlY - blY).pow(2))
                 val maxHeight = max(heightA, heightB)
 
                 // Prepare Destination Points
@@ -1393,8 +1394,6 @@ class MainViewModel(
             ),
             isUndoable = false
         )
-        arRenderer?.triggerCapture() // Trigger immediately or wait? Better wait for user input.
-        // Actually, just change state to FRONT, let user press button.
     }
 
     companion object { private const val MAX_UNDO_STACK_SIZE = 50 }
