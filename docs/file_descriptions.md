@@ -101,6 +101,9 @@ A pager-based onboarding tutorial explaining the app's features.
 #### `TargetRefinementScreen.kt`
 The UI for creating/editing the AR target mask. Visualizes OpenCV keypoints and allows painting/erasing the mask.
 
+#### `UnwarpScreen.kt`
+UI for the "Rectify Image" feature. Allows the user to drag 4 corners on a captured image to define a planar surface, providing a magnifier loop for precision.
+
 #### `AdjustmentsPanel.kt`
 The bottom sheet containing image controls (Opacity, Contrast, etc.). Uses custom `Knob` components.
 

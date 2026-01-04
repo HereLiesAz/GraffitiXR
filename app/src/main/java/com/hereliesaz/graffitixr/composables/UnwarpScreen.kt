@@ -184,12 +184,17 @@ fun UnwarpScreen(
             val zoomFactor = 4
             val magnifierSize = 300 // px
             val srcSize = magnifierSize / zoomFactor
-            val startX = (pixelX - srcSize / 2).coerceIn(0, targetImage.width - srcSize)
-            val startY = (pixelY - srcSize / 2).coerceIn(0, targetImage.height - srcSize)
+
+            // Ensure srcSize is not larger than image dimensions
+            val actualSrcWidth = srcSize.coerceAtMost(targetImage.width)
+            val actualSrcHeight = srcSize.coerceAtMost(targetImage.height)
+
+            val startX = (pixelX - actualSrcWidth / 2).coerceIn(0, targetImage.width - actualSrcWidth)
+            val startY = (pixelY - actualSrcHeight / 2).coerceIn(0, targetImage.height - actualSrcHeight)
 
             // We render the crop manually or use a library. Simple way: Sub-bitmap
             // To be safe against crashes, ensure dimensions > 0
-            if (srcSize > 0) {
+            if (actualSrcWidth > 0 && actualSrcHeight > 0) {
                 // Determine placement of magnifier (avoid being under finger)
                 // Place it opposite to the touch
                 val magOffsetX = if (magnifierPosition.x < with(density) { screenWidth.toPx() } / 2) {
@@ -213,7 +218,7 @@ fun UnwarpScreen(
                     // But creating a small bitmap is easier for now given existing tools
                      // Safe handling of bitmap creation without try-catch around composable
                      val crop = try {
-                         Bitmap.createBitmap(targetImage, startX, startY, srcSize.coerceAtMost(targetImage.width - startX), srcSize.coerceAtMost(targetImage.height - startY))
+                         Bitmap.createBitmap(targetImage, startX, startY, actualSrcWidth, actualSrcHeight)
                      } catch (e: Exception) {
                          null
                      }
