@@ -364,7 +364,8 @@ class MainViewModel(
                             targetCreationState = TargetCreationState.SUCCESS,
                             isArTargetCreated = true,
                             arState = ArState.SEARCHING,
-                            fingerprintJson = fingerprintJson
+                            fingerprintJson = fingerprintJson,
+                            capturedTargetImages = emptyList() // Clear the image cache
                         )
                     )
                 }
