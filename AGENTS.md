@@ -35,7 +35,7 @@ The user interacts with the application through a simple user interface. The mai
 -   **State Management:** All UI state is held in the immutable `UiState.kt` data class and managed via a `StateFlow` in `MainViewModel.kt`.
 
 ### **Key Files**
--   `MainActivity.kt`: The single activity entry point. It handles permissions, initializes the ARCore session, and hosts the `MainScreen` composable.
+-   `MainActivity.kt`: The single activity entry point. It handles permissions, initializes the ARCore session, and sets up the Jetpack Navigation `NavController` and `NavHost`, which hosts the `MainScreen` composable.
 -   **`MainViewModel.kt`**: The central logic hub. It manages all state changes and user events.
 -   `ARScreen.kt`: The composable for the AR experience.
 -   `ARCoreRenderer.kt`: The renderer for the AR experience.
