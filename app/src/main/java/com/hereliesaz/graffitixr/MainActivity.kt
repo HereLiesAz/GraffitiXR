@@ -31,6 +31,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -133,6 +136,7 @@ fun AppContent(
     var showOnboarding by remember { mutableStateOf(!onboardingShown) }
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val navController = rememberNavController()
 
     // Keep screen on if in Trace mode and locked
     LaunchedEffect(uiState.editorMode, uiState.isTouchLocked) {
@@ -157,40 +161,42 @@ fun AppContent(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        if (showOnboarding) {
-            OnboardingScreen(onDismiss = {
-                showOnboarding = false
-                onOnboardingDismiss()
-            })
-        } else {
-            // Determine required permissions based on API level
-            val permissions = mutableListOf(
-                Manifest.permission.CAMERA,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
-
-            val permissionState = rememberMultiplePermissionsState(
-                permissions = permissions
-            )
-
-            // Check if Camera (essential) is granted. Others are optional but requested together.
-            val cameraGranted = permissionState.permissions.find { it.permission == Manifest.permission.CAMERA }?.status?.isGranted == true
-
-            if (cameraGranted) {
-                MainScreen(viewModel = viewModel)
-            } else {
-                PermissionScreen(
-                    onRequestPermission = {
-                        permissionState.launchMultiplePermissionRequest()
+        NavHost(navController = navController, startDestination = "main") {
+            composable("main") {
+                if (showOnboarding) {
+                    OnboardingScreen(onDismiss = {
+                        showOnboarding = false
+                        onOnboardingDismiss()
+                    })
+                } else {
+                    val permissions = remember {
+                        mutableListOf(
+                            Manifest.permission.CAMERA,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ).apply {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                add(Manifest.permission.READ_MEDIA_IMAGES)
+                                add(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                            }
+                        }
                     }
-                )
+                    val permissionState = rememberMultiplePermissionsState(permissions = permissions)
+
+                    val cameraGranted =
+                        permissionState.permissions.find { it.permission == Manifest.permission.CAMERA }?.status?.isGranted == true
+
+                    if (cameraGranted) {
+                        MainScreen(viewModel = viewModel, navController = navController)
+                    } else {
+                        PermissionScreen(
+                            onRequestPermission = {
+                                permissionState.launchMultiplePermissionRequest()
+                            }
+                        )
+                    }
+                }
             }
         }
     }

@@ -45,7 +45,7 @@ ProGuard/R8 configuration rules. Essential for preserving code that is accessed 
 
 #### `MainActivity.kt`
 The single `Activity` entry point.
--   **Responsibilities:** Initializes OpenCV, handles runtime permissions (Camera), manages the global `MainViewModel`, and hosts the Compose UI content.
+-   **Responsibilities:** Initializes OpenCV, handles runtime permissions (Camera), manages the global `MainViewModel`, and hosts the Compose UI content. It also sets up the Jetpack Navigation `NavController` and `NavHost`.
 -   **Key Features:** Implements a hidden "Unlock" mechanism via volume keys.
 
 #### `MainViewModel.kt`
