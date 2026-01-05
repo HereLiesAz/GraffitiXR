@@ -334,29 +334,29 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             )
 
                             azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
-                            azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, route = "ar", onClick = { onModeSelected(EditorMode.AR) })
-                            azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, route = "ghost_mode", onClick = { onModeSelected(EditorMode.OVERLAY) })
-                            azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, route = "mockup", onClick = { onModeSelected(EditorMode.STATIC) })
-                            azRailSubItem(id = "trace_mode", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, route = "trace_mode", onClick = { onModeSelected(EditorMode.TRACE) })
+                            azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(EditorMode.AR) })
+                            azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = { onModeSelected(EditorMode.OVERLAY) })
+                            azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = { onModeSelected(EditorMode.STATIC) })
+                            azRailSubItem(id = "trace_mode", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = { onModeSelected(EditorMode.TRACE) })
 
                             azDivider()
 
                             if (uiState.editorMode == EditorMode.AR) {
                                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
-                                azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, route = "surveyor") {
+                                azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo) {
                                     val intent = android.content.Intent(context, MappingActivity::class.java)
                                     context.startActivity(intent)
                                     resetDialogs()
                                 }
-                                azRailSubItem(id = "create_target", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, route = "create_target", onClick = {
+                                azRailSubItem(id = "create_target", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
                                     viewModel.onCreateTargetClicked()
                                     resetDialogs()
                                 })
-                                azRailSubItem(id = "refine_target", hostId = "target_host", text = navStrings.refine, info = navStrings.refineInfo, route = "refine_target", onClick = {
+                                azRailSubItem(id = "refine_target", hostId = "target_host", text = navStrings.refine, info = navStrings.refineInfo, onClick = {
                                     viewModel.onRefineTargetToggled()
                                     resetDialogs()
                                 })
-                                azRailSubItem(id = "mark_progress", hostId = "target_host", text = navStrings.update, info = navStrings.updateInfo, route = "mark_progress", onClick = {
+                                azRailSubItem(id = "mark_progress", hostId = "target_host", text = navStrings.update, info = navStrings.updateInfo, onClick = {
                                     viewModel.onMarkProgressToggled()
                                     resetDialogs()
                                 })
@@ -366,38 +366,38 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
                             azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
 
-                            azRailSubItem(id = "image", text = navStrings.open, hostId = "design_host", info = navStrings.openInfo, route = "image") {
+                            azRailSubItem(id = "image", text = navStrings.open, hostId = "design_host", info = navStrings.openInfo) {
                                 resetDialogs()
                                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             }
 
                             if (uiState.editorMode == EditorMode.STATIC) {
-                                azRailSubItem(id = "background", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo, route = "background") {
+                                azRailSubItem(id = "background", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
                                     resetDialogs()
                                     backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                                 }
                             }
 
                             if (uiState.overlayImageUri != null) {
-                                azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, route = "isolate", onClick = {
+                                azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
                                     viewModel.onRemoveBackgroundClicked()
                                     resetDialogs()
                                 })
-                                azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, route = "outline", onClick = {
+                                azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
                                     viewModel.onLineDrawingClicked()
                                     resetDialogs()
                                 })
                                 azDivider()
 
-                                azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo, route = "adjust") {
+                                azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
                                     showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
                                     showColorBalanceDialog = false
                                 }
-                                azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo, route = "color_balance") {
+                                azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
                                     showColorBalanceDialog = !showColorBalanceDialog
                                     showSliderDialog = null
                                 }
-                                azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.blending, info = navStrings.blendingInfo, route = "blending", onClick = {
+                                azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.blending, info = navStrings.blendingInfo, onClick = {
                                     viewModel.onCycleBlendMode()
                                     resetDialogs()
                                 })
@@ -409,7 +409,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     toggleOnText = "Locked",
                                     toggleOffText = "Unlocked",
                                     info = "Prevent accidental moves",
-                                    route = "lock_image",
                                     onClick = { viewModel.toggleImageLock() }
                                 )
                             }
@@ -417,27 +416,27 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             azDivider()
 
                             azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
-                            azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings", route = "settings_sub") {
+                            azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
                                 showSettings = true
                                 resetDialogs()
                             }
-                            azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", info = "Show Help", route = "help_sub") {
+                            azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", info = "Show Help") {
                                 showInfoScreen = true
                                 resetDialogs()
                             }
-                            azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, route = "new_project", onClick = {
+                            azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, onClick = {
                                 viewModel.onNewProject()
                                 resetDialogs()
                             })
-                            azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo, route = "save_project") {
+                            azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
                                 createDocumentLauncher.launch("Project.gxr")
                                 resetDialogs()
                             }
-                            azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo, route = "load_project") {
+                            azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
                                 showProjectLibrary = true
                                 resetDialogs()
                             }
-                            azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo, route = "export_project", onClick = {
+                            azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo, onClick = {
                                 viewModel.onSaveClicked()
                                 resetDialogs()
                             })
@@ -445,14 +444,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             azDivider()
 
                             if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
-                                azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, route = "light", onClick = {
+                                azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
                                     viewModel.onToggleFlashlight()
                                     resetDialogs()
                                 })
                             }
 
                             if (uiState.editorMode == EditorMode.TRACE) {
-                                azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, route = "lock_trace", onClick = {
+                                azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
                                     viewModel.setTouchLocked(true)
                                     resetDialogs()
                                 })
