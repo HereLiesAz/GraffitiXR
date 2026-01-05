@@ -499,7 +499,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 onDismissInfoScreen = { /* No-op */ }
                             )
 
-                            azRailHostItem(id = "mode_host", text = navStrings.modes, route = "mode_host")
+                            azRailHostItem(id = "mode_host", text = navStrings.modes, route = "main")
                             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, route = "ar", onClick = { onModeSelected(EditorMode.AR) })
                             azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, route = "ghost_mode", onClick = { onModeSelected(EditorMode.OVERLAY) })
                             azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, route = "mockup", onClick = { onModeSelected(EditorMode.STATIC) })
@@ -508,7 +508,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             azDivider()
 
                             if (uiState.editorMode == EditorMode.AR) {
-                                azRailHostItem(id = "target_host", text = navStrings.grid, route = "target_host")
+                                azRailHostItem(id = "target_host", text = navStrings.grid, route = "main")
                                 azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, route = "surveyor") {
                                     val intent = android.content.Intent(context, MappingActivity::class.java)
                                     context.startActivity(intent)
@@ -530,7 +530,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 azDivider()
                             }
 
-                            azRailHostItem(id = "design_host", text = navStrings.design, route = "design_host")
+                            azRailHostItem(id = "design_host", text = navStrings.design, route = "main")
 
                             azRailSubItem(id = "image", text = navStrings.open, hostId = "design_host", info = navStrings.openInfo, route = "image") {
                                 resetDialogs()
@@ -582,7 +582,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
                             azDivider()
 
-                            azRailHostItem(id = "project_host", text = navStrings.project, route = "project_host")
+                            azRailHostItem(id = "project_host", text = navStrings.project, route = "main")
                             azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings", route = "settings_sub") {
                                 showSettings = true
                                 resetDialogs()
