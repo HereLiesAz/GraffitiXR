@@ -40,6 +40,36 @@ jobs:
             echo "Warning: google-services.json.template not found. Skipping injection."
           fi
 
+      - name: Generate Keystore from Secrets
+        env:
+          KEYSTORE_PRIVATE: ${{ secrets.KEYSTORE_PRIVATE }}
+          KEYSTORE_CERTIFICATE: ${{ secrets.KEYSTORE_CERTIFICATE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "Generating keystore from certificate and private key..."
+
+          # Write the private key and certificate to temporary files
+          echo "$KEYSTORE_PRIVATE" > private_key.pem
+          echo "$KEYSTORE_CERTIFICATE" > certificate.crt
+
+          # Create a PKCS12 file from the key and certificate
+          openssl pkcs12 -export -in certificate.crt -inkey private_key.pem \
+            -name "$KEY_ALIAS" -out keystore.p12 \
+            -password pass:"$KEYSTORE_PASSWORD"
+
+          # Convert the PKCS12 file to a JKS keystore
+          keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 \
+            -destkeystore app/keystore.jks -deststoretype JKS \
+            -srcstorepass "$KEYSTORE_PASSWORD" \
+            -deststorepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" -noprompt
+
+          echo "Keystore generated successfully at app/keystore.jks"
+
+          # Clean up temporary files
+          rm private_key.pem certificate.crt keystore.p12
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -56,12 +86,20 @@ jobs:
 
       - name: Build with Gradle
         id: gradle-build
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set +e
           export BUILD_NUMBER=$(git rev-list --count HEAD)
           
           # Build the APK
-          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache > build.log 2>&1
+          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD > build.log 2>&1
           
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
@@ -177,16 +215,15 @@ jobs:
           if gh release view $TAG_NAME > /dev/null 2>&1; then
              echo "Updating existing release..."
 
-             # Cleanup ALL existing assets to avoid conflicts and accumulation
-             gh release view "$TAG_NAME" --json assets --jq '.assets[].name' | while IFS= read -r asset; do
-               [ -n "$asset" ] && gh release delete-asset "$TAG_NAME" "$asset" -y || true
-             done
+             # Clean up ONLY the build-tools asset to avoid conflicts
+             gh release delete-asset "$TAG_NAME" "$BUILD_TOOLS" -y || true
 
              gh release edit $TAG_NAME --prerelease \
                --title "Latest Debug Build ($TAG_NAME)" \
                --notes "Auto-build from commit $GITHUB_SHA" \
                --target $GITHUB_SHA
 
+             # Clobber ensures that if we re-run the workflow on the exact same commit, it replaces the APK instead of failing.
              gh release upload $TAG_NAME "$APK_FILE" --clobber
              [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
           else
