@@ -34,7 +34,8 @@ enum class TargetCreationMode : Parcelable {
     CAPTURE,
     GUIDED_GRID,
     GUIDED_POINTS,
-    MULTI_POINT_CALIBRATION
+    MULTI_POINT_CALIBRATION,
+    RECTIFY
 }
 
 /**
@@ -58,7 +59,8 @@ enum class CaptureStep : Parcelable {
     CALIBRATION_POINT_2,
     CALIBRATION_POINT_3,
     CALIBRATION_POINT_4,
-    PHOTO_SEQUENCE
+    PHOTO_SEQUENCE,
+    RECTIFY
 }
 
 /**

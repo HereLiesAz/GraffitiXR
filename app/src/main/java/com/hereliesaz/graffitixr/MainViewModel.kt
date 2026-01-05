@@ -47,10 +47,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import org.opencv.android.Utils
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Size
+import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.coroutines.resume
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
@@ -168,10 +176,11 @@ class MainViewModel(
             TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
             TargetCreationMode.GUIDED_POINTS -> CaptureStep.ASK_GPS
             TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.PHOTO_SEQUENCE
+            TargetCreationMode.RECTIFY -> CaptureStep.INSTRUCTION
             else -> CaptureStep.ASK_GPS // Sentinel for future modes
         }
 
-        val newScale = if (mode != TargetCreationMode.CAPTURE && mode != TargetCreationMode.MULTI_POINT_CALIBRATION) 0.5f else uiState.value.arObjectScale
+        val newScale = if (mode != TargetCreationMode.CAPTURE && mode != TargetCreationMode.MULTI_POINT_CALIBRATION && mode != TargetCreationMode.RECTIFY) 0.5f else uiState.value.arObjectScale
 
         updateState(uiState.value.copy(
             targetCreationMode = mode,
@@ -194,7 +203,7 @@ class MainViewModel(
         } else if (enableGps) {
             CaptureStep.CALIBRATION_POINT_1
         } else {
-            if (mode == TargetCreationMode.CAPTURE) CaptureStep.FRONT else CaptureStep.GUIDED_CAPTURE
+            if (mode == TargetCreationMode.CAPTURE) CaptureStep.FRONT else if (mode == TargetCreationMode.RECTIFY) CaptureStep.FRONT else CaptureStep.GUIDED_CAPTURE
         }
 
         updateState(uiState.value.copy(
@@ -423,6 +432,12 @@ class MainViewModel(
                     CaptureStep.REVIEW -> CaptureStep.REVIEW
                     else -> CaptureStep.REVIEW
                 }
+            } else if (mode == TargetCreationMode.RECTIFY) {
+                when(currentStep) {
+                    CaptureStep.INSTRUCTION -> CaptureStep.FRONT
+                    CaptureStep.FRONT -> CaptureStep.RECTIFY
+                    else -> CaptureStep.REVIEW
+                }
             } else if (mode == TargetCreationMode.MULTI_POINT_CALIBRATION) {
                  // Should not happen here for calibration points as they don't capture frames
                  CaptureStep.REVIEW
@@ -442,6 +457,12 @@ class MainViewModel(
                 capturedTargetImages = newImages
             ), isUndoable = false)
              Toast.makeText(getApplication(), "Photo captured (${newImages.size})", Toast.LENGTH_SHORT).show()
+        } else if (nextStep == CaptureStep.RECTIFY) {
+            // Store captured image and move to RECTIFY screen
+            updateState(uiState.value.copy(
+                capturedTargetImages = newImages,
+                captureStep = nextStep
+            ), isUndoable = false)
         } else if (nextStep != CaptureStep.REVIEW) {
             updateState(uiState.value.copy(
                 capturedTargetImages = newImages,
@@ -1271,6 +1292,108 @@ class MainViewModel(
                 .apply()
             Toast.makeText(getApplication(), "Downloading update...", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) { Toast.makeText(getApplication(), "Failed to start download: ${e.message}", Toast.LENGTH_LONG).show() }
+    }
+
+    fun unwarpImage(points: List<Offset>) {
+        val bitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Convert Bitmap to Mat
+                val mat = Mat()
+                Utils.bitmapToMat(bitmap, mat)
+
+                // Prepare Source Points (from Normalized to Pixel coords)
+                val width = mat.cols().toDouble()
+                val height = mat.rows().toDouble()
+                val srcArray = DoubleArray(8)
+                // Points are TL, TR, BR, BL
+                srcArray[0] = points[0].x * width; srcArray[1] = points[0].y * height
+                srcArray[2] = points[1].x * width; srcArray[3] = points[1].y * height
+                srcArray[4] = points[2].x * width; srcArray[5] = points[2].y * height
+                srcArray[6] = points[3].x * width; srcArray[7] = points[3].y * height
+
+                // Calculate Dimensions of Resulting Rect using Pixel Coordinates
+                // Points are normalized (0..1), so convert to pixels first for distance calc
+                val brX = points[2].x * width; val brY = points[2].y * height
+                val blX = points[3].x * width; val blY = points[3].y * height
+                val trX = points[1].x * width; val trY = points[1].y * height
+                val tlX = points[0].x * width; val tlY = points[0].y * height
+
+                val widthA = sqrt((brX - blX).pow(2) + (brY - blY).pow(2))
+                val widthB = sqrt((trX - tlX).pow(2) + (trY - tlY).pow(2))
+                val maxWidth = max(widthA, widthB)
+
+                val heightA = sqrt((trX - brX).pow(2) + (trY - brY).pow(2))
+                val heightB = sqrt((tlX - blX).pow(2) + (tlY - blY).pow(2))
+                val maxHeight = max(heightA, heightB)
+
+                // Prepare Destination Points
+                val dstArray = doubleArrayOf(
+                    0.0, 0.0,
+                    maxWidth - 1, 0.0,
+                    maxWidth - 1, maxHeight - 1,
+                    0.0, maxHeight - 1
+                )
+
+                val srcMat = Mat(4, 2, CvType.CV_32F)
+                srcMat.put(0, 0, floatArrayOf(
+                    srcArray[0].toFloat(), srcArray[1].toFloat(),
+                    srcArray[2].toFloat(), srcArray[3].toFloat(),
+                    srcArray[4].toFloat(), srcArray[5].toFloat(),
+                    srcArray[6].toFloat(), srcArray[7].toFloat()
+                ))
+
+                val dstMat = Mat(4, 2, CvType.CV_32F)
+                dstMat.put(0, 0, floatArrayOf(
+                    dstArray[0].toFloat(), dstArray[1].toFloat(),
+                    dstArray[2].toFloat(), dstArray[3].toFloat(),
+                    dstArray[4].toFloat(), dstArray[5].toFloat(),
+                    dstArray[6].toFloat(), dstArray[7].toFloat()
+                ))
+
+                val transform = Imgproc.getPerspectiveTransform(srcMat, dstMat)
+                val warped = Mat()
+                Imgproc.warpPerspective(mat, warped, transform, Size(maxWidth, maxHeight))
+
+                val resultBitmap = Bitmap.createBitmap(warped.cols(), warped.rows(), Bitmap.Config.ARGB_8888)
+                Utils.matToBitmap(warped, resultBitmap)
+
+                // Cleanup
+                mat.release()
+                warped.release()
+                transform.release()
+                srcMat.release()
+                dstMat.release()
+
+                // Update State
+                withContext(Dispatchers.Main) {
+                    updateState(
+                        uiState.value.copy(
+                            capturedTargetImages = listOf(resultBitmap),
+                            captureStep = CaptureStep.REVIEW
+                        ),
+                        isUndoable = false
+                    )
+                }
+
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Unwarp failed", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to unwarp image", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    fun onRetakeCapture() {
+        // Go back to capture screen
+        updateState(
+            uiState.value.copy(
+                capturedTargetImages = emptyList(),
+                captureStep = CaptureStep.FRONT
+            ),
+            isUndoable = false
+        )
     }
 
     companion object { private const val MAX_UNDO_STACK_SIZE = 50 }

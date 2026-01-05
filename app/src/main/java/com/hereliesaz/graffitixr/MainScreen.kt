@@ -73,6 +73,7 @@ import com.hereliesaz.graffitixr.composables.TargetCreationOverlay
 import com.hereliesaz.graffitixr.composables.TargetRefinementScreen
 import com.hereliesaz.graffitixr.composables.TraceScreen
 import com.hereliesaz.graffitixr.composables.UndoRedoRow
+import com.hereliesaz.graffitixr.composables.UnwarpScreen
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
@@ -387,6 +388,27 @@ fun MainScreen(viewModel: MainViewModel) {
                             onUndo = viewModel::onUndoClicked,
                             onRedo = viewModel::onRedoClicked,
                             onConfirm = viewModel::onConfirmTargetCreation
+                        )
+                    } else if (uiState.captureStep == CaptureStep.RECTIFY) {
+                        val uri = uiState.capturedTargetUris.firstOrNull()
+                        val imageBitmap by produceState<Bitmap?>(initialValue = null, uri, uiState.capturedTargetImages) {
+                            if (uiState.capturedTargetImages.isNotEmpty()) {
+                                value = uiState.capturedTargetImages.first()
+                            } else if (uri != null) {
+                                value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                                    ImageDecoder.decodeBitmap(source)
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                                }
+                            }
+                        }
+
+                        UnwarpScreen(
+                            targetImage = imageBitmap,
+                            onConfirm = viewModel::unwarpImage,
+                            onRetake = viewModel::onRetakeCapture
                         )
                     } else {
                         TargetCreationOverlay(

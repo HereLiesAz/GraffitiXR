@@ -145,6 +145,7 @@ fun TargetCreationOverlay(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     MethodButton(text = "Capture Existing Marks", onClick = { onMethodSelected(TargetCreationMode.CAPTURE) })
+                    MethodButton(text = "Rectify Image (Planar Target)", onClick = { onMethodSelected(TargetCreationMode.RECTIFY) })
                     MethodButton(text = "Create Guided Grid", onClick = { onMethodSelected(TargetCreationMode.GUIDED_GRID) })
                     MethodButton(text = "Create Guided Points", onClick = { onMethodSelected(TargetCreationMode.GUIDED_POINTS) })
                     MethodButton(text = "Multi-Point Calibration", onClick = { onMethodSelected(TargetCreationMode.MULTI_POINT_CALIBRATION) })
@@ -417,5 +418,6 @@ private fun getInstructionText(step: CaptureStep): String {
         CaptureStep.CALIBRATION_POINT_2 -> "Hold phone flat against wall at Spot 2.\nWait for vibration."
         CaptureStep.CALIBRATION_POINT_3 -> "Hold phone flat against wall at Spot 3.\nWait for vibration."
         CaptureStep.CALIBRATION_POINT_4 -> "Hold phone flat against wall at Spot 4.\nWait for vibration."
+        CaptureStep.RECTIFY -> "Rectify the image."
     }
 }
