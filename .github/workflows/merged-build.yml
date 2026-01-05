@@ -45,6 +45,7 @@ jobs:
           KEYSTORE_PRIVATE: ${{ secrets.KEYSTORE_PRIVATE }}
           KEYSTORE_CERTIFICATE: ${{ secrets.KEYSTORE_CERTIFICATE }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           echo "Generating keystore from certificate and private key..."
@@ -56,7 +57,8 @@ jobs:
           # Create a PKCS12 file from the key and certificate
           openssl pkcs12 -export -in certificate.crt -inkey private_key.pem \
             -name "$KEY_ALIAS" -out keystore.p12 \
-            -password pass:"$KEYSTORE_PASSWORD"
+            -password pass:"$KEYSTORE_PASSWORD" \
+            -passin pass:"$KEY_PASSWORD"
 
           # Convert the PKCS12 file to a JKS keystore
           keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 \
