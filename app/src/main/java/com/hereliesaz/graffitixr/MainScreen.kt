@@ -326,6 +326,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     arState = uiState.arState,
                     isPlanesDetected = uiState.isArPlanesDetected,
                     isTargetCreated = uiState.isArTargetCreated,
+                    isOverlayImageLoaded = uiState.overlayImageUri != null,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 40.dp)
@@ -450,7 +451,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 16.dp, end = 16.dp)
+                        .padding(top = 100.dp, end = 16.dp)
                         .zIndex(7f)
                 ) {
                     IconButton(
@@ -786,6 +787,7 @@ fun StatusOverlay(
     arState: ArState,
     isPlanesDetected: Boolean,
     isTargetCreated: Boolean,
+    isOverlayImageLoaded: Boolean,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -798,6 +800,7 @@ fun StatusOverlay(
         val text = when {
             qualityWarning != null -> qualityWarning
             !isTargetCreated -> "Create a Grid to start."
+            isTargetCreated && !isOverlayImageLoaded -> "Select 'Design' to open an image."
             arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."
             arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."
             arState == ArState.LOCKED -> "Looking for your Grid..."
