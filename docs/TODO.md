@@ -32,10 +32,10 @@ This document tracks the development status, future enhancements, and identified
 
 ## **V1.13 Guided Target Creation (Completed)**
 
--   **[x] Guided Grid Creation:**
+-   **[x] Guided Griding Creation:**
     -   [x] Implement "Guided Grid" workflow for AR target creation.
     -   [x] Add "Guided Points" (4 X's) workflow.
-    -   [x] Create UI for choosing between Capture, Grid, and Points.
+    -   [x] Create UI for choosing between Capture, Griding, and Points.
     -   [x] Implement dynamic grid generation and configuration (Rows x Cols).
     -   [x] Allow re-positioning of the grid anchor during creation.
 
@@ -131,9 +131,9 @@ This document tracks the development status, future enhancements, and identified
     -   [x] **Fix AR Drag:** Implemented single-touch drag to place anchor in AR mode.
     -   [x] **Two-Finger Drag:** Implemented global two-finger drag (pan) to move AR anchor.
     -   [x] **Fix Camera Lag:** Resolved camera resource conflict when switching from Overlay to AR mode.
-    -   [x] **Fix Grid Creation:** Resolved black screen issue in Refinement step by fixing FileProvider paths.
+    -   [x] **Fix Griding Creation:** Resolved black screen issue in Refinement step by fixing FileProvider paths.
     -   [x] **Robust Auto-Save:** Implemented periodic auto-save to persist application state.
-    -   [x] **Grid Orientation:** Fixed sideways fingerprint grid issue by rotating captured frames.
+    -   [x] **Griding Orientation:** Fixed sideways fingerprint grid issue by rotating captured frames.
     -   [x] **Flashlight:** Added flashlight toggle for AR and Overlay modes.
     -   [x] **Magic Align:** Added button to flatten image rotation.
     -   [x] **UI Polish:** Updated Settings navigation, Undo/Redo styling, and Refinement visualization.
