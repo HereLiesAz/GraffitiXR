@@ -22,6 +22,14 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Added persistent, self-dismissing unlock instructions popup.
     -   [x] Trigger instructions on lock, resume, volume press, and 4-tap gesture.
 
+## **V1.16 Rectify Image Targeting (Current)**
+
+-   **[x] Rectify Image Workflow:**
+    -   [x] Implement "Rectify Image" mode for creating planar targets from angled photos.
+    -   [x] Create `UnwarpScreen` with 4-point corner selection and magnifier loop.
+    -   [x] Integrate OpenCV `getPerspectiveTransform` and `warpPerspective` for image rectification.
+    -   [x] Add entry point in `TargetCreationOverlay`.
+
 ## **V1.13 Guided Target Creation (Completed)**
 
 -   **[x] Guided Grid Creation:**

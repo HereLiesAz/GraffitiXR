@@ -14,7 +14,9 @@ The architecture of GraffitiXR is designed to be modular, scalable, and robust, 
 
 The application is structured into several distinct layers, each with a clear separation of concerns:
 
-*   **UI Layer (Jetpack Compose & ViewModels):** This layer is the user's entry point, built entirely with Jetpack Compose for a modern, declarative UI. It is responsible for managing all user interactions and reflecting the application's state. State will be managed in ViewModels and hoisted to the UI, following modern Compose best practices.
+*   **UI Layer (Jetpack Compose & ViewModels):** This layer is the user's entry point, built entirely with Jetpack Compose for a modern, declarative UI. It is responsible for managing all user interactions and reflecting the application's state.
+    *   **MainScreen:** The primary host for the application.
+    *   **UnwarpScreen:** A new interface for the "Rectify Image" feature, allowing users to manually unwarp angled photos for planar AR targeting using 4-point selection and a magnifier loop.
 *   **Camera & AR Service Layer:** A critical abstraction layer that provides a unified interface for camera and AR session management. This service is responsible for managing the ARCore SDK for the AR Overlay mode.
 *   **Rendering Engine (OpenGL ES):** A custom rendering pipeline built around Android's GLSurfaceView and GLSurfaceView.Renderer. This engine is responsible for two primary tasks: drawing the live camera feed to the screen background and rendering the user's overlay image with real-time adjustments for opacity, saturation, and contrast controlled by custom fragment shaders.
 *   **Computer Vision Module (OpenCV):** An isolated module that can be used for advanced features like stabilizing the AR projection against drift.

@@ -14,6 +14,7 @@ And if you've got nothing to prove, you just want something copied onto paper pe
 ## Features
 
 -   **AR Grid Mode:** Leveraging ARCore and OpenCV, this mode allows artists to anchor a digital image to a physical location with high precision. The application's key feature is its ability to save the location "fingerprint," allowing the artist to return to the site at a later time and have the image overlay automatically reappear in the correct position, size, and orientation.
+-   **Rectify Image Target:** Create planar AR targets from angled photos by manually selecting corners, allowing for robust tracking even on skewed surfaces.
 -   **Non-AR Overlay Mode:** A non-AR mode that overlays a semi-transparent image on the camera feed, useful for direct tracing when the device is held in a fixed position (e.g., on a tripod).
 -   **Mockup Mode:** Allows artists to create a quick visualization by taking a photo of a surface and using perspective warp tools to fit their artwork onto it.
 -   **Tracing Mode:** Turn your phone into a lightbox for tracing an image onto paper.
