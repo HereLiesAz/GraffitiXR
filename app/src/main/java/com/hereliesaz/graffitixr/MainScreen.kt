@@ -293,24 +293,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             .zIndex(3f),
                         isVisible = gestureInProgress
                     )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 16.dp, end = 16.dp)
-                            .zIndex(7f)
-                    ) {
-                        IconButton(
-                            onClick = { showInfoScreen = true },
-                            modifier = Modifier.align(Alignment.TopEnd)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Info,
-                                contentDescription = "Help",
-                                tint = Color.White
-                            )
-                        }
-                    }
                 }
 
                 if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
@@ -420,10 +402,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 showSettings = true
                                 resetDialogs()
                             }
-                            azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", info = "Show Help") {
-                                showInfoScreen = true
-                                resetDialogs()
-                            }
                             azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, onClick = {
                                 viewModel.onNewProject()
                                 resetDialogs()
@@ -442,6 +420,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             })
 
                             azDivider()
+
+                            azRailItem(id = "help", text = "Help", info = "Show Help") {
+                                showInfoScreen = true
+                                resetDialogs()
+                            }
 
                             if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
                                 azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
@@ -471,13 +454,18 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     )
                 }
 
-                AdjustmentsPanels(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    showSliderDialog = showSliderDialog,
-                    showColorBalanceDialog = showColorBalanceDialog,
-                    screenHeight = screenHeight
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    AdjustmentsPanels(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        showSliderDialog = showSliderDialog,
+                        showColorBalanceDialog = showColorBalanceDialog,
+                        screenHeight = screenHeight
+                    )
+                }
 
                 uiState.showOnboardingDialogForMode?.let { mode ->
                     OnboardingDialog(
