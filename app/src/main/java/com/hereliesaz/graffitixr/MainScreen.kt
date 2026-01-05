@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -52,6 +53,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
@@ -60,7 +62,6 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
-import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.MockupScreen
@@ -77,6 +78,7 @@ import com.hereliesaz.graffitixr.composables.UnwarpScreen
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
+import com.hereliesaz.graffitixr.ui.NavStrings
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
 import kotlinx.coroutines.Dispatchers
@@ -98,7 +100,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showProjectLibrary by remember { mutableStateOf(false) }
-    var showSaveProjectDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
     var showInfoScreen by remember { mutableStateOf(false) }
@@ -107,9 +108,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
 
     // Helper to reset dialog states
-    fun resetDialogs() {
-        showSliderDialog = null
-        showColorBalanceDialog = false
+    val resetDialogs = remember {
+        {
+            showSliderDialog = null
+            showColorBalanceDialog = false
+        }
     }
 
     // Pre-load strings to avoid Composable calls in lambdas
@@ -179,17 +182,16 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 
     // Helper for automation
-    fun onModeSelected(mode: EditorMode) {
-        viewModel.onEditorModeChanged(mode)
+    val onModeSelected = remember(viewModel, hasSelectedModeOnce) {
+        { mode: EditorMode ->
+            viewModel.onEditorModeChanged(mode)
+            resetDialogs()
 
-        // Hide adjustment knobs when switching modes/tools
-        resetDialogs()
-
-        if (!hasSelectedModeOnce) {
-            hasSelectedModeOnce = true
-            // If AR, auto-launch target capture (which now starts with INSTRUCTION step)
-            if (mode == EditorMode.AR) {
-                viewModel.onCreateTargetClicked()
+            if (!hasSelectedModeOnce) {
+                hasSelectedModeOnce = true
+                if (mode == EditorMode.AR) {
+                    viewModel.onCreateTargetClicked()
+                }
             }
         }
     }
@@ -246,81 +248,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         }
                     )
                 } else {
-                    // Main Content Area (Z-Index 1)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .zIndex(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Common callbacks for gesture handling
-                        val onScaleChanged: (Float) -> Unit = viewModel::onScaleChanged
-                        val onOffsetChanged: (Offset) -> Unit = viewModel::onOffsetChanged
-                        val onRotationZChanged: (Float) -> Unit = viewModel::onRotationZChanged
-                        val onRotationXChanged: (Float) -> Unit = viewModel::onRotationXChanged
-                        val onRotationYChanged: (Float) -> Unit = viewModel::onRotationYChanged
-                        val onCycleRotationAxis: () -> Unit = viewModel::onCycleRotationAxis
-                        val onGestureStart: () -> Unit = {
-                            viewModel.onGestureStart()
-                            gestureInProgress = true
-                        }
-                        val onGestureEnd: () -> Unit = {
-                            viewModel.onGestureEnd()
-                            gestureInProgress = false
-                        }
-
-                        when (uiState.editorMode) {
-                            EditorMode.STATIC -> MockupScreen(
-                                uiState = uiState,
-                                onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
-                                onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                                onOpacityChanged = viewModel::onOpacityChanged,
-                                onBrightnessChanged = viewModel::onBrightnessChanged,
-                                onContrastChanged = viewModel::onContrastChanged,
-                                onSaturationChanged = viewModel::onSaturationChanged,
-                                onScaleChanged = onScaleChanged,
-                                onOffsetChanged = onOffsetChanged,
-                                onRotationZChanged = onRotationZChanged,
-                                onRotationXChanged = onRotationXChanged,
-                                onRotationYChanged = onRotationYChanged,
-                                onCycleRotationAxis = onCycleRotationAxis,
-                                onGestureStart = onGestureStart,
-                                onGestureEnd = onGestureEnd
-                            )
-                            EditorMode.TRACE -> TraceScreen(
-                                uiState = uiState,
-                                onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                                onScaleChanged = onScaleChanged,
-                                onOffsetChanged = onOffsetChanged,
-                                onRotationZChanged = onRotationZChanged,
-                                onRotationXChanged = onRotationXChanged,
-                                onRotationYChanged = onRotationYChanged,
-                                onCycleRotationAxis = onCycleRotationAxis,
-                                onGestureStart = onGestureStart,
-                                onGestureEnd = onGestureEnd
-                            )
-                            EditorMode.OVERLAY -> OverlayScreen(
-                                uiState = uiState,
-                                onScaleChanged = onScaleChanged,
-                                onOffsetChanged = onOffsetChanged,
-                                onRotationZChanged = onRotationZChanged,
-                                onRotationXChanged = onRotationXChanged,
-                                onRotationYChanged = onRotationYChanged,
-                                onCycleRotationAxis = onCycleRotationAxis,
-                                onGestureStart = onGestureStart,
-                                onGestureEnd = onGestureEnd
-                            )
-                            EditorMode.AR -> {
-                                ArView(
-                                    viewModel = viewModel,
-                                    uiState = uiState
-                                )
-                            }
-                        }
-                    }
+                    MainContentLayer(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        gestureInProgress = gestureInProgress,
+                        onGestureToggle = { gestureInProgress = it }
+                    )
                 }
 
-                // Status Overlay (AR Debug/Messages)
                 if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
                     StatusOverlay(
                         qualityWarning = uiState.qualityWarning,
@@ -334,7 +269,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     )
                 }
 
-                // Settings Dialog
                 if (showSettings) {
                     Box(modifier = Modifier.zIndex(1.5f)) {
                         SettingsScreen(
@@ -348,95 +282,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     }
                 }
 
-                // --- AR TARGET CREATION FLOW ---
-                if (uiState.isCapturingTarget) {
-                    Box(modifier = Modifier.zIndex(5f)) {
-                        if (uiState.captureStep == CaptureStep.REVIEW) {
-                            val uri = uiState.capturedTargetUris.firstOrNull()
-                            val imageBitmap by produceState<Bitmap?>(initialValue = null, uri) {
-                                uri?.let {
-                                    value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                                        val source = ImageDecoder.createSource(context.contentResolver, it)
-                                        ImageDecoder.decodeBitmap(source)
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it)
-                                    }
-                                }
-                            }
+                TargetCreationFlow(uiState, viewModel, context)
 
-                            val maskUri = uiState.targetMaskUri
-                            val maskBitmap by produceState<Bitmap?>(initialValue = null, maskUri) {
-                                if (maskUri != null) {
-                                    value = withContext(Dispatchers.IO) {
-                                        com.hereliesaz.graffitixr.utils.BitmapUtils.getBitmapFromUri(context, maskUri)
-                                    }
-                                } else {
-                                    value = null
-                                }
-                            }
-
-                            TargetRefinementScreen(
-                                targetImage = imageBitmap,
-                                mask = maskBitmap,
-                                keypoints = uiState.detectedKeypoints,
-                                paths = uiState.refinementPaths,
-                                isEraser = uiState.isRefinementEraser,
-                                canUndo = uiState.canUndo,
-                                canRedo = uiState.canRedo,
-                                onPathAdded = viewModel::onRefinementPathAdded,
-                                onModeChanged = { viewModel.onRefinementModeChanged(!it) },
-                                onUndo = viewModel::onUndoClicked,
-                                onRedo = viewModel::onRedoClicked,
-                                onConfirm = viewModel::onConfirmTargetCreation
-                            )
-                        } else if (uiState.captureStep == CaptureStep.RECTIFY) {
-                            val uri = uiState.capturedTargetUris.firstOrNull()
-                            val imageBitmap by produceState<Bitmap?>(initialValue = null, uri, uiState.capturedTargetImages) {
-                                if (uiState.capturedTargetImages.isNotEmpty()) {
-                                    value = uiState.capturedTargetImages.first()
-                                } else if (uri != null) {
-                                    value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                                        val source = ImageDecoder.createSource(context.contentResolver, uri)
-                                        ImageDecoder.decodeBitmap(source)
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                                    }
-                                }
-                            }
-
-                            UnwarpScreen(
-                                targetImage = imageBitmap,
-                                onConfirm = viewModel::unwarpImage,
-                                onRetake = viewModel::onRetakeCapture
-                            )
-                        } else {
-                            TargetCreationOverlay(
-                                step = uiState.captureStep,
-                                targetCreationMode = uiState.targetCreationMode,
-                                gridRows = uiState.gridRows,
-                                gridCols = uiState.gridCols,
-                                qualityWarning = uiState.qualityWarning,
-                                captureFailureTimestamp = uiState.captureFailureTimestamp,
-                                onCaptureClick = {
-                                    if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
-                                        viewModel.onCalibrationPointCaptured()
-                                    } else {
-                                        viewModel.onCaptureShutterClicked()
-                                    }
-                                },
-                                onCancelClick = viewModel::onCancelCaptureClicked,
-                                onMethodSelected = viewModel::onTargetCreationMethodSelected,
-                                onGridConfigChanged = viewModel::onGridConfigChanged,
-                                onGpsDecision = viewModel::onGpsDecision,
-                                onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
-                            )
-                        }
-                    }
-                }
-
-                // Gesture Feedback
                 if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
                     GestureFeedback(
                         uiState = uiState,
@@ -447,7 +294,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         isVisible = gestureInProgress
                     )
 
-                    // Help Icon
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -467,18 +313,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     }
                 }
 
-                // Custom Help Overlay (replaces built-in AzNavRail help)
-                if (showInfoScreen) {
-                    Box(modifier = Modifier.zIndex(8f)) {
-                        CustomHelpOverlay(
-                            uiState = uiState,
-                            navStrings = navStrings,
-                            onDismiss = { showInfoScreen = false }
-                        )
-                    }
-                }
-
-                // Navigation Rail
                 if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
                     Box(
                         modifier = Modifier
@@ -495,8 +329,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 packRailButtons = true,
                                 defaultShape = AzButtonShape.RECTANGLE,
                                 headerIconShape = AzHeaderIconShape.ROUNDED,
-                                infoScreen = false, // Disabled built-in help
-                                onDismissInfoScreen = { /* No-op */ }
+                                infoScreen = showInfoScreen,
+                                onDismissInfoScreen = { showInfoScreen = false }
                             )
 
                             azRailHostItem(id = "mode_host", text = navStrings.modes, route = "main")
@@ -549,7 +383,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     viewModel.onRemoveBackgroundClicked()
                                     resetDialogs()
                                 })
-                                azRailSubItem(id = "line_drawing", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, route = "line_drawing", onClick = {
+                                azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, route = "outline", onClick = {
                                     viewModel.onLineDrawingClicked()
                                     resetDialogs()
                                 })
@@ -627,45 +461,10 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     }
                 }
 
-                // Touch Lock Overlay
-                if (uiState.isTouchLocked) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .zIndex(100f)
-                            .background(Color.Transparent)
-                            .pointerInput(Unit) {
-                                awaitPointerEventScope {
-                                    var tapCount = 0
-                                    var lastTapTime = 0L
-                                    while (true) {
-                                        val event = awaitPointerEvent(pass = PointerEventPass.Main)
-                                        val change = event.changes.firstOrNull()
-                                        if (change != null && change.changedToUp()) {
-                                            val now = System.currentTimeMillis()
-                                            if (now - lastTapTime < 500) {
-                                                tapCount++
-                                            } else {
-                                                tapCount = 1
-                                            }
-                                            lastTapTime = now
+                TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
 
-                                            if (tapCount == 4) {
-                                                viewModel.showUnlockInstructions()
-                                                tapCount = 0
-                                            }
-                                        }
-                                        event.changes.forEach { it.consume() }
-                                    }
-                                }
-                            }
-                    )
-                }
-
-                // Unlock Instructions
                 UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
 
-                // Progress Drawing Canvas
                 if (uiState.isMarkingProgress) {
                     DrawingCanvas(
                         paths = uiState.drawingPaths,
@@ -673,67 +472,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     )
                 }
 
-                // Dialogs
-                if (showSaveProjectDialog) {
-                    SaveProjectDialog(
-                        onDismissRequest = { showSaveProjectDialog = false },
-                        onSaveRequest = { projectName ->
-                            viewModel.saveProject(projectName)
-                            showSaveProjectDialog = false
-                        }
-                    )
-                }
+                AdjustmentsPanels(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    showSliderDialog = showSliderDialog,
+                    showColorBalanceDialog = showColorBalanceDialog,
+                    screenHeight = screenHeight
+                )
 
-                // Adjustments Panels
-                if (uiState.overlayImageUri != null && !uiState.hideUiForCapture && !uiState.isTouchLocked) {
-                    val showKnobs = showSliderDialog == "Adjust"
-
-                    UndoRedoRow(
-                        canUndo = uiState.canUndo,
-                        canRedo = uiState.canRedo,
-                        onUndo = viewModel::onUndoClicked,
-                        onRedo = viewModel::onRedoClicked,
-                        onMagicClicked = viewModel::onMagicClicked,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(start = 100.dp, bottom = screenHeight * 0.075f) // Moved down and shifted right
-                            .zIndex(3f)
-                    )
-
-                    if (showKnobs) {
-                        AdjustmentsKnobsRow(
-                            opacity = uiState.opacity,
-                            brightness = uiState.brightness,
-                            contrast = uiState.contrast,
-                            saturation = uiState.saturation,
-                            onOpacityChange = viewModel::onOpacityChanged,
-                            onBrightnessChange = viewModel::onBrightnessChanged,
-                            onContrastChange = viewModel::onContrastChanged,
-                            onSaturationChange = viewModel::onSaturationChanged,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = screenHeight * 0.25f)
-                                .zIndex(3f)
-                        )
-                    }
-
-                    if (showColorBalanceDialog) {
-                        ColorBalanceKnobsRow(
-                            colorBalanceR = uiState.colorBalanceR,
-                            colorBalanceG = uiState.colorBalanceG,
-                            colorBalanceB = uiState.colorBalanceB,
-                            onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                            onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-                            onColorBalanceBChange = viewModel::onColorBalanceBChanged,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = screenHeight * 0.40f)
-                                .zIndex(3f)
-                        )
-                    }
-                }
-
-                // Onboarding
                 uiState.showOnboardingDialogForMode?.let { mode ->
                     OnboardingDialog(
                         editorMode = mode,
@@ -743,7 +489,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     )
                 }
 
-                // Feedback Elements
                 if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
                     RotationAxisFeedback(
                         axis = uiState.activeRotationAxis,
@@ -775,10 +520,272 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 if (uiState.isCapturingTarget) {
                     CaptureAnimation()
                 }
-
-                // Removed manual CircularProgressIndicator because AzNavRail handles it via azSettings
             }
         }
+    }
+}
+
+@Composable
+private fun MainContentLayer(
+    uiState: UiState,
+    viewModel: MainViewModel,
+    gestureInProgress: Boolean,
+    onGestureToggle: (Boolean) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1f),
+        contentAlignment = Alignment.Center
+    ) {
+        val onScaleChanged: (Float) -> Unit = viewModel::onScaleChanged
+        val onOffsetChanged: (Offset) -> Unit = viewModel::onOffsetChanged
+        val onRotationZChanged: (Float) -> Unit = viewModel::onRotationZChanged
+        val onRotationXChanged: (Float) -> Unit = viewModel::onRotationXChanged
+        val onRotationYChanged: (Float) -> Unit = viewModel::onRotationYChanged
+        val onCycleRotationAxis: () -> Unit = viewModel::onCycleRotationAxis
+        val onGestureStart: () -> Unit = {
+            viewModel.onGestureStart()
+            onGestureToggle(true)
+        }
+        val onGestureEnd: () -> Unit = {
+            viewModel.onGestureEnd()
+            onGestureToggle(false)
+        }
+
+        when (uiState.editorMode) {
+            EditorMode.STATIC -> MockupScreen(
+                uiState = uiState,
+                onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onBrightnessChanged = viewModel::onBrightnessChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onScaleChanged = onScaleChanged,
+                onOffsetChanged = onOffsetChanged,
+                onRotationZChanged = onRotationZChanged,
+                onRotationXChanged = onRotationXChanged,
+                onRotationYChanged = onRotationYChanged,
+                onCycleRotationAxis = onCycleRotationAxis,
+                onGestureStart = onGestureStart,
+                onGestureEnd = onGestureEnd
+            )
+            EditorMode.TRACE -> TraceScreen(
+                uiState = uiState,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onScaleChanged = onScaleChanged,
+                onOffsetChanged = onOffsetChanged,
+                onRotationZChanged = onRotationZChanged,
+                onRotationXChanged = onRotationXChanged,
+                onRotationYChanged = onRotationYChanged,
+                onCycleRotationAxis = onCycleRotationAxis,
+                onGestureStart = onGestureStart,
+                onGestureEnd = onGestureEnd
+            )
+            EditorMode.OVERLAY -> OverlayScreen(
+                uiState = uiState,
+                onScaleChanged = onScaleChanged,
+                onOffsetChanged = onOffsetChanged,
+                onRotationZChanged = onRotationZChanged,
+                onRotationXChanged = onRotationXChanged,
+                onRotationYChanged = onRotationYChanged,
+                onCycleRotationAxis = onCycleRotationAxis,
+                onGestureStart = onGestureStart,
+                onGestureEnd = onGestureEnd
+            )
+            EditorMode.AR -> {
+                ArView(
+                    viewModel = viewModel,
+                    uiState = uiState
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TargetCreationFlow(
+    uiState: UiState,
+    viewModel: MainViewModel,
+    context: Context
+) {
+    if (!uiState.isCapturingTarget) return
+
+    Box(modifier = Modifier.zIndex(5f)) {
+        if (uiState.captureStep == CaptureStep.REVIEW) {
+            val uri = uiState.capturedTargetUris.firstOrNull()
+            val imageBitmap by produceState<Bitmap?>(initialValue = null, uri) {
+                uri?.let {
+                    value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        val source = ImageDecoder.createSource(context.contentResolver, it)
+                        ImageDecoder.decodeBitmap(source)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it)
+                    }
+                }
+            }
+
+            val maskUri = uiState.targetMaskUri
+            val maskBitmap by produceState<Bitmap?>(initialValue = null, maskUri) {
+                if (maskUri != null) {
+                    value = withContext(Dispatchers.IO) {
+                        com.hereliesaz.graffitixr.utils.BitmapUtils.getBitmapFromUri(context, maskUri)
+                    }
+                } else {
+                    value = null
+                }
+            }
+
+            TargetRefinementScreen(
+                targetImage = imageBitmap,
+                mask = maskBitmap,
+                keypoints = uiState.detectedKeypoints,
+                paths = uiState.refinementPaths,
+                isEraser = uiState.isRefinementEraser,
+                canUndo = uiState.canUndo,
+                canRedo = uiState.canRedo,
+                onPathAdded = viewModel::onRefinementPathAdded,
+                onModeChanged = { viewModel.onRefinementModeChanged(!it) },
+                onUndo = viewModel::onUndoClicked,
+                onRedo = viewModel::onRedoClicked,
+                onConfirm = viewModel::onConfirmTargetCreation
+            )
+        } else if (uiState.captureStep == CaptureStep.RECTIFY) {
+            val uri = uiState.capturedTargetUris.firstOrNull()
+            val imageBitmap by produceState<Bitmap?>(initialValue = null, uri, uiState.capturedTargetImages) {
+                if (uiState.capturedTargetImages.isNotEmpty()) {
+                    value = uiState.capturedTargetImages.first()
+                } else if (uri != null) {
+                    value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        val source = ImageDecoder.createSource(context.contentResolver, uri)
+                        ImageDecoder.decodeBitmap(source)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                    }
+                }
+            }
+
+            UnwarpScreen(
+                targetImage = imageBitmap,
+                onConfirm = viewModel::unwarpImage,
+                onRetake = viewModel::onRetakeCapture
+            )
+        } else {
+            TargetCreationOverlay(
+                step = uiState.captureStep,
+                targetCreationMode = uiState.targetCreationMode,
+                gridRows = uiState.gridRows,
+                gridCols = uiState.gridCols,
+                qualityWarning = uiState.qualityWarning,
+                captureFailureTimestamp = uiState.captureFailureTimestamp,
+                onCaptureClick = {
+                    if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
+                        viewModel.onCalibrationPointCaptured()
+                    } else {
+                        viewModel.onCaptureShutterClicked()
+                    }
+                },
+                onCancelClick = viewModel::onCancelCaptureClicked,
+                onMethodSelected = viewModel::onTargetCreationMethodSelected,
+                onGridConfigChanged = viewModel::onGridConfigChanged,
+                onGpsDecision = viewModel::onGpsDecision,
+                onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
+            )
+        }
+    }
+}
+
+@Composable
+private fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
+    if (!isLocked) return
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(100f)
+            .background(Color.Transparent)
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    var tapCount = 0
+                    var lastTapTime = 0L
+                    while (true) {
+                        val event = awaitPointerEvent(pass = PointerEventPass.Main)
+                        val change = event.changes.firstOrNull()
+                        if (change != null && change.changedToUp()) {
+                            val now = System.currentTimeMillis()
+                            if (now - lastTapTime < 500) {
+                                tapCount++
+                            } else {
+                                tapCount = 1
+                            }
+                            lastTapTime = now
+
+                            if (tapCount == 4) {
+                                onUnlockRequested()
+                                tapCount = 0
+                            }
+                        }
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            }
+    )
+}
+
+@Composable
+private fun AdjustmentsPanels(
+    uiState: UiState,
+    viewModel: MainViewModel,
+    showSliderDialog: String?,
+    showColorBalanceDialog: Boolean,
+    screenHeight: Dp
+) {
+    if (uiState.overlayImageUri == null || uiState.hideUiForCapture || uiState.isTouchLocked) return
+
+    val showKnobs = showSliderDialog == "Adjust"
+
+    UndoRedoRow(
+        canUndo = uiState.canUndo,
+        canRedo = uiState.canRedo,
+        onUndo = viewModel::onUndoClicked,
+        onRedo = viewModel::onRedoClicked,
+        onMagicClicked = viewModel::onMagicClicked,
+        modifier = Modifier
+            .zIndex(3f)
+            .padding(start = 100.dp, bottom = screenHeight * 0.075f)
+    )
+
+    if (showKnobs) {
+        AdjustmentsKnobsRow(
+            opacity = uiState.opacity,
+            brightness = uiState.brightness,
+            contrast = uiState.contrast,
+            saturation = uiState.saturation,
+            onOpacityChange = viewModel::onOpacityChanged,
+            onBrightnessChange = viewModel::onBrightnessChanged,
+            onContrastChange = viewModel::onContrastChanged,
+            onSaturationChange = viewModel::onSaturationChanged,
+            modifier = Modifier
+                .zIndex(3f)
+                .padding(bottom = screenHeight * 0.25f)
+        )
+    }
+
+    if (showColorBalanceDialog) {
+        ColorBalanceKnobsRow(
+            colorBalanceR = uiState.colorBalanceR,
+            colorBalanceG = uiState.colorBalanceG,
+            colorBalanceB = uiState.colorBalanceB,
+            onColorBalanceRChange = viewModel::onColorBalanceRChanged,
+            onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+            onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+            modifier = Modifier
+                .zIndex(3f)
+                .padding(bottom = screenHeight * 0.40f)
+        )
     }
 }
 

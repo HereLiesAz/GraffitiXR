@@ -93,7 +93,7 @@ fun rememberNavStrings(): NavStrings {
         blending = stringResource(R.string.nav_blending),
         blendingInfo = stringResource(R.string.nav_blending_info),
         settings = stringResource(R.string.nav_settings),
-        project = "Project", // Hardcoded for now as I can't easily add string resource without modifying strings.xml which wasn't requested explicitly but I should probably do it properly if I could. User said "Rename it to Surveyor" implying I can change strings. I will add a resource or use a literal. I'll use a literal or look for an existing string. There is no "Project" string in strings.xml read earlier.
+        project = "Project", // Restored to "Project"
         new = stringResource(R.string.nav_new),
         newInfo = stringResource(R.string.nav_new_info),
         save = stringResource(R.string.nav_save),

@@ -27,7 +27,7 @@ val versionProperties = Properties().apply {
 }
 
 val vMajor = versionProperties.getProperty("versionMajor", "1").toInt()
-val vMinor = versionProperties.getProperty("versionMinor", "2").toInt()
+val vMinor = versionProperties.getProperty("versionMinor", "15").toInt()
 val defaultPatch = versionProperties.getProperty("versionPatch", "0").toInt()
 val defaultBuild = versionProperties.getProperty("versionBuild", "0").toInt()
 
@@ -108,7 +108,7 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
-        minSdk = 26
+        minSdk = 32 // Required for Android XR libraries (e.g., androidx.xr.compose.material3)
         targetSdk = 36
         versionCode = vMajor * 10000000 + vMinor * 100000 + vPatch * 1000 + vBuild
         versionName = "$vMajor.$vMinor.$vPatch.$vBuild"
