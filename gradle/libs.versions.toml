@@ -20,7 +20,6 @@ camerax = "1.5.2"
 accompanistPermissions = "0.37.3"
 mlkitSubjectSegmentation = "16.0.0-beta1"
 opencv = "4.12.0"
-azNavRail = "5.18"
 kotlinxSerialization = "1.9.0"
 segmentationSelfie = "16.0.0-beta6"
 firebaseBom = "34.7.0"
@@ -43,7 +42,6 @@ kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-cor
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 google-accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
 mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
-az-nav-rail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref = "azNavRail" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }

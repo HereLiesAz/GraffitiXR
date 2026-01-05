@@ -207,8 +207,6 @@ dependencies {
     implementation(libs.androidx.xr.arcore)
     implementation(libs.google.accompanist.permissions)
 
-    // AzNavRail
-    implementation(libs.az.nav.rail)
 
     // ML Kit
     implementation(libs.mlkit.subject.segmentation)
