@@ -187,41 +187,6 @@ class ArRenderer(
 
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
         this.initialAugmentedImages = bitmaps
-
-        // If session is running, trigger re-configuration in background
-        if (session != null && isSessionResumed) {
-            configJob?.cancel()
-            configJob = CoroutineScope(Dispatchers.Main).launch {
-                val session = this@ArRenderer.session
-                if (session == null) return@launch
-
-                val database = AugmentedImageDatabase(session)
-                withContext(Dispatchers.IO) {
-                    bitmaps.forEachIndexed { index, bitmap ->
-                        val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                        database.addImage("target_$index", resized)
-                    }
-                }
-
-                sessionLock.lock()
-                try {
-                    if (this@ArRenderer.session == session && isSessionResumed) {
-                        val currentConfig = session.config
-                        currentConfig.augmentedImageDatabase = database
-                        session.configure(currentConfig)
-                        Log.d(TAG, "Dynamic Update: AugmentedImageDatabase configured")
-                        // Reset anchor logic if needed
-                        activeAnchor?.detach()
-                        activeAnchor = null
-                        arState = ArState.SEARCHING
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to dynamic update AugmentedImageDatabase", e)
-                } finally {
-                    sessionLock.unlock()
-                }
-            }
-        }
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {

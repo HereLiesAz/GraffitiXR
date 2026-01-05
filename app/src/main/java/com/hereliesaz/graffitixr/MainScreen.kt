@@ -788,7 +788,6 @@ fun StatusOverlay(
     arState: ArState,
     isPlanesDetected: Boolean,
     isTargetCreated: Boolean,
-    isOverlayImageLoaded: Boolean,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -801,7 +800,6 @@ fun StatusOverlay(
         val text = when {
             qualityWarning != null -> qualityWarning
             !isTargetCreated -> "Create a Grid to start."
-            isTargetCreated && !isOverlayImageLoaded -> "Select 'Design' to open an image."
             arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."
             arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."
             arState == ArState.LOCKED -> "Looking for your Grid..."
