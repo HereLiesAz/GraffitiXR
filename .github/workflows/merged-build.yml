@@ -50,8 +50,14 @@ jobs:
           echo "Generating keystore from certificate and private key..."
 
           # Write the private key and certificate to temporary files
-          echo "$KEYSTORE_PRIVATE" > private_key.pem
-          echo "$KEYSTORE_CERTIFICATE" > certificate.crt
+          # Use printf to properly handle newlines in secrets
+          printf "%s\n" "$KEYSTORE_PRIVATE" > private_key.pem
+          printf "%s\n" "$KEYSTORE_CERTIFICATE" > certificate.crt
+
+          if [ -z "$KEYSTORE_PRIVATE" ]; then
+             echo "Error: KEYSTORE_PRIVATE secret is empty."
+             exit 1
+          fi
 
           # Create a PKCS12 file from the key and certificate
           openssl pkcs12 -export -in certificate.crt -inkey private_key.pem \
