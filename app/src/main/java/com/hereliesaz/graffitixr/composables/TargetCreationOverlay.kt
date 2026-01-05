@@ -100,7 +100,7 @@ fun TargetCreationOverlay(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = getInstructionText(step),
+                    text = getInstructionText(step, targetCreationMode),
                     color = Color.White,
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyLarge,
@@ -399,14 +399,22 @@ private fun getArrowDescriptionForStep(step: CaptureStep): String {
     }
 }
 
-private fun getInstructionText(step: CaptureStep): String {
+private fun getInstructionText(step: CaptureStep, mode: TargetCreationMode): String {
     return when (step) {
         CaptureStep.ADVICE -> "Find a well-lit surface.\nUse the 'Light' button if needed.\nTap the center of the wall to place an anchor."
         CaptureStep.CHOOSE_METHOD -> "Choose how to create your target."
         CaptureStep.GRID_CONFIG -> "Configure the grid size."
         CaptureStep.GUIDED_CAPTURE -> "Draw the marks on the wall following the guide.\nPress SCAN when done."
-        CaptureStep.INSTRUCTION -> "Move device slowly to scan surfaces.\nPress START when ready."
-        CaptureStep.FRONT -> "Stand directly in front of the target surface."
+        CaptureStep.INSTRUCTION -> if (mode == TargetCreationMode.RECTIFY) {
+            "1. Draw a clear rectangle on the wall.\n2. Doodle inside it to make it distinct.\n3. Tap START."
+        } else {
+            "Move device slowly to scan surfaces.\nPress START when ready."
+        }
+        CaptureStep.FRONT -> if (mode == TargetCreationMode.RECTIFY) {
+            "Capture the entire rectangle.\nEnsure all 4 corners are visible."
+        } else {
+            "Stand directly in front of the target surface."
+        }
         CaptureStep.LEFT -> "Take a step to the LEFT."
         CaptureStep.RIGHT -> "Take a step to the RIGHT."
         CaptureStep.UP -> "Aim slightly DOWNWARD from above."
@@ -418,6 +426,6 @@ private fun getInstructionText(step: CaptureStep): String {
         CaptureStep.CALIBRATION_POINT_2 -> "Hold phone flat against wall at Spot 2.\nWait for vibration."
         CaptureStep.CALIBRATION_POINT_3 -> "Hold phone flat against wall at Spot 3.\nWait for vibration."
         CaptureStep.CALIBRATION_POINT_4 -> "Hold phone flat against wall at Spot 4.\nWait for vibration."
-        CaptureStep.RECTIFY -> "Rectify the image."
+        CaptureStep.RECTIFY -> "Drag the corners to match your rectangle."
     }
 }
