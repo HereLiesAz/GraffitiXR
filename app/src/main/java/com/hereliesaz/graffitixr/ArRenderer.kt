@@ -193,14 +193,15 @@ class ArRenderer(
             configJob?.cancel()
             configJob = CoroutineScope(Dispatchers.Main).launch {
                 val session = this@ArRenderer.session
-                if (session == null) return@launch
+                if (session == null) {
+                    Log.w(TAG, "Session is null, skipping augmented image database update")
+                    return@launch
+                }
 
-                val database = AugmentedImageDatabase(session)
-                withContext(Dispatchers.IO) {
-                    bitmaps.forEachIndexed { index, bitmap ->
-                        val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                        database.addImage("target_$index", resized)
-                    }
+                val database = configureAugmentedImageDatabase(session, bitmaps)
+                if (database == null) {
+                    Log.w(TAG, "Failed to create augmented image database, no images were added.")
+                    return@launch
                 }
 
                 sessionLock.lock()
@@ -222,6 +223,30 @@ class ArRenderer(
                 }
             }
         }
+    }
+
+    /**
+     * Creates and populates an AugmentedImageDatabase from a list of bitmaps.
+     * Includes error handling for low-quality images.
+     *
+     * @return The configured AugmentedImageDatabase, or null if no images could be added.
+     */
+    private suspend fun configureAugmentedImageDatabase(session: Session, bitmaps: List<Bitmap>): AugmentedImageDatabase? {
+        val database = AugmentedImageDatabase(session)
+        var imagesAdded = 0
+        withContext(Dispatchers.IO) {
+            bitmaps.forEachIndexed { index, bitmap ->
+                try {
+                    val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
+                    database.addImage("target_$index", resized)
+                    imagesAdded++
+                } catch (e: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
+                    Log.e(TAG, "Image quality too low for AR tracking", e)
+                    mainHandler.post { onTrackingFailure("Image quality is too low. Please choose a different image.") }
+                }
+            }
+        }
+        return if (imagesAdded > 0) database else null
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -773,14 +798,12 @@ class ArRenderer(
                                     return@launch
                                 }
 
-                                val database = AugmentedImageDatabase(session)
-                                // Heavy resizing on IO thread
-                                withContext(Dispatchers.IO) {
-                                    images.forEachIndexed { index, bitmap ->
-                                        val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                                        database.addImage("target_$index", resized)
-                                    }
+                                val database = configureAugmentedImageDatabase(session, images)
+                                if (database == null) {
+                                    Log.w(TAG, "Failed to create augmented image database onResume, no images were added.")
+                                    return@launch
                                 }
+
 
                                 // Apply configuration back on Main/Session thread
                                 sessionLock.lock()
