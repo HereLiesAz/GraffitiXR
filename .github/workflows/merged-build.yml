@@ -40,6 +40,12 @@ jobs:
             echo "Warning: google-services.json.template not found. Skipping injection."
           fi
 
+      - name: Decode Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_CONTENTS }}
+        run: |
+          echo $KEYSTORE_BASE64 | base64 --decode > app/keystore.jks
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -56,12 +62,20 @@ jobs:
 
       - name: Build with Gradle
         id: gradle-build
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set +e
           export BUILD_NUMBER=$(git rev-list --count HEAD)
           
           # Build the APK
-          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache > build.log 2>&1
+          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
+            -Pandroid.injected.signing.store.password=$STORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD > build.log 2>&1
           
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
@@ -177,16 +191,15 @@ jobs:
           if gh release view $TAG_NAME > /dev/null 2>&1; then
              echo "Updating existing release..."
 
-             # Cleanup ALL existing assets to avoid conflicts and accumulation
-             gh release view "$TAG_NAME" --json assets --jq '.assets[].name' | while IFS= read -r asset; do
-               [ -n "$asset" ] && gh release delete-asset "$TAG_NAME" "$asset" -y || true
-             done
+             # Clean up ONLY the build-tools asset to avoid conflicts
+             gh release delete-asset "$TAG_NAME" "$BUILD_TOOLS" -y || true
 
              gh release edit $TAG_NAME --prerelease \
                --title "Latest Debug Build ($TAG_NAME)" \
                --notes "Auto-build from commit $GITHUB_SHA" \
                --target $GITHUB_SHA
 
+             # Clobber ensures that if we re-run the workflow on the exact same commit, it replaces the APK instead of failing.
              gh release upload $TAG_NAME "$APK_FILE" --clobber
              [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
           else
