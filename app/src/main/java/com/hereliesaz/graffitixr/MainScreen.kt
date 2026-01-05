@@ -454,13 +454,18 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     )
                 }
 
-                AdjustmentsPanels(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    showSliderDialog = showSliderDialog,
-                    showColorBalanceDialog = showColorBalanceDialog,
-                    screenHeight = screenHeight
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    AdjustmentsPanels(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        showSliderDialog = showSliderDialog,
+                        showColorBalanceDialog = showColorBalanceDialog,
+                        screenHeight = screenHeight
+                    )
+                }
 
                 uiState.showOnboardingDialogForMode?.let { mode ->
                     OnboardingDialog(
