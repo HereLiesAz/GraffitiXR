@@ -187,42 +187,6 @@ class ArRenderer(
 
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
         this.initialAugmentedImages = bitmaps
-
-        // If session is running, trigger re-configuration in background
-        if (session != null && isSessionResumed) {
-            configJob?.cancel()
-            configJob = CoroutineScope(Dispatchers.Main).launch {
-                val session = this@ArRenderer.session
-                if (session == null) {
-                    Log.w(TAG, "Session is null, skipping augmented image database update")
-                    return@launch
-                }
-
-                val database = configureAugmentedImageDatabase(session, bitmaps)
-                if (database == null) {
-                    Log.w(TAG, "Failed to create augmented image database, no images were added.")
-                    return@launch
-                }
-
-                sessionLock.lock()
-                try {
-                    if (this@ArRenderer.session == session && isSessionResumed) {
-                        val currentConfig = session.config
-                        currentConfig.augmentedImageDatabase = database
-                        session.configure(currentConfig)
-                        Log.d(TAG, "Dynamic Update: AugmentedImageDatabase configured")
-                        // Reset anchor logic if needed
-                        activeAnchor?.detach()
-                        activeAnchor = null
-                        arState = ArState.SEARCHING
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to dynamic update AugmentedImageDatabase", e)
-                } finally {
-                    sessionLock.unlock()
-                }
-            }
-        }
     }
 
     /**

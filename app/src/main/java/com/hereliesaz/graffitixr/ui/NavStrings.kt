@@ -68,7 +68,7 @@ fun rememberNavStrings(): NavStrings {
         mockupInfo = stringResource(R.string.nav_mockup_info),
         trace = stringResource(R.string.nav_trace),
         traceInfo = stringResource(R.string.nav_trace_info),
-        grid = "Griding", // stringResource(R.string.nav_grid), // Changed to Griding per user request
+        grid = stringResource(R.string.nav_grid),
         surveyor = stringResource(R.string.nav_surveyor),
         surveyorInfo = stringResource(R.string.nav_surveyor_info),
         create = stringResource(R.string.nav_create),

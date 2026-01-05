@@ -11,7 +11,7 @@ This document details the visual design, interaction patterns, and user experien
 
 ### **Core Components**
 -   **`AzNavRail`:** A left-aligned vertical navigation rail (using `com.github.HereLiesAz:AzNavRail`) handles top-level navigation.
-    -   **Host Items:** Group related functions (e.g., "Project", "Mode", "Griding", "Design").
+    -   **Host Items:** Group related functions (e.g., "Project", "Mode", "Grid", "Design").
     -   **Sub Items:** Specific actions (e.g., "Save", "Load", "Create Target").
 -   **`AdjustmentsPanel`:** A bottom sheet containing controls for image manipulation.
     -   **Knobs:** Custom rotary controls (`Knob.kt`) replace standard sliders for finer precision and a "pro" feel.
