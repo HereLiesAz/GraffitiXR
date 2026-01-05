@@ -50,13 +50,17 @@ jobs:
           echo "Generating keystore from certificate and private key..."
 
           # Write the private key and certificate to temporary files
-          # Use printf to properly handle newlines in secrets
-          printf "%s\n" "$KEYSTORE_PRIVATE" > private_key.pem
-          printf "%s\n" "$KEYSTORE_CERTIFICATE" > certificate.crt
+          # Intelligent check: If the secret doesn't look like a PEM header, assume it's Base64 and decode it.
+          echo "$KEYSTORE_PRIVATE" > private_key.pem
+          if ! grep -q -- "-----BEGIN" private_key.pem; then
+            echo "Info: KEYSTORE_PRIVATE looks encoded. Attempting Base64 decode..."
+            echo "$KEYSTORE_PRIVATE" | base64 --decode > private_key.pem
+          fi
 
-          if [ -z "$KEYSTORE_PRIVATE" ]; then
-             echo "Error: KEYSTORE_PRIVATE secret is empty."
-             exit 1
+          echo "$KEYSTORE_CERTIFICATE" > certificate.crt
+          if ! grep -q -- "-----BEGIN" certificate.crt; then
+            echo "Info: KEYSTORE_CERTIFICATE looks encoded. Attempting Base64 decode..."
+            echo "$KEYSTORE_CERTIFICATE" | base64 --decode > certificate.crt
           fi
 
           # Create a PKCS12 file from the key and certificate
