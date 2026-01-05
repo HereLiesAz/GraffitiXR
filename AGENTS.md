@@ -88,3 +88,9 @@ The files in the `docs` folder are an extension of this `AGENTS.md` file and are
 -   **`task_flow.md`**: How to manage tasks, use the `TODO.md` file, and prioritize work.
 -   **`testing.md`**: Guidelines for writing and running tests, including unit tests and manual verification.
 -   **`workflow.md`**: The development workflow, CI/CD pipelines, and release process.
+
+---
+
+## **5. Known Issues**
+
+-   **"Griding" String:** The user requested changing the UI string "Griding" to "Gridr". This string could not be located anywhere in the project's source code after an exhaustive search. It is suspected to be part of a pre-compiled dependency (potentially `aznavrail`), making it impossible to edit directly. This change request is currently blocked.
