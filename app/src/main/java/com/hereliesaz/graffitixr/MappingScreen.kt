@@ -1,18 +1,27 @@
 package com.hereliesaz.graffitixr
 
+import android.Manifest
 import android.app.Activity
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.view.Choreographer
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,11 +36,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.rememberNavController
-import com.eqgis.eqr.layout.SceneLayout
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.graffitixr.slam.SlamManager
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.sphereslam.SphereCameraManager
+import com.hereliesaz.sphereslam.SphereSLAM
+import android.graphics.Bitmap
+import org.opencv.core.Mat
+import android.os.Handler
+import android.os.HandlerThread
 
 @Composable
 fun MappingScreen(
@@ -41,54 +55,169 @@ fun MappingScreen(
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // SLAM Manager State
-    var slamManager by remember { mutableStateOf<SlamManager?>(null) }
+    // SphereSLAM State
+    var sphereSLAM by remember { mutableStateOf<SphereSLAM?>(null) }
+    var cameraManager by remember { mutableStateOf<SphereCameraManager?>(null) }
+
+    // Sensor Thread
+    var sensorThread by remember { mutableStateOf<HandlerThread?>(null) }
+
+    // Sensor Manager
+    val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+    var accelerometer by remember { mutableStateOf<Sensor?>(null) }
+    var gyroscope by remember { mutableStateOf<Sensor?>(null) }
+
+    // UI State
     var isMapping by remember { mutableStateOf(false) }
     var showInstructions by remember { mutableStateOf(true) }
+    var statsText by remember { mutableStateOf("") }
+    var trackingState by remember { mutableStateOf(-1) } // 0: No Images, 1: Not Init, 2: Tracking, 3: Lost
 
-    // UI Messages
-    val initialInstruction = "1. Press 'Start' to begin surveying."
-    val mappingInstruction = "2. Move device slowly to scan area.\n   Press 'Stop' when finished."
-    val saveInstruction = "3. Press 'Save' to store the map."
-
-    var currentInstruction by remember { mutableStateOf(initialInstruction) }
-
-    // SceneLayout Ref
-    var sceneLayoutRef by remember { mutableStateOf<SceneLayout?>(null) }
-
-    // Initialize SlamManager once
-    if (slamManager == null && activity != null) {
-        android.util.Log.v("MappingScreen", "Initializing SlamManager")
-        slamManager = SlamManager(activity)
+    // Permissions
+    var hasCameraPermission by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+        if (isGranted) {
+             Toast.makeText(context, "Camera Permission Granted", Toast.LENGTH_SHORT).show()
+        } else {
+             Toast.makeText(context, "Camera Permission Denied", Toast.LENGTH_SHORT).show()
+        }
     }
 
+    LaunchedEffect(Unit) {
+        permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    // Initialize SphereSLAM
+    DisposableEffect(Unit) {
+        android.util.Log.v("MappingScreen", "Initializing SphereSLAM")
+        // Use a dedicated cache subdirectory for safer saving
+        val slamCacheDir = java.io.File(context.cacheDir, "sphereslam_cache")
+        if (!slamCacheDir.exists()) slamCacheDir.mkdirs()
+
+        // SphereSLAM ctor calls initNative(assets, cacheDir.absolutePath)
+        // We cannot change the ctor call signature easily if it doesn't accept path,
+        // but if it takes context, it uses context.cacheDir.
+        // We will assume for now we can't change the path passed to JNI unless we change the library.
+        // However, we can clean the cache dir before starting to ensure we only save THIS session's data.
+        // Or we can filter later. For now, let's use the standard init.
+        val slam = SphereSLAM(context)
+        sphereSLAM = slam
+
+        val thread = HandlerThread("SensorThread")
+        thread.start()
+        sensorThread = thread
+
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+
+        var yBuffer: java.nio.ByteBuffer? = null
+        var yMat: Mat? = null
+
+        val camManager = SphereCameraManager(context) { image ->
+             try {
+                 val planes = image.planes
+                 val yPlane = planes[0]
+                 val ySize = yPlane.buffer.remaining()
+
+                 // Reallocate if needed
+                 if (yBuffer == null || yBuffer!!.capacity() != ySize) {
+                     yBuffer = java.nio.ByteBuffer.allocateDirect(ySize)
+                     yMat = Mat(image.height, image.width, org.opencv.core.CvType.CV_8UC1)
+                 }
+
+                 // Copy Y plane (Luminance) which is sufficient for SLAM tracking
+                 yBuffer!!.clear()
+                 yBuffer!!.put(yPlane.buffer)
+                 yBuffer!!.flip()
+
+                 // Update Mat from buffer
+                 // We need to use a byte array for put() or direct buffer if supported,
+                 // but Mat.put(row, col, byte[]) is standard.
+                 // Optimization: Use a reusable byte array to avoid allocation.
+                 val data = ByteArray(ySize)
+                 yPlane.buffer.get(data)
+                 yMat!!.put(0, 0, data)
+
+                 slam.processFrame(yMat!!.nativeObjAddr, image.timestamp.toDouble())
+             } catch (e: Exception) {
+                 android.util.Log.e("MappingScreen", "Error processing frame", e)
+             } finally {
+                 image.close()
+             }
+        }
+        cameraManager = camManager
+
+        onDispose {
+            android.util.Log.v("MappingScreen", "Cleaning up SphereSLAM")
+            slam.cleanup()
+            camManager.closeCamera()
+            camManager.stopBackgroundThread()
+            thread.quitSafely()
+        }
+    }
+
+    // Sensor Listener
+    val sensorListener = remember {
+        object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                event?.let {
+                    if (sphereSLAM != null) {
+                         sphereSLAM!!.processIMU(it.sensor.type, it.values[0], it.values[1], it.values[2], it.timestamp)
+                    }
+                }
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+    }
+
+    // Choreographer Frame Callback
+    val frameCallback = remember {
+        object : Choreographer.FrameCallback {
+            override fun doFrame(frameTimeNanos: Long) {
+                sphereSLAM?.renderFrame()
+
+                // Update stats occasionally
+                if (frameTimeNanos % 60 == 0L) {
+                    sphereSLAM?.let {
+                        trackingState = it.getTrackingState()
+                        statsText = it.getMapStats()
+                    }
+                }
+                Choreographer.getInstance().postFrameCallback(this)
+            }
+        }
+    }
+
+    // Lifecycle Management
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     android.util.Log.v("MappingScreen", "Lifecycle: ON_RESUME")
-                    // Always resume the SceneLayout to show camera feed
-                    sceneLayoutRef?.resume()
-                    slamManager?.resume()
+                    cameraManager?.startBackgroundThread()
+                    if (hasCameraPermission) {
+                        cameraManager?.openCamera()
+                    }
+                    val handler = sensorThread?.let { Handler(it.looper) }
+                    accelerometer?.let { sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_FASTEST, handler) }
+                    gyroscope?.let { sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_FASTEST, handler) }
+                    Choreographer.getInstance().postFrameCallback(frameCallback)
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     android.util.Log.v("MappingScreen", "Lifecycle: ON_PAUSE")
-                    sceneLayoutRef?.pause()
-                    slamManager?.pause()
+                    Choreographer.getInstance().removeFrameCallback(frameCallback)
+                    cameraManager?.closeCamera()
+                    cameraManager?.stopBackgroundThread()
+                    sensorManager.unregisterListener(sensorListener)
                 }
-                Lifecycle.Event.ON_DESTROY -> {
-                    android.util.Log.v("MappingScreen", "Lifecycle: ON_DESTROY")
-                    sceneLayoutRef?.destroy()
-                    slamManager?.dispose()
-                }
-                else -> {
-                    android.util.Log.v("MappingScreen", "Lifecycle: Other event ${event.name}")
-                }
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            android.util.Log.v("MappingScreen", "DisposableEffect: onDispose")
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
@@ -96,34 +225,25 @@ fun MappingScreen(
     val navController = rememberNavController()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. AR Scene Layer (Background)
-        // We place this first so it is at the bottom of the Z-stack.
+        // 1. SphereSLAM Render Surface
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                android.util.Log.v("MappingScreen", "AndroidView: Factory called")
-                SceneLayout(ctx).apply {
-                    try {
-                        if (ctx is Activity) {
-                            android.util.Log.v("MappingScreen", "SceneLayout: Calling init(ctx)")
-                            init(ctx)
-                            // Force resume immediately to start camera feed.
-                            // The LifecycleObserver might miss the initial ON_RESUME if added too late.
-                            android.util.Log.v("MappingScreen", "SceneLayout: Calling resume() immediately")
-                            this.resume()
-                            sceneLayoutRef = this
-                        } else {
-                            android.util.Log.e("MappingScreen", "Context is not an Activity, cannot init SceneLayout")
+                SurfaceView(ctx).apply {
+                    holder.addCallback(object : SurfaceHolder.Callback {
+                        override fun surfaceCreated(holder: SurfaceHolder) {
+                            sphereSLAM?.setNativeWindow(holder.surface)
                         }
-                    } catch (e: Exception) {
-                        android.util.Log.e("MappingScreen", "Error initializing SceneLayout", e)
-                    }
+                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+                        override fun surfaceDestroyed(holder: SurfaceHolder) {
+                            sphereSLAM?.setNativeWindow(null)
+                        }
+                    })
                 }
             }
         )
 
         // 2. Nav Rail Layer
-        // Placed second to float above the camera feed.
         AzNavRail(
             navController = navController,
             currentDestination = "surveyor",
@@ -149,21 +269,97 @@ fun MappingScreen(
                 text = "Help",
                 route = "help",
                 onClick = {
-                    android.util.Log.v("MappingScreen", "Button: Help clicked. Toggling showInstructions to ${!showInstructions}")
                     showInstructions = !showInstructions
                 }
             )
         }
 
-        // 3. UI Overlay Layer (Instructions & Buttons)
-        // Placed last to float above everything (though rail handles its own z-index usually)
+        // 3. UI Overlay Layer
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 80.dp) // Offset for Rail
+                .padding(start = 80.dp)
         ) {
+            // Stats / State Overlay
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
+                val stateStr = when(trackingState) {
+                    -1 -> "SYSTEM NOT READY"
+                    0 -> "NO IMAGES"
+                    1 -> "NOT INITIALIZED"
+                    2 -> "TRACKING"
+                    3 -> "LOST"
+                    else -> "UNKNOWN"
+                }
+                Text(
+                    text = "State: $stateStr\n$statsText",
+                    color = Color.Green,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            // PhotoSphere Creation Overlay (Integrated)
+            if (isMapping) {
+                 PhotoSphereCreationScreen(
+                     onCaptureComplete = {
+                         isMapping = false
+                         // Save Map Stats
+                         try {
+                             val projectDir = context.getExternalFilesDir(null)
+                             val statsFile = java.io.File(projectDir, "scan_data.txt")
+                             statsFile.writeText(statsText)
+
+                             // Copy SphereSLAM Cache (Map Data)
+                             // Since SphereSLAM lacks an explicit saveMap() API, we assume it persists state to the cache directory provided at init.
+                             // TODO: SphereSLAM library update required to expose saveMap() API.
+                             val cacheDir = context.cacheDir
+                             if (cacheDir.exists() && cacheDir.isDirectory) {
+                                 val mapDir = java.io.File(projectDir, "sphereslam_map")
+                                 if (!mapDir.exists()) mapDir.mkdirs()
+
+                                 // Filter to avoid copying unrelated cache files
+                                 // We assume SLAM data has specific extensions or patterns (e.g., .bin, .yaml, .map)
+                                 // Since we don't know exact extensions, we copy all but exclude known temp dirs.
+                                 cacheDir.listFiles()?.forEach { file ->
+                                     if (file.isFile && !file.name.startsWith("tmp") && !file.name.endsWith(".tmp")) {
+                                         file.copyTo(java.io.File(mapDir, file.name), overwrite = true)
+                                     }
+                                 }
+                             }
+
+                             // PixelCopy screenshot (Preview)
+                             val view = (context as? Activity)?.window?.decorView
+                             view?.let {
+                                 val bitmap = Bitmap.createBitmap(it.width, it.height, Bitmap.Config.ARGB_8888)
+                                 val location = IntArray(2)
+                                 it.getLocationInWindow(location)
+                                 android.view.PixelCopy.request(
+                                     (context as Activity).window,
+                                     android.graphics.Rect(location[0], location[1], location[0] + it.width, location[1] + it.height),
+                                     bitmap,
+                                     { result ->
+                                         if (result == android.view.PixelCopy.SUCCESS) {
+                                             val imageFile = java.io.File(projectDir, "photosphere_preview.jpg")
+                                             java.io.FileOutputStream(imageFile).use { out ->
+                                                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                                             }
+                                         }
+                                     },
+                                     android.os.Handler(android.os.Looper.getMainLooper())
+                                 )
+                             }
+
+                             Toast.makeText(context, "Map Data & Preview Saved", Toast.LENGTH_SHORT).show()
+                         } catch (e: Exception) {
+                             android.util.Log.e("MappingScreen", "Error saving capture", e)
+                             Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                         }
+                     },
+                     onExit = { isMapping = false }
+                 )
+            }
+
             // Instructions Overlay
-            if (showInstructions) {
+            if (showInstructions && !isMapping) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -172,84 +368,23 @@ fun MappingScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "SURVEYOR MODE\n\n$currentInstruction",
+                        text = "SURVEYOR MODE\n\n1. Press 'Create PhotoSphere' to begin.",
                         color = Color.White,
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
             }
 
-            // Control Buttons
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(bottom = 96.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                // Start Button
-                com.hereliesaz.aznavrail.AzButton(
-                    text = "Start",
+            // Start Button (only if not mapping)
+            if (!isMapping) {
+                AzButton(
+                    text = "Create PhotoSphere",
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
-                        android.util.Log.v("MappingScreen", "Button: Start clicked")
-                        if (!isMapping) {
-                            try {
-                                if (slamManager == null && activity != null) {
-                                    android.util.Log.v("MappingScreen", "Re-initializing SlamManager")
-                                    slamManager = SlamManager(activity)
-                                }
-                                android.util.Log.v("MappingScreen", "Calling slamManager.init()")
-                                slamManager?.init()
-                                isMapping = true
-                                currentInstruction = mappingInstruction
-                                Toast.makeText(context, "Mapping Started", Toast.LENGTH_SHORT).show()
-                            } catch (e: Exception) {
-                                android.util.Log.e("MappingScreen", "Start Error", e)
-                                Toast.makeText(context, "Start Failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        } else {
-                            android.util.Log.v("MappingScreen", "Button: Start ignored (already mapping)")
-                        }
+                        isMapping = true
+                        sphereSLAM?.resetSystem()
                     },
-                    modifier = Modifier.padding(end = 16.dp)
-                )
-
-                // Stop Button
-                com.hereliesaz.aznavrail.AzButton(
-                    text = "Stop",
-                    shape = AzButtonShape.RECTANGLE,
-                    onClick = {
-                        android.util.Log.v("MappingScreen", "Button: Stop clicked")
-                        if (isMapping) {
-                            // slamManager?.stop() // SlamManager doesn't have stop(), maybe dispose() or pause()?
-                            android.util.Log.v("MappingScreen", "Setting isMapping = false")
-                            isMapping = false
-                            currentInstruction = saveInstruction
-                            Toast.makeText(context, "Mapping Stopped", Toast.LENGTH_SHORT).show()
-                        } else {
-                            android.util.Log.v("MappingScreen", "Button: Stop ignored (not mapping)")
-                        }
-                    },
-                    modifier = Modifier.padding(end = 16.dp)
-                )
-
-                // Save Button
-                com.hereliesaz.aznavrail.AzButton(
-                    text = "Save",
-                    shape = AzButtonShape.RECTANGLE,
-                    onClick = {
-                        android.util.Log.v("MappingScreen", "Button: Save clicked")
-                        try {
-                            android.util.Log.v("MappingScreen", "Calling slamManager.saveMap()")
-                            slamManager?.saveMap()
-                            currentInstruction = "Map Saved!\n$initialInstruction"
-                            Toast.makeText(context, "Map Save Requested", Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            android.util.Log.e("MappingScreen", "Save Error", e)
-                            Toast.makeText(context, "Save Failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
                 )
             }
         }

@@ -161,7 +161,7 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -184,6 +184,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            pickFirsts += "lib/arm64-v8a/libc++_shared.so"
         }
     }
 }
@@ -242,9 +245,8 @@ dependencies {
     // OpenCV
     implementation(libs.opencv)
 
-    // Sceneform-EQR
-    implementation(libs.eq.renderer)
-    implementation(libs.eq.slam)
+    // SphereSLAM
+    implementation(libs.sphere.slam)
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
