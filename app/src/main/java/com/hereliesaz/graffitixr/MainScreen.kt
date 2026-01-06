@@ -348,9 +348,67 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
                             azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
 
-                            azRailSubItem(id = "image", text = navStrings.open, hostId = "design_host", info = navStrings.openInfo) {
+                            val openButtonText = if (uiState.layers.isNotEmpty()) "Add" else navStrings.open
+                            val openButtonId = if (uiState.layers.isNotEmpty()) "add_layer" else "image"
+
+                            azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
                                 resetDialogs()
                                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }
+
+                            // Dynamic Layers
+                            // Visual order is reversed (last layer on top), so we iterate backwards for display.
+                            // However, azRailRelocItem newOrder will reflect the visual order.
+                            // We need to map visual order back to logical order (logical index 0 = bottom, last = top).
+
+                            val layers = uiState.layers
+                            val visualLayers = layers.reversed()
+
+                            visualLayers.forEach { layer ->
+                                azRailRelocItem(
+                                    id = "layer_${layer.id}",
+                                    hostId = "design_host",
+                                    text = layer.name,
+                                    onClick = { viewModel.onLayerActivated(layer.id) },
+                                    onRelocate = { _, _, newOrder ->
+                                        // newOrder is list of item IDs in new visual order (Top to Bottom)
+                                        // We need to convert this to Logical Order (Bottom to Top)
+                                        // Logical: [0: Bottom, 1: Middle, 2: Top]
+                                        // Visual: [Top, Middle, Bottom]
+                                        // So, Logical = Reversed(Visual)
+
+                                        val rawIds = newOrder.map { it.removePrefix("layer_") }
+                                        val logicalOrder = rawIds.reversed()
+                                        viewModel.onLayerReordered(logicalOrder)
+                                    }
+                                ) {
+                                    // Hidden Menu
+                                    inputItem(
+                                        hint = "Rename"
+                                        // prefill seems unsupported in 6.1 DSL based on error "No parameter with name 'prefill' found"
+                                        // I'll skip prefill or check if it takes a lambda with existing value?
+                                        // The snippet was `inputItem("Rename") { newName -> ... }`.
+                                        // I will just use hint for now.
+                                    ) { newName ->
+                                        viewModel.onLayerRenamed(layer.id, newName)
+                                    }
+
+                                    listItem(text = "Duplicate") {
+                                        viewModel.onLayerDuplicated(layer.id)
+                                    }
+
+                                    listItem(text = "Copy Mods") {
+                                        viewModel.copyLayerModifications(layer.id)
+                                    }
+
+                                    listItem(text = "Paste Mods") {
+                                        viewModel.pasteLayerModifications(layer.id)
+                                    }
+
+                                    listItem(text = "Remove") {
+                                        viewModel.onLayerRemoved(layer.id)
+                                    }
+                                }
                             }
 
                             if (uiState.editorMode == EditorMode.STATIC) {
