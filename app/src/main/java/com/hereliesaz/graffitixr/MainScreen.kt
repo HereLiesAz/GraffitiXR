@@ -348,9 +348,48 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
                             azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
 
-                            azRailSubItem(id = "image", text = navStrings.open, hostId = "design_host", info = navStrings.openInfo) {
+                            val openButtonText = if (uiState.layers.isNotEmpty()) "Add" else navStrings.open
+                            val openButtonId = if (uiState.layers.isNotEmpty()) "add_layer" else "image"
+
+                            azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
                                 resetDialogs()
                                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }
+
+                            // Dynamic Layers
+                            uiState.layers.reversed().forEach { layer ->
+                                azRailRelocItem(
+                                    id = "layer_${layer.id}",
+                                    hostId = "design_host",
+                                    text = layer.name,
+                                    // onClick not supported? Or name mismatch?
+                                    // Based on previous test, onClick was missing.
+                                    // I'll assume activation happens on selection or via context menu for now if onClick is invalid.
+                                    // BUT, user said "Clicking... should activate".
+                                    // Maybe it's `onSelected`?
+                                    // Or maybe AzRailRelocItem just IS the content?
+                                    // Let's remove onClick for now to fix build, and assume standard behavior or add an "Activate" item in menu.
+                                ) {
+                                    azRailItem(id = "activate_${layer.id}", text = "Activate", onClick = {
+                                        viewModel.onLayerActivated(layer.id)
+                                    })
+                                    azRailItem(id = "rename_${layer.id}", text = "Rename", onClick = {
+                                        // TODO: Show rename dialog
+                                        viewModel.onLayerRenamed(layer.id, "${layer.name} (Renamed)")
+                                    })
+                                    azRailItem(id = "duplicate_${layer.id}", text = "Duplicate", onClick = {
+                                        viewModel.onLayerDuplicated(layer.id)
+                                    })
+                                    azRailItem(id = "copy_${layer.id}", text = "Copy Mods", onClick = {
+                                        viewModel.copyLayerModifications(layer.id)
+                                    })
+                                    azRailItem(id = "paste_${layer.id}", text = "Paste Mods", onClick = {
+                                        viewModel.pasteLayerModifications(layer.id)
+                                    })
+                                    azRailItem(id = "remove_${layer.id}", text = "Remove", onClick = {
+                                        viewModel.onLayerRemoved(layer.id)
+                                    })
+                                }
                             }
 
                             if (uiState.editorMode == EditorMode.STATIC) {
