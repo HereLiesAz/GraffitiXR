@@ -26,6 +26,7 @@ import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.GithubRelease
+import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
 import com.hereliesaz.graffitixr.utils.BitmapUtils
@@ -872,25 +873,171 @@ class MainViewModel(
 
     fun onOverlayImageSelected(uri: Uri) {
         val showHint = !onboardingManager.hasSeenDoubleTapHint()
-        updateState(uiState.value.copy(overlayImageUri = uri, originalOverlayImageUri = uri, backgroundRemovedImageUri = null, isLineDrawing = false, showDoubleTapHint = showHint, activeRotationAxis = RotationAxis.Y))
+
+        // Multi-Layer Support
+        val newLayer = OverlayLayer(
+            id = java.util.UUID.randomUUID().toString(),
+            name = "Layer ${uiState.value.layers.size + 1}",
+            uri = uri,
+            originalUri = uri,
+            rotationY = uiState.value.rotationY,
+            rotationX = uiState.value.rotationX,
+            rotationZ = uiState.value.rotationZ,
+            scale = uiState.value.scale,
+            offset = uiState.value.offset
+        )
+        val newLayers = uiState.value.layers + newLayer
+
+        updateState(uiState.value.copy(
+            overlayImageUri = uri, // Keep for backward compat / single layer logic for now
+            originalOverlayImageUri = uri,
+            backgroundRemovedImageUri = null,
+            isLineDrawing = false,
+            showDoubleTapHint = showHint,
+            activeRotationAxis = RotationAxis.Y,
+            layers = newLayers,
+            activeLayerId = newLayer.id
+        ))
+    }
+
+    fun onLayerActivated(layerId: String) {
+        val layer = uiState.value.layers.find { it.id == layerId } ?: return
+
+        // Sync layer properties to UI controls
+        updateState(uiState.value.copy(
+            activeLayerId = layerId,
+            overlayImageUri = layer.uri,
+            originalOverlayImageUri = layer.originalUri,
+            backgroundRemovedImageUri = layer.backgroundRemovedUri,
+            scale = layer.scale,
+            rotationX = layer.rotationX,
+            rotationY = layer.rotationY,
+            rotationZ = layer.rotationZ,
+            offset = layer.offset,
+            opacity = layer.opacity,
+            brightness = layer.brightness,
+            contrast = layer.contrast,
+            saturation = layer.saturation,
+            colorBalanceR = layer.colorBalanceR,
+            colorBalanceG = layer.colorBalanceG,
+            colorBalanceB = layer.colorBalanceB,
+            curvesPoints = layer.curvesPoints,
+            blendMode = layer.blendMode
+        ), isUndoable = false)
+    }
+
+    fun onLayerReordered(fromId: String, toId: String) {
+        // Find indices
+        val layers = uiState.value.layers.toMutableList()
+        val fromIndex = layers.indexOfFirst { it.id == fromId }
+        val toIndex = layers.indexOfFirst { it.id == toId }
+
+        if (fromIndex != -1 && toIndex != -1) {
+            val item = layers.removeAt(fromIndex)
+            layers.add(toIndex, item)
+            updateState(uiState.value.copy(layers = layers))
+        }
+    }
+
+    fun onLayerRenamed(layerId: String, newName: String) {
+        val updatedLayers = uiState.value.layers.map {
+            if (it.id == layerId) it.copy(name = newName) else it
+        }
+        updateState(uiState.value.copy(layers = updatedLayers))
+    }
+
+    fun onLayerDuplicated(layerId: String) {
+        val layer = uiState.value.layers.find { it.id == layerId } ?: return
+        val newLayer = layer.copy(
+            id = java.util.UUID.randomUUID().toString(),
+            name = "${layer.name} Copy"
+        )
+        val updatedLayers = uiState.value.layers + newLayer
+        updateState(uiState.value.copy(layers = updatedLayers, activeLayerId = newLayer.id))
+    }
+
+    fun onLayerRemoved(layerId: String) {
+        val updatedLayers = uiState.value.layers.filter { it.id != layerId }
+        val nextActiveId = if (updatedLayers.isNotEmpty()) updatedLayers.last().id else null
+
+        // If removing the last layer, clear main overlay URIs
+        val overlayUri = if (updatedLayers.isEmpty()) null else uiState.value.overlayImageUri
+
+        updateState(uiState.value.copy(
+            layers = updatedLayers,
+            activeLayerId = nextActiveId,
+            overlayImageUri = overlayUri
+        ))
+    }
+
+    // Clipboard for layer modifications
+    private var clipboardLayer: OverlayLayer? = null
+
+    fun copyLayerModifications(layerId: String) {
+        val layer = uiState.value.layers.find { it.id == layerId } ?: return
+        clipboardLayer = layer
+        Toast.makeText(getApplication(), "Layer modifications copied", Toast.LENGTH_SHORT).show()
+    }
+
+    fun pasteLayerModifications(layerId: String) {
+        val source = clipboardLayer ?: return
+        val layers = uiState.value.layers.map { layer ->
+            if (layer.id == layerId) {
+                layer.copy(
+                    scale = source.scale,
+                    rotationX = source.rotationX,
+                    rotationY = source.rotationY,
+                    rotationZ = source.rotationZ,
+                    offset = source.offset,
+                    opacity = source.opacity,
+                    brightness = source.brightness,
+                    contrast = source.contrast,
+                    saturation = source.saturation,
+                    colorBalanceR = source.colorBalanceR,
+                    colorBalanceG = source.colorBalanceG,
+                    colorBalanceB = source.colorBalanceB,
+                    curvesPoints = source.curvesPoints,
+                    blendMode = source.blendMode
+                )
+            } else {
+                layer
+            }
+        }
+        updateState(uiState.value.copy(layers = layers))
+        // If pasting to active layer, sync UI
+        if (layerId == uiState.value.activeLayerId) {
+            onLayerActivated(layerId)
+        }
+        Toast.makeText(getApplication(), "Modifications pasted", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun updateActiveLayer(update: (OverlayLayer) -> OverlayLayer) {
+        val activeId = uiState.value.activeLayerId ?: return
+        val layers = uiState.value.layers.map {
+            if (it.id == activeId) update(it) else it
+        }
+        updateState(uiState.value.copy(layers = layers), isUndoable = false)
     }
 
     fun onOpacityChanged(opacity: Float) {
         // Sentinel Security: Clamp opacity to 0..1
         val safeOpacity = opacity.coerceIn(0f, 1f)
         updateState(uiState.value.copy(opacity = safeOpacity), isUndoable = false)
+        updateActiveLayer { it.copy(opacity = safeOpacity) }
     }
 
     fun onContrastChanged(contrast: Float) {
         // Sentinel Security: Clamp contrast to 0..2
         val safeContrast = contrast.coerceIn(0f, 2f)
         updateState(uiState.value.copy(contrast = safeContrast), isUndoable = false)
+        updateActiveLayer { it.copy(contrast = safeContrast) }
     }
 
     fun onSaturationChanged(saturation: Float) {
         // Sentinel Security: Clamp saturation to 0..2
         val safeSaturation = saturation.coerceIn(0f, 2f)
         updateState(uiState.value.copy(saturation = safeSaturation), isUndoable = false)
+        updateActiveLayer { it.copy(saturation = safeSaturation) }
     }
 
     fun onScaleChanged(scaleFactor: Float) {
@@ -898,10 +1045,13 @@ class MainViewModel(
         // Sentinel Security: Prevent scale explosion or collapse
         val newScale = (currentScale * scaleFactor).coerceIn(0.01f, 10.0f)
         updateState(uiState.value.copy(scale = newScale), isUndoable = false)
+        updateActiveLayer { it.copy(scale = newScale) }
     }
 
     fun onOffsetChanged(offset: Offset) {
-        updateState(uiState.value.copy(offset = uiState.value.offset + offset), isUndoable = false)
+        val newOffset = uiState.value.offset + offset
+        updateState(uiState.value.copy(offset = newOffset), isUndoable = false)
+        updateActiveLayer { it.copy(offset = newOffset) }
     }
 
     fun onEditorModeChanged(mode: EditorMode) {

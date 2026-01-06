@@ -7,6 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.AugmentedImageDatabase
 import com.hereliesaz.graffitixr.data.GithubRelease
+import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.data.RefinementPath
 import com.hereliesaz.graffitixr.utils.BlendModeParceler
 import com.hereliesaz.graffitixr.utils.DrawingPathsParceler
@@ -167,6 +168,10 @@ data class UiState(
     val overlayImageUri: Uri? = null,
     val originalOverlayImageUri: Uri? = null,
     val backgroundRemovedImageUri: Uri? = null,
+
+    // Multi-Layer Support
+    val layers: List<OverlayLayer> = emptyList(),
+    val activeLayerId: String? = null,
     val isLineDrawing: Boolean = false,
     val isBackgroundRemovalEnabled: Boolean = false,
     val isBackgroundRemovalLoading: Boolean = false,

@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 
 import android.util.Log
+import org.opencv.android.OpenCVLoader
 
 class MappingActivity : ComponentActivity() {
     private val TAG = "MappingActivity"
@@ -13,6 +14,13 @@ class MappingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.v(TAG, "onCreate: called")
+
+        if (!OpenCVLoader.initLocal()) {
+            Log.e(TAG, "OpenCVLoader.initLocal() failed")
+        } else {
+            Log.v(TAG, "OpenCVLoader.initLocal() success")
+        }
+
         setContent {
             GraffitiXRTheme {
                 MappingScreen(onExit = {
