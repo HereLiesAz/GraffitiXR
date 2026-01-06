@@ -926,16 +926,20 @@ class MainViewModel(
         ), isUndoable = false)
     }
 
-    fun onLayerReordered(fromId: String, toId: String) {
-        // Find indices
-        val layers = uiState.value.layers.toMutableList()
-        val fromIndex = layers.indexOfFirst { it.id == fromId }
-        val toIndex = layers.indexOfFirst { it.id == toId }
+    fun onLayerReordered(newOrderIds: List<String>) {
+        val currentLayers = uiState.value.layers
+        // Reorder current layers to match newOrderIds
+        // Note: newOrderIds might be partial or contain only relocatable items.
+        // But since all our layers are relocatable, we can assume 1:1 map.
 
-        if (fromIndex != -1 && toIndex != -1) {
-            val item = layers.removeAt(fromIndex)
-            layers.add(toIndex, item)
-            updateState(uiState.value.copy(layers = layers))
+        val reorderedLayers = newOrderIds.mapNotNull { id ->
+            currentLayers.find { it.id == id }
+        }
+
+        // If mapNotNull filtered out items (shouldn't happen in normal flow), append leftovers or handle error.
+        // For safety, we only update if sizes match.
+        if (reorderedLayers.size == currentLayers.size) {
+            updateState(uiState.value.copy(layers = reorderedLayers))
         }
     }
 

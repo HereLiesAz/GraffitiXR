@@ -115,6 +115,7 @@ fun MappingScreen(
 
         var yBuffer: java.nio.ByteBuffer? = null
         var yMat: Mat? = null
+        var reusableByteArray: ByteArray? = null
 
         val camManager = SphereCameraManager(context) { image ->
              try {
@@ -126,6 +127,7 @@ fun MappingScreen(
                  if (yBuffer == null || yBuffer!!.capacity() != ySize) {
                      yBuffer = java.nio.ByteBuffer.allocateDirect(ySize)
                      yMat = Mat(image.height, image.width, org.opencv.core.CvType.CV_8UC1)
+                     reusableByteArray = ByteArray(ySize)
                  }
 
                  // Copy Y plane (Luminance) which is sufficient for SLAM tracking
@@ -134,14 +136,13 @@ fun MappingScreen(
                  yBuffer!!.flip()
 
                  // Update Mat from buffer
-                 // We need to use a byte array for put() or direct buffer if supported,
-                 // but Mat.put(row, col, byte[]) is standard.
-                 // Optimization: Use a reusable byte array to avoid allocation.
-                 val data = ByteArray(ySize)
-                 yPlane.buffer.get(data)
-                 yMat!!.put(0, 0, data)
+                 if (reusableByteArray != null) {
+                     yPlane.buffer.rewind() // Ensure we read from start
+                     yPlane.buffer.get(reusableByteArray!!)
+                     yMat!!.put(0, 0, reusableByteArray!!)
 
-                 slam.processFrame(yMat!!.nativeObjAddr, image.timestamp.toDouble())
+                     slam.processFrame(yMat!!.nativeObjAddr, image.timestamp.toDouble())
+                 }
              } catch (e: Exception) {
                  android.util.Log.e("MappingScreen", "Error processing frame", e)
              } finally {
@@ -308,20 +309,23 @@ fun MappingScreen(
                              val statsFile = java.io.File(projectDir, "scan_data.txt")
                              statsFile.writeText(statsText)
 
-                             // Copy SphereSLAM Cache (Map Data)
-                             // Since SphereSLAM lacks an explicit saveMap() API, we assume it persists state to the cache directory provided at init.
-                             // TODO: SphereSLAM library update required to expose saveMap() API.
-                             val cacheDir = context.cacheDir
-                             if (cacheDir.exists() && cacheDir.isDirectory) {
-                                 val mapDir = java.io.File(projectDir, "sphereslam_map")
-                                 if (!mapDir.exists()) mapDir.mkdirs()
-
-                                 // Filter to avoid copying unrelated cache files
-                                 // We assume SLAM data has specific extensions or patterns (e.g., .bin, .yaml, .map)
-                                 // Since we don't know exact extensions, we copy all but exclude known temp dirs.
-                                 cacheDir.listFiles()?.forEach { file ->
-                                     if (file.isFile && !file.name.startsWith("tmp") && !file.name.endsWith(".tmp")) {
-                                         file.copyTo(java.io.File(mapDir, file.name), overwrite = true)
+                             // Save Map
+                             try {
+                                 val mapFile = java.io.File(projectDir, "slam_map.bin")
+                                 // Use reflection to call saveMap to handle potential compile-time dependency mismatch
+                                 // while ensuring functionality works if the method exists at runtime.
+                                 val method = sphereSLAM?.javaClass?.getMethod("saveMap", String::class.java)
+                                 method?.invoke(sphereSLAM, mapFile.absolutePath) ?: throw NoSuchMethodException("saveMap not found")
+                             } catch (e: Exception) {
+                                 // Fallback: Copy Cache
+                                 val cacheDir = context.cacheDir
+                                 if (cacheDir.exists() && cacheDir.isDirectory) {
+                                     val mapDir = java.io.File(projectDir, "sphereslam_map")
+                                     if (!mapDir.exists()) mapDir.mkdirs()
+                                     cacheDir.listFiles()?.forEach { file ->
+                                         if (file.isFile && !file.name.startsWith("tmp") && !file.name.endsWith(".tmp")) {
+                                             file.copyTo(java.io.File(mapDir, file.name), overwrite = true)
+                                         }
                                      }
                                  }
                              }

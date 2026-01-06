@@ -357,38 +357,57 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             }
 
                             // Dynamic Layers
-                            uiState.layers.reversed().forEach { layer ->
+                            // Visual order is reversed (last layer on top), so we iterate backwards for display.
+                            // However, azRailRelocItem newOrder will reflect the visual order.
+                            // We need to map visual order back to logical order (logical index 0 = bottom, last = top).
+
+                            val layers = uiState.layers
+                            val visualLayers = layers.reversed()
+
+                            visualLayers.forEach { layer ->
                                 azRailRelocItem(
                                     id = "layer_${layer.id}",
                                     hostId = "design_host",
                                     text = layer.name,
-                                    // onClick not supported? Or name mismatch?
-                                    // Based on previous test, onClick was missing.
-                                    // I'll assume activation happens on selection or via context menu for now if onClick is invalid.
-                                    // BUT, user said "Clicking... should activate".
-                                    // Maybe it's `onSelected`?
-                                    // Or maybe AzRailRelocItem just IS the content?
-                                    // Let's remove onClick for now to fix build, and assume standard behavior or add an "Activate" item in menu.
+                                    onClick = { viewModel.onLayerActivated(layer.id) },
+                                    onRelocate = { _, _, newOrder ->
+                                        // newOrder is list of item IDs in new visual order (Top to Bottom)
+                                        // We need to convert this to Logical Order (Bottom to Top)
+                                        // Logical: [0: Bottom, 1: Middle, 2: Top]
+                                        // Visual: [Top, Middle, Bottom]
+                                        // So, Logical = Reversed(Visual)
+
+                                        val rawIds = newOrder.map { it.removePrefix("layer_") }
+                                        val logicalOrder = rawIds.reversed()
+                                        viewModel.onLayerReordered(logicalOrder)
+                                    }
                                 ) {
-                                    azRailItem(id = "activate_${layer.id}", text = "Activate", onClick = {
-                                        viewModel.onLayerActivated(layer.id)
-                                    })
-                                    azRailItem(id = "rename_${layer.id}", text = "Rename", onClick = {
-                                        // TODO: Show rename dialog
-                                        viewModel.onLayerRenamed(layer.id, "${layer.name} (Renamed)")
-                                    })
-                                    azRailItem(id = "duplicate_${layer.id}", text = "Duplicate", onClick = {
+                                    // Hidden Menu
+                                    inputItem(
+                                        hint = "Rename"
+                                        // prefill seems unsupported in 6.1 DSL based on error "No parameter with name 'prefill' found"
+                                        // I'll skip prefill or check if it takes a lambda with existing value?
+                                        // The snippet was `inputItem("Rename") { newName -> ... }`.
+                                        // I will just use hint for now.
+                                    ) { newName ->
+                                        viewModel.onLayerRenamed(layer.id, newName)
+                                    }
+
+                                    listItem(text = "Duplicate") {
                                         viewModel.onLayerDuplicated(layer.id)
-                                    })
-                                    azRailItem(id = "copy_${layer.id}", text = "Copy Mods", onClick = {
+                                    }
+
+                                    listItem(text = "Copy Mods") {
                                         viewModel.copyLayerModifications(layer.id)
-                                    })
-                                    azRailItem(id = "paste_${layer.id}", text = "Paste Mods", onClick = {
+                                    }
+
+                                    listItem(text = "Paste Mods") {
                                         viewModel.pasteLayerModifications(layer.id)
-                                    })
-                                    azRailItem(id = "remove_${layer.id}", text = "Remove", onClick = {
+                                    }
+
+                                    listItem(text = "Remove") {
                                         viewModel.onLayerRemoved(layer.id)
-                                    })
+                                    }
                                 }
                             }
 
