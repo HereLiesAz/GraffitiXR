@@ -187,6 +187,10 @@ android {
         }
         jniLibs {
             pickFirsts += "lib/arm64-v8a/libc++_shared.so"
+            pickFirsts += "lib/arm64-v8a/libopencv_java4.so"
+            pickFirsts += "lib/armeabi-v7a/libopencv_java4.so"
+            pickFirsts += "lib/x86/libopencv_java4.so"
+            pickFirsts += "lib/x86_64/libopencv_java4.so"
         }
     }
 }
