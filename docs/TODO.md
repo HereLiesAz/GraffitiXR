@@ -14,6 +14,7 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Implement `MappingActivity` UI with `SceneLayout` and controls.
     -   [x] Replace `SlamCore` with local `SlamManager` to resolve compilation and integration issues.
     -   [x] Implement `saveMap` functionality via `SlamManager` native interface.
+    -   [x] Update `SphereSLAM` library to v0.4.27.167 to fix build and resolution issues.
 
 ## **V1.14 UI/UX Enhancements (Completed)**
 
