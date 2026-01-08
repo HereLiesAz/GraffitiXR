@@ -306,7 +306,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             .fillMaxHeight()
                     ) {
                         AzNavRail(
-                            navController = navController,
+                            navController = null,
                             currentDestination = currentRoute,
                             isLandscape = isLandscape
                         ) {

@@ -355,7 +355,7 @@ class MainViewModel(
 
                 val fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint)
 
-                arRenderer?.setAugmentedImageDatabase(listOf(originalBitmap))
+                arRenderer?.setAugmentedImageDatabase(uiState.value.capturedTargetImages)
                 arRenderer?.setFingerprint(fingerprint)
 
                 withContext(Dispatchers.Main) {
@@ -366,7 +366,6 @@ class MainViewModel(
                             isArTargetCreated = true,
                             arState = ArState.SEARCHING,
                             fingerprintJson = fingerprintJson,
-                            capturedTargetImages = emptyList(), // Clear the image cache
                             refinementPaths = emptyList(),    // Clear refinement paths
                             targetMaskUri = null              // Clear the mask URI
                         )
