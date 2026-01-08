@@ -3,10 +3,13 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.net.Uri
+import android.provider.MediaStore
 import android.view.Choreographer
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -15,8 +18,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,10 +46,9 @@ import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.sphereslam.SphereCameraManager
 import com.hereliesaz.sphereslam.SphereSLAM
-import android.graphics.Bitmap
-import org.opencv.core.Mat
+import java.io.File
+import java.io.FileOutputStream
 import android.os.Handler
 import android.os.HandlerThread
 
@@ -57,7 +62,6 @@ fun MappingScreen(
 
     // SphereSLAM State
     var sphereSLAM by remember { mutableStateOf<SphereSLAM?>(null) }
-    var cameraManager by remember { mutableStateOf<SphereCameraManager?>(null) }
 
     // Sensor Thread
     var sensorThread by remember { mutableStateOf<HandlerThread?>(null) }
@@ -68,41 +72,62 @@ fun MappingScreen(
     var gyroscope by remember { mutableStateOf<Sensor?>(null) }
 
     // UI State
-    var isMapping by remember { mutableStateOf(false) }
     var showInstructions by remember { mutableStateOf(true) }
     var statsText by remember { mutableStateOf("") }
     var trackingState by remember { mutableStateOf(-1) } // 0: No Images, 1: Not Init, 2: Tracking, 3: Lost
 
-    // Permissions
-    var hasCameraPermission by remember { mutableStateOf(false) }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasCameraPermission = isGranted
-        if (isGranted) {
-             Toast.makeText(context, "Camera Permission Granted", Toast.LENGTH_SHORT).show()
-        } else {
-             Toast.makeText(context, "Camera Permission Denied", Toast.LENGTH_SHORT).show()
+    // Launchers
+    val aospCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        // No result data expected from standard camera intent usually
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val inputStream = context.contentResolver.openInputStream(it)
+                inputStream?.use { input ->
+                    // Save to project dir
+                    val projectDir = context.getExternalFilesDir(null)
+                    val destFile = File(projectDir, "photosphere.jpg")
+                    FileOutputStream(destFile).use { output ->
+                        input.copyTo(output)
+                    }
+
+                    // Also save to cache dir for SphereSLAM if needed
+                    val cacheDir = context.cacheDir
+                    val cacheFile = File(cacheDir, "photosphere.jpg")
+                    cacheFile.writeBytes(destFile.readBytes())
+
+                    Toast.makeText(context, "Photosphere Imported Successfully", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Import Failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    LaunchedEffect(Unit) {
-        permissionLauncher.launch(Manifest.permission.CAMERA)
+    // Check for AOSP Camera
+    val packageManager = context.packageManager
+    val aospCameraPackage = "com.android.camera"
+    val hasAospCamera = remember {
+        try {
+            packageManager.getPackageInfo(aospCameraPackage, 0)
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     // Initialize SphereSLAM
     DisposableEffect(Unit) {
         android.util.Log.v("MappingScreen", "Initializing SphereSLAM")
-        // Use a dedicated cache subdirectory for safer saving
         val slamCacheDir = java.io.File(context.cacheDir, "sphereslam_cache")
         if (!slamCacheDir.exists()) slamCacheDir.mkdirs()
 
-        // SphereSLAM ctor calls initNative(assets, cacheDir.absolutePath)
-        // We cannot change the ctor call signature easily if it doesn't accept path,
-        // but if it takes context, it uses context.cacheDir.
-        // We will assume for now we can't change the path passed to JNI unless we change the library.
-        // However, we can clean the cache dir before starting to ensure we only save THIS session's data.
-        // Or we can filter later. For now, let's use the standard init.
         val slam = SphereSLAM(context)
         sphereSLAM = slam
 
@@ -113,49 +138,12 @@ fun MappingScreen(
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
-        var yBuffer: java.nio.ByteBuffer? = null
-        var yMat: Mat? = null
-        var reusableByteArray: ByteArray? = null
-
-        val camManager = SphereCameraManager(context) { image ->
-             try {
-                 val planes = image.planes
-                 val yPlane = planes[0]
-                 val ySize = yPlane.buffer.remaining()
-
-                 // Reallocate if needed
-                 if (yBuffer == null || yBuffer!!.capacity() != ySize) {
-                     yBuffer = java.nio.ByteBuffer.allocateDirect(ySize)
-                     yMat = Mat(image.height, image.width, org.opencv.core.CvType.CV_8UC1)
-                     reusableByteArray = ByteArray(ySize)
-                 }
-
-                 // Copy Y plane (Luminance) which is sufficient for SLAM tracking
-                 yBuffer!!.clear()
-                 yBuffer!!.put(yPlane.buffer)
-                 yBuffer!!.flip()
-
-                 // Update Mat from buffer
-                 if (reusableByteArray != null) {
-                     yPlane.buffer.rewind() // Ensure we read from start
-                     yPlane.buffer.get(reusableByteArray!!)
-                     yMat!!.put(0, 0, reusableByteArray!!)
-
-                     slam.processFrame(yMat!!.nativeObjAddr, image.timestamp.toDouble())
-                 }
-             } catch (e: Exception) {
-                 android.util.Log.e("MappingScreen", "Error processing frame", e)
-             } finally {
-                 image.close()
-             }
-        }
-        cameraManager = camManager
+        // Note: Manual camera capture via SphereCameraManager removed.
+        // We rely on external photosphere creation and import.
 
         onDispose {
             android.util.Log.v("MappingScreen", "Cleaning up SphereSLAM")
             slam.cleanup()
-            camManager.closeCamera()
-            camManager.stopBackgroundThread()
             thread.quitSafely()
         }
     }
@@ -180,7 +168,6 @@ fun MappingScreen(
             override fun doFrame(frameTimeNanos: Long) {
                 sphereSLAM?.renderFrame()
 
-                // Update stats occasionally
                 if (frameTimeNanos % 60 == 0L) {
                     sphereSLAM?.let {
                         trackingState = it.getTrackingState()
@@ -198,10 +185,6 @@ fun MappingScreen(
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     android.util.Log.v("MappingScreen", "Lifecycle: ON_RESUME")
-                    cameraManager?.startBackgroundThread()
-                    if (hasCameraPermission) {
-                        cameraManager?.openCamera()
-                    }
                     val handler = sensorThread?.let { Handler(it.looper) }
                     accelerometer?.let { sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_FASTEST, handler) }
                     gyroscope?.let { sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_FASTEST, handler) }
@@ -210,8 +193,6 @@ fun MappingScreen(
                 Lifecycle.Event.ON_PAUSE -> {
                     android.util.Log.v("MappingScreen", "Lifecycle: ON_PAUSE")
                     Choreographer.getInstance().removeFrameCallback(frameCallback)
-                    cameraManager?.closeCamera()
-                    cameraManager?.stopBackgroundThread()
                     sensorManager.unregisterListener(sensorListener)
                 }
                 else -> {}
@@ -298,72 +279,8 @@ fun MappingScreen(
                 )
             }
 
-            // PhotoSphere Creation Overlay (Integrated)
-            if (isMapping) {
-                 PhotoSphereCreationScreen(
-                     onCaptureComplete = {
-                         isMapping = false
-                         // Save Map Stats
-                         try {
-                             val projectDir = context.getExternalFilesDir(null)
-                             val statsFile = java.io.File(projectDir, "scan_data.txt")
-                             statsFile.writeText(statsText)
-
-                             // Save Map
-                             try {
-                                 val mapFile = java.io.File(projectDir, "slam_map.bin")
-                                 // Use reflection to call saveMap to handle potential compile-time dependency mismatch
-                                 // while ensuring functionality works if the method exists at runtime.
-                                 val method = sphereSLAM?.javaClass?.getMethod("saveMap", String::class.java)
-                                 method?.invoke(sphereSLAM, mapFile.absolutePath) ?: throw NoSuchMethodException("saveMap not found")
-                             } catch (e: Exception) {
-                                 // Fallback: Copy Cache
-                                 val cacheDir = context.cacheDir
-                                 if (cacheDir.exists() && cacheDir.isDirectory) {
-                                     val mapDir = java.io.File(projectDir, "sphereslam_map")
-                                     if (!mapDir.exists()) mapDir.mkdirs()
-                                     cacheDir.listFiles()?.forEach { file ->
-                                         if (file.isFile && !file.name.startsWith("tmp") && !file.name.endsWith(".tmp")) {
-                                             file.copyTo(java.io.File(mapDir, file.name), overwrite = true)
-                                         }
-                                     }
-                                 }
-                             }
-
-                             // PixelCopy screenshot (Preview)
-                             val view = (context as? Activity)?.window?.decorView
-                             view?.let {
-                                 val bitmap = Bitmap.createBitmap(it.width, it.height, Bitmap.Config.ARGB_8888)
-                                 val location = IntArray(2)
-                                 it.getLocationInWindow(location)
-                                 android.view.PixelCopy.request(
-                                     (context as Activity).window,
-                                     android.graphics.Rect(location[0], location[1], location[0] + it.width, location[1] + it.height),
-                                     bitmap,
-                                     { result ->
-                                         if (result == android.view.PixelCopy.SUCCESS) {
-                                             val imageFile = java.io.File(projectDir, "photosphere_preview.jpg")
-                                             java.io.FileOutputStream(imageFile).use { out ->
-                                                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-                                             }
-                                         }
-                                     },
-                                     android.os.Handler(android.os.Looper.getMainLooper())
-                                 )
-                             }
-
-                             Toast.makeText(context, "Map Data & Preview Saved", Toast.LENGTH_SHORT).show()
-                         } catch (e: Exception) {
-                             android.util.Log.e("MappingScreen", "Error saving capture", e)
-                             Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
-                         }
-                     },
-                     onExit = { isMapping = false }
-                 )
-            }
-
             // Instructions Overlay
-            if (showInstructions && !isMapping) {
+            if (showInstructions) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -372,23 +289,44 @@ fun MappingScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "SURVEYOR MODE\n\n1. Press 'Create PhotoSphere' to begin.",
+                        text = "SURVEYOR MODE\n\n1. Use 'Launch Camera' to take a photosphere.\n2. Use 'Import Photosphere' to load it.",
                         color = Color.White,
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
             }
 
-            // Start Button (only if not mapping)
-            if (!isMapping) {
+            // Controls
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 96.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+            ) {
+                if (hasAospCamera) {
+                    AzButton(
+                        text = "Launch Camera",
+                        shape = AzButtonShape.RECTANGLE,
+                        onClick = {
+                            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+                            intent.setPackage(aospCameraPackage)
+                            // Try to target the main activity directly as requested
+                            intent.setClassName(aospCameraPackage, "com.android.camera.CameraActivity")
+                            try {
+                                aospCameraLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not launch AOSP Camera", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                }
+
                 AzButton(
-                    text = "Create PhotoSphere",
+                    text = "Import Photosphere",
                     shape = AzButtonShape.RECTANGLE,
                     onClick = {
-                        isMapping = true
-                        sphereSLAM?.resetSystem()
-                    },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
+                        importLauncher.launch("image/*")
+                    }
                 )
             }
         }
