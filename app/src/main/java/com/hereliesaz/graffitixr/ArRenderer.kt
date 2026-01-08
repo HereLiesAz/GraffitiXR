@@ -770,10 +770,9 @@ class ArRenderer(
                     // Note: Standard ARCore uses Cloud Anchors for persistence.
                     config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
 
-                    if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
-                        config.depthMode = Config.DepthMode.AUTOMATIC
-                        isDepthSupported = true
-                    }
+                    // Disable Depth Mode to prevent native MediaPipe/motion_stereo crashes (RET_CHECK failures)
+                    config.depthMode = Config.DepthMode.DISABLED
+                    isDepthSupported = false
 
                     session!!.configure(config)
                     Log.d(TAG, "onResume: Session configured")
