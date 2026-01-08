@@ -62,6 +62,7 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
+import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.MockupScreen
@@ -506,6 +507,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
                 UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
 
+                if (showInfoScreen) {
+                    CustomHelpOverlay(
+                        uiState = uiState,
+                        navStrings = navStrings,
+                        onDismiss = { showInfoScreen = false }
+                    )
+                }
+
                 if (uiState.isMarkingProgress) {
                     DrawingCanvas(
                         paths = uiState.drawingPaths,
@@ -789,7 +798,7 @@ private fun AdjustmentsPanels(
     showColorBalanceDialog: Boolean,
     screenHeight: Dp
 ) {
-    if (uiState.overlayImageUri == null || uiState.hideUiForCapture || uiState.isTouchLocked) return
+    if ((uiState.overlayImageUri == null && uiState.layers.isEmpty()) || uiState.hideUiForCapture || uiState.isTouchLocked) return
 
     val showKnobs = showSliderDialog == "Adjust"
 
