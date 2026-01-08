@@ -275,7 +275,7 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        if (!sessionLock.tryLock()) return
+        sessionLock.lock()
 
         try {
             if (session == null || !isSessionResumed) {
@@ -416,7 +416,11 @@ class ArRenderer(
         Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
         Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
         Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
-        Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
+
+        // FIX: Only rotate -90 on X if we are on a Plane (PLACED), NOT if we are on an Image Target (LOCKED).
+        if (arState == ArState.PLACED) {
+            Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
+        }
 
         Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
 
