@@ -104,8 +104,10 @@ fun ArView(
         renderer.arState = uiState.arState
     }
 
-    if (uiState.overlayImageUri != null) {
-        renderer.updateOverlayImage(uiState.overlayImageUri)
+    LaunchedEffect(uiState.overlayImageUri) {
+        if (uiState.overlayImageUri != null) {
+            renderer.updateOverlayImage(uiState.overlayImageUri)
+        }
     }
 
     renderer.isAnchorReplacementAllowed = uiState.isCapturingTarget
