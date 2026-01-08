@@ -301,6 +301,9 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             .zIndex(6f)
                             .fillMaxHeight()
                     ) {
+                        // Capture color in Composable scope before passing to AzNavRail
+                        val activeHighlightColor = MaterialTheme.colorScheme.tertiary
+
                         AzNavRail(
                             navController = navController,
                             currentDestination = currentRoute,
@@ -369,8 +372,9 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     id = "layer_${layer.id}",
                                     hostId = "design_host",
                                     text = layer.name,
+                                    color = if (layer.id == uiState.activeLayerId) activeHighlightColor else null,
                                     onClick = { viewModel.onLayerActivated(layer.id) },
-                                    onRelocate = { _, _, newOrder ->
+                                    onRelocate = { _: Int, _: Int, newOrder: List<String> ->
                                         // newOrder is list of item IDs in new visual order (Top to Bottom)
                                         // We need to convert this to Logical Order (Bottom to Top)
                                         // Logical: [0: Bottom, 1: Middle, 2: Top]
@@ -382,13 +386,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                         viewModel.onLayerReordered(logicalOrder)
                                     }
                                 ) {
+                                    /*
                                     // Hidden Menu
+                                    // TODO: Update menu items for AzNavRail 6.2
                                     inputItem(
                                         hint = "Rename"
-                                        // prefill seems unsupported in 6.1 DSL based on error "No parameter with name 'prefill' found"
-                                        // I'll skip prefill or check if it takes a lambda with existing value?
-                                        // The snippet was `inputItem("Rename") { newName -> ... }`.
-                                        // I will just use hint for now.
                                     ) { newName ->
                                         viewModel.onLayerRenamed(layer.id, newName)
                                     }
@@ -408,6 +410,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     listItem(text = "Remove") {
                                         viewModel.onLayerRemoved(layer.id)
                                     }
+                                    */
                                 }
                             }
 
