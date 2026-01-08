@@ -203,7 +203,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 
     // Calculate current route for NavRail highlighting
-    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen) {
+    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId) {
         when {
             showInfoScreen -> "help"
             showSettings -> "settings_sub"
@@ -212,6 +212,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             showColorBalanceDialog -> "color_balance"
             uiState.isMarkingProgress -> "mark_progress"
             uiState.isCapturingTarget -> "create_target"
+            uiState.activeLayerId != null -> "layer_${uiState.activeLayerId}"
             uiState.editorMode == EditorMode.AR -> "ar"
             uiState.editorMode == EditorMode.OVERLAY -> "ghost_mode"
             uiState.editorMode == EditorMode.STATIC -> "mockup"

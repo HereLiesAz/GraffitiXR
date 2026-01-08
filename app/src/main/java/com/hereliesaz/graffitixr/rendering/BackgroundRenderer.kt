@@ -42,6 +42,10 @@ class BackgroundRenderer {
     fun createOnGlThread() {
         Log.d(TAG, "createOnGlThread: Initializing BackgroundRenderer")
 
+        // Reset state to ensure clean initialization
+        textureId = -1
+        program = 0
+
         // Generate the background texture.
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
@@ -80,6 +84,7 @@ class BackgroundRenderer {
         GLES20.glAttachShader(program, fragmentShader)
         GLES20.glLinkProgram(program)
         GLES20.glUseProgram(program)
+        checkGLError("createOnGlThread: After useProgram")
 
         val linkStatus = IntArray(1)
         GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
@@ -129,9 +134,17 @@ class BackgroundRenderer {
             return
         }
 
+        // Debug: Check for pre-existing errors
+        checkGLError("Before draw")
+
         if (!firstFrameLogged) {
             Log.d(TAG, "draw: First Frame drawing. TextureID: $textureId, Program: $program")
             firstFrameLogged = true
+        }
+
+        if (program == 0 || textureId == -1) {
+            Log.e(TAG, "draw: Invalid state. Program: $program, TextureID: $textureId")
+            return
         }
 
         // Disable depth test to ensure background is always drawn "behind" everything
