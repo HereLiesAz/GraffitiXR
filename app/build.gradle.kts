@@ -113,6 +113,15 @@ android {
         versionCode = vMajor * 10000000 + vMinor * 100000 + vPatch * 1000 + vBuild
         versionName = "$vMajor.$vMinor.$vPatch.$vBuild"
 
+        // Inject ARCore API Key
+        // Note: The Google Services plugin might also generate this resource if google-services.json is present.
+        // We check if it's already defined to avoid duplication errors, or use a different name if needed.
+        // However, ARCore specifically looks for com.google.android.ar.API_KEY meta-data which points to a string resource.
+        // If google-services.json provides it, we don't need to overwrite it, but the user explicitly asked to use ARCORE_API_KEY.
+        // To resolve the collision, we will use a specific name 'arcore_api_key' and update the manifest to reference it.
+        val arcoreApiKey = localProperties.getProperty("ARCORE_API_KEY") ?: System.getenv("ARCORE_API_KEY") ?: ""
+        resValue("string", "arcore_api_key", arcoreApiKey)
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
