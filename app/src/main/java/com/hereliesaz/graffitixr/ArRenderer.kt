@@ -625,6 +625,12 @@ class ArRenderer(
                 activeAnchor?.detach()
                 activeAnchor = hit.createAnchor()
 
+                val previousState = arState
+                arState = ArState.PLACED
+                if (previousState != ArState.PLACED) {
+                    mainHandler.post { onAnchorCreated() }
+                }
+
                 // Bolt Optimization: Reuse matrix
                 hit.hitPose.toMatrix(calculationPoseMatrix, 0)
                 arImagePose = calculationPoseMatrix
