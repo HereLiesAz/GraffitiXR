@@ -96,6 +96,9 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
+    // Capture theme color for AzNavRail
+    val activeHighlightColor = MaterialTheme.colorScheme.tertiary
+
     // UI Visibility States
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
@@ -203,7 +206,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 
     // Calculate current route for NavRail highlighting
-    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen) {
+    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId) {
         when {
             showInfoScreen -> "help"
             showSettings -> "settings_sub"
@@ -212,6 +215,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             showColorBalanceDialog -> "color_balance"
             uiState.isMarkingProgress -> "mark_progress"
             uiState.isCapturingTarget -> "create_target"
+            uiState.activeLayerId != null -> "layer_${uiState.activeLayerId}"
             uiState.editorMode == EditorMode.AR -> "ar"
             uiState.editorMode == EditorMode.OVERLAY -> "ghost_mode"
             uiState.editorMode == EditorMode.STATIC -> "mockup"
@@ -301,9 +305,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             .zIndex(6f)
                             .fillMaxHeight()
                     ) {
-                        // Capture color in Composable scope before passing to AzNavRail
-                        val activeHighlightColor = MaterialTheme.colorScheme.tertiary
-
                         AzNavRail(
                             navController = navController,
                             currentDestination = currentRoute,
@@ -315,6 +316,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 defaultShape = AzButtonShape.RECTANGLE,
                                 headerIconShape = AzHeaderIconShape.ROUNDED,
                                 infoScreen = showInfoScreen,
+                                activeColor = activeHighlightColor,
                                 onDismissInfoScreen = { showInfoScreen = false }
                             )
 
@@ -372,7 +374,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     id = "layer_${layer.id}",
                                     hostId = "design_host",
                                     text = layer.name,
-                                    color = if (layer.id == uiState.activeLayerId) activeHighlightColor else null,
                                     onClick = { viewModel.onLayerActivated(layer.id) },
                                     onRelocate = { _: Int, _: Int, newOrder: List<String> ->
                                         // newOrder is list of item IDs in new visual order (Top to Bottom)
@@ -386,9 +387,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                         viewModel.onLayerReordered(logicalOrder)
                                     }
                                 ) {
-                                    /*
                                     // Hidden Menu
-                                    // TODO: Update menu items for AzNavRail 6.2
                                     inputItem(
                                         hint = "Rename"
                                     ) { newName ->
@@ -410,7 +409,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     listItem(text = "Remove") {
                                         viewModel.onLayerRemoved(layer.id)
                                     }
-                                    */
                                 }
                             }
 
