@@ -702,20 +702,27 @@ class MainViewModel(
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
         val newScale = (currentScale * scaleFactor).coerceIn(0.01f, 10.0f)
-        updateState(uiState.value.copy(arObjectScale = newScale), isUndoable = false)
+        updateState(uiState.value.copy(arObjectScale = newScale, scale = newScale), isUndoable = false)
+        updateActiveLayer { it.copy(scale = newScale) }
     }
 
     fun onRotationXChanged(delta: Float) {
-        updateState(uiState.value.copy(rotationX = uiState.value.rotationX + delta), isUndoable = false)
+        val newRot = uiState.value.rotationX + delta
+        updateState(uiState.value.copy(rotationX = newRot), isUndoable = false)
+        updateActiveLayer { it.copy(rotationX = newRot) }
     }
 
     fun onRotationYChanged(delta: Float) {
-        updateState(uiState.value.copy(rotationY = uiState.value.rotationY + delta), isUndoable = false)
+        val newRot = uiState.value.rotationY + delta
+        updateState(uiState.value.copy(rotationY = newRot), isUndoable = false)
+        updateActiveLayer { it.copy(rotationY = newRot) }
     }
 
     fun onRotationZChanged(delta: Float) {
         val currentRotation = uiState.value.rotationZ
-        updateState(uiState.value.copy(rotationZ = currentRotation + delta), isUndoable = false)
+        val newRot = currentRotation + delta
+        updateState(uiState.value.copy(rotationZ = newRot), isUndoable = false)
+        updateActiveLayer { it.copy(rotationZ = newRot) }
     }
 
     fun onFeedbackShown() {
@@ -879,23 +886,30 @@ class MainViewModel(
             name = "Layer ${uiState.value.layers.size + 1}",
             uri = uri,
             originalUri = uri,
-            rotationY = uiState.value.rotationY,
-            rotationX = uiState.value.rotationX,
-            rotationZ = uiState.value.rotationZ,
-            scale = uiState.value.scale,
-            offset = uiState.value.offset
+            // Reset transforms for new layer
+            rotationY = 0f,
+            rotationX = 0f,
+            rotationZ = 0f,
+            scale = 1f,
+            offset = Offset.Zero
         )
         val newLayers = uiState.value.layers + newLayer
 
         updateState(uiState.value.copy(
-            overlayImageUri = uri, // Keep for backward compat / single layer logic for now
+            overlayImageUri = uri,
             originalOverlayImageUri = uri,
             backgroundRemovedImageUri = null,
             isLineDrawing = false,
             showDoubleTapHint = showHint,
             activeRotationAxis = RotationAxis.Y,
             layers = newLayers,
-            activeLayerId = newLayer.id
+            activeLayerId = newLayer.id,
+            // Also reset global controls to match new layer
+            rotationY = 0f,
+            rotationX = 0f,
+            rotationZ = 0f,
+            scale = 1f,
+            offset = Offset.Zero
         ))
     }
 

@@ -95,9 +95,26 @@ fun ArView(
         renderer.arState = uiState.arState
     }
 
+    renderer.activeLayerId = uiState.activeLayerId
+
+    // Push all layers to renderer for multi-layer support
+    LaunchedEffect(uiState.layers) {
+        renderer.setLayers(uiState.layers)
+    }
+
+    // Legacy support for single overlay image if layers are empty (fallback)
     LaunchedEffect(uiState.overlayImageUri) {
         if (uiState.overlayImageUri != null) {
             renderer.updateOverlayImage(uiState.overlayImageUri)
+            // Update legacy global properties just in case
+            renderer.opacity = uiState.opacity
+            renderer.scale = uiState.arObjectScale
+            renderer.rotationX = uiState.rotationX
+            renderer.rotationY = uiState.rotationY
+            renderer.rotationZ = uiState.rotationZ
+            renderer.colorBalanceR = uiState.colorBalanceR
+            renderer.colorBalanceG = uiState.colorBalanceG
+            renderer.colorBalanceB = uiState.colorBalanceB
         }
     }
 

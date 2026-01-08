@@ -106,6 +106,7 @@ class ArRenderer(
     // Multi-Layer Support
     private val layerBitmaps = ConcurrentHashMap<String, Bitmap>()
     @Volatile private var _layers: List<OverlayLayer> = emptyList()
+    @Volatile var activeLayerId: String? = null
     @Volatile var overlayBitmap: Bitmap? = null
 
     @Volatile var guideBitmap: Bitmap? = null
@@ -407,7 +408,7 @@ class ArRenderer(
         if (arImagePose != null) {
             // Draw Guide (Single)
             if (showGuide) {
-                drawLayer(guideBitmap, 1.0f, 0f, 0f, 0f, 0f, 0f, 1.0f, 1.0f, 1.0f)
+                drawLayer(guideBitmap, 1.0f, 0f, 0f, 0f, 0f, 0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, false)
             } else {
                 // Draw Layers (Multi)
                 // Use a snapshot of current layers to avoid race conditions
@@ -429,14 +430,17 @@ class ArRenderer(
                                 offY,
                                 layer.opacity,
                                 layer.brightness,
-                                layer.colorBalanceR
+                                layer.colorBalanceR,
+                                layer.colorBalanceG,
+                                layer.colorBalanceB,
+                                layer.id == activeLayerId
                             )
                         }
                     }
                 }
                 // Fallback for legacy overlayBitmap if layers are empty?
                 if (currentLayers.isEmpty() && overlayBitmap != null) {
-                    drawLayer(overlayBitmap, scale, rotationX, rotationY, rotationZ, 0f, 0f, opacity, brightness, colorBalanceR)
+                    drawLayer(overlayBitmap, scale, rotationX, rotationY, rotationZ, 0f, 0f, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB, true)
                 }
             }
         }
@@ -453,7 +457,10 @@ class ArRenderer(
         offsetY: Float,
         opacity: Float,
         brightness: Float,
-        colorR: Float
+        colorR: Float,
+        colorG: Float,
+        colorB: Float,
+        reportBounds: Boolean
     ) {
         if (bitmap == null) return
         val pose = arImagePose ?: return
@@ -467,6 +474,7 @@ class ArRenderer(
         // 1. Fix Orientation (Lay flat if on plane)
         // 2. User Rotation (Spin/Tilt relative to flat surface)
         // 3. User Scale (Size)
+        // 4. Translation (if any)
 
         // FIX: Only rotate -90 on X if we are on a Plane (PLACED), NOT if we are on an Image Target (LOCKED).
         // This must happen BEFORE user rotations so user rotates the "laid flat" object.
@@ -478,6 +486,13 @@ class ArRenderer(
         Matrix.rotateM(modelMtx, 0, rotZ, 0f, 0f, 1f)
         Matrix.rotateM(modelMtx, 0, rotX, 1f, 0f, 0f)
         Matrix.rotateM(modelMtx, 0, rotY, 0f, 1f, 0f)
+
+        // Translation
+        // Note: X/Y translation in 3D usually corresponds to X/Z on the plane.
+        // But since we rotated -90 X, Y is now Z.
+        // Assuming offsets are small relative values (meters).
+        // If offsetX/Y are 0, this does nothing.
+        Matrix.translateM(modelMtx, 0, offsetX, offsetY, 0f)
 
         Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
 
@@ -491,12 +506,14 @@ class ArRenderer(
         // Draw
         simpleQuadRenderer.draw(
             calculationMvpMatrix, calculationModelViewMatrix,
-            bitmap, opacity, brightness, colorR, 1.0f, 1.0f, // Simplified color balance for now
+            bitmap, opacity, brightness, colorR, colorG, colorB,
             if (isDepthSupported) depthTextureId else -1
         )
 
-        // Report bounds (this will report bounds for the last drawn layer, which corresponds to the top-most visual layer usually)
-        calculateAndReportBounds(calculationMvpMatrix)
+        // Report bounds only for active layer to ensure gestures target it
+        if (reportBounds) {
+            calculateAndReportBounds(calculationMvpMatrix)
+        }
     }
 
     /**
@@ -1050,6 +1067,23 @@ class ArRenderer(
     fun setLayers(newLayers: List<OverlayLayer>) {
         this._layers = newLayers
 
+        // Check if we need to load any bitmaps
+        var needsLoading = false
+        for (layer in newLayers) {
+            if (!layerBitmaps.containsKey(layer.id)) {
+                needsLoading = true
+                break
+            }
+        }
+
+        // Check for cleanup
+        val currentMapSize = layerBitmaps.size
+        if (!needsLoading && currentMapSize == newLayers.size) {
+            // Optimization: If counts match and we have all keys, assume synced.
+            // (Strictly we should check keys, but this covers the gesture update case perfectly)
+            return
+        }
+
         // Sync bitmaps
         CoroutineScope(Dispatchers.IO).launch {
             newLayers.forEach { layer ->
@@ -1070,9 +1104,7 @@ class ArRenderer(
                 }
             }
 
-            // Clean up old bitmaps?
-            // Optional: Remove IDs not in newLayers to save memory
-            // But be careful if layers are momentarily removed during reorder.
+            // Clean up old bitmaps
             val newIds = newLayers.map { it.id }.toSet()
             val iterator = layerBitmaps.iterator()
             while (iterator.hasNext()) {
