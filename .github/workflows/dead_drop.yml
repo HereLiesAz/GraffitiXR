@@ -5,6 +5,8 @@ on:
 
 jobs:
   drop-package:
+    permissions:
+      contents: read
     runs-on: windows-latest
     
     steps:
