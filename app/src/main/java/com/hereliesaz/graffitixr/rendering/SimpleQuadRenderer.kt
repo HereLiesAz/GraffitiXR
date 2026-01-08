@@ -188,6 +188,7 @@ class SimpleQuadRenderer {
         GLES20.glVertexAttribPointer(texCoordAttrib, 2, GLES20.GL_FLOAT, false, 0, texCoordBuffer)
         GLES20.glEnableVertexAttribArray(texCoordAttrib)
 
+        GLES20.glDisable(GLES20.GL_CULL_FACE)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, 4)
 
         GLES20.glDisableVertexAttribArray(positionAttrib)
