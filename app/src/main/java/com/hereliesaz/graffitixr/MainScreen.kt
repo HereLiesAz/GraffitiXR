@@ -62,6 +62,7 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
 import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
+import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
 import com.hereliesaz.graffitixr.composables.MockupScreen
@@ -505,6 +506,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
 
                 UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
+
+                if (showInfoScreen) {
+                    CustomHelpOverlay(
+                        uiState = uiState,
+                        navStrings = navStrings,
+                        onDismiss = { showInfoScreen = false }
+                    )
+                }
 
                 if (uiState.isMarkingProgress) {
                     DrawingCanvas(
