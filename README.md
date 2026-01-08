@@ -6,9 +6,7 @@ So I'm making something better by repurposing the grid method. I was always thin
 Progress tracking replaces those marks with the piece itself as you go, like an ever-evolving fingerprinted target.
 GraffitiXR is an advanced augmented reality application for Android, designed to assist artists in visualizing and planning large-scale artworks such as murals. The app provides a suite of tools to project a digital image onto a real-world surface, offering a seamless workflow from concept to creation.
 
-Just for shits and giggles, I included the non-AR version for image tracing just like you get with those other apps, too. Just in case you cray like that.      
-Or if you cray-cray, there's Mockup mode. Nab a picture of the wall, cuz I got some quick tools for a quick mockup.
-And if you've got nothing to prove, you just want something copied onto paper perfectly, Trace mode allows you to use your phone as a lightbox, keeping your screen on with the brightness turned up, locking your image into place and blocking all touches until you're finished. 
+Just for shits and giggles, I included the non-AR version for image tracing just like you get with those other apps, too. Just in case you cray like that. Or if you cray-cray, there's Mockup mode. Nab a picture of the wall, cuz I got some quick tools for a quick mockup. And if you've got nothing to prove, you just want something copied onto paper perfectly, Trace mode allows you to use your phone as a lightbox, keeping your screen on with the brightness turned up, locking your image into place and blocking all touches until you're finished. 
 
 
 ## Features
