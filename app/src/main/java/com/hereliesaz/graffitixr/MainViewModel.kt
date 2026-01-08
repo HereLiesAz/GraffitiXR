@@ -1461,19 +1461,43 @@ class MainViewModel(
                 // Prepare Source Points (from Normalized to Pixel coords)
                 val width = mat.cols().toDouble()
                 val height = mat.rows().toDouble()
+
+                // Geometric Sort: Ensure TL, TR, BR, BL order
+                // 1. Sort by Y to separate Top (0,1) and Bottom (2,3)
+                val sortedByY = points.sortedBy { it.y }
+                val topRow = sortedByY.take(2).sortedBy { it.x }
+                val bottomRow = sortedByY.takeLast(2).sortedBy { it.x }
+
+                // Now we have [TL, TR] and [BL, BR].
+                // Expected order for getPerspectiveTransform with dstArray below is TL, TR, BR, BL.
+                // Note: dstArray order below is (0,0), (w,0), (w,h), (0,h) which corresponds to TL, TR, BR, BL.
+                // Wait, logic check:
+                // dstArray index 0: 0,0 (TL)
+                // dstArray index 1: w,0 (TR)
+                // dstArray index 2: w,h (BR)
+                // dstArray index 3: 0,h (BL)
+
+                // So we need sortedPoints = [TL, TR, BR, BL]
+                val tl = topRow[0]
+                val tr = topRow[1]
+                val bl = bottomRow[0]
+                val br = bottomRow[1]
+
+                // Re-ordered list
+                val sortedPoints = listOf(tl, tr, br, bl)
+
                 val srcArray = DoubleArray(8)
-                // Points are TL, TR, BR, BL
-                srcArray[0] = points[0].x * width; srcArray[1] = points[0].y * height
-                srcArray[2] = points[1].x * width; srcArray[3] = points[1].y * height
-                srcArray[4] = points[2].x * width; srcArray[5] = points[2].y * height
-                srcArray[6] = points[3].x * width; srcArray[7] = points[3].y * height
+                srcArray[0] = sortedPoints[0].x * width; srcArray[1] = sortedPoints[0].y * height
+                srcArray[2] = sortedPoints[1].x * width; srcArray[3] = sortedPoints[1].y * height
+                srcArray[4] = sortedPoints[2].x * width; srcArray[5] = sortedPoints[2].y * height
+                srcArray[6] = sortedPoints[3].x * width; srcArray[7] = sortedPoints[3].y * height
 
                 // Calculate Dimensions of Resulting Rect using Pixel Coordinates
                 // Points are normalized (0..1), so convert to pixels first for distance calc
-                val brX = points[2].x * width; val brY = points[2].y * height
-                val blX = points[3].x * width; val blY = points[3].y * height
-                val trX = points[1].x * width; val trY = points[1].y * height
-                val tlX = points[0].x * width; val tlY = points[0].y * height
+                val brX = sortedPoints[2].x * width; val brY = sortedPoints[2].y * height
+                val blX = sortedPoints[3].x * width; val blY = sortedPoints[3].y * height
+                val trX = sortedPoints[1].x * width; val trY = sortedPoints[1].y * height
+                val tlX = sortedPoints[0].x * width; val tlY = sortedPoints[0].y * height
 
                 val widthA = sqrt((brX - blX).pow(2) + (brY - blY).pow(2))
                 val widthB = sqrt((trX - tlX).pow(2) + (trY - tlY).pow(2))

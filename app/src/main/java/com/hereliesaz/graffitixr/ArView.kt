@@ -91,15 +91,6 @@ fun ArView(
         }
     }
 
-    renderer.opacity = uiState.opacity
-    renderer.scale = uiState.arObjectScale
-    renderer.rotationX = uiState.rotationX
-    renderer.rotationY = uiState.rotationY
-    renderer.rotationZ = uiState.rotationZ
-    renderer.colorBalanceR = uiState.colorBalanceR
-    renderer.colorBalanceG = uiState.colorBalanceG
-    renderer.colorBalanceB = uiState.colorBalanceB
-
     if (uiState.arState != renderer.arState) {
         renderer.arState = uiState.arState
     }
@@ -200,7 +191,7 @@ fun ArView(
                         // Note: If capturing target, we only allow ZOOM.
                         val isGestureAllowed = pointerCount >= 1
 
-                        if (isGestureAllowed) {
+                        if (isGestureAllowed && !uiState.isImageLocked) {
                             val zoomChange = event.calculateZoom()
                             val rotationChange = event.calculateRotation()
                             val panChange = event.calculatePan()
