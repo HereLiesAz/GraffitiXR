@@ -28,6 +28,7 @@ import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.data.Fingerprint
+import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
@@ -49,6 +50,7 @@ import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.DescriptorMatcher
 import org.opencv.features2d.ORB
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
@@ -100,7 +102,13 @@ class ArRenderer(
     @Volatile private var captureNextFrame = false
     private var viewportWidth = 0
     private var viewportHeight = 0
+
+    // Multi-Layer Support
+    private val layerBitmaps = ConcurrentHashMap<String, Bitmap>()
+    @Volatile private var _layers: List<OverlayLayer> = emptyList()
+    @Volatile var activeLayerId: String? = null
     @Volatile var overlayBitmap: Bitmap? = null
+
     @Volatile var guideBitmap: Bitmap? = null
     @Volatile var showGuide: Boolean = false
     @Volatile var arImagePose: FloatArray? = null
@@ -119,7 +127,7 @@ class ArRenderer(
     // Background job for resuming the session
     private var resumeJob: Job? = null
 
-    // Transforms
+    // Legacy / Global Transforms (Retained for guide or fallbacks, but layers use their own)
     var opacity: Float = 1.0f
     var brightness: Float = 0f
     var scale: Float = 1.0f
@@ -129,6 +137,7 @@ class ArRenderer(
     var colorBalanceR: Float = 1.0f
     var colorBalanceG: Float = 1.0f
     var colorBalanceB: Float = 1.0f
+
     var isAnchorReplacementAllowed: Boolean = false
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
@@ -275,7 +284,7 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        if (!sessionLock.tryLock()) return
+        sessionLock.lock()
 
         try {
             if (session == null || !isSessionResumed) {
@@ -397,32 +406,114 @@ class ArRenderer(
         }
 
         if (arImagePose != null) {
-            updateModelMatrix()
-            // Bolt Optimization: Calculate MVP once per frame
-            Matrix.multiplyMM(calculationModelViewMatrix, 0, viewMtx, 0, calculationModelMatrix, 0)
-            Matrix.multiplyMM(calculationMvpMatrix, 0, projMtx, 0, calculationModelViewMatrix, 0)
+            // Draw Guide (Single)
+            if (showGuide) {
+                drawLayer(guideBitmap, 1.0f, 0f, 0f, 0f, 0f, 0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, false)
+            } else {
+                // Draw Layers (Multi)
+                // Use a snapshot of current layers to avoid race conditions
+                val currentLayers = _layers
+                for (layer in currentLayers) {
+                    if (layer.isVisible) {
+                        val bitmap = layerBitmaps[layer.id]
+                        if (bitmap != null) {
+                            val offX = layer.offset.x
+                            val offY = layer.offset.y
 
-            drawArtwork(calculationMvpMatrix, calculationModelViewMatrix)
-            calculateAndReportBounds(calculationMvpMatrix)
+                            drawLayer(
+                                bitmap,
+                                layer.scale,
+                                layer.rotationX,
+                                layer.rotationY,
+                                layer.rotationZ,
+                                offX,
+                                offY,
+                                layer.opacity,
+                                layer.brightness,
+                                layer.colorBalanceR,
+                                layer.colorBalanceG,
+                                layer.colorBalanceB,
+                                layer.id == activeLayerId
+                            )
+                        }
+                    }
+                }
+                // Fallback for legacy overlayBitmap if layers are empty?
+                if (currentLayers.isEmpty() && overlayBitmap != null) {
+                    drawLayer(overlayBitmap, scale, rotationX, rotationY, rotationZ, 0f, 0f, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB, true)
+                }
+            }
         }
     }
 
-    private fun updateModelMatrix() {
+    // Updated helper to draw a specific layer with its own transforms
+    private fun drawLayer(
+        bitmap: Bitmap?,
+        scale: Float,
+        rotX: Float,
+        rotY: Float,
+        rotZ: Float,
+        offsetX: Float,
+        offsetY: Float,
+        opacity: Float,
+        brightness: Float,
+        colorR: Float,
+        colorG: Float,
+        colorB: Float,
+        reportBounds: Boolean
+    ) {
+        if (bitmap == null) return
         val pose = arImagePose ?: return
+
         // Bolt Optimization: Reuse matrix
         System.arraycopy(pose, 0, calculationModelMatrix, 0, 16)
         val modelMtx = calculationModelMatrix
 
-        Matrix.rotateM(modelMtx, 0, rotationZ, 0f, 0f, 1f)
-        Matrix.rotateM(modelMtx, 0, rotationX, 1f, 0f, 0f)
-        Matrix.rotateM(modelMtx, 0, rotationY, 0f, 1f, 0f)
-        Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
+        // Apply Transforms
+        // Order matters:
+        // 1. Fix Orientation (Lay flat if on plane)
+        // 2. User Rotation (Spin/Tilt relative to flat surface)
+        // 3. User Scale (Size)
+        // 4. Translation (if any)
+
+        // FIX: Only rotate -90 on X if we are on a Plane (PLACED), NOT if we are on an Image Target (LOCKED).
+        // This must happen BEFORE user rotations so user rotates the "laid flat" object.
+        if (arState == ArState.PLACED) {
+            Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
+        }
+
+        // Apply User Layer Transforms
+        Matrix.rotateM(modelMtx, 0, rotZ, 0f, 0f, 1f)
+        Matrix.rotateM(modelMtx, 0, rotX, 1f, 0f, 0f)
+        Matrix.rotateM(modelMtx, 0, rotY, 0f, 1f, 0f)
+
+        // Translation
+        // Note: X/Y translation in 3D usually corresponds to X/Z on the plane.
+        // But since we rotated -90 X, Y is now Z.
+        // Assuming offsets are small relative values (meters).
+        // If offsetX/Y are 0, this does nothing.
+        Matrix.translateM(modelMtx, 0, offsetX, offsetY, 0f)
 
         Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
 
-        val bitmap = if (showGuide) guideBitmap else overlayBitmap
-        val aspectRatio = if (bitmap != null && bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
+        val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
+
+        // Bolt Optimization: Calculate MVP once per frame per layer
+        Matrix.multiplyMM(calculationModelViewMatrix, 0, viewMtx, 0, modelMtx, 0)
+        Matrix.multiplyMM(calculationMvpMatrix, 0, projMtx, 0, calculationModelViewMatrix, 0)
+
+        // Draw
+        simpleQuadRenderer.draw(
+            calculationMvpMatrix, calculationModelViewMatrix,
+            bitmap, opacity, brightness, colorR, colorG, colorB,
+            if (isDepthSupported) depthTextureId else -1
+        )
+
+        // Report bounds only for active layer to ensure gestures target it
+        if (reportBounds) {
+            calculateAndReportBounds(calculationMvpMatrix)
+        }
     }
 
     /**
@@ -472,32 +563,39 @@ class ArRenderer(
         }
     }
 
-    private fun drawArtwork(mvpMatrix: FloatArray, modelViewMatrix: FloatArray) {
-        val bitmap = if (showGuide) guideBitmap else overlayBitmap
-        if (bitmap == null) return
-        // Bolt Optimization: use pre-calculated calculationModelMatrix from updateModelMatrix()
-
-        // Force full opacity for guide
-        val drawOpacity = if (showGuide) 1.0f else opacity
-
-        simpleQuadRenderer.draw(
-            mvpMatrix, modelViewMatrix,
-            bitmap, drawOpacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB,
-            if (isDepthSupported) depthTextureId else -1
-        )
-    }
-
     private fun handleTap(frame: Frame) {
         val tap = tapQueue.poll() ?: return
         val hitResult = frame.hitTest(tap.first, tap.second)
         for (hit in hitResult) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                activeAnchor?.detach()
-                activeAnchor = hit.createAnchor()
-                arState = ArState.PLACED
-                mainHandler.post { onAnchorCreated() }
-                break
+
+                // Green Surface Check (Parallel to Screen)
+                // ViewMatrix: World -> Camera. Camera Forward = -ViewMtx.Row2 (indices 2,6,10)
+                val camFwdX = -viewMtx[2]
+                val camFwdY = -viewMtx[6]
+                val camFwdZ = -viewMtx[10]
+
+                // Plane Normal: Y axis of Plane Center Pose
+                // Use hit pose or plane center pose? Ideally plane normal.
+                val hitPose = hit.hitPose
+                // Pose.toMatrix converts to Model Matrix. Col 1 (4,5,6) is Y axis (Normal)
+                hitPose.toMatrix(calculationPoseMatrix, 0)
+                val normX = calculationPoseMatrix[4]
+                val normY = calculationPoseMatrix[5]
+                val normZ = calculationPoseMatrix[6]
+
+                val dot = camFwdX * normX + camFwdY * normY + camFwdZ * normZ
+                val absDot = abs(dot)
+
+                // Threshold from PlaneRenderer for "Green"
+                if (absDot > 0.7f) {
+                    activeAnchor?.detach()
+                    activeAnchor = hit.createAnchor()
+                    arState = ArState.PLACED
+                    mainHandler.post { onAnchorCreated() }
+                    break
+                }
             }
         }
     }
@@ -882,6 +980,9 @@ class ArRenderer(
             cachedCaptureBitmap?.recycle()
             cachedCaptureBitmap = null
 
+            // Clear Layer Bitmaps
+            layerBitmaps.clear()
+
         } catch (e: Exception) {
             Log.e(TAG, "Cleanup error", e)
         } finally {
@@ -944,6 +1045,8 @@ class ArRenderer(
     }
 
     fun updateOverlayImage(uri: Uri) {
+        // Legacy Support - Map to "Default" layer or similar?
+        // Ideally we transition fully to setLayers.
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val request = ImageRequest.Builder(context)
@@ -957,6 +1060,58 @@ class ArRenderer(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Overlay update error", e)
+            }
+        }
+    }
+
+    fun setLayers(newLayers: List<OverlayLayer>) {
+        this._layers = newLayers
+
+        // Check if we need to load any bitmaps
+        var needsLoading = false
+        for (layer in newLayers) {
+            if (!layerBitmaps.containsKey(layer.id)) {
+                needsLoading = true
+                break
+            }
+        }
+
+        // Check for cleanup
+        val currentMapSize = layerBitmaps.size
+        if (!needsLoading && currentMapSize == newLayers.size) {
+            // Optimization: If counts match and we have all keys, assume synced.
+            // (Strictly we should check keys, but this covers the gesture update case perfectly)
+            return
+        }
+
+        // Sync bitmaps
+        CoroutineScope(Dispatchers.IO).launch {
+            newLayers.forEach { layer ->
+                if (!layerBitmaps.containsKey(layer.id)) {
+                    try {
+                        val request = ImageRequest.Builder(context)
+                            .data(layer.uri)
+                            .allowHardware(false) // GL needs software bitmap
+                            .build()
+                        val result = context.imageLoader.execute(request)
+                        val drawable = result.drawable
+                        if (drawable is android.graphics.drawable.BitmapDrawable) {
+                            layerBitmaps[layer.id] = drawable.bitmap
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to load layer bitmap: ${layer.id}", e)
+                    }
+                }
+            }
+
+            // Clean up old bitmaps
+            val newIds = newLayers.map { it.id }.toSet()
+            val iterator = layerBitmaps.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (!newIds.contains(entry.key)) {
+                    iterator.remove()
+                }
             }
         }
     }

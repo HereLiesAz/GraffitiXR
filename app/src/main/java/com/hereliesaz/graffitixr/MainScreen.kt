@@ -789,7 +789,7 @@ private fun AdjustmentsPanels(
     showColorBalanceDialog: Boolean,
     screenHeight: Dp
 ) {
-    if (uiState.overlayImageUri == null || uiState.hideUiForCapture || uiState.isTouchLocked) return
+    if ((uiState.overlayImageUri == null && uiState.layers.isEmpty()) || uiState.hideUiForCapture || uiState.isTouchLocked) return
 
     val showKnobs = showSliderDialog == "Adjust"
 

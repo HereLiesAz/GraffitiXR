@@ -702,20 +702,27 @@ class MainViewModel(
     fun onArObjectScaleChanged(scaleFactor: Float) {
         val currentScale = uiState.value.arObjectScale
         val newScale = (currentScale * scaleFactor).coerceIn(0.01f, 10.0f)
-        updateState(uiState.value.copy(arObjectScale = newScale), isUndoable = false)
+        updateState(uiState.value.copy(arObjectScale = newScale, scale = newScale), isUndoable = false)
+        updateActiveLayer { it.copy(scale = newScale) }
     }
 
     fun onRotationXChanged(delta: Float) {
-        updateState(uiState.value.copy(rotationX = uiState.value.rotationX + delta), isUndoable = false)
+        val newRot = uiState.value.rotationX + delta
+        updateState(uiState.value.copy(rotationX = newRot), isUndoable = false)
+        updateActiveLayer { it.copy(rotationX = newRot) }
     }
 
     fun onRotationYChanged(delta: Float) {
-        updateState(uiState.value.copy(rotationY = uiState.value.rotationY + delta), isUndoable = false)
+        val newRot = uiState.value.rotationY + delta
+        updateState(uiState.value.copy(rotationY = newRot), isUndoable = false)
+        updateActiveLayer { it.copy(rotationY = newRot) }
     }
 
     fun onRotationZChanged(delta: Float) {
         val currentRotation = uiState.value.rotationZ
-        updateState(uiState.value.copy(rotationZ = currentRotation + delta), isUndoable = false)
+        val newRot = currentRotation + delta
+        updateState(uiState.value.copy(rotationZ = newRot), isUndoable = false)
+        updateActiveLayer { it.copy(rotationZ = newRot) }
     }
 
     fun onFeedbackShown() {
@@ -879,23 +886,30 @@ class MainViewModel(
             name = "Layer ${uiState.value.layers.size + 1}",
             uri = uri,
             originalUri = uri,
-            rotationY = uiState.value.rotationY,
-            rotationX = uiState.value.rotationX,
-            rotationZ = uiState.value.rotationZ,
-            scale = uiState.value.scale,
-            offset = uiState.value.offset
+            // Reset transforms for new layer
+            rotationY = 0f,
+            rotationX = 0f,
+            rotationZ = 0f,
+            scale = 1f,
+            offset = Offset.Zero
         )
         val newLayers = uiState.value.layers + newLayer
 
         updateState(uiState.value.copy(
-            overlayImageUri = uri, // Keep for backward compat / single layer logic for now
+            overlayImageUri = uri,
             originalOverlayImageUri = uri,
             backgroundRemovedImageUri = null,
             isLineDrawing = false,
             showDoubleTapHint = showHint,
             activeRotationAxis = RotationAxis.Y,
             layers = newLayers,
-            activeLayerId = newLayer.id
+            activeLayerId = newLayer.id,
+            // Also reset global controls to match new layer
+            rotationY = 0f,
+            rotationX = 0f,
+            rotationZ = 0f,
+            scale = 1f,
+            offset = Offset.Zero
         ))
     }
 
@@ -1461,19 +1475,43 @@ class MainViewModel(
                 // Prepare Source Points (from Normalized to Pixel coords)
                 val width = mat.cols().toDouble()
                 val height = mat.rows().toDouble()
+
+                // Geometric Sort: Ensure TL, TR, BR, BL order
+                // 1. Sort by Y to separate Top (0,1) and Bottom (2,3)
+                val sortedByY = points.sortedBy { it.y }
+                val topRow = sortedByY.take(2).sortedBy { it.x }
+                val bottomRow = sortedByY.takeLast(2).sortedBy { it.x }
+
+                // Now we have [TL, TR] and [BL, BR].
+                // Expected order for getPerspectiveTransform with dstArray below is TL, TR, BR, BL.
+                // Note: dstArray order below is (0,0), (w,0), (w,h), (0,h) which corresponds to TL, TR, BR, BL.
+                // Wait, logic check:
+                // dstArray index 0: 0,0 (TL)
+                // dstArray index 1: w,0 (TR)
+                // dstArray index 2: w,h (BR)
+                // dstArray index 3: 0,h (BL)
+
+                // So we need sortedPoints = [TL, TR, BR, BL]
+                val tl = topRow[0]
+                val tr = topRow[1]
+                val bl = bottomRow[0]
+                val br = bottomRow[1]
+
+                // Re-ordered list
+                val sortedPoints = listOf(tl, tr, br, bl)
+
                 val srcArray = DoubleArray(8)
-                // Points are TL, TR, BR, BL
-                srcArray[0] = points[0].x * width; srcArray[1] = points[0].y * height
-                srcArray[2] = points[1].x * width; srcArray[3] = points[1].y * height
-                srcArray[4] = points[2].x * width; srcArray[5] = points[2].y * height
-                srcArray[6] = points[3].x * width; srcArray[7] = points[3].y * height
+                srcArray[0] = sortedPoints[0].x * width; srcArray[1] = sortedPoints[0].y * height
+                srcArray[2] = sortedPoints[1].x * width; srcArray[3] = sortedPoints[1].y * height
+                srcArray[4] = sortedPoints[2].x * width; srcArray[5] = sortedPoints[2].y * height
+                srcArray[6] = sortedPoints[3].x * width; srcArray[7] = sortedPoints[3].y * height
 
                 // Calculate Dimensions of Resulting Rect using Pixel Coordinates
                 // Points are normalized (0..1), so convert to pixels first for distance calc
-                val brX = points[2].x * width; val brY = points[2].y * height
-                val blX = points[3].x * width; val blY = points[3].y * height
-                val trX = points[1].x * width; val trY = points[1].y * height
-                val tlX = points[0].x * width; val tlY = points[0].y * height
+                val brX = sortedPoints[2].x * width; val brY = sortedPoints[2].y * height
+                val blX = sortedPoints[3].x * width; val blY = sortedPoints[3].y * height
+                val trX = sortedPoints[1].x * width; val trY = sortedPoints[1].y * height
+                val tlX = sortedPoints[0].x * width; val tlY = sortedPoints[0].y * height
 
                 val widthA = sqrt((brX - blX).pow(2) + (brY - blY).pow(2))
                 val widthB = sqrt((trX - tlX).pow(2) + (trY - tlY).pow(2))
