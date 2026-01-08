@@ -741,8 +741,8 @@ class ArRenderer(
                     }
 
                     // Enable Local Anchor Persistence for Multi-Point Calibration
-                    // TODO: Enable this when API dependency resolves correctly.
-                    // config.anchorPersistenceMode = Config.AnchorPersistenceMode.LOCAL
+                    // Note: Standard ARCore uses Cloud Anchors for persistence.
+                    config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
 
                     if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                         config.depthMode = Config.DepthMode.AUTOMATIC
