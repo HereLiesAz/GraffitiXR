@@ -64,6 +64,7 @@
             android:name="com.google.ar.core"
             android:value="optional"
             tools:replace="android:value" />
+        <meta-data android:name="com.google.android.ar.API_KEY" android:value="@string/google_api_key"/>
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="subject_segment" />
 
         <provider
