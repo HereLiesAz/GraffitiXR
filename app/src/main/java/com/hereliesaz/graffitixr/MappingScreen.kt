@@ -106,6 +106,18 @@ fun MappingScreen(
         val slam = SphereSLAM(context)
         sphereSLAM = slam
 
+        // Resolve processFrame method dynamically to handle version mismatches between environments
+        var processFrameMethod: java.lang.reflect.Method? = null
+        try {
+            processFrameMethod = slam.javaClass.getMethod("processFrame", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+        } catch (e: NoSuchMethodException) {
+            try {
+                processFrameMethod = slam.javaClass.getMethod("processFrame", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType)
+            } catch (e2: Exception) {
+                android.util.Log.e("MappingScreen", "processFrame method not found")
+            }
+        }
+
         val thread = HandlerThread("SensorThread")
         thread.start()
         sensorThread = thread
@@ -141,7 +153,13 @@ fun MappingScreen(
                      yPlane.buffer.get(reusableByteArray!!)
                      yMat!!.put(0, 0, reusableByteArray!!)
 
-                     slam.processFrame(yMat!!.nativeObjAddr, image.timestamp.toDouble())
+                     if (processFrameMethod != null) {
+                         if (processFrameMethod!!.parameterCount == 5) {
+                             processFrameMethod!!.invoke(slam, yMat!!.nativeObjAddr, image.timestamp.toDouble(), image.width, image.height, yPlane.rowStride)
+                         } else {
+                             processFrameMethod!!.invoke(slam, yMat!!.nativeObjAddr, image.timestamp.toDouble())
+                         }
+                     }
                  }
              } catch (e: Exception) {
                  android.util.Log.e("MappingScreen", "Error processing frame", e)
