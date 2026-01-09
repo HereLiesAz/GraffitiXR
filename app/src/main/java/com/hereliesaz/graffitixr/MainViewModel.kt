@@ -816,6 +816,7 @@ class MainViewModel(
                         fOut.close()
                         val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
                         updateState(uiState.value.copy(overlayImageUri = newUri, backgroundRemovedImageUri = newUri, isLoading = false))
+                        updateActiveLayer { it.copy(uri = newUri, backgroundRemovedUri = newUri) }
                     } else {
                         setLoading(false)
                         Toast.makeText(getApplication(), "Background removal failed", Toast.LENGTH_SHORT).show()
@@ -845,6 +846,7 @@ class MainViewModel(
                 val restoreUri = uiState.value.backgroundRemovedImageUri ?: uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri
                 if (restoreUri != null) {
                     updateState(uiState.value.copy(overlayImageUri = restoreUri, isLineDrawing = false, isLoading = false))
+                    updateActiveLayer { it.copy(uri = restoreUri) }
                 } else {
                     updateState(uiState.value.copy(isLineDrawing = false, isLoading = false))
                 }
@@ -863,6 +865,7 @@ class MainViewModel(
                 fOut.close()
                 val newUri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
                 updateState(uiState.value.copy(overlayImageUri = newUri, isLineDrawing = true, isLoading = false))
+                updateActiveLayer { it.copy(uri = newUri) }
             } else {
                 setLoading(false)
             }
@@ -1178,6 +1181,7 @@ class MainViewModel(
         }
         Toast.makeText(getApplication(), "Blend Mode: ${nextMode}", Toast.LENGTH_SHORT).show()
         updateState(uiState.value.copy(blendMode = nextMode))
+        updateActiveLayer { it.copy(blendMode = nextMode) }
     }
 
     fun onMagicClicked() {

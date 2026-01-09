@@ -32,7 +32,7 @@ fun UndoRedoRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp),
+            .padding(end = 48.dp), // Reduced start padding (handled by parent or default)
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

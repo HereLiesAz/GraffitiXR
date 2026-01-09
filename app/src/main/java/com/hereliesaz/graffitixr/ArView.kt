@@ -232,9 +232,21 @@ fun ArView(
                             }
 
                             if (pastTouchSlop) {
-                                // Pan: Block only if showing grid guide
-                                if (panChange != androidx.compose.ui.geometry.Offset.Zero && !uiState.isGridGuideVisible) {
-                                    glSurfaceView.queueEvent { renderer.queuePan(panChange.x, panChange.y) }
+                                // Pan Logic
+                                if (panChange != androidx.compose.ui.geometry.Offset.Zero) {
+                                    if (uiState.isGridGuideVisible) {
+                                        // Creating Target: Always move anchor (World)
+                                        glSurfaceView.queueEvent { renderer.queuePan(panChange.x, panChange.y) }
+                                    } else if (uiState.activeLayerId != null) {
+                                        // Layer Active: Move Individual Layer Offset
+                                        // Scale factor: pixels to meters (approximate)
+                                        val scaleFactor = 0.0005f
+                                        val offsetDelta = androidx.compose.ui.geometry.Offset(panChange.x * scaleFactor, -panChange.y * scaleFactor)
+                                        viewModel.onOffsetChanged(offsetDelta)
+                                    } else {
+                                        // No Layer Active: Move Anchor (World)
+                                        glSurfaceView.queueEvent { renderer.queuePan(panChange.x, panChange.y) }
+                                    }
                                 }
 
                                 // Zoom: Allow always (as requested)

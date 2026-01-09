@@ -29,6 +29,11 @@ class SimpleQuadRenderer {
     private var depthTextureUniform = 0
     private var useDepthUniform = 0
 
+    // Blending Uniforms
+    private var backgroundTextureUniform = 0
+    private var screenSizeUniform = 0
+    private var blendModeUniform = 0
+
     private var vertexBuffer: FloatBuffer? = null
     private var texCoordBuffer: FloatBuffer? = null
     private var textureId = -1
@@ -55,35 +60,80 @@ class SimpleQuadRenderer {
         """
 
         val fragmentShaderCode = """
+            #extension GL_OES_EGL_image_external : require
             precision mediump float;
             uniform sampler2D u_Texture;
+            uniform samplerExternalOES u_BackgroundTexture;
             uniform sampler2D u_DepthTexture;
             uniform int u_UseDepth;
             uniform float u_Alpha;
             uniform float u_Brightness;
             uniform vec3 u_ColorBalance;
+            uniform vec2 u_ScreenSize;
+            uniform int u_BlendMode;
+
             varying vec2 v_TexCoord;
             varying float v_ViewDepth;
             
-            // Constant: Depth scale (mm to meters approx or raw units)
-            // ARCore depth is 16-bit uint in mm. 
-            // We assume depth texture is bound correctly.
-            
+            vec3 applyBlend(vec3 dst, vec3 src, int mode) {
+                if (mode == 0) return mix(dst, src, 1.0); // Normal (Handled by Alpha Mix later)
+                if (mode == 1) return dst * src; // Multiply
+                if (mode == 2) return 1.0 - (1.0 - dst) * (1.0 - src); // Screen
+                if (mode == 3) { // Overlay
+                    vec3 res;
+                    for (int i = 0; i < 3; i++) {
+                        if (dst[i] < 0.5) res[i] = 2.0 * dst[i] * src[i];
+                        else res[i] = 1.0 - 2.0 * (1.0 - dst[i]) * (1.0 - src[i]);
+                    }
+                    return res;
+                }
+                if (mode == 4) return min(dst, src); // Darken
+                if (mode == 5) return max(dst, src); // Lighten
+                return src;
+            }
+
             void main() {
-                vec4 color = texture2D(u_Texture, v_TexCoord);
+                vec4 srcColor = texture2D(u_Texture, v_TexCoord);
+
+                // Fetch background color for blending
+                vec2 screenUV = gl_FragCoord.xy / u_ScreenSize;
+                vec4 dstColor = texture2D(u_BackgroundTexture, screenUV);
+
                 float visibility = 1.0;
 
                 if (u_UseDepth == 1) {
-                    // NOTE: To implement strict occlusion, we need screen coordinates.
-                    // This shader is a "Pass-Through" that prepares for occlusion 
-                    // but defaults to visible to prevent black-screen issues if uniforms are missing.
-                    // In a production polish phase, we add u_ScreenSize to sample gl_FragCoord.
+                    // Depth Logic (Placeholder)
                 }
 
-                color.rgb *= u_ColorBalance;
-                color.rgb += u_Brightness;
+                srcColor.rgb *= u_ColorBalance;
+                srcColor.rgb += u_Brightness;
+                srcColor.rgb = clamp(srcColor.rgb, 0.0, 1.0);
+
+                vec3 blendedRGB = srcColor.rgb;
+
+                if (u_BlendMode != 0 && u_BlendMode != 13) { // 0=SrcOver (Default), 13=SrcOver (Compose Enum fallback)
+                    // Custom Blending Math
+                    // Blend source with background
+                    // Result = Mix(Background, BlendedResult, SourceAlpha * GlobalAlpha)
+
+                    vec3 mixed = applyBlend(dstColor.rgb, srcColor.rgb, u_BlendMode);
+
+                    // We output the mixed color with full alpha, but we rely on GL blending being disabled or set to (ONE, ZERO)
+                    // Wait, standard rendering pipeline has background already drawn.
+                    // If we output gl_FragColor = vec4(mixed, alpha), and GL_BLEND is (SRC_ALPHA, ONE_MINUS_SRC_ALPHA):
+                    // Final = mixed * alpha + dst * (1-alpha)
+                    // If mode is Multiply, mixed = src * dst.
+                    // Final = src*dst*alpha + dst - dst*alpha = dst * (src*alpha + 1 - alpha) -> Correct lerp.
+
+                    blendedRGB = mixed;
+                }
+
+                // For modes like Screen/Multiply, the math usually assumes opaque source.
+                // We just output the calculated color.
+                // However, standard GL blending is ON in ArRenderer.
+                // We should output the computed blend as the color, and let alpha do the mixing intensity.
                 
-                gl_FragColor = vec4(clamp(color.rgb, 0.0, 1.0), color.a * u_Alpha * visibility);
+                gl_FragColor = vec4(blendedRGB, srcColor.a * u_Alpha * visibility);
             }
         """
 
@@ -106,6 +156,10 @@ class SimpleQuadRenderer {
 
         depthTextureUniform = GLES20.glGetUniformLocation(program, "u_DepthTexture")
         useDepthUniform = GLES20.glGetUniformLocation(program, "u_UseDepth")
+
+        backgroundTextureUniform = GLES20.glGetUniformLocation(program, "u_BackgroundTexture")
+        screenSizeUniform = GLES20.glGetUniformLocation(program, "u_ScreenSize")
+        blendModeUniform = GLES20.glGetUniformLocation(program, "u_BlendMode")
 
         // Geometry: Vertical Quad (X-Y Plane)
         val vertices = floatArrayOf(
@@ -149,7 +203,11 @@ class SimpleQuadRenderer {
         colorR: Float,
         colorG: Float,
         colorB: Float,
-        depthTextureId: Int = -1
+        depthTextureId: Int = -1,
+        backgroundTextureId: Int,
+        viewWidth: Float,
+        viewHeight: Float,
+        blendMode: androidx.compose.ui.graphics.BlendMode
     ) {
         if (lastBitmap != bitmap) {
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
@@ -168,6 +226,19 @@ class SimpleQuadRenderer {
         GLES20.glUniform1f(alphaUniform, alpha)
         GLES20.glUniform1f(brightnessUniform, brightness)
         GLES20.glUniform3f(colorBalanceUniform, colorR, colorG, colorB)
+        GLES20.glUniform2f(screenSizeUniform, viewWidth, viewHeight)
+
+        // Map Compose BlendMode to Integer
+        val modeInt = when(blendMode) {
+            androidx.compose.ui.graphics.BlendMode.SrcOver -> 0
+            androidx.compose.ui.graphics.BlendMode.Multiply -> 1
+            androidx.compose.ui.graphics.BlendMode.Screen -> 2
+            androidx.compose.ui.graphics.BlendMode.Overlay -> 3
+            androidx.compose.ui.graphics.BlendMode.Darken -> 4
+            androidx.compose.ui.graphics.BlendMode.Lighten -> 5
+            else -> 0
+        }
+        GLES20.glUniform1i(blendModeUniform, modeInt)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
@@ -180,6 +251,14 @@ class SimpleQuadRenderer {
             GLES20.glUniform1i(useDepthUniform, 1)
         } else {
             GLES20.glUniform1i(useDepthUniform, 0)
+        }
+
+        // Bind Background Texture (OES)
+        // Ensure to use a texture unit that doesn't conflict. 0=Tex, 1=Depth. Use 2.
+        if (backgroundTextureId != -1) {
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE2)
+            GLES20.glBindTexture(android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES, backgroundTextureId)
+            GLES20.glUniform1i(backgroundTextureUniform, 2)
         }
 
         GLES20.glVertexAttribPointer(positionAttrib, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer)
