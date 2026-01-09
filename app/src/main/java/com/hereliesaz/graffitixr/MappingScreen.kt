@@ -3,10 +3,13 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Handler
+import android.os.HandlerThread
 import android.view.Choreographer
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -36,16 +39,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.rememberNavController
+import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.sphereslam.SphereCameraManager
 import com.hereliesaz.sphereslam.SphereSLAM
-import android.graphics.Bitmap
 import org.opencv.core.Mat
-import android.os.Handler
-import android.os.HandlerThread
 
 @Composable
 fun MappingScreen(
@@ -141,7 +141,13 @@ fun MappingScreen(
                      yPlane.buffer.get(reusableByteArray!!)
                      yMat!!.put(0, 0, reusableByteArray!!)
 
-                     slam.processFrame(yMat!!.nativeObjAddr, image.timestamp.toDouble())
+                     slam.processFrame(
+                         yMat!!.nativeObjAddr, 
+                         image.timestamp.toDouble(),
+                         image.width,
+                         image.height,
+                         yPlane.rowStride
+                     )
                  }
              } catch (e: Exception) {
                  android.util.Log.e("MappingScreen", "Error processing frame", e)
