@@ -408,12 +408,12 @@ class ArRenderer(
         if (arImagePose != null) {
             // Draw Guide (Single)
             if (showGuide) {
-                drawLayer(guideBitmap, 1.0f, 0f, 0f, 0f, 0f, 0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, false)
+                drawLayer(guideBitmap, 1.0f, 0f, 0f, 0f, 0f, 0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, false, -1, androidx.compose.ui.graphics.BlendMode.SrcOver)
             } else {
                 // Draw Layers (Multi)
                 // Use a snapshot of current layers to avoid race conditions
                 val currentLayers = _layers
-                for (layer in currentLayers) {
+                currentLayers.forEachIndexed { index, layer ->
                     if (layer.isVisible) {
                         val bitmap = layerBitmaps[layer.id]
                         if (bitmap != null) {
@@ -433,14 +433,16 @@ class ArRenderer(
                                 layer.colorBalanceR,
                                 layer.colorBalanceG,
                                 layer.colorBalanceB,
-                                layer.id == activeLayerId
+                                layer.id == activeLayerId,
+                                index,
+                                layer.blendMode
                             )
                         }
                     }
                 }
                 // Fallback for legacy overlayBitmap if layers are empty?
                 if (currentLayers.isEmpty() && overlayBitmap != null) {
-                    drawLayer(overlayBitmap, scale, rotationX, rotationY, rotationZ, 0f, 0f, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB, true)
+                    drawLayer(overlayBitmap, scale, rotationX, rotationY, rotationZ, 0f, 0f, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB, true, 0, androidx.compose.ui.graphics.BlendMode.SrcOver)
                 }
             }
         }
@@ -460,7 +462,9 @@ class ArRenderer(
         colorR: Float,
         colorG: Float,
         colorB: Float,
-        reportBounds: Boolean
+        reportBounds: Boolean,
+        layerIndex: Int,
+        blendMode: androidx.compose.ui.graphics.BlendMode
     ) {
         if (bitmap == null) return
         val pose = arImagePose ?: return
@@ -492,7 +496,9 @@ class ArRenderer(
         // But since we rotated -90 X, Y is now Z.
         // Assuming offsets are small relative values (meters).
         // If offsetX/Y are 0, this does nothing.
-        Matrix.translateM(modelMtx, 0, offsetX, offsetY, 0f)
+        // Apply Z-offset based on index to prevent Z-fighting (tremor)
+        val zOffset = if (layerIndex >= 0) layerIndex * 0.001f else 0f
+        Matrix.translateM(modelMtx, 0, offsetX, offsetY, zOffset)
 
         Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
 
@@ -507,7 +513,11 @@ class ArRenderer(
         simpleQuadRenderer.draw(
             calculationMvpMatrix, calculationModelViewMatrix,
             bitmap, opacity, brightness, colorR, colorG, colorB,
-            if (isDepthSupported) depthTextureId else -1
+            if (isDepthSupported) depthTextureId else -1,
+            backgroundRenderer.textureId,
+            viewportWidth.toFloat(),
+            viewportHeight.toFloat(),
+            blendMode
         )
 
         // Report bounds only for active layer to ensure gestures target it

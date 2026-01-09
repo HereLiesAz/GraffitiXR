@@ -375,7 +375,13 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     id = "layer_${layer.id}",
                                     hostId = "design_host",
                                     text = layer.name,
-                                    onClick = { viewModel.onLayerActivated(layer.id) },
+                                    onClick = {
+                                        // Only activate if not already active.
+                                        // If already active, let AzNavRail handle the second click to open the hidden menu.
+                                        if (uiState.activeLayerId != layer.id) {
+                                            viewModel.onLayerActivated(layer.id)
+                                        }
+                                    },
                                     onRelocate = { _: Int, _: Int, newOrder: List<String> ->
                                         // newOrder is list of item IDs in new visual order (Top to Bottom)
                                         // We need to convert this to Logical Order (Bottom to Top)
@@ -432,11 +438,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 azDivider()
 
                                 azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                                    showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
+                                    showSliderDialog = "Adjust" // Explicitly set, do not toggle to avoid double-click issues
                                     showColorBalanceDialog = false
                                 }
                                 azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
-                                    showColorBalanceDialog = !showColorBalanceDialog
+                                    showColorBalanceDialog = true // Explicitly set
                                     showSliderDialog = null
                                 }
                                 azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.blending, info = navStrings.blendingInfo, onClick = {
@@ -810,7 +816,7 @@ private fun AdjustmentsPanels(
         onMagicClicked = viewModel::onMagicClicked,
         modifier = Modifier
             .zIndex(3f)
-            .padding(start = 100.dp, bottom = screenHeight * 0.075f)
+            .padding(start = 80.dp, bottom = screenHeight * 0.075f) // Reduced padding
     )
 
     if (showKnobs) {
