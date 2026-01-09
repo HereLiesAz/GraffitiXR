@@ -3,13 +3,10 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.app.Activity
 import android.content.Context
-import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.Handler
-import android.os.HandlerThread
 import android.view.Choreographer
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -43,9 +40,13 @@ import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
+import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.sphereslam.SphereCameraManager
 import com.hereliesaz.sphereslam.SphereSLAM
+import android.graphics.Bitmap
 import org.opencv.core.Mat
+import android.os.Handler
+import android.os.HandlerThread
 
 @Composable
 fun MappingScreen(
@@ -106,6 +107,18 @@ fun MappingScreen(
         val slam = SphereSLAM(context)
         sphereSLAM = slam
 
+        // Resolve processFrame method dynamically to handle version mismatches between environments
+        var processFrameMethod: java.lang.reflect.Method? = null
+        try {
+            processFrameMethod = slam.javaClass.getMethod("processFrame", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+        } catch (e: NoSuchMethodException) {
+            try {
+                processFrameMethod = slam.javaClass.getMethod("processFrame", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType)
+            } catch (e2: Exception) {
+                android.util.Log.e("MappingScreen", "processFrame method not found")
+            }
+        }
+
         val thread = HandlerThread("SensorThread")
         thread.start()
         sensorThread = thread
@@ -142,12 +155,19 @@ fun MappingScreen(
                      yMat!!.put(0, 0, reusableByteArray!!)
 
                      slam.processFrame(
-                         yMat!!.nativeObjAddr, 
+                         yMat!!.nativeObjAddr,
                          image.timestamp.toDouble(),
                          image.width,
                          image.height,
                          yPlane.rowStride
                      )
+                     if (processFrameMethod != null) {
+                         if (processFrameMethod!!.parameterCount == 5) {
+                             processFrameMethod!!.invoke(slam, yMat!!.nativeObjAddr, image.timestamp.toDouble(), image.width, image.height, yPlane.rowStride)
+                         } else {
+                             processFrameMethod!!.invoke(slam, yMat!!.nativeObjAddr, image.timestamp.toDouble())
+                         }
+                     }
                  }
              } catch (e: Exception) {
                  android.util.Log.e("MappingScreen", "Error processing frame", e)
