@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import android.app.DownloadManager
 import android.content.Context
-import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.net.Uri
@@ -12,7 +11,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
@@ -48,13 +46,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStreamReader
 import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlin.math.max
@@ -665,7 +666,7 @@ class MainViewModel(
                     rotationY = uiState.value.rotationY,
                     offset = uiState.value.offset,
                     blendMode = uiState.value.blendMode,
-                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString(it) },
+                    fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString<Fingerprint>(it) },
                     drawingPaths = uiState.value.drawingPaths,
                     progressPercentage = uiState.value.progressPercentage,
                     evolutionImageUris = uiState.value.evolutionCaptureUris,
@@ -1247,7 +1248,7 @@ class MainViewModel(
                 rotationY = snapshot.rotationY,
                 offset = snapshot.offset,
                 blendMode = snapshot.blendMode,
-                fingerprint = snapshot.fingerprintJson?.let { Json.decodeFromString(Fingerprint.serializer(), it) },
+                fingerprint = snapshot.fingerprintJson?.let { Json.decodeFromString<Fingerprint>(it) },
                 drawingPaths = snapshot.drawingPaths,
                 progressPercentage = snapshot.progressPercentage,
                 evolutionImageUris = snapshot.evolutionCaptureUris,
@@ -1397,7 +1398,7 @@ class MainViewModel(
                     connection.requestMethod = "GET"; connection.connectTimeout = 5000; connection.readTimeout = 5000
                     connection.setRequestProperty("User-Agent", "GraffitiXR-App")
                     if (connection.responseCode == 200) {
-                        val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
+                        val reader = BufferedReader(InputStreamReader(connection.inputStream))
                         val response = StringBuilder(); var line: String?
                         while (reader.readLine().also { line = it } != null) response.append(line)
                         reader.close()
@@ -1471,37 +1472,31 @@ class MainViewModel(
     fun unwarpImage(points: List<Offset>) {
         val bitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            // --- EXPLICIT MAT MANAGEMENT IN VIEWMODEL ---
+            val mat = Mat()
+            val warped = Mat()
+            val transform = Mat()
+            val srcMat = Mat(4, 2, CvType.CV_32F)
+            val dstMat = Mat(4, 2, CvType.CV_32F)
+            
             try {
-                // Convert Bitmap to Mat
-                val mat = Mat()
+                // Ensure library is loaded before any Mat usage
+                if (!OpenCVLoader.initLocal()) {
+                    Log.e("MainViewModel", "OpenCV not initialized for unwarpImage")
+                    return@launch
+                }
+
                 Utils.bitmapToMat(bitmap, mat)
 
-                // Prepare Source Points (from Normalized to Pixel coords)
                 val width = mat.cols().toDouble()
                 val height = mat.rows().toDouble()
 
-                // Geometric Sort: Ensure TL, TR, BR, BL order
-                // 1. Sort by Y to separate Top (0,1) and Bottom (2,3)
                 val sortedByY = points.sortedBy { it.y }
                 val topRow = sortedByY.take(2).sortedBy { it.x }
                 val bottomRow = sortedByY.takeLast(2).sortedBy { it.x }
 
-                // Now we have [TL, TR] and [BL, BR].
-                // Expected order for getPerspectiveTransform with dstArray below is TL, TR, BR, BL.
-                // Note: dstArray order below is (0,0), (w,0), (w,h), (0,h) which corresponds to TL, TR, BR, BL.
-                // Wait, logic check:
-                // dstArray index 0: 0,0 (TL)
-                // dstArray index 1: w,0 (TR)
-                // dstArray index 2: w,h (BR)
-                // dstArray index 3: 0,h (BL)
-
-                // So we need sortedPoints = [TL, TR, BR, BL]
-                val tl = topRow[0]
-                val tr = topRow[1]
-                val bl = bottomRow[0]
-                val br = bottomRow[1]
-
-                // Re-ordered list
+                val tl = topRow[0]; val tr = topRow[1]
+                val bl = bottomRow[0]; val br = bottomRow[1]
                 val sortedPoints = listOf(tl, tr, br, bl)
 
                 val srcArray = DoubleArray(8)
@@ -1510,8 +1505,6 @@ class MainViewModel(
                 srcArray[4] = sortedPoints[2].x * width; srcArray[5] = sortedPoints[2].y * height
                 srcArray[6] = sortedPoints[3].x * width; srcArray[7] = sortedPoints[3].y * height
 
-                // Calculate Dimensions of Resulting Rect using Pixel Coordinates
-                // Points are normalized (0..1), so convert to pixels first for distance calc
                 val brX = sortedPoints[2].x * width; val brY = sortedPoints[2].y * height
                 val blX = sortedPoints[3].x * width; val blY = sortedPoints[3].y * height
                 val trX = sortedPoints[1].x * width; val trY = sortedPoints[1].y * height
@@ -1525,7 +1518,6 @@ class MainViewModel(
                 val heightB = sqrt((tlX - blX).pow(2) + (tlY - blY).pow(2))
                 val maxHeight = max(heightA, heightB)
 
-                // Prepare Destination Points
                 val dstArray = doubleArrayOf(
                     0.0, 0.0,
                     maxWidth - 1, 0.0,
@@ -1533,7 +1525,6 @@ class MainViewModel(
                     0.0, maxHeight - 1
                 )
 
-                val srcMat = Mat(4, 2, CvType.CV_32F)
                 srcMat.put(0, 0, floatArrayOf(
                     srcArray[0].toFloat(), srcArray[1].toFloat(),
                     srcArray[2].toFloat(), srcArray[3].toFloat(),
@@ -1541,7 +1532,6 @@ class MainViewModel(
                     srcArray[6].toFloat(), srcArray[7].toFloat()
                 ))
 
-                val dstMat = Mat(4, 2, CvType.CV_32F)
                 dstMat.put(0, 0, floatArrayOf(
                     dstArray[0].toFloat(), dstArray[1].toFloat(),
                     dstArray[2].toFloat(), dstArray[3].toFloat(),
@@ -1549,21 +1539,15 @@ class MainViewModel(
                     dstArray[6].toFloat(), dstArray[7].toFloat()
                 ))
 
-                val transform = Imgproc.getPerspectiveTransform(srcMat, dstMat)
-                val warped = Mat()
+                val perspectiveTransform = Imgproc.getPerspectiveTransform(srcMat, dstMat)
+                perspectiveTransform.copyTo(transform)
+                perspectiveTransform.release() // Initial transform Mat
+
                 Imgproc.warpPerspective(mat, warped, transform, Size(maxWidth, maxHeight))
 
                 val resultBitmap = Bitmap.createBitmap(warped.cols(), warped.rows(), Bitmap.Config.ARGB_8888)
                 Utils.matToBitmap(warped, resultBitmap)
 
-                // Cleanup
-                mat.release()
-                warped.release()
-                transform.release()
-                srcMat.release()
-                dstMat.release()
-
-                // Update State
                 withContext(Dispatchers.Main) {
                     updateState(
                         uiState.value.copy(
@@ -1579,6 +1563,13 @@ class MainViewModel(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Failed to unwarp image", Toast.LENGTH_SHORT).show()
                 }
+            } finally {
+                // --- AGGRESSIVE NATIVE RELEASE ---
+                mat.release()
+                warped.release()
+                transform.release()
+                srcMat.release()
+                dstMat.release()
             }
         }
     }

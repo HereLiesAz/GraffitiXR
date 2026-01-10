@@ -7,21 +7,42 @@ import android.graphics.Path
 import android.util.Log
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.RefinementPath
+import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
+import org.opencv.core.Core
+import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
 import org.opencv.core.MatOfKeyPoint
+import org.opencv.core.Scalar
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
 
 /**
+ * Ensures OpenCV is loaded and available for the current thread.
+ * Bolt Optimization: Call this at the start of any function using OpenCV to prevent n_delete crashes.
+ */
+fun ensureOpenCVLoaded(): Boolean {
+    if (OpenCVLoader.initLocal()) return true
+    try {
+        System.loadLibrary("opencv_java4")
+        return true
+    } catch (e: Exception) {
+        try {
+            System.loadLibrary("opencv_java")
+            return true
+        } catch (e2: Exception) {
+            return false
+        }
+    }
+}
+
+/**
  * Converts a bitmap to a line drawing (edge detection).
- *
- * @param bitmap The source bitmap.
- * @param isWhite If true, the lines will be white on a transparent background.
- * @return A new bitmap containing the edge data as an alpha channel.
  */
 fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
+    if (!ensureOpenCVLoaded()) return bitmap
+    
     val mat = Mat()
     val grayMat = Mat()
     val edges = Mat()
@@ -35,8 +56,8 @@ fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
         Imgproc.Canny(grayMat, edges, 50.0, 150.0)
 
         val colorValue = if (isWhite) 255.0 else 0.0
-        colorChannel.create(edges.size(), org.opencv.core.CvType.CV_8UC1)
-        colorChannel.setTo(org.opencv.core.Scalar(colorValue))
+        colorChannel.create(edges.size(), CvType.CV_8UC1)
+        colorChannel.setTo(Scalar(colorValue))
 
         val channels = java.util.ArrayList<Mat>()
         channels.add(colorChannel) // R
@@ -44,7 +65,7 @@ fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
         channels.add(colorChannel) // B
         channels.add(edges)        // A
 
-        org.opencv.core.Core.merge(channels, rgbaMat)
+        Core.merge(channels, rgbaMat)
 
         val resultBitmap = Bitmap.createBitmap(mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888)
         Utils.matToBitmap(rgbaMat, resultBitmap)
@@ -60,9 +81,10 @@ fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
 
 /**
  * Calculates a blur metric using the variance of the Laplacian.
- * Higher values indicate sharper images.
  */
 fun calculateBlurMetric(bitmap: Bitmap): Double {
+    if (!ensureOpenCVLoaded()) return 0.0
+    
     val mat = Mat()
     val grayMat = Mat()
     val laplacianImage = Mat()
@@ -72,8 +94,8 @@ fun calculateBlurMetric(bitmap: Bitmap): Double {
     try {
         Utils.bitmapToMat(bitmap, mat)
         Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
-        Imgproc.Laplacian(grayMat, laplacianImage, org.opencv.core.CvType.CV_64F)
-        org.opencv.core.Core.meanStdDev(laplacianImage, mean, stdDev)
+        Imgproc.Laplacian(grayMat, laplacianImage, CvType.CV_64F)
+        Core.meanStdDev(laplacianImage, mean, stdDev)
         val stdDevVal = stdDev.get(0, 0)[0]
         return stdDevVal * stdDevVal
     } finally {
@@ -87,9 +109,10 @@ fun calculateBlurMetric(bitmap: Bitmap): Double {
 
 /**
  * Estimates the number of features detectable by ORB in the image.
- * Useful for assessing if an image is a good candidate for AR tracking.
  */
 fun estimateFeatureRichness(bitmap: Bitmap): Int {
+    if (!ensureOpenCVLoaded()) return 0
+    
     val mat = Mat()
     val grayMat = Mat()
     val keypoints = MatOfKeyPoint()
@@ -104,16 +127,15 @@ fun estimateFeatureRichness(bitmap: Bitmap): Int {
         mat.release()
         grayMat.release()
         keypoints.release()
-        // Note: orb.clear() or similar might be needed if it was a native object, 
-        // but ORB in Java wrapper doesn't have a release() usually, it's a factory object.
     }
 }
 
 /**
  * Detects features in the bitmap, respecting the provided refinement masks.
- * Returns the keypoints as normalized offsets (0..1).
  */
 fun detectFeaturesWithMask(bitmap: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): List<androidx.compose.ui.geometry.Offset> {
+    if (!ensureOpenCVLoaded()) return emptyList()
+    
     val mat = Mat()
     val grayMat = Mat()
     val maskMat = Mat()
@@ -125,10 +147,11 @@ fun detectFeaturesWithMask(bitmap: Bitmap, refinementPaths: List<RefinementPath>
         Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
 
         val createdMask = createMaskMatFromPaths(bitmap.width, bitmap.height, refinementPaths, autoMask)
-        createdMask.copyTo(maskMat)
-        createdMask.release()
-
-        orb.detect(grayMat, keypoints, maskMat)
+        try {
+            orb.detect(grayMat, keypoints, createdMask)
+        } finally {
+            createdMask.release()
+        }
 
         val pointList = keypoints.toList()
         return pointList.map {
@@ -144,9 +167,10 @@ fun detectFeaturesWithMask(bitmap: Bitmap, refinementPaths: List<RefinementPath>
 
 /**
  * Creates an OpenCV Mask (CV_8UC1) from the refinement paths and an optional auto-generated mask.
- * White pixels in the mask indicate areas to process; black pixels are ignored.
+ * Caller MUST release the returned Mat.
  */
 fun createMaskMatFromPaths(width: Int, height: Int, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Mat {
+    ensureOpenCVLoaded()
     val maskBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(maskBitmap)
 
@@ -188,46 +212,39 @@ fun createMaskMatFromPaths(width: Int, height: Int, refinementPaths: List<Refine
         return maskMat
     } finally {
         maskMatTemp.release()
-        // maskMat is returned, caller must release it
     }
 }
 
 /**
  * Applies the mask defined by refinement paths to the source bitmap.
- * The result is a bitmap where masked-out areas are transparent.
  */
 fun applyMaskToBitmap(source: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Bitmap {
+    if (!ensureOpenCVLoaded()) return source
+    
     val mat = Mat()
-    val maskMat = Mat()
     val resultMat = Mat()
     
     try {
         Utils.bitmapToMat(source, mat)
 
         val createdMask = createMaskMatFromPaths(source.width, source.height, refinementPaths, autoMask)
-        createdMask.copyTo(maskMat)
-        createdMask.release()
-
-        resultMat.create(mat.size(), mat.type())
-        resultMat.setTo(org.opencv.core.Scalar(0.0, 0.0, 0.0, 255.0)) // Transparent
-
-        mat.copyTo(resultMat, maskMat)
+        try {
+            resultMat.create(mat.size(), mat.type())
+            resultMat.setTo(Scalar(0.0, 0.0, 0.0, 255.0)) // Transparent
+            mat.copyTo(resultMat, createdMask)
+        } finally {
+            createdMask.release()
+        }
 
         val finalBitmap = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
         Utils.matToBitmap(resultMat, finalBitmap)
-
         return finalBitmap
     } finally {
         mat.release()
-        maskMat.release()
         resultMat.release()
     }
 }
 
-/**
- * Generates the unique [Fingerprint] (Keypoints + Descriptors) for the given bitmap and mask.
- * This fingerprint is used for persistence and identifying the target in future sessions.
- */
 fun resizeBitmapForArCore(bitmap: Bitmap, maxSize: Int = 1024): Bitmap {
     val maxDimension = maxOf(bitmap.width, bitmap.height)
     if (maxDimension <= maxSize) return bitmap
@@ -239,10 +256,17 @@ fun resizeBitmapForArCore(bitmap: Bitmap, maxSize: Int = 1024): Bitmap {
     return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
 }
 
+/**
+ * Generates the unique [Fingerprint] (Keypoints + Descriptors) for the given bitmap and mask.
+ * 
+ * Bolt Optimization: Immediately converts Mat descriptors to ByteArray and releases the Mat
+ * to prevent finalizer UnsatisfiedLinkError crashes.
+ */
 fun generateFingerprint(bitmap: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Fingerprint {
+    if (!ensureOpenCVLoaded()) throw IllegalStateException("OpenCV not available")
+    
     val mat = Mat()
     val grayMat = Mat()
-    val maskMat = Mat()
     val keypoints = MatOfKeyPoint()
     val descriptors = Mat()
     val orb = ORB.create()
@@ -252,23 +276,39 @@ fun generateFingerprint(bitmap: Bitmap, refinementPaths: List<RefinementPath>, a
         Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
 
         val createdMask = createMaskMatFromPaths(bitmap.width, bitmap.height, refinementPaths, autoMask)
-        createdMask.copyTo(maskMat)
-        createdMask.release()
-
-        orb.detectAndCompute(grayMat, maskMat, keypoints, descriptors)
+        try {
+            orb.detectAndCompute(grayMat, createdMask, keypoints, descriptors)
+        } finally {
+            createdMask.release()
+        }
 
         if (descriptors.rows() == 0) {
             Log.w("ImageUtils", "No descriptors generated for fingerprint")
         }
 
-        return Fingerprint(keypoints.toList(), descriptors.clone())
+        // Bolt Optimization: Extract descriptors to ByteArray and metadata
+        val rows = descriptors.rows()
+        val cols = descriptors.cols()
+        val type = descriptors.type()
+        val totalBytes = descriptors.total().toInt() * descriptors.elemSize().toInt()
+        val data = ByteArray(totalBytes)
+        if (totalBytes > 0) {
+            descriptors.get(0, 0, data)
+        }
+
+        return Fingerprint(
+            keypoints = keypoints.toList(),
+            descriptorsData = data,
+            descriptorsRows = rows,
+            descriptorsCols = cols,
+            descriptorsType = type
+        )
     } catch (e: Exception) {
         Log.e("ImageUtils", "Error generating fingerprint", e)
         throw e
     } finally {
         mat.release()
         grayMat.release()
-        maskMat.release()
         keypoints.release()
         descriptors.release()
     }
