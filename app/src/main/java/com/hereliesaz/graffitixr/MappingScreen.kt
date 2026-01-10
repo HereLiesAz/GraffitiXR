@@ -3,10 +3,13 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Handler
+import android.os.HandlerThread
 import android.view.Choreographer
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -35,18 +38,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.sphereslam.SphereCameraManager
 import com.hereliesaz.sphereslam.SphereSLAM
-import android.graphics.Bitmap
 import org.opencv.core.Mat
-import android.os.Handler
-import android.os.HandlerThread
 
 @Composable
 fun MappingScreen(
@@ -94,28 +92,26 @@ fun MappingScreen(
     // Initialize SphereSLAM
     DisposableEffect(Unit) {
         android.util.Log.v("MappingScreen", "Initializing SphereSLAM")
-        // Use a dedicated cache subdirectory for safer saving
-        val slamCacheDir = java.io.File(context.cacheDir, "sphereslam_cache")
-        if (!slamCacheDir.exists()) slamCacheDir.mkdirs()
-
-        // SphereSLAM ctor calls initNative(assets, cacheDir.absolutePath)
-        // We cannot change the ctor call signature easily if it doesn't accept path,
-        // but if it takes context, it uses context.cacheDir.
-        // We will assume for now we can't change the path passed to JNI unless we change the library.
-        // However, we can clean the cache dir before starting to ensure we only save THIS session's data.
-        // Or we can filter later. For now, let's use the standard init.
-        val slam = SphereSLAM(context)
+        
+        val slam = try {
+            SphereSLAM(context)
+        } catch (e: Exception) {
+            android.util.Log.e("MappingScreen", "Failed to create SphereSLAM", e)
+            null
+        }
         sphereSLAM = slam
 
         // Resolve processFrame method dynamically to handle version mismatches between environments
         var processFrameMethod: java.lang.reflect.Method? = null
-        try {
-            processFrameMethod = slam.javaClass.getMethod("processFrame", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
-        } catch (e: NoSuchMethodException) {
+        if (slam != null) {
             try {
-                processFrameMethod = slam.javaClass.getMethod("processFrame", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType)
-            } catch (e2: Exception) {
-                android.util.Log.e("MappingScreen", "processFrame method not found")
+                processFrameMethod = slam.javaClass.getMethod("processFrame", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            } catch (e: NoSuchMethodException) {
+                try {
+                    processFrameMethod = slam.javaClass.getMethod("processFrame", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType)
+                } catch (e2: Exception) {
+                    android.util.Log.e("MappingScreen", "processFrame method not found")
+                }
             }
         }
 
@@ -126,46 +122,39 @@ fun MappingScreen(
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
-        var yBuffer: java.nio.ByteBuffer? = null
         var yMat: Mat? = null
         var reusableByteArray: ByteArray? = null
 
         val camManager = SphereCameraManager(context) { image ->
              try {
+                 if (sphereSLAM == null) return@SphereCameraManager
+                 
                  val planes = image.planes
                  val yPlane = planes[0]
                  val ySize = yPlane.buffer.remaining()
 
                  // Reallocate if needed
-                 if (yBuffer == null || yBuffer!!.capacity() != ySize) {
-                     yBuffer = java.nio.ByteBuffer.allocateDirect(ySize)
+                 if (yMat == null || yMat!!.cols() != image.width || yMat!!.rows() != image.height) {
+                     yMat?.release()
                      yMat = Mat(image.height, image.width, org.opencv.core.CvType.CV_8UC1)
                      reusableByteArray = ByteArray(ySize)
                  }
 
                  // Copy Y plane (Luminance) which is sufficient for SLAM tracking
-                 yBuffer!!.clear()
-                 yBuffer!!.put(yPlane.buffer)
-                 yBuffer!!.flip()
-
-                 // Update Mat from buffer
-                 if (reusableByteArray != null) {
+                 if (reusableByteArray != null && yMat != null) {
                      yPlane.buffer.rewind() // Ensure we read from start
                      yPlane.buffer.get(reusableByteArray!!)
                      yMat!!.put(0, 0, reusableByteArray!!)
 
-                     slam.processFrame(
-                         yMat!!.nativeObjAddr,
-                         image.timestamp.toDouble(),
-                         image.width,
-                         image.height,
-                         yPlane.rowStride
-                     )
                      if (processFrameMethod != null) {
-                         if (processFrameMethod!!.parameterCount == 5) {
-                             processFrameMethod!!.invoke(slam, yMat!!.nativeObjAddr, image.timestamp.toDouble(), image.width, image.height, yPlane.rowStride)
-                         } else {
-                             processFrameMethod!!.invoke(slam, yMat!!.nativeObjAddr, image.timestamp.toDouble())
+                         try {
+                             if (processFrameMethod!!.parameterCount == 5) {
+                                 processFrameMethod!!.invoke(sphereSLAM, yMat!!.nativeObjAddr, image.timestamp.toDouble(), image.width, image.height, yPlane.rowStride)
+                             } else {
+                                 processFrameMethod!!.invoke(sphereSLAM, yMat!!.nativeObjAddr, image.timestamp.toDouble())
+                             }
+                         } catch (e: Exception) {
+                             // Log only occasionally or use a throttled logger to avoid spamming
                          }
                      }
                  }
@@ -179,10 +168,11 @@ fun MappingScreen(
 
         onDispose {
             android.util.Log.v("MappingScreen", "Cleaning up SphereSLAM")
-            slam.cleanup()
+            sphereSLAM?.cleanup()
             camManager.closeCamera()
             camManager.stopBackgroundThread()
             thread.quitSafely()
+            yMat?.release()
         }
     }
 
@@ -249,8 +239,6 @@ fun MappingScreen(
         }
     }
 
-    val navController = rememberNavController()
-
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. SphereSLAM Render Surface
         AndroidView(
@@ -272,7 +260,7 @@ fun MappingScreen(
 
         // 2. Nav Rail Layer
         AzNavRail(
-            navController = navController,
+            navController = null, // Pass null to avoid illegal argument exception when no graph is set
             currentDestination = "surveyor",
             isLandscape = false
         ) {
@@ -284,7 +272,6 @@ fun MappingScreen(
             azRailItem(
                 id = "back",
                 text = "Back",
-                route = "back",
                 onClick = {
                     android.util.Log.v("MappingScreen", "Button: Back clicked")
                     onExit()
@@ -294,7 +281,6 @@ fun MappingScreen(
             azRailItem(
                 id = "help",
                 text = "Help",
-                route = "help",
                 onClick = {
                     showInstructions = !showInstructions
                 }
@@ -338,8 +324,6 @@ fun MappingScreen(
                              // Save Map
                              try {
                                  val mapFile = java.io.File(projectDir, "slam_map.bin")
-                                 // Use reflection to call saveMap to handle potential compile-time dependency mismatch
-                                 // while ensuring functionality works if the method exists at runtime.
                                  val method = sphereSLAM?.javaClass?.getMethod("saveMap", String::class.java)
                                  method?.invoke(sphereSLAM, mapFile.absolutePath) ?: throw NoSuchMethodException("saveMap not found")
                              } catch (e: Exception) {

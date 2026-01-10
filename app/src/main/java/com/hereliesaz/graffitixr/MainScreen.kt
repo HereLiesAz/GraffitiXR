@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,10 +25,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -78,8 +73,6 @@ import com.hereliesaz.graffitixr.composables.UndoRedoRow
 import com.hereliesaz.graffitixr.composables.UnwarpScreen
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
-import com.hereliesaz.graffitixr.dialogs.SaveProjectDialog
-import com.hereliesaz.graffitixr.ui.NavStrings
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
 import kotlinx.coroutines.Dispatchers
@@ -307,7 +300,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             .fillMaxHeight()
                     ) {
                         AzNavRail(
-                            navController = null,
+                            navController = navController,
                             currentDestination = currentRoute,
                             isLandscape = isLandscape
                         ) {
