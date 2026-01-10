@@ -7,33 +7,34 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Add any project specific keep rules here:
+# OpenCV keep rules to prevent UnsatisfiedLinkError
+-keep class org.opencv.** { *; }
+-keepclassmembers class org.opencv.** {
+    native <methods>;
+}
+-dontwarn org.opencv.**
 
-# If you use reflection, typically to load classes dynamically, you need to
-# tell ProGuard what not to remove.
-# -keep class com.your.package.YourClass
-# -keep class com.your.package.YourClass {
-#   public <init>();
-# }
+# Keep ARCore
+-keep class com.google.ar.** { *; }
+-dontwarn com.google.ar.**
 
-# If you use JNI(Java Native Interface), you might want to keep
-# all native class names.
-# -keepclasseswithmembernames class * {
-#     native <methods>;
-# }
+# Keep SphereSLAM
+-keep class com.hereliesaz.sphereslam.** { *; }
+-keepclassmembers class com.hereliesaz.sphereslam.** {
+    native <methods>;
+}
 
-# If you use an enum, you should probably keep the default constructor.
-# -keepclassmembers enum * {
-#     public static **[] values();
-#     public static ** valueOf(java.lang.String);
-# }
+# General native method keep
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
 
-# If you use serialization, you might want to keep all fields.
-# -keepclassmembers class * implements java.io.Serializable {
-#     static final long serialVersionUID;
-#     private static final java.io.ObjectStreamField[] serialPersistentFields;
-#     private void writeObject(java.io.ObjectOutputStream);
-#     private void readObject(java.io.ObjectInputStream);
-#     java.lang.Object writeReplace();
-#     java.lang.Object readResolve();
-# }
+# Serialization
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}

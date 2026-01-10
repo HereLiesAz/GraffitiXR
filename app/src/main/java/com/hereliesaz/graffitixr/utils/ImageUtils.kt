@@ -64,19 +64,25 @@ fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
  */
 fun calculateBlurMetric(bitmap: Bitmap): Double {
     val mat = Mat()
-    Utils.bitmapToMat(bitmap, mat)
     val grayMat = Mat()
-    Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
-
     val laplacianImage = Mat()
-    Imgproc.Laplacian(grayMat, laplacianImage, org.opencv.core.CvType.CV_64F)
-
     val mean = MatOfDouble()
     val stdDev = MatOfDouble()
-    org.opencv.core.Core.meanStdDev(laplacianImage, mean, stdDev)
-
-    val variance = stdDev.get(0, 0)[0] * stdDev.get(0, 0)[0]
-    return variance
+    
+    try {
+        Utils.bitmapToMat(bitmap, mat)
+        Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
+        Imgproc.Laplacian(grayMat, laplacianImage, org.opencv.core.CvType.CV_64F)
+        org.opencv.core.Core.meanStdDev(laplacianImage, mean, stdDev)
+        val stdDevVal = stdDev.get(0, 0)[0]
+        return stdDevVal * stdDevVal
+    } finally {
+        mat.release()
+        grayMat.release()
+        laplacianImage.release()
+        mean.release()
+        stdDev.release()
+    }
 }
 
 /**
@@ -85,15 +91,22 @@ fun calculateBlurMetric(bitmap: Bitmap): Double {
  */
 fun estimateFeatureRichness(bitmap: Bitmap): Int {
     val mat = Mat()
-    Utils.bitmapToMat(bitmap, mat)
     val grayMat = Mat()
-    Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
-
-    val orb = ORB.create()
     val keypoints = MatOfKeyPoint()
-    orb.detect(grayMat, keypoints)
-
-    return keypoints.rows()
+    val orb = ORB.create()
+    
+    try {
+        Utils.bitmapToMat(bitmap, mat)
+        Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
+        orb.detect(grayMat, keypoints)
+        return keypoints.rows()
+    } finally {
+        mat.release()
+        grayMat.release()
+        keypoints.release()
+        // Note: orb.clear() or similar might be needed if it was a native object, 
+        // but ORB in Java wrapper doesn't have a release() usually, it's a factory object.
+    }
 }
 
 /**
@@ -102,19 +115,30 @@ fun estimateFeatureRichness(bitmap: Bitmap): Int {
  */
 fun detectFeaturesWithMask(bitmap: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): List<androidx.compose.ui.geometry.Offset> {
     val mat = Mat()
-    Utils.bitmapToMat(bitmap, mat)
     val grayMat = Mat()
-    Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
-
-    val maskMat = createMaskMatFromPaths(bitmap.width, bitmap.height, refinementPaths, autoMask)
-
-    val orb = ORB.create()
+    val maskMat = Mat()
     val keypoints = MatOfKeyPoint()
-    orb.detect(grayMat, keypoints, maskMat)
+    val orb = ORB.create()
+    
+    try {
+        Utils.bitmapToMat(bitmap, mat)
+        Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
 
-    val pointList = keypoints.toList()
-    return pointList.map {
-        androidx.compose.ui.geometry.Offset(it.pt.x.toFloat() / bitmap.width, it.pt.y.toFloat() / bitmap.height)
+        val createdMask = createMaskMatFromPaths(bitmap.width, bitmap.height, refinementPaths, autoMask)
+        createdMask.copyTo(maskMat)
+        createdMask.release()
+
+        orb.detect(grayMat, keypoints, maskMat)
+
+        val pointList = keypoints.toList()
+        return pointList.map {
+            androidx.compose.ui.geometry.Offset(it.pt.x.toFloat() / bitmap.width, it.pt.y.toFloat() / bitmap.height)
+        }
+    } finally {
+        mat.release()
+        grayMat.release()
+        maskMat.release()
+        keypoints.release()
     }
 }
 
@@ -156,10 +180,16 @@ fun createMaskMatFromPaths(width: Int, height: Int, refinementPaths: List<Refine
         canvas.drawPath(path, paint)
     }
 
+    val maskMatTemp = Mat()
     val maskMat = Mat()
-    Utils.bitmapToMat(maskBitmap, maskMat)
-    Imgproc.cvtColor(maskMat, maskMat, Imgproc.COLOR_BGR2GRAY)
-    return maskMat
+    try {
+        Utils.bitmapToMat(maskBitmap, maskMatTemp)
+        Imgproc.cvtColor(maskMatTemp, maskMat, Imgproc.COLOR_BGR2GRAY)
+        return maskMat
+    } finally {
+        maskMatTemp.release()
+        // maskMat is returned, caller must release it
+    }
 }
 
 /**
@@ -168,20 +198,30 @@ fun createMaskMatFromPaths(width: Int, height: Int, refinementPaths: List<Refine
  */
 fun applyMaskToBitmap(source: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Bitmap {
     val mat = Mat()
-    Utils.bitmapToMat(source, mat)
-
-    val maskMat = createMaskMatFromPaths(source.width, source.height, refinementPaths, autoMask)
-
+    val maskMat = Mat()
     val resultMat = Mat()
-    resultMat.create(mat.size(), mat.type())
-    resultMat.setTo(org.opencv.core.Scalar(0.0, 0.0, 0.0, 255.0)) // Transparent
+    
+    try {
+        Utils.bitmapToMat(source, mat)
 
-    mat.copyTo(resultMat, maskMat)
+        val createdMask = createMaskMatFromPaths(source.width, source.height, refinementPaths, autoMask)
+        createdMask.copyTo(maskMat)
+        createdMask.release()
 
-    val finalBitmap = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
-    Utils.matToBitmap(resultMat, finalBitmap)
+        resultMat.create(mat.size(), mat.type())
+        resultMat.setTo(org.opencv.core.Scalar(0.0, 0.0, 0.0, 255.0)) // Transparent
 
-    return finalBitmap
+        mat.copyTo(resultMat, maskMat)
+
+        val finalBitmap = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(resultMat, finalBitmap)
+
+        return finalBitmap
+    } finally {
+        mat.release()
+        maskMat.release()
+        resultMat.release()
+    }
 }
 
 /**
@@ -200,33 +240,36 @@ fun resizeBitmapForArCore(bitmap: Bitmap, maxSize: Int = 1024): Bitmap {
 }
 
 fun generateFingerprint(bitmap: Bitmap, refinementPaths: List<RefinementPath>, autoMask: Bitmap? = null): Fingerprint {
+    val mat = Mat()
+    val grayMat = Mat()
+    val maskMat = Mat()
+    val keypoints = MatOfKeyPoint()
+    val descriptors = Mat()
+    val orb = ORB.create()
+    
     try {
-        val mat = Mat()
         Utils.bitmapToMat(bitmap, mat)
-        val grayMat = Mat()
         Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
 
-        val maskMat = createMaskMatFromPaths(bitmap.width, bitmap.height, refinementPaths, autoMask)
+        val createdMask = createMaskMatFromPaths(bitmap.width, bitmap.height, refinementPaths, autoMask)
+        createdMask.copyTo(maskMat)
+        createdMask.release()
 
-        val orb = ORB.create()
-        val keypoints = MatOfKeyPoint()
-        val descriptors = Mat()
         orb.detectAndCompute(grayMat, maskMat, keypoints, descriptors)
 
         if (descriptors.rows() == 0) {
             Log.w("ImageUtils", "No descriptors generated for fingerprint")
         }
 
-        mat.release()
-        grayMat.release()
-        maskMat.release()
-
-        val fingerprint = Fingerprint(keypoints.toList(), descriptors)
-        keypoints.release()
-
-        return fingerprint
+        return Fingerprint(keypoints.toList(), descriptors.clone())
     } catch (e: Exception) {
         Log.e("ImageUtils", "Error generating fingerprint", e)
         throw e
+    } finally {
+        mat.release()
+        grayMat.release()
+        maskMat.release()
+        keypoints.release()
+        descriptors.release()
     }
 }
