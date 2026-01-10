@@ -63,6 +63,7 @@ import kotlin.math.abs
  *
  * Updates:
  * - Calculates screen-space bounding box of the artwork and sends to ViewModel.
+ * - Robust error handling for ARCore fatal exceptions and matrix thread safety.
  */
 class ArRenderer(
     private val context: Context,
@@ -111,7 +112,14 @@ class ArRenderer(
 
     @Volatile var guideBitmap: Bitmap? = null
     @Volatile var showGuide: Boolean = false
+    
+    /**
+     * The current world pose of the project anchor.
+     * Thread Safety: This is always a cloned array or a stable copy when set,
+     * allowing external threads to read it (e.g., for serialization) without race conditions.
+     */
     @Volatile var arImagePose: FloatArray? = null
+    
     @Volatile var arState: ArState = ArState.SEARCHING
     private var activeAnchor: Anchor? = null
 
@@ -242,6 +250,8 @@ class ArRenderer(
                 } catch (e: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
                     Log.e(TAG, "Image quality too low for AR tracking", e)
                     mainHandler.post { onTrackingFailure("Image quality is too low. Please choose a different image.") }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error adding image to database", e)
                 }
             }
         }
@@ -287,33 +297,29 @@ class ArRenderer(
         sessionLock.lock()
 
         try {
-            if (session == null || !isSessionResumed) {
-                // Log only once per second or something if session is null?
-                // For now, let's trust it won't spam too much if we are in activity
+            val currentSession = session
+            if (currentSession == null || !isSessionResumed) {
                 return
             }
 
             if (backgroundRenderer.textureId != -1) {
-                session!!.setCameraTextureName(backgroundRenderer.textureId)
+                currentSession.setCameraTextureName(backgroundRenderer.textureId)
             } else {
                 Log.e(TAG, "onDrawFrame: Background renderer textureId is -1")
             }
-            displayRotationHelper.updateSessionIfNeeded(session!!)
+            displayRotationHelper.updateSessionIfNeeded(currentSession)
 
-            if (isDepthSupported) {
-                try {
-                    val frame = session!!.update()
+            try {
+                val frame = currentSession.update()
+                if (isDepthSupported) {
                     updateDepthTexture(frame)
-                    drawFrame(frame)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error updating frame", e)
                 }
-            } else {
-                val frame = session?.update() ?: return
                 drawFrame(frame)
+            } catch (e: SessionPausedException) {
+                // Paused
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating AR frame", e)
             }
-        } catch (e: SessionPausedException) {
-            // Paused
         } catch (t: Throwable) {
             Log.e(TAG, "Exception on GL Thread", t)
         } finally {
@@ -336,13 +342,12 @@ class ArRenderer(
             }
         } catch (e: NotYetAvailableException) {
             // Ignore
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating depth texture", e)
         }
     }
 
     private fun drawFrame(frame: Frame) {
-        // Log frame details periodically?
-        // For verbose debug, let's log critical background renderer call
-        // backgroundRenderer.draw(frame) logs itself now.
         backgroundRenderer.draw(frame)
 
         if (captureNextFrame) {
@@ -379,10 +384,14 @@ class ArRenderer(
             val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
             for (img in updatedAugmentedImages) {
                 if (img.trackingState == TrackingState.TRACKING && img.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING) {
-                    activeAnchor = img.createAnchor(img.centerPose)
-                    arState = ArState.LOCKED
-                    mainHandler.post { onAnchorCreated() }
-                    break
+                    try {
+                        activeAnchor = img.createAnchor(img.centerPose)
+                        arState = ArState.LOCKED
+                        mainHandler.post { onAnchorCreated() }
+                        break
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to create anchor for augmented image", e)
+                    }
                 }
             }
         }
@@ -392,17 +401,21 @@ class ArRenderer(
                 val pose = activeAnchor!!.pose
                 // Bolt Optimization: Reuse matrix
                 pose.toMatrix(calculationPoseMatrix, 0)
-                arImagePose = calculationPoseMatrix
+                // Matrix copy to ensure thread safety for external consumers (MainViewModel)
+                arImagePose = calculationPoseMatrix.clone()
                 handlePan(frame, viewMtx, projMtx)
             }
         }
 
         if (activeAnchor == null || isAnchorReplacementAllowed) {
-            val planes = session!!.getAllTrackables(Plane::class.java)
-            // Bolt Optimization: Draw all planes in one batch to minimize state changes
-            val hasPlane = planeRenderer.drawPlanes(planes, viewMtx, projMtx)
-            mainHandler.post { onPlanesDetected(hasPlane) }
-            handleTap(frame)
+            val currentSession = session
+            if (currentSession != null) {
+                val planes = currentSession.getAllTrackables(Plane::class.java)
+                // Bolt Optimization: Draw all planes in one batch to minimize state changes
+                val hasPlane = planeRenderer.drawPlanes(planes, viewMtx, projMtx)
+                mainHandler.post { onPlanesDetected(hasPlane) }
+                handleTap(frame)
+            }
         }
 
         if (arImagePose != null) {
@@ -474,14 +487,7 @@ class ArRenderer(
         val modelMtx = calculationModelMatrix
 
         // Apply Transforms
-        // Order matters:
-        // 1. Fix Orientation (Lay flat if on plane)
-        // 2. User Rotation (Spin/Tilt relative to flat surface)
-        // 3. User Scale (Size)
-        // 4. Translation (if any)
-
         // FIX: Only rotate -90 on X if we are on a Plane (PLACED), NOT if we are on an Image Target (LOCKED).
-        // This must happen BEFORE user rotations so user rotates the "laid flat" object.
         if (arState == ArState.PLACED) {
             Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
         }
@@ -492,11 +498,6 @@ class ArRenderer(
         Matrix.rotateM(modelMtx, 0, rotY, 0f, 1f, 0f)
 
         // Translation
-        // Note: X/Y translation in 3D usually corresponds to X/Z on the plane.
-        // But since we rotated -90 X, Y is now Z.
-        // Assuming offsets are small relative values (meters).
-        // If offsetX/Y are 0, this does nothing.
-        // Apply Z-offset based on index to prevent Z-fighting (tremor)
         val zOffset = if (layerIndex >= 0) layerIndex * 0.001f else 0f
         Matrix.translateM(modelMtx, 0, offsetX, offsetY, zOffset)
 
@@ -539,7 +540,6 @@ class ArRenderer(
         for (i in 0 until 4) {
             val offset = i * 4
             // Clip = MVP * Object
-            // Note: Matrix.multiplyMV takes offset for input vector, but we must use calculationTempVec from index 0
             Matrix.multiplyMV(calculationTempVec, 0, mvpMtx, 0, boundsCorners, offset)
 
             if (calculationTempVec[3] != 0f) {
@@ -581,15 +581,11 @@ class ArRenderer(
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
 
                 // Green Surface Check (Parallel to Screen)
-                // ViewMatrix: World -> Camera. Camera Forward = -ViewMtx.Row2 (indices 2,6,10)
                 val camFwdX = -viewMtx[2]
                 val camFwdY = -viewMtx[6]
                 val camFwdZ = -viewMtx[10]
 
-                // Plane Normal: Y axis of Plane Center Pose
-                // Use hit pose or plane center pose? Ideally plane normal.
                 val hitPose = hit.hitPose
-                // Pose.toMatrix converts to Model Matrix. Col 1 (4,5,6) is Y axis (Normal)
                 hitPose.toMatrix(calculationPoseMatrix, 0)
                 val normX = calculationPoseMatrix[4]
                 val normY = calculationPoseMatrix[5]
@@ -600,11 +596,15 @@ class ArRenderer(
 
                 // Threshold from PlaneRenderer for "Green"
                 if (absDot > 0.7f) {
-                    activeAnchor?.detach()
-                    activeAnchor = hit.createAnchor()
-                    arState = ArState.PLACED
-                    mainHandler.post { onAnchorCreated() }
-                    break
+                    try {
+                        activeAnchor?.detach()
+                        activeAnchor = hit.createAnchor()
+                        arState = ArState.PLACED
+                        mainHandler.post { onAnchorCreated() }
+                        break
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Fatal error creating anchor from tap", e)
+                    }
                 }
             }
         }
@@ -632,19 +632,23 @@ class ArRenderer(
         for (hit in hitResult) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                activeAnchor?.detach()
-                activeAnchor = hit.createAnchor()
+                try {
+                    activeAnchor?.detach()
+                    activeAnchor = hit.createAnchor()
 
-                val previousState = arState
-                arState = ArState.PLACED
-                if (previousState != ArState.PLACED) {
-                    mainHandler.post { onAnchorCreated() }
+                    val previousState = arState
+                    arState = ArState.PLACED
+                    if (previousState != ArState.PLACED) {
+                        mainHandler.post { onAnchorCreated() }
+                    }
+
+                    // Bolt Optimization: Reuse matrix
+                    hit.hitPose.toMatrix(calculationPoseMatrix, 0)
+                    arImagePose = calculationPoseMatrix.clone()
+                    break
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error creating anchor during pan", e)
                 }
-
-                // Bolt Optimization: Reuse matrix
-                hit.hitPose.toMatrix(calculationPoseMatrix, 0)
-                arImagePose = calculationPoseMatrix
-                break
             }
         }
     }
@@ -687,10 +691,8 @@ class ArRenderer(
                 val rotation = getRotationDegrees()
                 val bitmap = if (rotation != 0f) {
                     val rotated = BitmapUtils.rotateBitmap(rawBitmap, rotation)
-                    // Note: rawBitmap is reused, so we don't recycle it here
                     rotated
                 } else {
-                    // Deep copy because rawBitmap is reused
                     val srcConfig = rawBitmap.config
                     val targetConfig = when (srcConfig) {
                         null, Bitmap.Config.HARDWARE -> Bitmap.Config.ARGB_8888
@@ -881,7 +883,6 @@ class ArRenderer(
                     }
 
                     // Enable Local Anchor Persistence for Multi-Point Calibration
-                    // Note: Standard ARCore uses Cloud Anchors for persistence.
                     config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
 
                     // Disable Depth Mode to prevent native MediaPipe/motion_stereo crashes (RET_CHECK failures)
@@ -988,7 +989,7 @@ class ArRenderer(
                 analysisKeypoints.release()
                 analysisMatches.release()
                 analysisMask.release()
-                matcher.clear() // Release matcher resources (Java wrapper usually handles basic release via clear or finalize, but clear is safe)
+                matcher.clear()
             } finally {
                 analysisLock.unlock()
             }
@@ -1034,8 +1035,6 @@ class ArRenderer(
         val session = this.session ?: return
         val earth = session.earth ?: return
 
-        // Convert heading (degrees) to Quaternion (rotation around Y - Up)
-        // Heading is typically clockwise from North. GL rotation is CCW.
         val angleRad = Math.toRadians(-headingDegrees)
         val halfAngle = angleRad / 2.0
         val qx = 0.0f
@@ -1061,8 +1060,6 @@ class ArRenderer(
     }
 
     fun updateOverlayImage(uri: Uri) {
-        // Legacy Support - Map to "Default" layer or similar?
-        // Ideally we transition fully to setLayers.
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val request = ImageRequest.Builder(context)
@@ -1095,8 +1092,6 @@ class ArRenderer(
         // Check for cleanup
         val currentMapSize = layerBitmaps.size
         if (!needsLoading && currentMapSize == newLayers.size) {
-            // Optimization: If counts match and we have all keys, assume synced.
-            // (Strictly we should check keys, but this covers the gesture update case perfectly)
             return
         }
 
