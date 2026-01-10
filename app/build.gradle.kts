@@ -250,8 +250,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
 
-    // OpenCV - Use the Android-specific AAR for better compatibility
-    implementation(libs.opencv.android)
+    // OpenCV - Use the correct Maven Central artifact
+    implementation(libs.opencv)
 
     // SphereSLAM
     implementation(libs.sphere.slam)
