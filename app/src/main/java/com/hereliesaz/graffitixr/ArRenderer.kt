@@ -248,10 +248,11 @@ class ArRenderer(
                     database.addImage("target_$index", resized)
                     imagesAdded++
                 } catch (e: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
-                    Log.e(TAG, "Image quality too low for AR tracking", e)
-                    mainHandler.post { onTrackingFailure("Image quality is too low. Please choose a different image.") }
+                    Log.e(TAG, "Image quality too low for AR tracking: target_$index", e)
+                    // Non-fatal, just log and notify
+                    mainHandler.post { onTrackingFailure("Target image quality is too low for reliable tracking. Try capturing a sharper image with more detail.") }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error adding image to database", e)
+                    Log.e(TAG, "Error adding image to database: target_$index", e)
                 }
             }
         }

@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -39,7 +38,6 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.hereliesaz.graffitixr.composables.OnboardingScreen
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
-import org.opencv.android.OpenCVLoader
 
 /**
  * The single Activity for the GraffitiXR application.
@@ -103,11 +101,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (!OpenCVLoader.initLocal()) {
-            Log.e("OpenCV", "Unable to load OpenCV!")
-        } else {
-            Log.d("OpenCV", "OpenCV loaded successfully!")
-        }
+        // Note: OpenCV initialization is handled in GraffitiApplication.kt to ensure 
+        // availability across all threads including finalizers.
 
         val prefs = getSharedPreferences("GraffitiXR", Context.MODE_PRIVATE)
         val onboardingShown = prefs.getBoolean("onboarding_shown", false)

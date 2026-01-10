@@ -12,28 +12,34 @@ class GraffitiApplication : Application() {
         // Load OpenCV as early as possible to ensure native libraries are available for all threads
         Log.d("GraffitiApplication", "Initializing OpenCV...")
         try {
-            // initLocal() is the preferred way for modern OpenCV Android SDKs
+            // initLocal() is the preferred way for modern OpenCV Android SDKs (4.5+)
             if (OpenCVLoader.initLocal()) {
-                Log.d("GraffitiApplication", "OpenCVLoader.initLocal() successful")
+                Log.i("GraffitiApplication", "OpenCVLoader.initLocal() successful")
             } else {
                 Log.w("GraffitiApplication", "OpenCVLoader.initLocal() failed, trying explicit System.loadLibrary...")
                 // Fallback to explicit loading if initLocal fails
-                System.loadLibrary("opencv_java4")
-                Log.d("GraffitiApplication", "System.loadLibrary(opencv_java4) successful")
-            }
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e("GraffitiApplication", "OpenCV UnsatisfiedLinkError: ${e.message}")
-            try {
-                // Some versions or builds might have a different library name
-                System.loadLibrary("opencv_java")
-                Log.d("GraffitiApplication", "System.loadLibrary(opencv_java) successful")
-            } catch (e2: UnsatisfiedLinkError) {
-                Log.e("GraffitiApplication", "OpenCV loadLibrary failed completely: ${e2.message}")
+                loadOpenCVExplicitly()
             }
         } catch (e: Exception) {
-            Log.e("GraffitiApplication", "OpenCV initialization exception: ${e.message}")
+            Log.e("GraffitiApplication", "OpenCV initialization exception: ${e.message}", e)
+            loadOpenCVExplicitly()
         }
 
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
+    }
+
+    private fun loadOpenCVExplicitly() {
+        try {
+            System.loadLibrary("opencv_java4")
+            Log.i("GraffitiApplication", "System.loadLibrary(opencv_java4) successful")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e("GraffitiApplication", "opencv_java4 not found, trying opencv_java")
+            try {
+                System.loadLibrary("opencv_java")
+                Log.i("GraffitiApplication", "System.loadLibrary(opencv_java) successful")
+            } catch (e2: UnsatisfiedLinkError) {
+                Log.e("GraffitiApplication", "OpenCV loadLibrary failed completely: ${e2.message}")
+            }
+        }
     }
 }
