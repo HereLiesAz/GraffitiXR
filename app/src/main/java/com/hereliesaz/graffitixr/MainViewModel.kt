@@ -87,9 +87,6 @@ class MainViewModel(
     private val _captureEvent = MutableSharedFlow<CaptureEvent>()
     val captureEvent = _captureEvent.asSharedFlow()
 
-    private val _requestImagePicker = MutableSharedFlow<Unit>()
-    val requestImagePicker = _requestImagePicker.asSharedFlow()
-
     private val _feedbackEvent = MutableSharedFlow<FeedbackEvent>()
     val feedbackEvent = _feedbackEvent.asSharedFlow()
 
@@ -335,6 +332,10 @@ class MainViewModel(
         updateState(uiState.value.copy(isRefinementEraser = isEraser), isUndoable = false)
     }
 
+    fun onImagePickerShown() {
+        updateState(uiState.value.copy(showImagePicker = false), isUndoable = false)
+    }
+
     fun onConfirmTargetCreation() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -360,6 +361,10 @@ class MainViewModel(
                 arRenderer?.setFingerprint(fingerprint)
 
                 withContext(Dispatchers.Main) {
+                    // Check if we need to show the image picker BEFORE updating state
+                    // This ensures the showImagePicker flag is set in the same transaction if needed
+                    val shouldShowPicker = uiState.value.overlayImageUri == null
+
                     updateState(
                         uiState.value.copy(
                             isCapturingTarget = false,
@@ -368,14 +373,10 @@ class MainViewModel(
                             arState = ArState.SEARCHING,
                             fingerprintJson = fingerprintJson,
                             refinementPaths = emptyList(),    // Clear refinement paths
-                            targetMaskUri = null              // Clear the mask URI
+                            targetMaskUri = null,             // Clear the mask URI
+                            showImagePicker = shouldShowPicker
                         )
                     )
-
-                    // Prompt to select image if none selected
-                    if (uiState.value.overlayImageUri == null) {
-                        _requestImagePicker.emit(Unit)
-                    }
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error confirming target creation", e)
@@ -601,8 +602,9 @@ class MainViewModel(
                                     updateDetectedKeypoints()
 
                                     // Prompt to select image if none selected
-                                    if (uiState.value.overlayImageUri == null) {
-                                        _requestImagePicker.emit(Unit)
+                                    val shouldShowPicker = uiState.value.overlayImageUri == null
+                                    if (shouldShowPicker) {
+                                        updateState(uiState.value.copy(showImagePicker = true), isUndoable = false)
                                     }
                                 }
                             } catch (e: Exception) {
@@ -757,9 +759,7 @@ class MainViewModel(
                 updateState(uiState.value.copy(captureStep = CaptureStep.CHOOSE_METHOD), isUndoable = false)
             }
         } else if (uiState.value.overlayImageUri == null) {
-            viewModelScope.launch {
-                _requestImagePicker.emit(Unit)
-            }
+            updateState(uiState.value.copy(showImagePicker = true), isUndoable = false)
         }
     }
 
