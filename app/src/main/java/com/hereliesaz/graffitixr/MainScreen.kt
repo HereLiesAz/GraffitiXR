@@ -805,6 +805,9 @@ private fun AdjustmentsPanels(
     if ((uiState.overlayImageUri == null && uiState.layers.isEmpty()) || uiState.hideUiForCapture || uiState.isTouchLocked) return
 
     val showKnobs = showSliderDialog == "Adjust"
+    // Nothing allowed in bottom 10% in portrait.
+    val bottomPadding = if (isLandscape) 32.dp else (screenHeight * 0.1f)
+    val undoRedoStartPadding = if (isLandscape) 80.dp else 0.dp
 
     // Layout Constants
     val portraitBottomKeepoutPercentage = 0.1f
