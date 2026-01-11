@@ -422,7 +422,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 }
                             }
 
-                            if (uiState.overlayImageUri != null) {
+                            if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
                                 azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
                                     viewModel.onRemoveBackgroundClicked()
                                     resetDialogs()
@@ -533,7 +533,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         viewModel = viewModel,
                         showSliderDialog = showSliderDialog,
                         showColorBalanceDialog = showColorBalanceDialog,
-                        screenHeight = screenHeight
+                        screenHeight = screenHeight,
+                        isLandscape = isLandscape
                     )
                 }
 
@@ -798,17 +799,20 @@ private fun AdjustmentsPanels(
     viewModel: MainViewModel,
     showSliderDialog: String?,
     showColorBalanceDialog: Boolean,
-    screenHeight: Dp
+    screenHeight: Dp,
+    isLandscape: Boolean
 ) {
     if ((uiState.overlayImageUri == null && uiState.layers.isEmpty()) || uiState.hideUiForCapture || uiState.isTouchLocked) return
 
     val showKnobs = showSliderDialog == "Adjust"
+    val bottomPadding = if (isLandscape) 32.dp else 100.dp
+    val undoRedoStartPadding = if (isLandscape) 80.dp else 0.dp
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .zIndex(3f)
-            .padding(bottom = 32.dp),
+            .padding(bottom = bottomPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -845,7 +849,7 @@ private fun AdjustmentsPanels(
             onRedo = viewModel::onRedoClicked,
             onMagicClicked = viewModel::onMagicClicked,
             modifier = Modifier
-                .padding(start = 80.dp)
+                .padding(start = undoRedoStartPadding)
                 .fillMaxWidth()
         )
     }
