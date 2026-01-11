@@ -422,7 +422,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 }
                             }
 
-                            if (uiState.overlayImageUri != null) {
+                            if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
                                 azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
                                     viewModel.onRemoveBackgroundClicked()
                                     resetDialogs()
@@ -533,7 +533,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         viewModel = viewModel,
                         showSliderDialog = showSliderDialog,
                         showColorBalanceDialog = showColorBalanceDialog,
-                        screenHeight = screenHeight
+                        screenHeight = screenHeight,
+                        isLandscape = isLandscape
                     )
                 }
 
@@ -798,20 +799,34 @@ private fun AdjustmentsPanels(
     viewModel: MainViewModel,
     showSliderDialog: String?,
     showColorBalanceDialog: Boolean,
-    screenHeight: Dp
+    screenHeight: Dp,
+    isLandscape: Boolean
 ) {
     if ((uiState.overlayImageUri == null && uiState.layers.isEmpty()) || uiState.hideUiForCapture || uiState.isTouchLocked) return
 
     val showKnobs = showSliderDialog == "Adjust"
 
+    // Layout Constants
+    val portraitBottomKeepoutPercentage = 0.1f
+    val landscapeBottomPadding = 32.dp
+    val landscapeStartPadding = 80.dp
+    val portraitStartPadding = 0.dp
+
+    // In portrait mode, we must keep the bottom 10% of the screen clear to avoid overlapping
+    // with the bottom navigation rail and AR controls (like the 'Place' button).
+    val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
+    val undoRedoStartPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .zIndex(3f)
-            .padding(bottom = 32.dp),
+            .padding(bottom = bottomPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Knobs are shown above buttons.
+        // Balance and Adjust are mutually exclusive, occupying the same space.
         if (showColorBalanceDialog) {
             ColorBalanceKnobsRow(
                 colorBalanceR = uiState.colorBalanceR,
@@ -838,6 +853,7 @@ private fun AdjustmentsPanels(
             )
         }
 
+        // Always shown if image is available (parent check), at bottom of this column
         UndoRedoRow(
             canUndo = uiState.canUndo,
             canRedo = uiState.canRedo,
@@ -845,7 +861,7 @@ private fun AdjustmentsPanels(
             onRedo = viewModel::onRedoClicked,
             onMagicClicked = viewModel::onMagicClicked,
             modifier = Modifier
-                .padding(start = 80.dp)
+                .padding(start = undoRedoStartPadding)
                 .fillMaxWidth()
         )
     }

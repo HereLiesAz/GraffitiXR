@@ -374,6 +374,7 @@ class MainViewModel(
 
                     // Prompt to select image if none selected
                     if (uiState.value.overlayImageUri == null) {
+                        delay(500) // Give UI time to settle
                         _requestImagePicker.emit(Unit)
                     }
                 }
@@ -602,6 +603,7 @@ class MainViewModel(
 
                                     // Prompt to select image if none selected
                                     if (uiState.value.overlayImageUri == null) {
+                                        delay(500) // Give UI time to settle
                                         _requestImagePicker.emit(Unit)
                                     }
                                 }
