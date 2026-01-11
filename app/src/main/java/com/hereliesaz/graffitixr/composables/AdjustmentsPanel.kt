@@ -14,12 +14,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.graffitixr.EditorMode
 import com.hereliesaz.graffitixr.UiState
 
 /**
  * Integrated panel for image adjustments, color balance, and undo/redo controls.
- * This panel is now more inclusive, showing undo/redo/magic controls even if an image
- * isn't fully loaded, as long as there are actions to undo or a session to align.
+ * This panel handles the visibility of the adjustment knobs and the persistent 
+ * action row (Undo, Redo, Magic Wand).
  */
 @Composable
 fun AdjustmentsPanel(
@@ -40,22 +41,26 @@ fun AdjustmentsPanel(
     onMagicAlign: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Return early if UI should be hidden (capture mode or touch lock)
+    // Hide entirely during capture or if touch is locked
     if (uiState.hideUiForCapture || uiState.isTouchLocked) return
 
     val hasImage = uiState.overlayImageUri != null || uiState.layers.isNotEmpty()
+    val isArMode = uiState.editorMode == EditorMode.AR
     val hasHistory = uiState.canUndo || uiState.canRedo
-    
-    // We show the panel if there is an image OR if there is something to undo/redo
-    if (!hasImage && !hasHistory) return
 
-    // Layout Constants
+    // The panel should be visible if we are adjusting an image, or if we have an image active,
+    // or if we are in AR mode (to provide access to the Magic Wand for anchoring).
+    // This ensures the Undo/Redo/Magic buttons are accessible when relevant.
+    val isVisible = showKnobs || showColorBalance || hasImage || isArMode || hasHistory
+
+    if (!isVisible) return
+
+    // Layout Constants matching the project's UI design system
     val portraitBottomKeepoutPercentage = 0.1f
     val landscapeBottomPadding = 32.dp
     val landscapeStartPadding = 80.dp
     val portraitStartPadding = 0.dp
     
-    // Calculate adaptive padding based on orientation and screen dimensions
     val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
     val startPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
 
@@ -66,44 +71,45 @@ fun AdjustmentsPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Color Balance Knobs
-        AnimatedVisibility(
-            visible = showColorBalance && hasImage,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            ColorBalanceKnobsRow(
-                colorBalanceR = uiState.colorBalanceR,
-                colorBalanceG = uiState.colorBalanceG,
-                colorBalanceB = uiState.colorBalanceB,
-                onColorBalanceRChange = onColorBalanceRChange,
-                onColorBalanceGChange = onColorBalanceGChange,
-                onColorBalanceBChange = onColorBalanceBChange,
-                modifier = Modifier.fillMaxWidth()
-            )
+        // Image-specific adjustment knobs
+        if (hasImage) {
+            AnimatedVisibility(
+                visible = showColorBalance,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
+                ColorBalanceKnobsRow(
+                    colorBalanceR = uiState.colorBalanceR,
+                    colorBalanceG = uiState.colorBalanceG,
+                    colorBalanceB = uiState.colorBalanceB,
+                    onColorBalanceRChange = onColorBalanceRChange,
+                    onColorBalanceGChange = onColorBalanceGChange,
+                    onColorBalanceBChange = onColorBalanceBChange,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            AnimatedVisibility(
+                visible = showKnobs,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
+                AdjustmentsKnobsRow(
+                    opacity = uiState.opacity,
+                    brightness = uiState.brightness,
+                    contrast = uiState.contrast,
+                    saturation = uiState.saturation,
+                    onOpacityChange = onOpacityChange,
+                    onBrightnessChange = onBrightnessChange,
+                    onContrastChange = onContrastChange,
+                    onSaturationChange = onSaturationChange,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
-        // Image Adjustment Knobs (Opacity, Brightness, Contrast, Saturation)
-        AnimatedVisibility(
-            visible = showKnobs && hasImage,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            AdjustmentsKnobsRow(
-                opacity = uiState.opacity,
-                brightness = uiState.brightness,
-                contrast = uiState.contrast,
-                saturation = uiState.saturation,
-                onOpacityChange = onOpacityChange,
-                onBrightnessChange = onBrightnessChange,
-                onContrastChange = onContrastChange,
-                onSaturationChange = onSaturationChange,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        // Action Row: Undo, Redo, and Magic Wand (Magic Align)
-        // This row is visible as long as the panel is active
+        // Persistent Action Row: Undo, Redo, and Magic Wand (Magic Align)
+        // These are visible as long as the panel is visible.
         UndoRedoRow(
             canUndo = uiState.canUndo,
             canRedo = uiState.canRedo,
