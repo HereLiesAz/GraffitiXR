@@ -164,6 +164,7 @@ data class UiState(
     val isToolbarVisible: Boolean = true,
     val isSettingsPanelVisible: Boolean = false,
     val isImageSelectionMode: Boolean = false,
+    val showImagePicker: Boolean = false,
     val backgroundImageUri: Uri? = null,
     val overlayImageUri: Uri? = null,
     val originalOverlayImageUri: Uri? = null,
