@@ -50,4 +50,17 @@ class GraffitiApplication : Application() {
             }
         }
     }
+
+    companion object {
+        init {
+            // Static block to ensure library is loaded even if Application.onCreate is somehow bypassed or delayed
+            try {
+                if (!OpenCVLoader.initLocal()) {
+                    System.loadLibrary("opencv_java4")
+                }
+            } catch (e: Throwable) {
+                // Ignore, as onCreate will try again more thoroughly
+            }
+        }
+    }
 }

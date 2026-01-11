@@ -19,13 +19,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -51,15 +48,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.graffitixr.composables.AdjustmentsKnobsRow
-import com.hereliesaz.graffitixr.composables.ColorBalanceKnobsRow
+import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
 import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
@@ -72,7 +67,6 @@ import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
 import com.hereliesaz.graffitixr.composables.TargetCreationOverlay
 import com.hereliesaz.graffitixr.composables.TargetRefinementScreen
 import com.hereliesaz.graffitixr.composables.TraceScreen
-import com.hereliesaz.graffitixr.composables.UndoRedoRow
 import com.hereliesaz.graffitixr.composables.UnwarpScreen
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
@@ -360,10 +354,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             }
 
                             // Dynamic Layers
-                            // Visual order is reversed (last layer on top), so we iterate backwards for display.
-                            // However, azRailRelocItem newOrder will reflect the visual order.
-                            // We need to map visual order back to logical order (logical index 0 = bottom, last = top).
-
                             val layers = uiState.layers
                             val visualLayers = layers.reversed()
 
@@ -373,19 +363,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     hostId = "design_host",
                                     text = layer.name,
                                     onClick = {
-                                        // Only activate if not already active.
-                                        // If already active, let AzNavRail handle the second click to open the hidden menu.
                                         if (uiState.activeLayerId != layer.id) {
                                             viewModel.onLayerActivated(layer.id)
                                         }
                                     },
                                     onRelocate = { _: Int, _: Int, newOrder: List<String> ->
-                                        // newOrder is list of item IDs in new visual order (Top to Bottom)
-                                        // We need to convert this to Logical Order (Bottom to Top)
-                                        // Logical: [0: Bottom, 1: Middle, 2: Top]
-                                        // Visual: [Top, Middle, Bottom]
-                                        // So, Logical = Reversed(Visual)
-
                                         val rawIds = newOrder.map { it.removePrefix("layer_") }
                                         val logicalOrder = rawIds.reversed()
                                         viewModel.onLayerReordered(logicalOrder)
@@ -435,11 +417,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 azDivider()
 
                                 azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                                    showSliderDialog = "Adjust" // Explicitly set, do not toggle to avoid double-click issues
+                                    showSliderDialog = "Adjust"
                                     showColorBalanceDialog = false
                                 }
                                 azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
-                                    showColorBalanceDialog = true // Explicitly set
+                                    showColorBalanceDialog = true
                                     showSliderDialog = null
                                 }
                                 azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.blending, info = navStrings.blendingInfo, onClick = {
@@ -529,13 +511,22 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.BottomCenter
                 ) {
-                    AdjustmentsPanels(
+                    AdjustmentsPanel(
                         uiState = uiState,
-                        viewModel = viewModel,
-                        showSliderDialog = showSliderDialog,
-                        showColorBalanceDialog = showColorBalanceDialog,
+                        showKnobs = showSliderDialog == "Adjust",
+                        showColorBalance = showColorBalanceDialog,
+                        isLandscape = isLandscape,
                         screenHeight = screenHeight,
-                        isLandscape = isLandscape
+                        onOpacityChange = viewModel::onOpacityChanged,
+                        onBrightnessChange = viewModel::onBrightnessChanged,
+                        onContrastChange = viewModel::onContrastChanged,
+                        onSaturationChange = viewModel::onSaturationChanged,
+                        onColorBalanceRChange = viewModel::onColorBalanceRChanged,
+                        onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+                        onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+                        onUndo = viewModel::onUndoClicked,
+                        onRedo = viewModel::onRedoClicked,
+                        onMagicAlign = viewModel::onMagicClicked
                     )
                 }
 
@@ -792,78 +783,6 @@ private fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
                 }
             }
     )
-}
-
-@Composable
-private fun AdjustmentsPanels(
-    uiState: UiState,
-    viewModel: MainViewModel,
-    showSliderDialog: String?,
-    showColorBalanceDialog: Boolean,
-    screenHeight: Dp,
-    isLandscape: Boolean
-) {
-    if ((uiState.overlayImageUri == null && uiState.layers.isEmpty()) || uiState.hideUiForCapture || uiState.isTouchLocked) return
-
-    // Layout Constants
-    val portraitBottomKeepoutPercentage = 0.1f
-    val landscapeBottomPadding = 32.dp
-    val landscapeStartPadding = 80.dp
-    val portraitStartPadding = 0.dp
-    val showKnobs = showSliderDialog == "Adjust"
-    // Nothing allowed in bottom 10% in portrait. // In portrait mode, we must keep the bottom 10% of the screen clear to avoid overlapping
-    //    // with the bottom navigation rail and AR controls (like the 'Place' button).
-    val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
-    val undoRedoStartPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .zIndex(3f)
-            .padding(bottom = bottomPadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Knobs are shown above buttons.
-        // Balance and Adjust are mutually exclusive, occupying the same space.
-        if (showColorBalanceDialog) {
-            ColorBalanceKnobsRow(
-                colorBalanceR = uiState.colorBalanceR,
-                colorBalanceG = uiState.colorBalanceG,
-                colorBalanceB = uiState.colorBalanceB,
-                onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-                onColorBalanceBChange = viewModel::onColorBalanceBChanged,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        if (showKnobs) {
-            AdjustmentsKnobsRow(
-                opacity = uiState.opacity,
-                brightness = uiState.brightness,
-                contrast = uiState.contrast,
-                saturation = uiState.saturation,
-                onOpacityChange = viewModel::onOpacityChanged,
-                onBrightnessChange = viewModel::onBrightnessChanged,
-                onContrastChange = viewModel::onContrastChanged,
-                onSaturationChange = viewModel::onSaturationChanged,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        // Always shown if image is available (parent check), at bottom of this column
-        UndoRedoRow(
-            canUndo = uiState.canUndo,
-            canRedo = uiState.canRedo,
-            onUndo = viewModel::onUndoClicked,
-            onRedo = viewModel::onRedoClicked,
-            onMagicClicked = viewModel::onMagicClicked,
-            modifier = Modifier
-                .padding(start = undoRedoStartPadding)
-                .fillMaxWidth()
-        )
-    }
 }
 
 @Composable
