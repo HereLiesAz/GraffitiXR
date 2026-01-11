@@ -347,7 +347,7 @@ class MainViewModel(
 
                 val fingerprint = com.hereliesaz.graffitixr.utils.generateFingerprint(originalBitmap, refinementPaths, mask)
 
-                if (fingerprint.keypoints.isEmpty() || fingerprint.descriptors.empty()) {
+                if (fingerprint.keypoints.isEmpty() || fingerprint.descriptorsData.isEmpty()) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(getApplication(), "No features found. Try a more detailed surface.", Toast.LENGTH_LONG).show()
                     }
