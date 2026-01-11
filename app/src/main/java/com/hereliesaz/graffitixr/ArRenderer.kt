@@ -168,6 +168,16 @@ class ArRenderer(
     private val calculationTempVec = FloatArray(4)
     private val calculationResVec = FloatArray(4)
 
+    // Matrices for Background Blending
+    private val displayToCameraTransform = FloatArray(9) // 3x3 Matrix
+    // We want to calculate the matrix that maps Shader UVs (Y-up, 0..1) to Camera Texture UVs.
+    // We use 3 points to define the affine transform:
+    // P0: Shader (0,0) [Bottom-Left] -> View (0,1) [Bottom-Left]
+    // P1: Shader (1,0) [Bottom-Right] -> View (1,1) [Bottom-Right]
+    // P2: Shader (0,1) [Top-Left]    -> View (0,0) [Top-Left]
+    private val coordsViewport = floatArrayOf(0f, 1f, 1f, 1f, 0f, 0f)
+    private val coordsTexture = FloatArray(6) // Resulting texture coords
+
     // Bolt Optimization: Reusable RectF and state for bounds optimization to reduce allocations and UI updates
     private val calculationBounds = RectF()
     private val lastReportedBounds = RectF()
@@ -303,6 +313,53 @@ class ArRenderer(
                 if (isDepthSupported) {
                     updateDepthTexture(frame)
                 }
+
+                // Calculate Display -> Camera Transform (once per frame)
+                // Map Shader UV points to Texture Coordinates
+                frame.transformCoordinates2d(
+                    com.google.ar.core.Coordinates2d.VIEW_NORMALIZED,
+                    coordsViewport,
+                    com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
+                    coordsTexture
+                )
+
+                // Calculate Affine Matrix (3x3)
+                // Maps (0,0) -> (u0, v0) = Translation (c, f)
+                // Maps (1,0) -> (u1, v1)
+                // Maps (0,1) -> (u2, v2)
+
+                // Matrix M:
+                // | a b c |
+                // | d e f |
+                // | 0 0 1 |
+                //
+                // x' = ax + by + c
+                // y' = dx + ey + f
+
+                val u0 = coordsTexture[0]; val v0 = coordsTexture[1]
+                val u1 = coordsTexture[2]; val v1 = coordsTexture[3]
+                val u2 = coordsTexture[4]; val v2 = coordsTexture[5]
+
+                val c = u0
+                val f = v0
+                val a = u1 - u0
+                val d = v1 - v0
+                val b = u2 - u0
+                val e = v2 - v0
+
+                // Column-Major Order for OpenGL
+                displayToCameraTransform[0] = a
+                displayToCameraTransform[1] = d
+                displayToCameraTransform[2] = 0f
+
+                displayToCameraTransform[3] = b
+                displayToCameraTransform[4] = e
+                displayToCameraTransform[5] = 0f
+
+                displayToCameraTransform[6] = c
+                displayToCameraTransform[7] = f
+                displayToCameraTransform[8] = 1f
+
                 drawFrame(frame)
             } catch (e: SessionPausedException) {
                 // Paused
@@ -398,7 +455,28 @@ class ArRenderer(
             val currentSession = session
             if (currentSession != null) {
                 val planes = currentSession.getAllTrackables(Plane::class.java)
-                val hasPlane = planeRenderer.drawPlanes(planes, viewMtx, projMtx)
+
+                // Determine plane visualization style based on state
+                // If Target Created (LOCKED), we hide them completely (alpha 0, width 0)
+                // If Anchor Placed (PLACED), we dim them and thin them
+                // Otherwise (SEARCHING), full visibility
+                val (gridAlpha, gridWidth, outlineWidth) = when (arState) {
+                    ArState.LOCKED -> Triple(0.0f, 0.0f, 0.0f) // Hidden
+                    ArState.PLACED -> Triple(0.3f, 0.005f, 2.0f) // Dimmed
+                    else -> Triple(1.0f, 0.02f, 5.0f) // Default
+                }
+
+                // We always draw (even if invisible) to return hasPlane status correctly for UI
+                // But we optimize by passing 0 alpha if hidden
+                val hasPlane = planeRenderer.drawPlanes(
+                    planes,
+                    viewMtx,
+                    projMtx,
+                    gridAlpha,
+                    gridWidth,
+                    outlineWidth
+                )
+
                 mainHandler.post { onPlanesDetected(hasPlane) }
                 handleTap(frame)
             }
@@ -494,6 +572,7 @@ class ArRenderer(
             backgroundRenderer.textureId,
             viewportWidth.toFloat(),
             viewportHeight.toFloat(),
+            displayToCameraTransform,
             blendMode
         )
 

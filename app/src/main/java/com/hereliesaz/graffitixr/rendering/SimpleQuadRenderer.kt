@@ -24,6 +24,7 @@ class SimpleQuadRenderer {
     private var alphaUniform = 0
     private var brightnessUniform = 0
     private var colorBalanceUniform = 0
+    private var screenSizeUniform = 0
 
     // Depth uniforms
     private var depthTextureUniform = 0
@@ -31,7 +32,7 @@ class SimpleQuadRenderer {
 
     // Blending Uniforms
     private var backgroundTextureUniform = 0
-    private var screenSizeUniform = 0
+    private var displayToCameraTransformUniform = 0
     private var blendModeUniform = 0
 
     private var vertexBuffer: FloatBuffer? = null
@@ -70,13 +71,14 @@ class SimpleQuadRenderer {
             uniform float u_Brightness;
             uniform vec3 u_ColorBalance;
             uniform vec2 u_ScreenSize;
+            uniform mat3 u_DisplayToCameraTransform;
             uniform int u_BlendMode;
 
             varying vec2 v_TexCoord;
             varying float v_ViewDepth;
             
             vec3 applyBlend(vec3 dst, vec3 src, int mode) {
-                if (mode == 0) return mix(dst, src, 1.0); // Normal (Handled by Alpha Mix later)
+                if (mode == 0) return mix(dst, src, 1.0); // Normal
                 if (mode == 1) return dst * src; // Multiply
                 if (mode == 2) return 1.0 - (1.0 - dst) * (1.0 - src); // Screen
                 if (mode == 3) { // Overlay
@@ -95,9 +97,14 @@ class SimpleQuadRenderer {
             void main() {
                 vec4 srcColor = texture2D(u_Texture, v_TexCoord);
 
-                // Fetch background color for blending
+                // Calculate Screen UV (0..1)
                 vec2 screenUV = gl_FragCoord.xy / u_ScreenSize;
-                vec4 dstColor = texture2D(u_BackgroundTexture, screenUV);
+
+                // Transform to Camera Texture UV
+                vec3 screenPos = vec3(screenUV.x, screenUV.y, 1.0);
+                vec2 cameraUV = (u_DisplayToCameraTransform * screenPos).xy;
+
+                vec4 dstColor = texture2D(u_BackgroundTexture, cameraUV);
 
                 float visibility = 1.0;
 
@@ -111,27 +118,10 @@ class SimpleQuadRenderer {
 
                 vec3 blendedRGB = srcColor.rgb;
 
-                if (u_BlendMode != 0 && u_BlendMode != 13) { // 0=SrcOver (Default), 13=SrcOver (Compose Enum fallback)
-                    // Custom Blending Math
-                    // Blend source with background
-                    // Result = Mix(Background, BlendedResult, SourceAlpha * GlobalAlpha)
-
+                if (u_BlendMode != 0 && u_BlendMode != 13) {
                     vec3 mixed = applyBlend(dstColor.rgb, srcColor.rgb, u_BlendMode);
-
-                    // We output the mixed color with full alpha, but we rely on GL blending being disabled or set to (ONE, ZERO)
-                    // Wait, standard rendering pipeline has background already drawn.
-                    // If we output gl_FragColor = vec4(mixed, alpha), and GL_BLEND is (SRC_ALPHA, ONE_MINUS_SRC_ALPHA):
-                    // Final = mixed * alpha + dst * (1-alpha)
-                    // If mode is Multiply, mixed = src * dst.
-                    // Final = src*dst*alpha + dst - dst*alpha = dst * (src*alpha + 1 - alpha) -> Correct lerp.
-
                     blendedRGB = mixed;
                 }
-
-                // For modes like Screen/Multiply, the math usually assumes opaque source.
-                // We just output the calculated color.
-                // However, standard GL blending is ON in ArRenderer.
-                // We should output the computed blend as the color, and let alpha do the mixing intensity.
                 
                 gl_FragColor = vec4(blendedRGB, srcColor.a * u_Alpha * visibility);
             }
@@ -153,12 +143,13 @@ class SimpleQuadRenderer {
         alphaUniform = GLES20.glGetUniformLocation(program, "u_Alpha")
         brightnessUniform = GLES20.glGetUniformLocation(program, "u_Brightness")
         colorBalanceUniform = GLES20.glGetUniformLocation(program, "u_ColorBalance")
+        screenSizeUniform = GLES20.glGetUniformLocation(program, "u_ScreenSize")
 
         depthTextureUniform = GLES20.glGetUniformLocation(program, "u_DepthTexture")
         useDepthUniform = GLES20.glGetUniformLocation(program, "u_UseDepth")
 
         backgroundTextureUniform = GLES20.glGetUniformLocation(program, "u_BackgroundTexture")
-        screenSizeUniform = GLES20.glGetUniformLocation(program, "u_ScreenSize")
+        displayToCameraTransformUniform = GLES20.glGetUniformLocation(program, "u_DisplayToCameraTransform")
         blendModeUniform = GLES20.glGetUniformLocation(program, "u_BlendMode")
 
         // Geometry: Vertical Quad (X-Y Plane)
@@ -207,6 +198,7 @@ class SimpleQuadRenderer {
         backgroundTextureId: Int,
         viewWidth: Float,
         viewHeight: Float,
+        displayToCameraTransform: FloatArray,
         blendMode: androidx.compose.ui.graphics.BlendMode
     ) {
         if (lastBitmap != bitmap) {
@@ -227,6 +219,8 @@ class SimpleQuadRenderer {
         GLES20.glUniform1f(brightnessUniform, brightness)
         GLES20.glUniform3f(colorBalanceUniform, colorR, colorG, colorB)
         GLES20.glUniform2f(screenSizeUniform, viewWidth, viewHeight)
+
+        GLES20.glUniformMatrix3fv(displayToCameraTransformUniform, 1, false, displayToCameraTransform, 0)
 
         // Map Compose BlendMode to Integer
         val modeInt = when(blendMode) {
