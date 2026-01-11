@@ -1,6 +1,10 @@
 #include <jni.h>
 #include <string>
 #include <android/log.h>
+#include <mutex>
+
+// Standard include for ORB_SLAM3 System
+#include "System.h"
 
 // Conditional inclusion for ORB_SLAM3
 // Define HAS_ORB_SLAM3 in CMakeLists.txt when the real library is available.
