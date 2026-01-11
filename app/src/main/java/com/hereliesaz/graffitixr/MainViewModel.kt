@@ -371,6 +371,11 @@ class MainViewModel(
                             targetMaskUri = null              // Clear the mask URI
                         )
                     )
+
+                    // Prompt to select image if none selected
+                    if (uiState.value.overlayImageUri == null) {
+                        _requestImagePicker.emit(Unit)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error confirming target creation", e)
@@ -594,6 +599,11 @@ class MainViewModel(
                                     )
                                     Toast.makeText(getApplication(), "Grid created successfully", Toast.LENGTH_SHORT).show()
                                     updateDetectedKeypoints()
+
+                                    // Prompt to select image if none selected
+                                    if (uiState.value.overlayImageUri == null) {
+                                        _requestImagePicker.emit(Unit)
+                                    }
                                 }
                             } catch (e: Exception) {
                                 Log.e("MainViewModel", "Error processing segmentation result", e)

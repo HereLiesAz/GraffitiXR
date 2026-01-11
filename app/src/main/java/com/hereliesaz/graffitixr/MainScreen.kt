@@ -19,10 +19,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -801,44 +804,49 @@ private fun AdjustmentsPanels(
 
     val showKnobs = showSliderDialog == "Adjust"
 
-    UndoRedoRow(
-        canUndo = uiState.canUndo,
-        canRedo = uiState.canRedo,
-        onUndo = viewModel::onUndoClicked,
-        onRedo = viewModel::onRedoClicked,
-        onMagicClicked = viewModel::onMagicClicked,
+    Column(
         modifier = Modifier
+            .fillMaxWidth()
             .zIndex(3f)
-            .padding(start = 80.dp, bottom = screenHeight * 0.075f) // Reduced padding
-    )
+            .padding(bottom = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        if (showColorBalanceDialog) {
+            ColorBalanceKnobsRow(
+                colorBalanceR = uiState.colorBalanceR,
+                colorBalanceG = uiState.colorBalanceG,
+                colorBalanceB = uiState.colorBalanceB,
+                onColorBalanceRChange = viewModel::onColorBalanceRChanged,
+                onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+                onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
-    if (showKnobs) {
-        AdjustmentsKnobsRow(
-            opacity = uiState.opacity,
-            brightness = uiState.brightness,
-            contrast = uiState.contrast,
-            saturation = uiState.saturation,
-            onOpacityChange = viewModel::onOpacityChanged,
-            onBrightnessChange = viewModel::onBrightnessChanged,
-            onContrastChange = viewModel::onContrastChanged,
-            onSaturationChange = viewModel::onSaturationChanged,
-            modifier = Modifier
-                .zIndex(3f)
-                .padding(bottom = screenHeight * 0.25f)
-        )
-    }
+        if (showKnobs) {
+            AdjustmentsKnobsRow(
+                opacity = uiState.opacity,
+                brightness = uiState.brightness,
+                contrast = uiState.contrast,
+                saturation = uiState.saturation,
+                onOpacityChange = viewModel::onOpacityChanged,
+                onBrightnessChange = viewModel::onBrightnessChanged,
+                onContrastChange = viewModel::onContrastChanged,
+                onSaturationChange = viewModel::onSaturationChanged,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
-    if (showColorBalanceDialog) {
-        ColorBalanceKnobsRow(
-            colorBalanceR = uiState.colorBalanceR,
-            colorBalanceG = uiState.colorBalanceG,
-            colorBalanceB = uiState.colorBalanceB,
-            onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-            onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-            onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+        UndoRedoRow(
+            canUndo = uiState.canUndo,
+            canRedo = uiState.canRedo,
+            onUndo = viewModel::onUndoClicked,
+            onRedo = viewModel::onRedoClicked,
+            onMagicClicked = viewModel::onMagicClicked,
             modifier = Modifier
-                .zIndex(3f)
-                .padding(bottom = screenHeight * 0.40f)
+                .padding(start = 80.dp)
+                .fillMaxWidth()
         )
     }
 }

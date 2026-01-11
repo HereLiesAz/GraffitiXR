@@ -36,6 +36,7 @@ import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
 import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
+import com.hereliesaz.graffitixr.utils.enhanceImageForAr
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +67,7 @@ import kotlin.math.abs
  * - Removed all Mat members to prevent finalizer UnsatisfiedLinkError.
  * - Stores Fingerprint data as raw bytes/metadata to avoid native pointer leaks.
  * - Explicit local Mat management in analysis loop.
- * - Enhanced error handling for Augmented Image quality.
+ * - Enhanced error handling for Augmented Image quality: attempts enhancement if initial add fails.
  */
 class ArRenderer(
     private val context: Context,
@@ -168,11 +169,21 @@ class ArRenderer(
     private val calculationTempVec = FloatArray(4)
     private val calculationResVec = FloatArray(4)
 
+    // Matrices for Background Blending
+    private val displayToCameraTransform = FloatArray(9) // 3x3 Matrix
+    // We want to calculate the matrix that maps Shader UVs (Y-up, 0..1) to Camera Texture UVs.
+    // We use 3 points to define the affine transform:
+    // P0: Shader (0,0) [Bottom-Left] -> View (0,1) [Bottom-Left]
+    // P1: Shader (1,0) [Bottom-Right] -> View (1,1) [Bottom-Right]
+    // P2: Shader (0,1) [Top-Left]    -> View (0,0) [Top-Left]
+    private val coordsViewport = floatArrayOf(0f, 1f, 1f, 1f, 0f, 0f)
+    private val coordsTexture = FloatArray(6) // Resulting texture coords
+
     // Bolt Optimization: Reusable RectF and state for bounds optimization to reduce allocations and UI updates
     private val calculationBounds = RectF()
     private val lastReportedBounds = RectF()
     private var hasReportedBounds = false
-    private val BOUNDS_UPDATE_THRESHOLD = 2f // pixels
+    private val BOUNDS_UPDATE_THRESHOLD_VAL = 2f // pixels
 
     private val boundsCorners = floatArrayOf(
         -0.5f, -0.5f, 0f, 1f,
@@ -225,7 +236,7 @@ class ArRenderer(
 
     /**
      * Creates and populates an AugmentedImageDatabase from a list of bitmaps.
-     * Includes error handling for low-quality images.
+     * Includes error handling for low-quality images and an auto-fix attempt using OpenCV.
      */
     private suspend fun configureAugmentedImageDatabase(session: Session, bitmaps: List<Bitmap>): AugmentedImageDatabase? {
         val database = AugmentedImageDatabase(session)
@@ -234,11 +245,21 @@ class ArRenderer(
             bitmaps.forEachIndexed { index, bitmap ->
                 try {
                     val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                    database.addImage("target_$index", resized)
-                    imagesAdded++
-                } catch (e: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
-                    Log.e(TAG, "Image quality too low for AR tracking: target_$index", e)
-                    mainHandler.post { onTrackingFailure("Target image quality is too low for reliable tracking. Try capturing a sharper image with more detail.") }
+                    try {
+                        database.addImage("target_$index", resized)
+                        imagesAdded++
+                    } catch (e: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
+                        Log.w(TAG, "Image quality low for target_$index. Attempting OpenCV enhancement...")
+                        val enhanced = enhanceImageForAr(resized)
+                        try {
+                            database.addImage("target_$index", enhanced)
+                            imagesAdded++
+                            Log.i(TAG, "Successfully added target_$index after enhancement.")
+                        } catch (e2: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
+                            Log.e(TAG, "Image still insufficient quality after enhancement: target_$index")
+                            mainHandler.post { onTrackingFailure("Target image quality is too low for reliable tracking. Please capture a sharper image with more high-contrast details.") }
+                        }
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error adding image to database: target_$index", e)
                 }
@@ -303,6 +324,53 @@ class ArRenderer(
                 if (isDepthSupported) {
                     updateDepthTexture(frame)
                 }
+
+                // Calculate Display -> Camera Transform (once per frame)
+                // Map Shader UV points to Texture Coordinates
+                frame.transformCoordinates2d(
+                    com.google.ar.core.Coordinates2d.VIEW_NORMALIZED,
+                    coordsViewport,
+                    com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
+                    coordsTexture
+                )
+
+                // Calculate Affine Matrix (3x3)
+                // Maps (0,0) -> (u0, v0) = Translation (c, f)
+                // Maps (1,0) -> (u1, v1)
+                // Maps (0,1) -> (u2, v2)
+
+                // Matrix M:
+                // | a b c |
+                // | d e f |
+                // | 0 0 1 |
+                //
+                // x' = ax + by + c
+                // y' = dx + ey + f
+
+                val u0 = coordsTexture[0]; val v0 = coordsTexture[1]
+                val u1 = coordsTexture[2]; val v1 = coordsTexture[3]
+                val u2 = coordsTexture[4]; val v2 = coordsTexture[5]
+
+                val c = u0
+                val f = v0
+                val a = u1 - u0
+                val d = v1 - v0
+                val b = u2 - u0
+                val e = v2 - v0
+
+                // Column-Major Order for OpenGL
+                displayToCameraTransform[0] = a
+                displayToCameraTransform[1] = d
+                displayToCameraTransform[2] = 0f
+
+                displayToCameraTransform[3] = b
+                displayToCameraTransform[4] = e
+                displayToCameraTransform[5] = 0f
+
+                displayToCameraTransform[6] = c
+                displayToCameraTransform[7] = f
+                displayToCameraTransform[8] = 1f
+
                 drawFrame(frame)
             } catch (e: SessionPausedException) {
                 // Paused
@@ -398,7 +466,28 @@ class ArRenderer(
             val currentSession = session
             if (currentSession != null) {
                 val planes = currentSession.getAllTrackables(Plane::class.java)
-                val hasPlane = planeRenderer.drawPlanes(planes, viewMtx, projMtx)
+
+                // Determine plane visualization style based on state
+                // If Target Created (LOCKED), we hide them completely (alpha 0, width 0)
+                // If Anchor Placed (PLACED), we dim them and thin them
+                // Otherwise (SEARCHING), full visibility
+                val (gridAlpha, gridWidth, outlineWidth) = when (arState) {
+                    ArState.LOCKED -> Triple(0.0f, 0.0f, 0.0f) // Hidden
+                    ArState.PLACED -> Triple(0.3f, 0.005f, 2.0f) // Dimmed
+                    else -> Triple(1.0f, 0.02f, 5.0f) // Default
+                }
+
+                // We always draw (even if invisible) to return hasPlane status correctly for UI
+                // But we optimize by passing 0 alpha if hidden
+                val hasPlane = planeRenderer.drawPlanes(
+                    planes,
+                    viewMtx,
+                    projMtx,
+                    gridAlpha,
+                    gridWidth,
+                    outlineWidth
+                )
+
                 mainHandler.post { onPlanesDetected(hasPlane) }
                 handleTap(frame)
             }
@@ -494,6 +583,7 @@ class ArRenderer(
             backgroundRenderer.textureId,
             viewportWidth.toFloat(),
             viewportHeight.toFloat(),
+            displayToCameraTransform,
             blendMode
         )
 
@@ -520,19 +610,19 @@ class ArRenderer(
                 val screenY = (1f - ndcY) / 2f * viewportHeight
 
                 minX = minOf(minX, screenX)
-                minY = minOf(minY, screenY)
-                maxX = maxOf(maxX, screenX)
-                maxY = maxOf(maxY, screenY)
+                minY = minY.coerceAtMost(screenY)
+                maxX = maxX.coerceAtLeast(screenX)
+                maxY = maxY.coerceAtLeast(screenY)
             }
         }
 
         calculationBounds.set(minX, minY, maxX, maxY)
 
         if (!hasReportedBounds ||
-            abs(calculationBounds.left - lastReportedBounds.left) > BOUNDS_UPDATE_THRESHOLD ||
-            abs(calculationBounds.top - lastReportedBounds.top) > BOUNDS_UPDATE_THRESHOLD ||
-            abs(calculationBounds.right - lastReportedBounds.right) > BOUNDS_UPDATE_THRESHOLD ||
-            abs(calculationBounds.bottom - lastReportedBounds.bottom) > BOUNDS_UPDATE_THRESHOLD
+            abs(calculationBounds.left - lastReportedBounds.left) > BOUNDS_UPDATE_THRESHOLD_VAL ||
+            abs(calculationBounds.top - lastReportedBounds.top) > BOUNDS_UPDATE_THRESHOLD_VAL ||
+            abs(calculationBounds.right - lastReportedBounds.right) > BOUNDS_UPDATE_THRESHOLD_VAL ||
+            abs(calculationBounds.bottom - lastReportedBounds.bottom) > BOUNDS_UPDATE_THRESHOLD_VAL
         ) {
             hasReportedBounds = true
             lastReportedBounds.set(calculationBounds)
@@ -621,6 +711,13 @@ class ArRenderer(
 
     private fun analyzeFrameAsync(frame: Frame) {
         if (isAnalyzing.getAndSet(true)) return
+        
+        // --- CRITICAL CHECK: OpenCV Availability ---
+        if (!ensureOpenCVLoaded()) {
+            isAnalyzing.set(false)
+            return
+        }
+
         val image = try { frame.acquireCameraImage() } catch (e: Exception) { isAnalyzing.set(false); return }
 
         try {
@@ -639,7 +736,7 @@ class ArRenderer(
             image.close()
 
             analysisScope.launch {
-                // --- STRICT LOCAL MAT MANAGEMENT ---
+                // Double check inside coroutine as well
                 if (!ensureOpenCVLoaded()) { isAnalyzing.set(false); return@launch }
                 
                 val rawMat = Mat()
