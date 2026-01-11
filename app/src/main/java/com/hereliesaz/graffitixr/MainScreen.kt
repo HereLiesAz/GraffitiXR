@@ -805,7 +805,8 @@ private fun AdjustmentsPanels(
     if ((uiState.overlayImageUri == null && uiState.layers.isEmpty()) || uiState.hideUiForCapture || uiState.isTouchLocked) return
 
     val showKnobs = showSliderDialog == "Adjust"
-    val bottomPadding = if (isLandscape) 32.dp else 100.dp
+    // Nothing allowed in bottom 10% in portrait.
+    val bottomPadding = if (isLandscape) 32.dp else (screenHeight * 0.1f)
     val undoRedoStartPadding = if (isLandscape) 80.dp else 0.dp
 
     Column(
@@ -816,6 +817,8 @@ private fun AdjustmentsPanels(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Knobs are shown above buttons.
+        // Balance and Adjust are mutually exclusive, occupying the same space.
         if (showColorBalanceDialog) {
             ColorBalanceKnobsRow(
                 colorBalanceR = uiState.colorBalanceR,
@@ -842,6 +845,7 @@ private fun AdjustmentsPanels(
             )
         }
 
+        // Always shown if image is available (parent check), at bottom of this column
         UndoRedoRow(
             canUndo = uiState.canUndo,
             canRedo = uiState.canRedo,
