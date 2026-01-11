@@ -25,6 +25,7 @@ class PlaneRenderer {
     private var positionAttribute = 0
     private var modelViewProjectionUniform = 0
     private var colorUniform = 0
+    private var gridControlUniform = 0 // x=thickness, y=alpha
 
     private var vertexBuffer: FloatBuffer? = null
 
@@ -49,6 +50,7 @@ class PlaneRenderer {
         positionAttribute = GLES20.glGetAttribLocation(planeProgram, "a_Position")
         modelViewProjectionUniform = GLES20.glGetUniformLocation(planeProgram, "u_ModelViewProjection")
         colorUniform = GLES20.glGetUniformLocation(planeProgram, "u_Color")
+        gridControlUniform = GLES20.glGetUniformLocation(planeProgram, "u_GridControl")
     }
 
     /**
@@ -85,9 +87,19 @@ class PlaneRenderer {
      * @param planes The collection of ARCore planes to draw.
      * @param viewMatrix The camera's view matrix.
      * @param projectionMatrix The camera's projection matrix.
+     * @param gridAlpha Opacity multiplier for the internal grid fill.
+     * @param gridLineWidth Thickness of the internal grid lines.
+     * @param outlineWidth Thickness of the outer boundary line.
      * @return True if at least one plane was drawn.
      */
-    fun drawPlanes(planes: Collection<Plane>, viewMatrix: FloatArray, projectionMatrix: FloatArray): Boolean {
+    fun drawPlanes(
+        planes: Collection<Plane>,
+        viewMatrix: FloatArray,
+        projectionMatrix: FloatArray,
+        gridAlpha: Float = 1.0f,
+        gridLineWidth: Float = 0.02f,
+        outlineWidth: Float = 5.0f
+    ): Boolean {
         var hasDrawn = false
         var isStateSet = false
 
@@ -157,16 +169,23 @@ class PlaneRenderer {
             GLES20.glEnableVertexAttribArray(positionAttribute)
 
             // 4. Draw Fill (Grid Pattern)
-            // Use low alpha (0.0) for the fill so the grid lines (mixed to alpha 1.0 in shader) stand out against transparent background.
-            GLES20.glUniform4f(colorUniform, r, g, b, 0.0f)
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, plane.polygon.limit() / 2)
+            if (gridAlpha > 0.0f) {
+                GLES20.glUniform2f(gridControlUniform, gridLineWidth, gridAlpha)
+                GLES20.glUniform4f(colorUniform, r, g, b, 0.0f)
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, plane.polygon.limit() / 2)
+            }
 
             // 5. Draw Outline (Solid Color)
-            GLES20.glLineWidth(5.0f)
-            GLES20.glUniform4f(colorUniform, r, g, b, 1.0f)
-            GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, plane.polygon.limit() / 2)
+            if (outlineWidth > 0.0f) {
+                GLES20.glLineWidth(outlineWidth)
+                GLES20.glUniform4f(colorUniform, r, g, b, 1.0f)
+                GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, plane.polygon.limit() / 2)
+            }
 
             GLES20.glDisableVertexAttribArray(positionAttribute)
+
+            // We consider the plane "processed" (detected) even if we didn't draw it due to visibility settings.
+            // This ensures the UI knows planes exist.
             hasDrawn = true
         }
 
@@ -203,20 +222,24 @@ class PlaneRenderer {
         private const val FRAGMENT_SHADER = """
             precision mediump float;
             uniform vec4 u_Color;
+            uniform vec2 u_GridControl; // x = thickness, y = alpha
             varying vec2 v_TexCoord;
             void main() {
                 // Grid logic
                 float gridWidth = 0.1524; // Width of grid cells in meters (approx 6 inches)
-                float lineThickness = 0.02; // Thickness of lines in meters
+                float lineThickness = u_GridControl.x;
 
                 // Calculate grid lines
                 vec2 grid = step(gridWidth - lineThickness, mod(abs(v_TexCoord), gridWidth));
                 float isLine = max(grid.x, grid.y);
 
                 // Mix alpha: Higher alpha for lines, lower for fill
-                float alpha = mix(u_Color.a, 1.0, isLine);
+                // u_Color.a is passed as 0.0 for fill usually, so mix(0.0, 1.0, isLine) = isLine (1.0 or 0.0)
+                // Then we scale by global alpha (u_GridControl.y)
 
-                // Output color. Do NOT multiply alpha by u_Color.a again, as that zeros out the grid when fill is transparent.
+                float alpha = mix(u_Color.a, 1.0, isLine);
+                alpha *= u_GridControl.y;
+
                 gl_FragColor = vec4(u_Color.rgb, alpha);
             }
         """
