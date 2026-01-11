@@ -47,12 +47,11 @@ fun AdjustmentsPanel(
     val hasImage = uiState.overlayImageUri != null || uiState.layers.isNotEmpty()
     val isArMode = uiState.editorMode == EditorMode.AR
     val hasHistory = uiState.canUndo || uiState.canRedo
-    val isDrawing = uiState.isMarkingProgress
 
     // The panel should be visible if we are adjusting an image, or if we have an image active,
     // or if we are in AR mode (to provide access to the Magic Wand for anchoring),
-    // or if the user is currently drawing/marking progress (to allow Undo).
-    val isVisible = showKnobs || showColorBalance || hasImage || isArMode || hasHistory || isDrawing
+    // or if there's any history to undo/redo.
+    val isVisible = showKnobs || showColorBalance || hasImage || isArMode || hasHistory
 
     if (!isVisible) return
 
@@ -73,7 +72,7 @@ fun AdjustmentsPanel(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Image-specific adjustment knobs
-        // Only show knobs if there is an active image to adjust
+        // These are only shown if an image is actually present to adjust.
         if (hasImage) {
             AnimatedVisibility(
                 visible = showColorBalance,
@@ -111,7 +110,7 @@ fun AdjustmentsPanel(
         }
 
         // Persistent Action Row: Undo, Redo, and Magic Wand (Magic Align)
-        // These are visible as long as the panel is visible.
+        // These are visible as long as the panel itself is visible.
         UndoRedoRow(
             canUndo = uiState.canUndo,
             canRedo = uiState.canRedo,
