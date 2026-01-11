@@ -175,9 +175,10 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     ) { uri -> uri?.let { viewModel.exportProjectToUri(it) } }
 
     // Image Picker Request Handler
-    LaunchedEffect(viewModel) {
-        viewModel.requestImagePicker.collect {
+    LaunchedEffect(uiState.showImagePicker) {
+        if (uiState.showImagePicker) {
             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            viewModel.onImagePickerShown()
         }
     }
 
@@ -811,6 +812,17 @@ private fun AdjustmentsPanels(
 
     // Layout Constants
     val portraitBottomKeepoutPercentage = 0.1f
+    val landscapeBottomPadding = 32.dp
+    val landscapeStartPadding = 80.dp
+    val portraitStartPadding = 0.dp
+
+    // In portrait mode, we must keep the bottom 10% of the screen clear to avoid overlapping
+    // with the bottom navigation rail and AR controls (like the 'Place' button).
+    val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
+    val undoRedoStartPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
+
+    // Layout Constants
+    val portraitBottomKeepoutPercentage = 0.15f
     val landscapeBottomPadding = 32.dp
     val landscapeStartPadding = 80.dp
     val portraitStartPadding = 0.dp
