@@ -843,6 +843,28 @@ private fun AdjustmentsPanels(
     val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
     val undoRedoStartPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
 
+    // Layout Constants
+    val portraitBottomKeepoutPercentage = 0.15f
+    val landscapeBottomPadding = 32.dp
+    val landscapeStartPadding = 80.dp
+    val portraitStartPadding = 0.dp
+
+    // In portrait mode, we must keep the bottom 15% of the screen clear to avoid overlapping
+    // with the bottom navigation rail and AR controls (like the 'Place' button).
+    val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
+    val undoRedoStartPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
+
+    // Layout Constants
+    val portraitBottomKeepoutPercentage = 0.15f
+    val landscapeBottomPadding = 32.dp
+    val landscapeStartPadding = 80.dp
+    val portraitStartPadding = 0.dp
+
+    // In portrait mode, we must keep the bottom 10% of the screen clear to avoid overlapping
+    // with the bottom navigation rail and AR controls (like the 'Place' button).
+    val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
+    val undoRedoStartPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
