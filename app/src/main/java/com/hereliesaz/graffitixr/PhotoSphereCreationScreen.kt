@@ -1,9 +1,6 @@
 package com.hereliesaz.graffitixr
 
 import android.app.Activity
-import android.util.Log
-import android.view.Choreographer
-import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -12,13 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.model.AzButtonShape
 
@@ -34,9 +29,7 @@ fun PhotoSphereCreationScreen(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // This is where the SphereSLAM SurfaceView will go (passed from parent or integrated here)
-        // For now, we assume the parent (MappingScreen) handles the View, or we can put it here.
-        // But since MappingScreen also needs SphereSLAM, let's assume this screen is just the UI overlay
-        // OR we can make this screen handle the whole capture process.
+        // For now, we assume the parent (MappingScreen) handles the View.
 
         Box(
             modifier = Modifier
@@ -45,7 +38,7 @@ fun PhotoSphereCreationScreen(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Rotata slowly to capture the environment.\nCover all angles.",
+                text = "Rotate slowly to capture the environment.\nCover all angles.\nSystem will auto-capture keyframes.",
                 color = Color.White,
                 style = MaterialTheme.typography.bodyLarge
             )

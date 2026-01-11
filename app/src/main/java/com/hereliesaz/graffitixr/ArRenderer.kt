@@ -36,6 +36,7 @@ import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
 import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
+import com.hereliesaz.graffitixr.utils.enhanceImageForAr
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +67,7 @@ import kotlin.math.abs
  * - Removed all Mat members to prevent finalizer UnsatisfiedLinkError.
  * - Stores Fingerprint data as raw bytes/metadata to avoid native pointer leaks.
  * - Explicit local Mat management in analysis loop.
- * - Enhanced error handling for Augmented Image quality.
+ * - Enhanced error handling for Augmented Image quality: attempts enhancement if initial add fails.
  */
 class ArRenderer(
     private val context: Context,
@@ -182,7 +183,7 @@ class ArRenderer(
     private val calculationBounds = RectF()
     private val lastReportedBounds = RectF()
     private var hasReportedBounds = false
-    private val BOUNDS_UPDATE_THRESHOLD = 2f // pixels
+    private val BOUNDS_UPDATE_THRESHOLD_VAL = 2f // pixels
 
     private val boundsCorners = floatArrayOf(
         -0.5f, -0.5f, 0f, 1f,
@@ -235,7 +236,7 @@ class ArRenderer(
 
     /**
      * Creates and populates an AugmentedImageDatabase from a list of bitmaps.
-     * Includes error handling for low-quality images.
+     * Includes error handling for low-quality images and an auto-fix attempt using OpenCV.
      */
     private suspend fun configureAugmentedImageDatabase(session: Session, bitmaps: List<Bitmap>): AugmentedImageDatabase? {
         val database = AugmentedImageDatabase(session)
@@ -244,11 +245,21 @@ class ArRenderer(
             bitmaps.forEachIndexed { index, bitmap ->
                 try {
                     val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                    database.addImage("target_$index", resized)
-                    imagesAdded++
-                } catch (e: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
-                    Log.e(TAG, "Image quality too low for AR tracking: target_$index", e)
-                    mainHandler.post { onTrackingFailure("Target image quality is too low for reliable tracking. Try capturing a sharper image with more detail.") }
+                    try {
+                        database.addImage("target_$index", resized)
+                        imagesAdded++
+                    } catch (e: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
+                        Log.w(TAG, "Image quality low for target_$index. Attempting OpenCV enhancement...")
+                        val enhanced = enhanceImageForAr(resized)
+                        try {
+                            database.addImage("target_$index", enhanced)
+                            imagesAdded++
+                            Log.i(TAG, "Successfully added target_$index after enhancement.")
+                        } catch (e2: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
+                            Log.e(TAG, "Image still insufficient quality after enhancement: target_$index")
+                            mainHandler.post { onTrackingFailure("Target image quality is too low for reliable tracking. Please capture a sharper image with more high-contrast details.") }
+                        }
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error adding image to database: target_$index", e)
                 }
@@ -599,19 +610,19 @@ class ArRenderer(
                 val screenY = (1f - ndcY) / 2f * viewportHeight
 
                 minX = minOf(minX, screenX)
-                minY = minOf(minY, screenY)
-                maxX = maxOf(maxX, screenX)
-                maxY = maxOf(maxY, screenY)
+                minY = minY.coerceAtMost(screenY)
+                maxX = maxX.coerceAtLeast(screenX)
+                maxY = maxY.coerceAtLeast(screenY)
             }
         }
 
         calculationBounds.set(minX, minY, maxX, maxY)
 
         if (!hasReportedBounds ||
-            abs(calculationBounds.left - lastReportedBounds.left) > BOUNDS_UPDATE_THRESHOLD ||
-            abs(calculationBounds.top - lastReportedBounds.top) > BOUNDS_UPDATE_THRESHOLD ||
-            abs(calculationBounds.right - lastReportedBounds.right) > BOUNDS_UPDATE_THRESHOLD ||
-            abs(calculationBounds.bottom - lastReportedBounds.bottom) > BOUNDS_UPDATE_THRESHOLD
+            abs(calculationBounds.left - lastReportedBounds.left) > BOUNDS_UPDATE_THRESHOLD_VAL ||
+            abs(calculationBounds.top - lastReportedBounds.top) > BOUNDS_UPDATE_THRESHOLD_VAL ||
+            abs(calculationBounds.right - lastReportedBounds.right) > BOUNDS_UPDATE_THRESHOLD_VAL ||
+            abs(calculationBounds.bottom - lastReportedBounds.bottom) > BOUNDS_UPDATE_THRESHOLD_VAL
         ) {
             hasReportedBounds = true
             lastReportedBounds.set(calculationBounds)
@@ -700,6 +711,13 @@ class ArRenderer(
 
     private fun analyzeFrameAsync(frame: Frame) {
         if (isAnalyzing.getAndSet(true)) return
+        
+        // --- CRITICAL CHECK: OpenCV Availability ---
+        if (!ensureOpenCVLoaded()) {
+            isAnalyzing.set(false)
+            return
+        }
+
         val image = try { frame.acquireCameraImage() } catch (e: Exception) { isAnalyzing.set(false); return }
 
         try {
@@ -718,7 +736,7 @@ class ArRenderer(
             image.close()
 
             analysisScope.launch {
-                // --- STRICT LOCAL MAT MANAGEMENT ---
+                // Double check inside coroutine as well
                 if (!ensureOpenCVLoaded()) { isAnalyzing.set(false); return@launch }
                 
                 val rawMat = Mat()

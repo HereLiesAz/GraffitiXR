@@ -23,17 +23,58 @@ import org.opencv.imgproc.Imgproc
  * Bolt Optimization: Call this at the start of any function using OpenCV to prevent n_delete crashes.
  */
 fun ensureOpenCVLoaded(): Boolean {
-    if (OpenCVLoader.initLocal()) return true
     try {
-        System.loadLibrary("opencv_java4")
-        return true
+        if (OpenCVLoader.initLocal()) return true
     } catch (e: Exception) {
+        Log.e("ImageUtils", "OpenCVLoader.initLocal() failed: ${e.message}")
+    }
+
+    return try {
+        System.loadLibrary("opencv_java4")
+        true
+    } catch (e: UnsatisfiedLinkError) {
         try {
             System.loadLibrary("opencv_java")
-            return true
-        } catch (e2: Exception) {
-            return false
+            true
+        } catch (e2: UnsatisfiedLinkError) {
+            Log.e("ImageUtils", "OpenCV loadLibrary failed: ${e2.message}")
+            false
         }
+    }
+}
+
+/**
+ * Enhances image quality for AR tracking using Histogram Equalization.
+ */
+fun enhanceImageForAr(bitmap: Bitmap): Bitmap {
+    if (!ensureOpenCVLoaded()) return bitmap
+    
+    val mat = Mat()
+    val grayMat = Mat()
+    val equalizedMat = Mat()
+    val resultMat = Mat()
+    
+    try {
+        Utils.bitmapToMat(bitmap, mat)
+        Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_BGR2GRAY)
+        
+        // Equalize histogram to improve contrast
+        Imgproc.equalizeHist(grayMat, equalizedMat)
+        
+        // Convert back to RGBA for ARCore
+        Imgproc.cvtColor(equalizedMat, resultMat, Imgproc.COLOR_GRAY2RGBA)
+        
+        val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(resultMat, resultBitmap)
+        return resultBitmap
+    } catch (e: Exception) {
+        Log.e("ImageUtils", "Error enhancing image for AR: ${e.message}")
+        return bitmap
+    } finally {
+        mat.release()
+        grayMat.release()
+        equalizedMat.release()
+        resultMat.release()
     }
 }
 
