@@ -6,20 +6,30 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
+import org.opencv.android.OpenCVLoader
 
 class MappingActivity : ComponentActivity() {
     private val TAG = "MappingActivity"
+
+    companion object {
+        init {
+            // Static load to ensure library is available for finalizers
+            try {
+                if (!OpenCVLoader.initLocal()) {
+                    System.loadLibrary("opencv_java4")
+                }
+            } catch (e: Throwable) {
+                Log.e("MappingActivity", "Static OpenCV load failed", e)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.v(TAG, "onCreate: called")
 
-        // Use robust initialization from utils to ensure native libraries are ready
-        if (!ensureOpenCVLoaded()) {
-            Log.e(TAG, "OpenCV initialization failed in MappingActivity")
-        } else {
-            Log.v(TAG, "OpenCV initialized successfully in MappingActivity")
-        }
+        // Redundant check for safety
+        ensureOpenCVLoaded()
 
         setContent {
             GraffitiXRTheme {

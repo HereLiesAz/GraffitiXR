@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -15,8 +16,13 @@ import android.view.SurfaceView
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,13 +31,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.slam.SlamReflectionHelper
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
@@ -314,6 +325,141 @@ fun MappingScreen(
         }
 
         // 3. UI Overlay Layer
-        Box(modifier = Modifier.fillMaxSize()) // Added missing closing part of Box for UI Overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 80.dp)
+        ) {
+            // Stats / State Overlay
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
+                val stateStr = when(trackingState) {
+                    -1 -> "SYSTEM NOT READY"
+                    0 -> "NO IMAGES"
+                    1 -> "NOT INITIALIZED"
+                    2 -> "TRACKING"
+                    3 -> "LOST"
+                    else -> "UNKNOWN"
+                }
+                Text(
+                    text = "State: $stateStr\n$statsText",
+                    color = Color.Green,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            // PhotoSphere Creation Overlay (Integrated)
+            if (isMapping) {
+                 PhotoSphereCreationScreen(
+                     onCaptureComplete = {
+                         isMapping = false
+                         // Save Map Stats
+                         try {
+                             val projectDir = context.getExternalFilesDir(null)
+                             val statsFile = File(projectDir, "scan_data.txt")
+                             statsFile.writeText(statsText)
+
+                             val mapFile = File(projectDir, "slam_map.bin")
+                             val photoSphereFile = File(projectDir, "photosphere.ppm") // or .png if library handles it
+
+                             // Save Map
+                             val mapSaved = sphereSLAM?.let { s -> SlamReflectionHelper.saveMap(s, mapFile.absolutePath) } ?: false
+
+                             // Save Photosphere (Native)
+                             val photoSaved = sphereSLAM?.let { s -> SlamReflectionHelper.savePhotosphere(s, photoSphereFile.absolutePath) } ?: false
+
+                             // Fallback Logic for Map
+                             if (!mapSaved) {
+                                 // Fallback: Copy Cache
+                                 val cacheDir = context.cacheDir
+                                 if (cacheDir.exists() && cacheDir.isDirectory) {
+                                     val mapDir = File(projectDir, "sphereslam_map")
+                                     if (!mapDir.exists()) mapDir.mkdirs()
+                                     cacheDir.listFiles()?.forEach { file ->
+                                         if (file.isFile && !file.name.startsWith("tmp") && !file.name.endsWith(".tmp")) {
+                                             file.copyTo(File(mapDir, file.name), overwrite = true)
+                                         }
+                                     }
+                                 }
+                             }
+
+                             // Fallback Logic for Photosphere (PixelCopy)
+                             if (!photoSaved) {
+                                 val view = activity?.window?.decorView
+                                 view?.let {
+                                     val bitmap = Bitmap.createBitmap(it.width, it.height, Bitmap.Config.ARGB_8888)
+                                     val location = IntArray(2)
+                                     it.getLocationInWindow(location)
+                                     val win = activity.window ?: return@let
+                                     android.view.PixelCopy.request(
+                                         win,
+                                         android.graphics.Rect(location[0], location[1], location[0] + it.width, location[1] + it.height),
+                                         bitmap,
+                                         { result ->
+                                             if (result == android.view.PixelCopy.SUCCESS) {
+                                                 val imageFile = File(projectDir, "photosphere_preview.jpg")
+                                                 java.io.FileOutputStream(imageFile).use { out ->
+                                                     bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                                                 }
+                                             }
+                                         },
+                                         android.os.Handler(android.os.Looper.getMainLooper())
+                                     )
+                                 }
+                             }
+
+                             Toast.makeText(context, "Map & Photosphere Saved", Toast.LENGTH_SHORT).show()
+                         } catch (e: Exception) {
+                             android.util.Log.e("MappingScreen", "Error saving capture", e)
+                             Toast.makeText(context, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                         }
+                     },
+                     onExit = { isMapping = false }
+                 )
+            }
+
+            // Instructions Overlay
+            if (showInstructions && !isMapping) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(top = 16.dp, start = 16.dp)
+                        .background(Color(0x80000000))
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "SURVEYOR MODE\n\n1. Press 'Create PhotoSphere' to begin mapping.\n2. Or use 'Load Map' to view previous scans.",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+
+            // Buttons (only if not mapping)
+            if (!isMapping) {
+                Column(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AzButton(
+                        text = "Load Map",
+                        shape = AzButtonShape.RECTANGLE,
+                        onClick = {
+                            loadMapLauncher.launch("*/*")
+                        },
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    AzButton(
+                        text = "Create PhotoSphere",
+                        shape = AzButtonShape.RECTANGLE,
+                        onClick = {
+                            isMapping = true
+                            sphereSLAM?.resetSystem()
+                        },
+                        modifier = Modifier
+                    )
+                }
+            }
+        }
     }
 }
