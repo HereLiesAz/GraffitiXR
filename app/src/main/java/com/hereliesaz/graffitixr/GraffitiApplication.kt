@@ -53,13 +53,15 @@ class GraffitiApplication : Application() {
 
     companion object {
         init {
-            // Static block to ensure library is loaded even if Application.onCreate is somehow bypassed or delayed
+            // CRITICAL: Static block to ensure library is loaded even before Application.onCreate
+            // This is essential for preventing n_delete crashes on finalized Mats.
             try {
                 if (!OpenCVLoader.initLocal()) {
                     System.loadLibrary("opencv_java4")
                 }
             } catch (e: Throwable) {
-                // Ignore, as onCreate will try again more thoroughly
+                // If this fails, onCreate will try again more thoroughly
+                Log.e("GraffitiApplication", "Static OpenCV load failed", e)
             }
         }
     }

@@ -1,6 +1,6 @@
 package com.hereliesaz.graffitixr.slam
 
-import java.nio.ByteBuffer
+import android.util.Log
 
 /**
  * Manager for the ORB-SLAM3 system via JNI.
@@ -10,9 +10,13 @@ class SlamManager {
     companion object {
         init {
             try {
+                // Ensure dependency library (OpenCV) is loaded before SLAM
+                System.loadLibrary("opencv_java4")
                 System.loadLibrary("graffiti_slam")
             } catch (e: UnsatisfiedLinkError) {
-                e.printStackTrace()
+                Log.e("SlamManager", "Failed to load SLAM native library: ${e.message}")
+            } catch (e: Exception) {
+                Log.e("SlamManager", "Error during native initialization: ${e.message}")
             }
         }
     }
