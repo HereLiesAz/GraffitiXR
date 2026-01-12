@@ -1,12 +1,11 @@
 package com.hereliesaz.graffitixr
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
-
-import android.util.Log
-import org.opencv.android.OpenCVLoader
+import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 
 class MappingActivity : ComponentActivity() {
     private val TAG = "MappingActivity"
@@ -15,10 +14,11 @@ class MappingActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Log.v(TAG, "onCreate: called")
 
-        if (!OpenCVLoader.initLocal()) {
-            Log.e(TAG, "OpenCVLoader.initLocal() failed")
+        // Use robust initialization from utils to ensure native libraries are ready
+        if (!ensureOpenCVLoaded()) {
+            Log.e(TAG, "OpenCV initialization failed in MappingActivity")
         } else {
-            Log.v(TAG, "OpenCVLoader.initLocal() success")
+            Log.v(TAG, "OpenCV initialized successfully in MappingActivity")
         }
 
         setContent {
