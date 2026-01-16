@@ -1,83 +1,98 @@
 #include <jni.h>
 #include <string>
-#include <android/log.h>
-#include <mutex>
+#include <vector>
+#include <opencv2/core.hpp>
+#include "include/MobileGS.h"
 
-// Conditional inclusion for ORB_SLAM3
-// Define HAS_ORB_SLAM3 in CMakeLists.txt when the real library is available.
-#ifdef HAS_ORB_SLAM3
-    #include <System.h>
-    // Note: ORB_SLAM3::System::SaveAtlas is typically private.
-    // This code assumes a version of ORB_SLAM3 where SaveAtlas is public,
-    // or that the library has been patched to expose it.
-#else
-    #include "include/ORB_SLAM3_Mock.h"
-#endif
-
-#define LOG_TAG "GraffitiJNI"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-
-// Global pointer to the SLAM system
-ORB_SLAM3::System* SLAM = nullptr;
+static MobileGS* gMobileGS = nullptr;
 
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_initNative(JNIEnv *env, jobject thiz, jstring vocPath, jstring settingsPath) {
-    LOGI("initNative called: Initializing SLAM system");
-
-    const char *vocPathChars = env->GetStringUTFChars(vocPath, nullptr);
-    const char *settingsPathChars = env->GetStringUTFChars(settingsPath, nullptr);
-
-    // Initialize SLAM system
-    // Using MONOCULAR sensor as default for this example, and disabling viewer
-    SLAM = new ORB_SLAM3::System(vocPathChars, settingsPathChars, ORB_SLAM3::System::MONOCULAR, false);
-
-    env->ReleaseStringUTFChars(vocPath, vocPathChars);
-    env->ReleaseStringUTFChars(settingsPath, settingsPathChars);
+Java_com_hereliesaz_graffitixr_slam_SlamManager_initNative(JNIEnv *env, jobject thiz) {
+if (!gMobileGS) {
+gMobileGS = new MobileGS();
+}
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_disposeNative(JNIEnv *env, jobject thiz) {
-    LOGI("disposeNative called: Shutting down SLAM system");
-    if (SLAM) {
-        SLAM->Shutdown();
-        delete SLAM;
-        SLAM = nullptr;
-    }
+Java_com_hereliesaz_graffitixr_slam_SlamManager_destroyNative(JNIEnv *env, jobject thiz) {
+if (gMobileGS) {
+delete gMobileGS;
+gMobileGS = nullptr;
+}
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_saveMapNative(JNIEnv *env, jobject thiz) {
-    LOGI("saveMapNative called: Saving map");
-    if (SLAM) {
-        // Saving Atlas as Binary File
-        // Note: Check ORB_SLAM3 API visibility for SaveAtlas
-        SLAM->SaveAtlas(ORB_SLAM3::System::BINARY_FILE);
-    } else {
-        LOGE("SLAM system is not initialized, cannot save map.");
-    }
+Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCamera(JNIEnv *env, jobject thiz,
+        jfloatArray view_mtx,
+jfloatArray proj_mtx) {
+if (!gMobileGS) return;
+jfloat* view = env->GetFloatArrayElements(view_mtx, nullptr);
+jfloat* proj = env->GetFloatArrayElements(proj_mtx, nullptr);
+gMobileGS->updateCamera(view, proj);
+env->ReleaseFloatArrayElements(view_mtx, view, 0);
+env->ReleaseFloatArrayElements(proj_mtx, proj, 0);
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_processFrameNative(JNIEnv *env, jobject thiz, jint width, jint height, jbyteArray data, jlong timestamp) {
-    // LOGI("processFrameNative called: Processing frame");
+Java_com_hereliesaz_graffitixr_slam_SlamManager_feedSensors(JNIEnv *env, jobject thiz,
+        jbyteArray image_data,
+jint width, jint height,
+jfloatArray point_cloud,
+        jint point_count) {
+if (!gMobileGS) return;
+// 1. Process Background Image (assuming RGBA from Bitmap)
+jbyte* pixels = env->GetByteArrayElements(image_data, nullptr);
+if (pixels != nullptr && width > 0 && height > 0) {
+cv::Mat frame(height, width, CV_8UC4, (unsigned char*)pixels);
+gMobileGS->setBackgroundFrame(frame);
+}
+env->ReleaseByteArrayElements(image_data, pixels, 0);
 
-    if (SLAM) {
-        jbyte *dataBytes = env->GetByteArrayElements(data, nullptr);
-
-        // Create OpenCV matrix from raw data
-        // Assuming single channel (grayscale) for monocular SLAM or as pre-processed input
-        cv::Mat im(height, width, CV_8UC1, (unsigned char*)dataBytes);
-
-        // Pass frame to SLAM system
-        // Timestamp conversion if necessary (e.g. nanoseconds to seconds)
-        double t = (double)timestamp / 1000000000.0;
-        SLAM->TrackMonocular(im, t);
-
-        env->ReleaseByteArrayElements(data, dataBytes, JNI_ABORT);
-    }
+// 2. Process Sparse Points (Fallback/Augmentation)
+// For now we trust feedDepth more for dense mapping, so we skip sparse point ingestion
+// unless you want mixed mode. Let's skip for cleaner code, as feedDepth handles geometry.
 }
 
-} // extern "C"
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_feedDepth(JNIEnv *env, jobject thiz,
+        jbyteArray depth_data,
+jint width, jint height) {
+if (!gMobileGS) return;
+
+jbyte* data = env->GetByteArrayElements(depth_data, nullptr);
+if (data != nullptr) {
+// ARCore Depth is 16-bit unsigned (CV_16U)
+cv::Mat depthMap(height, width, CV_16U, (unsigned char*)data);
+gMobileGS->processDepthFrame(depthMap, width, height);
+}
+env->ReleaseByteArrayElements(depth_data, data, 0);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_drawFrame(JNIEnv *env, jobject thiz) {
+if (gMobileGS) {
+gMobileGS->draw();
+}
+}
+
+JNIEXPORT jboolean JNICALL
+        Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jstring path) {
+if (!gMobileGS) return false;
+const char *nativePath = env->GetStringUTFChars(path, 0);
+bool result = gMobileGS->saveModel(nativePath);
+env->ReleaseStringUTFChars(path, nativePath);
+return result;
+}
+
+JNIEXPORT jboolean JNICALL
+        Java_com_hereliesaz_graffitixr_slam_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jstring path) {
+if (!gMobileGS) return false;
+const char *nativePath = env->GetStringUTFChars(path, 0);
+bool result = gMobileGS->loadModel(nativePath);
+env->ReleaseStringUTFChars(path, nativePath);
+return result;
+}
+
+}

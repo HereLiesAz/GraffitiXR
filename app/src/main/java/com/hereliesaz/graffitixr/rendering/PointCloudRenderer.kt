@@ -1,174 +1,167 @@
 package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES20
+import android.opengl.Matrix
 import android.util.Log
 import com.google.ar.core.PointCloud
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.HashSet
 
 /**
- * Renders the 3D Point Cloud detected by ARCore.
- *
- * The Point Cloud consists of feature points that ARCore uses to track the environment.
- * Visualizing these points is crucial for user feedback, letting them know that the
- * system is successfully understanding the world geometry.
- *
- * Each point has:
- * - X, Y, Z coordinates.
- * - Confidence value (stored in the W component).
+ * Renders the 3D Point Cloud.
+ * NOW WITH MEMORY: Accumulates points over time to build a persistent world model.
  */
 class PointCloudRenderer {
-    // Vertex Shader: Projects points to screen space.
-    // Uses the W component (confidence) to potentially modulate size/color (though currently unused).
+    private val TAG = "PointCloudRenderer"
+
     private val vertexShaderCode =
         "uniform mat4 u_MvpMatrix;" +
-        "attribute vec4 a_Position;" +
-        "varying float v_Confidence;" +
-        "void main() {" +
-        "   gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);" +
-        "   gl_PointSize = 15.0;" +
-        "   v_Confidence = a_Position.w;" +
-        "}"
+                "uniform float u_PointSize;" +
+                "attribute vec4 a_Position;" +
+                "void main() {" +
+                "   gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);" +
+                "   gl_PointSize = u_PointSize;" +
+                "}"
 
-    // Fragment Shader: Renders circular points using gl_PointCoord.
     private val fragmentShaderCode =
         "precision mediump float;" +
-        "varying float v_Confidence;" +
-        "void main() {" +
-        "    vec2 coord = gl_PointCoord - vec2(0.5);" +
-        "    if (length(coord) > 0.5) {" +
-        "        discard;" +
-        "    }" +
-        "    gl_FragColor = vec4(0.0, 1.0, 1.0, 1.0);" +
-        "}"
+                "uniform vec4 u_Color;" +
+                "void main() {" +
+                "    vec2 coord = gl_PointCoord - vec2(0.5);" +
+                "    if (length(coord) > 0.5) discard;" +
+                "    gl_FragColor = u_Color;" +
+                "}"
 
     private var program: Int = 0
     private var positionHandle: Int = 0
     private var mvpMatrixHandle: Int = 0
-    private var vertexBuffer: FloatBuffer? = null
+    private var colorHandle: Int = 0
+    private var pointSizeHandle: Int = 0
 
-    // Pre-allocate a small buffer to start with
-    private var vertexBufferSize = 1000 * 4 * 4 // 1000 points
+    // The Persistent Memory
+    private val maxPoints = 50000 // Cap at 50k points to save memory
+    private var accumulatedPointCount = 0
+    private var vboId = 0
 
-    // Bolt Optimization: Pre-allocate MVP matrix to avoid allocation in draw loop
-    private val mvpMatrix = FloatArray(16)
+    // We use a local float array for accumulation before uploading to GPU
+    // 4 floats per point (x, y, z, confidence)
+    private val localBuffer: FloatArray = FloatArray(maxPoints * 4)
+    private val pointIds = HashSet<Int>() // To track what we've already seen
 
-    init {
-        updateVertexBuffer(1000)
-    }
-
-    /**
-     * Resizes the vertex buffer to accommodate the new number of points.
-     */
-    private fun updateVertexBuffer(numPoints: Int) {
-        if (vertexBuffer == null || vertexBuffer!!.capacity() < numPoints * 4) {
-            val bb = ByteBuffer.allocateDirect(numPoints * 4 * 4) // 4 floats per point, 4 bytes per float
-            bb.order(ByteOrder.nativeOrder())
-            vertexBuffer = bb.asFloatBuffer()
-            vertexBufferSize = numPoints * 4 * 4
-        }
-    }
-
-    /**
-     * Compiles and links the shaders on the GL thread.
-     */
     fun createOnGlThread() {
-        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
-        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
+        val vertexShader = ShaderUtil.loadGLShader(TAG, vertexShaderCode, GLES20.GL_VERTEX_SHADER)
+        val fragmentShader = ShaderUtil.loadGLShader(TAG, fragmentShaderCode, GLES20.GL_FRAGMENT_SHADER)
 
         program = GLES20.glCreateProgram().also {
             GLES20.glAttachShader(it, vertexShader)
             GLES20.glAttachShader(it, fragmentShader)
             GLES20.glLinkProgram(it)
-            val linkStatus = IntArray(1)
-            GLES20.glGetProgramiv(it, GLES20.GL_LINK_STATUS, linkStatus, 0)
-            if (linkStatus[0] == 0) {
-                Log.e(TAG, "Could not link program: " + GLES20.glGetProgramInfoLog(it))
-                GLES20.glDeleteProgram(it)
-                program = 0
-            }
         }
-    }
 
-    private fun loadShader(type: Int, shaderCode: String): Int {
-        val shader = GLES20.glCreateShader(type)
-        if (shader == 0) {
-            Log.e(TAG, "Could not create shader of type $type")
-            return 0
-        }
-        GLES20.glShaderSource(shader, shaderCode)
-        GLES20.glCompileShader(shader)
-        val compileStatus = IntArray(1)
-        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
-        if (compileStatus[0] == 0) {
-            Log.e(TAG, "Could not compile shader $type: ${GLES20.glGetShaderInfoLog(shader)}")
-            GLES20.glDeleteShader(shader)
-            return 0
-        }
-        return shader
+        positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
+        mvpMatrixHandle = GLES20.glGetUniformLocation(program, "u_MvpMatrix")
+        colorHandle = GLES20.glGetUniformLocation(program, "u_Color")
+        pointSizeHandle = GLES20.glGetUniformLocation(program, "u_PointSize")
+
+        val buffers = IntArray(1)
+        GLES20.glGenBuffers(1, buffers, 0)
+        vboId = buffers[0]
+
+        // Initialize empty VBO
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
+        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, maxPoints * 4 * 4, null, GLES20.GL_DYNAMIC_DRAW)
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
     }
 
     /**
-     * Draws the point cloud.
-     *
-     * @param pointCloud The ARCore PointCloud object containing the latest feature points.
-     * @param viewMatrix Camera View Matrix.
-     * @param projectionMatrix Camera Projection Matrix.
+     * Updates the persistent map with new data from ARCore.
      */
-    fun draw(pointCloud: PointCloud, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
-        if (program == 0) {
-            Log.w(TAG, "Program is 0, skipping draw")
-            return
-        }
-
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
-        GLES20.glDisable(GLES20.GL_BLEND)
-
-        GLES20.glUseProgram(program)
-
+    fun update(pointCloud: PointCloud) {
         val points = pointCloud.points
+        val ids = pointCloud.ids
+
+        if (points == null || ids == null) return
+
         val numPoints = points.remaining() / 4
+        var newPointsAdded = 0
 
-        // Log removed to avoid spamming logcat
-        // Log.d(TAG, "Drawing $numPoints points")
+        // Iterate through new points
+        for (i in 0 until numPoints) {
+            val id = ids.get(i)
+            // If we haven't seen this point ID before, and we have space, add it.
+            if (!pointIds.contains(id) && accumulatedPointCount < maxPoints) {
+                pointIds.add(id)
 
-        if (numPoints == 0) {
-            return
+                // Read x,y,z,confidence
+                val x = points.get(i * 4)
+                val y = points.get(i * 4 + 1)
+                val z = points.get(i * 4 + 2)
+                val conf = points.get(i * 4 + 3)
+
+                // Append to local buffer
+                val offset = accumulatedPointCount * 4
+                localBuffer[offset] = x
+                localBuffer[offset + 1] = y
+                localBuffer[offset + 2] = z
+                localBuffer[offset + 3] = conf
+
+                accumulatedPointCount++
+                newPointsAdded++
+            }
         }
 
-        updateVertexBuffer(numPoints)
-        vertexBuffer?.let { buffer ->
-            buffer.clear()
-            buffer.put(points)
-            buffer.position(0)
+        // If we added points, upload the *new* range to the GPU
+        if (newPointsAdded > 0) {
+            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
+            val byteBuffer = ByteBuffer.allocateDirect(newPointsAdded * 4 * 4)
+            byteBuffer.order(ByteOrder.nativeOrder())
+            val floatBuffer = byteBuffer.asFloatBuffer()
 
-            positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
-            GLES20.glEnableVertexAttribArray(positionHandle)
-            GLES20.glVertexAttribPointer(positionHandle, 4, GLES20.GL_FLOAT, false, 16, buffer)
-        }
+            // Copy just the new chunk
+            val startOffset = (accumulatedPointCount - newPointsAdded) * 4
+            floatBuffer.put(localBuffer, startOffset, newPointsAdded * 4)
+            floatBuffer.position(0)
 
-        // Bolt Optimization: Use pre-allocated MVP matrix
-        android.opengl.Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
-
-        mvpMatrixHandle = GLES20.glGetUniformLocation(program, "u_MvpMatrix")
-        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
-
-        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, numPoints)
-
-        GLES20.glDisableVertexAttribArray(positionHandle)
-
-        GLES20.glEnable(GLES20.GL_DEPTH_TEST)
-        GLES20.glEnable(GLES20.GL_BLEND)
-
-        // Check for GL errors
-        val error = GLES20.glGetError()
-        if (error != GLES20.GL_NO_ERROR) {
-            Log.e(TAG, "GL Error in draw: $error")
+            // Upload to VBO at the correct offset
+            GLES20.glBufferSubData(
+                GLES20.GL_ARRAY_BUFFER,
+                startOffset * 4,
+                newPointsAdded * 4 * 4,
+                byteBuffer
+            )
+            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
         }
     }
 
-    companion object {
-        private const val TAG = "PointCloudRenderer"
+    fun draw(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
+        if (accumulatedPointCount == 0) return
+
+        GLES20.glUseProgram(program)
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+
+        val mvpMatrix = FloatArray(16)
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
+
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
+
+        // Render: Cyan/Teal for that "Hacker" aesthetic
+        GLES20.glUniform4f(colorHandle, 0.0f, 1.0f, 0.8f, 1.0f)
+        GLES20.glUniform1f(pointSizeHandle, 10.0f) // Nice visible dots
+
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
+        GLES20.glVertexAttribPointer(positionHandle, 4, GLES20.GL_FLOAT, false, 16, 0)
+        GLES20.glEnableVertexAttribArray(positionHandle)
+
+        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, accumulatedPointCount)
+
+        GLES20.glDisableVertexAttribArray(positionHandle)
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
+    }
+
+    fun clear() {
+        accumulatedPointCount = 0
+        pointIds.clear()
     }
 }

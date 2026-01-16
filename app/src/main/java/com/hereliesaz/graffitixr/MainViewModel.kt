@@ -31,7 +31,6 @@ import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.applyCurves
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
-import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +61,7 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 import com.google.ar.core.Session.FeatureMapQuality
 import com.google.ar.core.Pose
+import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
@@ -79,7 +79,7 @@ class MainViewModel(
 
     private val onboardingManager = OnboardingManager(application)
     private val projectManager = ProjectManager(application)
-    private val slamManager = SlamManager() // The new Brain
+    private val slamManager = SlamManager()
 
     private val undoStack = mutableListOf<UiState>()
     private val redoStack = mutableListOf<UiState>()
@@ -125,12 +125,10 @@ class MainViewModel(
         }
     }
 
-    // --- Neural Scan Logic ---
-
     fun toggleMappingMode() {
         val next = !uiState.value.isMappingMode
         updateState(uiState.value.copy(isMappingMode = next), isUndoable = false)
-        arRenderer?.showMiniMap = next // Toggle the visualizer in Renderer
+        arRenderer?.showMiniMap = next
 
         if (!next) {
             slamManager.reset()
@@ -145,7 +143,6 @@ class MainViewModel(
 
     fun finalizeMap() {
         val session = arRenderer?.session ?: return
-        // Create anchor at camera + 0.5m forward
         val cameraPose = session.update().camera.pose
         val anchorPose = cameraPose.compose(Pose.makeTranslation(0f, 0f, -0.5f))
         val anchor = session.createAnchor(anchorPose)
@@ -312,7 +309,9 @@ class MainViewModel(
     private fun handleTargetCreationFailure(e: Exception) { updateState(uiState.value.copy(isCapturingTarget = false, targetCreationState = TargetCreationState.IDLE, captureStep = CaptureStep.ADVICE, capturedTargetImages = emptyList(), arState = ArState.SEARCHING, isLoading = false, isGridGuideVisible = false)); arRenderer?.showGuide = false; Toast.makeText(getApplication(), "Target creation failed: ${e.message}", Toast.LENGTH_LONG).show() }
 
     fun onCycleRotationAxis() { val nextAxis = when (uiState.value.activeRotationAxis) { RotationAxis.X -> RotationAxis.Y; RotationAxis.Y -> RotationAxis.Z; RotationAxis.Z -> RotationAxis.X }; updateState(uiState.value.copy(activeRotationAxis = nextAxis, showRotationAxisFeedback = true)); Toast.makeText(getApplication(), "Rotation Axis: ${nextAxis.name}", Toast.LENGTH_SHORT).show() }
+
     fun onArObjectScaleChanged(scaleFactor: Float) { val newScale = (uiState.value.arObjectScale * scaleFactor).coerceIn(0.01f, 10.0f); updateState(uiState.value.copy(arObjectScale = newScale, scale = newScale), isUndoable = false); updateActiveLayer { it.copy(scale = newScale) } }
+
     fun onRotationXChanged(delta: Float) { val newRot = uiState.value.rotationX + delta; updateState(uiState.value.copy(rotationX = newRot), isUndoable = false); updateActiveLayer { it.copy(rotationX = newRot) } }
     fun onRotationYChanged(delta: Float) { val newRot = uiState.value.rotationY + delta; updateState(uiState.value.copy(rotationY = newRot), isUndoable = false); updateActiveLayer { it.copy(rotationY = newRot) } }
     fun onRotationZChanged(delta: Float) { val newRot = uiState.value.rotationZ + delta; updateState(uiState.value.copy(rotationZ = newRot), isUndoable = false); updateActiveLayer { it.copy(rotationZ = newRot) } }
@@ -332,14 +331,39 @@ class MainViewModel(
 
     fun onRemoveBackgroundClicked() { viewModelScope.launch { setLoading(true); (uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri)?.let { uri -> try { val resultBitmap = BackgroundRemover.removeBackground(BitmapUtils.getBitmapFromUri(getApplication(), uri) ?: return@launch); if (resultBitmap != null) { saveBitmapToCache(resultBitmap, "background_removed")?.let { newUri -> updateState(uiState.value.copy(overlayImageUri = newUri, backgroundRemovedImageUri = newUri, isLoading = false)); updateActiveLayer { it.copy(uri = newUri, backgroundRemovedUri = newUri) } } } else { setLoading(false); Toast.makeText(getApplication(), "Background removal failed", Toast.LENGTH_SHORT).show() } } catch (e: Exception) { setLoading(false) } } ?: setLoading(false) } }
 
-    fun onBrightnessChanged(brightness: Float) { updateState(uiState.value.copy(brightness = brightness.coerceIn(-1f, 1f)), isUndoable = false) }
+    fun onBrightnessChanged(brightness: Float) { val safe = brightness.coerceIn(-1f, 1f); updateState(uiState.value.copy(brightness = safe), isUndoable = false); updateActiveLayer { it.copy(brightness = safe) } }
 
     fun onLineDrawingClicked() { viewModelScope.launch { setLoading(true); if (uiState.value.isLineDrawing) { (uiState.value.backgroundRemovedImageUri ?: uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri)?.let { updateState(uiState.value.copy(overlayImageUri = it, isLineDrawing = false, isLoading = false)); updateActiveLayer { l -> l.copy(uri = it) } } ?: setLoading(false) } else { (uiState.value.backgroundRemovedImageUri ?: uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri)?.let { uri -> val lineDrawingBitmap = convertToLineDrawing(BitmapUtils.getBitmapFromUri(getApplication(), uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch, isWhite = true); saveBitmapToCache(lineDrawingBitmap, "line_drawing")?.let { newUri -> updateState(uiState.value.copy(overlayImageUri = newUri, isLineDrawing = true, isLoading = false)); updateActiveLayer { it.copy(uri = newUri) } } } ?: setLoading(false) } } }
 
     private fun setLoading(isLoading: Boolean) { updateState(uiState.value.copy(isLoading = isLoading), isUndoable = false) }
     fun onBackgroundImageSelected(uri: Uri) { updateState(uiState.value.copy(backgroundImageUri = uri)) }
     fun onOverlayImageSelected(uri: Uri) { val newLayer = OverlayLayer(id = java.util.UUID.randomUUID().toString(), name = "Layer ${uiState.value.layers.size + 1}", uri = uri, originalUri = uri); updateState(uiState.value.copy(overlayImageUri = uri, originalOverlayImageUri = uri, backgroundRemovedImageUri = null, isLineDrawing = false, showDoubleTapHint = !onboardingManager.hasSeenDoubleTapHint(), activeRotationAxis = RotationAxis.Y, layers = uiState.value.layers + newLayer, activeLayerId = newLayer.id, rotationY = 0f, rotationX = 0f, rotationZ = 0f, scale = 1f, offset = Offset.Zero)) }
-    fun onLayerActivated(layerId: String) { uiState.value.layers.find { it.id == layerId }?.let { updateState(uiState.value.copy(activeLayerId = layerId, overlayImageUri = it.uri, originalOverlayImageUri = it.originalUri, backgroundRemovedImageUri = it.backgroundRemovedUri, scale = it.scale, rotationX = it.rotationX, rotationY = it.rotationY, rotationZ = it.rotationZ, offset = it.offset, opacity = it.opacity, brightness = it.brightness, contrast = it.contrast, saturation = it.saturation, colorBalanceR = it.colorBalanceR, colorBalanceG = it.colorBalanceG, colorBalanceB = it.colorBalanceB, curvesPoints = it.curvesPoints, blendMode = it.blendMode), isUndoable = false) } }
+
+    fun onLayerActivated(layerId: String) {
+        uiState.value.layers.find { it.id == layerId }?.let {
+            updateState(uiState.value.copy(
+                activeLayerId = layerId,
+                overlayImageUri = it.uri,
+                originalOverlayImageUri = it.originalUri,
+                backgroundRemovedImageUri = it.backgroundRemovedUri,
+                scale = it.scale,
+                rotationX = it.rotationX,
+                rotationY = it.rotationY,
+                rotationZ = it.rotationZ,
+                offset = it.offset,
+                opacity = it.opacity,
+                brightness = it.brightness,
+                contrast = it.contrast,
+                saturation = it.saturation,
+                colorBalanceR = it.colorBalanceR,
+                colorBalanceG = it.colorBalanceG,
+                colorBalanceB = it.colorBalanceB,
+                curvesPoints = it.curvesPoints,
+                blendMode = it.blendMode
+            ), isUndoable = false)
+        }
+    }
+
     fun onLayerReordered(newOrderIds: List<String>) { val reordered = newOrderIds.mapNotNull { id -> uiState.value.layers.find { it.id == id } }; if (reordered.size == uiState.value.layers.size) updateState(uiState.value.copy(layers = reordered)) }
     fun onLayerRenamed(layerId: String, newName: String) { updateState(uiState.value.copy(layers = uiState.value.layers.map { if (it.id == layerId) it.copy(name = newName) else it })) }
     fun onLayerDuplicated(layerId: String) { uiState.value.layers.find { it.id == layerId }?.let { val newLayer = it.copy(id = java.util.UUID.randomUUID().toString(), name = "${it.name} Copy"); updateState(uiState.value.copy(layers = uiState.value.layers + newLayer, activeLayerId = newLayer.id)) } }
@@ -361,12 +385,16 @@ class MainViewModel(
     fun onSaveClicked() { viewModelScope.launch { updateState(uiState.value.copy(hideUiForCapture = true), isUndoable = false); delay(200); _captureEvent.emit(CaptureEvent.RequestCapture) } }
     fun saveCapturedBitmap(bitmap: Bitmap) { updateState(uiState.value.copy(hideUiForCapture = false), isUndoable = false); viewModelScope.launch { setLoading(true); val success = withContext(Dispatchers.IO) { saveBitmapToGallery(getApplication(), bitmap) }; Toast.makeText(getApplication(), if (success) "Image saved" else "Save failed", Toast.LENGTH_SHORT).show(); setLoading(false) } }
 
-    fun onColorBalanceRChanged(value: Float) { updateState(uiState.value.copy(colorBalanceR = value.coerceIn(0f, 2f)), isUndoable = false) }
-    fun onColorBalanceGChanged(value: Float) { updateState(uiState.value.copy(colorBalanceG = value.coerceIn(0f, 2f)), isUndoable = false) }
-    fun onColorBalanceBChanged(value: Float) { updateState(uiState.value.copy(colorBalanceB = value.coerceIn(0f, 2f)), isUndoable = false) }
+    // Updated to apply changes to ACTIVE LAYER
+    fun onColorBalanceRChanged(value: Float) { val safe = value.coerceIn(0f, 2f); updateState(uiState.value.copy(colorBalanceR = safe), isUndoable = false); updateActiveLayer { it.copy(colorBalanceR = safe) } }
+    fun onColorBalanceGChanged(value: Float) { val safe = value.coerceIn(0f, 2f); updateState(uiState.value.copy(colorBalanceG = safe), isUndoable = false); updateActiveLayer { it.copy(colorBalanceG = safe) } }
+    fun onColorBalanceBChanged(value: Float) { val safe = value.coerceIn(0f, 2f); updateState(uiState.value.copy(colorBalanceB = safe), isUndoable = false); updateActiveLayer { it.copy(colorBalanceB = safe) } }
 
     fun onCycleBlendMode() { val next = when (uiState.value.blendMode) { BlendMode.SrcOver -> BlendMode.Multiply; BlendMode.Multiply -> BlendMode.Screen; BlendMode.Screen -> BlendMode.Overlay; BlendMode.Overlay -> BlendMode.Darken; BlendMode.Darken -> BlendMode.Lighten; else -> BlendMode.SrcOver }; updateState(uiState.value.copy(blendMode = next)); updateActiveLayer { it.copy(blendMode = next) }; Toast.makeText(getApplication(), "Blend: $next", Toast.LENGTH_SHORT).show() }
-    fun onMagicClicked() { if (uiState.value.rotationX != 0f || uiState.value.rotationY != 0f || uiState.value.rotationZ != 0f) { updateState(uiState.value.copy(rotationX = 0f, rotationY = 0f, rotationZ = 0f)); Toast.makeText(getApplication(), "Aligned Flat", Toast.LENGTH_SHORT).show() } }
+
+    // Updated to apply alignment to ACTIVE LAYER
+    fun onMagicClicked() { if (uiState.value.rotationX != 0f || uiState.value.rotationY != 0f || uiState.value.rotationZ != 0f) { updateState(uiState.value.copy(rotationX = 0f, rotationY = 0f, rotationZ = 0f)); updateActiveLayer { it.copy(rotationX = 0f, rotationY = 0f, rotationZ = 0f) }; Toast.makeText(getApplication(), "Aligned Flat", Toast.LENGTH_SHORT).show() } }
+
     fun onToggleFlashlight() { val next = !uiState.value.isFlashlightOn; updateState(uiState.value.copy(isFlashlightOn = next), isUndoable = false); arRenderer?.setFlashlight(next) }
     fun toggleImageLock() { val next = !uiState.value.isImageLocked; updateState(uiState.value.copy(isImageLocked = next), isUndoable = false); Toast.makeText(getApplication(), if (next) "Locked" else "Unlocked", Toast.LENGTH_SHORT).show() }
 
