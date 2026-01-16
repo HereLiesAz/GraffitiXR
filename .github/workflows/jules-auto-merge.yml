@@ -21,7 +21,9 @@ jobs:
       - name: Invoke Jules
         uses: google-labs-code/jules-invoke@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use GH_TOKEN repository secret as requested for authentication
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           jules_api_key: ${{ secrets.JULES_API_KEY }}
           prompt: |
