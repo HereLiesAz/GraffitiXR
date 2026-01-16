@@ -3,7 +3,7 @@ package com.hereliesaz.graffitixr.utils
 import android.graphics.Bitmap
 import android.graphics.Color
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.segmentation.SubjectSegmentation
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import kotlinx.coroutines.tasks.await
 import java.nio.ByteBuffer
@@ -37,7 +37,7 @@ object BackgroundRemover {
                 Result.failure(Exception("The machine saw nothing worth saving."))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure<Bitmap>(e)
         }
     }
 }
