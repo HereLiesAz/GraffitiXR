@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.data.FingerprintSerializer
 import kotlinx.serialization.json.Json
 import kotlin.math.abs
+import com.google.ar.core.Session.FeatureMapQuality
 
 @Composable
 fun ArView(
@@ -62,8 +63,21 @@ fun ArView(
 
     DisposableEffect(renderer) {
         viewModel.arRenderer = renderer
+
+        // Connect the scan quality callback from Renderer (GL Thread) to ViewModel
+        renderer.onScanQualityUpdate = { quality ->
+            val score = when (quality) {
+                FeatureMapQuality.INSUFFICIENT -> 0.1f
+                FeatureMapQuality.SUFFICIENT -> 0.6f
+                FeatureMapQuality.GOOD -> 1.0f
+                else -> 0f
+            }
+            viewModel.updateMappingScore(score)
+        }
+
         onDispose {
             viewModel.arRenderer = null
+            renderer.onScanQualityUpdate = null
             renderer.cleanup()
         }
     }
@@ -101,6 +115,9 @@ fun ArView(
     LaunchedEffect(uiState.layers) {
         renderer.setLayers(uiState.layers)
     }
+
+    // Toggle Mini-Map visibility
+    renderer.showMiniMap = uiState.isMappingMode
 
     // Legacy support for single overlay image if layers are empty (fallback)
     LaunchedEffect(uiState.overlayImageUri) {

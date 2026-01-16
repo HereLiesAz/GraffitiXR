@@ -1,9 +1,6 @@
 package com.hereliesaz.graffitixr
 
-import android.Manifest
-import android.app.Activity
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.net.Uri
@@ -24,11 +21,13 @@ import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
+import com.google.ar.core.Session.FeatureMapQuality
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
+import com.hereliesaz.graffitixr.rendering.MiniMapRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
@@ -88,6 +87,7 @@ class ArRenderer(
     private val planeRenderer = PlaneRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
     private val simpleQuadRenderer = SimpleQuadRenderer()
+    private val miniMapRenderer = MiniMapRenderer()
     private val yuvToRgbConverter = YuvToRgbConverter(context)
 
     // Depth
@@ -98,6 +98,7 @@ class ArRenderer(
     @Volatile private var captureNextFrame = false
     private var viewportWidth = 0
     private var viewportHeight = 0
+    private var navRailWidthPx = 0
 
     // Multi-Layer Support
     private val layerBitmaps = ConcurrentHashMap<String, Bitmap>()
@@ -107,7 +108,9 @@ class ArRenderer(
 
     @Volatile var guideBitmap: Bitmap? = null
     @Volatile var showGuide: Boolean = false
-    
+    @Volatile var showMiniMap: Boolean = false
+    var onScanQualityUpdate: ((FeatureMapQuality) -> Unit)? = null
+
     @Volatile var arImagePose: FloatArray? = null
     @Volatile var arState: ArState = ArState.SEARCHING
     private var activeAnchor: Anchor? = null
@@ -237,7 +240,12 @@ class ArRenderer(
             planeRenderer.createOnGlThread()
             pointCloudRenderer.createOnGlThread()
             simpleQuadRenderer.createOnGlThread()
+            miniMapRenderer.createOnGlThread(context) // Initialize MiniMap
             createDepthTexture()
+
+            // Calculate standard NavRail width (80dp) in pixels
+            val density = context.resources.displayMetrics.density
+            navRailWidthPx = (80 * density).toInt()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize renderers", e)
         }
@@ -263,10 +271,9 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        
-        // Critical: Safety check for session state to prevent scheduler.cc RET_CHECK failure
+
         if (!isSessionResumed) return
-        
+
         sessionLock.lock()
         try {
             val currentSession = session
@@ -303,10 +310,20 @@ class ArRenderer(
                 displayToCameraTransform[6] = c; displayToCameraTransform[7] = f; displayToCameraTransform[8] = 1f
 
                 drawFrame(frame)
+
+                // Render Mini-Map if enabled
+                if (showMiniMap) {
+                    val quality = currentSession.estimateFeatureMapQualityForHosting(frame.camera.pose)
+                    mainHandler.post { onScanQualityUpdate?.invoke(quality) }
+
+                    frame.acquirePointCloud().use { pointCloud ->
+                        miniMapRenderer.draw(pointCloud, frame.camera.pose, viewportWidth, viewportHeight, navRailWidthPx)
+                    }
+                }
+
             } catch (e: SessionPausedException) {
                 // Ignore
             } catch (e: Exception) {
-                // Catch potential scheduler/mediapipe failures and log them, but don't crash
                 Log.e(TAG, "Error updating AR frame: ${e.message}")
             }
         } catch (t: Throwable) {
@@ -361,6 +378,14 @@ class ArRenderer(
 
         camera.getProjectionMatrix(projMtx, 0, 0.01f, 100.0f)
         camera.getViewMatrix(viewMtx, 0)
+
+        // Draw Main Point Cloud - Only if not showing grid guide
+        if (!showGuide) {
+            frame.acquirePointCloud().use { pointCloud ->
+                // Removed 'pointCloudRenderer.update' which does not exist
+                pointCloudRenderer.draw(pointCloud, viewMtx, projMtx)
+            }
+        }
 
         if (activeAnchor == null && arState != ArState.PLACED) {
             val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
@@ -516,7 +541,7 @@ class ArRenderer(
 
     private fun analyzeFrameAsync(frame: Frame) {
         if (isAnalyzing.getAndSet(true)) return
-        
+
         // --- CRITICAL CHECK: OpenCV Availability ---
         if (!ensureOpenCVLoaded()) {
             isAnalyzing.set(false)
@@ -540,7 +565,7 @@ class ArRenderer(
             analysisScope.launch {
                 // Ensure native library is still loaded in this coroutine thread
                 if (!ensureOpenCVLoaded()) { isAnalyzing.set(false); return@launch }
-                
+
                 // Bolt Optimization: Local Mat objects with explicit lifecycle
                 val rawMat = Mat()
                 val rotatedMat = Mat()
@@ -549,7 +574,7 @@ class ArRenderer(
                 val keypoints = MatOfKeyPoint()
                 val matches = MatOfDMatch()
                 val mask = Mat()
-                
+
                 try {
                     rawMat.create(height, width, CvType.CV_8UC1)
                     rawMat.put(0, 0, data)
@@ -574,7 +599,7 @@ class ArRenderer(
 
                         val matcherLocal = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
                         matcherLocal.match(descriptors, targetDescriptors, matches)
-                        
+
                         val total = matches.rows()
                         var good = 0
                         if (total > 0) {
@@ -637,7 +662,7 @@ class ArRenderer(
                     config.updateMode = Config.UpdateMode.BLOCKING
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
-                    val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    val hasFineLocation = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     config.geospatialMode = if (hasFineLocation && session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)) Config.GeospatialMode.ENABLED else Config.GeospatialMode.DISABLED
                     config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
                     config.depthMode = Config.DepthMode.DISABLED

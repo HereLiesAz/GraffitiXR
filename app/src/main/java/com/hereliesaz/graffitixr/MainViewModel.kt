@@ -24,6 +24,7 @@ import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.GithubRelease
 import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.data.ProjectData
+import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
 import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.OnboardingManager
@@ -59,6 +60,8 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sqrt
+import com.google.ar.core.Session.FeatureMapQuality
+import com.google.ar.core.Pose
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
@@ -76,6 +79,7 @@ class MainViewModel(
 
     private val onboardingManager = OnboardingManager(application)
     private val projectManager = ProjectManager(application)
+    private val slamManager = SlamManager() // The new Brain
 
     private val undoStack = mutableListOf<UiState>()
     private val redoStack = mutableListOf<UiState>()
@@ -119,6 +123,48 @@ class MainViewModel(
                 }
             }
         }
+    }
+
+    // --- Neural Scan Logic ---
+
+    fun toggleMappingMode() {
+        val next = !uiState.value.isMappingMode
+        updateState(uiState.value.copy(isMappingMode = next), isUndoable = false)
+        arRenderer?.showMiniMap = next // Toggle the visualizer in Renderer
+
+        if (!next) {
+            slamManager.reset()
+        }
+    }
+
+    fun updateMappingScore(score: Float) {
+        if (abs(score - uiState.value.mappingQualityScore) > 0.05f) {
+            updateState(uiState.value.copy(mappingQualityScore = score), isUndoable = false)
+        }
+    }
+
+    fun finalizeMap() {
+        val session = arRenderer?.session ?: return
+        // Create anchor at camera + 0.5m forward
+        val cameraPose = session.update().camera.pose
+        val anchorPose = cameraPose.compose(Pose.makeTranslation(0f, 0f, -0.5f))
+        val anchor = session.createAnchor(anchorPose)
+
+        updateState(uiState.value.copy(isHostingAnchor = true), isUndoable = false)
+
+        slamManager.hostAnchor(
+            session = session,
+            anchor = anchor,
+            onSuccess = { id ->
+                updateState(uiState.value.copy(isHostingAnchor = false, cloudAnchorId = id, isMappingMode = false), isUndoable = false)
+                arRenderer?.showMiniMap = false
+                Toast.makeText(getApplication(), "Map Saved to Cloud", Toast.LENGTH_LONG).show()
+            },
+            onError = { error ->
+                updateState(uiState.value.copy(isHostingAnchor = false), isUndoable = false)
+                Toast.makeText(getApplication(), "Hosting Failed: $error", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     fun updateArtworkBounds(bounds: RectF) {
@@ -331,7 +377,7 @@ class MainViewModel(
     private fun getGpsData(): com.hereliesaz.graffitixr.data.GpsData? { try { if (androidx.core.content.ContextCompat.checkSelfPermission(getApplication(), android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) return null; val lm = getApplication<Application>().getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager; val loc = lm?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER) ?: lm?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); return loc?.let { com.hereliesaz.graffitixr.data.GpsData(it.latitude, it.longitude, it.altitude, it.accuracy, it.time) } } catch (e: Exception) { return null } }
     private fun saveBitmapToCache(b: Bitmap, p: String = "target"): Uri? { try { val context = getApplication<Application>().applicationContext; val path = File(context.cacheDir, "project_assets").apply { mkdirs() }; val file = File(path, "${p}_${System.currentTimeMillis()}.png"); FileOutputStream(file).use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }; return FileProvider.getUriForFile(context, "${context.packageName}.provider", file) } catch (e: Exception) { return null } }
 
-    fun loadProject(name: String) { viewModelScope.launch(Dispatchers.IO) { projectManager.loadProject(name)?.let { updateState(uiState.value.copy(backgroundImageUri = it.backgroundImageUri, overlayImageUri = it.overlayImageUri, originalOverlayImageUri = it.originalOverlayImageUri ?: it.overlayImageUri, opacity = it.opacity, brightness = it.brightness, contrast = it.contrast, saturation = it.saturation, colorBalanceR = it.colorBalanceR, colorBalanceG = it.colorBalanceG, colorBalanceB = it.colorBalanceB, scale = it.scale, rotationZ = it.rotationZ, rotationX = it.rotationX, rotationY = it.rotationY, offset = it.offset, blendMode = it.blendMode, fingerprintJson = it.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }, drawingPaths = it.drawingPaths, isLineDrawing = it.isLineDrawing, capturedTargetUris = it.targetImageUris ?: emptyList())); withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '$name' loaded", Toast.LENGTH_SHORT).show() } } } }
+    fun loadProject(name: String) { viewModelScope.launch(Dispatchers.IO) { projectManager.loadProject(name)?.let { updateState(uiState.value.copy(backgroundImageUri = it.backgroundImageUri, overlayImageUri = it.overlayImageUri, originalOverlayImageUri = it.originalOverlayImageUri ?: it.overlayImageUri, opacity = it.opacity, brightness = it.brightness, contrast = it.contrast, saturation = it.saturation, colorBalanceR = it.colorBalanceR, colorBalanceG = it.colorBalanceG, colorBalanceB = it.colorBalanceB, scale = it.scale, rotationZ = it.rotationZ, rotationX = it.rotationX, rotationY = it.rotationY, offset = it.offset, blendMode = it.blendMode, fingerprintJson = it.fingerprint?.let { Json.encodeToString(Fingerprint.serializer(), it) }, drawingPaths = it.drawingPaths, isLineDrawing = false, capturedTargetUris = it.targetImageUris ?: emptyList())); withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '$name' loaded", Toast.LENGTH_SHORT).show() } } } }
     fun getProjectList(): List<String> = projectManager.getProjectList()
     fun deleteProject(name: String) { viewModelScope.launch(Dispatchers.IO) { projectManager.deleteProject(name); withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project '$name' deleted", Toast.LENGTH_SHORT).show() } } }
     fun onNewProject() { updateState(UiState(), isUndoable = false) }
@@ -371,11 +417,11 @@ class MainViewModel(
     fun exportProjectToUri(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             setLoading(true); try {
-                val savedTargetUris = uiState.value.capturedTargetImages.mapNotNull { saveBitmapToCache(it) }
-                val projectData = ProjectData(backgroundImageUri = uiState.value.backgroundImageUri, overlayImageUri = uiState.value.overlayImageUri, targetImageUris = savedTargetUris, refinementPaths = uiState.value.refinementPaths, opacity = uiState.value.opacity, contrast = uiState.value.contrast, saturation = uiState.value.saturation, colorBalanceR = uiState.value.colorBalanceR, colorBalanceG = uiState.value.colorBalanceG, colorBalanceB = uiState.value.colorBalanceB, scale = uiState.value.scale, rotationZ = uiState.value.rotationZ, rotationX = uiState.value.rotationX, rotationY = uiState.value.rotationY, offset = uiState.value.offset, blendMode = uiState.value.blendMode, fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString<Fingerprint>(it) }, drawingPaths = uiState.value.drawingPaths, progressPercentage = uiState.value.progressPercentage, evolutionImageUris = uiState.value.evolutionCaptureUris, gpsData = getGpsData(), sensorData = getSensorData(), calibrationSnapshots = uiState.value.calibrationSnapshots)
-                projectManager.exportProjectToZip(uri, projectData)
-                withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project exported", Toast.LENGTH_SHORT).show() }
-            } catch (e: Exception) { withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Export failed", Toast.LENGTH_SHORT).show() } } finally { setLoading(false) }
+            val savedTargetUris = uiState.value.capturedTargetImages.mapNotNull { saveBitmapToCache(it) }
+            val projectData = ProjectData(backgroundImageUri = uiState.value.backgroundImageUri, overlayImageUri = uiState.value.overlayImageUri, targetImageUris = savedTargetUris, refinementPaths = uiState.value.refinementPaths, opacity = uiState.value.opacity, contrast = uiState.value.contrast, saturation = uiState.value.saturation, colorBalanceR = uiState.value.colorBalanceR, colorBalanceG = uiState.value.colorBalanceG, colorBalanceB = uiState.value.colorBalanceB, scale = uiState.value.scale, rotationZ = uiState.value.rotationZ, rotationX = uiState.value.rotationX, rotationY = uiState.value.rotationY, offset = uiState.value.offset, blendMode = uiState.value.blendMode, fingerprint = uiState.value.fingerprintJson?.let { Json.decodeFromString<Fingerprint>(it) }, drawingPaths = uiState.value.drawingPaths, progressPercentage = uiState.value.progressPercentage, evolutionImageUris = uiState.value.evolutionCaptureUris, gpsData = getGpsData(), sensorData = getSensorData(), calibrationSnapshots = uiState.value.calibrationSnapshots)
+            projectManager.exportProjectToZip(uri, projectData)
+            withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Project exported", Toast.LENGTH_SHORT).show() }
+        } catch (e: Exception) { withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "Export failed", Toast.LENGTH_SHORT).show() } } finally { setLoading(false) }
         }
     }
 

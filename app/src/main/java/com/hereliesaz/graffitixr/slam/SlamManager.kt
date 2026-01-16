@@ -1,49 +1,53 @@
 package com.hereliesaz.graffitixr.slam
 
 import android.util.Log
+import com.google.ar.core.Anchor
+import com.google.ar.core.Session
+import com.google.ar.core.Session.FeatureMapQuality
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Manager for the ORB-SLAM3 system via JNI.
+ * Manages the "Neural Scan" process (Cloud Anchor Hosting).
+ * It talks to the ARCore oracle to determine if the world is real enough to save.
  */
 class SlamManager {
 
-    companion object {
-        init {
-            try {
-                // Ensure dependency library (OpenCV) is loaded before SLAM
-                System.loadLibrary("opencv_java4")
-                System.loadLibrary("graffiti_slam")
-            } catch (e: UnsatisfiedLinkError) {
-                Log.e("SlamManager", "Failed to load SLAM native library: ${e.message}")
-            } catch (e: Exception) {
-                Log.e("SlamManager", "Error during native initialization: ${e.message}")
-            }
+    private val _mappingQuality = MutableStateFlow(FeatureMapQuality.INSUFFICIENT)
+    val mappingQuality = _mappingQuality.asStateFlow()
+
+    private val _isHosting = MutableStateFlow(false)
+    val isHosting = _isHosting.asStateFlow()
+
+    /**
+     * Ask the oracle: "How good is the data for this pose?"
+     */
+    fun updateFeatureMapQuality(session: Session, cameraPose: com.google.ar.core.Pose) {
+        try {
+            val quality = session.estimateFeatureMapQualityForHosting(cameraPose)
+            _mappingQuality.value = quality
+        } catch (e: Exception) {
+            // The oracle is silent (usually session is paused or not ready)
         }
     }
 
     /**
-     * Initializes the SLAM system with the given vocabulary and settings files.
-     * @param vocPath Path to the ORB vocabulary file.
-     * @param settingsPath Path to the settings file (YAML).
+     * The Sacrifice: Upload the anchor to the cloud.
      */
-    external fun initNative(vocPath: String, settingsPath: String)
+    fun hostAnchor(session: Session, anchor: Anchor, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
+        _isHosting.value = true
+        session.hostCloudAnchorAsync(anchor, 365) { cloudAnchorId, state ->
+            _isHosting.value = false
+            if (state == Anchor.CloudAnchorState.SUCCESS) {
+                onSuccess(cloudAnchorId)
+            } else {
+                onError(state.toString())
+            }
+        }
+    }
 
-    /**
-     * Shuts down the SLAM system.
-     */
-    external fun disposeNative()
-
-    /**
-     * Saves the current map (Atlas).
-     */
-    external fun saveMapNative()
-
-    /**
-     * Processes a single frame.
-     * @param width Width of the image.
-     * @param height Height of the image.
-     * @param data Raw image data (e.g. Grayscale or RGB).
-     * @param timestamp Timestamp of the frame.
-     */
-    external fun processFrameNative(width: Int, height: Int, data: ByteArray, timestamp: Long)
+    fun reset() {
+        _mappingQuality.value = FeatureMapQuality.INSUFFICIENT
+        _isHosting.value = false
+    }
 }

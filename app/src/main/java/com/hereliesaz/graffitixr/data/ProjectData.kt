@@ -2,70 +2,9 @@ package com.hereliesaz.graffitixr.data
 
 import android.net.Uri
 import android.os.Parcelable
-import androidx.compose.ui.geometry.Offset
 import kotlinx.parcelize.Parcelize
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-
-@Serializable
-data class ProjectData(
-    @Serializable(with = UriSerializer::class)
-    val backgroundImageUri: Uri?,
-    @Serializable(with = UriSerializer::class)
-    val overlayImageUri: Uri?,
-    @Serializable(with = UriSerializer::class)
-    val originalOverlayImageUri: Uri? = null,
-    // List of URIs for the captured target images (Front, Left, Right, etc.)
-    @Serializable(with = UriListSerializer::class)
-    val targetImageUris: List<Uri> = emptyList(),
-    // Saved mask paths
-    @Serializable(with = RefinementPathListSerializer::class)
-    val refinementPaths: List<RefinementPath> = emptyList(),
-
-    val opacity: Float,
-    val brightness: Float = 0f,
-    val contrast: Float,
-    val saturation: Float,
-    val colorBalanceR: Float,
-    val colorBalanceG: Float,
-    val colorBalanceB: Float,
-    val scale: Float,
-    val rotationZ: Float,
-    val rotationX: Float,
-    val rotationY: Float,
-    @Serializable(with = OffsetSerializer::class)
-    val offset: Offset,
-    @Serializable(with = BlendModeSerializer::class)
-    val blendMode: androidx.compose.ui.graphics.BlendMode,
-    @Serializable(with = FingerprintSerializer::class)
-    val fingerprint: Fingerprint?,
-    @Serializable(with = DrawingPathsSerializer::class)
-    val drawingPaths: List<List<Pair<Float, Float>>>,
-    val progressPercentage: Float = 0f,
-    @Serializable(with = UriListSerializer::class)
-    val evolutionImageUris: List<Uri> = emptyList(),
-    val isLineDrawing: Boolean = false,
-    val gpsData: GpsData? = null,
-    val sensorData: SensorData? = null,
-
-    // New field for Multi-Point Calibration Snapshots
-    val calibrationSnapshots: List<CalibrationSnapshot> = emptyList()
-)
-
-@Serializable
-@Parcelize
-data class CalibrationSnapshot(
-    val gpsData: GpsData?,
-    val sensorData: SensorData?,
-    val poseMatrix: List<Float>?, // Flattened 4x4 matrix
-    val timestamp: Long
-) : Parcelable
+import java.util.UUID
 
 @Serializable
 @Parcelize
@@ -85,49 +24,74 @@ data class SensorData(
     val roll: Float
 ) : Parcelable
 
-object DrawingPathsSerializer : KSerializer<List<List<Pair<Float, Float>>>> {
-    private val listSerializer = ListSerializer(ListSerializer(PairFloatFloatSerializer))
-    override val descriptor = listSerializer.descriptor
-    override fun serialize(encoder: Encoder, value: List<List<Pair<Float, Float>>>) {
-        listSerializer.serialize(encoder, value)
-    }
-    override fun deserialize(decoder: Decoder): List<List<Pair<Float, Float>>> {
-        return listSerializer.deserialize(decoder)
-    }
-}
+@Serializable
+@Parcelize
+data class CalibrationSnapshot(
+    val gpsData: GpsData?,
+    val sensorData: SensorData?,
+    val poseMatrix: List<Float>?,
+    val timestamp: Long
+) : Parcelable
 
-object PairFloatFloatSerializer : KSerializer<Pair<Float, Float>> {
-    override val descriptor = ListSerializer(Float.serializer()).descriptor
-    override fun serialize(encoder: Encoder, value: Pair<Float, Float>) {
-        val list = listOf(value.first, value.second)
-        encoder.encodeSerializableValue(ListSerializer(Float.serializer()), list)
-    }
-    override fun deserialize(decoder: Decoder): Pair<Float, Float> {
-        val list = decoder.decodeSerializableValue(ListSerializer(Float.serializer()))
-        // Sentinel Security: Validate input size to prevent IndexOutOfBoundsException
-        if (list.size != 2) {
-            throw IllegalArgumentException("Invalid input for PairFloatFloatSerializer: Expected 2 elements, got ${list.size}")
-        }
-        return Pair(list[0], list[1])
-    }
-}
+@Serializable
+data class ProjectData(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "Untitled",
+    val created: Long = System.currentTimeMillis(),
+    val lastModified: Long = System.currentTimeMillis(),
 
-object NonNullableUriSerializer : KSerializer<Uri> {
-    override val descriptor = PrimitiveSerialDescriptor("Uri", PrimitiveKind.STRING)
-    override fun serialize(encoder: Encoder, value: Uri) = encoder.encodeString(value.toString())
-    override fun deserialize(decoder: Decoder): Uri = Uri.parse(decoder.decodeString())
-}
+    @Serializable(with = UriSerializer::class)
+    val backgroundImageUri: Uri? = null,
 
-object UriListSerializer : KSerializer<List<Uri>> {
-    private val serializer = ListSerializer(NonNullableUriSerializer)
-    override val descriptor = serializer.descriptor
-    override fun serialize(encoder: Encoder, value: List<Uri>) = serializer.serialize(encoder, value)
-    override fun deserialize(decoder: Decoder): List<Uri> = serializer.deserialize(decoder)
-}
+    @Serializable(with = UriSerializer::class)
+    val overlayImageUri: Uri? = null,
 
-object RefinementPathListSerializer : KSerializer<List<RefinementPath>> {
-    private val serializer = ListSerializer(RefinementPathSerializer)
-    override val descriptor = serializer.descriptor
-    override fun serialize(encoder: Encoder, value: List<RefinementPath>) = serializer.serialize(encoder, value)
-    override fun deserialize(decoder: Decoder): List<RefinementPath> = serializer.deserialize(decoder)
-}
+    @Serializable(with = UriSerializer::class)
+    val originalOverlayImageUri: Uri? = null,
+
+    val targetImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
+
+    @Serializable(with = RefinementPathSerializer::class)
+    val refinementPaths: List<RefinementPath> = emptyList(),
+
+    val opacity: Float = 1f,
+    val brightness: Float = 0f,
+    val contrast: Float = 1f,
+    val saturation: Float = 1f,
+
+    val colorBalanceR: Float = 1f,
+    val colorBalanceG: Float = 1f,
+    val colorBalanceB: Float = 1f,
+
+    val scale: Float = 1f,
+    val rotationX: Float = 0f,
+    val rotationY: Float = 0f,
+    val rotationZ: Float = 0f,
+
+    @Serializable(with = OffsetSerializer::class)
+    val offset: androidx.compose.ui.geometry.Offset = androidx.compose.ui.geometry.Offset.Zero,
+
+    @Serializable(with = BlendModeSerializer::class)
+    val blendMode: androidx.compose.ui.graphics.BlendMode = androidx.compose.ui.graphics.BlendMode.SrcOver,
+
+    val fingerprint: Fingerprint? = null,
+
+    // Using a simpler representation for drawing paths (list of point lists)
+    // Serialization of Pair<Float, Float> needs to be handled or simplified.
+    // For now we assume standard list serialization works for basic types if Pair is serializable
+    // Pair is Serializable in Kotlin.
+    val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
+
+    val progressPercentage: Float = 0f,
+
+    val evolutionImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
+
+    val gpsData: GpsData? = null,
+    val sensorData: SensorData? = null,
+    val calibrationSnapshots: List<CalibrationSnapshot> = emptyList(),
+
+    val layers: List<OverlayLayer> = emptyList(),
+
+    // Neural Scan ID
+    val cloudAnchorId: String? = null
+)
