@@ -22,6 +22,7 @@ fun OnboardingDialog(
         EditorMode.OVERLAY -> "In this mode, you can overlay your artwork on the live camera feed. This is a great way to get a quick preview of your work in the real world."
         EditorMode.TRACE -> "In this mode, your device acts as a lightbox. Place a piece of paper over the screen to trace your artwork. You can lock the screen to prevent accidental touches."
         EditorMode.AR -> "In this mode, you can use Augmented Reality to place your artwork in the real world. First, you'll need to create an image target by pointing your camera at a real-world object."
+        else -> "Welcome to ${editorMode.name} mode. Use the available tools to edit your project."
     }
 
     AlertDialog(
