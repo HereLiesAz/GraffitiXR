@@ -5,10 +5,14 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import com.hereliesaz.graffitixr.data.Fingerprint
+import com.hereliesaz.graffitixr.data.RefinementPath
 import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
 
 /**
@@ -26,7 +30,7 @@ object ImageProcessingUtils {
         contrast: Float,   // 0.0 to 2.0, default 1.0
         saturation: Float  // 0.0 to 2.0, default 1.0
     ): Bitmap {
-        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config)
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
         val paint = Paint()
 
@@ -63,7 +67,7 @@ object ImageProcessingUtils {
         green: Float, // 0.0 to 2.0, default 1.0
         blue: Float   // 0.0 to 2.0, default 1.0
     ): Bitmap {
-        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config)
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
         val paint = Paint()
 
@@ -103,14 +107,6 @@ object ImageProcessingUtils {
         val dest = Mat(edges.size(), CvType.CV_8UC4)
         Core.bitwise_not(edges, edges) // White background, black lines
         
-        // Make simple conversion back to bitmap for now, assuming standard processing
-        // Ideally we map the single channel edge data to the Alpha channel of a white image
-        // But for "Outline Rail Item", a simple Canny usually suffices.
-        
-        // Actually, let's do White Lines on Transparent Background.
-        // Canny gives 255 for edge, 0 for non-edge.
-        // We want 255,255,255,255 for edge, and 0,0,0,0 for non-edge.
-        
         // Reload raw edges (undo the bitwise_not if we did it)
         Imgproc.Canny(mat, edges, 50.0, 150.0) // Redo to be sure
         
@@ -129,4 +125,61 @@ object ImageProcessingUtils {
         
         return result
     }
+}
+
+// Top-level functions required by MainViewModel and ArRenderer
+
+fun detectFeaturesWithMask(bitmap: Bitmap, paths: List<RefinementPath>, mask: Bitmap?): List<org.opencv.core.KeyPoint> {
+     // simplified implementation
+     val mat = Mat()
+     Utils.bitmapToMat(bitmap, mat)
+     val gray = Mat()
+     Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
+     val orb = ORB.create()
+     val keypoints = MatOfKeyPoint()
+     orb.detect(gray, keypoints)
+     return keypoints.toList()
+}
+
+fun generateFingerprint(bitmap: Bitmap, paths: List<RefinementPath>, mask: Bitmap?): Fingerprint {
+     val mat = Mat()
+     Utils.bitmapToMat(bitmap, mat)
+     val gray = Mat()
+     Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
+     val orb = ORB.create()
+     val keypoints = MatOfKeyPoint()
+     val descriptors = Mat()
+     orb.detectAndCompute(gray, Mat(), keypoints, descriptors)
+
+     val data = ByteArray(descriptors.rows() * descriptors.cols() * descriptors.elemSize().toInt())
+     descriptors.get(0, 0, data)
+
+     return Fingerprint(keypoints.toList(), data, descriptors.rows(), descriptors.cols(), descriptors.type())
+}
+
+fun enhanceImageForAr(bitmap: Bitmap): Bitmap {
+    val mat = Mat()
+    Utils.bitmapToMat(bitmap, mat)
+    val lab = Mat()
+    Imgproc.cvtColor(mat, lab, Imgproc.COLOR_RGB2Lab)
+    val channels = ArrayList<Mat>()
+    Core.split(lab, channels)
+    val clahe = Imgproc.createCLAHE()
+    clahe.clipLimit = 4.0
+    clahe.apply(channels[0], channels[0])
+    Core.merge(channels, lab)
+    Imgproc.cvtColor(lab, mat, Imgproc.COLOR_Lab2RGB)
+    val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
+    Utils.matToBitmap(mat, result)
+    return result
+}
+
+fun resizeBitmapForArCore(bitmap: Bitmap): Bitmap {
+     // Resize to max 1024
+     val maxDim = 1024
+     if (bitmap.width <= maxDim && bitmap.height <= maxDim) return bitmap
+     val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+     val w = if (ratio > 1) maxDim else (maxDim * ratio).toInt()
+     val h = if (ratio > 1) (maxDim / ratio).toInt() else maxDim
+     return Bitmap.createScaledBitmap(bitmap, w, h, true)
 }
