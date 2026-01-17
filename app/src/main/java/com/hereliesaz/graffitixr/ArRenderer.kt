@@ -116,7 +116,10 @@ class ArRenderer(
         val currentIds = layerBitmaps.keys.toList()
         currentIds.forEach { id ->
             if (id !in newLayerIds) {
-                layerBitmaps.remove(id)
+                val bitmap = layerBitmaps.remove(id)
+                if (bitmap != null && !bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
                 layerUris.remove(id)
             }
         }
@@ -302,7 +305,7 @@ class ArRenderer(
                                     backgroundTextureId,
                                     viewportWidth.toFloat(),
                                     viewportHeight.toFloat(),
-                                    floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f), // Identity
+                                    displayTransform,
                                     layer.blendMode
                                 )
                             }
@@ -395,5 +398,9 @@ class ArRenderer(
         session?.close()
         session = null
         rendererScope.cancel()
+
+        layerBitmaps.values.forEach { if (!it.isRecycled) it.recycle() }
+        layerBitmaps.clear()
+        layerUris.clear()
     }
 }

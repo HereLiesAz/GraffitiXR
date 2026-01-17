@@ -100,7 +100,7 @@ class MainViewModel(
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Error removing background", e)
+                e.printStackTrace()
                 _feedbackEvent.send(FeedbackEvent.Toast("Error removing background"))
             }
             _uiState.update { it.copy(isLoading = false) }
@@ -124,7 +124,7 @@ class MainViewModel(
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Failed to generate outline", e)
+                e.printStackTrace()
                 _feedbackEvent.send(FeedbackEvent.Toast("Failed to generate outline"))
             }
             _uiState.update { it.copy(isLoading = false) }
@@ -337,7 +337,7 @@ class MainViewModel(
     fun onFeedbackShown() = _uiState.update { it.copy(showRotationAxisFeedback = false) }
     fun onMarkProgressToggled() = _uiState.update { it.copy(isMarkingProgress = !it.isMarkingProgress) }
     fun onDrawingPathFinished(p: List<Offset>) = _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(p)) }
-    fun updateArtworkBounds(b: android.graphics.RectF) = _uiState.update { it.copy() }
+    fun updateArtworkBounds(b: android.graphics.RectF) = _artworkBounds.update { b }
     fun setArPlanesDetected(d: Boolean) = _uiState.update { it.copy(isArPlanesDetected = d) }
     fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
     fun onFrameCaptured(b: Bitmap) {}

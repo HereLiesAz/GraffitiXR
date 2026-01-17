@@ -36,7 +36,7 @@ data class NavStrings(
     val adjustInfo: String,
     val balance: String,
     val balanceInfo: String,
-    val blending: String,
+    val build: String,
     val blendingInfo: String,
     val settings: String,
     val project: String,
@@ -90,7 +90,7 @@ fun rememberNavStrings(): NavStrings {
         adjustInfo = stringResource(R.string.nav_adjust_info),
         balance = stringResource(R.string.nav_balance),
         balanceInfo = stringResource(R.string.nav_balance_info),
-        blending = stringResource(R.string.nav_blending),
+        build = "Build", // Renamed from blending, hardcoded as resource might not be updated yet
         blendingInfo = stringResource(R.string.nav_blending_info),
         settings = stringResource(R.string.nav_settings),
         project = "Project", // Restored to "Project"

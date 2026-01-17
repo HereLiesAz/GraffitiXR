@@ -509,7 +509,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     showColorBalanceDialog = true
                                     showSliderDialog = null
                                 }
-                                azRailSubItem(id = "blending", hostId = "design_host", text = "Build", info = navStrings.blendingInfo, onClick = {
+                                azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
                                     viewModel.onCycleBlendMode()
                                     showSliderDialog = null; showColorBalanceDialog = false
                                     resetDialogs()

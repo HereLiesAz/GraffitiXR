@@ -91,7 +91,7 @@ fun CustomHelpOverlay(
                 HelpItem(navStrings.outline, navStrings.outlineInfo)
                 HelpItem(navStrings.adjust, navStrings.adjustInfo)
                 HelpItem(navStrings.balance, navStrings.balanceInfo)
-                HelpItem(navStrings.blending, navStrings.blendingInfo)
+                HelpItem(navStrings.build, navStrings.blendingInfo)
                 HelpItem("Lock Image", "Prevent accidental moves")
             }
             Spacer(modifier = Modifier.height(16.dp))
