@@ -1,25 +1,21 @@
-# Task Management & Workflow
+# Task Flow & Contribution
 
-## **1. The Source of Truth: `TODO.md`**
--   All active tasks, bugs, and feature requests are tracked in `docs/TODO.md`.
--   **Structure:**
-    -   `V[Current] Enhancements`: Active tasks.
-    -   `V[Next] Features`: Planned work.
-    -   `Backlog`: Future ideas.
-    -   `Completed`: History of work.
+## 1. Pick a Task
+Check `TODO.md`. Look for "High Priority".
 
-## **2. Selecting a Task**
-1.  Open `TODO.md`.
-2.  Find the first unchecked item `[ ]` in the current version section.
-3.  If the description is vague, look for context in `AGENTS.md` or the code.
-4.  If the list is empty, consult `AGENTS.md` "Current Project Goals" or ask the user.
+## 2. Create a Branch
+Format: `feature/your-feature-name` or `fix/issue-description`.
 
-## **3. Executing a Task**
-1.  **Plan:** Use `set_plan` to outline your steps.
-2.  **Implement:** Write code, keeping it modular and clean.
-3.  **Verify:** Run tests and build.
-4.  **Update:** Mark the item as `[x]` in `TODO.md`.
+## 3. The Implementation Loop
+1.  **Code:** Write Kotlin/C++.
+2.  **Build:** Run `./gradlew assembleDebug`.
+3.  **Test:** If touching Native code, you **MUST** test on a physical device. The Emulator does not support ARCore depth efficiently.
 
-## **4. Adding New Tasks**
--   If you discover a bug or necessary refactor while working, add it to `TODO.md` as a new item.
--   Do not distract yourself; finish the current task first, then loop back.
+## 4. Documentation
+* If you changed a UI pattern, update `UI_UX.md`.
+* If you changed a C++ parameter, update `SLAM_SETUP.md`.
+
+## 5. Merge
+* Open a PR.
+* Ensure CI passes (Lint + Build).
+* Squash and Merge.

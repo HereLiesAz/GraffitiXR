@@ -1,96 +1,65 @@
 # AGENT INSTRUCTIONS for GraffitiXR
 
-**CRITICAL INSTRUCTION: The AI absolutely MUST get a PERFECT code review AND a passing build with tests, and MUST keep all documents and documentation up to date, BEFORE committing--WITHOUT exception.**
+**CRITICAL PROTOCOL: You MUST achieve a PERFECT code review and a passing build BEFORE committing. The Native C++ layer is fragile; treat it with extreme caution.**
 
-This document provides technical guidance for AI agents working on the GraffitiXR Android application.
-
----
-
-## **1. Conceptual Overview**
-
-### **What it is**
-This is an Android application that uses augmented reality (AR) to project an image onto a wall or other surface. It allows the user to see how a mural or other artwork would look in a real-world environment before it is created.
-
-### **What it's for**
-The main purpose of this application is to help artists, designers, and homeowners visualize how a mural or other large-scale artwork will look in a specific location. It can be used to test different images, sizes, and placements without the need for physical mockups.
-
-### **How it works**
-If AR is enabled, the application uses the device's camera and ARCore. The user can create an "Image Target" at runtime by pointing the camera at a real-world object or surface and tapping a button. This captures the camera view and uses it to create a target that ARCore can recognize and track. The user can then select an image from their device to project onto this newly created target. The app uses a custom rendering engine to render the image on the target, with controls for opacity, contrast, and saturation. If AR is not enabled, the device will need to be placed on a tripod, and simply overlays the image onto the camera view, with the same adjustable settings for the image.
-
-### **How the user interacts with it**
-The user interacts with the application through a simple user interface. The main screen shows the camera view with the AR overlay. There are buttons to select an image and adjust the properties of the projected image.
-
-1) The user points the camera at a wall or other surface.
-2) The user taps "Create Target" to generate a trackable AR target from the camera view.
-3) The user selects an image from their device.
-4) The app projects the image onto the AR target.
-5) The user can then adjust the opacity, contrast, and saturation of the image to see how it looks in the environment.
+This document defines the technical reality of the GraffitiXR project.
 
 ---
 
-## **2. Technical Details**
+## **1. Architecture Overview**
 
--   **Package Name:** `com.hereliesaz.graffitixr`
--   **Architecture:** MVVM (Model-View-ViewModel) using Jetpack Compose and a single Activity (`MainActivity.kt`).
--   **State Management:** All UI state is held in the immutable `UiState.kt` data class and managed via a `StateFlow` in `MainViewModel.kt`.
+GraffitiXR is a **Local-Only Hybrid Application**.
+It relies on a custom Shared Library (`graffiti-lib`) for high-performance mapping.
 
-### **Key Files**
--   `MainActivity.kt`: The single activity entry point. It handles permissions, initializes the ARCore session, and sets up the Jetpack Navigation `NavController` and `NavHost`, which hosts the `MainScreen` composable.
--   **`MainViewModel.kt`**: The central logic hub. It manages all state changes and user events.
--   `ARScreen.kt`: The composable for the AR experience.
--   `ARCoreRenderer.kt`: The renderer for the AR experience.
--   `ImageTraceScreen.kt`: The composable for the simple camera overlay mode (non-AR).
--   `MockupScreen.kt`: The composable for the mock-up mode on a static background image.
+**HARD RULE:** No Cloud APIs. No Firebase Database. No Google Cloud Anchors. All data is local.
 
-### **Development Guidelines**
--   **State:** All state changes MUST be initiated via a function call on the `MainViewModel`.
--   **Documentation:** All new public code MUST be documented with exhaustive KDocs.
--   **Testing:** New features should be accompanied by corresponding unit tests in `app/src/test/`.
--   **Critical Dependencies:** The OpenCV dependency is **critical** for the AR fingerprinting feature and **must not be removed**.
--   **Versioning:** The project follows a versioning scheme `a.b.c.d` (Major.Minor.Patch.Build).
-    -   `a` (Major): Managed by the user.
-    -   `b` (Minor): **MANDATORY** update by AI when fairly major features or refactorings are implemented.
-    -   `c` (Patch): **MANDATORY** update by AI for minor functionality and notable bugfixes.
-    -   `d` (Build): Managed programmatically by the CI system.
-    -   Update `version.properties` in the root directory accordingly.
-
-### **AR Persistence (Fingerprinting)**
-A core feature is the ability to save an AR project and have the digital overlay reappear in the correct physical location when the project is reloaded. This is mission-critical for the app's professional use case.
-
--   **How it Works:** When an AR target is created, the app uses OpenCV's ORB feature detector to extract a unique "fingerprint" (keypoints and descriptors) from the target image.
--   **Serialization:** This fingerprint data, which consists of non-standard OpenCV types, is serialized into a JSON string using custom serializers (`KeyPointSerializer`, `MatSerializer`) and saved within the project file.
--   **Reloading:** When a project is loaded, the app reloads the original target image `Bitmap` and uses that to reconstruct the `AugmentedImageDatabase` for live ARCore tracking. The fingerprint's purpose is for stable, persistent storage of the target's identity, not for live tracking.
--   **Do Not Remove:** The entire OpenCV-based fingerprinting and serialization pipeline is essential. Do not modify or remove it without a full understanding of the persistence architecture.
+### **The Stack**
+1.  **UI Layer (Kotlin/Compose):**
+    * **`MainActivity.kt`**: Single Activity.
+    * **`MainScreen.kt`**: Uses **`AzNavRail`** for all navigation.
+    * **`MainViewModel.kt`**: Manages `UiState`.
+2.  **Logic Layer (Kotlin):**
+    * **`SlamManager.kt`**: Bridges ARCore frames to the Native Engine.
+    * **`ProjectManager.kt`**: Handles zipping/unzipping `.gxr` project containers.
+3.  **Native Core (C++17):**
+    * **`MobileGS.cpp`**: The **Confidence Engine**. Handles point cloud accumulation and rendering.
 
 ---
 
-## **3. Current Project Goals**
+## **2. Critical Systems**
 
-Refer to `TODO.md` in the `docs` folder for the up-to-date project backlog.
+### **A. MobileGS (Confidence Mapping)**
+* **Location:** `app/src/main/cpp/MobileGS.cpp`
+* **The Logic:**
+    * **Input:** Depth Map + Pose.
+    * **Process:** Unproject points -> Hash to Voxel ID.
+    * **Duplication:** If Voxel ID exists, **INCREMENT CONFIDENCE**. Do not overwrite.
+    * **Render:** Only draw splats where `confidence > CONFIDENCE_THRESHOLD`.
+* **Purpose:** This mechanism naturally filters out moving objects (which don't accumulate confidence) and reinforces the static wall structure.
+
+### **B. Persistence (The `.gxr` File)**
+* **Format:** ZIP Archive.
+* **Contents:**
+    1.  `model.map`: Binary dump of High-Confidence Splats.
+    2.  `target.fingerprint`: Serialized OpenCV Keypoints/Descriptors (ORB).
+    3.  `meta.json`: Image edits, GPS, Compass heading.
+* **Re-Localization:**
+    * When loading a project, `FingerprintManager` scans the camera feed for the saved descriptors.
+    * Once a match is found (Homography found), the `model.map` is aligned to the world frame.
+
+### **C. AzNavRail Integration**
+* **Mandate:** The UI is strictly governed by `AzNavRail`.
+* **Prohibited:** No standard Android navigation bars.
+* **Pattern:** Use `RailItem` for primary modes (Scan, Trace, Mockup).
 
 ---
 
-## **4. Documentation Index**
+## **3. Development Rules**
 
-The files in the `docs` folder are an extension of this `AGENTS.md` file and are **every bit as important**. You must consult them for specific details.
+1.  **Privacy First:** Do not add libraries that transmit user data.
+2.  **Native Safety:** Thread safety in `MobileGS` is manual (`std::mutex`). The Sorter thread runs asynchronous to the Render thread.
+3.  **No Snippets:** Provide **FULL FILES** only.
 
--   **`AGENT_GUIDE.md`**: Detailed behavioral guidelines and operational procedures for AI agents.
--   **`TODO.md`**: The project roadmap and backlog.
--   **`UI_UX.md`**: Details on the user interface, styling, gestures, and user experience patterns.
--   **`auth.md`**: Authentication and authorization details (e.g., GitHub API integration).
--   **`conduct.md`**: Code of conduct and ethical guidelines for development.
--   **`data_layer.md`**: Documentation of the data persistence layer, including `ProjectData`, `Fingerprint`, and serialization.
--   **`fauxpas.md`**: A list of common mistakes and forbidden actions (e.g., breaking the build, removing critical dependencies).
--   **`file_descriptions.md`**: A catalog of key files in the repository and their purposes.
--   **`misc.md`**: Miscellaneous information that doesn't fit elsewhere.
--   **`performance.md`**: Performance considerations, optimization techniques (e.g., `ArRenderer`), and threading models.
--   **`screens.md`**: Detailed breakdown of each application screen and its functionality.
--   **`task_flow.md`**: How to manage tasks, use the `TODO.md` file, and prioritize work.
--   **`testing.md`**: Guidelines for writing and running tests, including unit tests and manual verification.
--   **`workflow.md`**: The development workflow, CI/CD pipelines, and release process.
-
----
-
-## **5. Known Issues**
-
--   **"Griding" String:** The user requested changing the UI string "Griding" to "Gridr". This string could not be located anywhere in the project's source code after an exhaustive search. It is suspected to be part of a pre-compiled dependency (potentially `aznavrail`), making it impossible to edit directly. This change request is currently blocked.
+## **4. Known Issues**
+* **Confidence Drift:** Rapid movement can cause "double walls" if the confidence threshold is too low.
+* **Memory Pressure:** The Voxel Map can grow large. `MobileGS` must implement a culling routine to prune low-confidence points when RAM is tight.

@@ -64,3 +64,38 @@ The app uses `kotlinx.serialization` with custom serializers for complex/native 
 -   **Cache:** Temporary images (camera captures, processed results) are stored in `context.cacheDir`.
 -   **Persistence:** Saved projects are stored in `context.filesDir/projects/{projectId}/`.
 -   **Export:** Users can export projects to a `.zip` file containing the JSON data and all referenced image assets.
+
+# Data Layer & Persistence
+
+## The `.gxr` File Format
+GraffitiXR projects are saved as compressed ZIP archives with the extension `.gxr`.
+
+### Structure
+```text
+project.gxr
+├── meta.json          // Metadata (GPS, Heading, Image Transforms)
+├── model.map          // Binary Gaussian Splat data
+├── target.fingerprint // OpenCV ORB descriptors (for re-localization)
+└── reference.png      // The artist's source image
+
+model.map Specification
+A binary dump of the std::vector<SplatGaussian>.
+{
+"version": 1,
+"created_at": 1715420000,
+"gps": {
+"lat": 29.9511,
+"lng": -90.0715
+},
+"overlay": {
+"scale": 1.5,
+"opacity": 0.8,
+"rotation": 45.0
+}
+}
+
+Byte Offset,Type,Description
+0,char[4],"Magic Header ""GXR1"""
+4,int32,Splat Count (N)
+8,struct,"Splat[0] (Pos {x,y,z}, Color {r,g,b,a})"
+...,...,Splat[N]

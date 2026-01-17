@@ -1,39 +1,26 @@
-# Testing Strategy & Guidelines
+# Testing Strategy
 
-## **1. Automated Testing**
+## 1. Unit Tests (Kotlin)
+* **Location:** `app/src/test/`
+* **Scope:** `MainViewModel` logic, Data Serialization (`ProjectManager`), and Utility functions.
+* **Run:** `./gradlew testDebugUnitTest`
 
-### **Unit Tests (`app/src/test/`)**
--   **Focus:** Logic classes like `MainViewModel`, `ProgressCalculator`, `Utils`.
--   **Framework:** JUnit 4, Mockito, Kotlin Coroutines Test.
--   **Running:** `./gradlew testDebugUnitTest`
--   **Key Test Class:** `MainViewModelTest` covers state transitions, calculations, and flow logic.
+## 2. Native Tests (C++)
+* **Status:** Hard. We do not currently have a C++ unit test runner (GTest) integrated.
+* **Method:** "Visual Verification."
+    * Enable `DEBUG_COLORS` in `MobileGS.h`.
+    * Scan a corner. If the corner looks like a rainbow, the normals are wrong.
 
-### **UI Tests (`app/src/androidTest/`)**
--   **Focus:** Compose UI interactions.
--   **Status:** Currently limited. Focus is on Unit Tests.
+## 3. UI Tests (Compose)
+* **Location:** `app/src/androidTest/`
+* **Scope:** Verifying `AzNavRail` interactions.
+* **Note:** ARCore cannot be easily mocked in UI tests. Mock the `ArRenderer` when writing Compose tests.
 
-## **2. Manual Verification**
-
-### **AR Mode**
--   **Requirement:** A physical Android device supporting ARCore.
--   **Emulator:** The standard Android Emulator supports a "Virtual Scene" for ARCore, which is sufficient for basic logic checks but not for performance or camera quality tuning.
-
-### **Regression Checks**
--   **AR Gestures (Drag, Pinch-Zoom, Twist-Rotate):**
-    -   Verify that the AR image can be dragged with one finger.
-    -   Verify that the AR image can be scaled (pinch) and rotated (twist) with two fingers.
-    -   Verify that two-finger drag also moves the image.
-    -   **Important:** This must be verified on every build affecting AR input logic to prevent regression.
-
-### **Build Verification**
--   **Command:** `./gradlew assembleDebug`
--   **Mandatory:** Must pass before every commit.
-
-### **Linting**
--   **Command:** `./gradlew lintDebug`
--   **Policy:** Treat warnings as errors where possible. Fix deprecations immediately.
-
-## **3. Test-Driven Development (TDD)**
--   When fixing a bug (e.g., calculation error), write a failing test case in `MainViewModelTest` first.
--   Fix the bug.
--   Verify the test passes.
+## 4. Field Testing (The "Wall Test")
+Before a release, you must:
+1.  Build Release APK.
+2.  Go to a physical brick wall.
+3.  Scan it.
+4.  Project an image.
+5.  Walk 5 meters away and come back.
+6.  **Pass Condition:** The image is still on the wall within < 1cm of drift.

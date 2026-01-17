@@ -40,3 +40,5 @@ captures/
 backup.ps1
 project_backup_*
 google-services.json
+/app/libs/opencv/sdk/*
+/app/src/cpp/include/glm/*

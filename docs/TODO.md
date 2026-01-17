@@ -152,3 +152,27 @@ This document tracks the development status, future enhancements, and identified
 ## **Project Backlog**
 
 All items completed. Ready for the next phase of development.
+# Project Roadmap & Backlog
+
+## 🔴 High Priority (The Core)
+
+- [ ] **Voxel Map Culling:** The `MobileGS` engine currently keeps *all* points. We need a "Garbage Collector" pass that deletes points with `confidence < 5` after 60 seconds of inactivity to save RAM.
+- [ ] **Serialization Speed:** The `.map` save takes ~3 seconds for large walls. Move the `saveModel` C++ function to a background thread (std::async) to prevent UI freeze.
+- [ ] **AzNavRail Haptics:** Add haptic feedback when scrolling through rail items so the user can "feel" the menu without looking.
+
+## 🟡 Medium Priority (Features)
+
+- [ ] **"Ghost" Toggle:** A button to toggle the rendered splats on/off. Sometimes the green dots get in the way of seeing the actual wall art.
+- [ ] **Fingerprint Aging:** The ORB descriptors should age out. If a wall changes significantly (painted over), the old fingerprint prevents re-localization. We need a "Force Rescan" button.
+- [ ] **Left-Handed Mode:** Invert the AzNavRail alignment in `MainScreen.kt`.
+
+## 🟢 Low Priority (Polish)
+
+- [ ] **Mockup Mode - Perspective Warp:** The current 2D perspective warp is linear. Add a "Mesh Warp" for curved surfaces (pillars).
+- [ ] **App Icon:** The current icon is a placeholder. Needs something that screams "Cyberpunk Spray Can."
+
+## ❌ Deprecated / Won't Do
+
+- [ ] ~~Cloud Anchors Integration~~ (Removed: Privacy Policy update).
+- [ ] ~~Social Gallery~~ (Removed: Scope creep).
+- [ ] ~~iOS Port~~ (No: Apple's restrictive file system makes the `.gxr` zip container logic a nightmare).

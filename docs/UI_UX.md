@@ -1,69 +1,40 @@
-# User Interface & User Experience (UI/UX)
+# UI/UX Patterns & Gesture Control
 
-This document details the visual design, interaction patterns, and user experience philosophy of the GraffitiXR application.
+GraffitiXR is designed for one-handed use while holding a spray can or a ladder. We do not use standard Android navigation (BottomNav, Drawers). Everything is driven by the **Rail**.
 
-## **1. Visual Design System**
+## 1. The Rail (AzNavRail)
 
-### **Theme & Styling**
--   **Dark Mode:** The application uses a dark theme by default to reduce glare and focus attention on the camera feed and projected art.
--   **Transparency:** Panels (like `AdjustmentsPanel`) use semi-transparent backgrounds to ensure the camera view is never fully obstructed.
--   **Immersive:** The UI elements are minimal and overlaid on the full-screen camera view (`ARScreen`, `OverlayScreen`) or static canvas (`MockupScreen`).
+* **Position:** Vertical strip on the right side (configurable for left-handed use in Settings).
+* **Philosophy:** "Thumb Range Only." If you have to reach for the top of the screen, the UI failed.
+* **Hierarchy:**
+    * **Primary Modes:** (Scan, Project, Trace) are top-level Rail Items.
+    * **Context Actions:** (Opacity, Grid Toggle, Save) appear as expanding "Flyouts" from the active Rail Item.
 
-### **Core Components**
--   **`AzNavRail`:** A left-aligned vertical navigation rail (using `com.github.HereLiesAz:AzNavRail`) handles top-level navigation.
--       The AzNavRail is an absolutely mandatory, non-negotiable composable. Its AzRailRelocItems make multilayered image editing possible via the already standardized UI. It's a DSL style library, not designed to be guessed at. You MUST read ALL AzNavRail documentation and sample app source code before making ANY plans whatsoever to edit its implementation. https://github.com/HereLiesAz/AzNavRail
-    -   **Host Items:** Group related functions (e.g., "Project", "Mode", "Grid", "Design").
-    -   **Sub Items:** Specific actions (e.g., "Save", "Load", "Create Target").
--   **`AdjustmentsPanel`:** A bottom sheet containing controls for image manipulation.
-    -   **Knobs:** Custom rotary controls (`Knob.kt`) replace standard sliders for finer precision and a "pro" feel.
-    -   **Toggle Buttons:** Used for binary states like "Invert", "Line Mode".
--   **`Knob` Control:** A custom composable that allows value adjustment via rotation or vertical drag. It supports a label, value display, and reset-on-double-tap.
+## 2. The Viewport & Gestures
 
-## **2. Interaction Patterns**
+The screen is divided into two layers: The **AR World** (Camera) and the **Overlay** (Image).
 
-### **Gestures**
-The application relies heavily on touch gestures for direct manipulation of the artwork.
+### AR Mode (Scan & Project)
+* **Move Device:** Translates the camera in 3D space.
+* **Tap Wall:** Places the "Anchor" (Origin point) for the confidence map.
+* **Long Press (Rail Item):** Locks the specific tool (e.g., locks the opacity slider so accidental touches don't change it).
 
--   **One-Finger Drag:**
-    -   **AR Mode:** Moves the AR anchor across detected planes (raycasting).
-    -   **Refinement Screen:** Draws or erases mask paths.
--   **Two-Finger Gestures (Multitouch):**
-    -   **Pinch-to-Zoom:** Scales the overlay image or AR object.
-    -   **Twist-to-Rotate:** Rotates the overlay image or AR object (Z-axis).
-    -   **Two-Finger Pan:** Moves the AR anchor (alternative to single-finger drag to avoid conflicts).
--   **Double Tap:**
-    -   Resets specific values (like Knob centering).
-    -   In `OverlayScreen`, resets the image transformation.
+### Edit Mode (Image Manipulation)
+When an image is selected:
+* **1-Finger Drag:** Panning is **DISABLED** by default to prevent accidental shifts. You must select the "Move" tool on the Rail first.
+* **2-Finger Pinch:** Scale the image.
+* **2-Finger Twist:** Rotate the image.
+* **3-Finger Swipe:** "Wipe" the confidence map (Reset SLAM) in case of drift.
 
-### **Feedback Mechanisms**
--   **`TapFeedback`:** Visual ripples or markers appear at the touch point to confirm interaction.
--   **Haptics:** The app triggers vibration feedback (`FeedbackEvent.VibrateSingle`, `VibrateDouble`) for key actions like target capture or snapping.
--   **Toasts:** Used for transient system messages ("Project saved", "Aligned Flat").
+## 3. Visual Feedback
 
-## **3. Screen-Specific UX**
+### The Confidence Cloud
+Instead of showing raw point clouds, we render **Heat Voxel Cubes**:
+* **Red (Alpha 0.2):** Low confidence. Transient. Ignored by the persistence engine.
+* **Yellow (Alpha 0.5):** Growing confidence.
+* **Green (Alpha 1.0):** Locked. These points are saved to the `.map` file.
 
-### **AR Screen (`ARScreen.kt`)**
--   **State:** `SEARCHING` -> `LOCKED` -> `PLACED`.
--   **Visuals:** Displays the live camera feed. Uses a dotted grid to visualize detected planes.
--   **Interaction:** Users scan the room. Once planes are found, they tap to place the image. The image stays anchored to the real world.
-
-### **Trace/Overlay Screen (`OverlayScreen.kt`)**
--   **Purpose:** For non-AR devices or simple tracing.
--   **Interaction:** The image is "stuck" to the screen (camera moves behind it). Users align the camera to the physical wall.
--   **Tools:** Opacity is key here to see the hand behind the phone.
-
-### **Mockup Screen (`MockupScreen.kt`)**
--   **Purpose:** Static visualization on a photo.
--   **Interaction:** Users pick a background image. The overlay is placed on top. No camera feed.
-
-### **Target Refinement (`TargetRefinementScreen.kt`)**
--   **Purpose:** Fine-tuning the AR target mask.
--   **Visuals:** Shows the captured target image.
--   **Interaction:**
-    -   **Yellow Keypoints:** Visualizes OpenCV ORB features.
-    -   **Masking:** Users paint to include/exclude areas from tracking.
-    -   **Zoom:** Users can zoom in for pixel-perfect masking.
-
-## **4. Onboarding & Help**
--   **`HelpScreen`:** A full-screen tutorial.
--   **Progressive Onboarding:** The `OnboardingManager` tracks which modes the user has seen and shows specific tutorials for `AR`, `OVERLAY`, etc., upon first entry.
+### The Lazy Grid
+A projected grid line overlay that snaps to the dominant plane found in the confidence map.
+* **Purpose:** Helps the artist judge perspective distortion visually.
+* **Behavior:** It is "Lazy"—it smooths out jitter. If tracking glitches, the grid floats gently rather than snapping violently.

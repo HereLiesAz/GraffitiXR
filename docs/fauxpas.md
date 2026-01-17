@@ -1,37 +1,20 @@
-# Common Faux Pas & Forbidden Actions
+### 8. `fauxpas.md`
+*What NOT to do.*
 
-A list of mistakes to avoid ensuring the stability and integrity of the project.
+```markdown
+# Development Faux Pas (Do Not Do This)
 
-## **1. Critical Technical Errors**
+## 1. Do NOT add Cloud Dependencies
+* Adding Firebase Database, AWS Amplify, or similar "backend-as-a-service" SDKs will result in immediate rejection. We are off-grid.
 
-### **Removing OpenCV**
--   **The Error:** Removing the OpenCV dependency or the `Fingerprint` serialization logic.
--   **Why it's bad:** OpenCV is **required** for the AR persistence feature (`Fingerprint`). Without it, projects cannot be saved or loaded correctly.
--   **Correction:** Keep `libs.opencv` in `build.gradle.kts` and maintain the `Fingerprint` class.
+## 2. Do NOT break the Rail
+* Do not add a `BottomNavigationView`.
+* Do not add a Hamburger Menu (`DrawerLayout`).
+* The `AzNavRail` is the **only** navigation paradigm.
 
-### **Breaking the Build**
--   **The Error:** Committing code that does not compile.
--   **Why it's bad:** It blocks the CI pipeline and prevents the user (and other agents) from testing.
--   **Correction:** Always run `./gradlew assembleDebug` before committing.
+## 3. Do NOT leak Native Memory
+* In `MobileGS.cpp`, every `new` must have a `delete`.
+* Be extremely careful with JNI `GetPrimitiveArrayCritical`. Do not perform blocking operations while holding a primitive lock.
 
-### **Ignoring `google-services.json`**
--   **The Error:** Deleting `app/google-services.json.template` or failing to understand why the build fails on CI.
--   **Why it's bad:** The CI pipeline relies on this template to inject secrets.
--   **Correction:** Respect the template file.
-
-## **2. Process Violations**
-
-### **Ignoring `AGENTS.md`**
--   **The Error:** Proceeding with a plan that contradicts the instructions in `AGENTS.md`.
--   **Why it's bad:** `AGENTS.md` contains the project's specific "laws of physics".
--   **Correction:** Read `AGENTS.md` first.
-
-### **Destructive Resets**
--   **The Error:** Deleting the entire source tree to "start over".
--   **Why it's bad:** It destroys history and the user's trust.
--   **Correction:** Refactor, don't delete. Fix forward.
-
-### **Editing Build Artifacts**
--   **The Error:** modifying files in `app/build/` directly.
--   **Why it's bad:** These changes are overwritten on the next build.
--   **Correction:** Edit the source files in `app/src/`.
+## 4. Do NOT block the UI Thread
+* Never call `MobileGS::saveModel()` on the Main Thread. It writes megabytes to disk. Use a Coroutine with `Dispatchers.IO`.

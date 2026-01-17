@@ -1,40 +1,38 @@
-# ORB-SLAM3 Integration Guide
+# SLAM & MobileGS Configuration
 
-This project is set up to integrate **ORB-SLAM3** for advanced visual SLAM capabilities. Due to the size and licensing (GPLv3) of ORB-SLAM3, the source code is not included directly in this repository's main branch.
+This document outlines the configuration and tuning of the custom Gaussian Splatting engine.
 
-## Setup Instructions
+## The Engine (`MobileGS.cpp`)
 
-To fully enable SLAM functionality, follow these steps:
+The engine operates on a **Sparse Voxel Hashing** system. It does not store a dense point cloud; it stores a hash map of 5mm³ voxels.
 
-1.  **Clone ORB-SLAM3**:
-    Download the ORB-SLAM3 source code from [https://github.com/UZ-SLAMLab/ORB_SLAM3](https://github.com/UZ-SLAMLab/ORB_SLAM3).
+### Key Parameters
 
-2.  **Place Source Code**:
-    Copy the `ORB_SLAM3` folder into `app/src/main/cpp/`.
-    The path should look like: `app/src/main/cpp/ORB_SLAM3/`.
+These constants are defined in `MobileGS.h` and can be tweaked for performance vs. accuracy.
 
-3.  **Install Dependencies**:
-    *   **Eigen3**: Download Eigen3 headers and place them in `app/src/main/cpp/Eigen3`.
-    *   **OpenCV**: The project already uses OpenCV for Android. Ensure the native libraries (`libopencv_java4.so`) are accessible to CMake.
+| Parameter | Value | Description |
+| :--- | :--- | :--- |
+| `VOXEL_SIZE` | `0.005f` (5mm) | The physical size of a single splat. Smaller = more detail, higher RAM usage. |
+| `CONFIDENCE_THRESHOLD` | `5` | A voxel must be "seen" this many times before it is rendered/saved. Filters sensor noise. |
+| `MAX_SPLATS` | `100,000` | Hard limit on the instance buffer size to maintain 60 FPS on mid-range devices. |
+| `CULL_DISTANCE` | `5.0f` (Meters) | Points further than 5m are ignored to keep the map local to the wall. |
 
-4.  **Update CMakeLists.txt**:
-    Open `app/src/main/cpp/CMakeLists.txt` and uncomment the sections related to ORB-SLAM3 includes and source files.
+## Sensor Input
 
-    ```cmake
-    include_directories(
-        ${CMAKE_CURRENT_SOURCE_DIR}/ORB_SLAM3
-        ${CMAKE_CURRENT_SOURCE_DIR}/ORB_SLAM3/include
-        ...
-    )
-    ```
+The engine requires two synchronized streams from ARCore:
+1.  **Depth Map (16-bit):** Used for unprojection. Values > 6500mm are discarded.
+2.  **Camera Pose (Matrix4x4):** The precise location of the device in world space.
 
-5.  **Implement JNI Bridge**:
-    Update `app/src/main/cpp/GraffitiJNI.cpp` to replace the "Stub" implementations with actual calls to the ORB-SLAM3 `System` object.
+## Tuning Guide
 
-    ```cpp
-    // Example
-    SLAM = new ORB_SLAM3::System(vocFile, settingsFile, ORB_SLAM3::System::MONOCULAR, true);
-    ```
+### "The Map is drifting / Double Vision"
+* **Cause:** Learning rate is too high, or `VOXEL_SIZE` is too large.
+* **Fix:** Decrease `VOXEL_SIZE` to `0.003f`. Ensure the user is moving slowly.
 
-## Licensing
-Please note that linking against ORB-SLAM3 requires your application to comply with the **GPLv3** license.
+### "The Map takes too long to appear"
+* **Cause:** `CONFIDENCE_THRESHOLD` is too high.
+* **Fix:** Lower it to `3`, but be warned that "ghost points" (noise) will increase.
+
+### "App crashes after scanning for 2 minutes"
+* **Cause:** `MAX_SPLATS` exceeded.
+* **Fix:** Implement a "Least Recently Used" (LRU) culling strategy in `MobileGS::pruneMap()` to delete old voxels.
