@@ -125,7 +125,7 @@ class SimpleQuadRenderer {
         GLES20.glEnableVertexAttribArray(quadPositionParam)
         GLES20.glEnableVertexAttribArray(quadTexCoordParam)
 
-        // Blend Mode Logic
+        // Blend Mode Logic (Supported: SrcOver, Screen, Multiply, Plus)
         GLES20.glEnable(GLES20.GL_BLEND)
         when (blendMode) {
             BlendMode.SrcOver -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)

@@ -13,8 +13,12 @@ import java.io.FileOutputStream
 
 object ImageUtils {
 
+    /**
+     * Generates a white outline on a transparent background from the input bitmap using Canny edge detection.
+     */
     fun generateOutline(input: Bitmap): Bitmap {
         // Ensure OpenCV loaded logic handled by Utils.kt or caller
+        // Using Canny Edge Detection
         val mat = Mat()
         val edges = Mat()
         val result = Mat()

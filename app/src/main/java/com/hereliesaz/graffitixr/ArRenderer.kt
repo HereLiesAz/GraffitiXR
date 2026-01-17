@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.RectF
+import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
@@ -79,21 +80,44 @@ class ArRenderer(
     // Layers and Anchors
     private var layers: List<OverlayLayer> = emptyList()
     private val layerBitmaps = ConcurrentHashMap<String, Bitmap>()
+    private val layerUris = ConcurrentHashMap<String, Uri>()
     private var anchor: Anchor? = null
     private val queuedSingleTaps = ConcurrentLinkedQueue<FloatArray>()
     private val rendererScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // Pre-allocated matrices to avoid GC churn
+    private val anchorMatrix = FloatArray(16)
+    private val modelMatrix = FloatArray(16)
+    private val layerMatrix = FloatArray(16)
+    private val mvpMatrix = FloatArray(16)
+    private val modelViewMatrix = FloatArray(16)
+    private val displayTransform = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f) // Identity
+
     fun updateLayers(newLayers: List<OverlayLayer>) {
         this.layers = newLayers
+        val newLayerIds = newLayers.map { it.id }.toSet()
+
         // Trigger bitmap loading for new layers if needed
         newLayers.forEach { layer ->
-            if (!layerBitmaps.containsKey(layer.id)) {
+            val cachedUri = layerUris[layer.id]
+            // Reload if ID is new OR Uri has changed
+            if (cachedUri == null || cachedUri != layer.uri) {
                  rendererScope.launch {
                      val bmp = ImageUtils.loadBitmapFromUri(context, layer.uri)
                      if (bmp != null) {
                          updateLayerBitmap(layer.id, bmp)
+                         layerUris[layer.id] = layer.uri
                      }
                  }
+            }
+        }
+
+        // Cleanup unused bitmaps
+        val currentIds = layerBitmaps.keys.toList()
+        currentIds.forEach { id ->
+            if (id !in newLayerIds) {
+                layerBitmaps.remove(id)
+                layerUris.remove(id)
             }
         }
     }
@@ -243,7 +267,6 @@ class ArRenderer(
             // Draw Layers
             anchor?.let {
                 if (it.trackingState == TrackingState.TRACKING) {
-                    val anchorMatrix = FloatArray(16)
                     it.pose.toMatrix(anchorMatrix, 0)
 
                     layers.forEach { layer ->
@@ -251,13 +274,10 @@ class ArRenderer(
                             val bitmap = layerBitmaps[layer.id]
                             if (bitmap != null) {
                                 // Calculate Model Matrix (Anchor * Layer Transform)
-                                val modelMatrix = FloatArray(16)
-                                val layerMatrix = FloatArray(16)
                                 Matrix.setIdentityM(layerMatrix, 0)
 
                                 // Apply Layer Transforms (T * R * S)
-                                Matrix.translateM(layerMatrix, 0, layer.offset.x, layer.offset.y, 0f) // Using Z=0 for simplicity, or layer.offset is 2D? UiState says Offset.
-                                // Rotate?
+                                Matrix.translateM(layerMatrix, 0, layer.offset.x, layer.offset.y, 0f)
                                 Matrix.rotateM(layerMatrix, 0, layer.rotationX, 1f, 0f, 0f)
                                 Matrix.rotateM(layerMatrix, 0, layer.rotationY, 0f, 1f, 0f)
                                 Matrix.rotateM(layerMatrix, 0, layer.rotationZ, 0f, 0f, 1f)
@@ -266,13 +286,8 @@ class ArRenderer(
                                 Matrix.multiplyMM(modelMatrix, 0, anchorMatrix, 0, layerMatrix, 0)
 
                                 // MVP Matrix
-                                val mvpMatrix = FloatArray(16)
-                                val modelViewMatrix = FloatArray(16)
                                 Matrix.multiplyMM(modelViewMatrix, 0, viewmtx, 0, modelMatrix, 0)
                                 Matrix.multiplyMM(mvpMatrix, 0, projmtx, 0, modelViewMatrix, 0)
-
-                                // Display Transform for shader
-                                val displayTransform = floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f) // Identity
 
                                 simpleQuadRenderer.draw(
                                     mvpMatrix,
