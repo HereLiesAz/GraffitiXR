@@ -6,7 +6,6 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import com.hereliesaz.graffitixr.data.Fingerprint
-import com.hereliesaz.graffitixr.data.RefinementPath
 import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -198,14 +197,4 @@ fun enhanceImageForAr(bitmap: Bitmap): Bitmap {
         lab.release()
         channels.forEach { it.release() }
     }
-}
-
-fun resizeBitmapForArCore(bitmap: Bitmap): Bitmap {
-     // Resize to max 1024
-     val maxDim = 1024
-     if (bitmap.width <= maxDim && bitmap.height <= maxDim) return bitmap
-     val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
-     val w = if (ratio > 1) maxDim else (maxDim * ratio).toInt()
-     val h = if (ratio > 1) (maxDim / ratio).toInt() else maxDim
-     return Bitmap.createScaledBitmap(bitmap, w, h, true)
 }
