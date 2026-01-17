@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.rendering
 
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.util.Log
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
 import java.nio.ByteBuffer
@@ -22,6 +23,7 @@ class BackgroundRenderer {
     private var quadPositionParam: Int = 0
     private var quadTexCoordParam: Int = 0
     private var uTextureParam: Int = 0
+    private var hasTransformedCoords = false
 
     fun createOnGlThread() {
         val textures = IntArray(1)
@@ -77,13 +79,22 @@ class BackgroundRenderer {
         GLES20.glAttachShader(backgroundProgram, fragmentShader)
         GLES20.glLinkProgram(backgroundProgram)
 
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(backgroundProgram, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            Log.e("BackgroundRenderer", "Error linking program: " + GLES20.glGetProgramInfoLog(backgroundProgram))
+        }
+
         quadPositionParam = GLES20.glGetAttribLocation(backgroundProgram, "a_Position")
         quadTexCoordParam = GLES20.glGetAttribLocation(backgroundProgram, "a_TexCoord")
         uTextureParam = GLES20.glGetUniformLocation(backgroundProgram, "u_Texture")
+        
+        hasTransformedCoords = false
     }
 
     fun draw(frame: Frame) {
-        if (frame.hasDisplayGeometryChanged()) {
+        // Always transform coordinates if geometry changed OR if we haven't done it yet.
+        if (frame.hasDisplayGeometryChanged() || !hasTransformedCoords) {
             quadCoords2D.position(0)
             quadTexCoordTransformed.position(0)
             frame.transformCoordinates2d(
@@ -92,6 +103,7 @@ class BackgroundRenderer {
                 Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoordTransformed
             )
+            hasTransformedCoords = true
         }
 
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
@@ -104,11 +116,10 @@ class BackgroundRenderer {
 
         quadVertices.position(0)
         GLES20.glVertexAttribPointer(quadPositionParam, 3, GLES20.GL_FLOAT, false, 0, quadVertices)
-        
+        GLES20.glEnableVertexAttribArray(quadPositionParam)
+
         quadTexCoordTransformed.position(0)
         GLES20.glVertexAttribPointer(quadTexCoordParam, 2, GLES20.GL_FLOAT, false, 0, quadTexCoordTransformed)
-
-        GLES20.glEnableVertexAttribArray(quadPositionParam)
         GLES20.glEnableVertexAttribArray(quadTexCoordParam)
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
@@ -123,6 +134,15 @@ class BackgroundRenderer {
         val shader = GLES20.glCreateShader(type)
         GLES20.glShaderSource(shader, shaderCode)
         GLES20.glCompileShader(shader)
+
+        val compileStatus = IntArray(1)
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+        if (compileStatus[0] == 0) {
+            Log.e("BackgroundRenderer", "Error compiling shader: " + GLES20.glGetShaderInfoLog(shader))
+            GLES20.glDeleteShader(shader)
+            return 0
+        }
+
         return shader
     }
 

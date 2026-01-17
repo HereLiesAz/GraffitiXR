@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.MiniMapRenderer
@@ -128,24 +129,16 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
 
-        // 1. Create the texture for the camera feed
-        val textures = IntArray(1)
-        GLES20.glGenTextures(1, textures, 0)
-        backgroundTextureId = textures[0]
-        val textureTarget = android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES
-        GLES20.glBindTexture(textureTarget, backgroundTextureId)
-        GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
-        GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
-        GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST)
-        GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST)
-
-        // 2. Initialize renderers
+        // 1. Initialize renderers
         backgroundRenderer.createOnGlThread()
         planeRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread()
         simpleQuadRenderer.createOnGlThread()
         miniMapRenderer.createOnGlThread(context)
 
+        // 2. Use the texture ID from BackgroundRenderer for ARCore
+        backgroundTextureId = backgroundRenderer.textureId
+        
         // 3. Connect texture to session if ready
         session?.setCameraTextureName(backgroundTextureId)
     }
@@ -205,6 +198,8 @@ class ArRenderer(
                 onPlanesDetected(false)
             }
 
+        } catch (e: SessionPausedException) {
+             Log.w("ArRenderer", "Session paused during update")
         } catch (t: Throwable) {
             Log.e("ArRenderer", "Exception on the OpenGL thread", t)
         }
@@ -242,6 +237,11 @@ class ArRenderer(
                         config.focusMode = Config.FocusMode.AUTO
                         config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                         session!!.configure(config)
+                        
+                        // Set texture name if renderer is already created
+                        if (backgroundTextureId != -1) {
+                            session!!.setCameraTextureName(backgroundTextureId)
+                        }
                     }
                 }
             }
