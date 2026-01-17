@@ -22,8 +22,6 @@ import android.view.Window
  */
 fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
     val window: Window = activity.window
-    val width = window.decorView.width
-    val height = window.decorView.height
 
     // Prevent crash: Bitmap.createBitmap throws IllegalArgumentException if width or height are <= 0
     if (width <= 0 || height <= 0) {
