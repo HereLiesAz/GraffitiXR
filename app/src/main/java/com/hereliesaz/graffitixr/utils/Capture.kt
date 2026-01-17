@@ -32,19 +32,21 @@ fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
     try {
-        PixelCopy.request(
-            window,
-            Rect(0, 0, width, height),
-            bitmap,
-            { copyResult ->
-                if (copyResult == PixelCopy.SUCCESS) {
-                    callback(bitmap)
-                } else {
-                    callback(null)
-                }
-            },
-            Handler(Looper.getMainLooper())
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PixelCopy.request(
+                window,
+                Rect(0, 0, window.decorView.width, window.decorView.height),
+                bitmap,
+                { copyResult ->
+                    if (copyResult == PixelCopy.SUCCESS) {
+                        callback(bitmap)
+                    } else {
+                        callback(null)
+                    }
+                },
+                Handler(Looper.getMainLooper())
+            )
+        }
     } catch (e: Exception) {
         callback(null)
         e.printStackTrace()
