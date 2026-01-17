@@ -12,6 +12,7 @@ class BackgroundRenderer {
     private lateinit var quadVertices: FloatBuffer
     private lateinit var quadTexCoord: FloatBuffer
     private lateinit var quadTexCoordTransformed: FloatBuffer
+    private lateinit var quadCoords2D: FloatBuffer
 
     private var backgroundProgram: Int = 0
     private var textureTarget = GLES11Ext.GL_TEXTURE_EXTERNAL_OES
@@ -20,6 +21,7 @@ class BackgroundRenderer {
 
     private var quadPositionParam: Int = 0
     private var quadTexCoordParam: Int = 0
+    private var uTextureParam: Int = 0
 
     fun createOnGlThread() {
         val textures = IntArray(1)
@@ -38,6 +40,19 @@ class BackgroundRenderer {
             quadVertices = bbVertices.asFloatBuffer()
             quadVertices.put(QUAD_COORDS)
             quadVertices.position(0)
+        }
+
+        if (!::quadCoords2D.isInitialized) {
+            val bbCoords2D = ByteBuffer.allocateDirect(numVertices * 2 * 4)
+            bbCoords2D.order(ByteOrder.nativeOrder())
+            quadCoords2D = bbCoords2D.asFloatBuffer()
+            quadCoords2D.put(floatArrayOf(
+                -1.0f, -1.0f,
+                -1.0f, 1.0f,
+                1.0f, -1.0f,
+                1.0f, 1.0f
+            ))
+            quadCoords2D.position(0)
         }
 
         if (!::quadTexCoord.isInitialized) {
@@ -64,13 +79,16 @@ class BackgroundRenderer {
 
         quadPositionParam = GLES20.glGetAttribLocation(backgroundProgram, "a_Position")
         quadTexCoordParam = GLES20.glGetAttribLocation(backgroundProgram, "a_TexCoord")
+        uTextureParam = GLES20.glGetUniformLocation(backgroundProgram, "u_Texture")
     }
 
     fun draw(frame: Frame) {
         if (frame.hasDisplayGeometryChanged()) {
+            quadCoords2D.position(0)
+            quadTexCoordTransformed.position(0)
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
-                quadVertices,
+                quadCoords2D,
                 Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoordTransformed
             )
@@ -79,10 +97,15 @@ class BackgroundRenderer {
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDepthMask(false)
 
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(textureTarget, textureId)
         GLES20.glUseProgram(backgroundProgram)
+        GLES20.glUniform1i(uTextureParam, 0)
 
+        quadVertices.position(0)
         GLES20.glVertexAttribPointer(quadPositionParam, 3, GLES20.GL_FLOAT, false, 0, quadVertices)
+        
+        quadTexCoordTransformed.position(0)
         GLES20.glVertexAttribPointer(quadTexCoordParam, 2, GLES20.GL_FLOAT, false, 0, quadTexCoordTransformed)
 
         GLES20.glEnableVertexAttribArray(quadPositionParam)

@@ -102,6 +102,7 @@ val vPatch = providers.of(PatchVersionValueSource::class) {
 android {
     buildFeatures {
         buildConfig = true
+        compose = true
     }
     namespace = "com.hereliesaz.graffitixr"
     compileSdk = 36
@@ -127,13 +128,10 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17")
-                        // Re-enable this line and point it to the correct absolute path
-                        arguments += "-DOpenCV_DIR=${project.rootDir}/libs/opencv/sdk/native/jni"
-                    }
-                }
+                // OpenCV_DIR is now calculated in CMakeLists.txt to avoid sync issues
             }
-
-
+        }
+    }
 
     externalNativeBuild {
         cmake {
@@ -181,11 +179,6 @@ android {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
-    }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
     }
 
     packaging {
@@ -247,8 +240,6 @@ dependencies {
     implementation(libs.firebase.analytics)
 
     implementation(libs.opencv)
-
-    // implementation(libs.sphere.slam)
 
     implementation(libs.kotlinx.serialization.json)
 
