@@ -5,40 +5,46 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.view.PixelCopy
 import android.view.Window
 
+/**
+ * Captures the current window content as a Bitmap.
+ *
+ * Explicitly validates that the decorView dimensions are positive before attempting to create a Bitmap,
+ * preventing IllegalArgumentException on devices where the view layout might not be complete or valid.
+ *
+ * @param activity The target activity to capture.
+ * @param callback invoked with the captured Bitmap, or null if capture failed or dimensions were invalid.
+ */
 fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
     val window: Window = activity.window
 
-    if (window.decorView.width <= 0 || window.decorView.height <= 0) {
+    // Prevent crash: Bitmap.createBitmap throws IllegalArgumentException if width or height are <= 0
+    if (width <= 0 || height <= 0) {
         callback(null)
         return
     }
 
-    val bitmap = Bitmap.createBitmap(window.decorView.width, window.decorView.height, Bitmap.Config.ARGB_8888)
-    val locationOfViewInWindow = IntArray(2)
-    window.decorView.getLocationInWindow(locationOfViewInWindow)
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
     try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PixelCopy.request(
-                window,
-                Rect(0, 0, width, height),
-                bitmap,
-                { copyResult ->
-                    if (copyResult == PixelCopy.SUCCESS) {
-                        callback(bitmap)
-                    } else {
-                        callback(null)
-                    }
-                },
-                Handler(Looper.getMainLooper())
-            )
-        }
+        PixelCopy.request(
+            window,
+            Rect(0, 0, width, height),
+            bitmap,
+            { copyResult ->
+                if (copyResult == PixelCopy.SUCCESS) {
+                    callback(bitmap)
+                } else {
+                    callback(null)
+                }
+            },
+            Handler(Looper.getMainLooper())
+        )
     } catch (e: Exception) {
         callback(null)
         e.printStackTrace()
