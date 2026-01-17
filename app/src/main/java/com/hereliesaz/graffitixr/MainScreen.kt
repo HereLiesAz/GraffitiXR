@@ -595,7 +595,9 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
 
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(2f),
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     AdjustmentsPanel(
