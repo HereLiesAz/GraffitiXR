@@ -124,7 +124,7 @@ class MainViewModel(
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("MainViewModel", "Failed to generate outline", e)
                 _feedbackEvent.send(FeedbackEvent.Toast("Failed to generate outline"))
             }
             _uiState.update { it.copy(isLoading = false) }
