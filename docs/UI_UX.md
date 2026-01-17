@@ -11,6 +11,7 @@ This document details the visual design, interaction patterns, and user experien
 
 ### **Core Components**
 -   **`AzNavRail`:** A left-aligned vertical navigation rail (using `com.github.HereLiesAz:AzNavRail`) handles top-level navigation.
+-       The AzNavRail is an absolutely mandatory, non-negotiable composable. Its AzRailRelocItems make multilayered image editing possible via the already standardized UI. It's a DSL style library, not designed to be guessed at. You MUST read ALL AzNavRail documentation and sample app source code before making ANY plans whatsoever to edit its implementation. https://github.com/HereLiesAz/AzNavRail
     -   **Host Items:** Group related functions (e.g., "Project", "Mode", "Grid", "Design").
     -   **Sub Items:** Specific actions (e.g., "Save", "Load", "Create Target").
 -   **`AdjustmentsPanel`:** A bottom sheet containing controls for image manipulation.
