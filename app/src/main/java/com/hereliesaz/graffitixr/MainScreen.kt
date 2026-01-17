@@ -16,8 +16,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.graffitixr.ui.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
@@ -78,7 +79,6 @@ import com.hereliesaz.graffitixr.data.CaptureEvent
 import com.hereliesaz.graffitixr.data.FeedbackEvent
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
-import com.hereliesaz.graffitixr.ui.AzNavRail
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
 import kotlinx.coroutines.Dispatchers
@@ -300,7 +300,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             LinearProgressIndicator(
-                                progress = uiState.mappingQualityScore,
+                                progress = { uiState.mappingQualityScore },
                                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                                 color = if (uiState.mappingQualityScore > 0.8f) Color.Green else Color.Yellow,
                                 trackColor = Color.DarkGray
@@ -725,13 +725,6 @@ private fun MainContentLayer(
                     uiState = uiState
                 )
             }
-            else -> {
-                // Handle new modes by defaulting to AR view for now
-                ArView(
-                    viewModel = viewModel,
-                    uiState = uiState
-                )
-            }
         }
     }
 }
@@ -955,8 +948,8 @@ private fun CaptureAnimation() {
 fun UnlockInstructionsPopup(visible: Boolean) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn() + slideInHorizontally(initialOffsetX = { it / 2 }),
-        exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it / 2 }),
+        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
         modifier = Modifier
             .fillMaxSize()
             .zIndex(200f)

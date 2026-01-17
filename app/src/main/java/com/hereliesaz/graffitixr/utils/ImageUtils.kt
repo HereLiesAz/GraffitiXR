@@ -51,6 +51,10 @@ object ImageUtils {
         FileOutputStream(file).use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         }
+        return getUriForFile(file)
+    }
+
+    fun getUriForFile(file: File): Uri {
         return Uri.fromFile(file)
     }
 

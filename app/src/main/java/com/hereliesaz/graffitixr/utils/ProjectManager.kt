@@ -15,7 +15,17 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-class ProjectManager {
+interface UriProvider {
+    fun getUriForFile(file: File): Uri
+}
+
+class DefaultUriProvider : UriProvider {
+    override fun getUriForFile(file: File): Uri {
+        return Uri.fromFile(file)
+    }
+}
+
+class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()) {
 
     private val json = Json {
         prettyPrint = true
@@ -46,7 +56,7 @@ class ProjectManager {
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
             }
-            Uri.fromFile(file)
+            uriProvider.getUriForFile(file)
         }
 
         // 2. Deserialize Fingerprint JSON string to Object (if exists)
