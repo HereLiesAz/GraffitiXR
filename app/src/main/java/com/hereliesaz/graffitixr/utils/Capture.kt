@@ -14,6 +14,12 @@ import android.view.Window
 
 fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
     val window: Window = activity.window
+
+    if (window.decorView.width <= 0 || window.decorView.height <= 0) {
+        callback(null)
+        return
+    }
+
     val bitmap = Bitmap.createBitmap(window.decorView.width, window.decorView.height, Bitmap.Config.ARGB_8888)
     val locationOfViewInWindow = IntArray(2)
     window.decorView.getLocationInWindow(locationOfViewInWindow)
