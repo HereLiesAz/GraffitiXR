@@ -35,7 +35,7 @@ object BackgroundRemover {
                 Result.failure(Exception("The machine saw nothing worth saving."))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure<Bitmap>(e)
         }
     }
 }

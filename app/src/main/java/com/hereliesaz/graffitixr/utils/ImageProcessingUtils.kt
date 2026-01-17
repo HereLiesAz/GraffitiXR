@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.RefinementPath
 import org.opencv.android.Utils
@@ -14,6 +15,7 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
+import java.util.ArrayList
 
 /**
  * A collection of static methods to manipulate reality, pixel by pixel.

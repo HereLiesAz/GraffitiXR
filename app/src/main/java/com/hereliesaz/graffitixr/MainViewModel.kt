@@ -257,7 +257,7 @@ class MainViewModel(
                 val originalBitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
                 val mask = uiState.value.targetMaskUri?.let { BitmapUtils.getBitmapFromUri(getApplication(), it) }
                 val fingerprint = com.hereliesaz.graffitixr.utils.generateFingerprint(originalBitmap, uiState.value.refinementPaths, mask)
-                if (fingerprint.keypoints.isEmpty()) { withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "No features found. Try a more detailed surface.", Toast.LENGTH_LONG).show() }; return@launch }
+                if (fingerprint == null || fingerprint.keypoints.isEmpty()) { withContext(Dispatchers.Main) { Toast.makeText(getApplication(), "No features found. Try a more detailed surface.", Toast.LENGTH_LONG).show() }; return@launch }
                 arRenderer?.setAugmentedImageDatabase(uiState.value.capturedTargetImages)
                 arRenderer?.setFingerprint(fingerprint)
                 withContext(Dispatchers.Main) { updateState(uiState.value.copy(isCapturingTarget = false, targetCreationState = TargetCreationState.SUCCESS, isArTargetCreated = true, arState = ArState.SEARCHING, fingerprintJson = Json.encodeToString(Fingerprint.serializer(), fingerprint), refinementPaths = emptyList(), targetMaskUri = null, showImagePicker = uiState.value.overlayImageUri == null)) }
@@ -329,7 +329,39 @@ class MainViewModel(
 
     fun showTapFeedback(position: Offset, isSuccess: Boolean) { viewModelScope.launch { _tapFeedback.value = if (isSuccess) TapFeedback.Success(position) else TapFeedback.Failure(position); delay(500); _tapFeedback.value = null } }
 
-    fun onRemoveBackgroundClicked() { viewModelScope.launch { setLoading(true); (uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri)?.let { uri -> try { val result = BackgroundRemover.removeBackground(BitmapUtils.getBitmapFromUri(getApplication(), uri) ?: return@launch); val resultBitmap = result.getOrNull(); if (resultBitmap != null) { saveBitmapToCache(resultBitmap, "background_removed")?.let { newUri -> updateState(uiState.value.copy(overlayImageUri = newUri, backgroundRemovedImageUri = newUri, isLoading = false)); updateActiveLayer { it.copy(uri = newUri, backgroundRemovedUri = newUri) } } } else { setLoading(false); Toast.makeText(getApplication(), "Background removal failed", Toast.LENGTH_SHORT).show() } } catch (e: Exception) { setLoading(false) } } ?: setLoading(false) } }
+    fun onRemoveBackgroundClicked() {
+        viewModelScope.launch {
+            setLoading(true)
+            val uri = uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri
+            if (uri != null) {
+                try {
+                    val bitmap = BitmapUtils.getBitmapFromUri(getApplication(), uri)
+                    if (bitmap == null) {
+                        setLoading(false)
+                        return@launch
+                    }
+                    val result = BackgroundRemover.removeBackground(bitmap)
+                    result.onSuccess { resultBitmap ->
+                        val newUri = saveBitmapToCache(resultBitmap, "background_removed")
+                        if (newUri != null) {
+                            updateState(uiState.value.copy(overlayImageUri = newUri, backgroundRemovedImageUri = newUri, isLoading = false))
+                            updateActiveLayer { it.copy(uri = newUri, backgroundRemovedUri = newUri) }
+                        } else {
+                            setLoading(false)
+                            Toast.makeText(getApplication(), "Failed to save image", Toast.LENGTH_SHORT).show()
+                        }
+                    }.onFailure {
+                        setLoading(false)
+                        Toast.makeText(getApplication(), "Background removal failed", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    setLoading(false)
+                }
+            } else {
+                setLoading(false)
+            }
+        }
+    }
 
     fun onBrightnessChanged(brightness: Float) { val safe = brightness.coerceIn(-1f, 1f); updateState(uiState.value.copy(brightness = safe), isUndoable = false); updateActiveLayer { it.copy(brightness = safe) } }
 
