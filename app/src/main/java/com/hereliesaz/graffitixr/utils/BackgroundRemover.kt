@@ -14,6 +14,12 @@ object BackgroundRemover {
             .build()
         val segmenter = SubjectSegmentation.getClient(options)
 
+<<<<<<< HEAD
+        return try {
+            val image = InputImage.fromBitmap(bitmap, 0)
+            val result = segmenter.process(image).await()
+            result.foregroundBitmap
+=======
             val result = segmenter.process(inputImage).await()
             
             val foreground: Bitmap? = result.foregroundBitmap
@@ -22,6 +28,7 @@ object BackgroundRemover {
             } else {
                 Result.failure(Exception("The machine saw nothing worth saving."))
             }
+>>>>>>> origin/feature/ar-editor-enhancements-4573859779138866612
         } catch (e: Exception) {
             e.printStackTrace()
             null

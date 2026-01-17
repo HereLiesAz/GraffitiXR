@@ -52,6 +52,35 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+<<<<<<< HEAD
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
+import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
+import com.hereliesaz.graffitixr.composables.DrawingCanvas
+import com.hereliesaz.graffitixr.composables.GestureFeedback
+import com.hereliesaz.graffitixr.composables.MockupScreen
+import com.hereliesaz.graffitixr.composables.OverlayScreen
+import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
+import com.hereliesaz.graffitixr.composables.SettingsScreen
+import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
+import com.hereliesaz.graffitixr.composables.TargetCreationOverlay
+import com.hereliesaz.graffitixr.composables.TargetRefinementScreen
+import com.hereliesaz.graffitixr.composables.TraceScreen
+import com.hereliesaz.graffitixr.composables.UnwarpScreen
+import com.hereliesaz.graffitixr.data.CaptureEvent
+import com.hereliesaz.graffitixr.data.FeedbackEvent
+import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
+import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
+import com.hereliesaz.graffitixr.ui.rememberNavStrings
+import com.hereliesaz.graffitixr.utils.captureWindow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+=======
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -59,6 +88,7 @@ import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
 import com.hereliesaz.graffitixr.ui.components.AzNavRail
 import com.hereliesaz.graffitixr.ui.components.Knob
 import kotlinx.coroutines.launch
+>>>>>>> origin/feature/ar-editor-enhancements-4573859779138866612
 
 /**
  * The top-level UI composable for the GraffitiXR application.
@@ -66,9 +96,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     val uiState by viewModel.uiState.collectAsState()
+<<<<<<< HEAD
+    val tapFeedback by viewModel.tapFeedback.collectAsState()
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+=======
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val screenHeight = configuration.screenHeightDp.dp
+>>>>>>> origin/feature/ar-editor-enhancements-4573859779138866612
 
     // Capture theme color for AzNavRail
     val activeHighlightColor = MaterialTheme.colorScheme.tertiary
@@ -124,6 +161,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
+<<<<<<< HEAD
     // Capture Event Handler (PixelCopy)
     LaunchedEffect(viewModel, context) {
         viewModel.captureEvent.collect { event ->
@@ -133,8 +171,151 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         captureWindow(activity) { bitmap ->
                             bitmap?.let {
                                 viewModel.saveCapturedBitmap(it)
+=======
+        Row(modifier = Modifier.fillMaxSize()) {
+            AzNavRail(
+                currentMode = uiState.editorMode,
+                onModeSelected = { mode ->
+                    when (mode) {
+                        EditorMode.ISOLATE -> viewModel.onRemoveBackgroundClicked()
+                        EditorMode.OUTLINE -> viewModel.onLineDrawingClicked()
+                        else -> viewModel.onEditorModeChanged(mode)
+                    }
+                },
+                onCapture = { viewModel.onCaptureShutterClicked() },
+                onMenu = { /* Open Menu */ }
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            ) {
+                if (uiState.qualityWarning != null) {
+                    Text(
+                        text = uiState.qualityWarning ?: "",
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 16.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                            .padding(8.dp)
+                    )
+                }
+
+                // Explicitly use the androidx animation visibility
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = uiState.showRotationAxisFeedback,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = uiState.activeRotationAxis.name,
+                            color = Color.Cyan,
+                            style = MaterialTheme.typography.displayMedium
+                        )
+                    }
+                    LaunchedEffect(Unit) { viewModel.onFeedbackShown() }
+                }
+
+                if (uiState.layers.isNotEmpty() && !uiState.isImageLocked) {
+                    if (uiState.editorMode == EditorMode.AR) {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(24.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Knob(
+                                    value = when (uiState.activeRotationAxis) {
+                                        RotationAxis.X -> uiState.rotationX
+                                        RotationAxis.Y -> uiState.rotationY
+                                        RotationAxis.Z -> uiState.rotationZ
+                                    },
+                                    onValueChange = { delta ->
+                                        when (uiState.activeRotationAxis) {
+                                            RotationAxis.X -> viewModel.onRotationXChanged(delta * 360f)
+                                            RotationAxis.Y -> viewModel.onRotationYChanged(delta * 360f)
+                                            RotationAxis.Z -> viewModel.onRotationZChanged(delta * 360f)
+                                        }
+                                    },
+                                    text = "Rot ${uiState.activeRotationAxis.name}"
+                                )
+
+                                Knob(
+                                    value = uiState.scale,
+                                    onValueChange = { viewModel.onArObjectScaleChanged(it) },
+                                    text = "Scale"
+                                )
+
+                                Knob(
+                                    value = uiState.opacity,
+                                    onValueChange = { viewModel.onOpacityChanged(it) },
+                                    range = 0f..1f,
+                                    text = "Opacity"
+                                )
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .background(Color.Black.copy(alpha = 0.7f), CircleShape)
+                                    .border(1.dp, Color.DarkGray, CircleShape)
+                                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { viewModel.onUndoClicked() },
+                                    enabled = uiState.canUndo
+                                ) {
+                                    Icon(Icons.Default.Undo, "Undo", tint = if (uiState.canUndo) Color.White else Color.Gray)
+                                }
+
+                                IconButton(onClick = { viewModel.onMagicClicked() }) {
+                                    Icon(Icons.Default.AutoFixHigh, "Align", tint = Color.Cyan)
+                                }
+
+                                IconButton(
+                                    onClick = { viewModel.onRedoClicked() },
+                                    enabled = uiState.canRedo
+                                ) {
+                                    Icon(Icons.Default.Redo, "Redo", tint = if (uiState.canRedo) Color.White else Color.Gray)
+                                }
+>>>>>>> origin/feature/ar-editor-enhancements-4573859779138866612
                             }
                         }
+                    } else if (uiState.editorMode == EditorMode.ADJUST || uiState.editorMode == EditorMode.BALANCE) {
+                        AdjustmentsPanel(
+                            uiState = uiState,
+                            showKnobs = uiState.editorMode == EditorMode.ADJUST,
+                            showColorBalance = uiState.editorMode == EditorMode.BALANCE,
+                            isLandscape = isLandscape,
+                            screenHeight = screenHeight,
+                            onOpacityChange = { viewModel.onOpacityChanged(it) },
+                            onBrightnessChange = { viewModel.onBrightnessChanged(it) },
+                            onContrastChange = { viewModel.onContrastChanged(it) },
+                            onSaturationChange = { viewModel.onSaturationChanged(it) },
+                            onColorBalanceRChange = { viewModel.onColorBalanceRChanged(it) },
+                            onColorBalanceGChange = { viewModel.onColorBalanceGChanged(it) },
+                            onColorBalanceBChange = { viewModel.onColorBalanceBChanged(it) },
+                            onUndo = { viewModel.onUndoClicked() },
+                            onRedo = { viewModel.onRedoClicked() },
+                            onMagicAlign = { viewModel.onMagicClicked() },
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        )
                     }
                 }
                 is CaptureEvent.CaptureSuccess -> { /* Handle success if needed */ }
