@@ -12,6 +12,7 @@ class BackgroundRenderer {
     private lateinit var quadVertices: FloatBuffer
     private lateinit var quadTexCoord: FloatBuffer
     private lateinit var quadTexCoordTransformed: FloatBuffer
+    private lateinit var quadCoords2D: FloatBuffer
 
     private var backgroundProgram: Int = 0
     private var textureTarget = GLES11Ext.GL_TEXTURE_EXTERNAL_OES
@@ -38,6 +39,19 @@ class BackgroundRenderer {
             quadVertices = bbVertices.asFloatBuffer()
             quadVertices.put(QUAD_COORDS)
             quadVertices.position(0)
+        }
+
+        if (!::quadCoords2D.isInitialized) {
+            val bbCoords2D = ByteBuffer.allocateDirect(numVertices * 2 * 4)
+            bbCoords2D.order(ByteOrder.nativeOrder())
+            quadCoords2D = bbCoords2D.asFloatBuffer()
+            quadCoords2D.put(floatArrayOf(
+                -1.0f, -1.0f,
+                -1.0f, 1.0f,
+                1.0f, -1.0f,
+                1.0f, 1.0f
+            ))
+            quadCoords2D.position(0)
         }
 
         if (!::quadTexCoord.isInitialized) {
@@ -70,7 +84,7 @@ class BackgroundRenderer {
         if (frame.hasDisplayGeometryChanged()) {
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
-                quadVertices,
+                quadCoords2D,
                 Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoordTransformed
             )
