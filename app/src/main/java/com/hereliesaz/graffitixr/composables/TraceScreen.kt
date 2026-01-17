@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -53,10 +54,24 @@ fun TraceScreen(
     // without having to restart the pointerInput block.
     val currentUiState by rememberUpdatedState(uiState)
 
-    val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
+    // Resolve Active Layer
+    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
+    val scale = activeLayer?.scale ?: 1f
+    val offset = activeLayer?.offset ?: Offset.Zero
+    val rotationX = activeLayer?.rotationX ?: 0f
+    val rotationY = activeLayer?.rotationY ?: 0f
+    val rotationZ = activeLayer?.rotationZ ?: 0f
+    val opacity = activeLayer?.opacity ?: 1f
+    val blendMode = activeLayer?.blendMode ?: BlendMode.SrcOver
+    val contrast = activeLayer?.contrast ?: 1f
+    val saturation = activeLayer?.saturation ?: 1f
+    val colorBalanceR = activeLayer?.colorBalanceR ?: 1f
+    val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
+    val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
+
+    val colorMatrix = remember(saturation, contrast, colorBalanceR, colorBalanceG, colorBalanceB) {
         ColorMatrix().apply {
-            setToSaturation(uiState.saturation)
-            val contrast = uiState.contrast
+            setToSaturation(saturation)
             val contrastMatrix = ColorMatrix(
                 floatArrayOf(
                     contrast, 0f, 0f, 0f, (1 - contrast) * 128,
@@ -67,9 +82,9 @@ fun TraceScreen(
             )
             val colorBalanceMatrix = ColorMatrix(
                 floatArrayOf(
-                    uiState.colorBalanceR, 0f, 0f, 0f, 0f,
-                    0f, uiState.colorBalanceG, 0f, 0f, 0f,
-                    0f, 0f, uiState.colorBalanceB, 0f, 0f,
+                    colorBalanceR, 0f, 0f, 0f, 0f,
+                    0f, colorBalanceG, 0f, 0f, 0f,
+                    0f, 0f, colorBalanceB, 0f, 0f,
                     0f, 0f, 0f, 1f, 0f
                 )
             )
@@ -114,10 +129,14 @@ fun TraceScreen(
                             getValidBounds = {
                                 // Calculate bounds dynamically using the LATEST state
                                 val state = currentUiState
-                                val imgWidth = bmp.width * state.scale
-                                val imgHeight = bmp.height * state.scale
-                                val centerX = size.width / 2f + state.offset.x
-                                val centerY = size.height / 2f + state.offset.y
+                                val currentLayer = state.layers.find { it.id == state.activeLayerId } ?: state.layers.firstOrNull()
+                                val currentScale = currentLayer?.scale ?: 1f
+                                val currentOffset = currentLayer?.offset ?: Offset.Zero
+
+                                val imgWidth = bmp.width * currentScale
+                                val imgHeight = bmp.height * currentScale
+                                val centerX = size.width / 2f + currentOffset.x
+                                val centerY = size.height / 2f + currentOffset.y
                                 val left = centerX - imgWidth / 2f
                                 val top = centerY - imgHeight / 2f
                                 Rect(left, top, left + imgWidth, top + imgHeight)
@@ -141,13 +160,13 @@ fun TraceScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                scaleX = uiState.scale
-                                scaleY = uiState.scale
-                                rotationX = uiState.rotationX
-                                rotationY = uiState.rotationY
-                                rotationZ = uiState.rotationZ
-                                translationX = uiState.offset.x
-                                translationY = uiState.offset.y
+                                scaleX = scale
+                                scaleY = scale
+                                this.rotationX = rotationX
+                                this.rotationY = rotationY
+                                this.rotationZ = rotationZ
+                                translationX = offset.x
+                                translationY = offset.y
                             }
                     ) {
                         val xOffset = (size.width - bmp.width) / 2f
@@ -156,9 +175,9 @@ fun TraceScreen(
                         drawImage(
                             image = bmp.asImageBitmap(),
                             topLeft = Offset(xOffset, yOffset),
-                            alpha = uiState.opacity,
+                            alpha = opacity,
                             colorFilter = ColorFilter.colorMatrix(colorMatrix),
-                            blendMode = uiState.blendMode
+                            blendMode = blendMode
                         )
                     }
                 }

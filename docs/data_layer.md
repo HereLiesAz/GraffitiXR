@@ -6,16 +6,29 @@ This document describes how GraffitiXR handles data persistence, state managemen
 
 ### **`UiState` (Immutable)**
 -   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/UiState.kt`
--   **Purpose:** The single source of truth for the application's UI. It holds everything from current slider values (`opacity`, `contrast`) to complex objects like `capturedTargetImages` and `refinementPaths`.
+-   **Purpose:** The single source of truth for the application's UI. It holds:
+    -   Global state (`editorMode`, `isCapturingTarget`).
+    -   **Layers:** A list of `OverlayLayer` objects managed by the user.
+    -   **AR State:** Tracking status, anchors, and mapping quality.
+    -   **Editor State:** Paths (`List<List<Offset>>`) and Refinement logic.
 -   **Usage:** Managed by `MainViewModel` via a `StateFlow`. UI components observe this stream.
+
+### **`OverlayLayer` (Serializable)**
+-   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/data/OverlayLayer.kt`
+-   **Purpose:** Represents a single visual layer (image + properties).
+-   **Fields:**
+    -   `uri`: Image source.
+    -   `transforms`: Scale, Rotation (X,Y,Z), Offset.
+    -   `adjustments`: Opacity, Brightness, Contrast, Saturation, Color Balance.
+    -   `blendMode`: Composition mode (Multiply, Overlay, etc.).
 
 ### **`ProjectData` (Serializable)**
 -   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/data/ProjectData.kt`
 -   **Purpose:** The DTO (Data Transfer Object) used for saving and loading projects. It mirrors the persistent parts of `UiState`.
 -   **Fields:**
+    -   `layers`: List of `OverlayLayer`.
     -   `targetImageUris`: List of URIs for the AR target images.
-    -   `fingerprint`: The OpenCV feature data (see below).
-    -   `overlayImageUri`: URI for the user's art.
+    -   `fingerprint`: The OpenCV feature data.
     -   `refinementPaths`: Vector paths for the target mask.
     -   `gpsData`, `sensorData`: Contextual metadata.
 
@@ -23,8 +36,9 @@ This document describes how GraffitiXR handles data persistence, state managemen
 -   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/data/Fingerprint.kt`
 -   **Purpose:** Stores the OpenCV ORB features required to identify an AR target.
 -   **Structure:**
-    -   `keyPoints`: List of `org.opencv.core.KeyPoint`.
-    -   `descriptors`: `org.opencv.core.Mat` (serialized as rows/cols/type/data).
+    -   `keypoints`: List of `org.opencv.core.KeyPoint` (serialized via `KeyPointSerializer`).
+    -   `descriptorsData`: ByteArray containing raw descriptor data.
+    -   `descriptorsRows`, `descriptorsCols`, `descriptorsType`: Metadata to reconstruct the `Mat`.
 
 ## **2. Serialization Strategy**
 
@@ -32,17 +46,21 @@ The app uses `kotlinx.serialization` with custom serializers for complex/native 
 
 ### **Custom Serializers (`Serializers.kt`)**
 -   **`KeyPointSerializer`:** Converts OpenCV `KeyPoint` <-> JSON object (`x`, `y`, `size`, `angle`, etc.).
--   **`MatSerializer`:** Converts OpenCV `Mat` <-> JSON object. Since `Mat` holds native memory, the data is extracted to a Base64 string or byte array for storage and reconstructed upon loading.
--   **`BlendModeSerializer`:** specific serializer for Android `BlendMode`.
+-   **`UriSerializer`:** Persists `Uri` as string path.
+-   **`OffsetSerializer`:** Converts Compose `Offset` <-> JSON object.
+-   **`BlendModeSerializer`:** Converts Compose `BlendMode` <-> String name.
 
 ## **3. Project Management**
 
 ### **`ProjectManager`**
 -   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/utils/ProjectManager.kt`
 -   **Function:** Handles the I/O operations for project files (`.json` or `.zip`).
--   **Auto-Save:** The `MainViewModel` triggers an auto-save every 30 seconds to the "autosave" project slot.
+-   **Logic:**
+    -   Converts `UiState` -> `ProjectData` (handling type mapping like `List<Offset>` -> `List<Pair>`).
+    -   Saves images to local project directory.
+    -   Serializes JSON manifest.
 
 ### **File Storage**
 -   **Cache:** Temporary images (camera captures, processed results) are stored in `context.cacheDir`.
--   **Persistence:** Saved projects are stored in the app's internal storage directory.
+-   **Persistence:** Saved projects are stored in `context.filesDir/projects/{projectId}/`.
 -   **Export:** Users can export projects to a `.zip` file containing the JSON data and all referenced image assets.

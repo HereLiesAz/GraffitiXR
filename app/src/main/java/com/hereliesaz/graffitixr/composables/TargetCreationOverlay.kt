@@ -427,5 +427,6 @@ private fun getInstructionText(step: CaptureStep, mode: TargetCreationMode): Str
         CaptureStep.CALIBRATION_POINT_3 -> "Hold phone flat against wall at Spot 3.\nWait for vibration."
         CaptureStep.CALIBRATION_POINT_4 -> "Hold phone flat against wall at Spot 4.\nWait for vibration."
         CaptureStep.RECTIFY -> "Drag the corners to match your rectangle."
+        else -> ""
     }
 }

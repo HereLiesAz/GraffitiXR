@@ -23,6 +23,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -40,30 +41,6 @@ import com.hereliesaz.graffitixr.UiState
 import com.hereliesaz.graffitixr.utils.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 
-/**
- * A Composable that displays the live camera feed with a 2D image overlay.
- *
- * This screen implements the "Trace" or "Overlay" mode, where the image is
- * locked to the screen coordinates rather than anchored in the 3D world (AR).
- * This is useful for devices without AR support or for simple tracing tasks.
- *
- * Features:
- * 1.  Uses CameraX for the camera preview.
- * 2.  Renders the user's selected image on a Canvas on top of the preview.
- * 3.  Applies ColorMatrix filters (contrast, brightness, saturation, color balance).
- * 4.  Handles multi-touch gestures (scale, rotate, pan) to manipulate the overlay.
- *
- * @param uiState The current UI state.
- * @param onScaleChanged Callback for scale changes.
- * @param onOffsetChanged Callback for position changes (pan).
- * @param onRotationZChanged Callback for Z-axis rotation.
- * @param onRotationXChanged Callback for X-axis rotation (simulated/3D transform).
- * @param onRotationYChanged Callback for Y-axis rotation (simulated/3D transform).
- * @param onCycleRotationAxis Callback to switch the active rotation axis.
- * @param onGestureStart Callback when a gesture begins.
- * @param onGestureEnd Callback when a gesture ends.
- * @param modifier Composable modifier.
- */
 @Composable
 fun OverlayScreen(
     uiState: UiState,
@@ -85,6 +62,22 @@ fun OverlayScreen(
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val currentUiState by rememberUpdatedState(uiState)
 
+    // Resolve Active Layer
+    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
+    val scale = activeLayer?.scale ?: 1f
+    val offset = activeLayer?.offset ?: Offset.Zero
+    val rotationX = activeLayer?.rotationX ?: 0f
+    val rotationY = activeLayer?.rotationY ?: 0f
+    val rotationZ = activeLayer?.rotationZ ?: 0f
+    val opacity = activeLayer?.opacity ?: 1f
+    val blendMode = activeLayer?.blendMode ?: BlendMode.SrcOver
+    val contrast = activeLayer?.contrast ?: 1f
+    val brightness = activeLayer?.brightness ?: 0f
+    val saturation = activeLayer?.saturation ?: 1f
+    val colorBalanceR = activeLayer?.colorBalanceR ?: 1f
+    val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
+    val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
+
     // Flashlight control logic
     LaunchedEffect(uiState.isFlashlightOn, camera) {
         try {
@@ -97,10 +90,9 @@ fun OverlayScreen(
     }
 
     // Build the ColorMatrix based on slider values
-    val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
+    val colorMatrix = remember(saturation, contrast, brightness, colorBalanceR, colorBalanceG, colorBalanceB) {
         ColorMatrix().apply {
-            setToSaturation(uiState.saturation)
-            val contrast = uiState.contrast
+            setToSaturation(saturation)
             val contrastMatrix = ColorMatrix(
                 floatArrayOf(
                     contrast, 0f, 0f, 0f, (1 - contrast) * 128,
@@ -110,7 +102,7 @@ fun OverlayScreen(
                 )
             )
 
-            val b = uiState.brightness * 255f
+            val b = brightness * 255f
             val brightnessMatrix = ColorMatrix(
                 floatArrayOf(
                     1f, 0f, 0f, 0f, b,
@@ -122,9 +114,9 @@ fun OverlayScreen(
 
             val colorBalanceMatrix = ColorMatrix(
                 floatArrayOf(
-                    uiState.colorBalanceR, 0f, 0f, 0f, 0f,
-                    0f, uiState.colorBalanceG, 0f, 0f, 0f,
-                    0f, 0f, uiState.colorBalanceB, 0f, 0f,
+                    colorBalanceR, 0f, 0f, 0f, 0f,
+                    0f, colorBalanceG, 0f, 0f, 0f,
+                    0f, 0f, colorBalanceB, 0f, 0f,
                     0f, 0f, 0f, 1f, 0f
                 )
             )
@@ -172,7 +164,7 @@ fun OverlayScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        val imageUri = uiState.processedImageUri ?: uiState.overlayImageUri
+        val imageUri = uiState.overlayImageUri
 
         imageUri?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -204,10 +196,14 @@ fun OverlayScreen(
                         detectSmartOverlayGestures(
                             getValidBounds = {
                                 val state = currentUiState
-                                val imgWidth = bmp.width * state.scale
-                                val imgHeight = bmp.height * state.scale
-                                val centerX = size.width / 2f + state.offset.x
-                                val centerY = size.height / 2f + state.offset.y
+                                val currentLayer = state.layers.find { it.id == state.activeLayerId } ?: state.layers.firstOrNull()
+                                val currentScale = currentLayer?.scale ?: 1f
+                                val currentOffset = currentLayer?.offset ?: Offset.Zero
+
+                                val imgWidth = bmp.width * currentScale
+                                val imgHeight = bmp.height * currentScale
+                                val centerX = size.width / 2f + currentOffset.x
+                                val centerY = size.height / 2f + currentOffset.y
                                 val left = centerX - imgWidth / 2f
                                 val top = centerY - imgHeight / 2f
                                 Rect(left, top, left + imgWidth, top + imgHeight)
@@ -220,7 +216,7 @@ fun OverlayScreen(
                             when (currentUiState.activeRotationAxis) {
                                 RotationAxis.X -> onRotationXChanged(rotation)
                                 RotationAxis.Y -> onRotationYChanged(rotation)
-                                RotationAxis.Z -> onRotationZChanged(rotation) // Fixed: Removed negation
+                                RotationAxis.Z -> onRotationZChanged(rotation)
                             }
                         }
                     }
@@ -230,13 +226,13 @@ fun OverlayScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                scaleX = uiState.scale
-                                scaleY = uiState.scale
-                                rotationX = uiState.rotationX
-                                rotationY = uiState.rotationY
-                                rotationZ = uiState.rotationZ
-                                translationX = uiState.offset.x
-                                translationY = uiState.offset.y
+                                scaleX = scale
+                                scaleY = scale
+                                this.rotationX = rotationX
+                                this.rotationY = rotationY
+                                this.rotationZ = rotationZ
+                                translationX = offset.x
+                                translationY = offset.y
                             }
                     ) {
                         val xOffset = (size.width - bmp.width) / 2f
@@ -245,9 +241,9 @@ fun OverlayScreen(
                         drawImage(
                             image = bmp.asImageBitmap(),
                             topLeft = Offset(xOffset, yOffset),
-                            alpha = uiState.opacity,
+                            alpha = opacity,
                             colorFilter = ColorFilter.colorMatrix(colorMatrix),
-                            blendMode = uiState.blendMode
+                            blendMode = blendMode
                         )
                     }
                 }

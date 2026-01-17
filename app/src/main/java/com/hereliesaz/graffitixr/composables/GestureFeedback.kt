@@ -20,6 +20,12 @@ fun GestureFeedback(
     modifier: Modifier = Modifier,
     isVisible: Boolean
 ) {
+    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
+    val scale = activeLayer?.scale ?: 1f
+    val rotationX = activeLayer?.rotationX ?: 0f
+    val rotationY = activeLayer?.rotationY ?: 0f
+    val rotationZ = activeLayer?.rotationZ ?: 0f
+
     AnimatedVisibility(
         visible = isVisible,
         enter = fadeIn(),
@@ -31,13 +37,13 @@ fun GestureFeedback(
             contentAlignment = Alignment.Center
         ) {
             val rotationValue = when (uiState.activeRotationAxis) {
-                com.hereliesaz.graffitixr.RotationAxis.X -> uiState.rotationX
-                com.hereliesaz.graffitixr.RotationAxis.Y -> uiState.rotationY
-                com.hereliesaz.graffitixr.RotationAxis.Z -> uiState.rotationZ
+                com.hereliesaz.graffitixr.RotationAxis.X -> rotationX
+                com.hereliesaz.graffitixr.RotationAxis.Y -> rotationY
+                com.hereliesaz.graffitixr.RotationAxis.Z -> rotationZ
             }
             Text(
                 text = "Scale: %.2f, Rotation (%s): %.1f°".format(
-                    uiState.scale,
+                    scale,
                     uiState.activeRotationAxis.name,
                     rotationValue
                 ),

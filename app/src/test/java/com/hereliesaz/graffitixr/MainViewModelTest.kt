@@ -1,11 +1,11 @@
 package com.hereliesaz.graffitixr
 
-import android.app.Application
-import android.content.SharedPreferences
-import androidx.lifecycle.SavedStateHandle
+import android.net.Uri
+import com.hereliesaz.graffitixr.utils.ProjectManager
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -16,79 +16,59 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
 
     private lateinit var viewModel: MainViewModel
-    private val application: Application = mockk(relaxed = true)
-    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
-    private val sharedPreferences: SharedPreferences = mockk(relaxed = true)
-    private val editor: SharedPreferences.Editor = mockk(relaxed = true)
-
+    private val projectManager: ProjectManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
+        mockkStatic(Uri::class)
+        every { Uri.parse(any()) } returns mockk()
 
-        every { application.applicationContext } returns application
-        every { application.getSharedPreferences(any(), any()) } returns sharedPreferences
-        every { sharedPreferences.edit() } returns editor
-        every { editor.putBoolean(any(), any()) } returns editor
-        every { editor.apply() } returns Unit
-        every { sharedPreferences.getBoolean(any(), any()) } returns false
-
-        // Mock filesDir for ProjectManager
-        val tempDir = File.createTempFile("temp", "dir").parentFile
-        every { application.filesDir } returns tempDir
-
-        // Initialize ViewModel with the new constructor (no ARCoreManager)
-        viewModel = MainViewModel(application, savedStateHandle)
+        viewModel = MainViewModel(projectManager)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(Uri::class)
     }
 
     @Test
-    fun `initial state is correct`() = runTest {
+    fun `initial state is empty`() = runTest {
         val state = viewModel.uiState.value
-        assertEquals(1f, state.opacity, 0.0f)
-        assertEquals(1f, state.contrast, 0.0f)
-        assertEquals(1f, state.saturation, 0.0f)
+        assertEquals(0, state.layers.size)
     }
 
     @Test
-    fun `onOpacityChanged updates state`() = runTest {
+    fun `onOpacityChanged updates active layer`() = runTest {
+        val mockUri = mockk<Uri>()
+        viewModel.onOverlayImageSelected(mockUri)
+
+        // Default opacity is 1.0f
+        assertEquals(1f, viewModel.uiState.value.layers.first().opacity, 0.0f)
+
         viewModel.onOpacityChanged(0.5f)
-        assertEquals(0.5f, viewModel.uiState.value.opacity, 0.0f)
-    }
-
-    @Test
-    fun `onContrastChanged updates state`() = runTest {
-        viewModel.onContrastChanged(1.5f)
-        assertEquals(1.5f, viewModel.uiState.value.contrast, 0.0f)
-    }
-
-    @Test
-    fun `onSaturationChanged updates state`() = runTest {
-        viewModel.onSaturationChanged(0.2f)
-        assertEquals(0.2f, viewModel.uiState.value.saturation, 0.0f)
+        assertEquals(0.5f, viewModel.uiState.value.layers.first().opacity, 0.0f)
     }
 
     @Test
     fun `undo works correctly`() = runTest {
-        viewModel.onGestureStart()
+        val mockUri = mockk<Uri>()
+        viewModel.onOverlayImageSelected(mockUri)
+
+        // Create a history point
+        viewModel.onGestureEnd()
+
         viewModel.onOpacityChanged(0.5f)
-        assertEquals(0.5f, viewModel.uiState.value.opacity, 0.0f)
+        assertEquals(0.5f, viewModel.uiState.value.layers.first().opacity, 0.0f)
 
         viewModel.onUndoClicked()
-        assertEquals(1f, viewModel.uiState.value.opacity, 0.0f)
+        assertEquals(1f, viewModel.uiState.value.layers.first().opacity, 0.0f)
     }
 }

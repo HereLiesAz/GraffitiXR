@@ -58,7 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.graffitixr.ui.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
@@ -75,6 +75,8 @@ import com.hereliesaz.graffitixr.composables.TargetCreationOverlay
 import com.hereliesaz.graffitixr.composables.TargetRefinementScreen
 import com.hereliesaz.graffitixr.composables.TraceScreen
 import com.hereliesaz.graffitixr.composables.UnwarpScreen
+import com.hereliesaz.graffitixr.data.CaptureEvent
+import com.hereliesaz.graffitixr.data.FeedbackEvent
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
@@ -140,6 +142,9 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         val amplitude = intArrayOf(0, 255, 0, 255)
                         vibrator.vibrate(VibrationEffect.createWaveform(timing, amplitude, -1))
                     }
+                    is FeedbackEvent.Toast -> {
+                         android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
@@ -158,6 +163,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         }
                     }
                 }
+                is CaptureEvent.CaptureSuccess -> { /* Handle success if needed */ }
+                is CaptureEvent.CaptureFailure -> { /* Handle failure if needed */ }
             }
         }
     }
@@ -749,7 +756,7 @@ private fun TargetCreationFlow(
             val maskBitmap by produceState<Bitmap?>(initialValue = null, maskUri) {
                 if (maskUri != null) {
                     value = withContext(Dispatchers.IO) {
-                        com.hereliesaz.graffitixr.utils.BitmapUtils.getBitmapFromUri(context, maskUri)
+                        com.hereliesaz.graffitixr.utils.ImageUtils.loadBitmapFromUri(context, maskUri)
                     }
                 } else {
                     value = null

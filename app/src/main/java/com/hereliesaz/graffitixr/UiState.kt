@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Path
 import android.net.Uri
 import com.hereliesaz.graffitixr.data.OverlayLayer
+import com.hereliesaz.graffitixr.data.RefinementPath
 // NOTE: We assume EditorMode, ArState, etc. are defined in the root package
 // or their respective files as indicated by the "Redeclaration" errors.
 // If imports are missing, add them here based on where your original Enums live.
@@ -49,9 +50,9 @@ data class UiState(
     // Refinement / Editing
     val isMarkingProgress: Boolean = false,
     val progressPercentage: Float = 0f,
-    val drawingPaths: List<Path> = emptyList(),
-    val refinementPaths: List<Path> = emptyList(),
-    val detectedKeypoints: List<Any> = emptyList(),
+    val drawingPaths: List<List<androidx.compose.ui.geometry.Offset>> = emptyList(),
+    val refinementPaths: List<RefinementPath> = emptyList(),
+    val detectedKeypoints: List<androidx.compose.ui.geometry.Offset> = emptyList(),
     val isRefinementEraser: Boolean = false,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
@@ -63,6 +64,7 @@ data class UiState(
     val showDoubleTapHint: Boolean = false,
     val activeRotationAxis: RotationAxis = RotationAxis.Y,
     val showRotationAxisFeedback: Boolean = false,
+    val isFlashlightOn: Boolean = false,
 
     // Updates
     val updateStatusMessage: String? = null,
