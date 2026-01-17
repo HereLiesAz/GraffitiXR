@@ -56,6 +56,8 @@ class ArRenderer(
 
     // Texture for the camera feed
     private var backgroundTextureId = -1
+    private var viewportWidth = 1
+    private var viewportHeight = 1
 
     suspend fun generateFingerprint(bitmap: Bitmap): Fingerprint? = withContext(Dispatchers.Default) {
         if (!ensureOpenCVLoaded()) return@withContext null
@@ -135,10 +137,10 @@ class ArRenderer(
         GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST)
 
         // 2. Initialize renderers
-        backgroundRenderer.createOnGlThread(context)
-        planeRenderer.createOnGlThread(context, "models/trigrid.png")
-        pointCloudRenderer.createOnGlThread(context)
-        simpleQuadRenderer.createOnGlThread(context) // Ensure this method exists in SimpleQuadRenderer
+        backgroundRenderer.createOnGlThread()
+        planeRenderer.createOnGlThread()
+        pointCloudRenderer.createOnGlThread()
+        simpleQuadRenderer.createOnGlThread()
         miniMapRenderer.createOnGlThread(context)
 
         // 3. Connect texture to session if ready
@@ -148,6 +150,8 @@ class ArRenderer(
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         displayRotationHelper.onSurfaceChanged(width, height)
         GLES20.glViewport(0, 0, width, height)
+        viewportWidth = width
+        viewportHeight = height
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -177,12 +181,23 @@ class ArRenderer(
             val pointCloud = frame.acquirePointCloud()
             pointCloudRenderer.update(pointCloud)
             pointCloudRenderer.draw(viewmtx, projmtx)
+            
+            // Draw MiniMap if enabled
+            if (showMiniMap) {
+                // Tactical View: Drone perspective of the point cloud
+                miniMapRenderer.draw(pointCloud, camera.pose, viewportWidth, viewportHeight, 0)
+            }
+
             pointCloud.release()
 
             // Detect Planes
             if (hasTrackingPlane()) {
                 onPlanesDetected(true)
-                planeRenderer.drawPlanes(session!!, camera.displayOrientedPose, projmtx)
+                planeRenderer.drawPlanes(
+                    session!!.getAllTrackables(com.google.ar.core.Plane::class.java),
+                    viewmtx,
+                    projmtx
+                )
             } else {
                 onPlanesDetected(false)
             }
