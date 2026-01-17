@@ -27,7 +27,7 @@ fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PixelCopy.request(
                 window,
-                Rect(0, 0, window.decorView.width, window.decorView.height),
+                Rect(0, 0, width, height),
                 bitmap,
                 { copyResult ->
                     if (copyResult == PixelCopy.SUCCESS) {
@@ -39,7 +39,7 @@ fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
                 Handler(Looper.getMainLooper())
             )
         }
-    } catch (e: IllegalArgumentException) {
+    } catch (e: Exception) {
         callback(null)
         e.printStackTrace()
     }
