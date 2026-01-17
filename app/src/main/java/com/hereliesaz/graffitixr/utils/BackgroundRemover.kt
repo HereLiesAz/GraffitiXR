@@ -14,10 +14,14 @@ object BackgroundRemover {
             .build()
         val segmenter = SubjectSegmentation.getClient(options)
 
-        return try {
-            val image = InputImage.fromBitmap(bitmap, 0)
-            val result = segmenter.process(image).await()
-            result.foregroundBitmap
+            val result = segmenter.process(inputImage).await()
+            
+            val foreground: Bitmap? = result.foregroundBitmap
+            if (foreground != null) {
+                Result.success(foreground)
+            } else {
+                Result.failure(Exception("The machine saw nothing worth saving."))
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             null
