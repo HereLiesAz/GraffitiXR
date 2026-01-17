@@ -4,89 +4,110 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageFormat
 import android.media.Image
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import android.renderscript.ScriptIntrinsicYuvToRGB
-import android.renderscript.Type
-import java.nio.ByteBuffer
 
-/**
- * Helper class for converting YUV images to RGB bitmaps.
- *
- * This class uses RenderScript to perform the YUV to RGB conversion, which is
- * much faster than doing it on the CPU.
- */
-@Suppress("DEPRECATION")
-class YuvToRgbConverter(context: Context) {
+class YuvToRgbConverter(val context: Context) {
+    private var nv21: ByteArray? = null
+    private var argb: IntArray? = null
 
-    private val rs = RenderScript.create(context)
-    private val scriptYuvToRgb = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs))
-
-    // These allocations are reusable, so we create them only once.
-    private var yuvBits: ByteBuffer? = null
-    private var yuvAllocation: Allocation? = null
-    private var rgbAllocation: Allocation? = null
-
-    /**
-     * Converts a YUV [Image] to a [Bitmap].
-     *
-     * @param image The YUV image to convert.
-     * @return The converted RGB bitmap.
-     */
-    @Synchronized
     fun yuvToRgb(image: Image, output: Bitmap) {
-        if (image.format != ImageFormat.YUV_420_888) {
-            throw IllegalArgumentException("Invalid image format")
-        }
+        if (image.format != ImageFormat.YUV_420_888) return
 
         val width = image.width
         val height = image.height
+        val size = width * height
 
-        // Create the RenderScript allocations if they don\'t exist or the image dimensions have changed.
-        if (yuvAllocation == null) {
-            val yuvType = Type.Builder(rs, Element.U8(rs)).setX(width * height * 3 / 2)
-            yuvAllocation = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT)
-            yuvBits = ByteBuffer.allocate(width * height * 3 / 2)
+        // Ensure buffers
+        if (nv21 == null || nv21!!.size != size * 3 / 2) {
+            nv21 = ByteArray(size * 3 / 2)
+            argb = IntArray(size)
         }
 
-        if (rgbAllocation == null || rgbAllocation!!.type.x != width || rgbAllocation!!.type.y != height) {
-            val rgbType = Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height)
-            rgbAllocation = Allocation.createTyped(rs, rgbType.create(), Allocation.USAGE_SCRIPT)
-        }
+        // Capture to local variables to satisfy smart cast requirements
+        val localNv21 = nv21 ?: return
+        val localArgb = argb ?: return
 
-        yuvBits?.rewind()
+        val yPlane = image.planes[0]
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
 
-        // Copy the Y, U, and V planes into a single contiguous buffer.
-        image.planes.forEachIndexed { i, plane ->
-            val buffer = plane.buffer
-            val pixelStride = plane.pixelStride
-            val rowStride = plane.rowStride
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
 
-            val planeWidth = if (i == 0) width else width / 2
-            val planeHeight = if (i == 0) height else height / 2
-
-            if (pixelStride == 1 && rowStride == planeWidth) {
-                // If the plane is contiguous, we can copy it directly.
-                yuvBits!!.put(buffer)
-            } else {
-                // Otherwise, we have to copy it row by row.
-                val rowData = ByteArray(rowStride)
-                for (row in 0 until planeHeight - 1) {
-                    buffer.get(rowData, 0, rowStride)
-                    yuvBits!!.put(rowData, 0, planeWidth)
-                }
-                // Last row is a special case to avoid a buffer overflow.
-                buffer.get(rowData, 0, minOf(rowStride, buffer.remaining()))
-                yuvBits!!.put(rowData, 0, planeWidth)
+        // Y Copy
+        if (yPlane.rowStride == width) {
+            yBuffer.rewind()
+            yBuffer.get(localNv21, 0, size)
+        } else {
+            var pos = 0
+            for (row in 0 until height) {
+                yBuffer.position(row * yPlane.rowStride)
+                yBuffer.get(localNv21, pos, width)
+                pos += width
             }
         }
 
-        yuvBits?.rewind()
-        yuvAllocation!!.copyFrom(yuvBits!!.array())
+        // UV Copy
+        val uvHeight = height / 2
+        val uvWidth = width / 2
+        var uvPos = size
+        val uPixelStride = uPlane.pixelStride
+        val vPixelStride = vPlane.pixelStride
+        val uRowStride = uPlane.rowStride
+        val vRowStride = vPlane.rowStride
 
-        scriptYuvToRgb.setInput(yuvAllocation)
-        scriptYuvToRgb.forEach(rgbAllocation)
-        rgbAllocation!!.copyTo(output)
+        for (row in 0 until uvHeight) {
+            for (col in 0 until uvWidth) {
+                val vIndex = row * vRowStride + col * vPixelStride
+                val uIndex = row * uRowStride + col * uPixelStride
+
+                // NV21 expects V then U
+                localNv21[uvPos++] = vBuffer.get(vIndex)
+                localNv21[uvPos++] = uBuffer.get(uIndex)
+            }
+        }
+
+        decodeYUV420SP(localArgb, localNv21, width, height)
+        output.setPixels(localArgb, 0, width, 0, 0, width, height)
+    }
+
+    private fun decodeYUV420SP(rgb: IntArray, yuv420sp: ByteArray, width: Int, height: Int) {
+        val frameSize = width * height
+        var yp = 0
+        var uvp = 0
+        var i = 0
+        var y: Int
+        var u = 0
+        var v = 0
+        var r: Int
+        var g: Int
+        var b: Int
+
+        for (j in 0 until height) {
+            uvp = frameSize + (j shr 1) * width
+            u = 0
+            v = 0
+            for (k in 0 until width) {
+                y = (yuv420sp[yp].toInt() and 0xff) - 16
+                if (y < 0) y = 0
+                if ((k and 1) == 0) {
+                    v = (yuv420sp[uvp++].toInt() and 0xff) - 128
+                    u = (yuv420sp[uvp++].toInt() and 0xff) - 128
+                }
+
+                val y1192 = 1192 * y
+                r = (y1192 + 1634 * v)
+                g = (y1192 - 833 * v - 400 * u)
+                b = (y1192 + 2066 * u)
+
+                if (r < 0) r = 0 else if (r > 262143) r = 262143
+                if (g < 0) g = 0 else if (g > 262143) g = 262143
+                if (b < 0) b = 0 else if (b > 262143) b = 262143
+
+                rgb[i] = -0x1000000 or ((r shl 6) and 0xff0000) or ((g shr 2) and 0xff00) or ((b shr 10) and 0xff)
+                i++
+                yp++
+            }
+        }
     }
 }

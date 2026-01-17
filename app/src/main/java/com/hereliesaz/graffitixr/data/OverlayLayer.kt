@@ -18,13 +18,13 @@ data class OverlayLayer(
     val rotationZ: Float = 0f,
     val offset: Offset = Offset.Zero,
 
-    // Adjustments (Knobs)
+    // Adjustments (Added to fix Unresolved References)
     val opacity: Float = 1.0f,
     val brightness: Float = 0f,
     val contrast: Float = 1.0f,
     val saturation: Float = 1.0f,
 
-    // Color Balance
+    // Color Balance (Added to fix Unresolved References)
     val colorBalanceR: Float = 1.0f,
     val colorBalanceG: Float = 1.0f,
     val colorBalanceB: Float = 1.0f,

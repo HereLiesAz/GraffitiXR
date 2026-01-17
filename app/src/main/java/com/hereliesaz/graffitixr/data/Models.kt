@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.data
 
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -9,13 +8,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import java.util.UUID
 
-// --- ENUMS ---
+// --- ENUMS (Unified) ---
 
 enum class ArState {
-    SEARCHING, // Looking for planes or features
-    LOCKED,    // Features found, anchor established (Tracking)
-    PLACED     // User has explicitly placed the content
+    SEARCHING,
+    LOCKED,
+    PLACED
 }
 
 enum class RotationAxis { X, Y, Z }
@@ -59,9 +59,6 @@ data class Fingerprint(
     }
 }
 
-// Custom Serializer to handle the object if needed,
-// though @Serializable usually handles the data class fine.
-// This is a placeholder if you need custom JSON formatting later.
 object FingerprintSerializer : KSerializer<Fingerprint> {
     override val descriptor: SerialDescriptor = Fingerprint.serializer().descriptor
     override fun serialize(encoder: Encoder, value: Fingerprint) = Fingerprint.serializer().serialize(encoder, value)
@@ -69,48 +66,29 @@ object FingerprintSerializer : KSerializer<Fingerprint> {
 }
 
 data class OverlayLayer(
-    val id: String,
+    val id: String = UUID.randomUUID().toString(),
     val uri: Uri,
+    val name: String,
     val isVisible: Boolean = true,
-    val opacity: Float = 1.0f,
-    val brightness: Float = 0f,
-    val colorBalanceR: Float = 1.0f,
-    val colorBalanceG: Float = 1.0f,
-    val colorBalanceB: Float = 1.0f,
-    val blendMode: BlendMode = BlendMode.SrcOver,
+
+    // Transforms
     val scale: Float = 1.0f,
     val rotationX: Float = 0f,
     val rotationY: Float = 0f,
     val rotationZ: Float = 0f,
-    val offset: Offset = Offset.Zero
-)
+    val offset: Offset = Offset.Zero,
 
-// --- UI STATE ---
+    // Adjustments
+    val opacity: Float = 1.0f,
+    val brightness: Float = 0f,
+    val contrast: Float = 1.0f,
+    val saturation: Float = 1.0f,
 
-data class UiState(
-    // AR Status
-    val arState: ArState = ArState.SEARCHING,
-    val isPlaneDetected: Boolean = false,
-    val trackingWarning: String? = null,
-    val mappingQualityScore: Float = 0f,
-    val isTouchLocked: Boolean = false,
-    val showUnlockHint: Boolean = false,
+    // Color Balance
+    val colorBalanceR: Float = 1.0f,
+    val colorBalanceG: Float = 1.0f,
+    val colorBalanceB: Float = 1.0f,
 
-    // Capture & Processing
-    val isCapturingTarget: Boolean = false,
-    val isProcessingFingerprint: Boolean = false,
-    val scanProgress: Float = 0f,
-    val error: String? = null,
-    val fingerprintJson: String? = null,
-    val capturedTargetImages: Map<String, Bitmap> = emptyMap(), // ID -> Bitmap
-    val isImageLocked: Boolean = false,
-
-    // Layers & Transform
-    val layers: List<OverlayLayer> = emptyList(),
-    val activeLayerId: String? = null,
-    val arObjectScale: Float = 1.0f,
-    val rotationX: Float = 0f,
-    val rotationY: Float = 0f,
-    val rotationZ: Float = 0f,
-    val activeRotationAxis: RotationAxis = RotationAxis.Y
+    // Composition
+    val blendMode: BlendMode = BlendMode.SrcOver
 )

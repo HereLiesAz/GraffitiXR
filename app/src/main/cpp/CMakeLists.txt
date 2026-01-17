@@ -6,13 +6,10 @@ project("graffiti-lib")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++17 -ffast-math -fopenmp")
 
 # --- OPENCV CONFIGURATION ---
-# FIX: Pointing explicitly to the user's ABI-specific OpenCV config path.
-# Path logic: ${CMAKE_SOURCE_DIR} is 'app/src/main/cpp'
-# ../../../ takes us to 'app'
-# Then into 'libs/opencv/...'
-set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../../../libs/opencv/sdk/native/jni/abi-arm64-v8a")
+# FIX: Target the exact directory where OpenCVConfig.cmake lives
+set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../../../libs/opencv/sdk/native/jni/abi-${ANDROID_ABI}")
 
-message(STATUS "Forcing OpenCV_DIR to: ${OpenCV_DIR}")
+message(STATUS "OpenCV Config Dir: ${OpenCV_DIR}")
 
 find_package(OpenCV REQUIRED)
 

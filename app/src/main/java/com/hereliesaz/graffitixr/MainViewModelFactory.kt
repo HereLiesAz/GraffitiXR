@@ -3,18 +3,16 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.createSavedStateHandle
-import androidx.lifecycle.viewmodel.CreationExtras
+import com.hereliesaz.graffitixr.utils.ProjectManager
 
-class MainViewModelFactory : ViewModelProvider.Factory {
-
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
-        val application = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as Application
-        val savedStateHandle = extras.createSavedStateHandle()
-
+class MainViewModelFactory(
+    private val application: Application
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            return MainViewModel(application, savedStateHandle) as T
+            val projectManager = ProjectManager() // Initialize dependency
+            @Suppress("UNCHECKED_CAST")
+            return MainViewModel(projectManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
