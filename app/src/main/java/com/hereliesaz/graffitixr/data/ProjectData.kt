@@ -49,6 +49,9 @@ data class ProjectData(
     @Serializable(with = UriSerializer::class)
     val originalOverlayImageUri: Uri? = null,
 
+    @Serializable(with = UriSerializer::class)
+    val thumbnailUri: Uri? = null,
+
     val targetImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
 
     @Serializable(with = RefinementPathSerializer::class)

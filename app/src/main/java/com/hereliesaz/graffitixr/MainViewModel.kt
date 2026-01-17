@@ -1,7 +1,9 @@
 package com.hereliesaz.graffitixr
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Path
+import android.location.Location
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
@@ -212,12 +214,108 @@ class MainViewModel(
     }
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
 
-    // Stubs
-    fun getProjectList() = emptyList<String>()
-    fun loadProject(n: String) {}
-    fun deleteProject(n: String) {}
-    fun onNewProject() = _uiState.update { UiState() }
-    fun onSaveClicked() {}
+    // Project Management
+    fun loadAvailableProjects(context: Context) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val projectIds = projectManager.getProjectList(context)
+            val projects = projectIds.mapNotNull { id ->
+                projectManager.loadProjectMetadata(context, id)
+            }
+            // Initial sort: Newest first
+            val sorted = projects.sortedByDescending { it.lastModified }
+            _uiState.update { it.copy(availableProjects = sorted, isLoading = false) }
+        }
+    }
+
+    fun updateCurrentLocation(location: Location) {
+        val gpsData = GpsData(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            altitude = location.altitude,
+            accuracy = location.accuracy,
+            time = location.time
+        )
+        _uiState.update { it.copy(gpsData = gpsData) }
+        sortProjects(location)
+    }
+
+    fun sortProjects(userLocation: Location?) {
+        val projects = _uiState.value.availableProjects
+        if (projects.isEmpty()) return
+
+        val sorted = if (userLocation != null) {
+            // Threshold for "same location" (e.g. 200 meters)
+            val threshold = 200f
+
+            // Partition projects into "nearby" and "others"
+            val (nearby, others) = projects.partition { project ->
+                val dist = getDistance(project.gpsData, userLocation)
+                dist != null && dist < threshold
+            }
+
+            // Sort both lists by date (newest first)
+            val sortedNearby = nearby.sortedByDescending { it.lastModified }
+            val sortedOthers = others.sortedByDescending { it.lastModified }
+
+            // Combine: Nearby first, then others
+            sortedNearby + sortedOthers
+        } else {
+            projects.sortedByDescending { it.lastModified }
+        }
+        _uiState.update { it.copy(availableProjects = sorted) }
+    }
+
+    private fun getDistance(gps: GpsData?, location: Location): Float? {
+        if (gps == null) return null
+        val results = FloatArray(1)
+        Location.distanceBetween(gps.latitude, gps.longitude, location.latitude, location.longitude, results)
+        return results[0]
+    }
+
+    fun openProject(project: ProjectData, context: Context) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val loadedState = projectManager.loadProject(context, project.id)
+            if (loadedState != null) {
+                _uiState.update {
+                    loadedState.copy(
+                        showProjectList = false,
+                        currentProjectId = project.id,
+                        availableProjects = it.availableProjects // Preserve list
+                    )
+                }
+            } else {
+                // Handle error
+            }
+            _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    fun autoSaveProject(context: Context, thumbnail: Bitmap? = null) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            if (currentState.showProjectList) return@launch // Don't save if in menu
+
+            val projectId = currentState.currentProjectId ?: UUID.randomUUID().toString()
+            if (currentState.currentProjectId == null) {
+                _uiState.update { it.copy(currentProjectId = projectId) }
+            }
+            projectManager.saveProject(context, currentState, projectId, thumbnail)
+        }
+    }
+
+    fun deleteProject(context: Context, projectId: String) {
+        projectManager.deleteProject(context, projectId)
+        loadAvailableProjects(context)
+    }
+
+    fun onNewProject() {
+        val newId = UUID.randomUUID().toString()
+        _uiState.update { UiState(showProjectList = false, currentProjectId = newId) }
+    }
+
+    fun onSaveClicked() {} // Triggered manually if needed
     fun exportProjectToUri(u: Uri) {}
     fun onOnboardingComplete(m: EditorMode) = _uiState.update { it.copy(showOnboardingDialogForMode = null) }
     fun onFeedbackShown() = _uiState.update { it.copy(showRotationAxisFeedback = false) }

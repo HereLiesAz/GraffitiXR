@@ -254,15 +254,15 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             ) {
                 val screenHeight = maxHeight
 
-                if (showProjectLibrary) {
+                if (showProjectLibrary || uiState.showProjectList) {
                     ProjectLibraryScreen(
-                        projects = viewModel.getProjectList(),
-                        onLoadProject = { projectName ->
-                            viewModel.loadProject(projectName)
+                        projects = uiState.availableProjects,
+                        onLoadProject = { project ->
+                            viewModel.openProject(project, context)
                             showProjectLibrary = false
                         },
-                        onDeleteProject = { projectName ->
-                            viewModel.deleteProject(projectName)
+                        onDeleteProject = { projectId ->
+                            viewModel.deleteProject(context, projectId)
                         },
                         onNewProject = {
                             viewModel.onNewProject()
@@ -542,6 +542,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 resetDialogs()
                             }
                             azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
+                                viewModel.loadAvailableProjects(context)
                                 showProjectLibrary = true
                                 resetDialogs()
                             }

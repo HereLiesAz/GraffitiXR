@@ -7,6 +7,8 @@ import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.UiState
 import com.hereliesaz.graffitixr.data.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -46,11 +48,25 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
         }
     }
 
-    suspend fun saveProject(context: Context, state: UiState, projectId: String) {
+    suspend fun saveProject(context: Context, state: UiState, projectId: String, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()
 
-        // 1. Save Target Images (Bitmaps) -> URIs
+        // 1. Save Thumbnail (if provided)
+        val thumbnailUri = if (thumbnail != null) {
+            val file = File(root, "thumbnail.png")
+            FileOutputStream(file).use { out ->
+                // Resize for efficiency? Usually caller provides what they want
+                thumbnail.compress(Bitmap.CompressFormat.PNG, 80, out)
+            }
+            uriProvider.getUriForFile(file)
+        } else {
+            // Check if existing thumbnail exists to preserve it
+            val file = File(root, "thumbnail.png")
+            if (file.exists()) uriProvider.getUriForFile(file) else null
+        }
+
+        // 2. Save Target Images (Bitmaps) -> URIs
         val savedTargetUris = state.capturedTargetImages.mapIndexed { index, bitmap ->
             val file = File(root, "target_$index.png")
             FileOutputStream(file).use { out ->
@@ -59,7 +75,7 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
             uriProvider.getUriForFile(file)
         }
 
-        // 2. Deserialize Fingerprint JSON string to Object (if exists)
+        // 3. Deserialize Fingerprint JSON string to Object (if exists)
         val fingerprintObj: Fingerprint? = state.fingerprintJson?.let {
             try {
                 json.decodeFromString(FingerprintSerializer, it)
@@ -83,8 +99,10 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
             lastModified = System.currentTimeMillis(),
             backgroundImageUri = state.backgroundImageUri,
             overlayImageUri = state.overlayImageUri,
+            thumbnailUri = thumbnailUri,
             targetImageUris = savedTargetUris,
             refinementPaths = state.refinementPaths,
+            gpsData = state.gpsData,
             opacity = activeLayer?.opacity ?: 1f,
             brightness = activeLayer?.brightness ?: 0f,
             contrast = activeLayer?.contrast ?: 1f,
@@ -109,12 +127,12 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
         File(root, "project.json").writeText(jsonString)
     }
 
-    suspend fun loadProject(context: Context, projectId: String): UiState? {
+    suspend fun loadProject(context: Context, projectId: String): UiState? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         val projectFile = File(root, "project.json")
-        if (!projectFile.exists()) return null
+        if (!projectFile.exists()) return@withContext null
 
-        return try {
+        return@withContext try {
             val jsonString = projectFile.readText()
             val projectData = json.decodeFromString<ProjectData>(jsonString)
 
@@ -174,6 +192,20 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
             }
         } catch (e: Exception) {
             Log.e("ProjectManager", "Failed to load project", e)
+            null
+        }
+    }
+
+    suspend fun loadProjectMetadata(context: Context, projectId: String): ProjectData? = withContext(Dispatchers.IO) {
+        val root = File(context.filesDir, "projects/$projectId")
+        val projectFile = File(root, "project.json")
+        if (!projectFile.exists()) return@withContext null
+
+        return@withContext try {
+            val jsonString = projectFile.readText()
+            json.decodeFromString<ProjectData>(jsonString)
+        } catch (e: Exception) {
+            Log.e("ProjectManager", "Failed to load project metadata", e)
             null
         }
     }
