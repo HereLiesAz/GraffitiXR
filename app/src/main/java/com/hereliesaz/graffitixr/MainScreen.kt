@@ -466,16 +466,25 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
                                 azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
                                     viewModel.onRemoveBackgroundClicked()
+                                    showSliderDialog = null; showColorBalanceDialog = false
+
                                     resetDialogs()
                                 })
                                 azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
                                     viewModel.onLineDrawingClicked()
+                                    showSliderDialog = null; showColorBalanceDialog = false
                                     resetDialogs()
                                 })
                                 azDivider()
 
+                                if (uiState.editorMode == EditorMode.STATIC) {
+                                    azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
+                                        showSliderDialog = null; showColorBalanceDialog = false
+                                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    }
+                                }
                                 azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                                    showSliderDialog = "Adjust"
+                                    showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
                                     showColorBalanceDialog = false
                                 }
                                 azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
@@ -484,6 +493,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 }
                                 azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.blending, info = navStrings.blendingInfo, onClick = {
                                     viewModel.onCycleBlendMode()
+                                    showSliderDialog = null; showColorBalanceDialog = false
                                     resetDialogs()
                                 })
 
