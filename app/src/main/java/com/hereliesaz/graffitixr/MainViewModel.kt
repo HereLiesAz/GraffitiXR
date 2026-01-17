@@ -86,17 +86,24 @@ class MainViewModel(
         val context = arRenderer?.context ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            _uiState.value.layers.find { it.id == activeId }?.let { layer ->
-                ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
-                    snapshotState()
-                    val processed = BackgroundRemover.removeBackground(original)
-                    if (processed != null) {
-                        val newUri = ImageUtils.saveBitmapToCache(context, processed)
-                        updateActiveLayer { it.copy(uri = newUri) }
-                    } else {
-                        _feedbackEvent.send(FeedbackEvent.Toast("Background removal failed."))
+            try {
+                val activeLayer = _uiState.value.layers.find { it.id == activeId }
+                if (activeLayer != null) {
+                    val original = ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    if (original != null) {
+                        snapshotState()
+                        val processed = BackgroundRemover.removeBackground(original)
+                        if (processed != null) {
+                            val newUri = ImageUtils.saveBitmapToCache(context, processed)
+                            updateActiveLayer { it.copy(uri = newUri) }
+                        } else {
+                            _feedbackEvent.send(FeedbackEvent.Toast("Failed to remove background"))
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackEvent.send(FeedbackEvent.Toast("Error removing background"))
             }
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -108,12 +115,16 @@ class MainViewModel(
         viewModelScope.launch {
             if (!ensureOpenCVLoaded()) return@launch
             _uiState.update { it.copy(isLoading = true) }
-            _uiState.value.layers.find { it.id == activeId }?.let { layer ->
-                ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
-                    snapshotState()
-                    val processed = ImageProcessingUtils.createOutline(original)
-                    val newUri = ImageUtils.saveBitmapToCache(context, processed)
-                    updateActiveLayer { it.copy(uri = newUri) }
+            try {
+                val activeLayer = _uiState.value.layers.find { it.id == activeId }
+                if (activeLayer != null) {
+                    val original = ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    if (original != null) {
+                        snapshotState()
+                        val processed = ImageUtils.generateOutline(original)
+                        val newUri = ImageUtils.saveBitmapToCache(context, processed)
+                        updateActiveLayer { it.copy(uri = newUri) }
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -329,7 +340,7 @@ class MainViewModel(
     fun onFeedbackShown() = _uiState.update { it.copy(showRotationAxisFeedback = false) }
     fun onMarkProgressToggled() = _uiState.update { it.copy(isMarkingProgress = !it.isMarkingProgress) }
     fun onDrawingPathFinished(p: List<Offset>) = _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(p)) }
-    fun updateArtworkBounds(b: android.graphics.RectF) = _uiState.update { it.copy() }
+    fun updateArtworkBounds(b: android.graphics.RectF) = _artworkBounds.update { b }
     fun setArPlanesDetected(d: Boolean) = _uiState.update { it.copy(isArPlanesDetected = d) }
     fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
     fun onFrameCaptured(b: Bitmap) {}

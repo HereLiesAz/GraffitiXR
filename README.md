@@ -26,6 +26,7 @@ Everything stays on the device. A project file is a zipped container holding:
 ### 🚅 AzNavRail UI
 -   **Thumb-Driven:** The entire UI is built on **AzNavRail**, placing all critical controls within thumb reach on a vertical rail.
 -   **Lazy Grid:** A dynamic grid overlay that snaps to the estimated dominant plane of your confidence map, stabilizing the projection even if tracking jitters.
+-   **Build Mode:** An AR blending tool allowing you to layer multiple images with various blend modes (Screen, Multiply, Overlay) and independent transforms to composite your mural plan directly on the wall.
 
 ## 🛠️ Tech Stack
 

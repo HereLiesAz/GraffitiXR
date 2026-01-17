@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.RectF
+import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
@@ -29,13 +30,17 @@ import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.locks.ReentrantLock
@@ -75,26 +80,47 @@ class ArRenderer(
     // Layers and Anchors
     private var layers: List<OverlayLayer> = emptyList()
     private val layerBitmaps = ConcurrentHashMap<String, Bitmap>()
+    private val layerUris = ConcurrentHashMap<String, Uri>()
     private var anchor: Anchor? = null
     private val queuedSingleTaps = ConcurrentLinkedQueue<FloatArray>()
+    private val rendererScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // Pre-allocated matrices to avoid GC churn
+    private val anchorMatrix = FloatArray(16)
+    private val modelMatrix = FloatArray(16)
+    private val layerMatrix = FloatArray(16)
+    private val mvpMatrix = FloatArray(16)
+    private val modelViewMatrix = FloatArray(16)
+    private val displayTransform = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f) // Identity
 
     fun updateLayers(newLayers: List<OverlayLayer>) {
         this.layers = newLayers
+        val newLayerIds = newLayers.map { it.id }.toSet()
+
         // Trigger bitmap loading for new layers if needed
         newLayers.forEach { layer ->
-            if (!layerBitmaps.containsKey(layer.id)) {
-                 // Bitmap loading should ideally happen in MainViewModel or via updateLayerBitmap
-                 // But for now, we assume MainViewModel will push bitmaps via updateLayerBitmap
-                 // or we try to load it here in background?
-                 // Since we are not in a suspend function, we can't easily switch context.
-                 // We will rely on updateLayerBitmap being called.
-                 // Fallback: Try to load on a background thread
-                 Thread {
+            val cachedUri = layerUris[layer.id]
+            // Reload if ID is new OR Uri has changed
+            if (cachedUri == null || cachedUri != layer.uri) {
+                 rendererScope.launch {
                      val bmp = ImageUtils.loadBitmapFromUri(context, layer.uri)
                      if (bmp != null) {
                          updateLayerBitmap(layer.id, bmp)
+                         layerUris[layer.id] = layer.uri
                      }
-                 }.start()
+                 }
+            }
+        }
+
+        // Cleanup unused bitmaps
+        val currentIds = layerBitmaps.keys.toList()
+        currentIds.forEach { id ->
+            if (id !in newLayerIds) {
+                val bitmap = layerBitmaps.remove(id)
+                if (bitmap != null && !bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+                layerUris.remove(id)
             }
         }
     }
@@ -244,7 +270,6 @@ class ArRenderer(
             // Draw Layers
             anchor?.let {
                 if (it.trackingState == TrackingState.TRACKING) {
-                    val anchorMatrix = FloatArray(16)
                     it.pose.toMatrix(anchorMatrix, 0)
 
                     layers.forEach { layer ->
@@ -252,13 +277,10 @@ class ArRenderer(
                             val bitmap = layerBitmaps[layer.id]
                             if (bitmap != null) {
                                 // Calculate Model Matrix (Anchor * Layer Transform)
-                                val modelMatrix = FloatArray(16)
-                                val layerMatrix = FloatArray(16)
                                 Matrix.setIdentityM(layerMatrix, 0)
 
                                 // Apply Layer Transforms (T * R * S)
-                                Matrix.translateM(layerMatrix, 0, layer.offset.x, layer.offset.y, 0f) // Using Z=0 for simplicity, or layer.offset is 2D? UiState says Offset.
-                                // Rotate?
+                                Matrix.translateM(layerMatrix, 0, layer.offset.x, layer.offset.y, 0f)
                                 Matrix.rotateM(layerMatrix, 0, layer.rotationX, 1f, 0f, 0f)
                                 Matrix.rotateM(layerMatrix, 0, layer.rotationY, 0f, 1f, 0f)
                                 Matrix.rotateM(layerMatrix, 0, layer.rotationZ, 0f, 0f, 1f)
@@ -267,13 +289,8 @@ class ArRenderer(
                                 Matrix.multiplyMM(modelMatrix, 0, anchorMatrix, 0, layerMatrix, 0)
 
                                 // MVP Matrix
-                                val mvpMatrix = FloatArray(16)
-                                val modelViewMatrix = FloatArray(16)
                                 Matrix.multiplyMM(modelViewMatrix, 0, viewmtx, 0, modelMatrix, 0)
                                 Matrix.multiplyMM(mvpMatrix, 0, projmtx, 0, modelViewMatrix, 0)
-
-                                // Display Transform for shader
-                                val displayTransform = floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f) // Identity
 
                                 simpleQuadRenderer.draw(
                                     mvpMatrix,
@@ -288,7 +305,7 @@ class ArRenderer(
                                     backgroundTextureId,
                                     viewportWidth.toFloat(),
                                     viewportHeight.toFloat(),
-                                    floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f), // Identity
+                                    displayTransform,
                                     layer.blendMode
                                 )
                             }
@@ -380,5 +397,10 @@ class ArRenderer(
     fun cleanup() {
         session?.close()
         session = null
+        rendererScope.cancel()
+
+        layerBitmaps.values.forEach { if (!it.isRecycled) it.recycle() }
+        layerBitmaps.clear()
+        layerUris.clear()
     }
 }

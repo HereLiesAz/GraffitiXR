@@ -8,6 +8,10 @@ import kotlinx.coroutines.tasks.await
 
 object BackgroundRemover {
 
+    /**
+     * Removes the background from the provided bitmap using MLKit Subject Segmentation.
+     * Returns the foreground bitmap on success, or null on failure.
+     */
     suspend fun removeBackground(bitmap: Bitmap): Bitmap? {
         val options = SubjectSegmenterOptions.Builder()
             .enableForegroundBitmap()
