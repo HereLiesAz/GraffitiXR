@@ -84,17 +84,24 @@ class MainViewModel(
         val context = arRenderer?.context ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            _uiState.value.layers.find { it.id == activeId }?.let { layer ->
-                ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
-                    snapshotState()
-                    val processed = BackgroundRemover.removeBackground(original)
-                    if (processed != null) {
-                        val newUri = ImageUtils.saveBitmapToCache(context, processed)
-                        updateActiveLayer { it.copy(uri = newUri) }
-                    } else {
-                        _feedbackEvent.send(FeedbackEvent.Toast("Failed to remove background"))
+            try {
+                val activeLayer = _uiState.value.layers.find { it.id == activeId }
+                if (activeLayer != null) {
+                    val original = ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    if (original != null) {
+                        snapshotState()
+                        val processed = BackgroundRemover.removeBackground(original)
+                        if (processed != null) {
+                            val newUri = ImageUtils.saveBitmapToCache(context, processed)
+                            updateActiveLayer { it.copy(uri = newUri) }
+                        } else {
+                            _feedbackEvent.send(FeedbackEvent.Toast("Failed to remove background"))
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackEvent.send(FeedbackEvent.Toast("Error removing background"))
             }
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -106,8 +113,10 @@ class MainViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                _uiState.value.layers.find { it.id == activeId }?.let { layer ->
-                    ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
+                val activeLayer = _uiState.value.layers.find { it.id == activeId }
+                if (activeLayer != null) {
+                    val original = ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    if (original != null) {
                         snapshotState()
                         val processed = ImageUtils.generateOutline(original)
                         val newUri = ImageUtils.saveBitmapToCache(context, processed)
