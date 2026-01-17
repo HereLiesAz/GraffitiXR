@@ -1,11 +1,14 @@
 package com.hereliesaz.graffitixr
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
@@ -218,6 +221,13 @@ class ArRenderer(
 
     fun onResume(activity: android.app.Activity) {
         displayRotationHelper.onResume()
+
+        // Check for camera permission before creating session
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            Log.w("ArRenderer", "Camera permission not granted. Deferring AR Session creation.")
+            return
+        }
+
         try {
             if (session == null) {
                 // Check if ARCore is installed/updated

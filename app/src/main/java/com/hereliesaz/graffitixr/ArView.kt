@@ -5,6 +5,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun ArView(
@@ -12,6 +15,7 @@ fun ArView(
     uiState: UiState
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Instantiate Renderer with callbacks to VM
     val arRenderer = remember {
@@ -28,10 +32,27 @@ fun ArView(
         }
     }
 
-    DisposableEffect(Unit) {
-        val activity = context as? android.app.Activity
-        activity?.let { arRenderer.onResume(it) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            val activity = context as? android.app.Activity ?: return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    arRenderer.onResume(activity)
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    arRenderer.onPause()
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    arRenderer.cleanup()
+                }
+                else -> {}
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             arRenderer.onPause()
             arRenderer.cleanup()
         }
