@@ -115,6 +115,9 @@ class MainViewModel(
                     val newUri = ImageUtils.saveBitmapToCache(context, processed)
                     updateActiveLayer { it.copy(uri = newUri) }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackEvent.send(FeedbackEvent.Toast("Failed to generate outline"))
             }
             _uiState.update { it.copy(isLoading = false) }
         }
