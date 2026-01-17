@@ -58,9 +58,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.graffitixr.ui.AzNavRail
+import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
+import com.hereliesaz.graffitixr.EditorMode.ADJUST
+import com.hereliesaz.graffitixr.EditorMode.AR
+import com.hereliesaz.graffitixr.EditorMode.BALANCE
+import com.hereliesaz.graffitixr.EditorMode.CROP
+import com.hereliesaz.graffitixr.EditorMode.DRAW
+import com.hereliesaz.graffitixr.EditorMode.ISOLATE
+import com.hereliesaz.graffitixr.EditorMode.OUTLINE
+import com.hereliesaz.graffitixr.EditorMode.OVERLAY
+import com.hereliesaz.graffitixr.EditorMode.PROJECT
+import com.hereliesaz.graffitixr.EditorMode.STATIC
+import com.hereliesaz.graffitixr.EditorMode.TRACE
 import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
 import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
@@ -118,7 +129,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
-    // Pre-load strings to avoid Composable calls in lambdas
+    // Preload strings to avoid Composable calls in lambdas
     val navStrings = rememberNavStrings()
 
     // Haptic Feedback Handler
@@ -679,7 +690,7 @@ private fun MainContentLayer(
         }
 
         when (uiState.editorMode) {
-            EditorMode.STATIC -> MockupScreen(
+            STATIC -> MockupScreen(
                 uiState = uiState,
                 onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
                 onOverlayImageSelected = viewModel::onOverlayImageSelected,
@@ -696,7 +707,7 @@ private fun MainContentLayer(
                 onGestureStart = onGestureStart,
                 onGestureEnd = onGestureEnd
             )
-            EditorMode.TRACE -> TraceScreen(
+            TRACE -> TraceScreen(
                 uiState = uiState,
                 onOverlayImageSelected = viewModel::onOverlayImageSelected,
                 onScaleChanged = onScaleChanged,
@@ -708,7 +719,7 @@ private fun MainContentLayer(
                 onGestureStart = onGestureStart,
                 onGestureEnd = onGestureEnd
             )
-            EditorMode.OVERLAY -> OverlayScreen(
+            OVERLAY -> OverlayScreen(
                 uiState = uiState,
                 onScaleChanged = onScaleChanged,
                 onOffsetChanged = onOffsetChanged,
@@ -719,12 +730,20 @@ private fun MainContentLayer(
                 onGestureStart = onGestureStart,
                 onGestureEnd = onGestureEnd
             )
-            EditorMode.AR -> {
+            AR -> {
                 ArView(
                     viewModel = viewModel,
                     uiState = uiState
                 )
             }
+
+            CROP -> TODO()
+            ADJUST -> TODO()
+            DRAW -> TODO()
+            PROJECT -> TODO()
+            ISOLATE -> TODO()
+            BALANCE -> TODO()
+            OUTLINE -> TODO()
         }
     }
 }
