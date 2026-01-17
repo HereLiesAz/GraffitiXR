@@ -96,6 +96,9 @@ fun AzNavRail(
                 EditorMode.ADJUST -> Icons.Default.Tune
                 EditorMode.DRAW -> Icons.Default.Brush
                 EditorMode.PROJECT -> Icons.Default.PermMedia
+                EditorMode.ISOLATE -> Icons.Default.ContentCut
+                EditorMode.BALANCE -> Icons.Default.Palette
+                EditorMode.OUTLINE -> Icons.Default.Edit
                 // Ensure exhaustive when is handled
                 else -> Icons.Default.Circle
             }
