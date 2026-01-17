@@ -1,227 +1,142 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
-import android.content.Context
-import android.os.Build
+import android.content.pm.PackageManager
+import android.opengl.GLSurfaceView
 import android.os.Bundle
-import android.view.KeyEvent
+import android.util.Log
+import android.view.View
+import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import com.hereliesaz.graffitixr.composables.OnboardingScreen
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 
-/**
- * The single Activity for the GraffitiXR application.
- */
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels { MainViewModelFactory() }
+    private val viewModel: MainViewModel by viewModels()
+    private lateinit var surfaceView: GLSurfaceView
+    private var arRenderer: ArRenderer? = null
 
-    // Hidden "Cheat Code" state for unlocking touch
-    private var volUpPressed = false
-    private var volDownPressed = false
+    // We need to verify these before booting the AR engine
+    private val REQUIRED_PERMISSIONS = arrayOf(
+        Manifest.permission.CAMERA,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    )
+    private val PERMISSION_CODE = 1001
 
-    override fun onResume() {
-        super.onResume()
-        if (viewModel.uiState.value.isTouchLocked) {
-            viewModel.showUnlockInstructions()
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-            volUpPressed = true
-            if (checkUnlock()) return true
-
-            if (viewModel.uiState.value.isTouchLocked) {
-                viewModel.showUnlockInstructions()
-                return true
-            }
-        } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-            volDownPressed = true
-            if (checkUnlock()) return true
-
-            if (viewModel.uiState.value.isTouchLocked) {
-                viewModel.showUnlockInstructions()
-                return true
-            }
-        }
-        return super.onKeyDown(keyCode, event)
-    }
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-            volUpPressed = false
-            if (viewModel.uiState.value.isTouchLocked) return true
-        } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-            volDownPressed = false
-            if (viewModel.uiState.value.isTouchLocked) return true
-        }
-        return super.onKeyUp(keyCode, event)
-    }
-
-    private fun checkUnlock(): Boolean {
-        if (volUpPressed && volDownPressed && viewModel.uiState.value.isTouchLocked) {
-            viewModel.setTouchLocked(false)
-            return true
-        }
-        return false
-    }
-
-    @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Note: OpenCV initialization is handled in GraffitiApplication.kt to ensure 
-        // availability across all threads including finalizers.
+        // 1. Fullscreen / Immersive Mode
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        hideSystemUI()
 
-        val prefs = getSharedPreferences("GraffitiXR", Context.MODE_PRIVATE)
-        val onboardingShown = prefs.getBoolean("onboarding_shown", false)
+        if (!hasPermissions()) {
+            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, PERMISSION_CODE)
+        } else {
+            setupAr()
+        }
+    }
+
+    private fun setupAr() {
+        // Create the SurfaceView programmatically or inflate it.
+        // For a pure mix of Compose + GL, we can use AndroidView, but
+        // managing the GLSurfaceView lifecycle is easier if we own the instance here
+        // and pass it to Compose or overlay Compose on top.
+
+        // Strategy: Use SetContent for the UI overlay, but the GLSurfaceView
+        // needs to be part of the layout.
+        // To keep it clean, I will assume MainScreen handles the AndroidView wrapping
+        // or we set it as the content view and add Compose as an overlay.
+
+        // HOWEVER, to ensure the Renderer gets the lifecycle callbacks,
+        // we will instantiate the Renderer here and pass it to the ViewModel/UI.
+
+        arRenderer = ArRenderer(
+            context = this,
+            onPlanesDetected = { detected -> viewModel.setArPlanesDetected(detected) },
+            onFrameCaptured = { bitmap -> viewModel.onFrameCaptured(bitmap) },
+            onAnchorCreated = { viewModel.onArImagePlaced() },
+            onProgressUpdated = { progress, bmp -> viewModel.onProgressUpdate(progress, bmp) },
+            onTrackingFailure = { msg -> viewModel.onTrackingFailure(msg) },
+            onBoundsUpdated = { rect -> viewModel.updateArtworkBounds(rect) }
+        )
+
+        // Bind Renderer to ViewModel so logic can flow back (e.g. capture trigger)
+        viewModel.arRenderer = arRenderer
 
         setContent {
             GraffitiXRTheme {
-                AppContent(
+                // MainScreen now takes the renderer to embed in the AndroidView
+                MainScreen(
                     viewModel = viewModel,
-                    onboardingShown = onboardingShown,
-                    onOnboardingDismiss = {
-                        prefs.edit { putBoolean("onboarding_shown", true) }
-                    }
+                    arRenderer = arRenderer!!,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
     }
-}
 
-@OptIn(ExperimentalPermissionsApi::class)
-@Composable
-fun AppContent(
-    viewModel: MainViewModel,
-    onboardingShown: Boolean,
-    onOnboardingDismiss: () -> Unit
-) {
-    var showOnboarding by remember { mutableStateOf(!onboardingShown) }
-    val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsState()
-    val navController = rememberNavController()
+    override fun onResume() {
+        super.onResume()
+        hideSystemUI()
+        if (hasPermissions()) {
+            try {
+                arRenderer?.onResume(this)
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error resuming AR session", e)
+                Toast.makeText(this, "Failed to resume AR: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
-    // Keep screen on if in Trace mode and locked
-    LaunchedEffect(uiState.editorMode, uiState.isTouchLocked) {
-        val activity = context as? android.app.Activity
-        activity?.let {
-            val window = it.window
-            if (uiState.editorMode == EditorMode.TRACE && uiState.isTouchLocked) {
-                window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                val params = window.attributes
-                params.screenBrightness = 1.0f
-                window.attributes = params
+    override fun onPause() {
+        super.onPause()
+        arRenderer?.onPause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        arRenderer?.cleanup()
+    }
+
+    private fun hasPermissions(): Boolean {
+        return REQUIRED_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_CODE) {
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                setupAr()
             } else {
-                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                val params = window.attributes
-                params.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                window.attributes = params
+                Toast.makeText(this, "Camera and Location permissions are required for AR.", Toast.LENGTH_LONG).show()
+                finish()
             }
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        NavHost(navController = navController, startDestination = "main") {
-            composable("main") {
-                if (showOnboarding) {
-                    OnboardingScreen(onDismiss = {
-                        showOnboarding = false
-                        onOnboardingDismiss()
-                    })
-                } else {
-                    val permissions = remember {
-                        mutableListOf(
-                            Manifest.permission.CAMERA,
-                            Manifest.permission.ACCESS_FINE_LOCATION
-                        ).apply {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                add(Manifest.permission.READ_MEDIA_IMAGES)
-                                add(Manifest.permission.POST_NOTIFICATIONS)
-                            } else {
-                                add(Manifest.permission.READ_EXTERNAL_STORAGE)
-                            }
-                        }
-                    }
-                    val permissionState = rememberMultiplePermissionsState(permissions = permissions)
-
-                    val cameraGranted =
-                        permissionState.permissions.find { it.permission == Manifest.permission.CAMERA }?.status?.isGranted == true
-
-                    if (cameraGranted) {
-                        MainScreen(viewModel = viewModel, navController = navController)
-                    } else {
-                        PermissionScreen(
-                            onRequestPermission = {
-                                permissionState.launchMultiplePermissionRequest()
-                            }
-                        )
-                    }
-                }
-            }
-
-        }
+    private fun hideSystemUI() {
+        window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                )
     }
-}
 
-@Composable
-fun PermissionScreen(onRequestPermission: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "GraffitiXR needs access to your Camera and Location to function.\n\nWe also request Photo Library access to load your designs and Notification access for updates.",
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        Button(onClick = onRequestPermission) {
-            Text(text = "Grant Permissions")
-        }
-    }
-}
-
-@Preview
-@Composable
-fun PermissionScreenPreview() {
-    GraffitiXRTheme {
-        PermissionScreen { }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemUI()
     }
 }

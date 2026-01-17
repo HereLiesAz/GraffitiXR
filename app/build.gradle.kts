@@ -127,10 +127,13 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17")
-                // Removed manual OpenCV_DIR argument to allow CMake auto-detection
+                        // Re-enable this line and point it to the correct absolute path
+                        arguments += "-DOpenCV_DIR=${project.rootDir}/libs/opencv/sdk/native/jni"
+                    }
+                }
             }
-        }
-    }
+
+
 
     externalNativeBuild {
         cmake {
@@ -170,13 +173,13 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     kotlin {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
 

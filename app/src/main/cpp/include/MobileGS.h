@@ -7,6 +7,8 @@
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
 #include <opencv2/core/mat.hpp>
+#include <chrono>
+#include <unordered_map> // Changed from set to map
 
 struct SplatGaussian {
     glm::vec3 position;
@@ -20,6 +22,22 @@ struct Sortable {
     float depth;
 };
 
+// Voxel Key for Spatial Hashing
+struct VoxelKey {
+    int x, y, z;
+
+    bool operator==(const VoxelKey& other) const {
+        return x == other.x && y == other.y && z == other.z;
+    }
+};
+
+// Custom Hash for VoxelKey
+struct VoxelHash {
+    size_t operator()(const VoxelKey& k) const {
+        return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1) ^ (std::hash<int>()(k.z) << 2);
+    }
+};
+
 class MobileGS {
 public:
     MobileGS();
@@ -27,9 +45,8 @@ public:
 
     void initialize();
     void updateCamera(const float* viewMtx, const float* projMtx);
-    void addGaussians(const std::vector<SplatGaussian>& gaussians);
 
-    // New: Handle dense depth map
+    // We process directly now, no separate addGaussians needed for external calls
     void processDepthFrame(const cv::Mat& depthMap, int width, int height);
     void setBackgroundFrame(const cv::Mat& frame);
 
@@ -49,6 +66,8 @@ private:
 
     GLuint mProgram;
     GLuint mVAO, mVBO;
+    // Add this under mVAO, mVBO
+    GLuint mQuadVBO;
     GLuint mBgProgram;
     GLuint mBgVAO, mBgVBO;
     GLuint mBgTexture;
@@ -58,9 +77,11 @@ private:
     glm::mat4 mSortViewMatrix;
 
     std::vector<SplatGaussian> mRenderGaussians;
-    std::vector<SplatGaussian> mIncomingGaussians;
+    // Removed mIncomingGaussians; we modify RenderGaussians in place (thread-safe) to enable updates.
+
     cv::Mat mPendingBgFrame;
 
+    // Sorting & Threading
     std::vector<Sortable> mSortListFront;
     std::vector<Sortable> mSortListBack;
     std::thread mSortThread;
@@ -70,12 +91,18 @@ private:
     bool mStopThread;
     bool mSortResultReady;
 
+    // Data Management
     std::mutex mDataMutex;
-    bool mNewDataAvailable;
     std::mutex mBgMutex;
     bool mNewBgAvailable;
     bool mIsInitialized;
 
-    // Throttling for density generation
-    int mFrameCounter;
+    // Logic Control
+    std::chrono::steady_clock::time_point mLastUpdateTime;
+
+    // Map Voxel -> Index in mRenderGaussians
+    std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;
+
+    const size_t MAX_POINTS = 65536;
+    const float VOXEL_SIZE = 0.02f;  // 2cm resolution
 };

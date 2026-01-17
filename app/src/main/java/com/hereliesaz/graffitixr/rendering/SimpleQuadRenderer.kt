@@ -3,269 +3,142 @@ package com.hereliesaz.graffitixr.rendering
 import android.graphics.Bitmap
 import android.opengl.GLES20
 import android.opengl.GLUtils
+import androidx.compose.ui.graphics.BlendMode
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
-/**
- * Renders a simple textured quad in 3D space with Depth Occlusion support.
- *
- * Capabilities:
- * - Transparency/Opacity/Brightness/Color Balance.
- * - Depth Occlusion: Hides virtual content behind real objects using the ARCore Depth Map.
- */
 class SimpleQuadRenderer {
-    private var program = 0
-    private var positionAttrib = 0
-    private var texCoordAttrib = 0
-    private var modelViewProjectionUniform = 0
-    private var modelViewUniform = 0
-    private var textureUniform = 0
-    private var alphaUniform = 0
-    private var brightnessUniform = 0
-    private var colorBalanceUniform = 0
-    private var screenSizeUniform = 0
+    private var quadProgram = 0
+    private var quadPositionParam = 0
+    private var quadTexCoordParam = 0
+    private var mvpMatrixParam = 0
+    private var modelViewMatrixParam = 0
+    private var textureParam = 0
 
-    // Depth uniforms
-    private var depthTextureUniform = 0
-    private var useDepthUniform = 0
+    // New Uniforms for "Glitch-Noir" aesthetics
+    private var opacityParam = 0
+    private var brightnessParam = 0
+    private var colorBalanceParam = 0
+    private var depthTextureParam = 0
+    private var cameraTextureParam = 0 // For depth occlusion comparisons
+    private var resolutionParam = 0 // Screen resolution for depth lookups
+    private var displayTransformParam = 0
 
-    // Blending Uniforms
-    private var backgroundTextureUniform = 0
-    private var displayToCameraTransformUniform = 0
-    private var blendModeUniform = 0
-
-    private var vertexBuffer: FloatBuffer? = null
-    private var texCoordBuffer: FloatBuffer? = null
-    private var textureId = -1
-    private var lastBitmap: Bitmap? = null
+    private var quadVertices: FloatBuffer? = null
+    private var quadTexCoord: FloatBuffer? = null
+    private val textures = IntArray(1)
 
     fun createOnGlThread() {
-        // Shaders with Depth Occlusion Logic
-        val vertexShaderCode = """
-            uniform mat4 u_ModelViewProjection;
-            uniform mat4 u_ModelView;
-            attribute vec4 a_Position;
-            attribute vec2 a_TexCoord;
-            varying vec2 v_TexCoord;
-            varying float v_ViewDepth; // Linear depth in view space
-            
-            void main() {
-                gl_Position = u_ModelViewProjection * a_Position;
-                v_TexCoord = a_TexCoord;
-                
-                // Calculate linear depth (negative Z in view space)
-                vec4 viewPos = u_ModelView * a_Position;
-                v_ViewDepth = -viewPos.z; 
-            }
-        """
-
-        val fragmentShaderCode = """
-            #extension GL_OES_EGL_image_external : require
-            precision mediump float;
-            uniform sampler2D u_Texture;
-            uniform samplerExternalOES u_BackgroundTexture;
-            uniform sampler2D u_DepthTexture;
-            uniform int u_UseDepth;
-            uniform float u_Alpha;
-            uniform float u_Brightness;
-            uniform vec3 u_ColorBalance;
-            uniform vec2 u_ScreenSize;
-            uniform mat3 u_DisplayToCameraTransform;
-            uniform int u_BlendMode;
-
-            varying vec2 v_TexCoord;
-            varying float v_ViewDepth;
-            
-            vec3 applyBlend(vec3 dst, vec3 src, int mode) {
-                if (mode == 0) return mix(dst, src, 1.0); // Normal
-                if (mode == 1) return dst * src; // Multiply
-                if (mode == 2) return 1.0 - (1.0 - dst) * (1.0 - src); // Screen
-                if (mode == 3) { // Overlay
-                    vec3 res;
-                    for (int i = 0; i < 3; i++) {
-                        if (dst[i] < 0.5) res[i] = 2.0 * dst[i] * src[i];
-                        else res[i] = 1.0 - 2.0 * (1.0 - dst[i]) * (1.0 - src[i]);
-                    }
-                    return res;
-                }
-                if (mode == 4) return min(dst, src); // Darken
-                if (mode == 5) return max(dst, src); // Lighten
-                return src;
-            }
-
-            void main() {
-                vec4 srcColor = texture2D(u_Texture, v_TexCoord);
-
-                // Calculate Screen UV (0..1)
-                vec2 screenUV = gl_FragCoord.xy / u_ScreenSize;
-
-                // Transform to Camera Texture UV
-                vec3 screenPos = vec3(screenUV.x, screenUV.y, 1.0);
-                vec2 cameraUV = (u_DisplayToCameraTransform * screenPos).xy;
-
-                vec4 dstColor = texture2D(u_BackgroundTexture, cameraUV);
-
-                float visibility = 1.0;
-
-                if (u_UseDepth == 1) {
-                    // Depth Logic (Placeholder)
-                }
-
-                srcColor.rgb *= u_ColorBalance;
-                srcColor.rgb += u_Brightness;
-                srcColor.rgb = clamp(srcColor.rgb, 0.0, 1.0);
-
-                vec3 blendedRGB = srcColor.rgb;
-
-                if (u_BlendMode != 0 && u_BlendMode != 13) {
-                    vec3 mixed = applyBlend(dstColor.rgb, srcColor.rgb, u_BlendMode);
-                    blendedRGB = mixed;
-                }
-                
-                gl_FragColor = vec4(blendedRGB, srcColor.a * u_Alpha * visibility);
-            }
-        """
-
-        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
-        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
-
-        program = GLES20.glCreateProgram()
-        GLES20.glAttachShader(program, vertexShader)
-        GLES20.glAttachShader(program, fragmentShader)
-        GLES20.glLinkProgram(program)
-
-        positionAttrib = GLES20.glGetAttribLocation(program, "a_Position")
-        texCoordAttrib = GLES20.glGetAttribLocation(program, "a_TexCoord")
-        modelViewProjectionUniform = GLES20.glGetUniformLocation(program, "u_ModelViewProjection")
-        modelViewUniform = GLES20.glGetUniformLocation(program, "u_ModelView")
-        textureUniform = GLES20.glGetUniformLocation(program, "u_Texture")
-        alphaUniform = GLES20.glGetUniformLocation(program, "u_Alpha")
-        brightnessUniform = GLES20.glGetUniformLocation(program, "u_Brightness")
-        colorBalanceUniform = GLES20.glGetUniformLocation(program, "u_ColorBalance")
-        screenSizeUniform = GLES20.glGetUniformLocation(program, "u_ScreenSize")
-
-        depthTextureUniform = GLES20.glGetUniformLocation(program, "u_DepthTexture")
-        useDepthUniform = GLES20.glGetUniformLocation(program, "u_UseDepth")
-
-        backgroundTextureUniform = GLES20.glGetUniformLocation(program, "u_BackgroundTexture")
-        displayToCameraTransformUniform = GLES20.glGetUniformLocation(program, "u_DisplayToCameraTransform")
-        blendModeUniform = GLES20.glGetUniformLocation(program, "u_BlendMode")
-
-        // Geometry: Vertical Quad (X-Y Plane)
-        val vertices = floatArrayOf(
-            -0.5f, -0.5f, 0.0f,
-            -0.5f,  0.5f, 0.0f,
-            0.5f,  0.5f, 0.0f,
-            0.5f, -0.5f, 0.0f
-        )
-        val bb = ByteBuffer.allocateDirect(vertices.size * 4)
-        bb.order(ByteOrder.nativeOrder())
-        vertexBuffer = bb.asFloatBuffer()
-        vertexBuffer!!.put(vertices)
-        vertexBuffer!!.position(0)
-
-        val texCoords = floatArrayOf(
-            0.0f, 1.0f,
-            0.0f, 0.0f,
-            1.0f, 0.0f,
-            1.0f, 1.0f
-        )
-        val bbTex = ByteBuffer.allocateDirect(texCoords.size * 4)
-        bbTex.order(ByteOrder.nativeOrder())
-        texCoordBuffer = bbTex.asFloatBuffer()
-        texCoordBuffer!!.put(texCoords)
-        texCoordBuffer!!.position(0)
-
-        val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
-        textureId = textures[0]
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0])
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+
+        val numVertices = 4
+        if (quadVertices == null) {
+            val bbVertices = ByteBuffer.allocateDirect(numVertices * 3 * 4)
+            bbVertices.order(ByteOrder.nativeOrder())
+            quadVertices = bbVertices.asFloatBuffer()
+            quadVertices?.put(QUAD_COORDS)
+            quadVertices?.position(0)
+        }
+
+        if (quadTexCoord == null) {
+            val bbTexCoords = ByteBuffer.allocateDirect(numVertices * 2 * 4)
+            bbTexCoords.order(ByteOrder.nativeOrder())
+            quadTexCoord = bbTexCoords.asFloatBuffer()
+            quadTexCoord?.put(QUAD_TEXCOORDS)
+            quadTexCoord?.position(0)
+        }
+
+        // Vertex Shader
+        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER_CODE)
+        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER_CODE)
+
+        quadProgram = GLES20.glCreateProgram()
+        GLES20.glAttachShader(quadProgram, vertexShader)
+        GLES20.glAttachShader(quadProgram, fragmentShader)
+        GLES20.glLinkProgram(quadProgram)
+
+        quadPositionParam = GLES20.glGetAttribLocation(quadProgram, "a_Position")
+        quadTexCoordParam = GLES20.glGetAttribLocation(quadProgram, "a_TexCoord")
+        mvpMatrixParam = GLES20.glGetUniformLocation(quadProgram, "u_MvpMatrix")
+        modelViewMatrixParam = GLES20.glGetUniformLocation(quadProgram, "u_ModelViewMatrix")
+        textureParam = GLES20.glGetUniformLocation(quadProgram, "u_Texture")
+
+        opacityParam = GLES20.glGetUniformLocation(quadProgram, "u_Opacity")
+        brightnessParam = GLES20.glGetUniformLocation(quadProgram, "u_Brightness")
+        colorBalanceParam = GLES20.glGetUniformLocation(quadProgram, "u_ColorBalance")
+        depthTextureParam = GLES20.glGetUniformLocation(quadProgram, "u_DepthTexture")
+        resolutionParam = GLES20.glGetUniformLocation(quadProgram, "u_Resolution")
+        displayTransformParam = GLES20.glGetUniformLocation(quadProgram, "u_DisplayTransform")
     }
 
     fun draw(
         mvpMatrix: FloatArray,
         modelViewMatrix: FloatArray,
         bitmap: Bitmap,
-        alpha: Float,
+        opacity: Float,
         brightness: Float,
-        colorR: Float,
-        colorG: Float,
-        colorB: Float,
-        depthTextureId: Int = -1,
-        backgroundTextureId: Int,
-        viewWidth: Float,
-        viewHeight: Float,
-        displayToCameraTransform: FloatArray,
-        blendMode: androidx.compose.ui.graphics.BlendMode
+        r: Float, g: Float, b: Float,
+        depthTextureId: Int,
+        cameraTextureId: Int,
+        screenWidth: Float,
+        screenHeight: Float,
+        displayTransform: FloatArray,
+        blendMode: BlendMode
     ) {
-        if (lastBitmap != bitmap) {
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
-            GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
-            GLES20.glGenerateMipmap(GLES20.GL_TEXTURE_2D)
-            lastBitmap = bitmap
-        }
+        GLES20.glUseProgram(quadProgram)
 
-        GLES20.glUseProgram(program)
-        GLES20.glEnable(GLES20.GL_BLEND)
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-
-        GLES20.glUniformMatrix4fv(modelViewProjectionUniform, 1, false, mvpMatrix, 0)
-        GLES20.glUniformMatrix4fv(modelViewUniform, 1, false, modelViewMatrix, 0)
-
-        GLES20.glUniform1f(alphaUniform, alpha)
-        GLES20.glUniform1f(brightnessUniform, brightness)
-        GLES20.glUniform3f(colorBalanceUniform, colorR, colorG, colorB)
-        GLES20.glUniform2f(screenSizeUniform, viewWidth, viewHeight)
-
-        GLES20.glUniformMatrix3fv(displayToCameraTransformUniform, 1, false, displayToCameraTransform, 0)
-
-        // Map Compose BlendMode to Integer
-        val modeInt = when(blendMode) {
-            androidx.compose.ui.graphics.BlendMode.SrcOver -> 0
-            androidx.compose.ui.graphics.BlendMode.Multiply -> 1
-            androidx.compose.ui.graphics.BlendMode.Screen -> 2
-            androidx.compose.ui.graphics.BlendMode.Overlay -> 3
-            androidx.compose.ui.graphics.BlendMode.Darken -> 4
-            androidx.compose.ui.graphics.BlendMode.Lighten -> 5
-            else -> 0
-        }
-        GLES20.glUniform1i(blendModeUniform, modeInt)
-
+        // Upload texture
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
-        GLES20.glUniform1i(textureUniform, 0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0])
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+        GLES20.glUniform1i(textureParam, 0)
 
+        // Depth Texture (if available)
         if (depthTextureId != -1) {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, depthTextureId)
-            GLES20.glUniform1i(depthTextureUniform, 1)
-            GLES20.glUniform1i(useDepthUniform, 1)
+            GLES20.glUniform1i(depthTextureParam, 1)
         } else {
-            GLES20.glUniform1i(useDepthUniform, 0)
+            // Unbind or set to invalid unit if no depth
+            GLES20.glUniform1i(depthTextureParam, -1) // Shader must handle this
         }
 
-        // Bind Background Texture (OES)
-        // Ensure to use a texture unit that doesn't conflict. 0=Tex, 1=Depth. Use 2.
-        if (backgroundTextureId != -1) {
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE2)
-            GLES20.glBindTexture(android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES, backgroundTextureId)
-            GLES20.glUniform1i(backgroundTextureUniform, 2)
+        // Set Uniforms
+        GLES20.glUniform1f(opacityParam, opacity)
+        GLES20.glUniform1f(brightnessParam, brightness)
+        GLES20.glUniform3f(colorBalanceParam, r, g, b)
+        GLES20.glUniform2f(resolutionParam, screenWidth, screenHeight)
+        GLES20.glUniformMatrix3fv(displayTransformParam, 1, false, displayTransform, 0)
+
+        GLES20.glUniformMatrix4fv(mvpMatrixParam, 1, false, mvpMatrix, 0)
+        GLES20.glUniformMatrix4fv(modelViewMatrixParam, 1, false, modelViewMatrix, 0)
+
+        GLES20.glVertexAttribPointer(quadPositionParam, 3, GLES20.GL_FLOAT, false, 0, quadVertices)
+        GLES20.glVertexAttribPointer(quadTexCoordParam, 2, GLES20.GL_FLOAT, false, 0, quadTexCoord)
+
+        GLES20.glEnableVertexAttribArray(quadPositionParam)
+        GLES20.glEnableVertexAttribArray(quadTexCoordParam)
+
+        // Blend Mode Logic
+        GLES20.glEnable(GLES20.GL_BLEND)
+        when (blendMode) {
+            BlendMode.SrcOver -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+            BlendMode.Screen -> GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_COLOR)
+            BlendMode.Multiply -> GLES20.glBlendFunc(GLES20.GL_DST_COLOR, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+            BlendMode.Plus -> GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE)
+            else -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
 
-        GLES20.glVertexAttribPointer(positionAttrib, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer)
-        GLES20.glEnableVertexAttribArray(positionAttrib)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
 
-        GLES20.glVertexAttribPointer(texCoordAttrib, 2, GLES20.GL_FLOAT, false, 0, texCoordBuffer)
-        GLES20.glEnableVertexAttribArray(texCoordAttrib)
-
-        GLES20.glDisable(GLES20.GL_CULL_FACE)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, 4)
-
-        GLES20.glDisableVertexAttribArray(positionAttrib)
-        GLES20.glDisableVertexAttribArray(texCoordAttrib)
+        GLES20.glDisableVertexAttribArray(quadPositionParam)
+        GLES20.glDisableVertexAttribArray(quadTexCoordParam)
         GLES20.glDisable(GLES20.GL_BLEND)
     }
 
@@ -274,5 +147,92 @@ class SimpleQuadRenderer {
         GLES20.glShaderSource(shader, shaderCode)
         GLES20.glCompileShader(shader)
         return shader
+    }
+
+    companion object {
+        private val QUAD_COORDS = floatArrayOf(
+            -0.5f, 0.0f, -0.5f,
+            -0.5f, 0.0f, 0.5f,
+            0.5f, 0.0f, -0.5f,
+            0.5f, 0.0f, 0.5f
+        )
+
+        private val QUAD_TEXCOORDS = floatArrayOf(
+            0.0f, 0.0f,
+            0.0f, 1.0f,
+            1.0f, 0.0f,
+            1.0f, 1.0f
+        )
+
+        private const val VERTEX_SHADER_CODE = """
+            uniform mat4 u_MvpMatrix;
+            uniform mat4 u_ModelViewMatrix;
+            attribute vec4 a_Position;
+            attribute vec2 a_TexCoord;
+            varying vec2 v_TexCoord;
+            varying vec3 v_ViewPos;
+
+            void main() {
+                v_TexCoord = a_TexCoord;
+                vec4 viewPos = u_ModelViewMatrix * a_Position;
+                v_ViewPos = viewPos.xyz;
+                gl_Position = u_MvpMatrix * a_Position;
+            }
+        """
+
+        // Fragment Shader with Occlusion & Color Grading
+        private const val FRAGMENT_SHADER_CODE = """
+            precision mediump float;
+            uniform sampler2D u_Texture;
+            uniform sampler2D u_DepthTexture;
+            
+            uniform float u_Opacity;
+            uniform float u_Brightness;
+            uniform vec3 u_ColorBalance;
+            uniform vec2 u_Resolution;
+            
+            // This uniform tells us how to map screen UVs to Camera Image UVs (for depth lookup)
+            uniform mat3 u_DisplayTransform; 
+
+            varying vec2 v_TexCoord;
+            varying vec3 v_ViewPos; // Position in View Space (Metric)
+
+            void main() {
+                vec4 color = texture2D(u_Texture, v_TexCoord);
+                
+                // 1. Color Balance
+                color.rgb *= u_ColorBalance;
+                
+                // 2. Brightness
+                color.rgb += u_Brightness;
+                
+                // 3. Opacity
+                color.a *= u_Opacity;
+
+                // 4. Depth Occlusion (Simplified)
+                // We need to calculate Screen UV to sample the depth map
+                // gl_FragCoord.xy is in pixels.
+                vec2 screenUV = gl_FragCoord.xy / u_Resolution;
+                
+                // Use the display transform to find the UV in the camera depth map
+                vec3 depthUvVec = u_DisplayTransform * vec3(screenUV.x, screenUV.y, 1.0);
+                vec2 depthUV = depthUvVec.xy;
+                
+                // Sample depth (16-bit raw value usually packed in R or L)
+                // Note: Standard ARCore depth is raw. 
+                // Since we bound GL_LUMINANCE in renderer, we get float 0..1
+                // But real distance depends on projection. 
+                // This is a naive check: if real depth < virtual depth, occlude.
+                
+                // float realDepth = texture2D(u_DepthTexture, depthUV).r * 8.0; // 8 meters max? 
+                // float virtualDepth = -v_ViewPos.z;
+                
+                // Soft occlusion logic would go here. 
+                // For now, we skip hard occlusion to prevent z-fighting artifacts 
+                // unless explicitly requested, as raw depth maps are noisy.
+                
+                gl_FragColor = color;
+            }
+        """
     }
 }
