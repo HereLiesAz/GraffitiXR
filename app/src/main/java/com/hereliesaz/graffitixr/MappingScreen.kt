@@ -16,6 +16,7 @@ import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.graffitixr.slam.SlamManager
 import kotlinx.coroutines.launch
 import com.google.ar.core.Pose
+import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 
 @Composable
@@ -111,8 +112,15 @@ fun MappingScreen(
 
         // 3. The HUD (Neural Scan UI)
         if (isMapping) {
+            // Map float quality to Enum
+            val qualityEnum = when {
+                mappingQuality < 0.5f -> Session.FeatureMapQuality.INSUFFICIENT
+                mappingQuality < 0.8f -> Session.FeatureMapQuality.SUFFICIENT
+                else -> Session.FeatureMapQuality.GOOD
+            }
+
             PhotoSphereCreationScreen(
-                currentQuality = mappingQuality,
+                currentQuality = qualityEnum,
                 isHosting = isHosting,
                 onCaptureComplete = {
                     val session = arRenderer.session

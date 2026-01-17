@@ -2,73 +2,209 @@ package com.hereliesaz.graffitixr.utils
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Log
-import com.hereliesaz.graffitixr.data.Fingerprint
-import com.hereliesaz.graffitixr.data.FingerprintSerializer
-import com.hereliesaz.graffitixr.data.UiState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.graffitixr.UiState
+import com.hereliesaz.graffitixr.data.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
-class ProjectManager {
+interface UriProvider {
+    fun getUriForFile(file: File): Uri
+}
 
-    suspend fun saveProject(context: Context, state: UiState, projectId: String = "current_project") = withContext(Dispatchers.IO) {
+class DefaultUriProvider : UriProvider {
+    override fun getUriForFile(file: File): Uri {
+        return Uri.fromFile(file)
+    }
+}
+
+class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()) {
+
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    fun getProjectList(context: Context): List<String> {
+        val projectsDir = File(context.filesDir, "projects")
+        if (!projectsDir.exists()) return emptyList()
+        return projectsDir.listFiles()?.filter { it.isDirectory }?.map { it.name } ?: emptyList()
+    }
+
+    fun deleteProject(context: Context, projectName: String) {
+        val projectDir = File(context.filesDir, "projects/$projectName")
+        if (projectDir.exists()) {
+            projectDir.deleteRecursively()
+        }
+    }
+
+    suspend fun saveProject(context: Context, state: UiState, projectId: String) {
         val root = File(context.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()
 
-        // 1. Save Fingerprint
-        state.fingerprintJson?.let { json ->
-            File(root, "fingerprint.json").writeText(json)
-        }
-
-        // 2. Save Targets
-        state.capturedTargetImages.forEach { (id, bitmap) ->
-            val file = File(root, "target_$id.png")
+        // 1. Save Target Images (Bitmaps) -> URIs
+        val savedTargetUris = state.capturedTargetImages.mapIndexed { index, bitmap ->
+            val file = File(root, "target_$index.png")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
             }
+            uriProvider.getUriForFile(file)
         }
 
-        // 3. Save Layer Metadata (simplified)
-        // We really should serialize the whole List<OverlayLayer>
-        // But for now, we just save a manifest.
-        val manifest = Json.encodeToString(state.layers.map { it.id }) // Placeholder
-        File(root, "layers_manifest.json").writeText(manifest)
-
-        Log.d("ProjectManager", "Project saved to ${root.absolutePath}")
-    }
-
-    suspend fun loadFingerprint(context: Context, projectId: String = "current_project"): Fingerprint? = withContext(Dispatchers.IO) {
-        val file = File(context.filesDir, "projects/$projectId/fingerprint.json")
-        if (!file.exists()) return@withContext null
-        try {
-            val json = file.readText()
-            return@withContext Json.decodeFromString(FingerprintSerializer, json)
-        } catch (e: Exception) {
-            Log.e("ProjectManager", "Failed to load fingerprint", e)
-            return@withContext null
-        }
-    }
-
-    suspend fun loadTargetImages(context: Context, projectId: String = "current_project"): Map<String, Bitmap> = withContext(Dispatchers.IO) {
-        val root = File(context.filesDir, "projects/$projectId")
-        if (!root.exists()) return@withContext emptyMap()
-
-        val map = mutableMapOf<String, Bitmap>()
-        root.listFiles()?.forEach { file ->
-            if (file.name.startsWith("target_") && file.name.endsWith(".png")) {
-                val id = file.name.removePrefix("target_").removeSuffix(".png")
-                try {
-                    val bmp = BitmapFactory.decodeFile(file.absolutePath)
-                    map[id] = bmp
-                } catch (e: Exception) {
-                    Log.e("ProjectManager", "Bad target image: ${file.name}")
-                }
+        // 2. Deserialize Fingerprint JSON string to Object (if exists)
+        val fingerprintObj: Fingerprint? = state.fingerprintJson?.let {
+            try {
+                json.decodeFromString(FingerprintSerializer, it)
+            } catch (e: Exception) {
+                Log.e("ProjectManager", "Failed to decode fingerprintJson", e)
+                null
             }
         }
-        return@withContext map
+
+        val activeLayer = state.layers.find { it.id == state.activeLayerId } ?: state.layers.firstOrNull()
+
+        // 3. Create ProjectData
+        // Map List<List<Offset>> to List<List<Pair<Float, Float>>>
+        val serializableDrawingPaths = state.drawingPaths.map { path ->
+            path.map { offset -> Pair(offset.x, offset.y) }
+        }
+
+        val projectData = ProjectData(
+            id = projectId,
+            name = projectId,
+            lastModified = System.currentTimeMillis(),
+            backgroundImageUri = state.backgroundImageUri,
+            overlayImageUri = state.overlayImageUri,
+            targetImageUris = savedTargetUris,
+            refinementPaths = state.refinementPaths,
+            opacity = activeLayer?.opacity ?: 1f,
+            brightness = activeLayer?.brightness ?: 0f,
+            contrast = activeLayer?.contrast ?: 1f,
+            saturation = activeLayer?.saturation ?: 1f,
+            colorBalanceR = activeLayer?.colorBalanceR ?: 1f,
+            colorBalanceG = activeLayer?.colorBalanceG ?: 1f,
+            colorBalanceB = activeLayer?.colorBalanceB ?: 1f,
+            scale = activeLayer?.scale ?: 1f,
+            rotationX = activeLayer?.rotationX ?: 0f,
+            rotationY = activeLayer?.rotationY ?: 0f,
+            rotationZ = activeLayer?.rotationZ ?: 0f,
+            offset = activeLayer?.offset ?: Offset.Zero,
+            blendMode = activeLayer?.blendMode ?: androidx.compose.ui.graphics.BlendMode.SrcOver,
+            fingerprint = fingerprintObj,
+            drawingPaths = serializableDrawingPaths,
+            progressPercentage = state.progressPercentage,
+            layers = state.layers
+        )
+
+        // 4. Save ProjectData to JSON
+        val jsonString = json.encodeToString(projectData)
+        File(root, "project.json").writeText(jsonString)
+    }
+
+    suspend fun loadProject(context: Context, projectId: String): UiState? {
+        val root = File(context.filesDir, "projects/$projectId")
+        val projectFile = File(root, "project.json")
+        if (!projectFile.exists()) return null
+
+        return try {
+            val jsonString = projectFile.readText()
+            val projectData = json.decodeFromString<ProjectData>(jsonString)
+
+            // Load Target Bitmaps
+            val targetBitmaps = projectData.targetImageUris.mapNotNull { uri ->
+                ImageUtils.loadBitmapFromUri(context, uri)
+            }
+
+            // Fingerprint Object -> JSON String
+            val fingerprintJson = projectData.fingerprint?.let {
+                json.encodeToString(FingerprintSerializer, it)
+            }
+
+            // Map drawing paths back to Offset
+            val drawingPaths = projectData.drawingPaths.map { path ->
+                path.map { pair -> Offset(pair.first, pair.second) }
+            }
+
+            // Map back to UiState
+            UiState(
+                backgroundImageUri = projectData.backgroundImageUri,
+                overlayImageUri = projectData.overlayImageUri,
+                capturedTargetImages = targetBitmaps,
+                capturedTargetUris = projectData.targetImageUris,
+                refinementPaths = projectData.refinementPaths,
+                drawingPaths = drawingPaths,
+                progressPercentage = projectData.progressPercentage,
+                fingerprintJson = fingerprintJson,
+                layers = projectData.layers,
+
+                // Active layer logic
+                activeLayerId = if (projectData.layers.isNotEmpty()) projectData.layers.first().id else null
+            ).let { state ->
+                if (state.layers.isEmpty() && projectData.overlayImageUri != null) {
+                    // Create migration layer from legacy fields
+                    val legacyLayer = OverlayLayer(
+                        uri = projectData.overlayImageUri,
+                        name = "Base Layer",
+                        opacity = projectData.opacity,
+                        brightness = projectData.brightness,
+                        contrast = projectData.contrast,
+                        saturation = projectData.saturation,
+                        colorBalanceR = projectData.colorBalanceR,
+                        colorBalanceG = projectData.colorBalanceG,
+                        colorBalanceB = projectData.colorBalanceB,
+                        scale = projectData.scale,
+                        rotationX = projectData.rotationX,
+                        rotationY = projectData.rotationY,
+                        rotationZ = projectData.rotationZ,
+                        offset = projectData.offset,
+                        blendMode = projectData.blendMode
+                    )
+                    state.copy(layers = listOf(legacyLayer), activeLayerId = legacyLayer.id)
+                } else {
+                    state
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ProjectManager", "Failed to load project", e)
+            null
+        }
+    }
+
+    fun exportProjectToUri(context: Context, projectId: String, uri: Uri) {
+        val sourceFolder = File(context.filesDir, "projects/$projectId")
+        if (!sourceFolder.exists()) return
+
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { os ->
+                ZipOutputStream(os).use { zos ->
+                    zipFolder(sourceFolder, sourceFolder.name, zos)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ProjectManager", "Export failed", e)
+        }
+    }
+
+    private fun zipFolder(folder: File, parentFolder: String, zos: ZipOutputStream) {
+        for (file in folder.listFiles() ?: emptyArray()) {
+            if (file.isDirectory) {
+                zipFolder(file, "$parentFolder/${file.name}", zos)
+            } else {
+                val entry = ZipEntry("$parentFolder/${file.name}")
+                zos.putNextEntry(entry)
+                FileInputStream(file).use { fis ->
+                    fis.copyTo(zos)
+                }
+                zos.closeEntry()
+            }
+        }
     }
 }

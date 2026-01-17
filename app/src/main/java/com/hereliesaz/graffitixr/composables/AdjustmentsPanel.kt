@@ -64,6 +64,16 @@ fun AdjustmentsPanel(
     val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
     val startPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
 
+    // Resolve active layer properties
+    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
+    val opacity = activeLayer?.opacity ?: 1f
+    val brightness = activeLayer?.brightness ?: 0f
+    val contrast = activeLayer?.contrast ?: 1f
+    val saturation = activeLayer?.saturation ?: 1f
+    val colorBalanceR = activeLayer?.colorBalanceR ?: 1f
+    val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
+    val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -80,9 +90,9 @@ fun AdjustmentsPanel(
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
             ) {
                 ColorBalanceKnobsRow(
-                    colorBalanceR = uiState.colorBalanceR,
-                    colorBalanceG = uiState.colorBalanceG,
-                    colorBalanceB = uiState.colorBalanceB,
+                    colorBalanceR = colorBalanceR,
+                    colorBalanceG = colorBalanceG,
+                    colorBalanceB = colorBalanceB,
                     onColorBalanceRChange = onColorBalanceRChange,
                     onColorBalanceGChange = onColorBalanceGChange,
                     onColorBalanceBChange = onColorBalanceBChange,
@@ -96,10 +106,10 @@ fun AdjustmentsPanel(
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
             ) {
                 AdjustmentsKnobsRow(
-                    opacity = uiState.opacity,
-                    brightness = uiState.brightness,
-                    contrast = uiState.contrast,
-                    saturation = uiState.saturation,
+                    opacity = opacity,
+                    brightness = brightness,
+                    contrast = contrast,
+                    saturation = saturation,
                     onOpacityChange = onOpacityChange,
                     onBrightnessChange = onBrightnessChange,
                     onContrastChange = onContrastChange,
