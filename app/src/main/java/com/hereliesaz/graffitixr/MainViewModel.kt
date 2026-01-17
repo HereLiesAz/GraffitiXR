@@ -100,7 +100,7 @@ class MainViewModel(
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("MainViewModel", "Error removing background", e)
                 _feedbackEvent.send(FeedbackEvent.Toast("Error removing background"))
             }
             _uiState.update { it.copy(isLoading = false) }
