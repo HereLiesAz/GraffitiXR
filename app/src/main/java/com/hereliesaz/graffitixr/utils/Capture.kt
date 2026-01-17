@@ -22,19 +22,20 @@ import android.view.Window
  */
 fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
     val window: Window = activity.window
+    val view = window.decorView
 
     // Prevent crash: Bitmap.createBitmap throws IllegalArgumentException if width or height are <= 0
-    if (width <= 0 || height <= 0) {
+    if (view.width <= 0 || view.height <= 0) {
         callback(null)
         return
     }
 
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
 
     try {
         PixelCopy.request(
             window,
-            Rect(0, 0, width, height),
+            Rect(0, 0, view.width, view.height),
             bitmap,
             { copyResult ->
                 if (copyResult == PixelCopy.SUCCESS) {

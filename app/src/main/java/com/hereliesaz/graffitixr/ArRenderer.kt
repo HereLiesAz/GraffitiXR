@@ -4,16 +4,22 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.RectF
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.opengl.Matrix
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.google.ar.core.Anchor
 import com.google.ar.core.Config
+import com.google.ar.core.Plane
 import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.data.Fingerprint
+import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.MiniMapRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
@@ -21,14 +27,21 @@ import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
 import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
+import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -54,7 +67,7 @@ class ArRenderer(
 
     @Volatile
     var session: Session? = null
-    var isAnchorReplacementAllowed: Boolean = false
+    var isAnchorReplacementAllowed: Boolean = true // Default to true to allow initial placement
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true
 
@@ -62,6 +75,32 @@ class ArRenderer(
     private var backgroundTextureId = -1
     private var viewportWidth = 1
     private var viewportHeight = 1
+
+    // Layers and Anchors
+    private var layers: List<OverlayLayer> = emptyList()
+    private val layerBitmaps = ConcurrentHashMap<String, Bitmap>()
+    private var anchor: Anchor? = null
+    private val queuedSingleTaps = ConcurrentLinkedQueue<FloatArray>()
+    private val rendererScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    fun updateLayers(newLayers: List<OverlayLayer>) {
+        this.layers = newLayers
+        // Trigger bitmap loading for new layers if needed
+        newLayers.forEach { layer ->
+            if (!layerBitmaps.containsKey(layer.id)) {
+                 rendererScope.launch {
+                     val bmp = ImageUtils.loadBitmapFromUri(context, layer.uri)
+                     if (bmp != null) {
+                         updateLayerBitmap(layer.id, bmp)
+                     }
+                 }
+            }
+        }
+    }
+
+    fun updateLayerBitmap(id: String, bitmap: Bitmap) {
+        layerBitmaps[id] = bitmap
+    }
 
     suspend fun generateFingerprint(bitmap: Bitmap): Fingerprint? = withContext(Dispatchers.Default) {
         if (!ensureOpenCVLoaded()) return@withContext null
@@ -123,7 +162,7 @@ class ArRenderer(
     }
 
     fun queueTap(x: Float, y: Float) {
-        // Queue tap event
+        queuedSingleTaps.offer(floatArrayOf(x, y))
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -162,6 +201,9 @@ class ArRenderer(
             val frame = session!!.update()
             val camera = frame.camera
 
+            // Handle Taps
+            handleTaps(frame, camera)
+
             // Draw Background
             backgroundRenderer.draw(frame)
 
@@ -190,12 +232,68 @@ class ArRenderer(
             if (hasTrackingPlane()) {
                 onPlanesDetected(true)
                 planeRenderer.drawPlanes(
-                    session!!.getAllTrackables(com.google.ar.core.Plane::class.java),
+                    session!!.getAllTrackables(Plane::class.java),
                     viewmtx,
                     projmtx
                 )
             } else {
                 onPlanesDetected(false)
+            }
+
+            // Draw Layers
+            anchor?.let {
+                if (it.trackingState == TrackingState.TRACKING) {
+                    val anchorMatrix = FloatArray(16)
+                    it.pose.toMatrix(anchorMatrix, 0)
+
+                    layers.forEach { layer ->
+                        if (layer.isVisible) {
+                            val bitmap = layerBitmaps[layer.id]
+                            if (bitmap != null) {
+                                // Calculate Model Matrix (Anchor * Layer Transform)
+                                val modelMatrix = FloatArray(16)
+                                val layerMatrix = FloatArray(16)
+                                Matrix.setIdentityM(layerMatrix, 0)
+
+                                // Apply Layer Transforms (T * R * S)
+                                Matrix.translateM(layerMatrix, 0, layer.offset.x, layer.offset.y, 0f) // Using Z=0 for simplicity, or layer.offset is 2D? UiState says Offset.
+                                // Rotate?
+                                Matrix.rotateM(layerMatrix, 0, layer.rotationX, 1f, 0f, 0f)
+                                Matrix.rotateM(layerMatrix, 0, layer.rotationY, 0f, 1f, 0f)
+                                Matrix.rotateM(layerMatrix, 0, layer.rotationZ, 0f, 0f, 1f)
+                                Matrix.scaleM(layerMatrix, 0, layer.scale, layer.scale, 1f)
+
+                                Matrix.multiplyMM(modelMatrix, 0, anchorMatrix, 0, layerMatrix, 0)
+
+                                // MVP Matrix
+                                val mvpMatrix = FloatArray(16)
+                                val modelViewMatrix = FloatArray(16)
+                                Matrix.multiplyMM(modelViewMatrix, 0, viewmtx, 0, modelMatrix, 0)
+                                Matrix.multiplyMM(mvpMatrix, 0, projmtx, 0, modelViewMatrix, 0)
+
+                                // Display Transform for shader
+                                val displayTransform = floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f) // Identity
+
+                                simpleQuadRenderer.draw(
+                                    mvpMatrix,
+                                    modelViewMatrix,
+                                    bitmap,
+                                    layer.opacity,
+                                    layer.brightness,
+                                    layer.colorBalanceR,
+                                    layer.colorBalanceG,
+                                    layer.colorBalanceB,
+                                    -1, // Depth texture
+                                    backgroundTextureId,
+                                    viewportWidth.toFloat(),
+                                    viewportHeight.toFloat(),
+                                    floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f), // Identity
+                                    layer.blendMode
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
         } catch (e: SessionPausedException) {
@@ -205,9 +303,29 @@ class ArRenderer(
         }
     }
 
+    private fun handleTaps(frame: com.google.ar.core.Frame, camera: com.google.ar.core.Camera) {
+        val tap = queuedSingleTaps.poll() ?: return
+        if (camera.trackingState != TrackingState.TRACKING) return
+
+        val hitResultList = frame.hitTest(tap[0], tap[1])
+        for (hit in hitResultList) {
+            val trackable = hit.trackable
+            if ((trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) ||
+                (trackable is com.google.ar.core.Point && trackable.orientationMode == com.google.ar.core.Point.OrientationMode.ESTIMATED_SURFACE_NORMAL)
+            ) {
+                if (isAnchorReplacementAllowed || anchor == null) {
+                    anchor?.detach()
+                    anchor = hit.createAnchor()
+                    onAnchorCreated()
+                    break // Only create one anchor
+                }
+            }
+        }
+    }
+
     private fun hasTrackingPlane(): Boolean {
-        session?.getAllTrackables(com.google.ar.core.Plane::class.java)?.forEach { plane ->
-            if (plane.trackingState == com.google.ar.core.TrackingState.TRACKING) {
+        session?.getAllTrackables(Plane::class.java)?.forEach { plane ->
+            if (plane.trackingState == TrackingState.TRACKING) {
                 return true
             }
         }
@@ -261,5 +379,6 @@ class ArRenderer(
     fun cleanup() {
         session?.close()
         session = null
+        rendererScope.cancel()
     }
 }
