@@ -1,56 +1,69 @@
 # Application Screens Documentation
 
-## **1. Main AR Screen (`ARScreen.kt`)**
+## **1. Main Screen (`MainScreen.kt`)**
+-   **Role:** The top-level orchestrator and container.
+-   **Functionality:**
+    -   Manages the `AzNavRail` for navigation between modes (AR, Overlay, Mockup, Trace).
+    -   Handles global gestures and input events.
+    -   Displays the `AdjustmentsPanel` for layer properties.
+    -   Integrates `ProjectLibraryScreen` and `SettingsScreen` as overlays.
+    -   Manages the Target Creation Flow and Neural Scan interactions.
+
+## **2. AR Screen (`ArView.kt`)**
 -   **Type:** `AndroidView` wrapping `GLSurfaceView`.
 -   **Renderer:** `ArRenderer.kt`.
 -   **Functionality:**
-    -   Renders the camera feed.
-    -   Visualizes AR planes (polygons).
-    -   Renders the user's overlay image (quad) mapped to the AR target or anchor.
-    -   Handles gestures (drag, scale, rotate) via Compose `pointerInput`.
--   **Key Logic:** `ARCoreManager` handles the session lifecycle.
+    -   Renders the camera feed via ARCore.
+    -   Visualizes AR planes and Point Clouds.
+    -   Renders multiple `OverlayLayer`s mapped to AR anchors.
+    -   Supports Cloud Anchor hosting and resolving.
+    -   Handles "Magic Align" for instant target matching.
 
-## **2. Trace/Overlay Screen (`OverlayScreen.kt`)**
--   **Type:** standard Composable with `CameraPreview`.
+## **3. Mapping Screen (`MappingScreen.kt`)**
+-   **Context:** "Surveyor Mode" / Neural Scan.
 -   **Functionality:**
-    -   Uses CameraX to show a simple camera feed.
-    -   Overlays the user's image as a simple 2D Composable (`Image` or `Canvas`).
-    -   Supports opacity adjustment for "tracing" (seeing the hand through the phone).
-    -   No AR tracking; the image is screen-locked.
+    -   Specialized AR view for environmental mapping.
+    -   Displays `MiniMap` (top-down view of the session).
+    -   Provides real-time feedback on Mapping Quality (`SlamManager`).
+    -   Allows finalizing and hosting a map for persistence.
 
-## **3. Mockup Screen (`MockupScreen.kt`)**
--   **Type:** 2D Image Manipulation Canvas.
+## **4. Trace/Overlay Screen (`OverlayScreen.kt`)**
+-   **Type:** standard Composable with `CameraPreview` (CameraX).
 -   **Functionality:**
-    -   Displays a static background image (picked by user).
-    -   Overlays the art image.
-    -   Allows perspective warping (4-corner distortion) to match the perspective of the wall in the photo.
+    -   Shows a simple camera feed without tracking.
+    -   Overlays the ACTIVE layer as a screen-locked 2D image.
+    -   Used for physical tracing ("Ghost Mode").
+    -   Supports opacity, contrast, and color balance adjustments.
 
-## **4. Settings Screen (`SettingsScreen.kt`)**
--   **Access:** Via Navigation Rail -> Host Item.
--   **Content:**
-    -   App Version.
-    -   Permission Status (Camera, Location, Notifications).
-    -   "Check for Updates" button (GitHub integration).
-    -   Links to Privacy Policy.
+## **5. Mockup Screen (`MockupScreen.kt`)**
+-   **Type:** 2D Image Canvas.
+-   **Functionality:**
+    -   Displays a user-selected static background image (e.g., photo of a wall).
+    -   Renders all `OverlayLayer`s on top.
+    -   Allows testing blending modes and scale relative to a static reference.
 
-## **5. Target Refinement Screen (`TargetRefinementScreen.kt`)**
+## **6. Target Refinement Screen (`TargetRefinementScreen.kt`)**
 -   **Context:** Part of the AR Target Creation flow.
 -   **Functionality:**
-    -   Shows the captured frame.
+    -   Shows the captured target candidate image.
     -   Visualizes the auto-generated mask (ML Kit).
-    -   Allows user to add/subtract from the mask using touch.
-    -   Visualizes OpenCV keypoints to show trackability.
-
-## **6. Help/Onboarding (`HelpScreen.kt`)**
--   **Type:** Full-screen Pager.
--   **Content:** Step-by-step tutorial images and text explaining the app's modes.
+    -   Allows user to refine the mask (Eraser/Restore tools).
+    -   Visualizes OpenCV keypoints (`Fingerprint`) to verify trackability.
 
 ## **7. Target Creation Overlay (`TargetCreationOverlay.kt`)**
--   **Context:** Overlaid on `ARScreen` during target creation.
+-   **Context:** Overlaid on `ArView` during target creation.
 -   **Functionality:**
-    -   Guides the user through target creation steps.
+    -   Guides the user through capturing a high-quality AR target.
     -   **Modes:**
-        -   **Capture:** Standard 5-angle capture.
-        -   **Guided Grid:** User configures a grid (Rows x Cols) and aligns it with wall marks.
-        -   **Guided Points:** User aligns with 4 reference points.
-    -   Visualizes steps and instructions.
+        -   **Capture:** Standard image capture.
+        -   **Rectify:** Planar target rectification.
+        -   **Guided Grid:** Grid alignment for large murals.
+        -   **Guided Points:** 4-point calibration.
+        -   **Multi-Point Calibration:** Advanced sensor fusion calibration.
+
+## **8. Settings Screen (`SettingsScreen.kt`)**
+-   **Access:** Via Navigation Rail -> Project -> Settings.
+-   **Content:**
+    -   App Version and Updates.
+    -   Permission Management.
+    -   Preferences.

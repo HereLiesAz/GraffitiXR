@@ -53,4 +53,27 @@ object ImageUtils {
         }
         return Uri.fromFile(file)
     }
+
+    fun getNextBlendMode(current: androidx.compose.ui.graphics.BlendMode): androidx.compose.ui.graphics.BlendMode {
+        val modes = listOf(
+            androidx.compose.ui.graphics.BlendMode.SrcOver,
+            androidx.compose.ui.graphics.BlendMode.Screen,
+            androidx.compose.ui.graphics.BlendMode.Multiply,
+            androidx.compose.ui.graphics.BlendMode.Overlay,
+            androidx.compose.ui.graphics.BlendMode.Darken,
+            androidx.compose.ui.graphics.BlendMode.Lighten,
+            androidx.compose.ui.graphics.BlendMode.ColorDodge,
+            androidx.compose.ui.graphics.BlendMode.ColorBurn,
+            androidx.compose.ui.graphics.BlendMode.Hardlight,
+            androidx.compose.ui.graphics.BlendMode.Softlight,
+            androidx.compose.ui.graphics.BlendMode.Difference,
+            androidx.compose.ui.graphics.BlendMode.Exclusion,
+            androidx.compose.ui.graphics.BlendMode.Hue,
+            androidx.compose.ui.graphics.BlendMode.Saturation,
+            androidx.compose.ui.graphics.BlendMode.Color,
+            androidx.compose.ui.graphics.BlendMode.Luminosity
+        )
+        val index = modes.indexOf(current)
+        return modes.getOrElse((index + 1) % modes.size) { androidx.compose.ui.graphics.BlendMode.SrcOver }
+    }
 }

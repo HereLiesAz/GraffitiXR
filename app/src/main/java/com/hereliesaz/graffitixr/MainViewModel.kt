@@ -13,6 +13,7 @@ import com.hereliesaz.graffitixr.utils.ProjectManager
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 class MainViewModel(
     private val projectManager: ProjectManager = ProjectManager()
@@ -42,10 +43,7 @@ class MainViewModel(
 
     private var layerModsClipboard: OverlayLayer? = null
 
-    // ============================================================================================
-    // HISTORY & MODIFICATION HELPERS
-    // ============================================================================================
-
+    // ... (Existing helpers) ...
     private fun snapshotState() {
         if (undoStack.size >= MAX_HISTORY) undoStack.removeFirst()
         undoStack.addLast(_uiState.value.layers.toList())
@@ -65,10 +63,7 @@ class MainViewModel(
         }
     }
 
-    // ============================================================================================
-    // ADJUSTMENT KNOBS (Active Layer Only)
-    // ============================================================================================
-
+    // ... (Existing adjustment methods) ...
     fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
     fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
     fun onContrastChanged(v: Float) = updateActiveLayer { it.copy(contrast = v) }
@@ -81,10 +76,7 @@ class MainViewModel(
         layer.copy(blendMode = ImageUtils.getNextBlendMode(layer.blendMode))
     }
 
-    // ============================================================================================
-    // DESIGN TOOLS (Using Existing Utilities)
-    // ============================================================================================
-
+    // ... (Existing background/outline methods) ...
     fun onRemoveBackgroundClicked() {
         val activeId = _uiState.value.activeLayerId ?: return
         val context = arRenderer?.context ?: return
@@ -94,8 +86,10 @@ class MainViewModel(
                 ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
                     snapshotState()
                     val processed = BackgroundRemover.removeBackground(original)
-                    val newUri = ImageUtils.saveBitmapToCache(context, processed)
-                    updateActiveLayer { it.copy(uri = newUri) }
+                    processed?.let { bmp ->
+                        val newUri = ImageUtils.saveBitmapToCache(context, bmp)
+                        updateActiveLayer { it.copy(uri = newUri) }
+                    }
                 }
             }
             _uiState.update { it.copy(isLoading = false) }
@@ -119,29 +113,22 @@ class MainViewModel(
         }
     }
 
-    // ============================================================================================
-    // LAYER MANAGEMENT & PERSISTENCE
-    // ============================================================================================
-
+    // ... (Layer Management) ...
     fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
-
     fun onLayerRenamed(id: String, name: String) {
         _uiState.update { state ->
             state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it })
         }
     }
-
     fun onLayerReordered(newOrder: List<String>) {
         snapshotState()
         val map = _uiState.value.layers.associateBy { it.id }
         _uiState.update { it.copy(layers = newOrder.mapNotNull { map[it] }) }
     }
-
     fun copyLayerModifications(id: String) {
         layerModsClipboard = _uiState.value.layers.find { it.id == id }
         viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
     }
-
     fun pasteLayerModifications(id: String) {
         layerModsClipboard?.let { template ->
             updateActiveLayer(saveHistory = true) { target ->
@@ -158,6 +145,27 @@ class MainViewModel(
         }
     }
 
+    // NEW METHODS
+    fun onLayerDuplicated(id: String) {
+        snapshotState()
+        val layer = _uiState.value.layers.find { it.id == id } ?: return
+        val newLayer = layer.copy(id = UUID.randomUUID().toString(), name = "${layer.name} (Copy)")
+        _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
+    }
+
+    fun onLayerRemoved(id: String) {
+        snapshotState()
+        _uiState.update { state ->
+            val newLayers = state.layers.filter { it.id != id }
+            val newActiveId = if (state.activeLayerId == id) newLayers.firstOrNull()?.id else state.activeLayerId
+            state.copy(layers = newLayers, activeLayerId = newActiveId)
+        }
+    }
+
+    fun onCancelCaptureClicked() {
+        _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW) }
+    }
+
     fun onUndoClicked() {
         if (undoStack.isEmpty()) return
         redoStack.addLast(_uiState.value.layers.toList())
@@ -172,10 +180,7 @@ class MainViewModel(
         updateHistoryFlags()
     }
 
-    // ============================================================================================
-    // AR & UI CALLBACKS (As required by MainScreen.kt)
-    // ============================================================================================
-
+    // ... (AR & UI Callbacks) ...
     fun onEditorModeChanged(mode: EditorMode) = _uiState.update { it.copy(editorMode = mode) }
     fun onScaleChanged(s: Float) = updateActiveLayer { it.copy(scale = it.scale * s) }
     fun onArObjectScaleChanged(s: Float) = onScaleChanged(s)
@@ -201,10 +206,13 @@ class MainViewModel(
 
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
     fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
-    fun onToggleFlashlight() = arRenderer?.setFlashlight(true)
+    fun onToggleFlashlight() {
+        _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
+        arRenderer?.setFlashlight(_uiState.value.isFlashlightOn)
+    }
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
 
-    // Other stubs required for compilation
+    // Stubs
     fun getProjectList() = emptyList<String>()
     fun loadProject(n: String) {}
     fun deleteProject(n: String) {}
@@ -214,8 +222,8 @@ class MainViewModel(
     fun onOnboardingComplete(m: EditorMode) = _uiState.update { it.copy(showOnboardingDialogForMode = null) }
     fun onFeedbackShown() = _uiState.update { it.copy(showRotationAxisFeedback = false) }
     fun onMarkProgressToggled() = _uiState.update { it.copy(isMarkingProgress = !it.isMarkingProgress) }
-    fun onDrawingPathFinished(p: Path) = _uiState.update { it.copy(drawingPaths = it.drawingPaths + p) }
-    fun updateArtworkBounds(b: android.graphics.RectF) = _uiState.update { it.copy() } // Stub
+    fun onDrawingPathFinished(p: List<Offset>) = _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(p)) }
+    fun updateArtworkBounds(b: android.graphics.RectF) = _uiState.update { it.copy() }
     fun setArPlanesDetected(d: Boolean) = _uiState.update { it.copy(isArPlanesDetected = d) }
     fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
     fun onFrameCaptured(b: Bitmap) {}
@@ -224,8 +232,11 @@ class MainViewModel(
     fun updateMappingScore(s: Float) = _uiState.update { it.copy(mappingQualityScore = s) }
     fun finalizeMap() {}
     fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
-    fun onOverlayImageSelected(u: Uri) {}
-    fun onBackgroundImageSelected(u: Uri) {}
+    fun onOverlayImageSelected(u: Uri) {
+        val newLayer = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}")
+        _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
+    }
+    fun onBackgroundImageSelected(u: Uri) = _uiState.update { it.copy(backgroundImageUri = u) }
     fun onImagePickerShown() {}
     fun onDoubleTapHintDismissed() {}
     fun onGestureStart() {}
@@ -238,7 +249,7 @@ class MainViewModel(
     fun onCalibrationPointCaptured() {}
     fun unwarpImage(l: List<Any>) {}
     fun onRetakeCapture() {}
-    fun onRefinementPathAdded(p: Path) {}
+    fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
     fun onRefinementModeChanged(b: Boolean) {}
     fun onConfirmTargetCreation() {}
     fun onMagicClicked() {}
