@@ -57,43 +57,6 @@ fun MockupScreen(
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val currentUiState by rememberUpdatedState(uiState)
 
-    val colorMatrix = remember(uiState.saturation, uiState.contrast, uiState.brightness, uiState.colorBalanceR, uiState.colorBalanceG, uiState.colorBalanceB) {
-        ColorMatrix().apply {
-            setToSaturation(uiState.saturation)
-            val contrast = uiState.contrast
-            val contrastMatrix = ColorMatrix(
-                floatArrayOf(
-                    contrast, 0f, 0f, 0f, (1 - contrast) * 128,
-                    0f, contrast, 0f, 0f, (1 - contrast) * 128,
-                    0f, 0f, contrast, 0f, (1 - contrast) * 128,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-
-            val b = uiState.brightness * 255f
-            val brightnessMatrix = ColorMatrix(
-                floatArrayOf(
-                    1f, 0f, 0f, 0f, b,
-                    0f, 1f, 0f, 0f, b,
-                    0f, 0f, 1f, 0f, b,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-
-            val colorBalanceMatrix = ColorMatrix(
-                floatArrayOf(
-                    uiState.colorBalanceR, 0f, 0f, 0f, 0f,
-                    0f, uiState.colorBalanceG, 0f, 0f, 0f,
-                    0f, 0f, uiState.colorBalanceB, 0f, 0f,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-            timesAssign(contrastMatrix)
-            timesAssign(brightnessMatrix)
-            timesAssign(colorBalanceMatrix)
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         uiState.backgroundImageUri?.let {
             AsyncImage(
@@ -103,34 +66,6 @@ fun MockupScreen(
                 contentScale = ContentScale.Crop
             )
         }
-
-        // Multi-Layer Rendering
-        // Note: For simplicity in Mockup mode, we iterate and render each layer in a Box.
-        // Gestures only apply to the ACTIVE layer.
-
-        // Use layers list if available, otherwise fallback to single image logic
-        val layersToRender = if (uiState.layers.isNotEmpty()) uiState.layers else if (uiState.overlayImageUri != null) {
-            listOf(
-                com.hereliesaz.graffitixr.data.OverlayLayer(
-                    id = "default",
-                    name = "Default",
-                    uri = uiState.overlayImageUri,
-                    scale = uiState.scale,
-                    rotationX = uiState.rotationX,
-                    rotationY = uiState.rotationY,
-                    rotationZ = uiState.rotationZ,
-                    offset = uiState.offset,
-                    opacity = uiState.opacity,
-                    brightness = uiState.brightness,
-                    contrast = uiState.contrast,
-                    saturation = uiState.saturation,
-                    colorBalanceR = uiState.colorBalanceR,
-                    colorBalanceG = uiState.colorBalanceG,
-                    colorBalanceB = uiState.colorBalanceB,
-                    blendMode = uiState.blendMode
-                )
-            )
-        } else emptyList()
 
         Box(
             modifier = Modifier
@@ -142,13 +77,9 @@ fun MockupScreen(
                     detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                 }
                 // Layer 2: Smart Gestures (Targeting Active Layer)
-                .pointerInput(currentUiState.activeLayerId, layersToRender.size) {
-                    // Logic to find active layer bitmap size is complex here without loading it first.
-                    // For now, we allow gestures globally and apply to active layer logic in callbacks.
+                .pointerInput(currentUiState.activeLayerId, currentUiState.layers.size) {
                     detectSmartOverlayGestures(
                         getValidBounds = {
-                            // Simplified bounds: Full screen or active layer bounds if possible
-                            // Ideally we get the active layer's bitmap size.
                             Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
                         },
                         onGestureStart = onGestureStart,
@@ -164,7 +95,7 @@ fun MockupScreen(
                     }
                 }
         ) {
-            layersToRender.forEach { layer ->
+            uiState.layers.forEach { layer ->
                 if (layer.isVisible) {
                     var layerBitmap by remember(layer.uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
 

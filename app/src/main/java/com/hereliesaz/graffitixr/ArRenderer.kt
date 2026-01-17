@@ -7,7 +7,6 @@ import android.opengl.GLSurfaceView
 import android.util.Log
 import com.google.ar.core.*
 import com.hereliesaz.graffitixr.data.Fingerprint
-import com.hereliesaz.graffitixr.data.KeyPointData
 import com.hereliesaz.graffitixr.rendering.*
 import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
@@ -32,9 +31,6 @@ class ArRenderer(
     private val onBoundsUpdated: (RectF) -> Unit
 ) : GLSurfaceView.Renderer {
 
-    // ... (Standard members) ...
-    // Assuming member variables from previous context (backgroundRenderer, etc.) are present
-    // Re-declaring critical ones for the snippet correctness:
     private val sessionLock = ReentrantLock()
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
@@ -47,9 +43,9 @@ class ArRenderer(
     @Volatile var session: Session? = null
     var isAnchorReplacementAllowed: Boolean = false
 
-    // ...
+    var showMiniMap: Boolean = false
+    var showGuide: Boolean = true
 
-    // Fix: Fingerprint generation logic with correct types
     suspend fun generateFingerprint(bitmap: Bitmap): Fingerprint? = withContext(Dispatchers.Default) {
         if (!ensureOpenCVLoaded()) return@withContext null
 
@@ -66,15 +62,12 @@ class ArRenderer(
 
             if (descriptors.rows() > 0) {
                 val kpsList = keypoints.toList()
-                val kpData = kpsList.map { kp ->
-                    KeyPointData(kp.pt.x.toFloat(), kp.pt.y.toFloat(), kp.size, kp.angle, kp.response, kp.octave, kp.class_id)
-                }
 
                 val descData = ByteArray(descriptors.rows() * descriptors.cols() * descriptors.channels())
                 descriptors.get(0, 0, descData)
 
                 return@withContext Fingerprint(
-                    keypoints = kpData,
+                    keypoints = kpsList,
                     descriptorsData = descData,
                     descriptorsRows = descriptors.rows(),
                     descriptorsCols = descriptors.cols(),
@@ -90,24 +83,69 @@ class ArRenderer(
             grayMat.release()
             descriptors.release()
             keypoints.release()
-            orb.release()
+            // orb.release() // Not available in all OpenCV versions, rely on GC or clear
+            orb.clear()
         }
     }
 
-    // Stub for flashlight to fix VM error
     fun setFlashlight(enabled: Boolean) {
-        // ... config update logic ...
+        session?.let { s ->
+            try {
+                val config = s.config
+                if (enabled) {
+                    config.flashMode = Config.FlashMode.TORCH
+                } else {
+                    config.flashMode = Config.FlashMode.OFF
+                }
+                s.configure(config)
+            } catch (e: Exception) {
+                Log.e("ArRenderer", "Failed to set flashlight", e)
+            }
+        }
     }
 
-    fun triggerCapture() { /* ... */ }
+    fun triggerCapture() {
+        // Implement capture trigger
+    }
 
-    // ... (Lifecycle methods onSurfaceCreated etc from previous turn) ...
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) { /* ... */ }
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) { /* ... */ }
-    override fun onDrawFrame(gl: GL10?) { /* ... */ }
+    fun queueTap(x: Float, y: Float) {
+        // Queue tap event
+    }
 
-    fun onResume(activity: android.app.Activity) { /* ... */ }
-    fun onPause() { /* ... */ }
-    fun cleanup() { /* ... */ }
-    fun queueTap(x: Float, y: Float) { /* ... */ }
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        backgroundRenderer.createOnGlThread()
+        planeRenderer.createOnGlThread()
+        pointCloudRenderer.createOnGlThread()
+        simpleQuadRenderer.createOnGlThread()
+        miniMapRenderer.createOnGlThread(context)
+    }
+
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        displayRotationHelper.onSurfaceChanged(width, height)
+    }
+
+    override fun onDrawFrame(gl: GL10?) {
+        // Render loop placeholder
+        // Use ReentrantLock to prevent native crashes
+        sessionLock.lock()
+        try {
+             // ... rendering logic ...
+        } finally {
+            sessionLock.unlock()
+        }
+    }
+
+    fun onResume(activity: android.app.Activity) {
+        displayRotationHelper.onResume()
+    }
+
+    fun onPause() {
+        displayRotationHelper.onPause()
+        session?.close()
+        session = null
+    }
+
+    fun cleanup() {
+        // Release resources
+    }
 }
