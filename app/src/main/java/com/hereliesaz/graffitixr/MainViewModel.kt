@@ -216,7 +216,6 @@ class MainViewModel(
 =======
 
 <<<<<<< HEAD
->>>>>>> Stashed changes
     fun onLayerRenamed(id: String, name: String) {
         _uiState.update { state ->
             state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it })
@@ -431,6 +430,7 @@ class MainViewModel(
         }
 >>>>>>> origin/feature/ar-editor-enhancements-4573859779138866612
     }
+
     fun copyLayerModifications(id: String) {
         layerModsClipboard = _uiState.value.layers.find { it.id == id }
         viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }

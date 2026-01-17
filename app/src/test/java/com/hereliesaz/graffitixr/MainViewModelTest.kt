@@ -64,6 +64,12 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `onColorBalanceRChanged updates state`() = runTest {
+        viewModel.onColorBalanceRChanged(1.2f)
+        assertEquals(1.2f, viewModel.uiState.value.colorBalanceR, 0.0f)
+    }
+
+    @Test
     fun `undo works correctly`() = runTest {
         val mockUri = mockk<Uri>()
         viewModel.onOverlayImageSelected(mockUri)
