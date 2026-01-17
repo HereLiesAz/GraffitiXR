@@ -169,6 +169,8 @@ class ArRenderer(
     private val ANALYSIS_INTERVAL_MS = 1500L
     private val analysisScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+    @Volatile var showMiniMap: Boolean = false
+
     fun setFingerprint(fingerprint: Fingerprint) {
         this.fingerprintData = fingerprint
         this.originalKeypointCount = fingerprint.keypoints.size
@@ -250,8 +252,8 @@ class ArRenderer(
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, depthTextureId)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_LINEAR)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {

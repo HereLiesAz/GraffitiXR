@@ -650,8 +650,8 @@ private fun MainContentLayer(
                     uiState = uiState
                 )
             }
-            else -> {
-                // Handle other modes or show nothing
+            EditorMode.CROP, EditorMode.ADJUST, EditorMode.DRAW, EditorMode.PROJECT -> {
+                // These modes might be managed by other screens or are sub-modes
             }
         }
     }
