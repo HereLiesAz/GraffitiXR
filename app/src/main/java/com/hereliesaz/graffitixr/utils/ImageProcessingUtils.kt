@@ -5,11 +5,17 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.graffitixr.data.Fingerprint
+import com.hereliesaz.graffitixr.data.RefinementPath
 import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
+import java.util.ArrayList
 
 /**
  * A collection of static methods to manipulate reality, pixel by pixel.
@@ -26,7 +32,7 @@ object ImageProcessingUtils {
         contrast: Float,   // 0.0 to 2.0, default 1.0
         saturation: Float  // 0.0 to 2.0, default 1.0
     ): Bitmap {
-        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config)
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
         val paint = Paint()
 
@@ -63,7 +69,7 @@ object ImageProcessingUtils {
         green: Float, // 0.0 to 2.0, default 1.0
         blue: Float   // 0.0 to 2.0, default 1.0
     ): Bitmap {
-        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config)
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
         val paint = Paint()
 
@@ -129,4 +135,112 @@ object ImageProcessingUtils {
         
         return result
     }
+}
+
+fun enhanceImageForAr(bitmap: Bitmap): Bitmap {
+    if (!ensureOpenCVLoaded()) return bitmap
+    // Convert to Mat
+    val mat = Mat()
+    Utils.bitmapToMat(bitmap, mat)
+
+    // Convert to Lab
+    val lab = Mat()
+    Imgproc.cvtColor(mat, lab, Imgproc.COLOR_RGB2Lab)
+
+    // Split channels
+    val channels = ArrayList<Mat>()
+    Core.split(lab, channels)
+
+    // Apply CLAHE to L channel (index 0)
+    val clahe = Imgproc.createCLAHE()
+    clahe.clipLimit = 4.0
+    clahe.apply(channels[0], channels[0])
+
+    // Merge
+    Core.merge(channels, lab)
+
+    // Convert back to RGB
+    val resultMat = Mat()
+    Imgproc.cvtColor(lab, resultMat, Imgproc.COLOR_Lab2RGB)
+
+    val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+    Utils.matToBitmap(resultMat, result)
+
+    mat.release(); lab.release(); resultMat.release()
+    for (c in channels) c.release()
+
+    return result
+}
+
+fun resizeBitmapForArCore(bitmap: Bitmap): Bitmap {
+    val maxDim = 1000
+    if (bitmap.width <= maxDim && bitmap.height <= maxDim) return bitmap
+
+    val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+    val width: Int
+    val height: Int
+    if (bitmap.width > bitmap.height) {
+        width = maxDim
+        height = (maxDim / ratio).toInt()
+    } else {
+        height = maxDim
+        width = (maxDim * ratio).toInt()
+    }
+    return Bitmap.createScaledBitmap(bitmap, width, height, true)
+}
+
+fun convertToLineDrawing(bitmap: Bitmap, isWhite: Boolean = true): Bitmap {
+    return ImageProcessingUtils.createOutline(bitmap)
+}
+
+fun detectFeaturesWithMask(bitmap: Bitmap, paths: List<RefinementPath>, mask: Bitmap?): List<Offset> {
+    if (!ensureOpenCVLoaded()) return emptyList()
+    val mat = Mat()
+    Utils.bitmapToMat(bitmap, mat)
+    val gray = Mat()
+    Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
+
+    val orb = ORB.create()
+    val keypoints = MatOfKeyPoint()
+    orb.detect(gray, keypoints)
+
+    val points = keypoints.toList().map {
+        Offset(it.pt.x.toFloat(), it.pt.y.toFloat())
+    }
+
+    mat.release(); gray.release(); keypoints.release()
+    return points
+}
+
+fun generateFingerprint(bitmap: Bitmap, paths: List<RefinementPath> = emptyList(), mask: Bitmap? = null): Fingerprint? {
+    if (!ensureOpenCVLoaded()) return null
+    val mat = Mat()
+    Utils.bitmapToMat(bitmap, mat)
+    val gray = Mat()
+    Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
+
+    val orb = ORB.create()
+    val keypoints = MatOfKeyPoint()
+    val descriptors = Mat()
+    orb.detectAndCompute(gray, Mat(), keypoints, descriptors)
+
+    if (keypoints.toList().isEmpty()) {
+        mat.release(); gray.release(); keypoints.release(); descriptors.release()
+        return Fingerprint(emptyList(), ByteArray(0), 0, 0, 0)
+    }
+
+    val kps = keypoints.toList()
+    val descData = ByteArray(descriptors.rows() * descriptors.cols() * descriptors.elemSize().toInt())
+    descriptors.get(0, 0, descData)
+
+    val fingerprint = Fingerprint(
+        kps,
+        descData,
+        descriptors.rows(),
+        descriptors.cols(),
+        descriptors.type()
+    )
+
+    mat.release(); gray.release(); keypoints.release(); descriptors.release()
+    return fingerprint
 }
