@@ -17,6 +17,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.google.ar.core.Pose
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
@@ -31,6 +32,7 @@ import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.applyCurves
 import com.hereliesaz.graffitixr.utils.convertToLineDrawing
+import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -59,8 +61,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sqrt
-import com.google.ar.core.Session.FeatureMapQuality
-import com.google.ar.core.Pose
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
