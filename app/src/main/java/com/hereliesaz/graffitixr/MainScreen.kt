@@ -509,7 +509,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     showColorBalanceDialog = true
                                     showSliderDialog = null
                                 }
-                                azRailSubItem(id = "blending", hostId = "design_host", text = "Build", info = navStrings.blendingInfo, onClick = {
+                                azRailSubItem(id = "blending", hostId = "design_host", text = "Blend", info = navStrings.blendingInfo, onClick = {
                                     viewModel.onCycleBlendMode()
                                     showSliderDialog = null; showColorBalanceDialog = false
                                     resetDialogs()
@@ -740,21 +740,11 @@ private fun MainContentLayer(
                 )
             }
 
-            // Fallback for tool modes to ensure content is visible
-            CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(
-                uiState = uiState,
-                onScaleChanged = onScaleChanged,
-                onOffsetChanged = onOffsetChanged,
-                onRotationZChanged = onRotationZChanged,
-                onRotationXChanged = onRotationXChanged,
-                onRotationYChanged = onRotationYChanged,
-                onCycleRotationAxis = onCycleRotationAxis,
-                onGestureStart = onGestureStart,
-                onGestureEnd = onGestureEnd
-            )
-            PROJECT -> {
-                // Should be handled by showProjectList, but as a fallback:
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+            CROP, ADJUST, DRAW, PROJECT, ISOLATE, BALANCE, OUTLINE -> {
+                ArView(
+                    viewModel = viewModel,
+                    uiState = uiState
+                )
             }
         }
     }
