@@ -29,11 +29,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.graffitixr.data.ProjectData
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ProjectLibraryScreen(
-    projects: List<String>,
-    onLoadProject: (String) -> Unit,
+    projects: List<ProjectData>,
+    onLoadProject: (ProjectData) -> Unit,
     onDeleteProject: (String) -> Unit,
     onNewProject: () -> Unit
 ) {
@@ -82,26 +86,46 @@ fun ProjectLibraryScreen(
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Project Icon
-                            Icon(
-                                Icons.Default.Folder,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                            // Thumbnail or Default Icon
+                            if (project.thumbnailUri != null) {
+                                coil.compose.AsyncImage(
+                                    model = project.thumbnailUri,
+                                    contentDescription = "Project Thumbnail",
+                                    modifier = Modifier
+                                        .size(60.dp)
+                                        .background(Color.DarkGray)
+                                        .padding(1.dp),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Folder,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(60.dp).padding(12.dp)
+                                )
+                            }
                             Spacer(Modifier.width(16.dp))
 
-                            // Project Name
-                            Text(
-                                text = project,
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f)
-                            )
+                            // Project Info
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = project.name,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+                                        .format(Date(project.lastModified)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+                            }
 
                             // Delete Action
-                            IconButton(onClick = { onDeleteProject(project) }) {
+                            IconButton(onClick = { onDeleteProject(project.id) }) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Delete project $project",
+                                    contentDescription = "Delete project ${project.name}",
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }

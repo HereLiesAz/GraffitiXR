@@ -125,23 +125,15 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
 
-        // 1. Create the texture for the camera feed
-        val textures = IntArray(1)
-        GLES20.glGenTextures(1, textures, 0)
-        backgroundTextureId = textures[0]
-        val textureTarget = android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES
-        GLES20.glBindTexture(textureTarget, backgroundTextureId)
-        GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
-        GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
-        GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST)
-        GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST)
-
-        // 2. Initialize renderers
+        // 1. Initialize renderers
         backgroundRenderer.createOnGlThread()
         planeRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread()
         simpleQuadRenderer.createOnGlThread()
         miniMapRenderer.createOnGlThread(context)
+
+        // 2. Use the texture created by BackgroundRenderer
+        backgroundTextureId = backgroundRenderer.textureId
 
         // 3. Connect texture to session if ready
         session?.setCameraTextureName(backgroundTextureId)

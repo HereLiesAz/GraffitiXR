@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Path
 import android.net.Uri
 import com.hereliesaz.graffitixr.data.OverlayLayer
+import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.data.RefinementPath
 // NOTE: We assume EditorMode, ArState, etc. are defined in the root package
 // or their respective files as indicated by the "Redeclaration" errors.
@@ -16,6 +17,12 @@ data class UiState(
     val showImagePicker: Boolean = false,
     val isLoading: Boolean = false,
     val hideUiForCapture: Boolean = false,
+
+    // Project Management
+    val availableProjects: List<ProjectData> = emptyList(),
+    val showProjectList: Boolean = true,
+    val currentProjectId: String? = null,
+    val gpsData: com.hereliesaz.graffitixr.data.GpsData? = null,
 
     // Layers & Images
     val overlayImageUri: Uri? = null,

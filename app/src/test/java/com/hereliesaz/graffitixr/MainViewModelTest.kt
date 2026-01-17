@@ -1,7 +1,9 @@
 package com.hereliesaz.graffitixr
 
+import android.content.Context
 import android.net.Uri
 import com.hereliesaz.graffitixr.utils.ProjectManager
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -70,5 +72,21 @@ class MainViewModelTest {
 
         viewModel.onUndoClicked()
         assertEquals(1f, viewModel.uiState.value.layers.first().opacity, 0.0f)
+    }
+
+    @Test
+    fun `autoSaveProject calls projectManager`() = runTest {
+        val context = mockk<Context>(relaxed = true)
+        viewModel.onNewProject() // Ensure we have a project ID
+
+        // Wait for coroutine to process onNewProject if needed, but it's using state update which is sync or quick
+        // Actually MainViewModel uses viewModelScope.launch.
+        // We need to advance time or wait. runTest handles this usually.
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.autoSaveProject(context)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { projectManager.saveProject(context, any(), any(), any()) }
     }
 }

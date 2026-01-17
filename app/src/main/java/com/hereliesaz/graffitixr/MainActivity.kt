@@ -16,7 +16,7 @@ import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
-    private val CAMERA_PERMISSION_CODE = 0
+    private val PERMISSION_REQUEST_CODE = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,10 +29,27 @@ class MainActivity : ComponentActivity() {
                 or View.SYSTEM_UI_FLAG_FULLSCREEN
                 or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
 
-        // CRITICAL FIX: Request Camera Permission at Runtime
+        // Request Permissions (Camera + Location)
+        val permissionsToRequest = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
+            permissionsToRequest.add(Manifest.permission.CAMERA)
         }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), PERMISSION_REQUEST_CODE)
+        }
+
+        // Load projects immediately
+        viewModel.loadAvailableProjects(this)
+
+        // Try to get location and sort
+        fetchLocationAndSort()
 
         setContent {
             val navController = rememberNavController()
@@ -45,17 +62,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        com.hereliesaz.graffitixr.utils.captureWindow(this) { bitmap ->
+            viewModel.autoSaveProject(this, bitmap)
+        }
+    }
+
+    private fun fetchLocationAndSort() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+            com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(this).lastLocation
+                .addOnSuccessListener { location ->
+                    location?.let {
+                        viewModel.updateCurrentLocation(it)
+                    }
+                }
+        }
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == CAMERA_PERMISSION_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("MainActivity", "Camera permission granted")
-                // Recreate activity to initialize AR session properly if needed,
-                // or let the onResume lifecycle handle it.
-            } else {
-                Log.e("MainActivity", "Camera permission denied")
-                // In production, show a UI explaining why it's needed
-            }
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            fetchLocationAndSort()
         }
     }
 }
