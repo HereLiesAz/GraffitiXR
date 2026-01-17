@@ -17,6 +17,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.google.ar.core.Pose
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
@@ -30,6 +31,7 @@ import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.applyCurves
+import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -58,9 +60,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sqrt
-import com.google.ar.core.Session.FeatureMapQuality
-import com.google.ar.core.Pose
-import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
@@ -370,32 +369,7 @@ class MainViewModel(
     private fun setLoading(isLoading: Boolean) { updateState(uiState.value.copy(isLoading = isLoading), isUndoable = false) }
     fun onBackgroundImageSelected(uri: Uri) { updateState(uiState.value.copy(backgroundImageUri = uri)) }
     fun onOverlayImageSelected(uri: Uri) { val newLayer = OverlayLayer(id = java.util.UUID.randomUUID().toString(), name = "Layer ${uiState.value.layers.size + 1}", uri = uri, originalUri = uri); updateState(uiState.value.copy(overlayImageUri = uri, originalOverlayImageUri = uri, backgroundRemovedImageUri = null, isLineDrawing = false, showDoubleTapHint = !onboardingManager.hasSeenDoubleTapHint(), activeRotationAxis = RotationAxis.Y, layers = uiState.value.layers + newLayer, activeLayerId = newLayer.id, rotationY = 0f, rotationX = 0f, rotationZ = 0f, scale = 1f, offset = Offset.Zero)) }
-
-    fun onLayerActivated(layerId: String) {
-        uiState.value.layers.find { it.id == layerId }?.let {
-            updateState(uiState.value.copy(
-                activeLayerId = layerId,
-                overlayImageUri = it.uri,
-                originalOverlayImageUri = it.originalUri,
-                backgroundRemovedImageUri = it.backgroundRemovedUri,
-                scale = it.scale,
-                rotationX = it.rotationX,
-                rotationY = it.rotationY,
-                rotationZ = it.rotationZ,
-                offset = it.offset,
-                opacity = it.opacity,
-                brightness = it.brightness,
-                contrast = it.contrast,
-                saturation = it.saturation,
-                colorBalanceR = it.colorBalanceR,
-                colorBalanceG = it.colorBalanceG,
-                colorBalanceB = it.colorBalanceB,
-                curvesPoints = it.curvesPoints,
-                blendMode = it.blendMode
-            ), isUndoable = false)
-        }
-    }
-
+    fun onLayerActivated(layerId: String) { uiState.value.layers.find { it.id == layerId }?.let { updateState(uiState.value.copy(activeLayerId = layerId, overlayImageUri = it.uri, originalOverlayImageUri = it.originalUri, backgroundRemovedImageUri = it.backgroundRemovedUri, scale = it.scale, rotationX = it.rotationX, rotationY = it.rotationY, rotationZ = it.rotationZ, offset = it.offset, opacity = it.opacity, brightness = it.brightness, contrast = it.contrast, saturation = it.saturation, colorBalanceR = it.colorBalanceR, colorBalanceG = it.colorBalanceG, colorBalanceB = it.colorBalanceB, curvesPoints = it.curvesPoints, blendMode = it.blendMode), isUndoable = false) } }
     fun onLayerReordered(newOrderIds: List<String>) { val reordered = newOrderIds.mapNotNull { id -> uiState.value.layers.find { it.id == id } }; if (reordered.size == uiState.value.layers.size) updateState(uiState.value.copy(layers = reordered)) }
     fun onLayerRenamed(layerId: String, newName: String) { updateState(uiState.value.copy(layers = uiState.value.layers.map { if (it.id == layerId) it.copy(name = newName) else it })) }
     fun onLayerDuplicated(layerId: String) { uiState.value.layers.find { it.id == layerId }?.let { val newLayer = it.copy(id = java.util.UUID.randomUUID().toString(), name = "${it.name} Copy"); updateState(uiState.value.copy(layers = uiState.value.layers + newLayer, activeLayerId = newLayer.id)) } }

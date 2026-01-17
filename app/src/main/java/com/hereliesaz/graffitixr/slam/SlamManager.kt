@@ -1,96 +1,49 @@
 package com.hereliesaz.graffitixr.slam
 
-import android.graphics.Bitmap
 import android.util.Log
-import com.google.ar.core.Anchor
-import com.google.ar.core.Session
-import com.google.ar.core.Session.FeatureMapQuality
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import java.nio.ByteBuffer
 
 /**
- * Manager that bridges Native Dense Mapping (MobileGS) and Cloud Anchor Hosting.
+ * Manager for the ORB-SLAM3 system via JNI.
  */
 class SlamManager {
 
-    // --- Native Interface (MobileGS) ---
     companion object {
         init {
             try {
-                System.loadLibrary("graffiti-lib")
+                // Ensure dependency library (OpenCV) is loaded before SLAM
+                System.loadLibrary("opencv_java4")
+                System.loadLibrary("graffiti_slam")
             } catch (e: UnsatisfiedLinkError) {
-                Log.e("SlamManager", "Native library not found: ${e.message}")
+                Log.e("SlamManager", "Failed to load SLAM native library: ${e.message}")
+            } catch (e: Exception) {
+                Log.e("SlamManager", "Error during native initialization: ${e.message}")
             }
         }
     }
 
-    external fun initNative()
-    external fun destroyNative()
-    external fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray)
+    /**
+     * Initializes the SLAM system with the given vocabulary and settings files.
+     * @param vocPath Path to the ORB vocabulary file.
+     * @param settingsPath Path to the settings file (YAML).
+     */
+    external fun initNative(vocPath: String, settingsPath: String)
 
-    external fun feedSensors(
-        imageData: ByteArray,
-        width: Int,
-        height: Int,
-        pointCloud: FloatArray,
-        pointCount: Int
-    )
+    /**
+     * Shuts down the SLAM system.
+     */
+    external fun disposeNative()
 
-    external fun feedDepth(
-        depthData: ByteArray,
-        width: Int,
-        height: Int
-    )
+    /**
+     * Saves the current map (Atlas).
+     */
+    external fun saveMapNative()
 
-    external fun drawFrame()
-    external fun saveWorld(path: String): Boolean
-    external fun loadWorld(path: String): Boolean
-
-    // Helper to feed bitmap data to C++
-    fun feedFrame(bitmap: Bitmap, points: FloatArray) {
-        val width = bitmap.width
-        val height = bitmap.height
-        val buffer = ByteBuffer.allocateDirect(bitmap.byteCount)
-        bitmap.copyPixelsToBuffer(buffer)
-
-        feedSensors(buffer.array(), width, height, points, points.size / 4)
-    }
-
-    // --- Cloud Anchor Logic (Restored) ---
-
-    private val _mappingQuality = MutableStateFlow(FeatureMapQuality.INSUFFICIENT)
-    val mappingQuality = _mappingQuality.asStateFlow()
-
-    private val _isHosting = MutableStateFlow(false)
-    val isHosting = _isHosting.asStateFlow()
-
-    fun updateFeatureMapQuality(session: Session, cameraPose: com.google.ar.core.Pose) {
-        try {
-            val quality = session.estimateFeatureMapQualityForHosting(cameraPose)
-            _mappingQuality.value = quality
-        } catch (e: Exception) {
-            // Session might be paused or not ready
-        }
-    }
-
-    fun hostAnchor(session: Session, anchor: Anchor, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
-        _isHosting.value = true
-        session.hostCloudAnchorAsync(anchor, 365) { cloudAnchorId, state ->
-            _isHosting.value = false
-            if (state == Anchor.CloudAnchorState.SUCCESS) {
-                onSuccess(cloudAnchorId)
-            } else {
-                onError(state.toString())
-            }
-        }
-    }
-
-    fun reset() {
-        _mappingQuality.value = FeatureMapQuality.INSUFFICIENT
-        _isHosting.value = false
-        // Note: We don't explicitly clear the native map here yet,
-        // as that requires exposing a 'clear()' JNI method.
-        // For now, this resets the UI state for Cloud Anchors.
-    }
+    /**
+     * Processes a single frame.
+     * @param width Width of the image.
+     * @param height Height of the image.
+     * @param data Raw image data (e.g. Grayscale or RGB).
+     * @param timestamp Timestamp of the frame.
+     */
+    external fun processFrameNative(width: Int, height: Int, data: ByteArray, timestamp: Long)
 }

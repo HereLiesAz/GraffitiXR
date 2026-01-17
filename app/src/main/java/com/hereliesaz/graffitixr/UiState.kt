@@ -6,7 +6,6 @@ import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.AugmentedImageDatabase
-import com.hereliesaz.graffitixr.data.CalibrationSnapshot
 import com.hereliesaz.graffitixr.data.GithubRelease
 import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.data.RefinementPath
@@ -67,6 +66,8 @@ enum class CaptureStep : Parcelable {
 
 /**
  * The single source of truth for the application's UI state.
+ * This immutable data class holds all the data required to render the UI,
+ * enabling a unidirectional data flow pattern.
  */
 @Parcelize
 data class UiState(
@@ -136,6 +137,12 @@ data class UiState(
     val isFlashlightOn: Boolean = false,
     val isGpsMarkingEnabled: Boolean = false,
 
+    // SLAM / Mapping State
+    val isMappingMode: Boolean = false,
+    val mappingQualityScore: Float = 0f,
+    val isHostingAnchor: Boolean = false,
+    val cloudAnchorId: String? = null,
+
     // Multi-step Capture State
     val targetCreationMode: TargetCreationMode = TargetCreationMode.CAPTURE,
     val captureStep: CaptureStep = CaptureStep.ADVICE,
@@ -157,15 +164,9 @@ data class UiState(
     val detectedKeypoints: @WriteWith<OffsetListParceler> List<Offset> = emptyList(),
     val targetMaskUri: Uri? = null,
 
-    // Calibration Snapshots (GPS + Sensor + Pose)
-    val calibrationSnapshots: List<CalibrationSnapshot> = emptyList(),
+    // Calibration Snapshots
+    val calibrationSnapshots: List<com.hereliesaz.graffitixr.data.CalibrationSnapshot> = emptyList(),
 
     @IgnoredOnParcel
-    val augmentedImageDatabase: AugmentedImageDatabase? = null,
-
-    // --- Neural Scan / Mapping State ---
-    val isMappingMode: Boolean = false,
-    val mappingQualityScore: Float = 0f, // 0.0 to 1.0 (Mapped from FeatureMapQuality)
-    val isHostingAnchor: Boolean = false,
-    val cloudAnchorId: String? = null
+    val augmentedImageDatabase: AugmentedImageDatabase? = null
 ) : Parcelable

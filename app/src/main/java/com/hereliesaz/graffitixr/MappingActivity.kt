@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr
 
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
@@ -34,21 +33,10 @@ class MappingActivity : ComponentActivity() {
 
         setContent {
             GraffitiXRTheme {
-                MappingScreen(
-                    onMapSaved = { id ->
-                        Log.v(TAG, "Map saved with ID: $id")
-                        // In a real scenario, you might return this result to the calling Activity
-                        // For now, we just toast and finish
-                        runOnUiThread {
-                            Toast.makeText(this, "Map Saved: $id", Toast.LENGTH_LONG).show()
-                        }
-                        finish()
-                    },
-                    onExit = {
-                        Log.v(TAG, "onExit: called from MappingScreen")
-                        finish()
-                    }
-                )
+                MappingScreen(onExit = {
+                    Log.v(TAG, "onExit: called from MappingScreen")
+                    finish()
+                })
             }
         }
     }

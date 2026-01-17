@@ -1,7 +1,9 @@
 package com.hereliesaz.graffitixr
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.net.Uri
@@ -11,6 +13,7 @@ import android.opengl.Matrix
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.core.content.ContextCompat
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.google.ar.core.Anchor
@@ -21,17 +24,14 @@ import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
-import com.google.ar.core.Session.FeatureMapQuality
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
-import com.hereliesaz.graffitixr.rendering.MiniMapRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
-import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
@@ -59,9 +59,10 @@ import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.abs
-import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
-import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 
+/**
+ * Custom GLSurfaceView.Renderer that handles the ARCore session and OpenGL ES rendering.
+ */
 class ArRenderer(
     private val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
@@ -87,19 +88,18 @@ class ArRenderer(
     private val planeRenderer = PlaneRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
     private val simpleQuadRenderer = SimpleQuadRenderer()
-    private val miniMapRenderer = MiniMapRenderer()
     private val yuvToRgbConverter = YuvToRgbConverter(context)
-    private val slamManager = SlamManager()
 
+    // Depth
     private var isDepthSupported = false
     private var depthTextureId = -1
 
+    // State
     @Volatile private var captureNextFrame = false
     private var viewportWidth = 0
     private var viewportHeight = 0
-    private var navRailWidthPx = 0
 
-    // Layers
+    // Multi-Layer Support
     private val layerBitmaps = ConcurrentHashMap<String, Bitmap>()
     @Volatile private var _layers: List<OverlayLayer> = emptyList()
     @Volatile var activeLayerId: String? = null
@@ -107,9 +107,7 @@ class ArRenderer(
 
     @Volatile var guideBitmap: Bitmap? = null
     @Volatile var showGuide: Boolean = false
-    @Volatile var showMiniMap: Boolean = false
-    var onScanQualityUpdate: ((FeatureMapQuality) -> Unit)? = null
-
+    
     @Volatile var arImagePose: FloatArray? = null
     @Volatile var arState: ArState = ArState.SEARCHING
     private var activeAnchor: Anchor? = null
@@ -119,7 +117,7 @@ class ArRenderer(
     private var configJob: Job? = null
     private var resumeJob: Job? = null
 
-    // Fallback Transforms
+    // Legacy Transforms
     var opacity: Float = 1.0f
     var brightness: Float = 0f
     var scale: Float = 1.0f
@@ -130,13 +128,14 @@ class ArRenderer(
     var colorBalanceG: Float = 1.0f
     var colorBalanceB: Float = 1.0f
 
-    // CONTROL FLAG: Prevents double-taps from jumping the anchor
     var isAnchorReplacementAllowed: Boolean = false
 
     private val tapQueue = ConcurrentLinkedQueue<Pair<Float, Float>>()
     private val panLock = Any()
+    private var pendingPanX = 0f
+    private var pendingPanY = 0f
 
-    // Matrices
+    // Reusable matrices
     private val worldPos = FloatArray(4)
     private val eyePos = FloatArray(4)
     private val clipPos = FloatArray(4)
@@ -177,11 +176,13 @@ class ArRenderer(
 
     fun setAugmentedImageDatabase(bitmaps: List<Bitmap>) {
         this.initialAugmentedImages = bitmaps
+
         if (session != null && isSessionResumed) {
             configJob?.cancel()
             configJob = CoroutineScope(Dispatchers.Main).launch {
                 val session = this@ArRenderer.session ?: return@launch
                 val database = configureAugmentedImageDatabase(session, bitmaps)
+
                 if (database != null) {
                     sessionLock.lock()
                     try {
@@ -191,7 +192,10 @@ class ArRenderer(
                             session.configure(config)
                         }
                     } catch (e: Exception) {
-                    } finally { sessionLock.unlock() }
+                        Log.e(TAG, "Failed to configure AugmentedImageDatabase dynamically", e)
+                    } finally {
+                        sessionLock.unlock()
+                    }
                 }
             }
         }
@@ -204,9 +208,23 @@ class ArRenderer(
             bitmaps.forEachIndexed { index, bitmap ->
                 try {
                     val resized = com.hereliesaz.graffitixr.utils.resizeBitmapForArCore(bitmap)
-                    database.addImage("target_$index", resized)
-                    imagesAdded++
-                } catch (e: Exception) {}
+                    try {
+                        database.addImage("target_$index", resized)
+                        imagesAdded++
+                    } catch (e: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
+                        Log.w(TAG, "Image quality low for target_$index. Attempting OpenCV enhancement...")
+                        val enhanced = enhanceImageForAr(resized)
+                        try {
+                            database.addImage("target_$index", enhanced)
+                            imagesAdded++
+                        } catch (e2: com.google.ar.core.exceptions.ImageInsufficientQualityException) {
+                            Log.e(TAG, "Image still insufficient quality after enhancement: target_$index")
+                            mainHandler.post { onTrackingFailure("Target image quality is too low for reliable tracking. Please capture a sharper image with more high-contrast details.") }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error adding image to database: target_$index", e)
+                }
             }
         }
         return if (imagesAdded > 0) database else null
@@ -219,12 +237,10 @@ class ArRenderer(
             planeRenderer.createOnGlThread()
             pointCloudRenderer.createOnGlThread()
             simpleQuadRenderer.createOnGlThread()
-            miniMapRenderer.createOnGlThread(context)
-            slamManager.initNative()
             createDepthTexture()
-            val density = context.resources.displayMetrics.density
-            navRailWidthPx = (80 * density).toInt()
-        } catch (e: Exception) { Log.e(TAG, "Init failed", e) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize renderers", e)
+        }
     }
 
     private fun createDepthTexture() {
@@ -247,52 +263,57 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+        
+        // Critical: Safety check for session state to prevent scheduler.cc RET_CHECK failure
         if (!isSessionResumed) return
+        
         sessionLock.lock()
         try {
-            val currentSession = session ?: return
-            if (backgroundRenderer.textureId != -1) currentSession.setCameraTextureName(backgroundRenderer.textureId)
+            val currentSession = session
+            if (currentSession == null) return
+
+            if (backgroundRenderer.textureId != -1) {
+                currentSession.setCameraTextureName(backgroundRenderer.textureId)
+            }
             displayRotationHelper.updateSessionIfNeeded(currentSession)
 
             try {
                 val frame = currentSession.update()
-                if (isDepthSupported) updateDepthTexture(frame)
-
-                val camera = frame.camera
-                camera.getViewMatrix(viewMtx, 0)
-                camera.getProjectionMatrix(projMtx, 0, 0.01f, 100.0f)
-
-                slamManager.updateCamera(viewMtx, projMtx)
-
-                if (showMiniMap) {
-                    try {
-                        val depthImage = frame.acquireDepthImage16Bits()
-                        if (depthImage != null) {
-                            val buffer = depthImage.planes[0].buffer
-                            val bytes = ByteArray(buffer.remaining())
-                            buffer.get(bytes)
-                            slamManager.feedDepth(bytes, depthImage.width, depthImage.height)
-                            depthImage.close()
-                        }
-                    } catch (e: Exception) {}
+                if (isDepthSupported) {
+                    updateDepthTexture(frame)
                 }
 
-                frame.transformCoordinates2d(com.google.ar.core.Coordinates2d.VIEW_NORMALIZED, coordsViewport, com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED, coordsTexture)
-                val u0 = coordsTexture[0]; val v0 = coordsTexture[1]; val u1 = coordsTexture[2]; val v1 = coordsTexture[3]; val u2 = coordsTexture[4]; val v2 = coordsTexture[5]
-                val c = u0; val f = v0; val a = u1 - u0; val d = v1 - v0; val b = u2 - u0; val e = v2 - v0
+                frame.transformCoordinates2d(
+                    com.google.ar.core.Coordinates2d.VIEW_NORMALIZED,
+                    coordsViewport,
+                    com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED,
+                    coordsTexture
+                )
+
+                val u0 = coordsTexture[0]; val v0 = coordsTexture[1]
+                val u1 = coordsTexture[2]; val v1 = coordsTexture[3]
+                val u2 = coordsTexture[4]; val v2 = coordsTexture[5]
+
+                val c = u0; val f = v0
+                val a = u1 - u0; val d = v1 - v0
+                val b = u2 - u0; val e = v2 - v0
+
                 displayToCameraTransform[0] = a; displayToCameraTransform[1] = d; displayToCameraTransform[2] = 0f
                 displayToCameraTransform[3] = b; displayToCameraTransform[4] = e; displayToCameraTransform[5] = 0f
                 displayToCameraTransform[6] = c; displayToCameraTransform[7] = f; displayToCameraTransform[8] = 1f
 
                 drawFrame(frame)
-
-                if (showMiniMap) {
-                    slamManager.drawFrame()
-                    val quality = currentSession.estimateFeatureMapQualityForHosting(camera.pose)
-                    mainHandler.post { onScanQualityUpdate?.invoke(quality) }
-                }
-            } catch (e: Exception) { Log.e(TAG, "Draw Frame Error", e) }
-        } finally { sessionLock.unlock() }
+            } catch (e: SessionPausedException) {
+                // Ignore
+            } catch (e: Exception) {
+                // Catch potential scheduler/mediapipe failures and log them, but don't crash
+                Log.e(TAG, "Error updating AR frame: ${e.message}")
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "Exception on GL Thread", t)
+        } finally {
+            sessionLock.unlock()
+        }
     }
 
     private fun updateDepthTexture(frame: Frame) {
@@ -301,7 +322,11 @@ class ArRenderer(
             if (depthImage != null) {
                 val buffer = depthImage.planes[0].buffer
                 GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, depthTextureId)
-                GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_LUMINANCE, depthImage.width, depthImage.height, 0, GLES20.GL_LUMINANCE, GLES20.GL_UNSIGNED_SHORT, buffer)
+                GLES20.glTexImage2D(
+                    GLES20.GL_TEXTURE_2D, 0, GLES20.GL_LUMINANCE,
+                    depthImage.width, depthImage.height, 0,
+                    GLES20.GL_LUMINANCE, GLES20.GL_UNSIGNED_SHORT, buffer
+                )
                 depthImage.close()
             }
         } catch (e: Exception) {}
@@ -309,7 +334,12 @@ class ArRenderer(
 
     private fun drawFrame(frame: Frame) {
         backgroundRenderer.draw(frame)
-        if (captureNextFrame) { captureFrameForFingerprint(frame); captureNextFrame = false }
+
+        if (captureNextFrame) {
+            captureFrameForFingerprint(frame)
+            captureNextFrame = false
+        }
+
         if (System.currentTimeMillis() - lastAnalysisTime > ANALYSIS_INTERVAL_MS && fingerprintData != null) {
             lastAnalysisTime = System.currentTimeMillis()
             analyzeFrameAsync(frame)
@@ -317,18 +347,20 @@ class ArRenderer(
 
         val camera = frame.camera
         if (camera.trackingState == TrackingState.TRACKING) {
-            if (!wasTracking) { wasTracking = true; mainHandler.post { onTrackingFailure(null) } }
+            if (!wasTracking) {
+                wasTracking = true
+                mainHandler.post { onTrackingFailure(null) }
+            }
         } else {
-            if (wasTracking) { wasTracking = false; mainHandler.post { onTrackingFailure("Tracking lost.") } }
+            if (wasTracking) {
+                wasTracking = false
+                mainHandler.post { onTrackingFailure("Tracking lost.") }
+            }
             return
         }
 
-        if (!showGuide) {
-            frame.acquirePointCloud().use { pointCloud ->
-                pointCloudRenderer.update(pointCloud)
-                pointCloudRenderer.draw(viewMtx, projMtx)
-            }
-        }
+        camera.getProjectionMatrix(projMtx, 0, 0.01f, 100.0f)
+        camera.getViewMatrix(viewMtx, 0)
 
         if (activeAnchor == null && arState != ArState.PLACED) {
             val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
@@ -348,6 +380,7 @@ class ArRenderer(
             if (activeAnchor!!.trackingState == TrackingState.TRACKING) {
                 activeAnchor!!.pose.toMatrix(calculationPoseMatrix, 0)
                 arImagePose = calculationPoseMatrix.clone()
+                handlePan(frame, viewMtx, projMtx)
             }
         }
 
@@ -379,9 +412,8 @@ class ArRenderer(
                         }
                     }
                 }
-                val singleOverlay = overlayBitmap
-                if (currentLayers.isEmpty() && singleOverlay != null) {
-                    drawLayer(singleOverlay, scale, rotationX, rotationY, rotationZ, 0f, 0f, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB, true, 0, androidx.compose.ui.graphics.BlendMode.SrcOver)
+                if (currentLayers.isEmpty() && overlayBitmap != null) {
+                    drawLayer(overlayBitmap, scale, rotationX, rotationY, rotationZ, 0f, 0f, opacity, brightness, colorBalanceR, colorBalanceG, colorBalanceB, true, 0, androidx.compose.ui.graphics.BlendMode.SrcOver)
                 }
             }
         }
@@ -390,28 +422,17 @@ class ArRenderer(
     private fun drawLayer(bitmap: Bitmap?, scale: Float, rotX: Float, rotY: Float, rotZ: Float, offsetX: Float, offsetY: Float, opacity: Float, brightness: Float, colorR: Float, colorG: Float, colorB: Float, reportBounds: Boolean, layerIndex: Int, blendMode: androidx.compose.ui.graphics.BlendMode) {
         if (bitmap == null) return
         val pose = arImagePose ?: return
-
-        // 1. ANCHOR: The 0,0,0 point
         System.arraycopy(pose, 0, calculationModelMatrix, 0, 16)
         val modelMtx = calculationModelMatrix
-
-        // 2. ALIGNMENT: Vertical Correction
         if (arState == ArState.PLACED) Matrix.rotateM(modelMtx, 0, -90f, 1f, 0f, 0f)
-
-        // 3. TRANSLATION: Move CENTER along the XY plane of the surface
-        val zOffset = if (layerIndex >= 0) layerIndex * 0.001f else 0f
-        Matrix.translateM(modelMtx, 0, offsetX, offsetY, zOffset)
-
-        // 4. ROTATION: Local Axis Rotation around new Center
         Matrix.rotateM(modelMtx, 0, rotZ, 0f, 0f, 1f)
         Matrix.rotateM(modelMtx, 0, rotX, 1f, 0f, 0f)
         Matrix.rotateM(modelMtx, 0, rotY, 0f, 1f, 0f)
-
-        // 5. SCALE: Size relative to center
+        val zOffset = if (layerIndex >= 0) layerIndex * 0.001f else 0f
+        Matrix.translateM(modelMtx, 0, offsetX, offsetY, zOffset)
         Matrix.scaleM(modelMtx, 0, scale, scale, 1f)
         val aspectRatio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
         Matrix.scaleM(modelMtx, 0, aspectRatio, 1f, 1f)
-
         Matrix.multiplyMM(calculationModelViewMatrix, 0, viewMtx, 0, modelMtx, 0)
         Matrix.multiplyMM(calculationMvpMatrix, 0, projMtx, 0, calculationModelViewMatrix, 0)
         simpleQuadRenderer.draw(calculationMvpMatrix, calculationModelViewMatrix, bitmap, opacity, brightness, colorR, colorG, colorB, if (isDepthSupported) depthTextureId else -1, backgroundRenderer.textureId, viewportWidth.toFloat(), viewportHeight.toFloat(), displayToCameraTransform, blendMode)
@@ -440,22 +461,41 @@ class ArRenderer(
 
     private fun handleTap(frame: Frame) {
         val tap = tapQueue.poll() ?: return
-        // CRITICAL: Ignore tap if anchor already placed and replacement locked
-        if (!isAnchorReplacementAllowed && activeAnchor != null) return
-
         val hitResult = frame.hitTest(tap.first, tap.second)
         for (hit in hitResult) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                try {
-                    activeAnchor?.detach()
-                    activeAnchor = hit.createAnchor()
-                    arState = ArState.PLACED
-                    mainHandler.post { onAnchorCreated() }
-                    break
-                } catch (e: Exception) {}
+                val camFwdX = -viewMtx[2]; val camFwdY = -viewMtx[6]; val camFwdZ = -viewMtx[10]
+                hit.hitPose.toMatrix(calculationPoseMatrix, 0)
+                val dot = camFwdX * calculationPoseMatrix[4] + camFwdY * calculationPoseMatrix[5] + camFwdZ * calculationPoseMatrix[6]
+                if (abs(dot) > 0.7f) {
+                    try { activeAnchor?.detach(); activeAnchor = hit.createAnchor(); arState = ArState.PLACED; mainHandler.post { onAnchorCreated() }; break } catch (e: Exception) {}
+                }
             }
         }
+    }
+
+    private fun handlePan(frame: Frame, viewMtx: FloatArray, projMtx: FloatArray) {
+        var dx = 0f; var dy = 0f
+        synchronized(panLock) { dx = pendingPanX; dy = pendingPanY; pendingPanX = 0f; pendingPanY = 0f }
+        if (dx == 0f && dy == 0f) return
+        val pose = arImagePose ?: return
+        val screenPos = projectPoseToScreen(pose, viewMtx, projMtx) ?: return
+        val newX = screenPos.first + dx; val newY = screenPos.second + dy
+        val hitResult = frame.hitTest(newX, newY)
+        for (hit in hitResult) {
+            if (hit.trackable is Plane && (hit.trackable as Plane).isPoseInPolygon(hit.hitPose)) {
+                try { activeAnchor?.detach(); activeAnchor = hit.createAnchor(); val previousState = arState; arState = ArState.PLACED; if (previousState != ArState.PLACED) mainHandler.post { onAnchorCreated() }; hit.hitPose.toMatrix(calculationPoseMatrix, 0); arImagePose = calculationPoseMatrix.clone(); break } catch (e: Exception) {}
+            }
+        }
+    }
+
+    private fun projectPoseToScreen(modelMtx: FloatArray, viewMtx: FloatArray, projMtx: FloatArray): Pair<Float, Float>? {
+        worldPos[0] = modelMtx[12]; worldPos[1] = modelMtx[13]; worldPos[2] = modelMtx[14]; worldPos[3] = 1.0f
+        Matrix.multiplyMV(eyePos, 0, viewMtx, 0, worldPos, 0)
+        Matrix.multiplyMV(clipPos, 0, projMtx, 0, eyePos, 0)
+        if (clipPos[3] == 0f) return null
+        return Pair((clipPos[0] / clipPos[3] + 1f) / 2f * viewportWidth, (1f - clipPos[1] / clipPos[3]) / 2f * viewportHeight)
     }
 
     private fun captureFrameForFingerprint(frame: Frame) {
@@ -476,8 +516,15 @@ class ArRenderer(
 
     private fun analyzeFrameAsync(frame: Frame) {
         if (isAnalyzing.getAndSet(true)) return
-        if (!ensureOpenCVLoaded()) { isAnalyzing.set(false); return }
+        
+        // --- CRITICAL CHECK: OpenCV Availability ---
+        if (!ensureOpenCVLoaded()) {
+            isAnalyzing.set(false)
+            return
+        }
+
         val image = try { frame.acquireCameraImage() } catch (e: Exception) { isAnalyzing.set(false); return }
+
         try {
             val rotation = getRotationDegrees()
             val plane = image.planes[0]; val buffer = plane.buffer
@@ -485,37 +532,71 @@ class ArRenderer(
             if (analysisBuffer == null || analysisBuffer!!.size != width * height) analysisBuffer = ByteArray(width * height)
             val data = analysisBuffer!!
             buffer.rewind()
-            if (width == rowStride) buffer.get(data) else { for (row in 0 until height) { buffer.position(row * rowStride); buffer.get(data, row * width, width) } }
+            if (width == rowStride) buffer.get(data) else {
+                for (row in 0 until height) { buffer.position(row * rowStride); buffer.get(data, row * width, width) }
+            }
             image.close()
+
             analysisScope.launch {
+                // Ensure native library is still loaded in this coroutine thread
                 if (!ensureOpenCVLoaded()) { isAnalyzing.set(false); return@launch }
-                val rawMat = Mat(); val rotatedMat = Mat(); val descriptors = Mat(); val targetDescriptors = Mat(); val keypoints = MatOfKeyPoint(); val matches = MatOfDMatch(); val mask = Mat()
+                
+                // Bolt Optimization: Local Mat objects with explicit lifecycle
+                val rawMat = Mat()
+                val rotatedMat = Mat()
+                val descriptors = Mat()
+                val targetDescriptors = Mat()
+                val keypoints = MatOfKeyPoint()
+                val matches = MatOfDMatch()
+                val mask = Mat()
+                
                 try {
-                    rawMat.create(height, width, CvType.CV_8UC1); rawMat.put(0, 0, data)
+                    rawMat.create(height, width, CvType.CV_8UC1)
+                    rawMat.put(0, 0, data)
+
                     val finalMat = if (rotation != 0f) {
-                        val code = when (rotation) { 90f -> Core.ROTATE_90_CLOCKWISE; 180f -> Core.ROTATE_180; 270f -> Core.ROTATE_90_COUNTERCLOCKWISE; else -> -1 }
+                        val code = when (rotation) {
+                            90f -> Core.ROTATE_90_CLOCKWISE
+                            180f -> Core.ROTATE_180
+                            270f -> Core.ROTATE_90_COUNTERCLOCKWISE
+                            else -> -1
+                        }
                         if (code != -1) { Core.rotate(rawMat, rotatedMat, code); rotatedMat } else rawMat
                     } else rawMat
+
                     val orbLocal = ORB.create()
                     orbLocal.detectAndCompute(finalMat, mask, keypoints, descriptors)
+
                     val fingerprint = fingerprintData
                     if (descriptors.rows() > 0 && fingerprint != null && fingerprint.descriptorsData.isNotEmpty()) {
                         targetDescriptors.create(fingerprint.descriptorsRows, fingerprint.descriptorsCols, fingerprint.descriptorsType)
                         targetDescriptors.put(0, 0, fingerprint.descriptorsData)
+
                         val matcherLocal = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
                         matcherLocal.match(descriptors, targetDescriptors, matches)
-                        val total = matches.rows(); var good = 0
+                        
+                        val total = matches.rows()
+                        var good = 0
                         if (total > 0) {
-                            val matchData = FloatArray(total * 4); matches.get(0, 0, matchData)
+                            val matchData = FloatArray(total * 4)
+                            matches.get(0, 0, matchData)
                             for (i in 0 until total) { if (matchData[i * 4 + 3] < 60) good++ }
                         }
                         val ratio = if (originalKeypointCount > 0) good.toFloat() / originalKeypointCount.toFloat() else 0f
                         mainHandler.post { onProgressUpdated((1.0f - ratio).coerceIn(0f, 1f) * 100f, null) }
                     }
-                } catch (e: Exception) { Log.e(TAG, "Analysis error: ${e.message}") } finally {
-                    if (rawMat.nativeObj != 0L) rawMat.release(); if (rotatedMat.nativeObj != 0L) rotatedMat.release()
-                    if (descriptors.nativeObj != 0L) descriptors.release(); if (targetDescriptors.nativeObj != 0L) targetDescriptors.release()
-                    if (keypoints.nativeObj != 0L) keypoints.release(); if (matches.nativeObj != 0L) matches.release(); if (mask.nativeObj != 0L) mask.release()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Analysis error: ${e.message}")
+                } finally {
+                    // Bolt Optimization: Aggressive native resource release to prevent finalizer UnsatisfiedLinkError
+                    // We check for valid native pointers before release to be extra safe
+                    if (rawMat.nativeObj != 0L) rawMat.release()
+                    if (rotatedMat.nativeObj != 0L) rotatedMat.release()
+                    if (descriptors.nativeObj != 0L) descriptors.release()
+                    if (targetDescriptors.nativeObj != 0L) targetDescriptors.release()
+                    if (keypoints.nativeObj != 0L) keypoints.release()
+                    if (matches.nativeObj != 0L) matches.release()
+                    if (mask.nativeObj != 0L) mask.release()
                     isAnalyzing.set(false)
                 }
             }
@@ -524,7 +605,11 @@ class ArRenderer(
 
     private fun getRotationDegrees(): Float {
         val displayRotation = when (displayRotationHelper.rotation) {
-            android.view.Surface.ROTATION_0 -> 0; android.view.Surface.ROTATION_90 -> 90; android.view.Surface.ROTATION_180 -> 180; android.view.Surface.ROTATION_270 -> 270; else -> 0
+            android.view.Surface.ROTATION_0 -> 0
+            android.view.Surface.ROTATION_90 -> 90
+            android.view.Surface.ROTATION_180 -> 180
+            android.view.Surface.ROTATION_270 -> 270
+            else -> 0
         }
         return ((90 - displayRotation + 360) % 360).toFloat()
     }
@@ -552,7 +637,7 @@ class ArRenderer(
                     config.updateMode = Config.UpdateMode.BLOCKING
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.focusMode = Config.FocusMode.AUTO
-                    val hasFineLocation = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                     config.geospatialMode = if (hasFineLocation && session!!.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)) Config.GeospatialMode.ENABLED else Config.GeospatialMode.DISABLED
                     config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
                     config.depthMode = Config.DepthMode.DISABLED
@@ -561,6 +646,7 @@ class ArRenderer(
                 }
             }
         } catch (e: Exception) { Log.e(TAG, "Resume error", e) } finally { sessionLock.unlock() }
+
         resumeJob?.cancel()
         resumeJob = CoroutineScope(Dispatchers.IO).launch {
             sessionLock.lock()
@@ -577,7 +663,6 @@ class ArRenderer(
     fun cleanup() {
         sessionLock.lock()
         try { configJob?.cancel(); analysisScope.cancel(); session?.close(); cachedCaptureBitmap?.recycle(); layerBitmaps.clear() } catch (e: Exception) {} finally { session = null; sessionLock.unlock() }
-        slamManager.destroyNative()
     }
 
     fun resetAnchor() {
@@ -586,7 +671,7 @@ class ArRenderer(
     }
 
     fun queueTap(x: Float, y: Float) { tapQueue.offer(Pair(x, y)) }
-    fun queuePan(dx: Float, dy: Float) { /* Disabled per requirements */ }
+    fun queuePan(dx: Float, dy: Float) { synchronized(panLock) { pendingPanX += dx; pendingPanY += dy } }
 
     fun createGeospatialAnchor(lat: Double, lng: Double, alt: Double, headingDegrees: Double) {
         val s = session ?: return; val earth = s.earth ?: return
@@ -631,7 +716,14 @@ class ArRenderer(
         const val TAG = "ArRenderer"
         const val BOUNDS_UPDATE_THRESHOLD = 2f
         init {
-            try { if (!OpenCVLoader.initLocal()) { System.loadLibrary("opencv_java4") } } catch (e: Throwable) { Log.e(TAG, "Static OpenCV load failed", e) }
+            // Bolt Optimization: Ensure native library is loaded for any thread accessing this class
+            try {
+                if (!OpenCVLoader.initLocal()) {
+                    System.loadLibrary("opencv_java4")
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "Static OpenCV load failed in ArRenderer", e)
+            }
         }
     }
 }

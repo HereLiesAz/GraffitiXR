@@ -16,25 +16,13 @@ endif()
 message(STATUS "OpenCV_DIR: ${OpenCV_DIR}")
 find_package(OpenCV REQUIRED)
 
-# --- 2. GLM Configuration (Auto-Download) ---
-include(FetchContent)
-FetchContent_Declare(
-    glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG 0.9.9.8
-)
-FetchContent_MakeAvailable(glm)
-
 # --- Include Directories ---
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${OpenCV_INCLUDE_DIRS})
-# GLM include (usually handled by target_link_libraries, but adding explicitly to be safe)
-include_directories(${glm_SOURCE_DIR})
 
 # --- Source Files ---
 set(SOURCE_FILES
     GraffitiJNI.cpp
-    MobileGS.cpp
 )
 
 # --- Native Library ---
@@ -49,7 +37,6 @@ find_library(egl-lib EGL)
 # --- Linking ---
 target_link_libraries(graffiti-lib
         ${OpenCV_LIBS}
-        glm::glm
         ${log-lib}
         ${android-lib}
         ${gles3-lib}

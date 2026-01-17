@@ -30,7 +30,6 @@ xrScenecore = "1.0.0-alpha10"
 xrCompose = "1.0.0-alpha09"
 xrComposeMaterial3 = "1.0.0-alpha13"
 xrArcore = "1.0.0-alpha09"
-uiGeometry = "1.10.1"
 
 [libraries]
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
@@ -78,7 +77,6 @@ androidx-xr-arcore = { group = "androidx.xr.arcore", name = "arcore", version.re
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
-androidx-compose-ui-geometry = { group = "androidx.compose.ui", name = "ui-geometry", version.ref = "uiGeometry" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
