@@ -129,49 +129,75 @@ object ImageProcessingUtils {
 
 // Top-level functions required by MainViewModel and ArRenderer
 
-fun detectFeaturesWithMask(bitmap: Bitmap, paths: List<RefinementPath>, mask: Bitmap?): List<org.opencv.core.KeyPoint> {
-     // simplified implementation
+fun detectFeaturesWithMask(bitmap: Bitmap): List<org.opencv.core.KeyPoint> {
      val mat = Mat()
-     Utils.bitmapToMat(bitmap, mat)
      val gray = Mat()
-     Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
      val orb = ORB.create()
      val keypoints = MatOfKeyPoint()
-     orb.detect(gray, keypoints)
-     return keypoints.toList()
+     return try {
+         Utils.bitmapToMat(bitmap, mat)
+         Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
+         orb.detect(gray, keypoints)
+         keypoints.toList()
+     } finally {
+         mat.release()
+         gray.release()
+         keypoints.release()
+         orb.clear() // Releases internal state (standard OpenCV Java binding for Algorithm)
+     }
 }
 
-fun generateFingerprint(bitmap: Bitmap, paths: List<RefinementPath>, mask: Bitmap?): Fingerprint {
+fun generateFingerprint(bitmap: Bitmap): Fingerprint {
      val mat = Mat()
-     Utils.bitmapToMat(bitmap, mat)
      val gray = Mat()
-     Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
      val orb = ORB.create()
      val keypoints = MatOfKeyPoint()
      val descriptors = Mat()
-     orb.detectAndCompute(gray, Mat(), keypoints, descriptors)
+     val emptyMask = Mat()
+     return try {
+         Utils.bitmapToMat(bitmap, mat)
+         Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
+         orb.detectAndCompute(gray, emptyMask, keypoints, descriptors)
 
-     val data = ByteArray(descriptors.rows() * descriptors.cols() * descriptors.elemSize().toInt())
-     descriptors.get(0, 0, data)
+         val data = ByteArray(descriptors.rows() * descriptors.cols() * descriptors.elemSize().toInt())
+         if (data.isNotEmpty()) {
+             descriptors.get(0, 0, data)
+         }
 
-     return Fingerprint(keypoints.toList(), data, descriptors.rows(), descriptors.cols(), descriptors.type())
+         Fingerprint(keypoints.toList(), data, descriptors.rows(), descriptors.cols(), descriptors.type())
+     } finally {
+         mat.release()
+         gray.release()
+         keypoints.release()
+         descriptors.release()
+         emptyMask.release()
+         orb.clear() // Releases internal state (standard OpenCV Java binding for Algorithm)
+     }
 }
 
 fun enhanceImageForAr(bitmap: Bitmap): Bitmap {
     val mat = Mat()
-    Utils.bitmapToMat(bitmap, mat)
     val lab = Mat()
-    Imgproc.cvtColor(mat, lab, Imgproc.COLOR_RGB2Lab)
     val channels = ArrayList<Mat>()
-    Core.split(lab, channels)
-    val clahe = Imgproc.createCLAHE()
-    clahe.clipLimit = 4.0
-    clahe.apply(channels[0], channels[0])
-    Core.merge(channels, lab)
-    Imgproc.cvtColor(lab, mat, Imgproc.COLOR_Lab2RGB)
-    val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
-    Utils.matToBitmap(mat, result)
-    return result
+    return try {
+        Utils.bitmapToMat(bitmap, mat)
+        Imgproc.cvtColor(mat, lab, Imgproc.COLOR_RGB2Lab)
+        Core.split(lab, channels)
+        val clahe = Imgproc.createCLAHE()
+        clahe.clipLimit = 4.0
+        if (channels.isNotEmpty()) {
+            clahe.apply(channels[0], channels[0])
+        }
+        Core.merge(channels, lab)
+        Imgproc.cvtColor(lab, mat, Imgproc.COLOR_Lab2RGB)
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(mat, result)
+        result
+    } finally {
+        mat.release()
+        lab.release()
+        channels.forEach { it.release() }
+    }
 }
 
 fun resizeBitmapForArCore(bitmap: Bitmap): Bitmap {
