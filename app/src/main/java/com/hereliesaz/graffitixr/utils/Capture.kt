@@ -14,14 +14,22 @@ import android.view.Window
 
 fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
     val window: Window = activity.window
-    val bitmap = Bitmap.createBitmap(window.decorView.width, window.decorView.height, Bitmap.Config.ARGB_8888)
+    val width = window.decorView.width
+    val height = window.decorView.height
+
+    if (width <= 0 || height <= 0) {
+        callback(null)
+        return
+    }
+
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val locationOfViewInWindow = IntArray(2)
     window.decorView.getLocationInWindow(locationOfViewInWindow)
     try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PixelCopy.request(
                 window,
-                Rect(0, 0, window.decorView.width, window.decorView.height),
+                Rect(0, 0, width, height),
                 bitmap,
                 { copyResult ->
                     if (copyResult == PixelCopy.SUCCESS) {
@@ -33,7 +41,7 @@ fun captureWindow(activity: Activity, callback: (Bitmap?) -> Unit) {
                 Handler(Looper.getMainLooper())
             )
         }
-    } catch (e: IllegalArgumentException) {
+    } catch (e: Exception) {
         callback(null)
         e.printStackTrace()
     }
