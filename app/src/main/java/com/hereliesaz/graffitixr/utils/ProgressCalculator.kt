@@ -3,29 +3,29 @@ package com.hereliesaz.graffitixr.utils
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Path
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.toArgb
 
-/**
- * Utility to calculate the progress of an artwork based on drawn paths.
- */
 fun calculateProgress(paths: List<Path>, bitmap: Bitmap): Int {
-    if (bitmap.width == 0 || bitmap.height == 0) return 0
-    
+    val width = bitmap.width
+    val height = bitmap.height
+    if (width == 0 || height == 0) return 0
+
     val canvas = Canvas(bitmap)
     val paint = Paint().apply {
-        color = android.graphics.Color.WHITE
-        style = Paint.Style.STROKE
+        color = Color.Red.toArgb()
         strokeWidth = 5f
+        style = Paint.Style.STROKE
     }
-    
-    paths.forEach { canvas.drawPath(it, paint) }
-    
-    var count = 0
-    for (x in 0 until bitmap.width) {
-        for (y in 0 until bitmap.height) {
-            if (bitmap.getPixel(x, y) != 0) count++
-        }
+
+    paths.forEach { path ->
+        canvas.drawPath(path.asAndroidPath(), paint)
     }
-    
-    return count
+
+    val pixels = IntArray(width * height)
+    bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+    return pixels.count { it != 0 }
 }

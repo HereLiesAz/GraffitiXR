@@ -91,8 +91,6 @@ data class ProjectData(
     val calibrationSnapshots: List<CalibrationSnapshot> = emptyList(),
 
     val layers: List<OverlayLayer> = emptyList(),
-    val activeLayerId: String? = null,
-    val isLineDrawing: Boolean = false,
 
     // Neural Scan ID
     val cloudAnchorId: String? = null

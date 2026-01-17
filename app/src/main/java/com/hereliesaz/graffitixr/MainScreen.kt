@@ -21,10 +21,15 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -39,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -51,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
+import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
@@ -125,10 +132,10 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
             if (vibrator.hasVibrator()) {
                 when (event) {
-                    FeedbackEvent.VibrateSingle -> {
+                    is FeedbackEvent.VibrateSingle -> {
                         vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
                     }
-                    FeedbackEvent.VibrateDouble -> {
+                    is FeedbackEvent.VibrateDouble -> {
                         val timing = longArrayOf(0, 50, 50, 50)
                         val amplitude = intArrayOf(0, 255, 0, 255)
                         vibrator.vibrate(VibrationEffect.createWaveform(timing, amplitude, -1))
@@ -198,7 +205,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 
     // Calculate current route for NavRail highlighting
-    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId) {
+    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId, uiState.isMappingMode) {
         when {
             showInfoScreen -> "help"
             showSettings -> "settings_sub"
@@ -206,6 +213,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             showSliderDialog == "Adjust" -> "adjust"
             showColorBalanceDialog -> "color_balance"
             uiState.isMarkingProgress -> "mark_progress"
+            uiState.isMappingMode -> "neural_scan"
             uiState.isCapturingTarget -> "create_target"
             uiState.activeLayerId != null -> "layer_${uiState.activeLayerId}"
             uiState.editorMode == EditorMode.AR -> "ar"
@@ -265,6 +273,46 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     )
                 }
 
+                // NEURAL SCAN HUD
+                if (uiState.isMappingMode) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 80.dp)
+                            .fillMaxWidth(0.6f)
+                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                            .padding(16.dp)
+                            .zIndex(12f)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "MAPPING QUALITY",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { uiState.mappingQualityScore },
+                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                                color = if (uiState.mappingQualityScore > 0.8f) Color.Green else Color.Yellow,
+                                trackColor = Color.DarkGray
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            if (uiState.mappingQualityScore > 0.5f) {
+                                AzButton(
+                                    text = if (uiState.isHostingAnchor) "UPLOADING..." else "FINALIZE MAP",
+                                    shape = AzButtonShape.RECTANGLE,
+                                    onClick = { viewModel.finalizeMap() },
+                                    enabled = !uiState.isHostingAnchor
+                                )
+                            } else {
+                                Text("Scan more area...", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+
                 if (showSettings) {
                     Box(modifier = Modifier.zIndex(1.5f)) {
                         SettingsScreen(
@@ -322,6 +370,16 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
                             if (uiState.editorMode == EditorMode.AR) {
                                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
+
+                                // NEW: Neural Scan Item
+                                azRailSubItem(
+                                    id = "neural_scan",
+                                    hostId = "target_host",
+                                    text = if (uiState.isMappingMode) "Stop Scan" else "Scan Space",
+                                    info = "Map the area for persistence",
+                                    onClick = { viewModel.toggleMappingMode() }
+                                )
+
                                 azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo) {
                                     val intent = android.content.Intent(context, MappingActivity::class.java)
                                     context.startActivity(intent)
@@ -649,9 +707,6 @@ private fun MainContentLayer(
                     viewModel = viewModel,
                     uiState = uiState
                 )
-            }
-            EditorMode.CROP, EditorMode.ADJUST, EditorMode.DRAW, EditorMode.PROJECT -> {
-                // These modes might be managed by other screens or are sub-modes
             }
         }
     }

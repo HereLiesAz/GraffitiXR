@@ -104,16 +104,15 @@ android {
         buildConfig = true
     }
     namespace = "com.hereliesaz.graffitixr"
-    compileSdk = 36 // Required for Android XR
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
-        minSdk = 32 // Required for Android XR libraries (e.g., androidx.xr.compose.material3)
+        minSdk = 32
         targetSdk = 36
         versionCode = vMajor * 10000000 + vMinor * 100000 + vPatch * 1000 + vBuild
         versionName = "$vMajor.$vMinor.$vPatch.$vBuild"
 
-        // Inject ARCore API Key
         val arcoreApiKey = localProperties.getProperty("ARCORE_API_KEY") ?: System.getenv("ARCORE_API_KEY") ?: ""
         resValue("string", "arcore_api_key", arcoreApiKey)
 
@@ -127,7 +126,8 @@ android {
         }
         externalNativeBuild {
             cmake {
-                cppFlags("")
+                cppFlags("-std=c++17")
+                // Removed manual OpenCV_DIR argument to allow CMake auto-detection
             }
         }
     }
@@ -211,26 +211,21 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
 
-    // ViewModel, Navigation, Coroutines, Coil
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.coil.compose)
 
-    // Constraint Layout (Required for Sceneform-EQR)
     implementation(libs.androidx.constraintlayout)
 
-    // ARCore
     implementation(libs.arcore.client)
 
-    // CameraX
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    // AndroidXR
     implementation(libs.androidx.xr.runtime)
     implementation(libs.androidx.xr.scenecore)
     implementation(libs.androidx.xr.compose)
@@ -238,10 +233,8 @@ dependencies {
     implementation(libs.androidx.xr.arcore)
     implementation(libs.google.accompanist.permissions)
 
-    // AzNavRail
     implementation(libs.az.nav.rail)
 
-    // ML Kit
     implementation(libs.mlkit.subject.segmentation)
     implementation(libs.segmentation.selfie)
     implementation(libs.play.services.base)
@@ -250,13 +243,10 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
 
-    // OpenCV - Use the correct Maven Central artifact
     implementation(libs.opencv)
 
-    // SphereSLAM
-    implementation(libs.sphere.slam)
+    // implementation(libs.sphere.slam)
 
-    // Serialization
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
