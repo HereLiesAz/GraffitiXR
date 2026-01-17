@@ -509,7 +509,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     showColorBalanceDialog = true
                                     showSliderDialog = null
                                 }
-                                azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.blending, info = navStrings.blendingInfo, onClick = {
+                                azRailSubItem(id = "blending", hostId = "design_host", text = "Blend", info = navStrings.blendingInfo, onClick = {
                                     viewModel.onCycleBlendMode()
                                     showSliderDialog = null; showColorBalanceDialog = false
                                     resetDialogs()
@@ -738,13 +738,12 @@ private fun MainContentLayer(
                 )
             }
 
-            CROP -> TODO()
-            ADJUST -> TODO()
-            DRAW -> TODO()
-            PROJECT -> TODO()
-            ISOLATE -> TODO()
-            BALANCE -> TODO()
-            OUTLINE -> TODO()
+            CROP, ADJUST, DRAW, PROJECT, ISOLATE, BALANCE, OUTLINE -> {
+                ArView(
+                    viewModel = viewModel,
+                    uiState = uiState
+                )
+            }
         }
     }
 }
