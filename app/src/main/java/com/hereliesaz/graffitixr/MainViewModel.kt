@@ -30,7 +30,6 @@ import com.hereliesaz.graffitixr.utils.BitmapUtils
 import com.hereliesaz.graffitixr.utils.OnboardingManager
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.applyCurves
-import com.hereliesaz.graffitixr.utils.convertToLineDrawing
 import com.hereliesaz.graffitixr.utils.saveBitmapToGallery
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -243,7 +242,8 @@ class MainViewModel(
             val bitmap = uiState.value.capturedTargetImages.firstOrNull() ?: return@launch
             val mask = uiState.value.targetMaskUri?.let { BitmapUtils.getBitmapFromUri(getApplication(), it) }
             val keypoints = com.hereliesaz.graffitixr.utils.detectFeaturesWithMask(bitmap, uiState.value.refinementPaths, mask)
-            withContext(Dispatchers.Main) { updateState(uiState.value.copy(detectedKeypoints = keypoints), isUndoable = false) }
+            val offsets = keypoints.map { Offset(it.pt.x.toFloat(), it.pt.y.toFloat()) }
+            withContext(Dispatchers.Main) { updateState(uiState.value.copy(detectedKeypoints = offsets), isUndoable = false) }
         }
     }
 
@@ -365,7 +365,7 @@ class MainViewModel(
 
     fun onBrightnessChanged(brightness: Float) { val safe = brightness.coerceIn(-1f, 1f); updateState(uiState.value.copy(brightness = safe), isUndoable = false); updateActiveLayer { it.copy(brightness = safe) } }
 
-    fun onLineDrawingClicked() { viewModelScope.launch { setLoading(true); if (uiState.value.isLineDrawing) { (uiState.value.backgroundRemovedImageUri ?: uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri)?.let { updateState(uiState.value.copy(overlayImageUri = it, isLineDrawing = false, isLoading = false)); updateActiveLayer { l -> l.copy(uri = it) } } ?: setLoading(false) } else { (uiState.value.backgroundRemovedImageUri ?: uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri)?.let { uri -> val lineDrawingBitmap = convertToLineDrawing(BitmapUtils.getBitmapFromUri(getApplication(), uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch, isWhite = true); saveBitmapToCache(lineDrawingBitmap, "line_drawing")?.let { newUri -> updateState(uiState.value.copy(overlayImageUri = newUri, isLineDrawing = true, isLoading = false)); updateActiveLayer { it.copy(uri = newUri) } } } ?: setLoading(false) } } }
+    fun onLineDrawingClicked() { viewModelScope.launch { setLoading(true); if (uiState.value.isLineDrawing) { (uiState.value.backgroundRemovedImageUri ?: uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri)?.let { updateState(uiState.value.copy(overlayImageUri = it, isLineDrawing = false, isLoading = false)); updateActiveLayer { l -> l.copy(uri = it) } } ?: setLoading(false) } else { (uiState.value.backgroundRemovedImageUri ?: uiState.value.originalOverlayImageUri ?: uiState.value.overlayImageUri)?.let { uri -> val lineDrawingBitmap = com.hereliesaz.graffitixr.utils.ImageProcessingUtils.createOutline(BitmapUtils.getBitmapFromUri(getApplication(), uri)?.copy(Bitmap.Config.ARGB_8888, true) ?: return@launch); saveBitmapToCache(lineDrawingBitmap, "line_drawing")?.let { newUri -> updateState(uiState.value.copy(overlayImageUri = newUri, isLineDrawing = true, isLoading = false)); updateActiveLayer { it.copy(uri = newUri) } } } ?: setLoading(false) } } }
 
     private fun setLoading(isLoading: Boolean) { updateState(uiState.value.copy(isLoading = isLoading), isUndoable = false) }
     fun onBackgroundImageSelected(uri: Uri) { updateState(uiState.value.copy(backgroundImageUri = uri)) }

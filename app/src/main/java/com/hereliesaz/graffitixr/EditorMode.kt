@@ -11,5 +11,8 @@ enum class EditorMode {
     CROP,    // Cropping the overlay image
     ADJUST,  // Adjusting color/brightness/contrast
     DRAW,    // Drawing masks or lines
-    PROJECT  // Project management or export
+    PROJECT, // Project management or export
+    ISOLATE, // Background removal
+    BALANCE, // Color balance
+    OUTLINE  // Edge detection
 }

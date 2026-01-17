@@ -1,12 +1,10 @@
 package com.hereliesaz.graffitixr.utils
 
 import android.graphics.Bitmap
-import android.graphics.Color
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import kotlinx.coroutines.tasks.await
-import java.nio.ByteBuffer
 
 /**
  * A utility class that performs the existential surgery of removing a background.
@@ -30,7 +28,7 @@ object BackgroundRemover {
 
             val result = segmenter.process(inputImage).await()
             
-            val foreground = result.foregroundBitmap
+            val foreground: Bitmap? = result.foregroundBitmap
             if (foreground != null) {
                 Result.success(foreground)
             } else {
