@@ -88,9 +88,11 @@ class MainViewModel(
                 ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
                     snapshotState()
                     val processed = BackgroundRemover.removeBackground(original)
-                    processed?.let { bmp ->
-                        val newUri = ImageUtils.saveBitmapToCache(context, bmp)
+                    if (processed != null) {
+                        val newUri = ImageUtils.saveBitmapToCache(context, processed)
                         updateActiveLayer { it.copy(uri = newUri) }
+                    } else {
+                        _feedbackEvent.send(FeedbackEvent.Toast("Failed to remove background"))
                     }
                 }
             }
@@ -103,13 +105,18 @@ class MainViewModel(
         val context = arRenderer?.context ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            _uiState.value.layers.find { it.id == activeId }?.let { layer ->
-                ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
-                    snapshotState()
-                    val processed = ImageUtils.generateOutline(original)
-                    val newUri = ImageUtils.saveBitmapToCache(context, processed)
-                    updateActiveLayer { it.copy(uri = newUri) }
+            try {
+                _uiState.value.layers.find { it.id == activeId }?.let { layer ->
+                    ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
+                        snapshotState()
+                        val processed = ImageUtils.generateOutline(original)
+                        val newUri = ImageUtils.saveBitmapToCache(context, processed)
+                        updateActiveLayer { it.copy(uri = newUri) }
+                    }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackEvent.send(FeedbackEvent.Toast("Failed to generate outline"))
             }
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -199,7 +206,7 @@ class MainViewModel(
         state.copy(activeRotationAxis = next, showRotationAxisFeedback = true)
     }
 
-    fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.PREVIEW) }
+    fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
     fun onCaptureShutterClicked() = viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
     fun saveCapturedBitmap(b: Bitmap) {
         _uiState.update { it.copy(capturedTargetImages = listOf(b), captureStep = CaptureStep.REVIEW) }

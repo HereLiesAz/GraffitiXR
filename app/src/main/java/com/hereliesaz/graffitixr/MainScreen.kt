@@ -509,7 +509,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     showColorBalanceDialog = true
                                     showSliderDialog = null
                                 }
-                                azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.blending, info = navStrings.blendingInfo, onClick = {
+                                azRailSubItem(id = "blending", hostId = "design_host", text = "Build", info = navStrings.blendingInfo, onClick = {
                                     viewModel.onCycleBlendMode()
                                     showSliderDialog = null; showColorBalanceDialog = false
                                     resetDialogs()
@@ -595,7 +595,9 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
 
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(2f),
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     AdjustmentsPanel(
@@ -738,13 +740,22 @@ private fun MainContentLayer(
                 )
             }
 
-            CROP -> TODO()
-            ADJUST -> TODO()
-            DRAW -> TODO()
-            PROJECT -> TODO()
-            ISOLATE -> TODO()
-            BALANCE -> TODO()
-            OUTLINE -> TODO()
+            // Fallback for tool modes to ensure content is visible
+            CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(
+                uiState = uiState,
+                onScaleChanged = onScaleChanged,
+                onOffsetChanged = onOffsetChanged,
+                onRotationZChanged = onRotationZChanged,
+                onRotationXChanged = onRotationXChanged,
+                onRotationYChanged = onRotationYChanged,
+                onCycleRotationAxis = onCycleRotationAxis,
+                onGestureStart = onGestureStart,
+                onGestureEnd = onGestureEnd
+            )
+            PROJECT -> {
+                // Should be handled by showProjectList, but as a fallback:
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+            }
         }
     }
 }
