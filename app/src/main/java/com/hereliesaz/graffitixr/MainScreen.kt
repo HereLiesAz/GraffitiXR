@@ -60,6 +60,7 @@ import androidx.navigation.NavController
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
+import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.EditorMode.ADJUST
 import com.hereliesaz.graffitixr.EditorMode.AR
@@ -337,6 +338,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             currentVersion = BuildConfig.VERSION_NAME,
                             updateStatus = uiState.updateStatusMessage,
                             isCheckingForUpdate = uiState.isCheckingForUpdate,
+                            isRightHanded = uiState.isRightHanded,
+                            onHandednessChanged = viewModel::setHandedness,
                             onCheckForUpdates = viewModel::checkForUpdates,
                             onInstallUpdate = viewModel::installLatestUpdate,
                             onClose = { showSettings = false }
@@ -375,6 +378,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 headerIconShape = AzHeaderIconShape.ROUNDED,
                                 infoScreen = showInfoScreen,
                                 activeColor = activeHighlightColor,
+                                dockingSide = if (uiState.isRightHanded) AzDockingSide.RIGHT else AzDockingSide.LEFT,
                                 onDismissInfoScreen = { showInfoScreen = false }
                             )
 

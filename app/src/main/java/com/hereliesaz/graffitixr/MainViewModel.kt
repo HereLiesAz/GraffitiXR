@@ -226,6 +226,7 @@ class MainViewModel(
     }
 
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
+    fun setHandedness(rightHanded: Boolean) = _uiState.update { it.copy(isRightHanded = rightHanded) }
     fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
     fun onToggleFlashlight() {
         _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
