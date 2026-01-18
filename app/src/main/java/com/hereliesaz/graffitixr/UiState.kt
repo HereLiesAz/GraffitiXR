@@ -65,6 +65,7 @@ data class UiState(
     val canRedo: Boolean = false,
 
     // Interaction
+    val isRightHanded: Boolean = true,
     val isTouchLocked: Boolean = false,
     val showUnlockInstructions: Boolean = false,
     val showOnboardingDialogForMode: EditorMode? = null,

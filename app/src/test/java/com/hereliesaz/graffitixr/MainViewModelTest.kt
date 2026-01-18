@@ -89,4 +89,13 @@ class MainViewModelTest {
 
         coVerify { projectManager.saveProject(context, any(), any(), any()) }
     }
+
+    @Test
+    fun `setHandedness updates state`() = runTest {
+        // Default is true (Right handed)
+        assertEquals(true, viewModel.uiState.value.isRightHanded)
+
+        viewModel.setHandedness(false)
+        assertEquals(false, viewModel.uiState.value.isRightHanded)
+    }
 }

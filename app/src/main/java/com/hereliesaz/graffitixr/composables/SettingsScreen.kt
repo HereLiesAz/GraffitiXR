@@ -54,6 +54,8 @@ fun SettingsScreen(
     currentVersion: String,
     updateStatus: String?,
     isCheckingForUpdate: Boolean,
+    isRightHanded: Boolean,
+    onHandednessChanged: (Boolean) -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
     onClose: () -> Unit
@@ -135,6 +137,16 @@ fun SettingsScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // Preferences Section
+                        item {
+                            SettingsSectionTitle("Preferences")
+                            SettingsItem(
+                                label = "Dominant Hand",
+                                value = if (isRightHanded) "Right" else "Left",
+                                modifier = Modifier.clickable { onHandednessChanged(!isRightHanded) }
+                            )
+                        }
+
                         // Version Section
                         item {
                             SettingsSectionTitle("App Information")
@@ -219,9 +231,9 @@ fun SettingsSectionTitle(title: String) {
 }
 
 @Composable
-fun SettingsItem(label: String, value: String) {
+fun SettingsItem(label: String, value: String, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
