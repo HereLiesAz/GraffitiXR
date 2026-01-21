@@ -41,98 +41,110 @@ fun ProjectLibraryScreen(
     onDeleteProject: (String) -> Unit,
     onNewProject: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Header with Title and New Project Button
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
         ) {
-            Text(
-                text = "Projects",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Button(onClick = onNewProject) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("New")
-            }
-        }
-
-        if (projects.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // Header with Title
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "No saved projects found.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Gray
+                    text = "Projects",
+                    style = MaterialTheme.typography.headlineMedium
                 )
             }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(projects) { project ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clickable { onLoadProject(project) }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+
+            if (projects.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "No saved projects found.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.Gray
+                    )
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(projects) { project ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            // Thumbnail or Default Icon
-                            if (project.thumbnailUri != null) {
-                                coil.compose.AsyncImage(
-                                    model = project.thumbnailUri,
-                                    contentDescription = "Project Thumbnail",
-                                    modifier = Modifier
-                                        .size(60.dp)
-                                        .background(Color.DarkGray)
-                                        .padding(1.dp),
-                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.Folder,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(60.dp).padding(12.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(16.dp))
+                            Row(
+                                modifier = Modifier
+                                    .clickable { onLoadProject(project) }
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Thumbnail or Default Icon
+                                if (project.thumbnailUri != null) {
+                                    coil.compose.AsyncImage(
+                                        model = project.thumbnailUri,
+                                        contentDescription = "Project Thumbnail",
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .background(Color.DarkGray)
+                                            .padding(1.dp),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Folder,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(60.dp).padding(12.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(16.dp))
 
-                            // Project Info
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = project.name,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Text(
-                                    text = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-                                        .format(Date(project.lastModified)),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.Gray
-                                )
-                            }
+                                // Project Info
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = project.name,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        text = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+                                            .format(Date(project.lastModified)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.Gray
+                                    )
+                                }
 
-                            // Delete Action
-                            IconButton(onClick = { onDeleteProject(project.id) }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete project ${project.name}",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
+                                // Delete Action
+                                IconButton(onClick = { onDeleteProject(project.id) }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete project ${project.name}",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+
+        // New Project Button - Centered in the screen
+        Button(
+            onClick = onNewProject,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(16.dp) // Add padding so it doesn't touch edges if screen is small
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("New")
         }
     }
 }
