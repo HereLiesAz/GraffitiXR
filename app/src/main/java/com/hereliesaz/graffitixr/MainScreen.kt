@@ -475,11 +475,12 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
             // OnScreen Content
             onscreen(alignment = Alignment.Center) {
-                NavHost(
-                    navController = localNavController,
-                    startDestination = "editor"
-                ) {
-                    composable("editor") {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    NavHost(
+                        navController = localNavController,
+                        startDestination = "editor"
+                    ) {
+                        composable("editor") {
                         EditorContent(
                             viewModel = viewModel,
                             uiState = uiState,
@@ -538,47 +539,49 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             )
                         }
                     }
-                    composable("settings") {
-                        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                            SettingsScreen(
-                                currentVersion = BuildConfig.VERSION_NAME,
-                                updateStatus = uiState.updateStatusMessage,
-                                isCheckingForUpdate = uiState.isCheckingForUpdate,
-                                isRightHanded = uiState.isRightHanded,
-                                onHandednessChanged = viewModel::setHandedness,
-                                onCheckForUpdates = viewModel::checkForUpdates,
-                                onInstallUpdate = viewModel::installLatestUpdate,
-                                onClose = { localNavController.popBackStack() }
-                            )
+                        composable("settings") {
+                            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                                SettingsScreen(
+                                    currentVersion = BuildConfig.VERSION_NAME,
+                                    updateStatus = uiState.updateStatusMessage,
+                                    isCheckingForUpdate = uiState.isCheckingForUpdate,
+                                    isRightHanded = uiState.isRightHanded,
+                                    onHandednessChanged = viewModel::setHandedness,
+                                    onCheckForUpdates = viewModel::checkForUpdates,
+                                    onInstallUpdate = viewModel::installLatestUpdate,
+                                    onClose = { localNavController.popBackStack() }
+                                )
+                            }
                         }
+                    }
+
+                    // GLOBAL OVERLAYS (Inside Safe Zone)
+                    TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
+
+                    UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
+
+                    if (showInfoScreen) {
+                        CustomHelpOverlay(
+                            uiState = uiState,
+                            navStrings = navStrings,
+                            onDismiss = { showInfoScreen = false }
+                        )
+                    }
+
+                    if (uiState.isCapturingTarget) {
+                        Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
+                            TargetCreationFlow(uiState, viewModel, context)
+                        }
+                    }
+
+                    // Progress Overlay (Flash)
+                    if (uiState.isCapturingTarget) {
+                        CaptureAnimation()
                     }
                 }
             }
         }
 
-        // GLOBAL OVERLAYS
-        TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
-
-        UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
-
-        if (showInfoScreen) {
-            CustomHelpOverlay(
-                uiState = uiState,
-                navStrings = navStrings,
-                onDismiss = { showInfoScreen = false }
-            )
-        }
-
-        if (uiState.isCapturingTarget) {
-            Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
-                TargetCreationFlow(uiState, viewModel, context)
-            }
-        }
-
-        // Progress Overlay
-         if (uiState.isCapturingTarget) {
-            CaptureAnimation()
-        }
     }
 }
 

@@ -94,13 +94,10 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.8f))
-            .windowInsetsPadding(WindowInsets.systemBars)
             .clickable(enabled = true) {}, // Block clicks
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 88.dp), // Clear the navigation rail
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Card(
