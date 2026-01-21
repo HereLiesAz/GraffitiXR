@@ -2,7 +2,7 @@
 
 ## 1. The AR Viewport (Main Screen)
 There is effectively only **one** screen.
-* **Background:** Live Camera Feed (GLSurfaceView).
+* **Background:** Live Camera Feed (GLSurfaceView) hosted within the `AzNavHost` background layer to ensure full-screen coverage.
 * **Foreground:** `AzNavRail` (Compose).
 * **Overlay:** 3D Splats (OpenGL).
 
