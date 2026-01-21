@@ -105,8 +105,12 @@ class ArRenderer(
                  rendererScope.launch {
                      val bmp = ImageUtils.loadBitmapFromUri(context, layer.uri)
                      if (bmp != null) {
-                         updateLayerBitmap(layer.id, bmp)
-                         layerUris[layer.id] = layer.uri
+                         // Double check if the layer is still valid before updating
+                         val currentLayer = layers.find { it.id == layer.id }
+                         if (currentLayer != null && currentLayer.uri == layer.uri) {
+                             updateLayerBitmap(layer.id, bmp)
+                             layerUris[layer.id] = layer.uri
+                         }
                      }
                  }
             }
