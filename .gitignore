@@ -44,3 +44,12 @@ google-services.json
 /app/src/main/cpp/include/glm/
 /app/libs/litert/
 /app/libs/mlkit/
+
+
+# Dependencies managed by 'dependencies' branch
+app/libs/opencv/
+app/libs/glm/
+app/libs/litert/
+
+# Legacy/Other
+/app/src/cpp/include/glm/*
