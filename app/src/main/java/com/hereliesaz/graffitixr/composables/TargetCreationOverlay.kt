@@ -74,13 +74,6 @@ fun TargetCreationOverlay(
     onGpsDecision: (Boolean) -> Unit = {},
     onFinishPhotoSequence: () -> Unit = {}
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val navRailSize = 80.dp
-
-    val paddingStart = if (isRightHanded && isLandscape) navRailSize + 16.dp else 16.dp
-    val paddingEnd = if (!isRightHanded && isLandscape) navRailSize + 16.dp else 16.dp
-
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -139,8 +132,7 @@ fun TargetCreationOverlay(
                 onClick = onCancelClick,
                 modifier = Modifier
                     .align(if (isRightHanded) Alignment.TopStart else Alignment.TopEnd)
-                    .padding(top = 8.dp)
-                    .padding(start = paddingStart, end = paddingEnd)
+                    .padding(top = 8.dp, start = 16.dp, end = 16.dp)
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White)
             }
@@ -229,8 +221,7 @@ fun TargetCreationOverlay(
                     onClick = onFinishPhotoSequence,
                     modifier = Modifier
                         .align(if (isRightHanded) Alignment.BottomStart else Alignment.BottomEnd)
-                        .padding(bottom = 32.dp)
-                        .padding(start = paddingStart, end = paddingEnd)
+                        .padding(bottom = 32.dp, start = 16.dp, end = 16.dp)
                 ) {
                     Text("Done")
                 }
