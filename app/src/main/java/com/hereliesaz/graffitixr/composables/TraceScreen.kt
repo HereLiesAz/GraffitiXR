@@ -96,7 +96,7 @@ fun TraceScreen(
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        uiState.overlayImageUri?.let { uri ->
+        activeLayer?.uri?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
             LaunchedEffect(uri) {

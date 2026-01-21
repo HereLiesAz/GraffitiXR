@@ -95,6 +95,8 @@ class ArRenderer(
     private val modelViewMatrix = FloatArray(16)
     private val displayTransform = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f) // Identity
 
+    private var capturePending = false
+
     fun updateLayers(newLayers: List<OverlayLayer>) {
         this.layers = newLayers
         val newLayerIds = newLayers.map { it.id }.toSet()
@@ -191,7 +193,7 @@ class ArRenderer(
     }
 
     fun triggerCapture() {
-        // Implement capture trigger
+        capturePending = true
     }
 
     fun queueTap(x: Float, y: Float) {
@@ -321,10 +323,41 @@ class ArRenderer(
                 }
             }
 
+            if (capturePending) {
+                capturePending = false
+                val bitmap = createBitmapFromGLSurface(0, 0, viewportWidth, viewportHeight)
+                bitmap?.let { onFrameCaptured(it) }
+            }
+
         } catch (e: SessionPausedException) {
              Log.w("ArRenderer", "Session paused during update")
         } catch (t: Throwable) {
             Log.e("ArRenderer", "Exception on the OpenGL thread", t)
+        }
+    }
+
+    private fun createBitmapFromGLSurface(x: Int, y: Int, w: Int, h: Int): Bitmap? {
+        val bitmapBuffer = java.nio.IntBuffer.allocate(w * h)
+        bitmapBuffer.position(0)
+        GLES20.glReadPixels(x, y, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, bitmapBuffer)
+        val bitmapSource = IntArray(w * h)
+        val offset1 = bitmapBuffer.array()
+        val offset2 = bitmapSource
+        for (i in 0 until h) {
+            val offset1Index = i * w
+            val offset2Index = (h - i - 1) * w
+            for (j in 0 until w) {
+                val texturePixel = offset1[offset1Index + j]
+                val blue = (texturePixel shr 16) and 0xff
+                val red = (texturePixel shl 16) and 0x00ff0000
+                val pixel = (texturePixel and -0xff0100) or red or blue
+                offset2[offset2Index + j] = pixel
+            }
+        }
+        return try {
+            Bitmap.createBitmap(offset2, 0, w, w, h, Bitmap.Config.ARGB_8888)
+        } catch (e: Exception) {
+            null
         }
     }
 
