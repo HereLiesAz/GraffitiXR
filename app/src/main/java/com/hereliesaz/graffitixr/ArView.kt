@@ -4,6 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -72,6 +75,13 @@ fun ArView(
                 setRenderer(arRenderer)
                 renderMode = android.opengl.GLSurfaceView.RENDERMODE_CONTINUOUSLY
             }
+        },
+        modifier = Modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onTap = { offset ->
+                    arRenderer.queueTap(offset.x, offset.y)
+                }
+            )
         }
     )
 }

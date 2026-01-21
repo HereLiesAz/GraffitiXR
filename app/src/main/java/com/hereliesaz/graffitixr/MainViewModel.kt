@@ -104,7 +104,12 @@ class MainViewModel(
                     if (original != null) {
                         snapshotState()
                         val processed = withContext(Dispatchers.IO) {
-                            BackgroundRemover.removeBackground(original)
+                            val safeBitmap = if (original.config != Bitmap.Config.ARGB_8888 || original.isMutable.not()) {
+                                original.copy(Bitmap.Config.ARGB_8888, true)
+                            } else {
+                                original
+                            }
+                            BackgroundRemover.removeBackground(safeBitmap)
                         }
                         if (processed != null) {
                             val newUri = withContext(Dispatchers.IO) {
@@ -383,7 +388,9 @@ class MainViewModel(
     fun updateArtworkBounds(b: android.graphics.RectF) = _artworkBounds.update { b }
     fun setArPlanesDetected(d: Boolean) = _uiState.update { it.copy(isArPlanesDetected = d) }
     fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
-    fun onFrameCaptured(b: Bitmap) {}
+    fun onFrameCaptured(b: Bitmap) {
+        _uiState.update { it.copy(capturedTargetImages = listOf(b), captureStep = CaptureStep.REVIEW) }
+    }
     fun onProgressUpdate(p: Float, b: Bitmap?) {}
     fun onTrackingFailure(m: String?) {}
     fun updateMappingScore(s: Float) = _uiState.update { it.copy(mappingQualityScore = s) }
