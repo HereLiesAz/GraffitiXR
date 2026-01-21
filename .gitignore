@@ -53,3 +53,5 @@ app/libs/litert/
 
 # Legacy/Other
 /app/src/cpp/include/glm/*
+
+build_log*.txt
