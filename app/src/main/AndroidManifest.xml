@@ -54,13 +54,6 @@
             android:theme="@style/Theme.GraffitiXR"
             android:process=":crash" />
 
-        <activity
-            android:name=".MappingActivity"
-            android:exported="false"
-            android:screenOrientation="fullSensor"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:theme="@style/Theme.GraffitiXR" />
-
         <meta-data
             android:name="com.google.ar.core"
             android:value="optional"
