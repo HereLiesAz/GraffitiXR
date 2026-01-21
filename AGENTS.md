@@ -2,7 +2,7 @@
 
 **CRITICAL PROTOCOL: You MUST achieve a PERFECT code review and a passing build BEFORE committing. The Native C++ layer is fragile; treat it with extreme caution.**
 
-This document defines the technical reality of the GraffitiXR project.
+This document defines the technical reality of the GraffitiXR project. The documents in /docs/ are an extension of this document, and ALL MUST BE READ CAREFULLY BEFORE STARTING ANY TASK!!!
 
 ---
 

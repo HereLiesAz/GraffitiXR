@@ -164,7 +164,7 @@ fun OverlayScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        val imageUri = uiState.overlayImageUri
+        val imageUri = activeLayer?.uri
 
         imageUri?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
