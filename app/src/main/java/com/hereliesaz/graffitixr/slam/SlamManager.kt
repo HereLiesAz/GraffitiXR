@@ -17,6 +17,7 @@ class SlamManager {
 
     // Lifecycle
     external fun initNative()
+    external fun initSLAM(vocabPath: String, settingsPath: String)
     external fun destroyNative()
 
     // Sensors
@@ -24,6 +25,8 @@ class SlamManager {
 
     // Updated: matches feedImage in JNI
     external fun feedImage(imageData: ByteArray, width: Int, height: Int)
+
+    external fun processFrameNative(width: Int, height: Int, data: ByteArray, timestamp: Long)
 
     external fun feedDepth(depthData: ByteArray, width: Int, height: Int)
 
