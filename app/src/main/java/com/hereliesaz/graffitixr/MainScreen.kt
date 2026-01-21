@@ -126,6 +126,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showInfoScreen by remember { mutableStateOf(false) }
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
+    var gestureInProgress by remember { mutableStateOf(false) }
 
     // Helper to reset dialog states
     val resetDialogs = remember {
@@ -275,25 +276,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 )
 
                 background {
-                    EditorContent(
-                        viewModel = viewModel,
+                    MainContentLayer(
                         uiState = uiState,
-                        showSliderDialog = showSliderDialog,
-                        showColorBalanceDialog = showColorBalanceDialog,
-                        onOpacityChange = viewModel::onOpacityChanged,
-                        onBrightnessChange = viewModel::onBrightnessChanged,
-                        onContrastChange = viewModel::onContrastChanged,
-                        onSaturationChange = viewModel::onSaturationChanged,
-                        onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                        onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-                        onColorBalanceBChange = viewModel::onColorBalanceBChanged,
-                        onUndo = viewModel::onUndoClicked,
-                        onRedo = viewModel::onRedoClicked,
-                        onMagicAlign = viewModel::onMagicClicked,
-                        onOnboardingComplete = viewModel::onOnboardingComplete,
-                        onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
-                        onFeedbackShown = viewModel::onFeedbackShown,
-                        tapFeedback = viewModel.tapFeedback.collectAsState().value
+                        viewModel = viewModel,
+                        gestureInProgress = gestureInProgress,
+                        onGestureToggle = { gestureInProgress = it }
                     )
                 }
 
@@ -489,7 +476,27 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             }
         ) {
             composable("editor") {
-                Box(modifier = Modifier.fillMaxSize())
+                EditorContent(
+                    viewModel = viewModel,
+                    uiState = uiState,
+                    gestureInProgress = gestureInProgress,
+                    showSliderDialog = showSliderDialog,
+                    showColorBalanceDialog = showColorBalanceDialog,
+                    onOpacityChange = viewModel::onOpacityChanged,
+                    onBrightnessChange = viewModel::onBrightnessChanged,
+                    onContrastChange = viewModel::onContrastChanged,
+                    onSaturationChange = viewModel::onSaturationChanged,
+                    onColorBalanceRChange = viewModel::onColorBalanceRChanged,
+                    onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+                    onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+                    onUndo = viewModel::onUndoClicked,
+                    onRedo = viewModel::onRedoClicked,
+                    onMagicAlign = viewModel::onMagicClicked,
+                    onOnboardingComplete = viewModel::onOnboardingComplete,
+                    onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
+                    onFeedbackShown = viewModel::onFeedbackShown,
+                    tapFeedback = viewModel.tapFeedback.collectAsState().value
+                )
             }
             composable("surveyor") {
                 MappingScreen(
@@ -573,6 +580,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 fun EditorContent(
     viewModel: MainViewModel,
     uiState: UiState,
+    gestureInProgress: Boolean,
     showSliderDialog: String?,
     showColorBalanceDialog: Boolean,
     onOpacityChange: (Float) -> Unit,
@@ -599,19 +607,9 @@ fun EditorContent(
     val topSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateTopPadding() + 16.dp)
     val bottomSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateBottomPadding() + 16.dp)
 
-    var gestureInProgress by remember { mutableStateOf(false) }
-
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
-        // MAIN CONTENT LAYER
-        MainContentLayer(
-            uiState = uiState,
-            viewModel = viewModel,
-            gestureInProgress = gestureInProgress,
-            onGestureToggle = { gestureInProgress = it }
-        )
-
         if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
             StatusOverlay(
                 qualityWarning = uiState.qualityWarning,

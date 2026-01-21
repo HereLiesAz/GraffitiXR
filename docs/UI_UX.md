@@ -16,7 +16,7 @@ The screen is divided into two layers: The **AR World** (Camera) and the **Overl
 
 ### AR Mode (Scan & Project)
 * **Move Device:** Translates the camera in 3D space.
-* **Tap Wall:** Places the "Anchor" (Origin point) and initiates the Grid/Confidence Map.
+* **Tap Wall:** Places the "Anchor" (Origin point) for the confidence map. If no Grid (Target) has been created yet, tapping a surface will automatically initiate the Grid Creation flow.
 * **Long Press (Rail Item):** Locks the specific tool (e.g., locks the opacity slider so accidental touches don't change it).
 
 ### Edit Mode (Image Manipulation)

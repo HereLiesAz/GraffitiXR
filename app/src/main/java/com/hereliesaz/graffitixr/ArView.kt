@@ -27,7 +27,12 @@ fun ArView(
             context = context,
             onPlanesDetected = viewModel::setArPlanesDetected,
             onFrameCaptured = viewModel::onFrameCaptured,
-            onAnchorCreated = viewModel::onArImagePlaced,
+            onAnchorCreated = {
+                if (!uiState.isArTargetCreated) {
+                    viewModel.onCreateTargetClicked()
+                }
+                viewModel.onArImagePlaced()
+            },
             onProgressUpdated = viewModel::onProgressUpdate,
             onTrackingFailure = viewModel::onTrackingFailure,
             onBoundsUpdated = viewModel::updateArtworkBounds
