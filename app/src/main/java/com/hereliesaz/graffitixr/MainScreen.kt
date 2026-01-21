@@ -65,7 +65,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
@@ -81,7 +81,6 @@ import com.hereliesaz.graffitixr.EditorMode.PROJECT
 import com.hereliesaz.graffitixr.EditorMode.STATIC
 import com.hereliesaz.graffitixr.EditorMode.TRACE
 import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
-import com.hereliesaz.graffitixr.composables.AzNavHost
 import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
@@ -257,13 +256,13 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        val isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked
+
         AzNavHost(
-            navController = localNavController,
-            startDestination = "editor",
-            currentDestination = currentRoute,
-            isLandscape = isLandscape,
-            isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked, // Hide rail only on capture or lock
-            rail = {
+            navController = localNavController
+        ) {
+            // Rail Definition (Only if visible)
+            if (isRailVisible) {
                 azSettings(
                     isLoading = uiState.isLoading,
                     packRailButtons = true,
@@ -274,15 +273,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
                     onDismissInfoScreen = { showInfoScreen = false }
                 )
-
-                background {
-                    MainContentLayer(
-                        uiState = uiState,
-                        viewModel = viewModel,
-                        gestureInProgress = gestureInProgress,
-                        onGestureToggle = { gestureInProgress = it }
-                    )
-                }
 
                 azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
                 azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(EditorMode.AR) })
@@ -474,78 +464,96 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     })
                 }
             }
-        ) {
-            composable("editor") {
-                EditorContent(
-                    viewModel = viewModel,
-                    uiState = uiState,
-                    gestureInProgress = gestureInProgress,
-                    showSliderDialog = showSliderDialog,
-                    showColorBalanceDialog = showColorBalanceDialog,
-                    onOpacityChange = viewModel::onOpacityChanged,
-                    onBrightnessChange = viewModel::onBrightnessChanged,
-                    onContrastChange = viewModel::onContrastChanged,
-                    onSaturationChange = viewModel::onSaturationChanged,
-                    onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                    onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-                    onColorBalanceBChange = viewModel::onColorBalanceBChanged,
-                    onUndo = viewModel::onUndoClicked,
-                    onRedo = viewModel::onRedoClicked,
-                    onMagicAlign = viewModel::onMagicClicked,
-                    onOnboardingComplete = viewModel::onOnboardingComplete,
-                    onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
-                    onFeedbackShown = viewModel::onFeedbackShown,
-                    tapFeedback = viewModel.tapFeedback.collectAsState().value
-                )
-            }
-            composable("surveyor") {
-                MappingScreen(
-                    onMapSaved = { /* Handle saved map if needed */ },
-                    onExit = { localNavController.popBackStack() }
-                )
-            }
-            composable("project_library") {
-                // ... same logic ...
-                // Ensure projects are loaded
-                LaunchedEffect(Unit) {
-                    viewModel.loadAvailableProjects(context)
-                }
 
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                    ProjectLibraryScreen(
-                        projects = uiState.availableProjects,
-                        onLoadProject = { project ->
-                            viewModel.openProject(project, context)
-                            localNavController.popBackStack()
-                        },
-                        onDeleteProject = { projectId ->
-                            viewModel.deleteProject(context, projectId)
-                        },
-                        onNewProject = {
-                            viewModel.onNewProject()
-                            localNavController.popBackStack()
-                        }
-                    )
-                    // Add a back button or rely on system back
-                    AzButton(
-                        text = "Back",
-                        onClick = { localNavController.popBackStack() },
-                        modifier = Modifier.align(Alignment.TopStart).padding(16.dp)
-                    )
-                }
+            // Background Definition
+            background {
+                MainContentLayer(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    gestureInProgress = gestureInProgress,
+                    onGestureToggle = { gestureInProgress = it }
+                )
             }
-            composable("settings") {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                    SettingsScreen(
-                        currentVersion = BuildConfig.VERSION_NAME,
-                        updateStatus = uiState.updateStatusMessage,
-                        isCheckingForUpdate = uiState.isCheckingForUpdate,
-                        isRightHanded = uiState.isRightHanded,
-                        onHandednessChanged = viewModel::setHandedness,
-                        onCheckForUpdates = viewModel::checkForUpdates,
-                        onInstallUpdate = viewModel::installLatestUpdate,
-                        onClose = { localNavController.popBackStack() }
-                    )
+
+            // OnScreen Content
+            onscreen(alignment = Alignment.Center) {
+                NavHost(
+                    navController = localNavController,
+                    startDestination = "editor"
+                ) {
+                    composable("editor") {
+                        EditorContent(
+                            viewModel = viewModel,
+                            uiState = uiState,
+                            gestureInProgress = gestureInProgress,
+                            showSliderDialog = showSliderDialog,
+                            showColorBalanceDialog = showColorBalanceDialog,
+                            onOpacityChange = viewModel::onOpacityChanged,
+                            onBrightnessChange = viewModel::onBrightnessChanged,
+                            onContrastChange = viewModel::onContrastChanged,
+                            onSaturationChange = viewModel::onSaturationChanged,
+                            onColorBalanceRChange = viewModel::onColorBalanceRChanged,
+                            onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+                            onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+                            onUndo = viewModel::onUndoClicked,
+                            onRedo = viewModel::onRedoClicked,
+                            onMagicAlign = viewModel::onMagicClicked,
+                            onOnboardingComplete = viewModel::onOnboardingComplete,
+                            onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
+                            onFeedbackShown = viewModel::onFeedbackShown,
+                            tapFeedback = viewModel.tapFeedback.collectAsState().value
+                        )
+                    }
+                    composable("surveyor") {
+                        MappingScreen(
+                            onMapSaved = { /* Handle saved map if needed */ },
+                            onExit = { localNavController.popBackStack() }
+                        )
+                    }
+                    composable("project_library") {
+                        // ... same logic ...
+                        // Ensure projects are loaded
+                        LaunchedEffect(Unit) {
+                            viewModel.loadAvailableProjects(context)
+                        }
+
+                        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                            ProjectLibraryScreen(
+                                projects = uiState.availableProjects,
+                                onLoadProject = { project ->
+                                    viewModel.openProject(project, context)
+                                    localNavController.popBackStack()
+                                },
+                                onDeleteProject = { projectId ->
+                                    viewModel.deleteProject(context, projectId)
+                                },
+                                onNewProject = {
+                                    viewModel.onNewProject()
+                                    localNavController.popBackStack()
+                                }
+                            )
+                            // Add a back button or rely on system back
+                            AzButton(
+                                text = "Back",
+                                onClick = { localNavController.popBackStack() },
+                                modifier = Modifier.align(Alignment.TopStart).padding(16.dp)
+                            )
+                        }
+                    }
+                    composable("settings") {
+                        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                            SettingsScreen(
+                                currentVersion = BuildConfig.VERSION_NAME,
+                                updateStatus = uiState.updateStatusMessage,
+                                isCheckingForUpdate = uiState.isCheckingForUpdate,
+                                isRightHanded = uiState.isRightHanded,
+                                onHandednessChanged = viewModel::setHandedness,
+                                onCheckForUpdates = viewModel::checkForUpdates,
+                                onInstallUpdate = viewModel::installLatestUpdate,
+                                onClose = { localNavController.popBackStack() }
+                            )
+                        }
+                    }
                 }
             }
         }
