@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.slam.SlamManager
 import kotlinx.coroutines.launch
 import com.google.ar.core.Pose
@@ -27,6 +28,9 @@ fun MappingScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+
+    val prefs = remember { context.getSharedPreferences("graffiti_settings", android.content.Context.MODE_PRIVATE) }
+    val isRightHanded = remember { prefs.getBoolean("is_right_handed", true) }
 
     // The Manager (The Brain)
     val slamManager = remember { SlamManager() }
@@ -106,7 +110,10 @@ fun MappingScreen(
             currentDestination = "surveyor",
             isLandscape = false
         ) {
-            azSettings(displayAppNameInHeader = true)
+            azSettings(
+                displayAppNameInHeader = true,
+                dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+            )
             azRailItem(id = "back", text = "Abort", onClick = onExit)
         }
 
@@ -120,6 +127,7 @@ fun MappingScreen(
             }
 
             PhotoSphereCreationScreen(
+                isRightHanded = isRightHanded,
                 currentQuality = qualityEnum,
                 isHosting = isHosting,
                 onCaptureComplete = {

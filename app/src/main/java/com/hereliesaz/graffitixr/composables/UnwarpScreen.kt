@@ -48,6 +48,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun UnwarpScreen(
+    isRightHanded: Boolean,
     targetImage: Bitmap?,
     onConfirm: (List<Offset>) -> Unit,
     onRetake: () -> Unit
@@ -251,16 +252,32 @@ fun UnwarpScreen(
                 .padding(32.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onRetake) {
-                Icon(Icons.Default.Refresh, contentDescription = "Retake", tint = Color.White)
-            }
+            if (isRightHanded) {
+                // Left-handed layout (User holds with Left hand, controls on Left)
+                Button(onClick = { onConfirm(points) }) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Rectify & Use")
+                }
 
-            Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.weight(1f))
 
-            Button(onClick = { onConfirm(points) }) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Rectify & Use")
+                IconButton(onClick = onRetake) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Retake", tint = Color.White)
+                }
+            } else {
+                // Right-handed layout (User holds with Right hand, controls on Right)
+                IconButton(onClick = onRetake) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Retake", tint = Color.White)
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Button(onClick = { onConfirm(points) }) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Rectify & Use")
+                }
             }
         }
     }

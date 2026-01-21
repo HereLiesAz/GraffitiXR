@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +60,7 @@ import com.hereliesaz.graffitixr.TargetCreationMode
 
 @Composable
 fun TargetCreationOverlay(
+    isRightHanded: Boolean,
     step: CaptureStep,
     targetCreationMode: TargetCreationMode = TargetCreationMode.CAPTURE,
     gridRows: Int = 2,
@@ -72,6 +74,13 @@ fun TargetCreationOverlay(
     onGpsDecision: (Boolean) -> Unit = {},
     onFinishPhotoSequence: () -> Unit = {}
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val navRailSize = 80.dp
+
+    val paddingStart = if (isRightHanded && isLandscape) navRailSize + 16.dp else 16.dp
+    val paddingEnd = if (!isRightHanded && isLandscape) navRailSize + 16.dp else 16.dp
+
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -129,8 +138,9 @@ fun TargetCreationOverlay(
             IconButton(
                 onClick = onCancelClick,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
+                    .align(if (isRightHanded) Alignment.TopStart else Alignment.TopEnd)
+                    .padding(top = 8.dp)
+                    .padding(start = paddingStart, end = paddingEnd)
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White)
             }
@@ -218,8 +228,9 @@ fun TargetCreationOverlay(
                 Button(
                     onClick = onFinishPhotoSequence,
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 32.dp, end = 32.dp)
+                        .align(if (isRightHanded) Alignment.BottomStart else Alignment.BottomEnd)
+                        .padding(bottom = 32.dp)
+                        .padding(start = paddingStart, end = paddingEnd)
                 ) {
                     Text("Done")
                 }
