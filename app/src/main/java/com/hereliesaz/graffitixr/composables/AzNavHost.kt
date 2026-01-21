@@ -32,6 +32,7 @@ fun AzNavHost(
     currentDestination: String? = null,
     isLandscape: Boolean? = null,
     isRailVisible: Boolean = true,
+    backgroundContent: @Composable () -> Unit = {},
     rail: AzNavHostScope.() -> Unit,
     content: NavGraphBuilder.() -> Unit
 ) {
@@ -62,10 +63,8 @@ fun AzNavHost(
         // Layer 1: Backgrounds
         // Note: scope.backgrounds are defined in the rail block, but NavHost content usually covers everything.
         // If we want to support backgrounds behind NavHost, we render them here.
-        scope.backgrounds.sortedBy { it.weight }.forEach { item ->
-            Box(modifier = Modifier.fillMaxSize()) {
-                item.content()
-            }
+        Box(modifier = Modifier.fillMaxSize()) {
+            backgroundContent()
         }
 
         // Layer 2: Content (NavHost)

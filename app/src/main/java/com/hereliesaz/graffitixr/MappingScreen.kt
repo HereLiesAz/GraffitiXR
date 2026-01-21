@@ -98,28 +98,27 @@ fun MappingScreen(
         startDestination = "mapping_content",
         currentDestination = "surveyor",
         isLandscape = false,
+        backgroundContent = {
+            // 1. The AR View (World + MiniMap)
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    GLSurfaceView(ctx).apply {
+                        preserveEGLContextOnPause = true
+                        setEGLContextClientVersion(2)
+                        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                        setRenderer(arRenderer)
+                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                    }
+                }
+            )
+        },
         rail = {
             azSettings(
                 displayAppNameInHeader = true,
                 dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
             )
             azRailItem(id = "back", text = "Abort", onClick = onExit)
-
-            background {
-                // 1. The AR View (World + MiniMap)
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        GLSurfaceView(ctx).apply {
-                            preserveEGLContextOnPause = true
-                            setEGLContextClientVersion(2)
-                            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                            setRenderer(arRenderer)
-                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                        }
-                    }
-                )
-            }
         }
     ) {
         composable("mapping_content") {

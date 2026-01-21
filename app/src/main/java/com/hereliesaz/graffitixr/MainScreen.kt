@@ -263,6 +263,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             currentDestination = currentRoute,
             isLandscape = isLandscape,
             isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked, // Hide rail only on capture or lock
+            backgroundContent = {
+                MainContentLayer(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    gestureInProgress = gestureInProgress,
+                    onGestureToggle = { gestureInProgress = it }
+                )
+            },
             rail = {
                 azSettings(
                     isLoading = uiState.isLoading,
@@ -274,15 +282,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
                     onDismissInfoScreen = { showInfoScreen = false }
                 )
-
-                background {
-                    MainContentLayer(
-                        uiState = uiState,
-                        viewModel = viewModel,
-                        gestureInProgress = gestureInProgress,
-                        onGestureToggle = { gestureInProgress = it }
-                    )
-                }
 
                 azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
                 azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(EditorMode.AR) })
