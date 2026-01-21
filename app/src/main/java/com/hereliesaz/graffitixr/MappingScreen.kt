@@ -38,10 +38,12 @@ fun MappingScreen(
     // UI State
     val mappingQuality by slamManager.mappingQuality.collectAsState()
     val isHosting by slamManager.isHosting.collectAsState()
-    var isMapping by remember { mutableStateOf(true) }
+    val isMappingState = remember { mutableStateOf(true) }
+    var isMapping by isMappingState
 
     // Renderer (The Eyes)
     val arRenderer = remember {
+        var lastUpdateTime = 0L
         ArRenderer(
             context = context,
             onPlanesDetected = {},
@@ -54,6 +56,18 @@ fun MappingScreen(
             // ACTIVATE TACTICAL MODE
             showMiniMap = true
             showGuide = false
+            onSessionUpdated = { session, frame ->
+                if (isMappingState.value) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastUpdateTime > 500) {
+                        if (frame.camera.trackingState == TrackingState.TRACKING) {
+                            val cameraPose = frame.camera.pose
+                            slamManager.updateFeatureMapQuality(session, cameraPose)
+                            lastUpdateTime = now
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -71,21 +85,6 @@ fun MappingScreen(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             arRenderer.cleanup()
-        }
-    }
-
-    // The Mapping Loop: Poll ARCore for "How good is this map?"
-    LaunchedEffect(isMapping) {
-        while (isMapping) {
-            val session = arRenderer.session
-            if (session != null) {
-                // Ensure we are tracking before asking for quality
-                if (session.update().camera.trackingState == TrackingState.TRACKING) {
-                    val cameraPose = session.update().camera.pose
-                    slamManager.updateFeatureMapQuality(session, cameraPose)
-                }
-            }
-            kotlinx.coroutines.delay(500) // Don't spam the API
         }
     }
 
