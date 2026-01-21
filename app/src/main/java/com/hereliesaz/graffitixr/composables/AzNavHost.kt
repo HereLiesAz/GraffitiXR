@@ -1,72 +1,127 @@
 package com.hereliesaz.graffitixr.composables
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
+import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.hereliesaz.aznavrail.AzNavHostScope
+import com.hereliesaz.aznavrail.AzNavHostScopeImpl
 import com.hereliesaz.aznavrail.AzNavRail
-import com.hereliesaz.aznavrail.AzNavRailScope
+import com.hereliesaz.aznavrail.LocalAzNavHostPresent
+import com.hereliesaz.aznavrail.LocalAzSafeZones
+import com.hereliesaz.aznavrail.internal.AzLayoutConfig
+import com.hereliesaz.aznavrail.internal.AzSafeZones
+import com.hereliesaz.aznavrail.model.AzDockingSide
 
-/**
- * A container that combines navigation and the application's signature AzNavRail.
- * It enforces the UI safety zones and overlay structure.
- */
 @Composable
 fun AzNavHost(
-    navController: NavHostController,
-    startDestination: String,
-    currentDestination: String?,
-    isLandscape: Boolean,
+    modifier: Modifier = Modifier,
+    navController: NavController? = null,
+    currentDestination: String? = null,
+    isLandscape: Boolean? = null,
+    initiallyExpanded: Boolean = false,
+    disableSwipeToOpen: Boolean = false,
     isRailVisible: Boolean = true,
-    rail: AzNavRailScope.() -> Unit,
-    builder: NavGraphBuilder.() -> Unit
+    content: AzNavHostScope.() -> Unit
 ) {
     val configuration = LocalConfiguration.current
+    val effectiveIsLandscape = isLandscape ?: (configuration.screenWidthDp > configuration.screenHeightDp)
 
-    // Safe Zone Calculations (Top/Bottom 10%)
-    val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
-    val screenHeight = configuration.screenHeightDp.dp
-    // 10% safety margin plus system bars
-    val topSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateTopPadding() + 16.dp)
-    val bottomSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateBottomPadding() + 16.dp)
+    val effectiveCurrentDestination = if (currentDestination != null) {
+        currentDestination
+    } else {
+        val navBackStackEntry by navController?.currentBackStackEntryAsState() ?: remember { mutableStateOf(null) }
+        navBackStackEntry?.destination?.route
+    }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Content Layer (Z-Index 1)
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(1f),
-            builder = builder
-        )
+    val scope = remember { AzNavHostScopeImpl() }
+    scope.resetHost()
 
-        // Rail Layer (Z-Index 6)
-        if (isRailVisible) {
-            Box(
-                modifier = Modifier
-                    .zIndex(6f)
-                    .fillMaxHeight()
-                    .padding(top = topSafePadding, bottom = bottomSafePadding)
-            ) {
-                AzNavRail(
-                    navController = null, // Navigation handled manually in rail block
-                    currentDestination = currentDestination,
-                    isLandscape = isLandscape,
-                    content = rail
-                )
+    scope.apply(content)
+
+    // Determine rail settings
+    val railScope = scope.getRailScopeImpl()
+    val dockingSide = railScope.dockingSide
+    val railWidth = railScope.collapsedRailWidth
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val maxHeight = maxHeight
+        val safeTop = maxHeight * AzLayoutConfig.SafeTopPercent
+        val safeBottom = maxHeight * AzLayoutConfig.SafeBottomPercent
+
+        // Layer 1: Backgrounds
+        scope.backgrounds.sortedBy { it.weight }.forEach { item ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                item.content()
             }
         }
+
+        // Layer 2: Restricted Content
+        val startPadding = if (isRailVisible && dockingSide == AzDockingSide.LEFT) railWidth else 0.dp
+        val endPadding = if (isRailVisible && dockingSide == AzDockingSide.RIGHT) railWidth else 0.dp
+        val topPadding = if (isRailVisible) safeTop else 0.dp
+        val bottomPadding = if (isRailVisible) safeBottom else 0.dp
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = topPadding, bottom = bottomPadding, start = startPadding, end = endPadding)
+        ) {
+            scope.onscreenItems.forEach { item ->
+                // Flip alignment if Right Docked
+                val finalAlignment = if (isRailVisible && dockingSide == AzDockingSide.RIGHT) {
+                    flipAlignment(item.alignment)
+                } else {
+                    item.alignment
+                }
+
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = finalAlignment
+                ) {
+                    item.content()
+                }
+            }
+        }
+
+        // Layer 3: AzNavRail
+        if (isRailVisible) {
+            CompositionLocalProvider(
+                LocalAzNavHostPresent provides true,
+                LocalAzSafeZones provides AzSafeZones(safeTop, safeBottom)
+            ) {
+                AzNavRail(
+                    modifier = Modifier.fillMaxSize(),
+                    navController = navController,
+                    currentDestination = effectiveCurrentDestination,
+                    isLandscape = effectiveIsLandscape,
+                    initiallyExpanded = initiallyExpanded,
+                    disableSwipeToOpen = disableSwipeToOpen,
+                    providedScope = railScope
+                ) {}
+            }
+        }
+    }
+}
+
+private fun flipAlignment(alignment: Alignment): Alignment {
+    return when (alignment) {
+        is BiasAlignment -> BiasAlignment(
+            horizontalBias = -alignment.horizontalBias,
+            verticalBias = alignment.verticalBias
+        )
+        else -> alignment
     }
 }

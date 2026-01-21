@@ -12,7 +12,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.graffitixr.composables.AzNavHost
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.slam.SlamManager
 import kotlinx.coroutines.launch
@@ -88,78 +88,80 @@ fun MappingScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 1. The AR View (World + MiniMap)
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                GLSurfaceView(ctx).apply {
-                    preserveEGLContextOnPause = true
-                    setEGLContextClientVersion(2)
-                    setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                    setRenderer(arRenderer)
-                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                }
-            }
+    AzNavHost(
+        modifier = Modifier.fillMaxSize(),
+        navController = null,
+        currentDestination = "surveyor",
+        isLandscape = false
+    ) {
+        azSettings(
+            displayAppNameInHeader = true,
+            dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
         )
+        azRailItem(id = "back", text = "Abort", onClick = onExit)
 
-        // 2. Navigation
-        AzNavRail(
-            navController = null,
-            currentDestination = "surveyor",
-            isLandscape = false
-        ) {
-            azSettings(
-                displayAppNameInHeader = true,
-                dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+        background {
+            // 1. The AR View (World + MiniMap)
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    GLSurfaceView(ctx).apply {
+                        preserveEGLContextOnPause = true
+                        setEGLContextClientVersion(2)
+                        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                        setRenderer(arRenderer)
+                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                    }
+                }
             )
-            azRailItem(id = "back", text = "Abort", onClick = onExit)
         }
 
         // 3. The HUD (Neural Scan UI)
         if (isMapping) {
-            // Map float quality to Enum
-            val qualityEnum = when {
-                mappingQuality < 0.5f -> Session.FeatureMapQuality.INSUFFICIENT
-                mappingQuality < 0.8f -> Session.FeatureMapQuality.SUFFICIENT
-                else -> Session.FeatureMapQuality.GOOD
-            }
+            onscreen {
+                // Map float quality to Enum
+                val qualityEnum = when {
+                    mappingQuality < 0.5f -> Session.FeatureMapQuality.INSUFFICIENT
+                    mappingQuality < 0.8f -> Session.FeatureMapQuality.SUFFICIENT
+                    else -> Session.FeatureMapQuality.GOOD
+                }
 
-            PhotoSphereCreationScreen(
-                isRightHanded = isRightHanded,
-                currentQuality = qualityEnum,
-                isHosting = isHosting,
-                onCaptureComplete = {
-                    val session = arRenderer.session
-                    if (session != null) {
-                        // The user is happy with the map.
-                        // Create an anchor exactly where the device is NOW.
-                        val cameraPose = session.update().camera.pose
-                        // We place the anchor slightly in front (0.5m) to ensure stability
-                        val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
-                        val anchorPose = cameraPose.compose(forwardOffset)
+                PhotoSphereCreationScreen(
+                    isRightHanded = isRightHanded,
+                    currentQuality = qualityEnum,
+                    isHosting = isHosting,
+                    onCaptureComplete = {
+                        val session = arRenderer.session
+                        if (session != null) {
+                            // The user is happy with the map.
+                            // Create an anchor exactly where the device is NOW.
+                            val cameraPose = session.update().camera.pose
+                            // We place the anchor slightly in front (0.5m) to ensure stability
+                            val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
+                            val anchorPose = cameraPose.compose(forwardOffset)
 
-                        val anchor = session.createAnchor(anchorPose)
+                            val anchor = session.createAnchor(anchorPose)
 
-                        // Initiate the Upload Ritual
-                        scope.launch {
-                            slamManager.hostAnchor(
-                                session = session,
-                                anchor = anchor,
-                                onSuccess = { cloudId ->
-                                    // Success. We have the ID.
-                                    Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
-                                    onMapSaved(cloudId)
-                                },
-                                onError = { error ->
-                                    Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
-                                }
-                            )
+                            // Initiate the Upload Ritual
+                            scope.launch {
+                                slamManager.hostAnchor(
+                                    session = session,
+                                    anchor = anchor,
+                                    onSuccess = { cloudId ->
+                                        // Success. We have the ID.
+                                        Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
+                                        onMapSaved(cloudId)
+                                    },
+                                    onError = { error ->
+                                        Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            }
                         }
-                    }
-                },
-                onExit = onExit
-            )
+                    },
+                    onExit = onExit
+                )
+            }
         }
     }
 }
