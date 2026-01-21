@@ -3,38 +3,76 @@ set -e
 
 echo "Setting up dependencies..."
 
-# Check if origin/dependencies exists
-if ! git ls-remote --exit-code --heads origin dependencies >/dev/null 2>&1; then
-    echo "Warning: 'dependencies' branch not found on remote."
-    echo "Please run the 'Update Dependencies' GitHub workflow to generate the libraries branch."
-    echo "If you are running this locally and have not pushed yet, ensure the branch exists."
-    # Try to fetch anyway in case it's there but ls-remote failed for some reason or just proceed to fail at checkout
-fi
+# Ensure app/libs exists
+mkdir -p app/libs
 
+# Fetch dependencies branch
 git fetch origin dependencies
 
-# Checkout libs
-# We use -- to separate path
-echo "Restoring libraries from dependencies branch..."
-git checkout origin/dependencies -- app/libs/opencv app/libs/glm app/libs/litert
+# --- OpenCV ---
+echo "Restoring OpenCV..."
+# Remove existing to avoid conflicts
+rm -rf opencv app/libs/opencv
 
-echo "Dependencies restored to app/libs/."
+# Checkout 'opencv' folder from root of dependencies branch
+git checkout origin/dependencies -- opencv
 
-# Patch OpenCV build.gradle for AGP 9.0 compatibility (proguard-android.txt is deprecated)
-if [ -f "$OPENCV_DEST/sdk/build.gradle" ]; then
-    if grep -q "proguard-android.txt" "$OPENCV_DEST/sdk/build.gradle"; then
-        echo "Patching OpenCV build.gradle for AGP 9.0 compatibility..."
-        # Portable sed in-place
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-             sed -i '' 's/proguard-android.txt/proguard-android-optimize.txt/g' "$OPENCV_DEST/sdk/build.gradle"
+# Create expected directory structure app/libs/opencv/sdk
+mkdir -p app/libs/opencv
+
+# Move checked out 'opencv' folder to 'app/libs/opencv/sdk'
+mv opencv app/libs/opencv/sdk
+
+# Patch OpenCV build.gradle
+if [ -f "app/libs/opencv/sdk/build.gradle" ]; then
+    echo "Patching OpenCV build.gradle..."
+     if [[ "$OSTYPE" == "darwin"* ]]; then
+             sed -i '' 's/proguard-android.txt/proguard-android-optimize.txt/g' "app/libs/opencv/sdk/build.gradle"
         else
-             sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' "$OPENCV_DEST/sdk/build.gradle"
+             sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' "app/libs/opencv/sdk/build.gradle"
         fi
-    fi
+
+     # Add kotlinOptions { jvmTarget = '17' } before buildTypes to fix JVM target incompatibility
+     # We check if it's already there to avoid duplication if run multiple times (though we nuked the folder above, so it's fresh)
+     if ! grep -q "jvmTarget = '17'" "app/libs/opencv/sdk/build.gradle"; then
+         echo "Adding kotlinOptions to OpenCV build.gradle..."
+         awk '/buildTypes \{/ { print "    kotlinOptions {\n        jvmTarget = \04717\047\n    }\n" } { print }' "app/libs/opencv/sdk/build.gradle" > temp_gradle && mv temp_gradle "app/libs/opencv/sdk/build.gradle"
+     fi
 fi
 
-# Cleanup
-rm -rf temp_libs
+# --- GLM ---
+echo "Restoring GLM..."
+rm -rf app/libs/glm
+mkdir -p app/libs/glm
 
-# Ensure they are ignored (just in case)
-echo "Libraries setup complete. Ensure .gitignore includes these paths."
+# Download GLM 1.0.1
+echo "Downloading GLM 1.0.1..."
+curl -L -o glm.zip https://github.com/g-truc/glm/archive/refs/tags/1.0.1.zip
+unzip -q glm.zip
+
+# Move 'glm' folder from the extracted directory to app/libs/glm
+# Structure is glm-1.0.1/glm
+mv glm-1.0.1/glm app/libs/glm/glm
+
+# Cleanup GLM temp files
+rm -rf glm-1.0.1 glm.zip
+
+# --- LiteRT ---
+echo "Restoring LiteRT..."
+rm -rf app/libs/litert
+mkdir -p app/libs/litert
+
+# Checkout litert aar
+git checkout origin/dependencies -- litert-2.1.0.aar
+
+mv litert-2.1.0.aar app/libs/litert/
+
+# Also check for 'litert_npu_runtime_libraries' folder if it exists
+if git ls-tree origin/dependencies | grep -q "litert_npu_runtime_libraries"; then
+    echo "Restoring LiteRT NPU libraries..."
+    rm -rf litert_npu_runtime_libraries
+    git checkout origin/dependencies -- litert_npu_runtime_libraries
+    mv litert_npu_runtime_libraries app/libs/litert/
+fi
+
+echo "Dependencies setup complete."
