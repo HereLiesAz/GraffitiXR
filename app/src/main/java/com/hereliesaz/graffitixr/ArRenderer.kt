@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
+import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -68,6 +69,7 @@ class ArRenderer(
 
     @Volatile
     var session: Session? = null
+    var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var isAnchorReplacementAllowed: Boolean = true // Default to true to allow initial placement
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true
@@ -230,6 +232,7 @@ class ArRenderer(
         try {
             session!!.setCameraTextureName(backgroundTextureId)
             val frame = session!!.update()
+            onSessionUpdated?.invoke(session!!, frame)
             val camera = frame.camera
 
             // Handle Taps
