@@ -54,7 +54,6 @@ data class ProjectData(
 
     val targetImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
 
-    @Serializable(with = RefinementPathSerializer::class)
     val refinementPaths: List<RefinementPath> = emptyList(),
 
     val opacity: Float = 1f,
