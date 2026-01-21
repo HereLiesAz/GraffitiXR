@@ -62,7 +62,10 @@ fun AdjustmentsPanel(
     val portraitStartPadding = 0.dp
     
     val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
-    val startPadding = if (isLandscape) landscapeStartPadding else portraitStartPadding
+
+    val isRightHanded = uiState.isRightHanded
+    val startPadding = if (isLandscape && isRightHanded) landscapeStartPadding else portraitStartPadding
+    val endPadding = if (isLandscape && !isRightHanded) landscapeStartPadding else 0.dp
 
     // Resolve active layer properties
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
@@ -128,7 +131,7 @@ fun AdjustmentsPanel(
             onRedo = onRedo,
             onMagicClicked = onMagicAlign,
             modifier = Modifier
-                .padding(start = startPadding)
+                .padding(start = startPadding, end = endPadding)
                 .fillMaxWidth()
         )
     }

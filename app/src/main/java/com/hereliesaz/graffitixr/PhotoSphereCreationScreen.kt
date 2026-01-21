@@ -23,6 +23,7 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 
 @Composable
 fun PhotoSphereCreationScreen(
+    isRightHanded: Boolean,
     currentQuality: FeatureMapQuality,
     isHosting: Boolean,
     onCaptureComplete: () -> Unit,
@@ -87,23 +88,40 @@ fun PhotoSphereCreationScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 48.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp),
+            horizontalArrangement = if (isRightHanded) Arrangement.spacedBy(16.dp, Alignment.Start) else Arrangement.spacedBy(16.dp, Alignment.End)
         ) {
-            AzButton(
-                text = "Abort",
-                shape = AzButtonShape.RECTANGLE,
-                onClick = onExit
-            )
-
-            // Only allow saving if quality is decent, otherwise we're just saving garbage.
-            if (currentQuality != FeatureMapQuality.INSUFFICIENT || isHosting) {
+            if (isRightHanded) {
+                // Left-handed layout (User holds with Left hand, controls on Left)
+                // Finalize first (Leftmost -> Thumb)
+                if (currentQuality != FeatureMapQuality.INSUFFICIENT || isHosting) {
+                    AzButton(
+                        text = if (isHosting) "Uploading..." else "Finalize Map",
+                        shape = AzButtonShape.RECTANGLE,
+                        onClick = onCaptureComplete,
+                    )
+                }
                 AzButton(
-                    text = if (isHosting) "Uploading..." else "Finalize Map",
+                    text = "Abort",
                     shape = AzButtonShape.RECTANGLE,
-                    onClick = onCaptureComplete,
-                    // enabled = !isHosting // Optional: disable while hosting
+                    onClick = onExit
                 )
+            } else {
+                // Right-handed layout (User holds with Right hand, controls on Right)
+                // Abort first (Leftmost), Finalize last (Rightmost -> Thumb)
+                AzButton(
+                    text = "Abort",
+                    shape = AzButtonShape.RECTANGLE,
+                    onClick = onExit
+                )
+                if (currentQuality != FeatureMapQuality.INSUFFICIENT || isHosting) {
+                    AzButton(
+                        text = if (isHosting) "Uploading..." else "Finalize Map",
+                        shape = AzButtonShape.RECTANGLE,
+                        onClick = onCaptureComplete,
+                    )
+                }
             }
         }
     }

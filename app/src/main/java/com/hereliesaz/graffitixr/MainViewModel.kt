@@ -1,12 +1,13 @@
 package com.hereliesaz.graffitixr
 
+import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.location.Location
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.data.*
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
@@ -20,10 +21,14 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class MainViewModel(
+    application: Application,
     private val projectManager: ProjectManager = ProjectManager()
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
-    private val _uiState = MutableStateFlow(UiState())
+    private val prefs = application.getSharedPreferences("graffiti_settings", Context.MODE_PRIVATE)
+    private val _uiState = MutableStateFlow(UiState(
+        isRightHanded = prefs.getBoolean("is_right_handed", true)
+    ))
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private val _feedbackEvent = Channel<FeedbackEvent>(Channel.BUFFERED)
@@ -226,7 +231,10 @@ class MainViewModel(
     }
 
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
-    fun setHandedness(rightHanded: Boolean) = _uiState.update { it.copy(isRightHanded = rightHanded) }
+    fun setHandedness(rightHanded: Boolean) {
+        prefs.edit().putBoolean("is_right_handed", rightHanded).apply()
+        _uiState.update { it.copy(isRightHanded = rightHanded) }
+    }
     fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
     fun onToggleFlashlight() {
         _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }

@@ -378,7 +378,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 headerIconShape = AzHeaderIconShape.ROUNDED,
                                 infoScreen = showInfoScreen,
                                 activeColor = activeHighlightColor,
-                                dockingSide = if (uiState.isRightHanded) AzDockingSide.RIGHT else AzDockingSide.LEFT,
+                                dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
                                 onDismissInfoScreen = { showInfoScreen = false }
                             )
 
@@ -829,12 +829,14 @@ private fun TargetCreationFlow(
             }
 
             UnwarpScreen(
+                isRightHanded = uiState.isRightHanded,
                 targetImage = imageBitmap,
                 onConfirm = viewModel::unwarpImage,
                 onRetake = viewModel::onRetakeCapture
             )
         } else {
             TargetCreationOverlay(
+                isRightHanded = uiState.isRightHanded,
                 step = uiState.captureStep,
                 targetCreationMode = uiState.targetCreationMode,
                 gridRows = uiState.gridRows,
