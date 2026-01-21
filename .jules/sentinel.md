@@ -1,4 +1,0 @@
-## 2024-05-23 - PairFloatFloatSerializer DoS Prevention
-**Vulnerability:** The `PairFloatFloatSerializer` in `ProjectData.kt` naively accessed list indices (`list[0]`, `list[1]`) without checking the list size. This allowed malformed JSON (e.g., `[]` or `[1.0]`) to crash the application with an `IndexOutOfBoundsException`, creating a Denial of Service (DoS) vulnerability.
-**Learning:** `ListSerializer` in `kotlinx.serialization` does not enforce a specific size. When using it to deserialize fixed-size structures (like a Pair or Point), explicit validation is mandatory before accessing elements.
-**Prevention:** Always validate `list.size` before accessing elements by index in custom `KSerializer` implementations that delegate to collection serializers. Throw `IllegalArgumentException` or `SerializationException` if the size is incorrect.
