@@ -1,13 +1,18 @@
 package com.hereliesaz.graffitixr
 
+import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import com.hereliesaz.graffitixr.utils.ProjectManager
+import io.mockk.Runs
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -24,6 +29,9 @@ class MainViewModelTest {
 
     private lateinit var viewModel: MainViewModel
     private val projectManager: ProjectManager = mockk(relaxed = true)
+    private val application: Application = mockk(relaxed = true)
+    private val prefs: SharedPreferences = mockk(relaxed = true)
+    private val editor: SharedPreferences.Editor = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -32,7 +40,13 @@ class MainViewModelTest {
         mockkStatic(Uri::class)
         every { Uri.parse(any()) } returns mockk()
 
-        viewModel = MainViewModel(projectManager)
+        every { application.getSharedPreferences(any(), any()) } returns prefs
+        every { prefs.edit() } returns editor
+        every { editor.putBoolean(any(), any()) } returns editor
+        every { editor.apply() } just Runs
+        every { prefs.getBoolean("is_right_handed", true) } returns true
+
+        viewModel = MainViewModel(application, projectManager)
     }
 
     @After

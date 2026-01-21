@@ -12,7 +12,7 @@ class MainViewModelFactory(
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             val projectManager = ProjectManager() // Initialize dependency
             @Suppress("UNCHECKED_CAST")
-            return MainViewModel(projectManager) as T
+            return MainViewModel(application, projectManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
