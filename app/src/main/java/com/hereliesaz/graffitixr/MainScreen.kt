@@ -109,7 +109,15 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
     // Capture theme color for AzNavRail
-    val activeHighlightColor = MaterialTheme.colorScheme.tertiary
+    val surfaceColors = listOf(
+        MaterialTheme.colorScheme.surface,
+        MaterialTheme.colorScheme.surfaceVariant,
+        MaterialTheme.colorScheme.inverseSurface,
+        MaterialTheme.colorScheme.primaryContainer,
+        MaterialTheme.colorScheme.secondaryContainer,
+        MaterialTheme.colorScheme.tertiaryContainer
+    )
+    val activeHighlightColor = surfaceColors[kotlin.math.abs(uiState.activeColorSeed) % surfaceColors.size]
 
     // UI Visibility States
     var showSliderDialog by remember { mutableStateOf<String?>(null) }

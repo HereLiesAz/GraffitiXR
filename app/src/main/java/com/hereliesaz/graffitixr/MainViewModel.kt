@@ -15,10 +15,13 @@ import com.hereliesaz.graffitixr.utils.ImageProcessingUtils
 import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
+import kotlin.random.Random
 
 class MainViewModel(
     application: Application,
@@ -27,7 +30,8 @@ class MainViewModel(
 
     private val prefs = application.getSharedPreferences("graffiti_settings", Context.MODE_PRIVATE)
     private val _uiState = MutableStateFlow(UiState(
-        isRightHanded = prefs.getBoolean("is_right_handed", true)
+        isRightHanded = prefs.getBoolean("is_right_handed", true),
+        activeColorSeed = Random.nextInt()
     ))
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
@@ -94,12 +98,18 @@ class MainViewModel(
             try {
                 val activeLayer = _uiState.value.layers.find { it.id == activeId }
                 if (activeLayer != null) {
-                    val original = ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    val original = withContext(Dispatchers.IO) {
+                        ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    }
                     if (original != null) {
                         snapshotState()
-                        val processed = BackgroundRemover.removeBackground(original)
+                        val processed = withContext(Dispatchers.IO) {
+                            BackgroundRemover.removeBackground(original)
+                        }
                         if (processed != null) {
-                            val newUri = ImageUtils.saveBitmapToCache(context, processed)
+                            val newUri = withContext(Dispatchers.IO) {
+                                ImageUtils.saveBitmapToCache(context, processed)
+                            }
                             updateActiveLayer { it.copy(uri = newUri) }
                         } else {
                             _feedbackEvent.send(FeedbackEvent.Toast("Failed to remove background"))
@@ -123,11 +133,17 @@ class MainViewModel(
             try {
                 val activeLayer = _uiState.value.layers.find { it.id == activeId }
                 if (activeLayer != null) {
-                    val original = ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    val original = withContext(Dispatchers.IO) {
+                        ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    }
                     if (original != null) {
                         snapshotState()
-                        val processed = ImageUtils.generateOutline(original)
-                        val newUri = ImageUtils.saveBitmapToCache(context, processed)
+                        val processed = withContext(Dispatchers.IO) {
+                            ImageUtils.generateOutline(original)
+                        }
+                        val newUri = withContext(Dispatchers.IO) {
+                            ImageUtils.saveBitmapToCache(context, processed)
+                        }
                         updateActiveLayer { it.copy(uri = newUri) }
                     }
                 }
@@ -340,7 +356,15 @@ class MainViewModel(
 
     fun onNewProject() {
         val newId = UUID.randomUUID().toString()
-        _uiState.update { UiState(showProjectList = false, currentProjectId = newId) }
+        val currentRightHanded = _uiState.value.isRightHanded
+        _uiState.update {
+            UiState(
+                showProjectList = false,
+                currentProjectId = newId,
+                isRightHanded = currentRightHanded,
+                activeColorSeed = Random.nextInt()
+            )
+        }
     }
 
     fun onSaveClicked() {} // Triggered manually if needed

@@ -6,7 +6,9 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import org.opencv.android.Utils
 import org.opencv.core.Core
+import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.Scalar
 import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
@@ -20,24 +22,34 @@ object ImageUtils {
         // Ensure OpenCV loaded logic handled by Utils.kt or caller
         // Using Canny Edge Detection
         val mat = Mat()
+        val gray = Mat()
         val edges = Mat()
-        val result = Mat()
 
         Utils.bitmapToMat(input, mat)
-        Imgproc.cvtColor(mat, edges, Imgproc.COLOR_RGB2GRAY)
-        Imgproc.Canny(edges, edges, 50.0, 150.0)
-        Core.bitwise_not(edges, result)
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
+        Imgproc.Canny(gray, edges, 50.0, 150.0)
 
-        val finalColor = Mat()
-        Imgproc.cvtColor(result, finalColor, Imgproc.COLOR_GRAY2RGBA)
+        // Create a black image for RGB channels
+        val black = Mat(edges.size(), CvType.CV_8UC1, Scalar(0.0))
+
+        // Merge to create RGBA: R=Black, G=Black, B=Black, A=Edges (White=Opaque, Black=Transparent)
+        val channels = java.util.ArrayList<Mat>()
+        channels.add(black) // R
+        channels.add(black) // G
+        channels.add(black) // B
+        channels.add(edges) // A
+
+        val result = Mat()
+        Core.merge(channels, result)
 
         val output = Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(finalColor, output)
+        Utils.matToBitmap(result, output)
 
         mat.release()
+        gray.release()
         edges.release()
+        black.release()
         result.release()
-        finalColor.release()
 
         return output
     }

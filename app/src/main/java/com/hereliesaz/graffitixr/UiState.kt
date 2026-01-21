@@ -70,9 +70,10 @@ data class UiState(
     val showUnlockInstructions: Boolean = false,
     val showOnboardingDialogForMode: EditorMode? = null,
     val showDoubleTapHint: Boolean = false,
-    val activeRotationAxis: RotationAxis = RotationAxis.Y,
+    val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
     val isFlashlightOn: Boolean = false,
+    val activeColorSeed: Int = 0,
 
     // Updates
     val updateStatusMessage: String? = null,
