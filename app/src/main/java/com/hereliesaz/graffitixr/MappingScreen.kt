@@ -12,6 +12,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.graffitixr.composables.AzNavHost
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.slam.SlamManager
@@ -88,37 +90,41 @@ fun MappingScreen(
         }
     }
 
+    val navController = rememberNavController()
+
     AzNavHost(
         modifier = Modifier.fillMaxSize(),
-        navController = null,
+        navController = navController,
+        startDestination = "mapping_content",
         currentDestination = "surveyor",
-        isLandscape = false
-    ) {
-        azSettings(
-            displayAppNameInHeader = true,
-            dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
-        )
-        azRailItem(id = "back", text = "Abort", onClick = onExit)
-
-        background {
-            // 1. The AR View (World + MiniMap)
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    GLSurfaceView(ctx).apply {
-                        preserveEGLContextOnPause = true
-                        setEGLContextClientVersion(2)
-                        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                        setRenderer(arRenderer)
-                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                    }
-                }
+        isLandscape = false,
+        rail = {
+            azSettings(
+                displayAppNameInHeader = true,
+                dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
             )
-        }
+            azRailItem(id = "back", text = "Abort", onClick = onExit)
 
-        // 3. The HUD (Neural Scan UI)
-        if (isMapping) {
-            onscreen {
+            background {
+                // 1. The AR View (World + MiniMap)
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        GLSurfaceView(ctx).apply {
+                            preserveEGLContextOnPause = true
+                            setEGLContextClientVersion(2)
+                            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                            setRenderer(arRenderer)
+                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                        }
+                    }
+                )
+            }
+        }
+    ) {
+        composable("mapping_content") {
+            // 3. The HUD (Neural Scan UI)
+            if (isMapping) {
                 // Map float quality to Enum
                 val qualityEnum = when {
                     mappingQuality < 0.5f -> Session.FeatureMapQuality.INSUFFICIENT
