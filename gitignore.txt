@@ -1,0 +1,46 @@
+# Gradle
+.gradle/
+build/
+
+# C/C++
+.cxx/
+
+# Local configuration
+local.properties
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# Keystore files
+*.jks
+*.keystore
+
+# APK files
+*.apk
+*.aab
+
+# Log files
+*.log
+
+# Profiler
+*.hprof
+*.heapdump
+captures/
+
+# Outputs
+/app/build
+/app/release/
+/app/debug/
+/.kotlin/sessions/
+
+backup.ps1
+project_backup_*
+google-services.json
+/app/libs/opencv/
+/app/src/main/cpp/include/glm/
+/app/libs/litert/
+/app/libs/mlkit/
