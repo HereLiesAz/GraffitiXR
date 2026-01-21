@@ -93,33 +93,32 @@ fun MappingScreen(
 
     val navController = rememberNavController()
 
-    AzNavHost(
-        modifier = Modifier.fillMaxSize(),
-        navController = navController
-    ) {
-        azSettings(
-            displayAppNameInHeader = true,
-            dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
-        )
-        azRailItem(id = "back", text = "Abort", onClick = onExit)
-
-        background {
-            // 1. The AR View (World + MiniMap)
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    GLSurfaceView(ctx).apply {
-                        preserveEGLContextOnPause = true
-                        setEGLContextClientVersion(2)
-                        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                        setRenderer(arRenderer)
-                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. The AR View (World + MiniMap) - Rendered behind AzNavHost
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                GLSurfaceView(ctx).apply {
+                    preserveEGLContextOnPause = true
+                    setEGLContextClientVersion(2)
+                    setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                    setRenderer(arRenderer)
+                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                 }
-            )
-        }
+            }
+        )
 
-        onscreen(alignment = Alignment.Center) {
+        AzNavHost(
+            modifier = Modifier.fillMaxSize(),
+            navController = navController
+        ) {
+            azSettings(
+                displayAppNameInHeader = true,
+                dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+            )
+            azRailItem(id = "back", text = "Abort", onClick = onExit)
+
+            onscreen(alignment = Alignment.Center) {
             androidx.navigation.compose.NavHost(
                 navController = navController,
                 startDestination = "mapping_content"
@@ -171,6 +170,7 @@ fun MappingScreen(
                         )
                     }
                 }
+            }
             }
         }
     }

@@ -256,6 +256,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // Background Content (Rendered behind AzNavHost)
+        MainContentLayer(
+            uiState = uiState,
+            viewModel = viewModel,
+            gestureInProgress = gestureInProgress,
+            onGestureToggle = { gestureInProgress = it }
+        )
+
         val isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked
 
         AzNavHost(
@@ -463,16 +471,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         resetDialogs()
                     })
                 }
-            }
-
-            // Background Definition
-            background {
-                MainContentLayer(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    gestureInProgress = gestureInProgress,
-                    onGestureToggle = { gestureInProgress = it }
-                )
             }
 
             // OnScreen Content
