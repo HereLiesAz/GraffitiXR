@@ -126,6 +126,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showInfoScreen by remember { mutableStateOf(false) }
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
+    var gestureInProgress by remember { mutableStateOf(false) }
 
     // Helper to reset dialog states
     val resetDialogs = remember {
@@ -273,6 +274,15 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
                     onDismissInfoScreen = { showInfoScreen = false }
                 )
+
+                background {
+                    MainContentLayer(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        gestureInProgress = gestureInProgress,
+                        onGestureToggle = { gestureInProgress = it }
+                    )
+                }
 
                 azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
                 azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(EditorMode.AR) })
@@ -469,6 +479,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 EditorContent(
                     viewModel = viewModel,
                     uiState = uiState,
+                    gestureInProgress = gestureInProgress,
                     showSliderDialog = showSliderDialog,
                     showColorBalanceDialog = showColorBalanceDialog,
                     onOpacityChange = viewModel::onOpacityChanged,
@@ -484,7 +495,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     onOnboardingComplete = viewModel::onOnboardingComplete,
                     onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
                     onFeedbackShown = viewModel::onFeedbackShown,
-                    tapFeedback = viewModel.tapFeedback.collectAsState().value // Should collect inside? No, collected above? No, passed as state.
+                    tapFeedback = viewModel.tapFeedback.collectAsState().value
                 )
             }
             composable("surveyor") {
@@ -569,6 +580,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 fun EditorContent(
     viewModel: MainViewModel,
     uiState: UiState,
+    gestureInProgress: Boolean,
     showSliderDialog: String?,
     showColorBalanceDialog: Boolean,
     onOpacityChange: (Float) -> Unit,
@@ -595,19 +607,9 @@ fun EditorContent(
     val topSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateTopPadding() + 16.dp)
     val bottomSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateBottomPadding() + 16.dp)
 
-    var gestureInProgress by remember { mutableStateOf(false) }
-
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
-        // MAIN CONTENT LAYER
-        MainContentLayer(
-            uiState = uiState,
-            viewModel = viewModel,
-            gestureInProgress = gestureInProgress,
-            onGestureToggle = { gestureInProgress = it }
-        )
-
         if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
             StatusOverlay(
                 qualityWarning = uiState.qualityWarning,

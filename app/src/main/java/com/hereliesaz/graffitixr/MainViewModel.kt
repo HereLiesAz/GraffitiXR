@@ -391,7 +391,7 @@ class MainViewModel(
     fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
     fun onOverlayImageSelected(u: Uri) {
         val newLayer = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}")
-        _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
+        _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, overlayImageUri = u) }
     }
     fun onBackgroundImageSelected(u: Uri) = _uiState.update { it.copy(backgroundImageUri = u) }
     fun onImagePickerShown() {}
@@ -439,6 +439,16 @@ class MainViewModel(
         _uiState.update { it.copy(isRefinementEraser = b) }
     }
     fun onConfirmTargetCreation() {
+        val captured = _uiState.value.capturedTargetImages.firstOrNull()
+        if (captured != null) {
+            viewModelScope.launch {
+                val fingerprint = arRenderer?.generateFingerprint(captured)
+                if (fingerprint != null) {
+                    val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.Fingerprint.serializer(), fingerprint)
+                    _uiState.update { it.copy(fingerprintJson = json) }
+                }
+            }
+        }
         _uiState.update {
             it.copy(
                 isCapturingTarget = false,
