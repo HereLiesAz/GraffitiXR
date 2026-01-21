@@ -240,7 +240,14 @@ class MainViewModel(
     }
 
     fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
-    fun onCaptureShutterClicked() = viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
+    fun onCaptureShutterClicked() {
+        val step = _uiState.value.captureStep
+        if (step == CaptureStep.GRID_CONFIG) {
+            _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
+        } else {
+            viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
+        }
+    }
     fun saveCapturedBitmap(b: Bitmap) {
         _uiState.update { it.copy(capturedTargetImages = listOf(b), captureStep = CaptureStep.REVIEW) }
         arRenderer?.triggerCapture()
@@ -392,17 +399,58 @@ class MainViewModel(
     fun onGestureStart() {}
     fun onGestureEnd() { snapshotState() }
     fun onRefineTargetToggled() {}
-    fun onTargetCreationMethodSelected(m: TargetCreationMode) {}
-    fun onGridConfigChanged(r: Int, c: Int) {}
-    fun onGpsDecision(e: Boolean) {}
-    fun onPhotoSequenceFinished() {}
-    fun onCalibrationPointCaptured() {}
+    fun onTargetCreationMethodSelected(m: TargetCreationMode) {
+        val nextStep = when (m) {
+            TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
+            TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1
+            else -> CaptureStep.INSTRUCTION
+        }
+        _uiState.update { it.copy(targetCreationMode = m, captureStep = nextStep) }
+    }
+    fun onGridConfigChanged(r: Int, c: Int) {
+        _uiState.update { it.copy(gridRows = r, gridCols = c) }
+    }
+    fun onGpsDecision(e: Boolean) {
+        // Advance to next relevant step, e.g. INSTRUCTION
+        _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
+    }
+    fun onPhotoSequenceFinished() {
+        _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) }
+    }
+    fun onCalibrationPointCaptured() {
+        _uiState.update {
+            val next = when(it.captureStep) {
+                CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
+                CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
+                CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
+                CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW
+                else -> it.captureStep
+            }
+            it.copy(captureStep = next)
+        }
+        viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
+    }
     fun unwarpImage(l: List<Any>) {}
-    fun onRetakeCapture() {}
+    fun onRetakeCapture() {
+        _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList()) }
+    }
     fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
-    fun onRefinementModeChanged(b: Boolean) {}
-    fun onConfirmTargetCreation() {}
-    fun onMagicClicked() {}
+    fun onRefinementModeChanged(b: Boolean) {
+        _uiState.update { it.copy(isRefinementEraser = b) }
+    }
+    fun onConfirmTargetCreation() {
+        _uiState.update {
+            it.copy(
+                isCapturingTarget = false,
+                captureStep = CaptureStep.PREVIEW,
+                isArTargetCreated = true
+            )
+        }
+    }
+    fun onMagicClicked() {
+        // Placeholder for magic align
+        viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateDouble) }
+    }
     fun checkForUpdates() {}
     fun installLatestUpdate() {}
 }
