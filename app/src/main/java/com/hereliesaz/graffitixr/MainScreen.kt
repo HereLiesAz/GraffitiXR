@@ -274,6 +274,29 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     onDismissInfoScreen = { showInfoScreen = false }
                 )
 
+                background {
+                    EditorContent(
+                        viewModel = viewModel,
+                        uiState = uiState,
+                        showSliderDialog = showSliderDialog,
+                        showColorBalanceDialog = showColorBalanceDialog,
+                        onOpacityChange = viewModel::onOpacityChanged,
+                        onBrightnessChange = viewModel::onBrightnessChanged,
+                        onContrastChange = viewModel::onContrastChanged,
+                        onSaturationChange = viewModel::onSaturationChanged,
+                        onColorBalanceRChange = viewModel::onColorBalanceRChanged,
+                        onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+                        onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+                        onUndo = viewModel::onUndoClicked,
+                        onRedo = viewModel::onRedoClicked,
+                        onMagicAlign = viewModel::onMagicClicked,
+                        onOnboardingComplete = viewModel::onOnboardingComplete,
+                        onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
+                        onFeedbackShown = viewModel::onFeedbackShown,
+                        tapFeedback = viewModel.tapFeedback.collectAsState().value
+                    )
+                }
+
                 azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
                 azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(EditorMode.AR) })
                 azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = { onModeSelected(EditorMode.OVERLAY) })
@@ -466,26 +489,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             }
         ) {
             composable("editor") {
-                EditorContent(
-                    viewModel = viewModel,
-                    uiState = uiState,
-                    showSliderDialog = showSliderDialog,
-                    showColorBalanceDialog = showColorBalanceDialog,
-                    onOpacityChange = viewModel::onOpacityChanged,
-                    onBrightnessChange = viewModel::onBrightnessChanged,
-                    onContrastChange = viewModel::onContrastChanged,
-                    onSaturationChange = viewModel::onSaturationChanged,
-                    onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                    onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-                    onColorBalanceBChange = viewModel::onColorBalanceBChanged,
-                    onUndo = viewModel::onUndoClicked,
-                    onRedo = viewModel::onRedoClicked,
-                    onMagicAlign = viewModel::onMagicClicked,
-                    onOnboardingComplete = viewModel::onOnboardingComplete,
-                    onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
-                    onFeedbackShown = viewModel::onFeedbackShown,
-                    tapFeedback = viewModel.tapFeedback.collectAsState().value // Should collect inside? No, collected above? No, passed as state.
-                )
+                Box(modifier = Modifier.fillMaxSize())
             }
             composable("surveyor") {
                 MappingScreen(
