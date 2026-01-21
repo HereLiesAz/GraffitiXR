@@ -1,0 +1,67 @@
+name: Update External Libraries
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *' # Run monthly
+
+jobs:
+  update-libs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Download Libraries
+        run: |
+          mkdir -p libs_dist
+          cd libs_dist
+
+          # OpenCV
+          echo "Downloading OpenCV 4.13.0..."
+          wget -q -O opencv-4.13.0-android-sdk.zip https://github.com/opencv/opencv/releases/download/4.13.0/opencv-4.13.0-android-sdk.zip
+
+          # GLM
+          echo "Downloading GLM 1.0.3..."
+          wget -q -O glm-1.0.3.zip https://github.com/g-truc/glm/releases/download/1.0.3/glm-1.0.3.zip || wget -q -O glm-1.0.3.zip https://sourceforge.net/projects/glm.mirror/files/1.0.3/glm-1.0.3.zip/download
+
+          # LiteRT
+          echo "Downloading LiteRT 2.1.0..."
+          wget -q -O litert-2.1.0.aar https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert/2.1.0/litert-2.1.0.aar
+
+          # MLKit Subject Segmentation
+          echo "Downloading MLKit..."
+          wget -q -O mlkit-subject-segmentation.aar https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-mlkit-subject-segmentation/16.0.0-beta1/play-services-mlkit-subject-segmentation-16.0.0-beta1.aar
+
+          # Create index.html
+          cat <<EOF > index.html
+          <!DOCTYPE html>
+          <html>
+          <head><title>External Dependencies</title></head>
+          <body>
+          <h1>External Dependencies</h1>
+          <ul>
+          <li><a href="opencv-4.13.0-android-sdk.zip">OpenCV 4.13.0 Android SDK</a></li>
+          <li><a href="glm-1.0.3.zip">GLM 1.0.3</a></li>
+          <li><a href="litert-2.1.0.aar">LiteRT 2.1.0</a></li>
+          <li><a href="mlkit-subject-segmentation.aar">MLKit Subject Segmentation</a></li>
+          </ul>
+          </body>
+          </html>
+          EOF
+
+      - name: Publish to Dependencies Branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd libs_dist
+          git init
+          git checkout -b dependencies
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update external libraries"
+          git remote add origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
+          git push -f origin dependencies
