@@ -29,7 +29,7 @@ fun AzNavHost(
     currentDestination: String?,
     isLandscape: Boolean,
     isRailVisible: Boolean = true,
-    rail: @Composable AzNavRailScope.() -> Unit,
+    rail: AzNavRailScope.() -> Unit,
     builder: NavGraphBuilder.() -> Unit
 ) {
     val configuration = LocalConfiguration.current

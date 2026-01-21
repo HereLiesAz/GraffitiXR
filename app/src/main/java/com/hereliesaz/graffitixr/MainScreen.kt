@@ -584,7 +584,7 @@ fun EditorContent(
     onOnboardingComplete: (EditorMode) -> Unit,
     onDoubleTapHintDismissed: () -> Unit,
     onFeedbackShown: () -> Unit,
-    tapFeedback: com.hereliesaz.graffitixr.data.Feedback
+    tapFeedback: com.hereliesaz.graffitixr.TapFeedback?
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp

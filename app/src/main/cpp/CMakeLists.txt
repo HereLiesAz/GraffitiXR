@@ -26,6 +26,7 @@ target_include_directories(
     graffiti-lib PRIVATE
     include
     ${OpenCV_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/glm
 )
 
 # --- LINKING ---
