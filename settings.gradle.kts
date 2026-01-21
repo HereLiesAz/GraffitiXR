@@ -17,3 +17,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "GraffitiXR"
 include(":app")
+
+include(":opencv")
+project(":opencv").projectDir = File("app/libs/opencv/sdk")

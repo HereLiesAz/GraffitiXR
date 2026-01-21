@@ -62,6 +62,7 @@ import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzNavRail
@@ -80,6 +81,7 @@ import com.hereliesaz.graffitixr.EditorMode.PROJECT
 import com.hereliesaz.graffitixr.EditorMode.STATIC
 import com.hereliesaz.graffitixr.EditorMode.TRACE
 import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
+import com.hereliesaz.graffitixr.composables.AzNavHost
 import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
 import com.hereliesaz.graffitixr.composables.DrawingCanvas
 import com.hereliesaz.graffitixr.composables.GestureFeedback
@@ -111,98 +113,18 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     // We use a local NavHost for top-level screens like Surveyor, Library, Settings.
     // The "Editor" (AR/Overlay) is the home destination.
     val localNavController = rememberNavController()
+    val navBackStackEntry by localNavController.currentBackStackEntryAsState()
+    val currentNavRoute = navBackStackEntry?.destination?.route
 
-    NavHost(navController = localNavController, startDestination = "editor") {
-        composable("editor") {
-            EditorScreen(viewModel, localNavController)
-        }
-        composable("surveyor") {
-            MappingScreen(
-                onMapSaved = { /* Handle saved map if needed */ },
-                onExit = { localNavController.popBackStack() }
-            )
-        }
-        composable("project_library") {
-            // We need to access the ViewModel's state or pass callbacks.
-            // Currently ProjectLibraryScreen takes callbacks.
-            val uiState by viewModel.uiState.collectAsState()
-            val context = LocalContext.current
-
-            // Ensure projects are loaded
-            LaunchedEffect(Unit) {
-                viewModel.loadAvailableProjects(context)
-            }
-
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                ProjectLibraryScreen(
-                    projects = uiState.availableProjects,
-                    onLoadProject = { project ->
-                        viewModel.openProject(project, context)
-                        localNavController.popBackStack()
-                    },
-                    onDeleteProject = { projectId ->
-                        viewModel.deleteProject(context, projectId)
-                    },
-                    onNewProject = {
-                        viewModel.onNewProject()
-                        localNavController.popBackStack()
-                    }
-                )
-                // Add a back button or rely on system back
-                AzButton(
-                    text = "Back",
-                    onClick = { localNavController.popBackStack() },
-                    modifier = Modifier.align(Alignment.TopStart).padding(16.dp)
-                )
-            }
-        }
-        composable("settings") {
-            val uiState by viewModel.uiState.collectAsState()
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                SettingsScreen(
-                    currentVersion = BuildConfig.VERSION_NAME,
-                    updateStatus = uiState.updateStatusMessage,
-                    isCheckingForUpdate = uiState.isCheckingForUpdate,
-                    isRightHanded = uiState.isRightHanded,
-                    onHandednessChanged = viewModel::setHandedness,
-                    onCheckForUpdates = viewModel::checkForUpdates,
-                    onInstallUpdate = viewModel::installLatestUpdate,
-                    onClose = { localNavController.popBackStack() }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun EditorScreen(viewModel: MainViewModel, navController: NavController) {
     val uiState by viewModel.uiState.collectAsState()
-    val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val density = LocalConfiguration.current.densityDpi
 
-    // Safe Zone Calculations (Top/Bottom 10%)
-    val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
-    val screenHeight = configuration.screenHeightDp.dp
-    // 10% safety margin plus system bars
-    val topSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateTopPadding() + 16.dp)
-    val bottomSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateBottomPadding() + 16.dp)
-
-    // Capture theme color for AzNavRail
-    val activeHighlightColor = remember(uiState.activeColorSeed) {
-        val colors = listOf(Color.Green, Color.Magenta, Color.Cyan)
-        colors[kotlin.math.abs(uiState.activeColorSeed) % colors.size]
-    }
-
-    // UI Visibility States
+    // HOISTED STATE
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
-    var gestureInProgress by remember { mutableStateOf(false) }
     var showInfoScreen by remember { mutableStateOf(false) }
-
-    // Automation State
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
 
     // Helper to reset dialog states
@@ -213,8 +135,77 @@ fun EditorScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
+    // Launchers
+    val overlayImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { viewModel.onOverlayImageSelected(it) } }
+
+    val backgroundImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri -> uri?.let { viewModel.exportProjectToUri(it) } }
+
+    // Image Picker Request Handler
+    LaunchedEffect(uiState.showImagePicker) {
+        if (uiState.showImagePicker) {
+            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            viewModel.onImagePickerShown()
+        }
+    }
+
+    LaunchedEffect(uiState.editorMode) {
+        if (uiState.editorMode == EditorMode.TRACE && uiState.overlayImageUri == null) {
+            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+    }
+
+    // Helper for automation
+    val onModeSelected = remember(viewModel, hasSelectedModeOnce) {
+        { mode: EditorMode ->
+            viewModel.onEditorModeChanged(mode)
+            resetDialogs()
+
+            if (!hasSelectedModeOnce) {
+                hasSelectedModeOnce = true
+                if (mode == EditorMode.AR) {
+                    viewModel.onCreateTargetClicked()
+                }
+            }
+        }
+    }
+
+    // Capture theme color for AzNavRail
+    val activeHighlightColor = remember(uiState.activeColorSeed) {
+        val colors = listOf(Color.Green, Color.Magenta, Color.Cyan)
+        colors[kotlin.math.abs(uiState.activeColorSeed) % colors.size]
+    }
+
     // Preload strings to avoid Composable calls in lambdas
     val navStrings = rememberNavStrings()
+
+    // Calculate current route for NavRail highlighting
+    val currentRoute = remember(uiState.editorMode, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId, uiState.isMappingMode, currentNavRoute) {
+        when {
+            currentNavRoute == "settings" -> "settings_sub"
+            currentNavRoute == "project_library" -> "load_project"
+            currentNavRoute == "surveyor" -> "surveyor"
+            showInfoScreen -> "help"
+            showSliderDialog == "Adjust" -> "adjust"
+            showColorBalanceDialog -> "color_balance"
+            uiState.isMarkingProgress -> "mark_progress"
+            uiState.isMappingMode -> "neural_scan"
+            uiState.isCapturingTarget -> "create_target"
+            uiState.activeLayerId != null -> "layer_${uiState.activeLayerId}"
+            uiState.editorMode == EditorMode.AR -> "ar"
+            uiState.editorMode == EditorMode.OVERLAY -> "ghost_mode"
+            uiState.editorMode == EditorMode.STATIC -> "mockup"
+            uiState.editorMode == EditorMode.TRACE -> "trace_mode"
+            else -> null
+        }
+    }
 
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
@@ -264,424 +255,457 @@ fun EditorScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
-    // Launchers
-    val overlayImagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri -> uri?.let { viewModel.onOverlayImageSelected(it) } }
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        AzNavHost(
+            navController = localNavController,
+            startDestination = "editor",
+            currentDestination = currentRoute,
+            isLandscape = isLandscape,
+            isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked, // Hide rail only on capture or lock
+            rail = {
+                azSettings(
+                    isLoading = uiState.isLoading,
+                    packRailButtons = true,
+                    defaultShape = AzButtonShape.RECTANGLE,
+                    headerIconShape = AzHeaderIconShape.ROUNDED,
+                    infoScreen = showInfoScreen,
+                    activeColor = activeHighlightColor,
+                    dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
+                    onDismissInfoScreen = { showInfoScreen = false }
+                )
 
-    val backgroundImagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+                azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
+                azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(EditorMode.AR) })
+                azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = { onModeSelected(EditorMode.OVERLAY) })
+                azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = { onModeSelected(EditorMode.STATIC) })
+                azRailSubItem(id = "trace_mode", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = { onModeSelected(EditorMode.TRACE) })
 
-    val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip")
-    ) { uri -> uri?.let { viewModel.exportProjectToUri(it) } }
+                azDivider()
 
-    // Image Picker Request Handler
-    LaunchedEffect(uiState.showImagePicker) {
-        if (uiState.showImagePicker) {
-            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            viewModel.onImagePickerShown()
-        }
-    }
+                if (uiState.editorMode == EditorMode.AR) {
+                    azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
 
-    // Helper for automation
-    val onModeSelected = remember(viewModel, hasSelectedModeOnce) {
-        { mode: EditorMode ->
-            viewModel.onEditorModeChanged(mode)
-            resetDialogs()
+                    azRailSubItem(
+                        id = "surveyor",
+                        hostId = "target_host",
+                        text = navStrings.surveyor,
+                        info = navStrings.surveyorInfo,
+                        onClick = {
+                            localNavController.navigate("surveyor")
+                            resetDialogs()
+                        }
+                    )
 
-            if (!hasSelectedModeOnce) {
-                hasSelectedModeOnce = true
-                if (mode == EditorMode.AR) {
-                    viewModel.onCreateTargetClicked()
+                    azRailSubItem(id = "create_target", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
+                        viewModel.onCreateTargetClicked()
+                        resetDialogs()
+                    })
+                    azRailSubItem(id = "refine_target", hostId = "target_host", text = navStrings.refine, info = navStrings.refineInfo, onClick = {
+                        viewModel.onRefineTargetToggled()
+                        resetDialogs()
+                    })
+                    azRailSubItem(id = "mark_progress", hostId = "target_host", text = navStrings.update, info = navStrings.updateInfo, onClick = {
+                        viewModel.onMarkProgressToggled()
+                        resetDialogs()
+                    })
+
+                    azDivider()
+                }
+
+                azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
+
+                val openButtonText = if (uiState.layers.isNotEmpty()) "Add" else navStrings.open
+                val openButtonId = if (uiState.layers.isNotEmpty()) "add_layer" else "image"
+
+                azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
+                    resetDialogs()
+                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+
+                // Dynamic Layers
+                val layers = uiState.layers
+                val visualLayers = layers.reversed()
+
+                visualLayers.forEach { layer ->
+                    azRailRelocItem(
+                        id = "layer_${layer.id}",
+                        hostId = "design_host",
+                        text = layer.name,
+                        onClick = {
+                            if (uiState.activeLayerId != layer.id) {
+                                viewModel.onLayerActivated(layer.id)
+                            }
+                        },
+                        onRelocate = { _: Int, _: Int, newOrder: List<String> ->
+                            val rawIds = newOrder.map { it.removePrefix("layer_") }
+                            val logicalOrder = rawIds.reversed()
+                            viewModel.onLayerReordered(logicalOrder)
+                        }
+                    ) {
+                        // Hidden Menu
+                        inputItem(
+                            hint = "Rename"
+                        ) { newName ->
+                            viewModel.onLayerRenamed(layer.id, newName)
+                        }
+
+                        listItem(text = "Duplicate") {
+                            viewModel.onLayerDuplicated(layer.id)
+                        }
+
+                        listItem(text = "Copy Mods") {
+                            viewModel.copyLayerModifications(layer.id)
+                        }
+
+                        listItem(text = "Paste Mods") {
+                            viewModel.pasteLayerModifications(layer.id)
+                        }
+
+                        listItem(text = "Remove") {
+                            viewModel.onLayerRemoved(layer.id)
+                        }
+                    }
+                }
+
+                if (uiState.editorMode == EditorMode.STATIC) {
+                    azRailSubItem(id = "background", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
+                        resetDialogs()
+                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                }
+
+                if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
+                    azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
+                        viewModel.onRemoveBackgroundClicked()
+                        showSliderDialog = null; showColorBalanceDialog = false
+
+                        resetDialogs()
+                    })
+                    azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
+                        viewModel.onLineDrawingClicked()
+                        showSliderDialog = null; showColorBalanceDialog = false
+                        resetDialogs()
+                    })
+                    azDivider()
+
+                    if (uiState.editorMode == EditorMode.STATIC) {
+                        azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
+                            showSliderDialog = null; showColorBalanceDialog = false
+                            backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
+                    }
+                    azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
+                        showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
+                        showColorBalanceDialog = false
+                    }
+                    azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
+                        showColorBalanceDialog = true
+                        showSliderDialog = null
+                    }
+                    azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
+                        viewModel.onCycleBlendMode()
+                        showSliderDialog = null; showColorBalanceDialog = false
+                        resetDialogs()
+                    })
+
+                    azRailSubToggle(
+                        id = "lock_image",
+                        hostId = "design_host",
+                        isChecked = uiState.isImageLocked,
+                        toggleOnText = "Locked",
+                        toggleOffText = "Unlocked",
+                        info = "Prevent accidental moves",
+                        onClick = { viewModel.toggleImageLock() }
+                    )
+                }
+
+                azDivider()
+
+                azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
+                azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
+                    localNavController.navigate("settings")
+                    resetDialogs()
+                }
+                azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, onClick = {
+                    viewModel.onNewProject()
+                    resetDialogs()
+                })
+                azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
+                    createDocumentLauncher.launch("Project.gxr")
+                    resetDialogs()
+                }
+                azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
+                    localNavController.navigate("project_library")
+                    resetDialogs()
+                }
+                azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo, onClick = {
+                    viewModel.onSaveClicked()
+                    resetDialogs()
+                })
+
+                azDivider()
+
+                azRailItem(id = "help", text = "Help", info = "Show Help") {
+                    showInfoScreen = true
+                    resetDialogs()
+                }
+
+                if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
+                    azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
+                        viewModel.onToggleFlashlight()
+                        resetDialogs()
+                    })
+                }
+
+                if (uiState.editorMode == EditorMode.TRACE) {
+                    azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
+                        viewModel.setTouchLocked(true)
+                        resetDialogs()
+                    })
+                }
+            }
+        ) {
+            composable("editor") {
+                EditorContent(
+                    viewModel = viewModel,
+                    uiState = uiState,
+                    showSliderDialog = showSliderDialog,
+                    showColorBalanceDialog = showColorBalanceDialog,
+                    onOpacityChange = viewModel::onOpacityChanged,
+                    onBrightnessChange = viewModel::onBrightnessChanged,
+                    onContrastChange = viewModel::onContrastChanged,
+                    onSaturationChange = viewModel::onSaturationChanged,
+                    onColorBalanceRChange = viewModel::onColorBalanceRChanged,
+                    onColorBalanceGChange = viewModel::onColorBalanceGChanged,
+                    onColorBalanceBChange = viewModel::onColorBalanceBChanged,
+                    onUndo = viewModel::onUndoClicked,
+                    onRedo = viewModel::onRedoClicked,
+                    onMagicAlign = viewModel::onMagicClicked,
+                    onOnboardingComplete = viewModel::onOnboardingComplete,
+                    onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
+                    onFeedbackShown = viewModel::onFeedbackShown,
+                    tapFeedback = viewModel.tapFeedback.collectAsState().value // Should collect inside? No, collected above? No, passed as state.
+                )
+            }
+            composable("surveyor") {
+                MappingScreen(
+                    onMapSaved = { /* Handle saved map if needed */ },
+                    onExit = { localNavController.popBackStack() }
+                )
+            }
+            composable("project_library") {
+                // ... same logic ...
+                // Ensure projects are loaded
+                LaunchedEffect(Unit) {
+                    viewModel.loadAvailableProjects(context)
+                }
+
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                    ProjectLibraryScreen(
+                        projects = uiState.availableProjects,
+                        onLoadProject = { project ->
+                            viewModel.openProject(project, context)
+                            localNavController.popBackStack()
+                        },
+                        onDeleteProject = { projectId ->
+                            viewModel.deleteProject(context, projectId)
+                        },
+                        onNewProject = {
+                            viewModel.onNewProject()
+                            localNavController.popBackStack()
+                        }
+                    )
+                    // Add a back button or rely on system back
+                    AzButton(
+                        text = "Back",
+                        onClick = { localNavController.popBackStack() },
+                        modifier = Modifier.align(Alignment.TopStart).padding(16.dp)
+                    )
+                }
+            }
+            composable("settings") {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                    SettingsScreen(
+                        currentVersion = BuildConfig.VERSION_NAME,
+                        updateStatus = uiState.updateStatusMessage,
+                        isCheckingForUpdate = uiState.isCheckingForUpdate,
+                        isRightHanded = uiState.isRightHanded,
+                        onHandednessChanged = viewModel::setHandedness,
+                        onCheckForUpdates = viewModel::checkForUpdates,
+                        onInstallUpdate = viewModel::installLatestUpdate,
+                        onClose = { localNavController.popBackStack() }
+                    )
                 }
             }
         }
-    }
 
-    LaunchedEffect(uiState.editorMode) {
-        if (uiState.editorMode == EditorMode.TRACE && uiState.overlayImageUri == null) {
-            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        // GLOBAL OVERLAYS
+        TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
+
+        UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
+
+        if (showInfoScreen) {
+            CustomHelpOverlay(
+                uiState = uiState,
+                navStrings = navStrings,
+                onDismiss = { showInfoScreen = false }
+            )
+        }
+
+        if (uiState.isCapturingTarget) {
+            Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
+                TargetCreationFlow(uiState, viewModel, context)
+            }
+        }
+
+        // Progress Overlay
+         if (uiState.isCapturingTarget) {
+            CaptureAnimation()
         }
     }
+}
 
-    // Calculate current route for NavRail highlighting
-    val currentRoute = remember(uiState.editorMode, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId, uiState.isMappingMode) {
-        when {
-            showInfoScreen -> "help"
-            showSliderDialog == "Adjust" -> "adjust"
-            showColorBalanceDialog -> "color_balance"
-            uiState.isMarkingProgress -> "mark_progress"
-            uiState.isMappingMode -> "neural_scan"
-            uiState.isCapturingTarget -> "create_target"
-            uiState.activeLayerId != null -> "layer_${uiState.activeLayerId}"
-            uiState.editorMode == EditorMode.AR -> "ar"
-            uiState.editorMode == EditorMode.OVERLAY -> "ghost_mode"
-            uiState.editorMode == EditorMode.STATIC -> "mockup"
-            uiState.editorMode == EditorMode.TRACE -> "trace_mode"
-            else -> null
-        }
-    }
+@Composable
+fun EditorContent(
+    viewModel: MainViewModel,
+    uiState: UiState,
+    showSliderDialog: String?,
+    showColorBalanceDialog: Boolean,
+    onOpacityChange: (Float) -> Unit,
+    onBrightnessChange: (Float) -> Unit,
+    onContrastChange: (Float) -> Unit,
+    onSaturationChange: (Float) -> Unit,
+    onColorBalanceRChange: (Float) -> Unit,
+    onColorBalanceGChange: (Float) -> Unit,
+    onColorBalanceBChange: (Float) -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onMagicAlign: () -> Unit,
+    onOnboardingComplete: (EditorMode) -> Unit,
+    onDoubleTapHintDismissed: () -> Unit,
+    onFeedbackShown: () -> Unit,
+    tapFeedback: com.hereliesaz.graffitixr.data.Feedback
+) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Black
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            BoxWithConstraints(
+    // Safe Zone Calculations (Top/Bottom 10%)
+    val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
+    val screenHeight = configuration.screenHeightDp.dp
+    val topSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateTopPadding() + 16.dp)
+    val bottomSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateBottomPadding() + 16.dp)
+
+    var gestureInProgress by remember { mutableStateOf(false) }
+
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // MAIN CONTENT LAYER
+        MainContentLayer(
+            uiState = uiState,
+            viewModel = viewModel,
+            gestureInProgress = gestureInProgress,
+            onGestureToggle = { gestureInProgress = it }
+        )
+
+        if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
+            StatusOverlay(
+                qualityWarning = uiState.qualityWarning,
+                arState = uiState.arState,
+                isPlanesDetected = uiState.isArPlanesDetected,
+                isTargetCreated = uiState.isArTargetCreated,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
+                    .align(Alignment.TopCenter)
+                    .padding(top = topSafePadding)
+                    .zIndex(10f)
+            )
+        }
 
-                // MAIN CONTENT LAYER
-                MainContentLayer(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    gestureInProgress = gestureInProgress,
-                    onGestureToggle = { gestureInProgress = it }
-                )
+        if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
+            GestureFeedback(
+                uiState = uiState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = topSafePadding + 20.dp) // Below status
+                    .zIndex(3f),
+                isVisible = gestureInProgress
+            )
+        }
 
-                if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
-                    StatusOverlay(
-                        qualityWarning = uiState.qualityWarning,
-                        arState = uiState.arState,
-                        isPlanesDetected = uiState.isArPlanesDetected,
-                        isTargetCreated = uiState.isArTargetCreated,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = topSafePadding)
-                            .zIndex(10f)
-                    )
+        if (uiState.isMarkingProgress) {
+            DrawingCanvas(
+                paths = uiState.drawingPaths,
+                onPathFinished = viewModel::onDrawingPathFinished
+            )
+        }
+
+        // ADJUSTMENTS PANEL
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = bottomSafePadding)
+                .zIndex(2f),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            AdjustmentsPanel(
+                uiState = uiState,
+                showKnobs = showSliderDialog == "Adjust",
+                showColorBalance = showColorBalanceDialog,
+                isLandscape = isLandscape,
+                screenHeight = this@BoxWithConstraints.maxHeight, // Pass full height
+                onOpacityChange = onOpacityChange,
+                onBrightnessChange = onBrightnessChange,
+                onContrastChange = onContrastChange,
+                onSaturationChange = onSaturationChange,
+                onColorBalanceRChange = onColorBalanceRChange,
+                onColorBalanceGChange = onColorBalanceGChange,
+                onColorBalanceBChange = onColorBalanceBChange,
+                onUndo = onUndo,
+                onRedo = onRedo,
+                onMagicAlign = onMagicAlign
+            )
+        }
+
+        uiState.showOnboardingDialogForMode?.let { mode ->
+            OnboardingDialog(
+                editorMode = mode,
+                onDismiss = {
+                    onOnboardingComplete(mode)
                 }
+            )
+        }
 
-                if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
-                    GestureFeedback(
-                        uiState = uiState,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = topSafePadding + 20.dp) // Below status
-                            .zIndex(3f),
-                        isVisible = gestureInProgress
-                    )
-                }
+        if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
+            RotationAxisFeedback(
+                axis = uiState.activeRotationAxis,
+                visible = uiState.showRotationAxisFeedback,
+                onFeedbackShown = onFeedbackShown,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = bottomSafePadding + 32.dp)
+                    .zIndex(4f)
+            )
 
-                // NAV RAIL
-                if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
-                    Box(
-                        modifier = Modifier
-                            .zIndex(6f)
-                            .fillMaxHeight()
-                            .padding(top = topSafePadding, bottom = bottomSafePadding)
-                    ) {
-                        AzNavRail(
-                            navController = null, // We handle navigation manually via onClick
-                            currentDestination = currentRoute,
-                            isLandscape = isLandscape
-                        ) {
-                            azSettings(
-                                isLoading = uiState.isLoading,
-                                packRailButtons = true,
-                                defaultShape = AzButtonShape.RECTANGLE,
-                                headerIconShape = AzHeaderIconShape.ROUNDED,
-                                infoScreen = showInfoScreen,
-                                activeColor = activeHighlightColor,
-                                dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
-                                onDismissInfoScreen = { showInfoScreen = false }
-                            )
+            TapFeedbackEffect(feedback = tapFeedback)
 
-                            azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
-                            azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(EditorMode.AR) })
-                            azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = { onModeSelected(EditorMode.OVERLAY) })
-                            azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = { onModeSelected(EditorMode.STATIC) })
-                            azRailSubItem(id = "trace_mode", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = { onModeSelected(EditorMode.TRACE) })
+            if (uiState.showDoubleTapHint) {
+                DoubleTapHintDialog(onDismissRequest = onDoubleTapHintDismissed)
+            }
 
-                            azDivider()
-
-                            if (uiState.editorMode == EditorMode.AR) {
-                                azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
-
-                                azRailSubItem(
-                                    id = "surveyor",
-                                    hostId = "target_host",
-                                    text = navStrings.surveyor,
-                                    info = navStrings.surveyorInfo,
-                                    onClick = {
-                                        navController.navigate("surveyor")
-                                        resetDialogs()
-                                    }
-                                )
-
-                                azRailSubItem(id = "create_target", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
-                                    viewModel.onCreateTargetClicked()
-                                    resetDialogs()
-                                })
-                                azRailSubItem(id = "refine_target", hostId = "target_host", text = navStrings.refine, info = navStrings.refineInfo, onClick = {
-                                    viewModel.onRefineTargetToggled()
-                                    resetDialogs()
-                                })
-                                azRailSubItem(id = "mark_progress", hostId = "target_host", text = navStrings.update, info = navStrings.updateInfo, onClick = {
-                                    viewModel.onMarkProgressToggled()
-                                    resetDialogs()
-                                })
-
-                                azDivider()
-                            }
-
-                            azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
-
-                            val openButtonText = if (uiState.layers.isNotEmpty()) "Add" else navStrings.open
-                            val openButtonId = if (uiState.layers.isNotEmpty()) "add_layer" else "image"
-
-                            azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
-                                resetDialogs()
-                                overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                            }
-
-                            // Dynamic Layers
-                            val layers = uiState.layers
-                            val visualLayers = layers.reversed()
-
-                            visualLayers.forEach { layer ->
-                                azRailRelocItem(
-                                    id = "layer_${layer.id}",
-                                    hostId = "design_host",
-                                    text = layer.name,
-                                    onClick = {
-                                        if (uiState.activeLayerId != layer.id) {
-                                            viewModel.onLayerActivated(layer.id)
-                                        }
-                                    },
-                                    onRelocate = { _: Int, _: Int, newOrder: List<String> ->
-                                        val rawIds = newOrder.map { it.removePrefix("layer_") }
-                                        val logicalOrder = rawIds.reversed()
-                                        viewModel.onLayerReordered(logicalOrder)
-                                    }
-                                ) {
-                                    // Hidden Menu
-                                    inputItem(
-                                        hint = "Rename"
-                                    ) { newName ->
-                                        viewModel.onLayerRenamed(layer.id, newName)
-                                    }
-
-                                    listItem(text = "Duplicate") {
-                                        viewModel.onLayerDuplicated(layer.id)
-                                    }
-
-                                    listItem(text = "Copy Mods") {
-                                        viewModel.copyLayerModifications(layer.id)
-                                    }
-
-                                    listItem(text = "Paste Mods") {
-                                        viewModel.pasteLayerModifications(layer.id)
-                                    }
-
-                                    listItem(text = "Remove") {
-                                        viewModel.onLayerRemoved(layer.id)
-                                    }
-                                }
-                            }
-
-                            if (uiState.editorMode == EditorMode.STATIC) {
-                                azRailSubItem(id = "background", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
-                                    resetDialogs()
-                                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                }
-                            }
-
-                            if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
-                                azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
-                                    viewModel.onRemoveBackgroundClicked()
-                                    showSliderDialog = null; showColorBalanceDialog = false
-
-                                    resetDialogs()
-                                })
-                                azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
-                                    viewModel.onLineDrawingClicked()
-                                    showSliderDialog = null; showColorBalanceDialog = false
-                                    resetDialogs()
-                                })
-                                azDivider()
-
-                                if (uiState.editorMode == EditorMode.STATIC) {
-                                    azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
-                                        showSliderDialog = null; showColorBalanceDialog = false
-                                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                    }
-                                }
-                                azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                                    showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
-                                    showColorBalanceDialog = false
-                                }
-                                azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
-                                    showColorBalanceDialog = true
-                                    showSliderDialog = null
-                                }
-                                azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
-                                    viewModel.onCycleBlendMode()
-                                    showSliderDialog = null; showColorBalanceDialog = false
-                                    resetDialogs()
-                                })
-
-                                azRailSubToggle(
-                                    id = "lock_image",
-                                    hostId = "design_host",
-                                    isChecked = uiState.isImageLocked,
-                                    toggleOnText = "Locked",
-                                    toggleOffText = "Unlocked",
-                                    info = "Prevent accidental moves",
-                                    onClick = { viewModel.toggleImageLock() }
-                                )
-                            }
-
-                            azDivider()
-
-                            azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
-                            azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
-                                navController.navigate("settings")
-                                resetDialogs()
-                            }
-                            azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, onClick = {
-                                viewModel.onNewProject()
-                                resetDialogs()
-                            })
-                            azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
-                                createDocumentLauncher.launch("Project.gxr")
-                                resetDialogs()
-                            }
-                            azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
-                                navController.navigate("project_library")
-                                resetDialogs()
-                            }
-                            azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo, onClick = {
-                                viewModel.onSaveClicked()
-                                resetDialogs()
-                            })
-
-                            azDivider()
-
-                            azRailItem(id = "help", text = "Help", info = "Show Help") {
-                                showInfoScreen = true
-                                resetDialogs()
-                            }
-
-                            if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
-                                azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
-                                    viewModel.onToggleFlashlight()
-                                    resetDialogs()
-                                })
-                            }
-
-                            if (uiState.editorMode == EditorMode.TRACE) {
-                                azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
-                                    viewModel.setTouchLocked(true)
-                                    resetDialogs()
-                                })
-                            }
-                        }
-                    }
-                }
-
-                TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
-
-                UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
-
-                if (showInfoScreen) {
-                    CustomHelpOverlay(
-                        uiState = uiState,
-                        navStrings = navStrings,
-                        onDismiss = { showInfoScreen = false }
-                    )
-                }
-
-                if (uiState.isMarkingProgress) {
-                    DrawingCanvas(
-                        paths = uiState.drawingPaths,
-                        onPathFinished = viewModel::onDrawingPathFinished
-                    )
-                }
-
-                // ADJUSTMENTS PANEL
-                Box(
+            if (uiState.isMarkingProgress) {
+                Text(
+                    text = "Progress: %.2f%%".format(uiState.progressPercentage),
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = bottomSafePadding)
-                        .zIndex(2f),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    AdjustmentsPanel(
-                        uiState = uiState,
-                        showKnobs = showSliderDialog == "Adjust",
-                        showColorBalance = showColorBalanceDialog,
-                        isLandscape = isLandscape,
-                        screenHeight = this@BoxWithConstraints.maxHeight, // Pass full height, alignment handled by Box
-                        onOpacityChange = viewModel::onOpacityChanged,
-                        onBrightnessChange = viewModel::onBrightnessChanged,
-                        onContrastChange = viewModel::onContrastChanged,
-                        onSaturationChange = viewModel::onSaturationChanged,
-                        onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                        onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-                        onColorBalanceBChange = viewModel::onColorBalanceBChanged,
-                        onUndo = viewModel::onUndoClicked,
-                        onRedo = viewModel::onRedoClicked,
-                        onMagicAlign = viewModel::onMagicClicked
-                    )
-                }
-
-                uiState.showOnboardingDialogForMode?.let { mode ->
-                    OnboardingDialog(
-                        editorMode = mode,
-                        onDismiss = {
-                            viewModel.onOnboardingComplete(mode)
-                        }
-                    )
-                }
-
-                if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
-                    RotationAxisFeedback(
-                        axis = uiState.activeRotationAxis,
-                        visible = uiState.showRotationAxisFeedback,
-                        onFeedbackShown = viewModel::onFeedbackShown,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = bottomSafePadding + 32.dp)
-                            .zIndex(4f)
-                    )
-
-                    TapFeedbackEffect(feedback = tapFeedback)
-
-                    if (uiState.showDoubleTapHint) {
-                        DoubleTapHintDialog(onDismissRequest = viewModel::onDoubleTapHintDismissed)
-                    }
-
-                    if (uiState.isMarkingProgress) {
-                        Text(
-                            text = "Progress: %.2f%%".format(uiState.progressPercentage),
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = topSafePadding)
-                                .zIndex(3f)
-                        )
-                    }
-                }
-
-                if (uiState.isCapturingTarget) {
-                    CaptureAnimation()
-                }
-
-                // Target Creation Overlay - MOVED TO TOP AND HIGH Z-INDEX
-                if (uiState.isCapturingTarget) {
-                     Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
-                         TargetCreationFlow(uiState, viewModel, context)
-                     }
-                }
+                        .align(Alignment.TopCenter)
+                        .padding(top = topSafePadding)
+                        .zIndex(3f)
+                )
             }
         }
     }
 }
 
+// ... rest of the file (MainContentLayer, TargetCreationFlow, etc.) stays mostly same ...
 @Composable
 private fun MainContentLayer(
     uiState: UiState,
@@ -689,6 +713,7 @@ private fun MainContentLayer(
     gestureInProgress: Boolean,
     onGestureToggle: (Boolean) -> Unit
 ) {
+   // ... existing code ...
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -784,9 +809,6 @@ private fun TargetCreationFlow(
     viewModel: MainViewModel,
     context: Context
 ) {
-    // Moved check to caller to ensure Z-index handling
-    // if (!uiState.isCapturingTarget) return
-
     Box(modifier = Modifier.fillMaxSize()) {
         if (uiState.captureStep == CaptureStep.REVIEW) {
             val uri = uiState.capturedTargetUris.firstOrNull()

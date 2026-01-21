@@ -12,6 +12,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
+import com.hereliesaz.graffitixr.utils.LocationTracker
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 
 class MainActivity : ComponentActivity() {
@@ -20,6 +21,7 @@ class MainActivity : ComponentActivity() {
         MainViewModelFactory(application)
     }
     private val PERMISSION_REQUEST_CODE = 0
+    private lateinit var locationTracker: LocationTracker
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +56,9 @@ class MainActivity : ComponentActivity() {
         // Load projects immediately
         viewModel.loadAvailableProjects(this)
 
+        // Initialize LocationTracker
+        locationTracker = LocationTracker(this)
+
         // Try to get location and sort
         fetchLocationAndSort()
 
@@ -68,23 +73,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (locationTracker.hasPermissions()) {
+            locationTracker.startLocationUpdates { location ->
+                viewModel.updateCurrentLocation(location)
+            }
+        }
+    }
+
     override fun onPause() {
         super.onPause()
+        locationTracker.stopLocationUpdates()
         com.hereliesaz.graffitixr.utils.captureWindow(this) { bitmap ->
             viewModel.autoSaveProject(this, bitmap)
         }
     }
 
     private fun fetchLocationAndSort() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-
-            com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(this).lastLocation
-                .addOnSuccessListener { location ->
-                    location?.let {
-                        viewModel.updateCurrentLocation(it)
-                    }
-                }
+        if (locationTracker.hasPermissions()) {
+            // Initial fetch
+            locationTracker.startLocationUpdates { location ->
+                viewModel.updateCurrentLocation(location)
+            }
         }
     }
 
