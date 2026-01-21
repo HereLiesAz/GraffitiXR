@@ -15,7 +15,9 @@ import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
+    private val viewModel: MainViewModel by viewModels {
+        MainViewModelFactory(application)
+    }
     private val PERMISSION_REQUEST_CODE = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
