@@ -22,6 +22,13 @@ git archive dependencies | tar -x -C temp_libs
 # Setup OpenCV
 if [ ! -d "$OPENCV_DEST" ]; then
     echo "Setting up OpenCV 4.13.0..."
+
+    # Check for split files and rejoin if necessary
+    if ls temp_libs/opencv-4.13.0-android-sdk.zip.part* 1> /dev/null 2>&1; then
+        echo "Rejoining split OpenCV files..."
+        cat temp_libs/opencv-4.13.0-android-sdk.zip.part* > temp_libs/opencv-4.13.0-android-sdk.zip
+    fi
+
     if [ -f "temp_libs/opencv-4.13.0-android-sdk.zip" ]; then
         unzip -q temp_libs/opencv-4.13.0-android-sdk.zip -d temp_libs/
         # Move the inner SDK folder to destination
@@ -32,7 +39,7 @@ if [ ! -d "$OPENCV_DEST" ]; then
              echo "Error: OpenCV SDK folder not found in zip"
         fi
     else
-        echo "Error: OpenCV zip not found"
+        echo "Error: OpenCV zip not found (checked for split parts too)"
     fi
 else
     echo "OpenCV already present."

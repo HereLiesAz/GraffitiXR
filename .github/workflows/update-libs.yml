@@ -23,6 +23,13 @@ jobs:
           echo "Downloading OpenCV 4.13.0..."
           wget -q -O opencv-4.13.0-android-sdk.zip https://github.com/opencv/opencv/releases/download/4.13.0/opencv-4.13.0-android-sdk.zip
 
+          # Split OpenCV if > 95MB to avoid GitHub limits
+          if [ $(stat -c%s opencv-4.13.0-android-sdk.zip) -gt 99000000 ]; then
+            echo "Splitting OpenCV zip..."
+            split -b 95M opencv-4.13.0-android-sdk.zip opencv-4.13.0-android-sdk.zip.part
+            rm opencv-4.13.0-android-sdk.zip
+          fi
+
           # GLM
           echo "Downloading GLM 1.0.3..."
           wget -q -O glm-1.0.3.zip https://github.com/g-truc/glm/releases/download/1.0.3/glm-1.0.3.zip || wget -q -O glm-1.0.3.zip https://sourceforge.net/projects/glm.mirror/files/1.0.3/glm-1.0.3.zip/download
@@ -43,7 +50,21 @@ jobs:
           <body>
           <h1>External Dependencies</h1>
           <ul>
-          <li><a href="opencv-4.13.0-android-sdk.zip">OpenCV 4.13.0 Android SDK</a></li>
+          EOF
+
+          if ls opencv-4.13.0-android-sdk.zip.part* 1> /dev/null 2>&1; then
+             echo "<li>OpenCV 4.13.0 Android SDK (Split):" >> index.html
+             echo "<ul>" >> index.html
+             for f in opencv-4.13.0-android-sdk.zip.part*; do
+                 echo "<li><a href=\"$f\">$f</a></li>" >> index.html
+             done
+             echo "</ul></li>" >> index.html
+             echo "<p>To reassemble: <code>cat opencv-4.13.0-android-sdk.zip.part* > opencv-4.13.0-android-sdk.zip</code></p>" >> index.html
+          else
+             echo "<li><a href=\"opencv-4.13.0-android-sdk.zip\">OpenCV 4.13.0 Android SDK</a></li>" >> index.html
+          fi
+
+          cat <<EOF >> index.html
           <li><a href="glm-1.0.3.zip">GLM 1.0.3</a></li>
           <li><a href="litert-2.1.0.aar">LiteRT 2.1.0</a></li>
           <li><a href="mlkit-subject-segmentation.aar">MLKit Subject Segmentation</a></li>
