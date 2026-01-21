@@ -12,6 +12,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
+import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 
 class MainActivity : ComponentActivity() {
 
@@ -22,6 +23,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize OpenCV early
+        ensureOpenCVLoaded()
 
         // Hide system UI for immersive mode
         window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE

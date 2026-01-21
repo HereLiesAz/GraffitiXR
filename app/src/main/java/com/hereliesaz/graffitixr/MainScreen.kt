@@ -23,11 +23,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +60,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzNavRail
 import com.hereliesaz.aznavrail.model.AzButtonShape
@@ -102,11 +108,87 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun MainScreen(viewModel: MainViewModel, navController: NavController) {
+    // We use a local NavHost for top-level screens like Surveyor, Library, Settings.
+    // The "Editor" (AR/Overlay) is the home destination.
+    val localNavController = rememberNavController()
+
+    NavHost(navController = localNavController, startDestination = "editor") {
+        composable("editor") {
+            EditorScreen(viewModel, localNavController)
+        }
+        composable("surveyor") {
+            MappingScreen(
+                onMapSaved = { /* Handle saved map if needed */ },
+                onExit = { localNavController.popBackStack() }
+            )
+        }
+        composable("project_library") {
+            // We need to access the ViewModel's state or pass callbacks.
+            // Currently ProjectLibraryScreen takes callbacks.
+            val uiState by viewModel.uiState.collectAsState()
+            val context = LocalContext.current
+
+            // Ensure projects are loaded
+            LaunchedEffect(Unit) {
+                viewModel.loadAvailableProjects(context)
+            }
+
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                ProjectLibraryScreen(
+                    projects = uiState.availableProjects,
+                    onLoadProject = { project ->
+                        viewModel.openProject(project, context)
+                        localNavController.popBackStack()
+                    },
+                    onDeleteProject = { projectId ->
+                        viewModel.deleteProject(context, projectId)
+                    },
+                    onNewProject = {
+                        viewModel.onNewProject()
+                        localNavController.popBackStack()
+                    }
+                )
+                // Add a back button or rely on system back
+                AzButton(
+                    text = "Back",
+                    onClick = { localNavController.popBackStack() },
+                    modifier = Modifier.align(Alignment.TopStart).padding(16.dp)
+                )
+            }
+        }
+        composable("settings") {
+            val uiState by viewModel.uiState.collectAsState()
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                SettingsScreen(
+                    currentVersion = BuildConfig.VERSION_NAME,
+                    updateStatus = uiState.updateStatusMessage,
+                    isCheckingForUpdate = uiState.isCheckingForUpdate,
+                    isRightHanded = uiState.isRightHanded,
+                    onHandednessChanged = viewModel::setHandedness,
+                    onCheckForUpdates = viewModel::checkForUpdates,
+                    onInstallUpdate = viewModel::installLatestUpdate,
+                    onClose = { localNavController.popBackStack() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun EditorScreen(viewModel: MainViewModel, navController: NavController) {
     val uiState by viewModel.uiState.collectAsState()
     val tapFeedback by viewModel.tapFeedback.collectAsState()
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val density = LocalConfiguration.current.densityDpi
+
+    // Safe Zone Calculations (Top/Bottom 10%)
+    val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
+    val screenHeight = configuration.screenHeightDp.dp
+    // 10% safety margin plus system bars
+    val topSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateTopPadding() + 16.dp)
+    val bottomSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateBottomPadding() + 16.dp)
 
     // Capture theme color for AzNavRail
     val activeHighlightColor = remember(uiState.activeColorSeed) {
@@ -117,8 +199,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     // UI Visibility States
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
-    var showProjectLibrary by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
     var showInfoScreen by remember { mutableStateOf(false) }
 
@@ -227,11 +307,9 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 
     // Calculate current route for NavRail highlighting
-    val currentRoute = remember(uiState.editorMode, showSettings, showProjectLibrary, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId, uiState.isMappingMode) {
+    val currentRoute = remember(uiState.editorMode, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId, uiState.isMappingMode) {
         when {
             showInfoScreen -> "help"
-            showSettings -> "settings_sub"
-            showProjectLibrary -> "load_project"
             showSliderDialog == "Adjust" -> "adjust"
             showColorBalanceDialog -> "color_balance"
             uiState.isMarkingProgress -> "mark_progress"
@@ -256,31 +334,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                val screenHeight = maxHeight
 
-                if (showProjectLibrary || uiState.showProjectList) {
-                    ProjectLibraryScreen(
-                        projects = uiState.availableProjects,
-                        onLoadProject = { project ->
-                            viewModel.openProject(project, context)
-                            showProjectLibrary = false
-                        },
-                        onDeleteProject = { projectId ->
-                            viewModel.deleteProject(context, projectId)
-                        },
-                        onNewProject = {
-                            viewModel.onNewProject()
-                            showProjectLibrary = false
-                        }
-                    )
-                } else {
-                    MainContentLayer(
-                        uiState = uiState,
-                        viewModel = viewModel,
-                        gestureInProgress = gestureInProgress,
-                        onGestureToggle = { gestureInProgress = it }
-                    )
-                }
+                // MAIN CONTENT LAYER
+                MainContentLayer(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    gestureInProgress = gestureInProgress,
+                    onGestureToggle = { gestureInProgress = it }
+                )
 
                 if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
                     StatusOverlay(
@@ -290,87 +351,32 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         isTargetCreated = uiState.isArTargetCreated,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 40.dp)
+                            .padding(top = topSafePadding)
                             .zIndex(10f)
                     )
                 }
-
-                // NEURAL SCAN HUD
-                if (uiState.isMappingMode) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 80.dp)
-                            .fillMaxWidth(0.6f)
-                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
-                            .padding(16.dp)
-                            .zIndex(12f)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "MAPPING QUALITY",
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            LinearProgressIndicator(
-                                progress = { uiState.mappingQualityScore },
-                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                                color = if (uiState.mappingQualityScore > 0.8f) Color.Green else Color.Yellow,
-                                trackColor = Color.DarkGray
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            if (uiState.mappingQualityScore > 0.5f) {
-                                AzButton(
-                                    text = if (uiState.isHostingAnchor) "UPLOADING..." else "FINALIZE MAP",
-                                    shape = AzButtonShape.RECTANGLE,
-                                    onClick = { viewModel.finalizeMap() },
-                                    enabled = !uiState.isHostingAnchor
-                                )
-                            } else {
-                                Text("Scan more area...", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
-                }
-
-                if (showSettings) {
-                    Box(modifier = Modifier.zIndex(1.5f)) {
-                        SettingsScreen(
-                            currentVersion = BuildConfig.VERSION_NAME,
-                            updateStatus = uiState.updateStatusMessage,
-                            isCheckingForUpdate = uiState.isCheckingForUpdate,
-                            isRightHanded = uiState.isRightHanded,
-                            onHandednessChanged = viewModel::setHandedness,
-                            onCheckForUpdates = viewModel::checkForUpdates,
-                            onInstallUpdate = viewModel::installLatestUpdate,
-                            onClose = { showSettings = false }
-                        )
-                    }
-                }
-
-                TargetCreationFlow(uiState, viewModel, context)
 
                 if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
                     GestureFeedback(
                         uiState = uiState,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 16.dp)
+                            .padding(top = topSafePadding + 20.dp) // Below status
                             .zIndex(3f),
                         isVisible = gestureInProgress
                     )
                 }
 
+                // NAV RAIL
                 if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
                     Box(
                         modifier = Modifier
                             .zIndex(6f)
                             .fillMaxHeight()
+                            .padding(top = topSafePadding, bottom = bottomSafePadding)
                     ) {
                         AzNavRail(
-                            navController = navController,
+                            navController = null, // We handle navigation manually via onClick
                             currentDestination = currentRoute,
                             isLandscape = isLandscape
                         ) {
@@ -396,20 +402,17 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             if (uiState.editorMode == EditorMode.AR) {
                                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
 
-                                // NEW: Neural Scan Item
                                 azRailSubItem(
-                                    id = "neural_scan",
+                                    id = "surveyor",
                                     hostId = "target_host",
-                                    text = if (uiState.isMappingMode) "Stop Scan" else "Scan Space",
-                                    info = "Map the area for persistence",
-                                    onClick = { viewModel.toggleMappingMode() }
+                                    text = navStrings.surveyor,
+                                    info = navStrings.surveyorInfo,
+                                    onClick = {
+                                        navController.navigate("surveyor")
+                                        resetDialogs()
+                                    }
                                 )
 
-                                azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo) {
-                                    val intent = android.content.Intent(context, MappingActivity::class.java)
-                                    context.startActivity(intent)
-                                    resetDialogs()
-                                }
                                 azRailSubItem(id = "create_target", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
                                     viewModel.onCreateTargetClicked()
                                     resetDialogs()
@@ -537,7 +540,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
                             azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
                             azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
-                                showSettings = true
+                                navController.navigate("settings")
                                 resetDialogs()
                             }
                             azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, onClick = {
@@ -549,8 +552,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                 resetDialogs()
                             }
                             azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
-                                viewModel.loadAvailableProjects(context)
-                                showProjectLibrary = true
+                                navController.navigate("project_library")
                                 resetDialogs()
                             }
                             azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo, onClick = {
@@ -601,9 +603,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     )
                 }
 
+                // ADJUSTMENTS PANEL
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .padding(bottom = bottomSafePadding)
                         .zIndex(2f),
                     contentAlignment = Alignment.BottomCenter
                 ) {
@@ -612,7 +616,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         showKnobs = showSliderDialog == "Adjust",
                         showColorBalance = showColorBalanceDialog,
                         isLandscape = isLandscape,
-                        screenHeight = screenHeight,
+                        screenHeight = this@BoxWithConstraints.maxHeight, // Pass full height, alignment handled by Box
                         onOpacityChange = viewModel::onOpacityChanged,
                         onBrightnessChange = viewModel::onBrightnessChanged,
                         onContrastChange = viewModel::onContrastChanged,
@@ -642,7 +646,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         onFeedbackShown = viewModel::onFeedbackShown,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 32.dp)
+                            .padding(bottom = bottomSafePadding + 32.dp)
                             .zIndex(4f)
                     )
 
@@ -657,7 +661,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             text = "Progress: %.2f%%".format(uiState.progressPercentage),
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
-                                .padding(top = 16.dp)
+                                .padding(top = topSafePadding)
                                 .zIndex(3f)
                         )
                     }
@@ -665,6 +669,13 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
                 if (uiState.isCapturingTarget) {
                     CaptureAnimation()
+                }
+
+                // Target Creation Overlay - MOVED TO TOP AND HIGH Z-INDEX
+                if (uiState.isCapturingTarget) {
+                     Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
+                         TargetCreationFlow(uiState, viewModel, context)
+                     }
                 }
             }
         }
@@ -760,7 +771,7 @@ private fun MainContentLayer(
                 onGestureEnd = onGestureEnd
             )
             PROJECT -> {
-                // Should be handled by showProjectList, but as a fallback:
+                // Fallback, should be handled by nav graph
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black))
             }
         }
@@ -773,9 +784,10 @@ private fun TargetCreationFlow(
     viewModel: MainViewModel,
     context: Context
 ) {
-    if (!uiState.isCapturingTarget) return
+    // Moved check to caller to ensure Z-index handling
+    // if (!uiState.isCapturingTarget) return
 
-    Box(modifier = Modifier.zIndex(5f)) {
+    Box(modifier = Modifier.fillMaxSize()) {
         if (uiState.captureStep == CaptureStep.REVIEW) {
             val uri = uiState.capturedTargetUris.firstOrNull()
             val imageBitmap by produceState<Bitmap?>(initialValue = null, uri) {
@@ -785,7 +797,7 @@ private fun TargetCreationFlow(
                         ImageDecoder.decodeBitmap(source)
                     } else {
                         @Suppress("DEPRECATION")
-                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it)
+                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                     }
                 }
             }
