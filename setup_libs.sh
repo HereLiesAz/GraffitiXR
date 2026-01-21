@@ -95,6 +95,19 @@ else
     echo "MLKit already present."
 fi
 
+# Patch OpenCV build.gradle for AGP 9.0 compatibility (proguard-android.txt is deprecated)
+if [ -f "$OPENCV_DEST/sdk/build.gradle" ]; then
+    if grep -q "proguard-android.txt" "$OPENCV_DEST/sdk/build.gradle"; then
+        echo "Patching OpenCV build.gradle for AGP 9.0 compatibility..."
+        # Portable sed in-place
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+             sed -i '' 's/proguard-android.txt/proguard-android-optimize.txt/g' "$OPENCV_DEST/sdk/build.gradle"
+        else
+             sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' "$OPENCV_DEST/sdk/build.gradle"
+        fi
+    fi
+fi
+
 # Cleanup
 rm -rf temp_libs
 
