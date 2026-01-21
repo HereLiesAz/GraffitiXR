@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
+import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -68,6 +69,7 @@ class ArRenderer(
 
     @Volatile
     var session: Session? = null
+    var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var isAnchorReplacementAllowed: Boolean = true // Default to true to allow initial placement
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true
@@ -105,8 +107,12 @@ class ArRenderer(
                  rendererScope.launch {
                      val bmp = ImageUtils.loadBitmapFromUri(context, layer.uri)
                      if (bmp != null) {
-                         updateLayerBitmap(layer.id, bmp)
-                         layerUris[layer.id] = layer.uri
+                         // Double check if the layer is still valid before updating
+                         val currentLayer = layers.find { it.id == layer.id }
+                         if (currentLayer != null && currentLayer.uri == layer.uri) {
+                             updateLayerBitmap(layer.id, bmp)
+                             layerUris[layer.id] = layer.uri
+                         }
                      }
                  }
             }
@@ -226,6 +232,7 @@ class ArRenderer(
         try {
             session!!.setCameraTextureName(backgroundTextureId)
             val frame = session!!.update()
+            onSessionUpdated?.invoke(session!!, frame)
             val camera = frame.camera
 
             // Handle Taps
