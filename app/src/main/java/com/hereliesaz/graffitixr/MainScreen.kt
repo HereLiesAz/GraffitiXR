@@ -187,8 +187,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     val navStrings = rememberNavStrings()
 
     // Calculate current route for NavRail highlighting
-    val currentRoute = remember(uiState.editorMode, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId, uiState.isMappingMode) {
+    val currentRoute = remember(uiState.editorMode, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId, uiState.isMappingMode, currentNavRoute) {
         when {
+            currentNavRoute == "settings" -> "settings_sub"
+            currentNavRoute == "project_library" -> "load_project"
+            currentNavRoute == "surveyor" -> "surveyor"
             showInfoScreen -> "help"
             showSliderDialog == "Adjust" -> "adjust"
             showColorBalanceDialog -> "color_balance"
@@ -258,7 +261,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             startDestination = "editor",
             currentDestination = currentRoute,
             isLandscape = isLandscape,
-            isRailVisible = currentNavRoute == "editor" && !uiState.hideUiForCapture && !uiState.isTouchLocked, // Hide rail on capture or lock or non-editor screens
+            isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked, // Hide rail only on capture or lock
             rail = {
                 azSettings(
                     isLoading = uiState.isLoading,
