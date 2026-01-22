@@ -45,9 +45,22 @@ dependencies {
 
 ```kotlin
 AzHostActivityLayout(navController = navController) {
-    azSettings(
-        displayAppNameInHeader = true,
-        dockingSide = AzDockingSide.LEFT
+    // 1. Theme (Visuals)
+    azTheme(
+        activeColor = Color.Red,
+        defaultShape = AzButtonShape.CIRCLE
+    )
+
+    // 2. Config (Behavior)
+    azConfig(
+        displayAppName = true,
+        dockingSide = AzDockingSide.LEFT,
+        packButtons = true
+    )
+
+    // 3. Advanced (Optional)
+    azAdvanced(
+        infoScreen = false
     )
 
     // Define Rail Items (Visible on collapsed rail)
@@ -118,27 +131,33 @@ The DSL is used inside `AzHostActivityLayout` to configure the rail and items.
 
 ### AzNavRail Scope
 
-**Settings:**
--   `azSettings(...)`: Configures global settings. Parameters:
-    - `displayAppNameInHeader`: Boolean
-    - `packRailButtons`: Boolean
-    - `expandedRailWidth`: Dp
-    - `collapsedRailWidth`: Dp
-    - `showFooter`: Boolean
-    - `isLoading`: Boolean
-    - `defaultShape`: AzButtonShape
-    - `enableRailDragging`: Boolean
-    - `headerIconShape`: AzHeaderIconShape
-    - `onUndock`: (() -> Unit)?
-    - `overlayService`: Class<out Service>?
-    - `onOverlayDrag`: ((Float, Float) -> Unit)?
-    - `onItemGloballyPositioned`: ((String, Rect) -> Unit)?
-    - `infoScreen`: Boolean
-    - `onDismissInfoScreen`: (() -> Unit)?
-    - `activeColor`: Color?
-    - `vibrate`: Boolean
-    - `dockingSide`: AzDockingSide (LEFT/RIGHT)
-    - `noMenu`: Boolean
+**Sectors:**
+
+1.  **`azTheme(...)`** (Visuals):
+    -   `expandedRailWidth`: Dp
+    -   `collapsedRailWidth`: Dp
+    -   `defaultShape`: AzButtonShape
+    -   `headerIconShape`: AzHeaderIconShape
+    -   `activeColor`: Color?
+    -   `showFooter`: Boolean
+
+2.  **`azConfig(...)`** (Behavior):
+    -   `displayAppName`: Boolean
+    -   `packButtons`: Boolean
+    -   `dockingSide`: AzDockingSide (LEFT/RIGHT)
+    -   `noMenu`: Boolean
+    -   `vibrate`: Boolean
+    -   `activeClassifiers`: Set<String>
+
+3.  **`azAdvanced(...)`** (Special Ops):
+    -   `isLoading`: Boolean
+    -   `enableRailDragging`: Boolean
+    -   `onUndock`: (() -> Unit)?
+    -   `overlayService`: Class<out Service>?
+    -   `onOverlayDrag`: ((Float, Float) -> Unit)?
+    -   `onItemGloballyPositioned`: ((String, Rect) -> Unit)?
+    -   `infoScreen`: Boolean
+    -   `onDismissInfoScreen`: (() -> Unit)?
 
 **Items:**
 -   `azMenuItem(...)`: Item visible only in expanded menu.
@@ -168,7 +187,7 @@ The DSL is used inside `AzHostActivityLayout` to configure the rail and items.
 @Composable
 fun AzHostActivityLayout(
     modifier: Modifier = Modifier,
-    navController: NavHostController = rememberNavController(),
+    navController: NavHostController, // Mandatory
     currentDestination: String? = null,
     isLandscape: Boolean? = null,
     initiallyExpanded: Boolean = false,
@@ -341,7 +360,7 @@ fun SampleScreen(
     var isOnline by remember { mutableStateOf(true) }
     var isDarkMode by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-    var packRailButtons by remember { mutableStateOf(false) }
+    var packButtons by remember { mutableStateOf(false) }
     val railCycleOptions = remember { listOf("A", "B", "C", "D") }
     var railSelectedOption by remember { mutableStateOf(railCycleOptions.first()) }
     val menuCycleOptions = remember { listOf("X", "Y", "Z") }
@@ -365,16 +384,22 @@ fun SampleScreen(
         isLandscape = isLandscape,
         initiallyExpanded = initiallyExpanded
     ) {
-        azSettings(
-            packRailButtons = packRailButtons,
+        azTheme(
+            defaultShape = AzButtonShape.RECTANGLE
+        )
+
+        azConfig(
+            packButtons = packButtons,
+            dockingSide = if (isDockingRight) AzDockingSide.RIGHT else AzDockingSide.LEFT,
+            noMenu = noMenu
+        )
+
+        azAdvanced(
             isLoading = isLoading,
-            defaultShape = AzButtonShape.RECTANGLE,
             enableRailDragging = enableRailDragging,
             onUndock = onUndockOverride,
             onRailDrag = onRailDrag,
             overlayService = if (useBasicOverlay) SampleBasicOverlayService::class.java else SampleOverlayService::class.java,
-            dockingSide = if (isDockingRight) AzDockingSide.RIGHT else AzDockingSide.LEFT,
-            noMenu = noMenu,
             infoScreen = showHelp,
             onDismissInfoScreen = { showHelp = false }
         )
