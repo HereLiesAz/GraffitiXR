@@ -19,6 +19,7 @@ import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzDockingSide
+import com.hereliesaz.graffitixr.utils.azConfig
 import com.hereliesaz.graffitixr.slam.SlamManager
 import kotlinx.coroutines.launch
 import com.google.ar.core.Pose
