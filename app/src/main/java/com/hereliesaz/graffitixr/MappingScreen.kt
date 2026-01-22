@@ -106,22 +106,24 @@ fun MappingScreen(
             )
             azRailItem(id = "back", text = "Abort", onClick = onExit)
 
+            // 1. The AR View (World + MiniMap) - Background
+            background(weight = 0) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        GLSurfaceView(ctx).apply {
+                            preserveEGLContextOnPause = true
+                            setEGLContextClientVersion(2)
+                            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                            setRenderer(arRenderer)
+                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                        }
+                    }
+                )
+            }
+
             onscreen(alignment = Alignment.Center) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // 1. The AR View (World + MiniMap)
-                    AndroidView(
-                        modifier = Modifier.fillMaxSize(),
-                        factory = { ctx ->
-                            GLSurfaceView(ctx).apply {
-                                preserveEGLContextOnPause = true
-                                setEGLContextClientVersion(2)
-                                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                                setRenderer(arRenderer)
-                                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                            }
-                        }
-                    )
-
                     AzNavHost(
                         startDestination = "mapping_content"
                     ) {

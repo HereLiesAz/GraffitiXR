@@ -473,6 +473,16 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
+            // Background Content (Full Screen)
+            background(weight = 0) {
+                MainContentLayer(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    gestureInProgress = gestureInProgress,
+                    onGestureToggle = { gestureInProgress = it }
+                )
+            }
+
             // OnScreen Content
             onscreen(alignment = Alignment.Center) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
