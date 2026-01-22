@@ -67,6 +67,7 @@ import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
+import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
@@ -256,30 +257,25 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // Background Content (Rendered behind AzNavHost)
-        MainContentLayer(
-            uiState = uiState,
-            viewModel = viewModel,
-            gestureInProgress = gestureInProgress,
-            onGestureToggle = { gestureInProgress = it }
-        )
+    val isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked
 
-        val isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked
-
-        AzHostActivityLayout(
-            navController = localNavController
-        ) {
-            // Rail Definition (Only if visible)
-            if (isRailVisible) {
-                azSettings(
-                    isLoading = uiState.isLoading,
-                    packRailButtons = true,
-                    defaultShape = AzButtonShape.RECTANGLE,
-                    headerIconShape = AzHeaderIconShape.ROUNDED,
-                    infoScreen = showInfoScreen,
+    AzHostActivityLayout(
+        navController = localNavController
+    ) {
+        // Rail Definition (Only if visible)
+        if (isRailVisible) {
+                azTheme(
                     activeColor = activeHighlightColor,
-                    dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
+                    defaultShape = AzButtonShape.RECTANGLE,
+                    headerIconShape = AzHeaderIconShape.ROUNDED
+                )
+                azConfig(
+                    packButtons = true,
+                    dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+                )
+                azAdvanced(
+                    isLoading = uiState.isLoading,
+                    infoScreen = showInfoScreen,
                     onDismissInfoScreen = { showInfoScreen = false }
                 )
 
@@ -474,6 +470,16 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
+            // Background Content (Full Screen)
+            background(weight = 0) {
+                MainContentLayer(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    gestureInProgress = gestureInProgress,
+                    onGestureToggle = { gestureInProgress = it }
+                )
+            }
+
             // OnScreen Content
             onscreen(alignment = Alignment.Center) {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -580,8 +586,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     }
                 }
             }
-        }
-
     }
 }
 
