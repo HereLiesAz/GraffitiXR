@@ -101,6 +101,9 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
+import com.hereliesaz.graffitixr.utils.azTheme
+import com.hereliesaz.graffitixr.utils.azConfig
+import com.hereliesaz.graffitixr.utils.azAdvanced
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
