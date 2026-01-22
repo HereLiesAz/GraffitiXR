@@ -256,30 +256,25 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // Background Content (Rendered behind AzNavHost)
-        MainContentLayer(
-            uiState = uiState,
-            viewModel = viewModel,
-            gestureInProgress = gestureInProgress,
-            onGestureToggle = { gestureInProgress = it }
-        )
+    val isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked
 
-        val isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked
-
-        AzHostActivityLayout(
-            navController = localNavController
-        ) {
-            // Rail Definition (Only if visible)
-            if (isRailVisible) {
-                azSettings(
-                    isLoading = uiState.isLoading,
-                    packRailButtons = true,
-                    defaultShape = AzButtonShape.RECTANGLE,
-                    headerIconShape = AzHeaderIconShape.ROUNDED,
-                    infoScreen = showInfoScreen,
+    AzHostActivityLayout(
+        navController = localNavController
+    ) {
+        // Rail Definition (Only if visible)
+        if (isRailVisible) {
+                azTheme(
                     activeColor = activeHighlightColor,
-                    dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
+                    defaultShape = AzButtonShape.RECTANGLE,
+                    headerIconShape = AzHeaderIconShape.ROUNDED
+                )
+                azConfig(
+                    packButtons = true,
+                    dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+                )
+                azAdvanced(
+                    isLoading = uiState.isLoading,
+                    infoScreen = showInfoScreen,
                     onDismissInfoScreen = { showInfoScreen = false }
                 )
 
@@ -476,7 +471,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
             // OnScreen Content
             onscreen(alignment = Alignment.Center) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                    MainContentLayer(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        gestureInProgress = gestureInProgress,
+                        onGestureToggle = { gestureInProgress = it }
+                    )
+
                     AzNavHost(
                         startDestination = "editor"
                     ) {
@@ -580,8 +582,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     }
                 }
             }
-        }
-
     }
 }
 
