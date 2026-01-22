@@ -18,6 +18,7 @@ import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.model.AzDockingSide
+import com.hereliesaz.graffitixr.utils.azConfig
 import com.hereliesaz.graffitixr.slam.SlamManager
 import kotlinx.coroutines.launch
 import com.google.ar.core.Pose
@@ -94,35 +95,35 @@ fun MappingScreen(
 
     val navController = rememberNavController()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 1. The AR View (World + MiniMap) - Rendered behind AzNavHost
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                GLSurfaceView(ctx).apply {
-                    preserveEGLContextOnPause = true
-                    setEGLContextClientVersion(2)
-                    setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                    setRenderer(arRenderer)
-                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                }
-            }
-        )
-
-        AzHostActivityLayout(
-            modifier = Modifier.fillMaxSize(),
-            navController = navController
-        ) {
-            azSettings(
-                displayAppNameInHeader = true,
+    AzHostActivityLayout(
+        modifier = Modifier.fillMaxSize(),
+        navController = navController
+    ) {
+            azConfig(
+                displayAppName = true,
                 dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
             )
             azRailItem(id = "back", text = "Abort", onClick = onExit)
 
             onscreen(alignment = Alignment.Center) {
-            AzNavHost(
-                startDestination = "mapping_content"
-            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // 1. The AR View (World + MiniMap)
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { ctx ->
+                            GLSurfaceView(ctx).apply {
+                                preserveEGLContextOnPause = true
+                                setEGLContextClientVersion(2)
+                                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                                setRenderer(arRenderer)
+                                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                            }
+                        }
+                    )
+
+                    AzNavHost(
+                        startDestination = "mapping_content"
+                    ) {
                 composable("mapping_content") {
                     // 3. The HUD (Neural Scan UI)
                     if (isMapping) {
@@ -171,7 +172,7 @@ fun MappingScreen(
                     }
                 }
             }
+        }
             }
         }
-    }
 }
