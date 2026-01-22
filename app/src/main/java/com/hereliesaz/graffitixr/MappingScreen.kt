@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.slam.SlamManager
@@ -108,7 +109,7 @@ fun MappingScreen(
             }
         )
 
-        AzNavHost(
+        AzHostActivityLayout(
             modifier = Modifier.fillMaxSize(),
             navController = navController
         ) {
@@ -119,8 +120,7 @@ fun MappingScreen(
             azRailItem(id = "back", text = "Abort", onClick = onExit)
 
             onscreen(alignment = Alignment.Center) {
-            androidx.navigation.compose.NavHost(
-                navController = navController,
+            AzNavHost(
                 startDestination = "mapping_content"
             ) {
                 composable("mapping_content") {

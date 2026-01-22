@@ -65,6 +65,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
@@ -266,7 +267,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
         val isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked
 
-        AzNavHost(
+        AzHostActivityLayout(
             navController = localNavController
         ) {
             // Rail Definition (Only if visible)
@@ -476,8 +477,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             // OnScreen Content
             onscreen(alignment = Alignment.Center) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    NavHost(
-                        navController = localNavController,
+                    AzNavHost(
                         startDestination = "editor"
                     ) {
                         composable("editor") {
