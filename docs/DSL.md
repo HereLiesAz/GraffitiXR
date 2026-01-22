@@ -3,7 +3,7 @@
 GraffitiXR configures the rail in `MainScreen.kt` using the DSL.
 
 ## Example Structure
-## IMPORTANT: AzNavRail MUST be used within an AzNavHost container. The library enforces strict layout rules (safe zones, padding, z-ordering) and will throw a runtime error if AzNavRail is instantiated directly without a host wrapper (except when running as a system overlay service).
+## IMPORTANT: AzNavRail MUST be used within an AzHostActivityLayout container. The library enforces strict layout rules (safe zones, padding, z-ordering) and will throw a runtime error if AzNavRail is instantiated directly without a host wrapper (except when running as a system overlay service).
 
 ```kotlin
 import androidx.compose.foundation.background
@@ -27,6 +27,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.AzTextBox
 import com.hereliesaz.aznavrail.model.AzButtonShape
@@ -36,7 +37,7 @@ import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 @Composable
 fun SampleScreen() {
     val navController = rememberNavController()
-    // currentDestination and isLandscape are automatically derived by AzNavHost
+    // currentDestination and isLandscape are automatically derived by AzHostActivityLayout
     // but can be overridden if needed.
 
     var isOnline by remember { mutableStateOf(true) }
@@ -47,7 +48,7 @@ fun SampleScreen() {
     val menuCycleOptions = remember { listOf("X", "Y", "Z") }
     var menuSelectedOption by remember { mutableStateOf(menuCycleOptions.first()) }
 
-    AzNavHost(navController = navController) {
+    AzHostActivityLayout(navController = navController) {
         azSettings(
             // displayAppNameInHeader = true, // Set to true to display the app name instead of the icon
             packRailButtons = false,
@@ -182,7 +183,7 @@ fun SampleScreen() {
                     }
                 )
 
-                NavHost(navController = navController, startDestination = "home") {
+                AzNavHost(startDestination = "home") {
                     composable("home") { Text("Home Screen") }
                     composable("multi-line") { Text("Multi-line Screen") }
                     composable("favorites") { Text("Favorites Screen") }
@@ -208,8 +209,8 @@ fun SampleScreen() {
 
 ```
 
-## AzNavHost Layout Rules
-AzNavHost enforces a "Strict Mode" layout system:
+## AzHostActivityLayout Layout Rules
+AzHostActivityLayout enforces a "Strict Mode" layout system:
 
 Rail Avoidance: No content in the onscreen block will overlap the rail. Padding is automatically applied based on the docking side.
 Vertical Safe Zones: Content is restricted from the top 20% and bottom 10% of the screen.
