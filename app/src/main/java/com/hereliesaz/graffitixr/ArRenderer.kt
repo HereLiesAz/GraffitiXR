@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.RectF
 import android.net.Uri
 import android.opengl.GLES20
@@ -69,21 +68,15 @@ class ArRenderer(
 
     @Volatile
     var session: Session? = null
-
-    @Volatile
-    private var isSessionPaused = true
-
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
-    var isAnchorReplacementAllowed: Boolean = true // Default to true to allow initial placement
+    var isAnchorReplacementAllowed: Boolean = true
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true
 
-    // Texture for the camera feed
     private var backgroundTextureId = -1
     private var viewportWidth = 1
     private var viewportHeight = 1
 
-    // Layers and Anchors
     private var layers: List<OverlayLayer> = emptyList()
     private val layerBitmaps = ConcurrentHashMap<String, Bitmap>()
     private val layerUris = ConcurrentHashMap<String, Uri>()
@@ -91,13 +84,12 @@ class ArRenderer(
     private val queuedSingleTaps = ConcurrentLinkedQueue<FloatArray>()
     private val rendererScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // Pre-allocated matrices to avoid GC churn
     private val anchorMatrix = FloatArray(16)
     private val modelMatrix = FloatArray(16)
     private val layerMatrix = FloatArray(16)
     private val mvpMatrix = FloatArray(16)
     private val modelViewMatrix = FloatArray(16)
-    private val displayTransform = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f) // Identity
+    private val displayTransform = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
 
     private var capturePending = false
 
@@ -105,15 +97,12 @@ class ArRenderer(
         this.layers = newLayers
         val newLayerIds = newLayers.map { it.id }.toSet()
 
-        // Trigger bitmap loading for new layers if needed
         newLayers.forEach { layer ->
             val cachedUri = layerUris[layer.id]
-            // Reload if ID is new OR Uri has changed
             if (cachedUri == null || cachedUri != layer.uri) {
                  rendererScope.launch {
                      val bmp = ImageUtils.loadBitmapFromUri(context, layer.uri)
                      if (bmp != null) {
-                         // Double check if the layer is still valid before updating
                          val currentLayer = layers.find { it.id == layer.id }
                          if (currentLayer != null && currentLayer.uri == layer.uri) {
                              updateLayerBitmap(layer.id, bmp)
@@ -124,7 +113,6 @@ class ArRenderer(
             }
         }
 
-        // Cleanup unused bitmaps
         val currentIds = layerBitmaps.keys.toList()
         currentIds.forEach { id ->
             if (id !in newLayerIds) {
@@ -184,11 +172,7 @@ class ArRenderer(
         session?.let { s ->
             try {
                 val config = s.config
-                if (enabled) {
-                    config.flashMode = Config.FlashMode.TORCH
-                } else {
-                    config.flashMode = Config.FlashMode.OFF
-                }
+                config.flashMode = if (enabled) Config.FlashMode.TORCH else Config.FlashMode.OFF
                 s.configure(config)
             } catch (e: Exception) {
                 Log.e("ArRenderer", "Failed to set flashlight", e)
@@ -207,18 +191,17 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
 
-        // 1. Initialize renderers
         backgroundRenderer.createOnGlThread()
         planeRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread()
         simpleQuadRenderer.createOnGlThread()
         miniMapRenderer.createOnGlThread(context)
 
-        // 2. Use the texture ID from BackgroundRenderer for ARCore
         backgroundTextureId = backgroundRenderer.textureId
-        
-        // 3. Connect texture to session if ready
         session?.setCameraTextureName(backgroundTextureId)
+
+        // Initialize Native Engine
+        slamManager.initNative()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -231,70 +214,69 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        if (session == null || isSessionPaused) return
+        if (session == null) return
 
         displayRotationHelper.updateSessionIfNeeded(session!!)
 
         try {
-            if (isSessionPaused) return
-
             session!!.setCameraTextureName(backgroundTextureId)
             val frame = session!!.update()
             onSessionUpdated?.invoke(session!!, frame)
             val camera = frame.camera
 
-            // Handle Taps
             handleTaps(frame, camera)
-
-            // Draw Background
             backgroundRenderer.draw(frame)
 
-            // Get Projection Matrix
             val projmtx = FloatArray(16)
             camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
-
-            // Get View Matrix
             val viewmtx = FloatArray(16)
             camera.getViewMatrix(viewmtx, 0)
 
-            // Visualize Point Cloud (Confidence Map)
+            // Feed Native Engine
+            slamManager.updateCamera(viewmtx, projmtx)
+
+            // Process Depth for MobileGS
+            if (frame.camera.trackingState == TrackingState.TRACKING) {
+                try {
+                    val depthImage = frame.acquireDepthImage16Bits()
+                    val depthBuffer = depthImage.planes[0].buffer
+                    val depthBytes = ByteArray(depthBuffer.remaining())
+                    depthBuffer.get(depthBytes)
+                    slamManager.feedDepth(depthBytes, depthImage.width, depthImage.height)
+                    depthImage.close()
+                } catch (e: Exception) {
+                    // Depth not always available
+                }
+            }
+
+            // Draw MobileGS Splats
+            slamManager.drawFrame()
+
             val pointCloud = frame.acquirePointCloud()
             pointCloudRenderer.update(pointCloud)
             pointCloudRenderer.draw(viewmtx, projmtx)
             
-            // Draw MiniMap if enabled
             if (showMiniMap) {
-                // Tactical View: Drone perspective of the point cloud
                 miniMapRenderer.draw(pointCloud, camera.pose, viewportWidth, viewportHeight, 0)
             }
-
             pointCloud.release()
 
-            // Detect Planes
             if (hasTrackingPlane()) {
                 onPlanesDetected(true)
-                planeRenderer.drawPlanes(
-                    session!!.getAllTrackables(Plane::class.java),
-                    viewmtx,
-                    projmtx
-                )
+                planeRenderer.drawPlanes(session!!.getAllTrackables(Plane::class.java), viewmtx, projmtx)
             } else {
                 onPlanesDetected(false)
             }
 
-            // Draw Layers
+            // Draw Standard Layers
             anchor?.let {
                 if (it.trackingState == TrackingState.TRACKING) {
                     it.pose.toMatrix(anchorMatrix, 0)
-
                     layers.forEach { layer ->
                         if (layer.isVisible) {
                             val bitmap = layerBitmaps[layer.id]
                             if (bitmap != null) {
-                                // Calculate Model Matrix (Anchor * Layer Transform)
                                 Matrix.setIdentityM(layerMatrix, 0)
-
-                                // Apply Layer Transforms (T * R * S)
                                 Matrix.translateM(layerMatrix, 0, layer.offset.x, layer.offset.y, 0f)
                                 Matrix.rotateM(layerMatrix, 0, layer.rotationX, 1f, 0f, 0f)
                                 Matrix.rotateM(layerMatrix, 0, layer.rotationY, 0f, 1f, 0f)
@@ -302,26 +284,14 @@ class ArRenderer(
                                 Matrix.scaleM(layerMatrix, 0, layer.scale, layer.scale, 1f)
 
                                 Matrix.multiplyMM(modelMatrix, 0, anchorMatrix, 0, layerMatrix, 0)
-
-                                // MVP Matrix
                                 Matrix.multiplyMM(modelViewMatrix, 0, viewmtx, 0, modelMatrix, 0)
                                 Matrix.multiplyMM(mvpMatrix, 0, projmtx, 0, modelViewMatrix, 0)
 
                                 simpleQuadRenderer.draw(
-                                    mvpMatrix,
-                                    modelViewMatrix,
-                                    bitmap,
-                                    layer.opacity,
-                                    layer.brightness,
-                                    layer.colorBalanceR,
-                                    layer.colorBalanceG,
-                                    layer.colorBalanceB,
-                                    -1, // Depth texture
-                                    backgroundTextureId,
-                                    viewportWidth.toFloat(),
-                                    viewportHeight.toFloat(),
-                                    displayTransform,
-                                    layer.blendMode
+                                    mvpMatrix, modelViewMatrix, bitmap, layer.opacity,
+                                    layer.brightness, layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB,
+                                    -1, backgroundTextureId, viewportWidth.toFloat(), viewportHeight.toFloat(),
+                                    displayTransform, layer.blendMode
                                 )
                             }
                         }
@@ -367,7 +337,7 @@ class ArRenderer(
         }
     }
 
-    private fun handleTaps(frame: com.google.ar.core.Frame, camera: com.google.ar.core.Camera) {
+    private fun handleTaps(frame: Frame, camera: com.google.ar.core.Camera) {
         val tap = queuedSingleTaps.poll() ?: return
         if (camera.trackingState != TrackingState.TRACKING) return
 
@@ -381,7 +351,7 @@ class ArRenderer(
                     anchor?.detach()
                     anchor = hit.createAnchor()
                     onAnchorCreated()
-                    break // Only create one anchor
+                    break
                 }
             }
         }
@@ -389,64 +359,51 @@ class ArRenderer(
 
     private fun hasTrackingPlane(): Boolean {
         session?.getAllTrackables(Plane::class.java)?.forEach { plane ->
-            if (plane.trackingState == TrackingState.TRACKING) {
-                return true
-            }
+            if (plane.trackingState == TrackingState.TRACKING) return true
         }
         return false
     }
 
     fun onResume(activity: android.app.Activity) {
         displayRotationHelper.onResume()
-
-        // Check for camera permission before creating session
-        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            Log.w("ArRenderer", "Camera permission not granted. Deferring AR Session creation.")
-            return
-        }
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return
 
         try {
             if (session == null) {
-                // Check if ARCore is installed/updated
                 when (com.google.ar.core.ArCoreApk.getInstance().requestInstall(activity, true)) {
-                    com.google.ar.core.ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
-                        return // ARCore will pause activity to install
-                    }
+                    com.google.ar.core.ArCoreApk.InstallStatus.INSTALL_REQUESTED -> return
                     com.google.ar.core.ArCoreApk.InstallStatus.INSTALLED -> {
-                        // Create the session
                         session = Session(context)
                         val config = Config(session)
                         config.focusMode = Config.FocusMode.AUTO
                         config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                        session!!.configure(config)
-                        
-                        // Set texture name if renderer is already created
-                        if (backgroundTextureId != -1) {
-                            session!!.setCameraTextureName(backgroundTextureId)
+                        // ENABLE DEPTH
+                        if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                            config.depthMode = Config.DepthMode.AUTOMATIC
                         }
+                        session!!.configure(config)
+                        if (backgroundTextureId != -1) session!!.setCameraTextureName(backgroundTextureId)
                     }
                 }
             }
-            isSessionPaused = false
             session?.resume()
         } catch (e: CameraNotAvailableException) {
-            Log.e("ArRenderer", "Camera not available. Please restart the app.", e)
+            Log.e("ArRenderer", "Camera not available", e)
         } catch (e: Exception) {
             Log.e("ArRenderer", "Failed to create AR Session", e)
         }
     }
 
     fun onPause() {
-        isSessionPaused = true
         displayRotationHelper.onPause()
         session?.pause()
     }
 
     fun cleanup() {
+        slamManager.destroyNative()
         session?.close()
         session = null
         rendererScope.cancel()
-
         layerBitmaps.values.forEach { if (!it.isRecycled) it.recycle() }
         layerBitmaps.clear()
         layerUris.clear()
