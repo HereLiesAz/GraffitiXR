@@ -40,18 +40,16 @@ captures/
 backup.ps1
 project_backup_*
 google-services.json
-/app/libs/opencv/
-/app/src/main/cpp/include/glm/
-/app/libs/litert/
-/app/libs/mlkit/
 
-
-# Dependencies managed by 'dependencies' branch
-app/libs/opencv/
-app/libs/glm/
-app/libs/litert/
+# Transient dependencies (stored in root libs/)
+/libs/opencv/
+/libs/glm/
+/libs/litert/
+/libs/mlkit-subject-segmentation/
+/libs/*.aar
+/libs/litert_npu_runtime_libraries/
 
 # Legacy/Other
-/app/src/cpp/include/glm/*
+/app/src/main/cpp/include/glm/*
 
 build_log*.txt

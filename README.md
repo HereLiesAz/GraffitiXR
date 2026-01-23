@@ -50,7 +50,7 @@ To build the project locally, you must first fetch the large dependencies (OpenC
     # Windows
     ./setup_libs.ps1
     ```
-    This will download and configure OpenCV and other libraries into `app/libs`.
+    This will download and configure OpenCV and other libraries into `libs/`.
 
 2.  **Build with Gradle:**
     Open the project in Android Studio or run via command line:

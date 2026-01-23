@@ -26,50 +26,48 @@ jobs:
           fi
 
       - name: Create libs directory
-        run: mkdir -p app/libs
+        run: mkdir -p libs
 
       - name: Download OpenCV
         env:
-          # User requested 4.13.0. Using 4.10.0 (latest stable) as fallback to ensure URL validity.
-          # Change to 4.13.0 when available.
           OPENCV_VERSION: 4.10.0 
         run: |
           echo "Downloading OpenCV ${OPENCV_VERSION}..."
-          rm -rf app/libs/opencv
+          rm -rf libs/opencv
+          mkdir -p libs/opencv
           wget -q https://github.com/opencv/opencv/releases/download/${OPENCV_VERSION}/opencv-${OPENCV_VERSION}-android-sdk.zip -O opencv.zip
           unzip -q opencv.zip
-          mv OpenCV-android-sdk app/libs/opencv
-          rm opencv.zip
+          # Move the contents of 'sdk' to the root of our opencv lib folder
+          mv OpenCV-android-sdk/sdk/* libs/opencv/
+          rm -rf OpenCV-android-sdk opencv.zip
 
       - name: Download GLM
         env:
-          # User requested 1.0.3. Using 1.0.1 (latest release) as fallback.
           GLM_VERSION: 1.0.1
         run: |
           echo "Downloading GLM ${GLM_VERSION}..."
-          rm -rf app/libs/glm
+          rm -rf libs/glm
           wget -q https://github.com/g-truc/glm/archive/refs/tags/${GLM_VERSION}.zip -O glm.zip
           unzip -q glm.zip
-          mv glm-${GLM_VERSION} app/libs/glm
-          rm glm.zip
+          mkdir -p libs/glm
+          mv glm-${GLM_VERSION}/glm libs/glm/glm
+          rm -rf glm-${GLM_VERSION} glm.zip
 
       - name: Download LiteRT
         env:
           LITERT_VERSION: 2.1.0
         run: |
           echo "Downloading LiteRT ${LITERT_VERSION}..."
-          rm -rf app/libs/litert
-          mkdir -p app/libs/litert
-          # URL for LiteRT standalone headers/libs is not standard.
-          # Placing a placeholder. Replace with actual download URL.
-          echo "LiteRT version ${LITERT_VERSION}" > app/libs/litert/README.md
-          echo "Please manually populate this directory or update the workflow with a valid URL." >> app/libs/litert/README.md
+          rm -rf libs/litert
+          mkdir -p libs/litert
+          echo "LiteRT version ${LITERT_VERSION}" > libs/litert/README.md
+          echo "Please manually populate this directory or update the workflow with a valid URL." >> libs/litert/README.md
 
       - name: Commit and Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add app/libs
+          git add libs
           # Only commit if there are changes
           if ! git diff --cached --quiet; then
             git commit -m "Update dependencies: OpenCV, GLM, LiteRT"

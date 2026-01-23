@@ -1,8 +1,9 @@
 [versions]
 agp = "9.0.0"
 constraintlayout = "2.2.1"
+litert = "2.1.0"
 sphereSlam = "v0.5.48.280"
-kotlin = "2.3.0"
+kotlin = "2.2.20"
 coreKtx = "1.17.0"
 junit = "4.13.2"
 mockk = "1.14.7"
@@ -28,6 +29,7 @@ playServicesLocation = "21.3.0"
 
 [libraries]
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
 sphere-slam = { module = "com.github.HereLiesAz:SphereSLAM", version.ref = "sphereSlam" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
