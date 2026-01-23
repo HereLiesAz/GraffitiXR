@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import java.util.concurrent.atomic.AtomicReference
 
 @Composable
 fun MappingScreen(
@@ -38,6 +39,11 @@ fun MappingScreen(
     val isRightHanded = remember { prefs.getBoolean("is_right_handed", true) }
 
     val slamManager = remember { SlamManager() }
+
+    // Thread-safe state to hold the latest camera pose from GL thread
+    val latestCameraPose = remember { AtomicReference<Pose?>(null) }
+
+    // Capture GLSurfaceView to manage lifecycle
     var glSurfaceView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
     val mappingQuality by slamManager.mappingQuality.collectAsState()
@@ -59,6 +65,11 @@ fun MappingScreen(
             showMiniMap = true
             showGuide = false
             onSessionUpdated = { session, frame ->
+                // Always cache the latest pose for UI actions (runs on GL thread)
+                if (frame.camera.trackingState == TrackingState.TRACKING) {
+                    latestCameraPose.set(frame.camera.pose)
+                }
+
                 if (isMappingState.value) {
                     val now = System.currentTimeMillis()
                     if (now - lastUpdateTime > 500) {
@@ -144,8 +155,11 @@ fun MappingScreen(
                                     isHosting = isHosting,
                                     onCaptureComplete = {
                                         val session = arRenderer.session
-                                        if (session != null) {
-                                            val cameraPose = session.update().camera.pose
+                                        val cameraPose = latestCameraPose.get()
+                                        if (session != null && cameraPose != null) {
+                                            // The user is happy with the map.
+                                            // Create an anchor exactly where the device is NOW.
+                                            // We place the anchor slightly in front (0.5m) to ensure stability
                                             val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
                                             val anchorPose = cameraPose.compose(forwardOffset)
                                             val anchor = session.createAnchor(anchorPose)
