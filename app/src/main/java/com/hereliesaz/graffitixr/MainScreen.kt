@@ -42,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset // <--- REQUIRED: Ensures onOffsetChanged works
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
@@ -70,7 +72,9 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
-// DELETED: Illegal imports of utils.azTheme, utils.azConfig, utils.azAdvanced
+// REMOVED: import com.hereliesaz.graffitixr.utils.azTheme
+// REMOVED: import com.hereliesaz.graffitixr.utils.azConfig
+// REMOVED: import com.hereliesaz.graffitixr.utils.azAdvanced
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -405,12 +409,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // --------------------------------------------------------------------------------
-            // LAYER 0: BACKGROUND (Edge-to-Edge)
-            // Z-Index: 0
-            // Content: MainContentLayer (AR/Images)
-            // Constraints: No Safe Zone Padding. Draws under system bars.
-            // --------------------------------------------------------------------------------
+            // BACKGROUND LAYER (Edge-to-Edge)
             background(weight = 0) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                     MainContentLayer(
@@ -422,12 +421,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // --------------------------------------------------------------------------------
-            // LAYER 1: ONSCREEN UI (Safe)
-            // Z-Index: 1
-            // Content: Editor Panels, Settings, Overlays
-            // Constraints: Safe Zone Padding enforced by AzHostActivityLayout.
-            // --------------------------------------------------------------------------------
+            // ONSCREEN UI (Safe)
             onscreen(alignment = Alignment.Center) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     
@@ -533,7 +527,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 }
 
-// ... (Rest of file remains unchanged as logic is internal to composables)
 @Composable
 fun EditorContent(
     viewModel: MainViewModel,
