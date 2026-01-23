@@ -1,4 +1,3 @@
-// Top-level settings file
 pluginManagement {
     repositories {
         google()
@@ -18,5 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "GraffitiXR"
 include(":app")
 
-include(":opencv")
-project(":opencv").projectDir = File("app/libs/opencv/sdk")
+// REMOVED: include(":opencv") - We use the AAR directly now.
