@@ -116,7 +116,7 @@ class MainViewModel @JvmOverloads constructor(
                             } else {
                                 original
                             }
-                            BackgroundRemover.removeBackground(safeBitmap)
+                            BackgroundRemover.removeBackground(context, safeBitmap)
                         }
                         if (processed != null) {
                             val newUri = withContext(Dispatchers.IO) {
