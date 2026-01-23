@@ -17,8 +17,6 @@ dependencyResolutionManagement {
         flatDir {
             dirs("app/libs")                   // For MLKit, LiteRT
             dirs("app/libs/opencv/java")       // For OpenCV
-     // For MLKit, LiteRT
-            dirs("app/libs/opencv/sdk/java")        // For OpenCV (Adjusted path)
         }
     }
 }
@@ -27,7 +25,8 @@ rootProject.name = "GraffitiXR"
 include(":app")
 
 val opencvSdk = file("app/libs/opencv/sdk")
-if (opencvSdk.exists()) {
+// Check for build.gradle to ensure it's a valid project, preventing errors on empty dirs
+if (file("app/libs/opencv/sdk/build.gradle").exists()) {
     include(":opencv")
     project(":opencv").projectDir = opencvSdk
 }
