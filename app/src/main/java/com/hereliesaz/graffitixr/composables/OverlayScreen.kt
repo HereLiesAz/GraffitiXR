@@ -5,8 +5,6 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.camera.camera2.interop.Camera2Interop
-import android.hardware.camera2.CameraDevice
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -136,13 +134,7 @@ fun OverlayScreen(
                 val executor = ContextCompat.getMainExecutor(ctx)
                 cameraProviderFuture.addListener({
                     val cameraProvider = cameraProviderFuture.get()
-                    val previewBuilder = Preview.Builder()
-
-                    // Force TEMPLATE_PREVIEW to avoid crashes on devices that don't support TEMPLATE_RECORD (e.g. Android 36/Pixel 5)
-                    Camera2Interop.Extender(previewBuilder)
-                        .setCaptureRequestTemplate(CameraDevice.TEMPLATE_PREVIEW)
-
-                    val preview = previewBuilder.build().also {
+                    val preview = Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
                     val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
