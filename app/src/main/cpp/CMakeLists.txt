@@ -14,8 +14,8 @@ endif()
 message(STATUS "Native build looking for libs in: ${LIBS_DIR}")
 
 # --- OPENCV CONFIGURATION ---
-# FIX: Path aligned to branch structure (removed 'sdk')
-set(OpenCV_DIR "${LIBS_DIR}/opencv/native/jni")
+# FIX: Path aligned to branch structure (restored 'sdk')
+set(OpenCV_DIR "${LIBS_DIR}/opencv/sdk/native/jni")
 
 if(EXISTS "${OpenCV_DIR}/OpenCVConfig.cmake")
     find_package(OpenCV REQUIRED)
