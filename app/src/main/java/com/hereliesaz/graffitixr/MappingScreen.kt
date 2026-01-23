@@ -19,7 +19,6 @@ import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzDockingSide
-// DELETED: import com.hereliesaz.graffitixr.utils.azConfig (Violates Scope Rules)
 import com.hereliesaz.graffitixr.slam.SlamManager
 import kotlinx.coroutines.launch
 import com.google.ar.core.Pose
@@ -28,7 +27,7 @@ import com.google.ar.core.TrackingState
 
 @Composable
 fun MappingScreen(
-    onMapSaved: (String) -> Unit, // Callback when we get a Cloud ID
+    onMapSaved: (String) -> Unit,
     onExit: () -> Unit
 ) {
     val context = LocalContext.current
@@ -38,19 +37,14 @@ fun MappingScreen(
     val prefs = remember { context.getSharedPreferences("graffiti_settings", android.content.Context.MODE_PRIVATE) }
     val isRightHanded = remember { prefs.getBoolean("is_right_handed", true) }
 
-    // The Manager (The Brain)
     val slamManager = remember { SlamManager() }
-
-    // Capture GLSurfaceView to manage lifecycle
     var glSurfaceView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-    // UI State
     val mappingQuality by slamManager.mappingQuality.collectAsState()
     val isHosting by slamManager.isHosting.collectAsState()
     val isMappingState = remember { mutableStateOf(true) }
     var isMapping by isMappingState
 
-    // Renderer (The Eyes)
     val arRenderer = remember {
         var lastUpdateTime = 0L
         ArRenderer(
@@ -62,7 +56,6 @@ fun MappingScreen(
             onTrackingFailure = {},
             onBoundsUpdated = {}
         ).apply {
-            // ACTIVATE TACTICAL MODE
             showMiniMap = true
             showGuide = false
             onSessionUpdated = { session, frame ->
@@ -80,7 +73,6 @@ fun MappingScreen(
         }
     }
 
-    // Lifecycle Management
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -117,14 +109,13 @@ fun MappingScreen(
             )
             azRailItem(id = "back", text = "Abort", onClick = onExit)
 
-            // 1. The AR View (World + MiniMap) - Background
             background(weight = 0) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         GLSurfaceView(ctx).apply {
                             preserveEGLContextOnPause = true
-                            setEGLContextClientVersion(2)
+                            setEGLContextClientVersion(3) // FIXED: Must be 3 for Splat Shaders
                             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                             setRenderer(arRenderer)
                             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
@@ -140,9 +131,7 @@ fun MappingScreen(
                         startDestination = "mapping_content"
                     ) {
                         composable("mapping_content") {
-                            // 3. The HUD (Neural Scan UI)
                             if (isMapping) {
-                                // Map float quality to Enum
                                 val qualityEnum = when {
                                     mappingQuality < 0.5f -> Session.FeatureMapQuality.INSUFFICIENT
                                     mappingQuality < 0.8f -> Session.FeatureMapQuality.SUFFICIENT
@@ -156,22 +145,16 @@ fun MappingScreen(
                                     onCaptureComplete = {
                                         val session = arRenderer.session
                                         if (session != null) {
-                                            // The user is happy with the map.
-                                            // Create an anchor exactly where the device is NOW.
                                             val cameraPose = session.update().camera.pose
-                                            // We place the anchor slightly in front (0.5m) to ensure stability
                                             val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
                                             val anchorPose = cameraPose.compose(forwardOffset)
-
                                             val anchor = session.createAnchor(anchorPose)
 
-                                            // Initiate the Upload Ritual
                                             scope.launch {
                                                 slamManager.hostAnchor(
                                                     session = session,
                                                     anchor = anchor,
                                                     onSuccess = { cloudId ->
-                                                        // Success. We have the ID.
                                                         Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
                                                         onMapSaved(cloudId)
                                                     },
