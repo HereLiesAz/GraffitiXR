@@ -19,6 +19,13 @@ public class TextDetectionModel_EAST extends TextDetectionModel {
 
     protected TextDetectionModel_EAST(long addr) { super(addr); }
 
+    // internal usage only
+    public static TextDetectionModel_EAST __fromPtr__(long addr) { return new TextDetectionModel_EAST(addr); }
+
+    //
+    // C++:   cv::dnn::TextDetectionModel_EAST::TextDetectionModel_EAST(Net network)
+    //
+
     /**
      * Create text detection algorithm from deep learning network
      * @param network Net object
@@ -27,8 +34,9 @@ public class TextDetectionModel_EAST extends TextDetectionModel {
         super(TextDetectionModel_EAST_0(network.getNativeObjAddr()));
     }
 
+
     //
-    // C++:   cv::dnn::TextDetectionModel_EAST::TextDetectionModel_EAST(Net network)
+    // C++:   cv::dnn::TextDetectionModel_EAST::TextDetectionModel_EAST(string model, string config = "")
     //
 
     /**
@@ -41,11 +49,6 @@ public class TextDetectionModel_EAST extends TextDetectionModel {
         super(TextDetectionModel_EAST_1(model, config));
     }
 
-
-    //
-    // C++:   cv::dnn::TextDetectionModel_EAST::TextDetectionModel_EAST(string model, string config = "")
-    //
-
     /**
      * Create text detection model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -55,12 +58,23 @@ public class TextDetectionModel_EAST extends TextDetectionModel {
         super(TextDetectionModel_EAST_2(model));
     }
 
-    // internal usage only
-    public static TextDetectionModel_EAST __fromPtr__(long addr) { return new TextDetectionModel_EAST(addr); }
-
 
     //
     // C++:  TextDetectionModel_EAST cv::dnn::TextDetectionModel_EAST::setConfidenceThreshold(float confThreshold)
+    //
+
+    /**
+     * Set the detection confidence threshold
+     * @param confThreshold A threshold used to filter boxes by confidences
+     * @return automatically generated
+     */
+    public TextDetectionModel_EAST setConfidenceThreshold(float confThreshold) {
+        return new TextDetectionModel_EAST(setConfidenceThreshold_0(nativeObj, confThreshold));
+    }
+
+
+    //
+    // C++:  float cv::dnn::TextDetectionModel_EAST::getConfidenceThreshold()
     //
 
     // C++:   cv::dnn::TextDetectionModel_EAST::TextDetectionModel_EAST(Net network)
@@ -68,23 +82,33 @@ public class TextDetectionModel_EAST extends TextDetectionModel {
 
 
     //
-    // C++:  float cv::dnn::TextDetectionModel_EAST::getConfidenceThreshold()
+    // C++:  TextDetectionModel_EAST cv::dnn::TextDetectionModel_EAST::setNMSThreshold(float nmsThreshold)
+    //
+
+    /**
+     * Set the detection NMS filter threshold
+     * @param nmsThreshold A threshold used in non maximum suppression
+     * @return automatically generated
+     */
+    public TextDetectionModel_EAST setNMSThreshold(float nmsThreshold) {
+        return new TextDetectionModel_EAST(setNMSThreshold_0(nativeObj, nmsThreshold));
+    }
+
+
+    //
+    // C++:  float cv::dnn::TextDetectionModel_EAST::getNMSThreshold()
     //
 
     // C++:   cv::dnn::TextDetectionModel_EAST::TextDetectionModel_EAST(string model, string config = "")
     private static native long TextDetectionModel_EAST_1(String model, String config);
 
 
-    //
-    // C++:  TextDetectionModel_EAST cv::dnn::TextDetectionModel_EAST::setNMSThreshold(float nmsThreshold)
-    //
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
 
     private static native long TextDetectionModel_EAST_2(String model);
-
-
-    //
-    // C++:  float cv::dnn::TextDetectionModel_EAST::getNMSThreshold()
-    //
 
     // C++:  TextDetectionModel_EAST cv::dnn::TextDetectionModel_EAST::setConfidenceThreshold(float confThreshold)
     private static native long setConfidenceThreshold_0(long nativeObj, float confThreshold);
@@ -110,34 +134,11 @@ public class TextDetectionModel_EAST extends TextDetectionModel {
     }
 
     /**
-     * Set the detection confidence threshold
-     * @param confThreshold A threshold used to filter boxes by confidences
-     * @return automatically generated
-     */
-    public TextDetectionModel_EAST setConfidenceThreshold(float confThreshold) {
-        return new TextDetectionModel_EAST(setConfidenceThreshold_0(nativeObj, confThreshold));
-    }
-
-    /**
      * Get the detection confidence threshold
      * @return automatically generated
      */
     public float getNMSThreshold() {
         return getNMSThreshold_0(nativeObj);
-    }
-
-    /**
-     * Set the detection NMS filter threshold
-     * @param nmsThreshold A threshold used in non maximum suppression
-     * @return automatically generated
-     */
-    public TextDetectionModel_EAST setNMSThreshold(float nmsThreshold) {
-        return new TextDetectionModel_EAST(setNMSThreshold_0(nativeObj, nmsThreshold));
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
     }
 
 }

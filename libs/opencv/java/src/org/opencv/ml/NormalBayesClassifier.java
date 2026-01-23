@@ -25,70 +25,6 @@ public class NormalBayesClassifier extends StatModel {
     //
 
     /**
-     * Creates empty model
-     * Use StatModel::train to train the model after creation.
-     * @return automatically generated
-     */
-    public static NormalBayesClassifier create() {
-        return NormalBayesClassifier.__fromPtr__(create_0());
-    }
-
-    /**
-     * Loads and creates a serialized NormalBayesClassifier from a file
-     *
-     * Use NormalBayesClassifier::save to serialize and store an NormalBayesClassifier to disk.
-     * Load the NormalBayesClassifier from this file again, by calling this function with the path to the file.
-     * Optionally specify the node for the file containing the classifier
-     *
-     * @param filepath path to serialized NormalBayesClassifier
-     * @param nodeName name of node containing the classifier
-     * @return automatically generated
-     */
-    public static NormalBayesClassifier load(String filepath, String nodeName) {
-        return NormalBayesClassifier.__fromPtr__(load_0(filepath, nodeName));
-    }
-
-
-    //
-    // C++: static Ptr_NormalBayesClassifier cv::ml::NormalBayesClassifier::create()
-    //
-
-    /**
-     * Loads and creates a serialized NormalBayesClassifier from a file
-     *
-     * Use NormalBayesClassifier::save to serialize and store an NormalBayesClassifier to disk.
-     * Load the NormalBayesClassifier from this file again, by calling this function with the path to the file.
-     * Optionally specify the node for the file containing the classifier
-     *
-     * @param filepath path to serialized NormalBayesClassifier
-     * @return automatically generated
-     */
-    public static NormalBayesClassifier load(String filepath) {
-        return NormalBayesClassifier.__fromPtr__(load_1(filepath));
-    }
-
-
-    //
-    // C++: static Ptr_NormalBayesClassifier cv::ml::NormalBayesClassifier::load(String filepath, String nodeName = String())
-    //
-
-    // C++:  float cv::ml::NormalBayesClassifier::predictProb(Mat inputs, Mat& outputs, Mat& outputProbs, int flags = 0)
-    private static native float predictProb_0(long nativeObj, long inputs_nativeObj, long outputs_nativeObj, long outputProbs_nativeObj, int flags);
-
-    private static native float predictProb_1(long nativeObj, long inputs_nativeObj, long outputs_nativeObj, long outputProbs_nativeObj);
-
-    // C++: static Ptr_NormalBayesClassifier cv::ml::NormalBayesClassifier::create()
-    private static native long create_0();
-
-    // C++: static Ptr_NormalBayesClassifier cv::ml::NormalBayesClassifier::load(String filepath, String nodeName = String())
-    private static native long load_0(String filepath, String nodeName);
-
-    private static native long load_1(String filepath);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    /**
      * Predicts the response for sample(s).
      *
      *     The method estimates the most probable classes for input vectors. Input vectors (one or more)
@@ -123,9 +59,74 @@ public class NormalBayesClassifier extends StatModel {
         return predictProb_1(nativeObj, inputs.nativeObj, outputs.nativeObj, outputProbs.nativeObj);
     }
 
+
+    //
+    // C++: static Ptr_NormalBayesClassifier cv::ml::NormalBayesClassifier::create()
+    //
+
+    /**
+     * Creates empty model
+     * Use StatModel::train to train the model after creation.
+     * @return automatically generated
+     */
+    public static NormalBayesClassifier create() {
+        return NormalBayesClassifier.__fromPtr__(create_0());
+    }
+
+
+    //
+    // C++: static Ptr_NormalBayesClassifier cv::ml::NormalBayesClassifier::load(String filepath, String nodeName = String())
+    //
+
+    /**
+     * Loads and creates a serialized NormalBayesClassifier from a file
+     *
+     * Use NormalBayesClassifier::save to serialize and store an NormalBayesClassifier to disk.
+     * Load the NormalBayesClassifier from this file again, by calling this function with the path to the file.
+     * Optionally specify the node for the file containing the classifier
+     *
+     * @param filepath path to serialized NormalBayesClassifier
+     * @param nodeName name of node containing the classifier
+     * @return automatically generated
+     */
+    public static NormalBayesClassifier load(String filepath, String nodeName) {
+        return NormalBayesClassifier.__fromPtr__(load_0(filepath, nodeName));
+    }
+
+    /**
+     * Loads and creates a serialized NormalBayesClassifier from a file
+     *
+     * Use NormalBayesClassifier::save to serialize and store an NormalBayesClassifier to disk.
+     * Load the NormalBayesClassifier from this file again, by calling this function with the path to the file.
+     * Optionally specify the node for the file containing the classifier
+     *
+     * @param filepath path to serialized NormalBayesClassifier
+     * @return automatically generated
+     */
+    public static NormalBayesClassifier load(String filepath) {
+        return NormalBayesClassifier.__fromPtr__(load_1(filepath));
+    }
+
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:  float cv::ml::NormalBayesClassifier::predictProb(Mat inputs, Mat& outputs, Mat& outputProbs, int flags = 0)
+    private static native float predictProb_0(long nativeObj, long inputs_nativeObj, long outputs_nativeObj, long outputProbs_nativeObj, int flags);
+    private static native float predictProb_1(long nativeObj, long inputs_nativeObj, long outputs_nativeObj, long outputProbs_nativeObj);
+
+    // C++: static Ptr_NormalBayesClassifier cv::ml::NormalBayesClassifier::create()
+    private static native long create_0();
+
+    // C++: static Ptr_NormalBayesClassifier cv::ml::NormalBayesClassifier::load(String filepath, String nodeName = String())
+    private static native long load_0(String filepath, String nodeName);
+    private static native long load_1(String filepath);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

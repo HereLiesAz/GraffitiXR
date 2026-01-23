@@ -26,6 +26,13 @@ public class ArucoDetector extends Algorithm {
 
     protected ArucoDetector(long addr) { super(addr); }
 
+    // internal usage only
+    public static ArucoDetector __fromPtr__(long addr) { return new ArucoDetector(addr); }
+
+    //
+    // C++:   cv::aruco::ArucoDetector::ArucoDetector(Dictionary dictionary = getPredefinedDictionary(cv::aruco::DICT_4X4_50), DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
+    //
+
     /**
      * Basic ArucoDetector constructor
      *
@@ -36,10 +43,6 @@ public class ArucoDetector extends Algorithm {
     public ArucoDetector(Dictionary dictionary, DetectorParameters detectorParams, RefineParameters refineParams) {
         super(ArucoDetector_0(dictionary.getNativeObjAddr(), detectorParams.getNativeObjAddr(), refineParams.getNativeObjAddr()));
     }
-
-    //
-    // C++:   cv::aruco::ArucoDetector::ArucoDetector(Dictionary dictionary = getPredefinedDictionary(cv::aruco::DICT_4X4_50), DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
-    //
 
     /**
      * Basic ArucoDetector constructor
@@ -68,9 +71,6 @@ public class ArucoDetector extends Algorithm {
         super(ArucoDetector_3());
     }
 
-    // internal usage only
-    public static ArucoDetector __fromPtr__(long addr) { return new ArucoDetector(addr); }
-
 
     //
     // C++:   cv::aruco::ArucoDetector::ArucoDetector(vector_Dictionary dictionaries, DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
@@ -82,135 +82,6 @@ public class ArucoDetector extends Algorithm {
     //
     // C++:  void cv::aruco::ArucoDetector::detectMarkers(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat())
     //
-
-    // C++:   cv::aruco::ArucoDetector::ArucoDetector(Dictionary dictionary = getPredefinedDictionary(cv::aruco::DICT_4X4_50), DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
-    private static native long ArucoDetector_0(long dictionary_nativeObj, long detectorParams_nativeObj, long refineParams_nativeObj);
-
-    private static native long ArucoDetector_1(long dictionary_nativeObj, long detectorParams_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::detectMarkersWithConfidence(Mat image, vector_Mat& corners, Mat& ids, Mat& markersConfidence, vector_Mat& rejectedImgPoints = vector_Mat())
-    //
-
-    private static native long ArucoDetector_2(long dictionary_nativeObj);
-
-    private static native long ArucoDetector_3();
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::refineDetectedMarkers(Mat image, Board board, vector_Mat& detectedCorners, Mat& detectedIds, vector_Mat& rejectedCorners, Mat cameraMatrix = Mat(), Mat distCoeffs = Mat(), Mat& recoveredIdxs = Mat())
-    //
-
-    // C++:  void cv::aruco::ArucoDetector::detectMarkers(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat())
-    private static native void detectMarkers_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj);
-
-    private static native void detectMarkers_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj);
-
-    // C++:  void cv::aruco::ArucoDetector::detectMarkersWithConfidence(Mat image, vector_Mat& corners, Mat& ids, Mat& markersConfidence, vector_Mat& rejectedImgPoints = vector_Mat())
-    private static native void detectMarkersWithConfidence_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long markersConfidence_nativeObj, long rejectedImgPoints_mat_nativeObj);
-
-    private static native void detectMarkersWithConfidence_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long markersConfidence_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::detectMarkersMultiDict(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat(), Mat& dictIndices = Mat())
-    //
-
-    // C++:  void cv::aruco::ArucoDetector::refineDetectedMarkers(Mat image, Board board, vector_Mat& detectedCorners, Mat& detectedIds, vector_Mat& rejectedCorners, Mat cameraMatrix = Mat(), Mat distCoeffs = Mat(), Mat& recoveredIdxs = Mat())
-    private static native void refineDetectedMarkers_0(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj, long recoveredIdxs_nativeObj);
-
-    private static native void refineDetectedMarkers_1(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj);
-
-    private static native void refineDetectedMarkers_2(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj);
-
-
-    //
-    // C++:  Dictionary cv::aruco::ArucoDetector::getDictionary()
-    //
-
-    private static native void refineDetectedMarkers_3(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::setDictionary(Dictionary dictionary)
-    //
-
-    // C++:  void cv::aruco::ArucoDetector::detectMarkersMultiDict(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat(), Mat& dictIndices = Mat())
-    private static native void detectMarkersMultiDict_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj, long dictIndices_nativeObj);
-
-
-    //
-    // C++:  vector_Dictionary cv::aruco::ArucoDetector::getDictionaries()
-    //
-
-    // Return type 'vector_Dictionary' is not supported, skipping the function
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::setDictionaries(vector_Dictionary dictionaries)
-    //
-
-    // Unknown type 'vector_Dictionary' (I), skipping the function
-
-
-    //
-    // C++:  DetectorParameters cv::aruco::ArucoDetector::getDetectorParameters()
-    //
-
-    private static native void detectMarkersMultiDict_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::setDetectorParameters(DetectorParameters detectorParameters)
-    //
-
-    private static native void detectMarkersMultiDict_2(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj);
-
-
-    //
-    // C++:  RefineParameters cv::aruco::ArucoDetector::getRefineParameters()
-    //
-
-    // C++:  Dictionary cv::aruco::ArucoDetector::getDictionary()
-    private static native long getDictionary_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::setRefineParameters(RefineParameters refineParameters)
-    //
-
-    // C++:  void cv::aruco::ArucoDetector::setDictionary(Dictionary dictionary)
-    private static native void setDictionary_0(long nativeObj, long dictionary_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::write(FileStorage fs, String name)
-    //
-
-    // Unknown type 'FileStorage' (I), skipping the function
-
-
-    //
-    // C++:  void cv::aruco::ArucoDetector::read(FileNode fn)
-    //
-
-    // Unknown type 'FileNode' (I), skipping the function
-
-    // C++:  DetectorParameters cv::aruco::ArucoDetector::getDetectorParameters()
-    private static native long getDetectorParameters_0(long nativeObj);
-
-    // C++:  void cv::aruco::ArucoDetector::setDetectorParameters(DetectorParameters detectorParameters)
-    private static native void setDetectorParameters_0(long nativeObj, long detectorParameters_nativeObj);
-
-    // C++:  RefineParameters cv::aruco::ArucoDetector::getRefineParameters()
-    private static native long getRefineParameters_0(long nativeObj);
-
-    // C++:  void cv::aruco::ArucoDetector::setRefineParameters(RefineParameters refineParameters)
-    private static native void setRefineParameters_0(long nativeObj, long refineParameters_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
 
     /**
      * Basic marker detection
@@ -269,6 +140,11 @@ public class ArucoDetector extends Algorithm {
         Converters.Mat_to_vector_Mat(corners_mat, corners);
         corners_mat.release();
     }
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::detectMarkersWithConfidence(Mat image, vector_Mat& corners, Mat& ids, Mat& markersConfidence, vector_Mat& rejectedImgPoints = vector_Mat())
+    //
 
     /**
      * Marker detection with confidence computation
@@ -335,6 +211,11 @@ public class ArucoDetector extends Algorithm {
         Converters.Mat_to_vector_Mat(corners_mat, corners);
         corners_mat.release();
     }
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::refineDetectedMarkers(Mat image, Board board, vector_Mat& detectedCorners, Mat& detectedIds, vector_Mat& rejectedCorners, Mat cameraMatrix = Mat(), Mat distCoeffs = Mat(), Mat& recoveredIdxs = Mat())
+    //
 
     /**
      * Refine not detected markers based on the already detected and the board layout
@@ -470,6 +351,11 @@ public class ArucoDetector extends Algorithm {
         rejectedCorners_mat.release();
     }
 
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::detectMarkersMultiDict(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat(), Mat& dictIndices = Mat())
+    //
+
     /**
      * Basic marker detection
      *
@@ -563,6 +449,11 @@ public class ArucoDetector extends Algorithm {
         corners_mat.release();
     }
 
+
+    //
+    // C++:  Dictionary cv::aruco::ArucoDetector::getDictionary()
+    //
+
     /**
      * Returns first dictionary from internal list used for marker detection.
      *
@@ -571,6 +462,11 @@ public class ArucoDetector extends Algorithm {
     public Dictionary getDictionary() {
         return new Dictionary(getDictionary_0(nativeObj));
     }
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::setDictionary(Dictionary dictionary)
+    //
 
     /**
      * Sets and replaces the first dictionary in internal list to be used for marker detection.
@@ -581,25 +477,122 @@ public class ArucoDetector extends Algorithm {
         setDictionary_0(nativeObj, dictionary.getNativeObjAddr());
     }
 
+
+    //
+    // C++:  vector_Dictionary cv::aruco::ArucoDetector::getDictionaries()
+    //
+
+    // Return type 'vector_Dictionary' is not supported, skipping the function
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::setDictionaries(vector_Dictionary dictionaries)
+    //
+
+    // Unknown type 'vector_Dictionary' (I), skipping the function
+
+
+    //
+    // C++:  DetectorParameters cv::aruco::ArucoDetector::getDetectorParameters()
+    //
+
     public DetectorParameters getDetectorParameters() {
         return new DetectorParameters(getDetectorParameters_0(nativeObj));
     }
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::setDetectorParameters(DetectorParameters detectorParameters)
+    //
 
     public void setDetectorParameters(DetectorParameters detectorParameters) {
         setDetectorParameters_0(nativeObj, detectorParameters.getNativeObjAddr());
     }
 
+
+    //
+    // C++:  RefineParameters cv::aruco::ArucoDetector::getRefineParameters()
+    //
+
     public RefineParameters getRefineParameters() {
         return new RefineParameters(getRefineParameters_0(nativeObj));
     }
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::setRefineParameters(RefineParameters refineParameters)
+    //
 
     public void setRefineParameters(RefineParameters refineParameters) {
         setRefineParameters_0(nativeObj, refineParameters.getNativeObjAddr());
     }
 
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::write(FileStorage fs, String name)
+    //
+
+    // Unknown type 'FileStorage' (I), skipping the function
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::read(FileNode fn)
+    //
+
+    // Unknown type 'FileNode' (I), skipping the function
+
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:   cv::aruco::ArucoDetector::ArucoDetector(Dictionary dictionary = getPredefinedDictionary(cv::aruco::DICT_4X4_50), DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
+    private static native long ArucoDetector_0(long dictionary_nativeObj, long detectorParams_nativeObj, long refineParams_nativeObj);
+    private static native long ArucoDetector_1(long dictionary_nativeObj, long detectorParams_nativeObj);
+    private static native long ArucoDetector_2(long dictionary_nativeObj);
+    private static native long ArucoDetector_3();
+
+    // C++:  void cv::aruco::ArucoDetector::detectMarkers(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat())
+    private static native void detectMarkers_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj);
+    private static native void detectMarkers_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj);
+
+    // C++:  void cv::aruco::ArucoDetector::detectMarkersWithConfidence(Mat image, vector_Mat& corners, Mat& ids, Mat& markersConfidence, vector_Mat& rejectedImgPoints = vector_Mat())
+    private static native void detectMarkersWithConfidence_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long markersConfidence_nativeObj, long rejectedImgPoints_mat_nativeObj);
+    private static native void detectMarkersWithConfidence_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long markersConfidence_nativeObj);
+
+    // C++:  void cv::aruco::ArucoDetector::refineDetectedMarkers(Mat image, Board board, vector_Mat& detectedCorners, Mat& detectedIds, vector_Mat& rejectedCorners, Mat cameraMatrix = Mat(), Mat distCoeffs = Mat(), Mat& recoveredIdxs = Mat())
+    private static native void refineDetectedMarkers_0(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj, long recoveredIdxs_nativeObj);
+    private static native void refineDetectedMarkers_1(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj);
+    private static native void refineDetectedMarkers_2(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj);
+    private static native void refineDetectedMarkers_3(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj);
+
+    // C++:  void cv::aruco::ArucoDetector::detectMarkersMultiDict(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat(), Mat& dictIndices = Mat())
+    private static native void detectMarkersMultiDict_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj, long dictIndices_nativeObj);
+    private static native void detectMarkersMultiDict_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj);
+    private static native void detectMarkersMultiDict_2(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj);
+
+    // C++:  Dictionary cv::aruco::ArucoDetector::getDictionary()
+    private static native long getDictionary_0(long nativeObj);
+
+    // C++:  void cv::aruco::ArucoDetector::setDictionary(Dictionary dictionary)
+    private static native void setDictionary_0(long nativeObj, long dictionary_nativeObj);
+
+    // C++:  DetectorParameters cv::aruco::ArucoDetector::getDetectorParameters()
+    private static native long getDetectorParameters_0(long nativeObj);
+
+    // C++:  void cv::aruco::ArucoDetector::setDetectorParameters(DetectorParameters detectorParameters)
+    private static native void setDetectorParameters_0(long nativeObj, long detectorParameters_nativeObj);
+
+    // C++:  RefineParameters cv::aruco::ArucoDetector::getRefineParameters()
+    private static native long getRefineParameters_0(long nativeObj);
+
+    // C++:  void cv::aruco::ArucoDetector::setRefineParameters(RefineParameters refineParameters)
+    private static native void setRefineParameters_0(long nativeObj, long refineParameters_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

@@ -32,6 +32,16 @@ public class Board {
       
     }
 
+    // internal usage only
+    public static Board __fromPtr__(long addr) { return new Board(addr); }
+
+    // C++:   cv::aruco::Board::Board(vector_Mat objPoints, Dictionary dictionary, Mat ids)
+    private static native long Board_0(long objPoints_mat_nativeObj, long dictionary_nativeObj, long ids_nativeObj);
+
+    //
+    // C++:   cv::aruco::Board::Board(vector_Mat objPoints, Dictionary dictionary, Mat ids)
+    //
+
     /**
      * Common Board constructor
      *
@@ -44,72 +54,10 @@ public class Board {
         nativeObj = Board_0(objPoints_mat.nativeObj, dictionary.getNativeObjAddr(), ids.nativeObj);
     }
 
-    // internal usage only
-    public static Board __fromPtr__(long addr) { return new Board(addr); }
-
-    //
-    // C++:   cv::aruco::Board::Board(vector_Mat objPoints, Dictionary dictionary, Mat ids)
-    //
-
-    // C++:   cv::aruco::Board::Board(vector_Mat objPoints, Dictionary dictionary, Mat ids)
-    private static native long Board_0(long objPoints_mat_nativeObj, long dictionary_nativeObj, long ids_nativeObj);
-
 
     //
     // C++:  Dictionary cv::aruco::Board::getDictionary()
     //
-
-    // C++:  Dictionary cv::aruco::Board::getDictionary()
-    private static native long getDictionary_0(long nativeObj);
-
-
-    //
-    // C++:  vector_vector_Point3f cv::aruco::Board::getObjPoints()
-    //
-
-    // C++:  vector_vector_Point3f cv::aruco::Board::getObjPoints()
-    private static native long getObjPoints_0(long nativeObj);
-
-
-    //
-    // C++:  vector_int cv::aruco::Board::getIds()
-    //
-
-    // C++:  vector_int cv::aruco::Board::getIds()
-    private static native long getIds_0(long nativeObj);
-
-
-    //
-    // C++:  Point3f cv::aruco::Board::getRightBottomCorner()
-    //
-
-    // C++:  Point3f cv::aruco::Board::getRightBottomCorner()
-    private static native double[] getRightBottomCorner_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::Board::matchImagePoints(vector_Mat detectedCorners, Mat detectedIds, Mat& objPoints, Mat& imgPoints)
-    //
-
-    // C++:  void cv::aruco::Board::matchImagePoints(vector_Mat detectedCorners, Mat detectedIds, Mat& objPoints, Mat& imgPoints)
-    private static native void matchImagePoints_0(long nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long objPoints_nativeObj, long imgPoints_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::Board::generateImage(Size outSize, Mat& img, int marginSize = 0, int borderBits = 1)
-    //
-
-    // C++:  void cv::aruco::Board::generateImage(Size outSize, Mat& img, int marginSize = 0, int borderBits = 1)
-    private static native void generateImage_0(long nativeObj, double outSize_width, double outSize_height, long img_nativeObj, int marginSize, int borderBits);
-
-    private static native void generateImage_1(long nativeObj, double outSize_width, double outSize_height, long img_nativeObj, int marginSize);
-
-    private static native void generateImage_2(long nativeObj, double outSize_width, double outSize_height, long img_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    public long getNativeObjAddr() { return nativeObj; }
 
     /**
      * return the Dictionary of markers employed for this board
@@ -118,6 +66,11 @@ public class Board {
     public Dictionary getDictionary() {
         return new Dictionary(getDictionary_0(nativeObj));
     }
+
+
+    //
+    // C++:  vector_vector_Point3f cv::aruco::Board::getObjPoints()
+    //
 
     /**
      * return array of object points of all the marker corners in the board.
@@ -138,6 +91,11 @@ public class Board {
         return retVal;
     }
 
+
+    //
+    // C++:  vector_int cv::aruco::Board::getIds()
+    //
+
     /**
      * vector of the identifiers of the markers in the board (should be the same size as objPoints)
      * @return vector of the identifiers of the markers
@@ -146,6 +104,11 @@ public class Board {
         return MatOfInt.fromNativeAddr(getIds_0(nativeObj));
     }
 
+
+    //
+    // C++:  Point3f cv::aruco::Board::getRightBottomCorner()
+    //
+
     /**
      * get coordinate of the bottom right corner of the board, is set when calling the function create()
      * @return automatically generated
@@ -153,6 +116,11 @@ public class Board {
     public Point3 getRightBottomCorner() {
         return new Point3(getRightBottomCorner_0(nativeObj));
     }
+
+
+    //
+    // C++:  void cv::aruco::Board::matchImagePoints(vector_Mat detectedCorners, Mat detectedIds, Mat& objPoints, Mat& imgPoints)
+    //
 
     /**
      * Given a board configuration and a set of detected markers, returns the corresponding
@@ -177,6 +145,11 @@ public class Board {
         Mat detectedCorners_mat = Converters.vector_Mat_to_Mat(detectedCorners);
         matchImagePoints_0(nativeObj, detectedCorners_mat.nativeObj, detectedIds.nativeObj, objPoints.nativeObj, imgPoints.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::aruco::Board::generateImage(Size outSize, Mat& img, int marginSize = 0, int borderBits = 1)
+    //
 
     /**
      * Draw a planar board
@@ -220,9 +193,37 @@ public class Board {
         generateImage_2(nativeObj, outSize.width, outSize.height, img.nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+    // C++:  Dictionary cv::aruco::Board::getDictionary()
+    private static native long getDictionary_0(long nativeObj);
+
+    // C++:  vector_vector_Point3f cv::aruco::Board::getObjPoints()
+    private static native long getObjPoints_0(long nativeObj);
+
+    // C++:  vector_int cv::aruco::Board::getIds()
+    private static native long getIds_0(long nativeObj);
+
+    // C++:  Point3f cv::aruco::Board::getRightBottomCorner()
+    private static native double[] getRightBottomCorner_0(long nativeObj);
+
+    // C++:  void cv::aruco::Board::matchImagePoints(vector_Mat detectedCorners, Mat detectedIds, Mat& objPoints, Mat& imgPoints)
+    private static native void matchImagePoints_0(long nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long objPoints_nativeObj, long imgPoints_nativeObj);
+
+    // C++:  void cv::aruco::Board::generateImage(Size outSize, Mat& img, int marginSize = 0, int borderBits = 1)
+    private static native void generateImage_0(long nativeObj, double outSize_width, double outSize_height, long img_nativeObj, int marginSize, int borderBits);
+
+    private static native void generateImage_1(long nativeObj, double outSize_width, double outSize_height, long img_nativeObj, int marginSize);
+
+    private static native void generateImage_2(long nativeObj, double outSize_width, double outSize_height, long img_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public long getNativeObjAddr() { return nativeObj; }
 
 }

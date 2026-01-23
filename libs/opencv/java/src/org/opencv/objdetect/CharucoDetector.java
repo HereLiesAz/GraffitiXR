@@ -19,6 +19,13 @@ public class CharucoDetector extends Algorithm {
 
     protected CharucoDetector(long addr) { super(addr); }
 
+    // internal usage only
+    public static CharucoDetector __fromPtr__(long addr) { return new CharucoDetector(addr); }
+
+    //
+    // C++:   cv::aruco::CharucoDetector::CharucoDetector(CharucoBoard board, CharucoParameters charucoParams = CharucoParameters(), DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
+    //
+
     /**
      * Basic CharucoDetector constructor
      *
@@ -30,10 +37,6 @@ public class CharucoDetector extends Algorithm {
     public CharucoDetector(CharucoBoard board, CharucoParameters charucoParams, DetectorParameters detectorParams, RefineParameters refineParams) {
         super(CharucoDetector_0(board.getNativeObjAddr(), charucoParams.getNativeObjAddr(), detectorParams.getNativeObjAddr(), refineParams.getNativeObjAddr()));
     }
-
-    //
-    // C++:   cv::aruco::CharucoDetector::CharucoDetector(CharucoBoard board, CharucoParameters charucoParams = CharucoParameters(), DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
-    //
 
     /**
      * Basic CharucoDetector constructor
@@ -65,140 +68,82 @@ public class CharucoDetector extends Algorithm {
         super(CharucoDetector_3(board.getNativeObjAddr()));
     }
 
-    // internal usage only
-    public static CharucoDetector __fromPtr__(long addr) { return new CharucoDetector(addr); }
-
 
     //
     // C++:  CharucoBoard cv::aruco::CharucoDetector::getBoard()
     //
-
-    // C++:   cv::aruco::CharucoDetector::CharucoDetector(CharucoBoard board, CharucoParameters charucoParams = CharucoParameters(), DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
-    private static native long CharucoDetector_0(long board_nativeObj, long charucoParams_nativeObj, long detectorParams_nativeObj, long refineParams_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::CharucoDetector::setBoard(CharucoBoard board)
-    //
-
-    private static native long CharucoDetector_1(long board_nativeObj, long charucoParams_nativeObj, long detectorParams_nativeObj);
-
-
-    //
-    // C++:  CharucoParameters cv::aruco::CharucoDetector::getCharucoParameters()
-    //
-
-    private static native long CharucoDetector_2(long board_nativeObj, long charucoParams_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::CharucoDetector::setCharucoParameters(CharucoParameters charucoParameters)
-    //
-
-    private static native long CharucoDetector_3(long board_nativeObj);
-
-
-    //
-    // C++:  DetectorParameters cv::aruco::CharucoDetector::getDetectorParameters()
-    //
-
-    // C++:  CharucoBoard cv::aruco::CharucoDetector::getBoard()
-    private static native long getBoard_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::CharucoDetector::setDetectorParameters(DetectorParameters detectorParameters)
-    //
-
-    // C++:  void cv::aruco::CharucoDetector::setBoard(CharucoBoard board)
-    private static native void setBoard_0(long nativeObj, long board_nativeObj);
-
-
-    //
-    // C++:  RefineParameters cv::aruco::CharucoDetector::getRefineParameters()
-    //
-
-    // C++:  CharucoParameters cv::aruco::CharucoDetector::getCharucoParameters()
-    private static native long getCharucoParameters_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::CharucoDetector::setRefineParameters(RefineParameters refineParameters)
-    //
-
-    // C++:  void cv::aruco::CharucoDetector::setCharucoParameters(CharucoParameters charucoParameters)
-    private static native void setCharucoParameters_0(long nativeObj, long charucoParameters_nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::CharucoDetector::detectBoard(Mat image, Mat& charucoCorners, Mat& charucoIds, vector_Mat& markerCorners = vector_Mat(), Mat& markerIds = Mat())
-    //
-
-    // C++:  DetectorParameters cv::aruco::CharucoDetector::getDetectorParameters()
-    private static native long getDetectorParameters_0(long nativeObj);
-
-    // C++:  void cv::aruco::CharucoDetector::setDetectorParameters(DetectorParameters detectorParameters)
-    private static native void setDetectorParameters_0(long nativeObj, long detectorParameters_nativeObj);
-
-    // C++:  RefineParameters cv::aruco::CharucoDetector::getRefineParameters()
-    private static native long getRefineParameters_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::aruco::CharucoDetector::detectDiamonds(Mat image, vector_Mat& diamondCorners, Mat& diamondIds, vector_Mat& markerCorners = vector_Mat(), Mat& markerIds = Mat())
-    //
-
-    // C++:  void cv::aruco::CharucoDetector::setRefineParameters(RefineParameters refineParameters)
-    private static native void setRefineParameters_0(long nativeObj, long refineParameters_nativeObj);
-
-    // C++:  void cv::aruco::CharucoDetector::detectBoard(Mat image, Mat& charucoCorners, Mat& charucoIds, vector_Mat& markerCorners = vector_Mat(), Mat& markerIds = Mat())
-    private static native void detectBoard_0(long nativeObj, long image_nativeObj, long charucoCorners_nativeObj, long charucoIds_nativeObj, long markerCorners_mat_nativeObj, long markerIds_nativeObj);
-
-    private static native void detectBoard_1(long nativeObj, long image_nativeObj, long charucoCorners_nativeObj, long charucoIds_nativeObj, long markerCorners_mat_nativeObj);
-
-    private static native void detectBoard_2(long nativeObj, long image_nativeObj, long charucoCorners_nativeObj, long charucoIds_nativeObj);
-
-    // C++:  void cv::aruco::CharucoDetector::detectDiamonds(Mat image, vector_Mat& diamondCorners, Mat& diamondIds, vector_Mat& markerCorners = vector_Mat(), Mat& markerIds = Mat())
-    private static native void detectDiamonds_0(long nativeObj, long image_nativeObj, long diamondCorners_mat_nativeObj, long diamondIds_nativeObj, long markerCorners_mat_nativeObj, long markerIds_nativeObj);
-
-    private static native void detectDiamonds_1(long nativeObj, long image_nativeObj, long diamondCorners_mat_nativeObj, long diamondIds_nativeObj, long markerCorners_mat_nativeObj);
-
-    private static native void detectDiamonds_2(long nativeObj, long image_nativeObj, long diamondCorners_mat_nativeObj, long diamondIds_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
 
     public CharucoBoard getBoard() {
         return new CharucoBoard(getBoard_0(nativeObj));
     }
 
+
+    //
+    // C++:  void cv::aruco::CharucoDetector::setBoard(CharucoBoard board)
+    //
+
     public void setBoard(CharucoBoard board) {
         setBoard_0(nativeObj, board.getNativeObjAddr());
     }
+
+
+    //
+    // C++:  CharucoParameters cv::aruco::CharucoDetector::getCharucoParameters()
+    //
 
     public CharucoParameters getCharucoParameters() {
         return new CharucoParameters(getCharucoParameters_0(nativeObj));
     }
 
+
+    //
+    // C++:  void cv::aruco::CharucoDetector::setCharucoParameters(CharucoParameters charucoParameters)
+    //
+
     public void setCharucoParameters(CharucoParameters charucoParameters) {
         setCharucoParameters_0(nativeObj, charucoParameters.getNativeObjAddr());
     }
+
+
+    //
+    // C++:  DetectorParameters cv::aruco::CharucoDetector::getDetectorParameters()
+    //
 
     public DetectorParameters getDetectorParameters() {
         return new DetectorParameters(getDetectorParameters_0(nativeObj));
     }
 
+
+    //
+    // C++:  void cv::aruco::CharucoDetector::setDetectorParameters(DetectorParameters detectorParameters)
+    //
+
     public void setDetectorParameters(DetectorParameters detectorParameters) {
         setDetectorParameters_0(nativeObj, detectorParameters.getNativeObjAddr());
     }
+
+
+    //
+    // C++:  RefineParameters cv::aruco::CharucoDetector::getRefineParameters()
+    //
 
     public RefineParameters getRefineParameters() {
         return new RefineParameters(getRefineParameters_0(nativeObj));
     }
 
+
+    //
+    // C++:  void cv::aruco::CharucoDetector::setRefineParameters(RefineParameters refineParameters)
+    //
+
     public void setRefineParameters(RefineParameters refineParameters) {
         setRefineParameters_0(nativeObj, refineParameters.getNativeObjAddr());
     }
+
+
+    //
+    // C++:  void cv::aruco::CharucoDetector::detectBoard(Mat image, Mat& charucoCorners, Mat& charucoIds, vector_Mat& markerCorners = vector_Mat(), Mat& markerIds = Mat())
+    //
 
     /**
      * detect aruco markers and interpolate position of ChArUco board corners
@@ -290,6 +235,11 @@ public class CharucoDetector extends Algorithm {
         detectBoard_2(nativeObj, image.nativeObj, charucoCorners.nativeObj, charucoIds.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::aruco::CharucoDetector::detectDiamonds(Mat image, vector_Mat& diamondCorners, Mat& diamondIds, vector_Mat& markerCorners = vector_Mat(), Mat& markerIds = Mat())
+    //
+
     /**
      * Detect ChArUco Diamond markers
      *
@@ -374,9 +324,55 @@ public class CharucoDetector extends Algorithm {
         diamondCorners_mat.release();
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:   cv::aruco::CharucoDetector::CharucoDetector(CharucoBoard board, CharucoParameters charucoParams = CharucoParameters(), DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
+    private static native long CharucoDetector_0(long board_nativeObj, long charucoParams_nativeObj, long detectorParams_nativeObj, long refineParams_nativeObj);
+    private static native long CharucoDetector_1(long board_nativeObj, long charucoParams_nativeObj, long detectorParams_nativeObj);
+    private static native long CharucoDetector_2(long board_nativeObj, long charucoParams_nativeObj);
+    private static native long CharucoDetector_3(long board_nativeObj);
+
+    // C++:  CharucoBoard cv::aruco::CharucoDetector::getBoard()
+    private static native long getBoard_0(long nativeObj);
+
+    // C++:  void cv::aruco::CharucoDetector::setBoard(CharucoBoard board)
+    private static native void setBoard_0(long nativeObj, long board_nativeObj);
+
+    // C++:  CharucoParameters cv::aruco::CharucoDetector::getCharucoParameters()
+    private static native long getCharucoParameters_0(long nativeObj);
+
+    // C++:  void cv::aruco::CharucoDetector::setCharucoParameters(CharucoParameters charucoParameters)
+    private static native void setCharucoParameters_0(long nativeObj, long charucoParameters_nativeObj);
+
+    // C++:  DetectorParameters cv::aruco::CharucoDetector::getDetectorParameters()
+    private static native long getDetectorParameters_0(long nativeObj);
+
+    // C++:  void cv::aruco::CharucoDetector::setDetectorParameters(DetectorParameters detectorParameters)
+    private static native void setDetectorParameters_0(long nativeObj, long detectorParameters_nativeObj);
+
+    // C++:  RefineParameters cv::aruco::CharucoDetector::getRefineParameters()
+    private static native long getRefineParameters_0(long nativeObj);
+
+    // C++:  void cv::aruco::CharucoDetector::setRefineParameters(RefineParameters refineParameters)
+    private static native void setRefineParameters_0(long nativeObj, long refineParameters_nativeObj);
+
+    // C++:  void cv::aruco::CharucoDetector::detectBoard(Mat image, Mat& charucoCorners, Mat& charucoIds, vector_Mat& markerCorners = vector_Mat(), Mat& markerIds = Mat())
+    private static native void detectBoard_0(long nativeObj, long image_nativeObj, long charucoCorners_nativeObj, long charucoIds_nativeObj, long markerCorners_mat_nativeObj, long markerIds_nativeObj);
+    private static native void detectBoard_1(long nativeObj, long image_nativeObj, long charucoCorners_nativeObj, long charucoIds_nativeObj, long markerCorners_mat_nativeObj);
+    private static native void detectBoard_2(long nativeObj, long image_nativeObj, long charucoCorners_nativeObj, long charucoIds_nativeObj);
+
+    // C++:  void cv::aruco::CharucoDetector::detectDiamonds(Mat image, vector_Mat& diamondCorners, Mat& diamondIds, vector_Mat& markerCorners = vector_Mat(), Mat& markerIds = Mat())
+    private static native void detectDiamonds_0(long nativeObj, long image_nativeObj, long diamondCorners_mat_nativeObj, long diamondIds_nativeObj, long markerCorners_mat_nativeObj, long markerIds_nativeObj);
+    private static native void detectDiamonds_1(long nativeObj, long image_nativeObj, long diamondCorners_mat_nativeObj, long diamondIds_nativeObj, long markerCorners_mat_nativeObj);
+    private static native void detectDiamonds_2(long nativeObj, long image_nativeObj, long diamondCorners_mat_nativeObj, long diamondIds_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

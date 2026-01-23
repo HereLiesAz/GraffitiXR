@@ -20,16 +20,32 @@ import org.opencv.utils.Converters;
  */
 public class QRCodeEncoder {
 
+    protected final long nativeObj;
+    protected QRCodeEncoder(long addr) {
+      nativeObj = addr;
+      
+    }
+
+    // internal usage only
+    public static QRCodeEncoder __fromPtr__(long addr) { return new QRCodeEncoder(addr); }
+
+    // C++: static Ptr_QRCodeEncoder cv::QRCodeEncoder::create(QRCodeEncoder_Params parameters = QRCodeEncoder::Params())
+    private static native long create_0(long parameters_nativeObj);
+
     // C++: enum CorrectionLevel (cv.QRCodeEncoder.CorrectionLevel)
     public static final int
             CORRECT_LEVEL_L = 0,
             CORRECT_LEVEL_M = 1,
             CORRECT_LEVEL_Q = 2,
             CORRECT_LEVEL_H = 3;
+
+
     // C++: enum ECIEncodings (cv.QRCodeEncoder.ECIEncodings)
     public static final int
             ECI_SHIFT_JIS = 20,
             ECI_UTF8 = 26;
+
+
     // C++: enum EncodeMode (cv.QRCodeEncoder.EncodeMode)
     public static final int
             MODE_AUTO = -1,
@@ -39,15 +55,11 @@ public class QRCodeEncoder {
             MODE_ECI = 7,
             MODE_KANJI = 8,
             MODE_STRUCTURED_APPEND = 3;
-    protected final long nativeObj;
 
-    protected QRCodeEncoder(long addr) {
-      nativeObj = addr;
 
-    }
-
-    // internal usage only
-    public static QRCodeEncoder __fromPtr__(long addr) { return new QRCodeEncoder(addr); }
+    //
+    // C++: static Ptr_QRCodeEncoder cv::QRCodeEncoder::create(QRCodeEncoder_Params parameters = QRCodeEncoder::Params())
+    //
 
     /**
      * Constructor
@@ -58,11 +70,6 @@ public class QRCodeEncoder {
         return QRCodeEncoder.__fromPtr__(create_0(parameters.getNativeObjAddr()));
     }
 
-
-    //
-    // C++: static Ptr_QRCodeEncoder cv::QRCodeEncoder::create(QRCodeEncoder_Params parameters = QRCodeEncoder::Params())
-    //
-
     /**
      * Constructor
      * @return automatically generated
@@ -71,33 +78,10 @@ public class QRCodeEncoder {
         return QRCodeEncoder.__fromPtr__(create_1());
     }
 
-    // C++: static Ptr_QRCodeEncoder cv::QRCodeEncoder::create(QRCodeEncoder_Params parameters = QRCodeEncoder::Params())
-    private static native long create_0(long parameters_nativeObj);
-
 
     //
     // C++:  void cv::QRCodeEncoder::encode(String encoded_info, Mat& qrcode)
     //
-
-    private static native long create_1();
-
-
-    //
-    // C++:  void cv::QRCodeEncoder::encodeStructuredAppend(String encoded_info, vector_Mat& qrcodes)
-    //
-
-    // C++:  void cv::QRCodeEncoder::encode(String encoded_info, Mat& qrcode)
-    private static native void encode_0(long nativeObj, String encoded_info, long qrcode_nativeObj);
-
-    // C++:  void cv::QRCodeEncoder::encodeStructuredAppend(String encoded_info, vector_Mat& qrcodes)
-    private static native void encodeStructuredAppend_0(long nativeObj, String encoded_info, long qrcodes_mat_nativeObj);
-
-private static native void encode_1(long nativeObj, byte[] encoded_info, long qrcode_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    public long getNativeObjAddr() { return nativeObj; }
 
     /**
      * Generates QR code from input string.
@@ -107,6 +91,11 @@ private static native void encode_1(long nativeObj, byte[] encoded_info, long qr
     public void encode(String encoded_info, Mat qrcode) {
         encode_0(nativeObj, encoded_info, qrcode.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::QRCodeEncoder::encodeStructuredAppend(String encoded_info, vector_Mat& qrcodes)
+    //
 
     /**
      * Generates QR code from input string in Structured Append mode. The encoded message is splitting over a number of QR codes.
@@ -120,6 +109,8 @@ private static native void encode_1(long nativeObj, byte[] encoded_info, long qr
         qrcodes_mat.release();
     }
 
+
+
 /** Generates QR code from input string.
 @param encoded_info Input bytes to encode.
 @param qrcode Generated QR code.
@@ -128,9 +119,25 @@ public void encode(byte[] encoded_info, Mat qrcode) {
     encode_1(nativeObj, encoded_info, qrcode.nativeObj);
 }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+    private static native long create_1();
+
+    // C++:  void cv::QRCodeEncoder::encode(String encoded_info, Mat& qrcode)
+    private static native void encode_0(long nativeObj, String encoded_info, long qrcode_nativeObj);
+
+    // C++:  void cv::QRCodeEncoder::encodeStructuredAppend(String encoded_info, vector_Mat& qrcodes)
+    private static native void encodeStructuredAppend_0(long nativeObj, String encoded_info, long qrcodes_mat_nativeObj);
+
+private static native void encode_1(long nativeObj, byte[] encoded_info, long qrcode_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public long getNativeObjAddr() { return nativeObj; }
 
 }

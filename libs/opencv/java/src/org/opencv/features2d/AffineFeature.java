@@ -82,25 +82,45 @@ public class AffineFeature extends Feature2D {
     // C++:  void cv::AffineFeature::setViewParams(vector_float tilts, vector_float rolls)
     //
 
-    // C++: static Ptr_AffineFeature cv::AffineFeature::create(Ptr_Feature2D backend, int maxTilt = 5, int minTilt = 0, float tiltStep = 1.4142135623730951f, float rotateStepBase = 72)
-    private static native long create_0(long backend_nativeObj, int maxTilt, int minTilt, float tiltStep, float rotateStepBase);
+    public void setViewParams(MatOfFloat tilts, MatOfFloat rolls) {
+        Mat tilts_mat = tilts;
+        Mat rolls_mat = rolls;
+        setViewParams_0(nativeObj, tilts_mat.nativeObj, rolls_mat.nativeObj);
+    }
 
 
     //
     // C++:  void cv::AffineFeature::getViewParams(vector_float tilts, vector_float rolls)
     //
 
-    private static native long create_1(long backend_nativeObj, int maxTilt, int minTilt, float tiltStep);
+    public void getViewParams(MatOfFloat tilts, MatOfFloat rolls) {
+        Mat tilts_mat = tilts;
+        Mat rolls_mat = rolls;
+        getViewParams_0(nativeObj, tilts_mat.nativeObj, rolls_mat.nativeObj);
+    }
 
 
     //
     // C++:  String cv::AffineFeature::getDefaultName()
     //
 
+    public String getDefaultName() {
+        return getDefaultName_0(nativeObj);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
+    // C++: static Ptr_AffineFeature cv::AffineFeature::create(Ptr_Feature2D backend, int maxTilt = 5, int minTilt = 0, float tiltStep = 1.4142135623730951f, float rotateStepBase = 72)
+    private static native long create_0(long backend_nativeObj, int maxTilt, int minTilt, float tiltStep, float rotateStepBase);
+    private static native long create_1(long backend_nativeObj, int maxTilt, int minTilt, float tiltStep);
     private static native long create_2(long backend_nativeObj, int maxTilt, int minTilt);
-
     private static native long create_3(long backend_nativeObj, int maxTilt);
-
     private static native long create_4(long backend_nativeObj);
 
     // C++:  void cv::AffineFeature::setViewParams(vector_float tilts, vector_float rolls)
@@ -114,26 +134,5 @@ public class AffineFeature extends Feature2D {
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    public void setViewParams(MatOfFloat tilts, MatOfFloat rolls) {
-        Mat tilts_mat = tilts;
-        Mat rolls_mat = rolls;
-        setViewParams_0(nativeObj, tilts_mat.nativeObj, rolls_mat.nativeObj);
-    }
-
-    public void getViewParams(MatOfFloat tilts, MatOfFloat rolls) {
-        Mat tilts_mat = tilts;
-        Mat rolls_mat = rolls;
-        getViewParams_0(nativeObj, tilts_mat.nativeObj, rolls_mat.nativeObj);
-    }
-
-    public String getDefaultName() {
-        return getDefaultName_0(nativeObj);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

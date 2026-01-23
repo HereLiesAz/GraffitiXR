@@ -25,8 +25,132 @@ public class FaceDetectorYN {
       
     }
 
+    public long getNativeObjAddr() { return nativeObj; }
+
     // internal usage only
     public static FaceDetectorYN __fromPtr__(long addr) { return new FaceDetectorYN(addr); }
+
+    //
+    // C++:  void cv::FaceDetectorYN::setInputSize(Size input_size)
+    //
+
+    public Size getInputSize() {
+        return new Size(getInputSize_0(nativeObj));
+    }
+
+
+    //
+    // C++:  Size cv::FaceDetectorYN::getInputSize()
+    //
+
+    /**
+     * Set the size for the network input, which overwrites the input size of creating model. Call this method when the size of input image does not match the input size when creating model
+     *
+     * @param input_size the size of the input image
+     */
+    public void setInputSize(Size input_size) {
+        setInputSize_0(nativeObj, input_size.width, input_size.height);
+    }
+
+
+    //
+    // C++:  void cv::FaceDetectorYN::setScoreThreshold(float score_threshold)
+    //
+
+    public float getScoreThreshold() {
+        return getScoreThreshold_0(nativeObj);
+    }
+
+
+    //
+    // C++:  float cv::FaceDetectorYN::getScoreThreshold()
+    //
+
+    /**
+     * Set the score threshold to filter out bounding boxes of score less than the given value
+     *
+     * @param score_threshold threshold for filtering out bounding boxes
+     */
+    public void setScoreThreshold(float score_threshold) {
+        setScoreThreshold_0(nativeObj, score_threshold);
+    }
+
+
+    //
+    // C++:  void cv::FaceDetectorYN::setNMSThreshold(float nms_threshold)
+    //
+
+    public float getNMSThreshold() {
+        return getNMSThreshold_0(nativeObj);
+    }
+
+
+    //
+    // C++:  float cv::FaceDetectorYN::getNMSThreshold()
+    //
+
+    /**
+     * Set the Non-maximum-suppression threshold to suppress bounding boxes that have IoU greater than the given value
+     *
+     * @param nms_threshold threshold for NMS operation
+     */
+    public void setNMSThreshold(float nms_threshold) {
+        setNMSThreshold_0(nativeObj, nms_threshold);
+    }
+
+
+    //
+    // C++:  void cv::FaceDetectorYN::setTopK(int top_k)
+    //
+
+    public int getTopK() {
+        return getTopK_0(nativeObj);
+    }
+
+
+    //
+    // C++:  int cv::FaceDetectorYN::getTopK()
+    //
+
+    /**
+     * Set the number of bounding boxes preserved before NMS
+     *
+     * @param top_k the number of bounding boxes to preserve from top rank based on score
+     */
+    public void setTopK(int top_k) {
+        setTopK_0(nativeObj, top_k);
+    }
+
+
+    //
+    // C++:  int cv::FaceDetectorYN::detect(Mat image, Mat& faces)
+    //
+
+    /**
+     * Detects faces in the input image. Following is an example output.
+     *
+     * ![image](pics/lena-face-detection.jpg)
+     *
+     * @param image an image to detect
+     * @param faces detection results stored in a 2D cv::Mat of shape [num_faces, 15]
+     * - 0-1: x, y of bbox top left corner
+     * - 2-3: width, height of bbox
+     * - 4-5: x, y of right eye (blue point in the example image)
+     * - 6-7: x, y of left eye (red point in the example image)
+     * - 8-9: x, y of nose tip (green point in the example image)
+     * - 10-11: x, y of right corner of mouth (pink point in the example image)
+     * - 12-13: x, y of left corner of mouth (yellow point in the example image)
+     * - 14: face score
+     * @return automatically generated
+     */
+    public int detect(Mat image, Mat faces) {
+        return detect_0(nativeObj, image.nativeObj, faces.nativeObj);
+    }
+
+
+    //
+    // C++: static Ptr_FaceDetectorYN cv::FaceDetectorYN::create(String model, String config, Size input_size, float score_threshold = 0.9f, float nms_threshold = 0.3f, int top_k = 5000, int backend_id = 0, int target_id = 0)
+    //
 
     /**
      * Creates an instance of face detector class with given parameters
@@ -45,10 +169,6 @@ public class FaceDetectorYN {
         return FaceDetectorYN.__fromPtr__(create_0(model, config, input_size.width, input_size.height, score_threshold, nms_threshold, top_k, backend_id, target_id));
     }
 
-    //
-    // C++:  void cv::FaceDetectorYN::setInputSize(Size input_size)
-    //
-
     /**
      * Creates an instance of face detector class with given parameters
      *
@@ -65,11 +185,6 @@ public class FaceDetectorYN {
         return FaceDetectorYN.__fromPtr__(create_1(model, config, input_size.width, input_size.height, score_threshold, nms_threshold, top_k, backend_id));
     }
 
-
-    //
-    // C++:  Size cv::FaceDetectorYN::getInputSize()
-    //
-
     /**
      * Creates an instance of face detector class with given parameters
      *
@@ -85,11 +200,6 @@ public class FaceDetectorYN {
         return FaceDetectorYN.__fromPtr__(create_2(model, config, input_size.width, input_size.height, score_threshold, nms_threshold, top_k));
     }
 
-
-    //
-    // C++:  void cv::FaceDetectorYN::setScoreThreshold(float score_threshold)
-    //
-
     /**
      * Creates an instance of face detector class with given parameters
      *
@@ -104,11 +214,6 @@ public class FaceDetectorYN {
         return FaceDetectorYN.__fromPtr__(create_3(model, config, input_size.width, input_size.height, score_threshold, nms_threshold));
     }
 
-
-    //
-    // C++:  float cv::FaceDetectorYN::getScoreThreshold()
-    //
-
     /**
      * Creates an instance of face detector class with given parameters
      *
@@ -121,11 +226,6 @@ public class FaceDetectorYN {
     public static FaceDetectorYN create(String model, String config, Size input_size, float score_threshold) {
         return FaceDetectorYN.__fromPtr__(create_4(model, config, input_size.width, input_size.height, score_threshold));
     }
-
-
-    //
-    // C++:  void cv::FaceDetectorYN::setNMSThreshold(float nms_threshold)
-    //
 
     /**
      * Creates an instance of face detector class with given parameters
@@ -141,7 +241,7 @@ public class FaceDetectorYN {
 
 
     //
-    // C++:  float cv::FaceDetectorYN::getNMSThreshold()
+    // C++: static Ptr_FaceDetectorYN cv::FaceDetectorYN::create(String framework, vector_uchar bufferModel, vector_uchar bufferConfig, Size input_size, float score_threshold = 0.9f, float nms_threshold = 0.3f, int top_k = 5000, int backend_id = 0, int target_id = 0)
     //
 
     /**
@@ -164,11 +264,6 @@ public class FaceDetectorYN {
         return FaceDetectorYN.__fromPtr__(create_6(framework, bufferModel_mat.nativeObj, bufferConfig_mat.nativeObj, input_size.width, input_size.height, score_threshold, nms_threshold, top_k, backend_id, target_id));
     }
 
-
-    //
-    // C++:  void cv::FaceDetectorYN::setTopK(int top_k)
-    //
-
     /**
      *
      *
@@ -188,11 +283,6 @@ public class FaceDetectorYN {
         return FaceDetectorYN.__fromPtr__(create_7(framework, bufferModel_mat.nativeObj, bufferConfig_mat.nativeObj, input_size.width, input_size.height, score_threshold, nms_threshold, top_k, backend_id));
     }
 
-
-    //
-    // C++:  int cv::FaceDetectorYN::getTopK()
-    //
-
     /**
      *
      *
@@ -211,11 +301,6 @@ public class FaceDetectorYN {
         return FaceDetectorYN.__fromPtr__(create_8(framework, bufferModel_mat.nativeObj, bufferConfig_mat.nativeObj, input_size.width, input_size.height, score_threshold, nms_threshold, top_k));
     }
 
-
-    //
-    // C++:  int cv::FaceDetectorYN::detect(Mat image, Mat& faces)
-    //
-
     /**
      *
      *
@@ -232,11 +317,6 @@ public class FaceDetectorYN {
         Mat bufferConfig_mat = bufferConfig;
         return FaceDetectorYN.__fromPtr__(create_9(framework, bufferModel_mat.nativeObj, bufferConfig_mat.nativeObj, input_size.width, input_size.height, score_threshold, nms_threshold));
     }
-
-
-    //
-    // C++: static Ptr_FaceDetectorYN cv::FaceDetectorYN::create(String model, String config, Size input_size, float score_threshold = 0.9f, float nms_threshold = 0.3f, int top_k = 5000, int backend_id = 0, int target_id = 0)
-    //
 
     /**
      *
@@ -269,6 +349,14 @@ public class FaceDetectorYN {
         return FaceDetectorYN.__fromPtr__(create_11(framework, bufferModel_mat.nativeObj, bufferConfig_mat.nativeObj, input_size.width, input_size.height));
     }
 
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
     // C++:  void cv::FaceDetectorYN::setInputSize(Size input_size)
     private static native void setInputSize_0(long nativeObj, double input_size_width, double input_size_height);
 
@@ -280,11 +368,6 @@ public class FaceDetectorYN {
 
     // C++:  float cv::FaceDetectorYN::getScoreThreshold()
     private static native float getScoreThreshold_0(long nativeObj);
-
-
-    //
-    // C++: static Ptr_FaceDetectorYN cv::FaceDetectorYN::create(String framework, vector_uchar bufferModel, vector_uchar bufferConfig, Size input_size, float score_threshold = 0.9f, float nms_threshold = 0.3f, int top_k = 5000, int backend_id = 0, int target_id = 0)
-    //
 
     // C++:  void cv::FaceDetectorYN::setNMSThreshold(float nms_threshold)
     private static native void setNMSThreshold_0(long nativeObj, float nms_threshold);
@@ -303,111 +386,21 @@ public class FaceDetectorYN {
 
     // C++: static Ptr_FaceDetectorYN cv::FaceDetectorYN::create(String model, String config, Size input_size, float score_threshold = 0.9f, float nms_threshold = 0.3f, int top_k = 5000, int backend_id = 0, int target_id = 0)
     private static native long create_0(String model, String config, double input_size_width, double input_size_height, float score_threshold, float nms_threshold, int top_k, int backend_id, int target_id);
-
     private static native long create_1(String model, String config, double input_size_width, double input_size_height, float score_threshold, float nms_threshold, int top_k, int backend_id);
-
     private static native long create_2(String model, String config, double input_size_width, double input_size_height, float score_threshold, float nms_threshold, int top_k);
-
     private static native long create_3(String model, String config, double input_size_width, double input_size_height, float score_threshold, float nms_threshold);
-
     private static native long create_4(String model, String config, double input_size_width, double input_size_height, float score_threshold);
-
     private static native long create_5(String model, String config, double input_size_width, double input_size_height);
 
     // C++: static Ptr_FaceDetectorYN cv::FaceDetectorYN::create(String framework, vector_uchar bufferModel, vector_uchar bufferConfig, Size input_size, float score_threshold = 0.9f, float nms_threshold = 0.3f, int top_k = 5000, int backend_id = 0, int target_id = 0)
     private static native long create_6(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, double input_size_width, double input_size_height, float score_threshold, float nms_threshold, int top_k, int backend_id, int target_id);
-
     private static native long create_7(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, double input_size_width, double input_size_height, float score_threshold, float nms_threshold, int top_k, int backend_id);
-
     private static native long create_8(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, double input_size_width, double input_size_height, float score_threshold, float nms_threshold, int top_k);
-
     private static native long create_9(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, double input_size_width, double input_size_height, float score_threshold, float nms_threshold);
-
     private static native long create_10(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, double input_size_width, double input_size_height, float score_threshold);
-
     private static native long create_11(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, double input_size_width, double input_size_height);
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    public long getNativeObjAddr() { return nativeObj; }
-
-    public Size getInputSize() {
-        return new Size(getInputSize_0(nativeObj));
-    }
-
-    /**
-     * Set the size for the network input, which overwrites the input size of creating model. Call this method when the size of input image does not match the input size when creating model
-     *
-     * @param input_size the size of the input image
-     */
-    public void setInputSize(Size input_size) {
-        setInputSize_0(nativeObj, input_size.width, input_size.height);
-    }
-
-    public float getScoreThreshold() {
-        return getScoreThreshold_0(nativeObj);
-    }
-
-    /**
-     * Set the score threshold to filter out bounding boxes of score less than the given value
-     *
-     * @param score_threshold threshold for filtering out bounding boxes
-     */
-    public void setScoreThreshold(float score_threshold) {
-        setScoreThreshold_0(nativeObj, score_threshold);
-    }
-
-    public float getNMSThreshold() {
-        return getNMSThreshold_0(nativeObj);
-    }
-
-    /**
-     * Set the Non-maximum-suppression threshold to suppress bounding boxes that have IoU greater than the given value
-     *
-     * @param nms_threshold threshold for NMS operation
-     */
-    public void setNMSThreshold(float nms_threshold) {
-        setNMSThreshold_0(nativeObj, nms_threshold);
-    }
-
-    public int getTopK() {
-        return getTopK_0(nativeObj);
-    }
-
-    /**
-     * Set the number of bounding boxes preserved before NMS
-     *
-     * @param top_k the number of bounding boxes to preserve from top rank based on score
-     */
-    public void setTopK(int top_k) {
-        setTopK_0(nativeObj, top_k);
-    }
-
-    /**
-     * Detects faces in the input image. Following is an example output.
-     *
-     * ![image](pics/lena-face-detection.jpg)
-     *
-     * @param image an image to detect
-     * @param faces detection results stored in a 2D cv::Mat of shape [num_faces, 15]
-     * - 0-1: x, y of bbox top left corner
-     * - 2-3: width, height of bbox
-     * - 4-5: x, y of right eye (blue point in the example image)
-     * - 6-7: x, y of left eye (red point in the example image)
-     * - 8-9: x, y of nose tip (green point in the example image)
-     * - 10-11: x, y of right corner of mouth (pink point in the example image)
-     * - 12-13: x, y of left corner of mouth (yellow point in the example image)
-     * - 14: face score
-     * @return automatically generated
-     */
-    public int detect(Mat image, Mat faces) {
-        return detect_0(nativeObj, image.nativeObj, faces.nativeObj);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

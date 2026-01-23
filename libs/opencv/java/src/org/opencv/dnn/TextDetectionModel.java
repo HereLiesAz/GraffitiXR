@@ -27,36 +27,6 @@ public class TextDetectionModel extends Model {
     // C++:  void cv::dnn::TextDetectionModel::detect(Mat frame, vector_vector_Point& detections, vector_float& confidences)
     //
 
-    // C++:  void cv::dnn::TextDetectionModel::detect(Mat frame, vector_vector_Point& detections, vector_float& confidences)
-    private static native void detect_0(long nativeObj, long frame_nativeObj, long detections_mat_nativeObj, long confidences_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::TextDetectionModel::detect(Mat frame, vector_vector_Point& detections)
-    //
-
-    // C++:  void cv::dnn::TextDetectionModel::detect(Mat frame, vector_vector_Point& detections)
-    private static native void detect_1(long nativeObj, long frame_nativeObj, long detections_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::TextDetectionModel::detectTextRectangles(Mat frame, vector_RotatedRect& detections, vector_float& confidences)
-    //
-
-    // C++:  void cv::dnn::TextDetectionModel::detectTextRectangles(Mat frame, vector_RotatedRect& detections, vector_float& confidences)
-    private static native void detectTextRectangles_0(long nativeObj, long frame_nativeObj, long detections_mat_nativeObj, long confidences_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::TextDetectionModel::detectTextRectangles(Mat frame, vector_RotatedRect& detections)
-    //
-
-    // C++:  void cv::dnn::TextDetectionModel::detectTextRectangles(Mat frame, vector_RotatedRect& detections)
-    private static native void detectTextRectangles_1(long nativeObj, long frame_nativeObj, long detections_mat_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     /**
      * Performs detection
      *
@@ -84,12 +54,22 @@ public class TextDetectionModel extends Model {
         detections_mat.release();
     }
 
+
+    //
+    // C++:  void cv::dnn::TextDetectionModel::detect(Mat frame, vector_vector_Point& detections)
+    //
+
     public void detect(Mat frame, List<MatOfPoint> detections) {
         Mat detections_mat = new Mat();
         detect_1(nativeObj, frame.nativeObj, detections_mat.nativeObj);
         Converters.Mat_to_vector_vector_Point(detections_mat, detections);
         detections_mat.release();
     }
+
+
+    //
+    // C++:  void cv::dnn::TextDetectionModel::detectTextRectangles(Mat frame, vector_RotatedRect& detections, vector_float& confidences)
+    //
 
     /**
      * Performs detection
@@ -110,14 +90,37 @@ public class TextDetectionModel extends Model {
         detectTextRectangles_0(nativeObj, frame.nativeObj, detections_mat.nativeObj, confidences_mat.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::dnn::TextDetectionModel::detectTextRectangles(Mat frame, vector_RotatedRect& detections)
+    //
+
     public void detectTextRectangles(Mat frame, MatOfRotatedRect detections) {
         Mat detections_mat = detections;
         detectTextRectangles_1(nativeObj, frame.nativeObj, detections_mat.nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:  void cv::dnn::TextDetectionModel::detect(Mat frame, vector_vector_Point& detections, vector_float& confidences)
+    private static native void detect_0(long nativeObj, long frame_nativeObj, long detections_mat_nativeObj, long confidences_mat_nativeObj);
+
+    // C++:  void cv::dnn::TextDetectionModel::detect(Mat frame, vector_vector_Point& detections)
+    private static native void detect_1(long nativeObj, long frame_nativeObj, long detections_mat_nativeObj);
+
+    // C++:  void cv::dnn::TextDetectionModel::detectTextRectangles(Mat frame, vector_RotatedRect& detections, vector_float& confidences)
+    private static native void detectTextRectangles_0(long nativeObj, long frame_nativeObj, long detections_mat_nativeObj, long confidences_mat_nativeObj);
+
+    // C++:  void cv::dnn::TextDetectionModel::detectTextRectangles(Mat frame, vector_RotatedRect& detections)
+    private static native void detectTextRectangles_1(long nativeObj, long frame_nativeObj, long detections_mat_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

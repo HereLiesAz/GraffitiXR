@@ -20,6 +20,13 @@ public class ClassificationModel extends Model {
 
     protected ClassificationModel(long addr) { super(addr); }
 
+    // internal usage only
+    public static ClassificationModel __fromPtr__(long addr) { return new ClassificationModel(addr); }
+
+    //
+    // C++:   cv::dnn::ClassificationModel::ClassificationModel(String model, String config = "")
+    //
+
     /**
      * Create classification model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -30,10 +37,6 @@ public class ClassificationModel extends Model {
         super(ClassificationModel_0(model, config));
     }
 
-    //
-    // C++:   cv::dnn::ClassificationModel::ClassificationModel(String model, String config = "")
-    //
-
     /**
      * Create classification model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -42,6 +45,11 @@ public class ClassificationModel extends Model {
     public ClassificationModel(String model) {
         super(ClassificationModel_1(model));
     }
+
+
+    //
+    // C++:   cv::dnn::ClassificationModel::ClassificationModel(Net network)
+    //
 
     /**
      * Create model from deep learning network.
@@ -53,15 +61,26 @@ public class ClassificationModel extends Model {
 
 
     //
-    // C++:   cv::dnn::ClassificationModel::ClassificationModel(Net network)
-    //
-
-    // internal usage only
-    public static ClassificationModel __fromPtr__(long addr) { return new ClassificationModel(addr); }
-
-
-    //
     // C++:  ClassificationModel cv::dnn::ClassificationModel::setEnableSoftmaxPostProcessing(bool enable)
+    //
+
+    /**
+     * Set enable/disable softmax post processing option.
+     *
+     * If this option is true, softmax is applied after forward inference within the classify() function
+     * to convert the confidences range to [0.0-1.0].
+     * This function allows you to toggle this behavior.
+     * Please turn true when not contain softmax layer in model.
+     * @param enable Set enable softmax post processing within the classify() function.
+     * @return automatically generated
+     */
+    public ClassificationModel setEnableSoftmaxPostProcessing(boolean enable) {
+        return new ClassificationModel(setEnableSoftmaxPostProcessing_0(nativeObj, enable));
+    }
+
+
+    //
+    // C++:  bool cv::dnn::ClassificationModel::getEnableSoftmaxPostProcessing()
     //
 
     // C++:   cv::dnn::ClassificationModel::ClassificationModel(String model, String config = "")
@@ -69,15 +88,24 @@ public class ClassificationModel extends Model {
 
 
     //
-    // C++:  bool cv::dnn::ClassificationModel::getEnableSoftmaxPostProcessing()
-    //
-
-    private static native long ClassificationModel_1(String model);
-
-
-    //
     // C++:  void cv::dnn::ClassificationModel::classify(Mat frame, int& classId, float& conf)
     //
+
+    public void classify(Mat frame, int[] classId, float[] conf) {
+        double[] classId_out = new double[1];
+        double[] conf_out = new double[1];
+        classify_0(nativeObj, frame.nativeObj, classId_out, conf_out);
+        if(classId!=null) classId[0] = (int)classId_out[0];
+        if(conf!=null) conf[0] = (float)conf_out[0];
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+    private static native long ClassificationModel_1(String model);
 
     // C++:   cv::dnn::ClassificationModel::ClassificationModel(Net network)
     private static native long ClassificationModel_2(long network_nativeObj);
@@ -102,33 +130,6 @@ public class ClassificationModel extends Model {
      */
     public boolean getEnableSoftmaxPostProcessing() {
         return getEnableSoftmaxPostProcessing_0(nativeObj);
-    }
-
-    /**
-     * Set enable/disable softmax post processing option.
-     *
-     * If this option is true, softmax is applied after forward inference within the classify() function
-     * to convert the confidences range to [0.0-1.0].
-     * This function allows you to toggle this behavior.
-     * Please turn true when not contain softmax layer in model.
-     * @param enable Set enable softmax post processing within the classify() function.
-     * @return automatically generated
-     */
-    public ClassificationModel setEnableSoftmaxPostProcessing(boolean enable) {
-        return new ClassificationModel(setEnableSoftmaxPostProcessing_0(nativeObj, enable));
-    }
-
-    public void classify(Mat frame, int[] classId, float[] conf) {
-        double[] classId_out = new double[1];
-        double[] conf_out = new double[1];
-        classify_0(nativeObj, frame.nativeObj, classId_out, conf_out);
-        if(classId!=null) classId[0] = (int)classId_out[0];
-        if(conf!=null) conf[0] = (float)conf_out[0];
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
     }
 
 }

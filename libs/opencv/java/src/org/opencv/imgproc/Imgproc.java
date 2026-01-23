@@ -27,6 +27,32 @@ import org.opencv.utils.Converters;
 
 public class Imgproc {
 
+    // C++: enum ColormapTypes (cv.ColormapTypes)
+    public static final int
+            COLORMAP_AUTUMN = 0,
+            COLORMAP_BONE = 1,
+            COLORMAP_JET = 2,
+            COLORMAP_WINTER = 3,
+            COLORMAP_RAINBOW = 4,
+            COLORMAP_OCEAN = 5,
+            COLORMAP_SUMMER = 6,
+            COLORMAP_SPRING = 7,
+            COLORMAP_COOL = 8,
+            COLORMAP_HSV = 9,
+            COLORMAP_PINK = 10,
+            COLORMAP_HOT = 11,
+            COLORMAP_PARULA = 12,
+            COLORMAP_MAGMA = 13,
+            COLORMAP_INFERNO = 14,
+            COLORMAP_PLASMA = 15,
+            COLORMAP_VIRIDIS = 16,
+            COLORMAP_CIVIDIS = 17,
+            COLORMAP_TWILIGHT = 18,
+            COLORMAP_TWILIGHT_SHIFTED = 19,
+            COLORMAP_TURBO = 20,
+            COLORMAP_DEEPGREEN = 21;
+
+
     // C++: enum <unnamed>
     public static final int
             CV_GAUSSIAN_5x5 = 7,
@@ -70,6 +96,8 @@ public class Imgproc {
             CV_HOUGH_PROBABILISTIC = 1,
             CV_HOUGH_MULTI_SCALE = 2,
             CV_HOUGH_GRADIENT = 3;
+
+
     // C++: enum MorphShapes_c (MorphShapes_c)
     public static final int
             CV_SHAPE_RECT = 0,
@@ -77,6 +105,8 @@ public class Imgproc {
             CV_SHAPE_ELLIPSE = 2,
             CV_SHAPE_DIAMOND = 3,
             CV_SHAPE_CUSTOM = 100;
+
+
     // C++: enum SmoothMethod_c (SmoothMethod_c)
     public static final int
             CV_BLUR_NO_SCALE = 0,
@@ -84,34 +114,12 @@ public class Imgproc {
             CV_GAUSSIAN = 2,
             CV_MEDIAN = 3,
             CV_BILATERAL = 4;
+
+
     // C++: enum AdaptiveThresholdTypes (cv.AdaptiveThresholdTypes)
     public static final int
             ADAPTIVE_THRESH_MEAN_C = 0,
             ADAPTIVE_THRESH_GAUSSIAN_C = 1;
-    // C++: enum ColormapTypes (cv.ColormapTypes)
-    public static final int
-            COLORMAP_AUTUMN = 0,
-            COLORMAP_BONE = 1,
-            COLORMAP_JET = 2,
-            COLORMAP_WINTER = 3,
-            COLORMAP_RAINBOW = 4,
-            COLORMAP_OCEAN = 5,
-            COLORMAP_SUMMER = 6,
-            COLORMAP_SPRING = 7,
-            COLORMAP_COOL = 8,
-            COLORMAP_HSV = 9,
-            COLORMAP_PINK = 10,
-            COLORMAP_HOT = 11,
-            COLORMAP_PARULA = 12,
-            COLORMAP_MAGMA = 13,
-            COLORMAP_INFERNO = 14,
-            COLORMAP_PLASMA = 15,
-            COLORMAP_VIRIDIS = 16,
-            COLORMAP_CIVIDIS = 17,
-            COLORMAP_TWILIGHT = 18,
-            COLORMAP_TWILIGHT_SHIFTED = 19,
-            COLORMAP_TURBO = 20,
-            COLORMAP_DEEPGREEN = 21;
     // C++: enum ConnectedComponentsAlgorithmsTypes (cv.ConnectedComponentsAlgorithmsTypes)
     public static final int
             CCL_DEFAULT = -1,
@@ -392,106 +400,6 @@ public class Imgproc {
             COLOR_RGBA2YUV_YUNV = COLOR_RGBA2YUV_YUY2,
             COLOR_BGRA2YUV_YUNV = COLOR_BGRA2YUV_YUY2,
             COLOR_COLORCVT_MAX = 155;
-    // C++: enum ConnectedComponentsTypes (cv.ConnectedComponentsTypes)
-    public static final int
-            CC_STAT_LEFT = 0,
-            CC_STAT_TOP = 1,
-            CC_STAT_WIDTH = 2,
-            CC_STAT_HEIGHT = 3,
-            CC_STAT_AREA = 4,
-            CC_STAT_MAX = 5;
-    // C++: enum ContourApproximationModes (cv.ContourApproximationModes)
-    public static final int
-            CHAIN_APPROX_NONE = 1,
-            CHAIN_APPROX_SIMPLE = 2,
-            CHAIN_APPROX_TC89_L1 = 3,
-            CHAIN_APPROX_TC89_KCOS = 4;
-    // C++: enum DistanceTransformLabelTypes (cv.DistanceTransformLabelTypes)
-    public static final int
-            DIST_LABEL_CCOMP = 0,
-            DIST_LABEL_PIXEL = 1;
-    // C++: enum DistanceTransformMasks (cv.DistanceTransformMasks)
-    public static final int
-            DIST_MASK_3 = 3,
-            DIST_MASK_5 = 5,
-            DIST_MASK_PRECISE = 0;
-    // C++: enum DistanceTypes (cv.DistanceTypes)
-    public static final int
-            DIST_USER = -1,
-            DIST_L1 = 1,
-            DIST_L2 = 2,
-            DIST_C = 3,
-            DIST_L12 = 4,
-            DIST_FAIR = 5,
-            DIST_WELSCH = 6,
-            DIST_HUBER = 7;
-    // C++: enum FloodFillFlags (cv.FloodFillFlags)
-    public static final int
-            FLOODFILL_FIXED_RANGE = 1 << 16,
-            FLOODFILL_MASK_ONLY = 1 << 17;
-    // C++: enum GrabCutClasses (cv.GrabCutClasses)
-    public static final int
-            GC_BGD = 0,
-            GC_FGD = 1,
-            GC_PR_BGD = 2,
-            GC_PR_FGD = 3;
-    // C++: enum GrabCutModes (cv.GrabCutModes)
-    public static final int
-            GC_INIT_WITH_RECT = 0,
-            GC_INIT_WITH_MASK = 1,
-            GC_EVAL = 2,
-            GC_EVAL_FREEZE_MODEL = 3;
-    // C++: enum HersheyFonts (cv.HersheyFonts)
-    public static final int
-            FONT_HERSHEY_SIMPLEX = 0,
-            FONT_HERSHEY_PLAIN = 1,
-            FONT_HERSHEY_DUPLEX = 2,
-            FONT_HERSHEY_COMPLEX = 3,
-            FONT_HERSHEY_TRIPLEX = 4,
-            FONT_HERSHEY_COMPLEX_SMALL = 5,
-            FONT_HERSHEY_SCRIPT_SIMPLEX = 6,
-            FONT_HERSHEY_SCRIPT_COMPLEX = 7,
-            FONT_ITALIC = 16;
-    // C++: enum HistCompMethods (cv.HistCompMethods)
-    public static final int
-            HISTCMP_CORREL = 0,
-            HISTCMP_CHISQR = 1,
-            HISTCMP_INTERSECT = 2,
-            HISTCMP_BHATTACHARYYA = 3,
-            HISTCMP_HELLINGER = HISTCMP_BHATTACHARYYA,
-            HISTCMP_CHISQR_ALT = 4,
-            HISTCMP_KL_DIV = 5;
-    // C++: enum HoughModes (cv.HoughModes)
-    public static final int
-            HOUGH_STANDARD = 0,
-            HOUGH_PROBABILISTIC = 1,
-            HOUGH_MULTI_SCALE = 2,
-            HOUGH_GRADIENT = 3,
-            HOUGH_GRADIENT_ALT = 4;
-    // C++: enum InterpolationFlags (cv.InterpolationFlags)
-    public static final int
-            INTER_NEAREST = 0,
-            INTER_LINEAR = 1,
-            INTER_CUBIC = 2,
-            INTER_AREA = 3,
-            INTER_LANCZOS4 = 4,
-            INTER_LINEAR_EXACT = 5,
-            INTER_NEAREST_EXACT = 6,
-            INTER_MAX = 7,
-            WARP_FILL_OUTLIERS = 8,
-            WARP_INVERSE_MAP = 16,
-            WARP_RELATIVE_MAP = 32;
-    // C++: enum LineSegmentDetectorModes (cv.LineSegmentDetectorModes)
-    public static final int
-            LSD_REFINE_NONE = 0,
-            LSD_REFINE_STD = 1,
-            LSD_REFINE_ADV = 2;
-    // C++: enum LineTypes (cv.LineTypes)
-    public static final int
-            FILLED = -1,
-            LINE_4 = 4,
-            LINE_8 = 8,
-            LINE_AA = 16;
     // C++: enum MarkerTypes (cv.MarkerTypes)
     public static final int
             MARKER_CROSS = 0,
@@ -500,71 +408,7 @@ public class Imgproc {
             MARKER_DIAMOND = 3,
             MARKER_SQUARE = 4,
             MARKER_TRIANGLE_UP = 5,
-            MARKER_TRIANGLE_DOWN = 6;    // C++: enum InterpolationMasks (cv.InterpolationMasks)
-    public static final int
-            INTER_BITS = 5,
-            INTER_BITS2 = INTER_BITS * 2,
-            INTER_TAB_SIZE = 1 << INTER_BITS,
-            INTER_TAB_SIZE2 = INTER_TAB_SIZE * INTER_TAB_SIZE;
-    // C++: enum MorphShapes (cv.MorphShapes)
-    public static final int
-            MORPH_RECT = 0,
-            MORPH_CROSS = 1,
-            MORPH_ELLIPSE = 2,
-            MORPH_DIAMOND = 3;
-    // C++: enum MorphTypes (cv.MorphTypes)
-    public static final int
-            MORPH_ERODE = 0,
-            MORPH_DILATE = 1,
-            MORPH_OPEN = 2,
-            MORPH_CLOSE = 3,
-            MORPH_GRADIENT = 4,
-            MORPH_TOPHAT = 5,
-            MORPH_BLACKHAT = 6,
-            MORPH_HITMISS = 7;
-    // C++: enum RectanglesIntersectTypes (cv.RectanglesIntersectTypes)
-    public static final int
-            INTERSECT_NONE = 0,
-            INTERSECT_PARTIAL = 1,
-            INTERSECT_FULL = 2;
-    // C++: enum RetrievalModes (cv.RetrievalModes)
-    public static final int
-            RETR_EXTERNAL = 0,
-            RETR_LIST = 1,
-            RETR_CCOMP = 2,
-            RETR_TREE = 3,
-            RETR_FLOODFILL = 4;
-    // C++: enum ShapeMatchModes (cv.ShapeMatchModes)
-    public static final int
-            CONTOURS_MATCH_I1 = 1,
-            CONTOURS_MATCH_I2 = 2,
-            CONTOURS_MATCH_I3 = 3;
-    // C++: enum SpecialFilter (cv.SpecialFilter)
-    public static final int
-            FILTER_SCHARR = -1;
-    // C++: enum TemplateMatchModes (cv.TemplateMatchModes)
-    public static final int
-            TM_SQDIFF = 0,
-            TM_SQDIFF_NORMED = 1,
-            TM_CCORR = 2,
-            TM_CCORR_NORMED = 3,
-            TM_CCOEFF = 4,
-            TM_CCOEFF_NORMED = 5;
-    // C++: enum ThresholdTypes (cv.ThresholdTypes)
-    public static final int
-            THRESH_BINARY = 0,
-            THRESH_BINARY_INV = 1,
-            THRESH_TRUNC = 2,
-            THRESH_TOZERO = 3,
-            THRESH_TOZERO_INV = 4,
-            THRESH_MASK = 7,
-            THRESH_OTSU = 8,
-            THRESH_TRIANGLE = 16,
-            THRESH_DRYRUN = 128;
-    // C++: enum WarpPolarMode (cv.WarpPolarMode)
-    public static final int
-            WARP_POLAR_LINEAR = 0,
-            WARP_POLAR_LOG = 256;
+            MARKER_TRIANGLE_DOWN = 6;
     private static final int
             IPL_BORDER_CONSTANT = 0,
             IPL_BORDER_REPLICATE = 1,
@@ -602,6 +446,426 @@ public class Imgproc {
             CV_THRESH_OTSU = 8,
             CV_THRESH_TRIANGLE = 16,
             CV_THRESH_DRYRUN = 128;
+
+
+    // C++: enum ConnectedComponentsTypes (cv.ConnectedComponentsTypes)
+    public static final int
+            CC_STAT_LEFT = 0,
+            CC_STAT_TOP = 1,
+            CC_STAT_WIDTH = 2,
+            CC_STAT_HEIGHT = 3,
+            CC_STAT_AREA = 4,
+            CC_STAT_MAX = 5;
+
+
+    // C++: enum ContourApproximationModes (cv.ContourApproximationModes)
+    public static final int
+            CHAIN_APPROX_NONE = 1,
+            CHAIN_APPROX_SIMPLE = 2,
+            CHAIN_APPROX_TC89_L1 = 3,
+            CHAIN_APPROX_TC89_KCOS = 4;
+
+
+    // C++: enum DistanceTransformLabelTypes (cv.DistanceTransformLabelTypes)
+    public static final int
+            DIST_LABEL_CCOMP = 0,
+            DIST_LABEL_PIXEL = 1;
+
+
+    // C++: enum DistanceTransformMasks (cv.DistanceTransformMasks)
+    public static final int
+            DIST_MASK_3 = 3,
+            DIST_MASK_5 = 5,
+            DIST_MASK_PRECISE = 0;
+
+
+    // C++: enum DistanceTypes (cv.DistanceTypes)
+    public static final int
+            DIST_USER = -1,
+            DIST_L1 = 1,
+            DIST_L2 = 2,
+            DIST_C = 3,
+            DIST_L12 = 4,
+            DIST_FAIR = 5,
+            DIST_WELSCH = 6,
+            DIST_HUBER = 7;
+
+
+    // C++: enum FloodFillFlags (cv.FloodFillFlags)
+    public static final int
+            FLOODFILL_FIXED_RANGE = 1 << 16,
+            FLOODFILL_MASK_ONLY = 1 << 17;
+
+
+    // C++: enum GrabCutClasses (cv.GrabCutClasses)
+    public static final int
+            GC_BGD = 0,
+            GC_FGD = 1,
+            GC_PR_BGD = 2,
+            GC_PR_FGD = 3;
+
+
+    // C++: enum GrabCutModes (cv.GrabCutModes)
+    public static final int
+            GC_INIT_WITH_RECT = 0,
+            GC_INIT_WITH_MASK = 1,
+            GC_EVAL = 2,
+            GC_EVAL_FREEZE_MODEL = 3;
+
+
+    // C++: enum HersheyFonts (cv.HersheyFonts)
+    public static final int
+            FONT_HERSHEY_SIMPLEX = 0,
+            FONT_HERSHEY_PLAIN = 1,
+            FONT_HERSHEY_DUPLEX = 2,
+            FONT_HERSHEY_COMPLEX = 3,
+            FONT_HERSHEY_TRIPLEX = 4,
+            FONT_HERSHEY_COMPLEX_SMALL = 5,
+            FONT_HERSHEY_SCRIPT_SIMPLEX = 6,
+            FONT_HERSHEY_SCRIPT_COMPLEX = 7,
+            FONT_ITALIC = 16;
+
+
+    // C++: enum HistCompMethods (cv.HistCompMethods)
+    public static final int
+            HISTCMP_CORREL = 0,
+            HISTCMP_CHISQR = 1,
+            HISTCMP_INTERSECT = 2,
+            HISTCMP_BHATTACHARYYA = 3,
+            HISTCMP_HELLINGER = HISTCMP_BHATTACHARYYA,
+            HISTCMP_CHISQR_ALT = 4,
+            HISTCMP_KL_DIV = 5;
+
+
+    // C++: enum HoughModes (cv.HoughModes)
+    public static final int
+            HOUGH_STANDARD = 0,
+            HOUGH_PROBABILISTIC = 1,
+            HOUGH_MULTI_SCALE = 2,
+            HOUGH_GRADIENT = 3,
+            HOUGH_GRADIENT_ALT = 4;
+
+
+    // C++: enum InterpolationFlags (cv.InterpolationFlags)
+    public static final int
+            INTER_NEAREST = 0,
+            INTER_LINEAR = 1,
+            INTER_CUBIC = 2,
+            INTER_AREA = 3,
+            INTER_LANCZOS4 = 4,
+            INTER_LINEAR_EXACT = 5,
+            INTER_NEAREST_EXACT = 6,
+            INTER_MAX = 7,
+            WARP_FILL_OUTLIERS = 8,
+            WARP_INVERSE_MAP = 16,
+            WARP_RELATIVE_MAP = 32;
+
+    /**
+     * Fills a connected component with the given color.
+     *
+     * The function cv::floodFill fills a connected component starting from the seed point with the specified
+     * color. The connectivity is determined by the color/brightness closeness of the neighbor pixels. The
+     * pixel at \((x,y)\) is considered to belong to the repainted domain if:
+     *
+     * <ul>
+     *   <li>
+     *  in case of a grayscale image and floating range
+     * \(\texttt{src} (x',y')- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} (x',y')+ \texttt{upDiff}\)
+     *   </li>
+     * </ul>
+     *
+     *
+     * <ul>
+     *   <li>
+     *  in case of a grayscale image and fixed range
+     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)+ \texttt{upDiff}\)
+     *   </li>
+     * </ul>
+     *
+     *
+     * <ul>
+     *   <li>
+     *  in case of a color image and floating range
+     * \(\texttt{src} (x',y')_r- \texttt{loDiff} _r \leq \texttt{src} (x,y)_r \leq \texttt{src} (x',y')_r+ \texttt{upDiff} _r,\)
+     * \(\texttt{src} (x',y')_g- \texttt{loDiff} _g \leq \texttt{src} (x,y)_g \leq \texttt{src} (x',y')_g+ \texttt{upDiff} _g\)
+     * and
+     * \(\texttt{src} (x',y')_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} (x',y')_b+ \texttt{upDiff} _b\)
+     *   </li>
+     * </ul>
+     *
+     *
+     * <ul>
+     *   <li>
+     *  in case of a color image and fixed range
+     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_r- \texttt{loDiff} _r \leq \texttt{src} (x,y)_r \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_r+ \texttt{upDiff} _r,\)
+     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_g- \texttt{loDiff} _g \leq \texttt{src} (x,y)_g \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_g+ \texttt{upDiff} _g\)
+     * and
+     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_b+ \texttt{upDiff} _b\)
+     *   </li>
+     * </ul>
+     *
+     *
+     * where \(src(x',y')\) is the value of one of pixel neighbors that is already known to belong to the
+     * component. That is, to be added to the connected component, a color/brightness of the pixel should
+     * be close enough to:
+     * <ul>
+     *   <li>
+     *  Color/brightness of one of its neighbors that already belong to the connected component in case
+     * of a floating range.
+     *   </li>
+     *   <li>
+     *  Color/brightness of the seed point in case of a fixed range.
+     *   </li>
+     * </ul>
+     *
+     * Use these functions to either mark a connected component with the specified color in-place, or build
+     * a mask and then extract the contour, or copy the region to another image, and so on.
+     *
+     * @param image Input/output 1- or 3-channel, 8-bit, or floating-point image. It is modified by the
+     * function unless the #FLOODFILL_MASK_ONLY flag is set in the second variant of the function. See
+     * the details below.
+     * @param mask Operation mask that should be a single-channel 8-bit image, 2 pixels wider and 2 pixels
+     * taller than image. If an empty Mat is passed it will be created automatically. Since this is both an
+     * input and output parameter, you must take responsibility of initializing it.
+     * Flood-filling cannot go across non-zero pixels in the input mask. For example,
+     * an edge detector output can be used as a mask to stop filling at edges. On output, pixels in the
+     * mask corresponding to filled pixels in the image are set to 1 or to the specified value in flags
+     * as described below. Additionally, the function fills the border of the mask with ones to simplify
+     * internal processing. It is therefore possible to use the same mask in multiple calls to the function
+     * to make sure the filled areas do not overlap.
+     * @param seedPoint Starting point.
+     * @param newVal New value of the repainted domain pixels.
+     * @param loDiff Maximal lower brightness/color difference between the currently observed pixel and
+     * one of its neighbors belonging to the component, or a seed pixel being added to the component.
+     * @param upDiff Maximal upper brightness/color difference between the currently observed pixel and
+     * one of its neighbors belonging to the component, or a seed pixel being added to the component.
+     * @param rect Optional output parameter set by the function to the minimum bounding rectangle of the
+     * repainted domain.
+     * @param flags Operation flags. The first 8 bits contain a connectivity value. The default value of
+     * 4 means that only the four nearest neighbor pixels (those that share an edge) are considered. A
+     * connectivity value of 8 means that the eight nearest neighbor pixels (those that share a corner)
+     * will be considered. The next 8 bits (8-16) contain a value between 1 and 255 with which to fill
+     * the mask (the default value is 1). For example, 4 | ( 255 &lt;&lt; 8 ) will consider 4 nearest
+     * neighbours and fill the mask with a value of 255. The following additional options occupy higher
+     * bits and therefore may be further combined with the connectivity and mask fill values using
+     * bit-wise or (|), see #FloodFillFlags.
+     *
+     * <b>Note:</b> Since the mask is larger than the filled image, a pixel \((x, y)\) in image corresponds to the
+     * pixel \((x+1, y+1)\) in the mask .
+     *
+     * SEE: findContours
+     * @return automatically generated
+     */
+    public static int floodFill(Mat image, Mat mask, Point seedPoint, Scalar newVal, Rect rect, Scalar loDiff, Scalar upDiff, int flags) {
+        double[] rect_out = new double[4];
+        int retVal = floodFill_0(image.nativeObj, mask.nativeObj, seedPoint.x, seedPoint.y, newVal.val[0], newVal.val[1], newVal.val[2], newVal.val[3], rect_out, loDiff.val[0], loDiff.val[1], loDiff.val[2], loDiff.val[3], upDiff.val[0], upDiff.val[1], upDiff.val[2], upDiff.val[3], flags);
+        if(rect!=null){ rect.x = (int)rect_out[0]; rect.y = (int)rect_out[1]; rect.width = (int)rect_out[2]; rect.height = (int)rect_out[3]; }
+        return retVal;
+    }    // C++: enum InterpolationMasks (cv.InterpolationMasks)
+    public static final int
+            INTER_BITS = 5,
+            INTER_BITS2 = INTER_BITS * 2,
+            INTER_TAB_SIZE = 1 << INTER_BITS,
+            INTER_TAB_SIZE2 = INTER_TAB_SIZE * INTER_TAB_SIZE;
+
+
+    // C++: enum LineSegmentDetectorModes (cv.LineSegmentDetectorModes)
+    public static final int
+            LSD_REFINE_NONE = 0,
+            LSD_REFINE_STD = 1,
+            LSD_REFINE_ADV = 2;
+
+
+    // C++: enum LineTypes (cv.LineTypes)
+    public static final int
+            FILLED = -1,
+            LINE_4 = 4,
+            LINE_8 = 8,
+            LINE_AA = 16;
+
+    /**
+     * Fills a connected component with the given color.
+     *
+     * The function cv::floodFill fills a connected component starting from the seed point with the specified
+     * color. The connectivity is determined by the color/brightness closeness of the neighbor pixels. The
+     * pixel at \((x,y)\) is considered to belong to the repainted domain if:
+     *
+     * <ul>
+     *   <li>
+     *  in case of a grayscale image and floating range
+     * \(\texttt{src} (x',y')- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} (x',y')+ \texttt{upDiff}\)
+     *   </li>
+     * </ul>
+     *
+     *
+     * <ul>
+     *   <li>
+     *  in case of a grayscale image and fixed range
+     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)+ \texttt{upDiff}\)
+     *   </li>
+     * </ul>
+     *
+     *
+     * <ul>
+     *   <li>
+     *  in case of a color image and floating range
+     * \(\texttt{src} (x',y')_r- \texttt{loDiff} _r \leq \texttt{src} (x,y)_r \leq \texttt{src} (x',y')_r+ \texttt{upDiff} _r,\)
+     * \(\texttt{src} (x',y')_g- \texttt{loDiff} _g \leq \texttt{src} (x,y)_g \leq \texttt{src} (x',y')_g+ \texttt{upDiff} _g\)
+     * and
+     * \(\texttt{src} (x',y')_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} (x',y')_b+ \texttt{upDiff} _b\)
+     *   </li>
+     * </ul>
+     *
+     *
+     * <ul>
+     *   <li>
+     *  in case of a color image and fixed range
+     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_r- \texttt{loDiff} _r \leq \texttt{src} (x,y)_r \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_r+ \texttt{upDiff} _r,\)
+     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_g- \texttt{loDiff} _g \leq \texttt{src} (x,y)_g \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_g+ \texttt{upDiff} _g\)
+     * and
+     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_b+ \texttt{upDiff} _b\)
+     *   </li>
+     * </ul>
+     *
+     *
+     * where \(src(x',y')\) is the value of one of pixel neighbors that is already known to belong to the
+     * component. That is, to be added to the connected component, a color/brightness of the pixel should
+     * be close enough to:
+     * <ul>
+     *   <li>
+     *  Color/brightness of one of its neighbors that already belong to the connected component in case
+     * of a floating range.
+     *   </li>
+     *   <li>
+     *  Color/brightness of the seed point in case of a fixed range.
+     *   </li>
+     * </ul>
+     *
+     * Use these functions to either mark a connected component with the specified color in-place, or build
+     * a mask and then extract the contour, or copy the region to another image, and so on.
+     *
+     * @param image Input/output 1- or 3-channel, 8-bit, or floating-point image. It is modified by the
+     * function unless the #FLOODFILL_MASK_ONLY flag is set in the second variant of the function. See
+     * the details below.
+     * @param mask Operation mask that should be a single-channel 8-bit image, 2 pixels wider and 2 pixels
+     * taller than image. If an empty Mat is passed it will be created automatically. Since this is both an
+     * input and output parameter, you must take responsibility of initializing it.
+     * Flood-filling cannot go across non-zero pixels in the input mask. For example,
+     * an edge detector output can be used as a mask to stop filling at edges. On output, pixels in the
+     * mask corresponding to filled pixels in the image are set to 1 or to the specified value in flags
+     * as described below. Additionally, the function fills the border of the mask with ones to simplify
+     * internal processing. It is therefore possible to use the same mask in multiple calls to the function
+     * to make sure the filled areas do not overlap.
+     * @param seedPoint Starting point.
+     * @param newVal New value of the repainted domain pixels.
+     * @param loDiff Maximal lower brightness/color difference between the currently observed pixel and
+     * one of its neighbors belonging to the component, or a seed pixel being added to the component.
+     * @param upDiff Maximal upper brightness/color difference between the currently observed pixel and
+     * one of its neighbors belonging to the component, or a seed pixel being added to the component.
+     * @param rect Optional output parameter set by the function to the minimum bounding rectangle of the
+     * repainted domain.
+     * 4 means that only the four nearest neighbor pixels (those that share an edge) are considered. A
+     * connectivity value of 8 means that the eight nearest neighbor pixels (those that share a corner)
+     * will be considered. The next 8 bits (8-16) contain a value between 1 and 255 with which to fill
+     * the mask (the default value is 1). For example, 4 | ( 255 &lt;&lt; 8 ) will consider 4 nearest
+     * neighbours and fill the mask with a value of 255. The following additional options occupy higher
+     * bits and therefore may be further combined with the connectivity and mask fill values using
+     * bit-wise or (|), see #FloodFillFlags.
+     *
+     * <b>Note:</b> Since the mask is larger than the filled image, a pixel \((x, y)\) in image corresponds to the
+     * pixel \((x+1, y+1)\) in the mask .
+     *
+     * SEE: findContours
+     * @return automatically generated
+     */
+    public static int floodFill(Mat image, Mat mask, Point seedPoint, Scalar newVal, Rect rect, Scalar loDiff, Scalar upDiff) {
+        double[] rect_out = new double[4];
+        int retVal = floodFill_1(image.nativeObj, mask.nativeObj, seedPoint.x, seedPoint.y, newVal.val[0], newVal.val[1], newVal.val[2], newVal.val[3], rect_out, loDiff.val[0], loDiff.val[1], loDiff.val[2], loDiff.val[3], upDiff.val[0], upDiff.val[1], upDiff.val[2], upDiff.val[3]);
+        if(rect!=null){ rect.x = (int)rect_out[0]; rect.y = (int)rect_out[1]; rect.width = (int)rect_out[2]; rect.height = (int)rect_out[3]; }
+        return retVal;
+    }
+
+
+    // C++: enum MorphShapes (cv.MorphShapes)
+    public static final int
+            MORPH_RECT = 0,
+            MORPH_CROSS = 1,
+            MORPH_ELLIPSE = 2,
+            MORPH_DIAMOND = 3;
+
+
+    // C++: enum MorphTypes (cv.MorphTypes)
+    public static final int
+            MORPH_ERODE = 0,
+            MORPH_DILATE = 1,
+            MORPH_OPEN = 2,
+            MORPH_CLOSE = 3,
+            MORPH_GRADIENT = 4,
+            MORPH_TOPHAT = 5,
+            MORPH_BLACKHAT = 6,
+            MORPH_HITMISS = 7;
+
+
+    // C++: enum RectanglesIntersectTypes (cv.RectanglesIntersectTypes)
+    public static final int
+            INTERSECT_NONE = 0,
+            INTERSECT_PARTIAL = 1,
+            INTERSECT_FULL = 2;
+
+
+    // C++: enum RetrievalModes (cv.RetrievalModes)
+    public static final int
+            RETR_EXTERNAL = 0,
+            RETR_LIST = 1,
+            RETR_CCOMP = 2,
+            RETR_TREE = 3,
+            RETR_FLOODFILL = 4;
+
+
+    // C++: enum ShapeMatchModes (cv.ShapeMatchModes)
+    public static final int
+            CONTOURS_MATCH_I1 = 1,
+            CONTOURS_MATCH_I2 = 2,
+            CONTOURS_MATCH_I3 = 3;
+
+
+    // C++: enum SpecialFilter (cv.SpecialFilter)
+    public static final int
+            FILTER_SCHARR = -1;
+
+
+    // C++: enum TemplateMatchModes (cv.TemplateMatchModes)
+    public static final int
+            TM_SQDIFF = 0,
+            TM_SQDIFF_NORMED = 1,
+            TM_CCORR = 2,
+            TM_CCORR_NORMED = 3,
+            TM_CCOEFF = 4,
+            TM_CCOEFF_NORMED = 5;
+
+
+    // C++: enum ThresholdTypes (cv.ThresholdTypes)
+    public static final int
+            THRESH_BINARY = 0,
+            THRESH_BINARY_INV = 1,
+            THRESH_TRUNC = 2,
+            THRESH_TOZERO = 3,
+            THRESH_TOZERO_INV = 4,
+            THRESH_MASK = 7,
+            THRESH_OTSU = 8,
+            THRESH_TRIANGLE = 16,
+            THRESH_DRYRUN = 128;
+
+
+    // C++: enum WarpPolarMode (cv.WarpPolarMode)
+    public static final int
+            WARP_POLAR_LINEAR = 0,
+            WARP_POLAR_LOG = 256;
+
+
+    //
+    // C++:  Ptr_LineSegmentDetector cv::createLineSegmentDetector(int refine = LSD_REFINE_STD, double scale = 0.8, double sigma_scale = 0.6, double quant = 2.0, double ang_th = 22.5, double log_eps = 0, double density_th = 0.7, int n_bins = 1024)
+    //
 
     /**
      * Creates a smart pointer to a LineSegmentDetector object and initializes it.
@@ -641,11 +905,6 @@ public class Imgproc {
     public static LineSegmentDetector createLineSegmentDetector(int refine, double scale, double sigma_scale, double quant, double ang_th, double log_eps, double density_th) {
         return LineSegmentDetector.__fromPtr__(createLineSegmentDetector_1(refine, scale, sigma_scale, quant, ang_th, log_eps, density_th));
     }
-
-
-    //
-    // C++:  Ptr_LineSegmentDetector cv::createLineSegmentDetector(int refine = LSD_REFINE_STD, double scale = 0.8, double sigma_scale = 0.6, double quant = 2.0, double ang_th = 22.5, double log_eps = 0, double density_th = 0.7, int n_bins = 1024)
-    //
 
     /**
      * Creates a smart pointer to a LineSegmentDetector object and initializes it.
@@ -752,6 +1011,11 @@ public class Imgproc {
         return LineSegmentDetector.__fromPtr__(createLineSegmentDetector_8());
     }
 
+
+    //
+    // C++:  Mat cv::getGaussianKernel(int ksize, double sigma, int ktype = CV_64F)
+    //
+
     /**
      * Returns Gaussian filter coefficients.
      *
@@ -801,7 +1065,7 @@ public class Imgproc {
 
 
     //
-    // C++:  Mat cv::getGaussianKernel(int ksize, double sigma, int ktype = CV_64F)
+    // C++:  void cv::getDerivKernels(Mat& kx, Mat& ky, int dx, int dy, int ksize, bool normalize = false, int ktype = CV_32F)
     //
 
     /**
@@ -849,11 +1113,6 @@ public class Imgproc {
         getDerivKernels_1(kx.nativeObj, ky.nativeObj, dx, dy, ksize, normalize);
     }
 
-
-    //
-    // C++:  void cv::getDerivKernels(Mat& kx, Mat& ky, int dx, int dy, int ksize, bool normalize = false, int ktype = CV_32F)
-    //
-
     /**
      * Returns filter coefficients for computing spatial image derivatives.
      *
@@ -874,6 +1133,11 @@ public class Imgproc {
     public static void getDerivKernels(Mat kx, Mat ky, int dx, int dy, int ksize) {
         getDerivKernels_2(kx.nativeObj, ky.nativeObj, dx, dy, ksize);
     }
+
+
+    //
+    // C++:  Mat cv::getGaborKernel(Size ksize, double sigma, double theta, double lambd, double gamma, double psi = CV_PI*0.5, int ktype = CV_64F)
+    //
 
     /**
      * Returns Gabor filter coefficients.
@@ -912,11 +1176,6 @@ public class Imgproc {
         return new Mat(getGaborKernel_1(ksize.width, ksize.height, sigma, theta, lambd, gamma, psi));
     }
 
-
-    //
-    // C++:  Mat cv::getGaborKernel(Size ksize, double sigma, double theta, double lambd, double gamma, double psi = CV_PI*0.5, int ktype = CV_64F)
-    //
-
     /**
      * Returns Gabor filter coefficients.
      *
@@ -933,6 +1192,11 @@ public class Imgproc {
     public static Mat getGaborKernel(Size ksize, double sigma, double theta, double lambd, double gamma) {
         return new Mat(getGaborKernel_2(ksize.width, ksize.height, sigma, theta, lambd, gamma));
     }
+
+
+    //
+    // C++:  Mat cv::getStructuringElement(int shape, Size ksize, Point anchor = Point(-1,-1))
+    //
 
     /**
      * Returns a structuring element of the specified size and shape for morphological operations.
@@ -973,7 +1237,7 @@ public class Imgproc {
 
 
     //
-    // C++:  Mat cv::getStructuringElement(int shape, Size ksize, Point anchor = Point(-1,-1))
+    // C++:  void cv::medianBlur(Mat src, Mat& dst, int ksize)
     //
 
     /**
@@ -994,6 +1258,11 @@ public class Imgproc {
     public static void medianBlur(Mat src, Mat dst, int ksize) {
         medianBlur_0(src.nativeObj, dst.nativeObj, ksize);
     }
+
+
+    //
+    // C++:  void cv::GaussianBlur(Mat src, Mat& dst, Size ksize, double sigmaX, double sigmaY = 0, int borderType = BORDER_DEFAULT, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
+    //
 
     /**
      * Blurs an image using a Gaussian filter.
@@ -1021,11 +1290,6 @@ public class Imgproc {
         GaussianBlur_0(src.nativeObj, dst.nativeObj, ksize.width, ksize.height, sigmaX, sigmaY, borderType, hint);
     }
 
-
-    //
-    // C++:  void cv::medianBlur(Mat src, Mat& dst, int ksize)
-    //
-
     /**
      * Blurs an image using a Gaussian filter.
      *
@@ -1050,11 +1314,6 @@ public class Imgproc {
     public static void GaussianBlur(Mat src, Mat dst, Size ksize, double sigmaX, double sigmaY, int borderType) {
         GaussianBlur_1(src.nativeObj, dst.nativeObj, ksize.width, ksize.height, sigmaX, sigmaY, borderType);
     }
-
-
-    //
-    // C++:  void cv::GaussianBlur(Mat src, Mat& dst, Size ksize, double sigmaX, double sigmaY = 0, int borderType = BORDER_DEFAULT, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
-    //
 
     /**
      * Blurs an image using a Gaussian filter.
@@ -1102,6 +1361,11 @@ public class Imgproc {
     public static void GaussianBlur(Mat src, Mat dst, Size ksize, double sigmaX) {
         GaussianBlur_3(src.nativeObj, dst.nativeObj, ksize.width, ksize.height, sigmaX);
     }
+
+
+    //
+    // C++:  void cv::bilateralFilter(Mat src, Mat& dst, int d, double sigmaColor, double sigmaSpace, int borderType = BORDER_DEFAULT)
+    //
 
     /**
      * Applies the bilateral filter to an image.
@@ -1170,7 +1434,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::bilateralFilter(Mat src, Mat& dst, int d, double sigmaColor, double sigmaSpace, int borderType = BORDER_DEFAULT)
+    // C++:  void cv::boxFilter(Mat src, Mat& dst, int ddepth, Size ksize, Point anchor = Point(-1,-1), bool normalize = true, int borderType = BORDER_DEFAULT)
     //
 
     /**
@@ -1230,11 +1494,6 @@ public class Imgproc {
         boxFilter_1(src.nativeObj, dst.nativeObj, ddepth, ksize.width, ksize.height, anchor.x, anchor.y, normalize);
     }
 
-
-    //
-    // C++:  void cv::boxFilter(Mat src, Mat& dst, int ddepth, Size ksize, Point anchor = Point(-1,-1), bool normalize = true, int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Blurs an image using the box filter.
      *
@@ -1288,6 +1547,11 @@ public class Imgproc {
         boxFilter_3(src.nativeObj, dst.nativeObj, ddepth, ksize.width, ksize.height);
     }
 
+
+    //
+    // C++:  void cv::sqrBoxFilter(Mat src, Mat& dst, int ddepth, Size ksize, Point anchor = Point(-1, -1), bool normalize = true, int borderType = BORDER_DEFAULT)
+    //
+
     /**
      * Calculates the normalized sum of squares of the pixel values overlapping the filter.
      *
@@ -1333,11 +1597,6 @@ public class Imgproc {
         sqrBoxFilter_1(src.nativeObj, dst.nativeObj, ddepth, ksize.width, ksize.height, anchor.x, anchor.y, normalize);
     }
 
-
-    //
-    // C++:  void cv::sqrBoxFilter(Mat src, Mat& dst, int ddepth, Size ksize, Point anchor = Point(-1, -1), bool normalize = true, int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Calculates the normalized sum of squares of the pixel values overlapping the filter.
      *
@@ -1378,6 +1637,11 @@ public class Imgproc {
     public static void sqrBoxFilter(Mat src, Mat dst, int ddepth, Size ksize) {
         sqrBoxFilter_3(src.nativeObj, dst.nativeObj, ddepth, ksize.width, ksize.height);
     }
+
+
+    //
+    // C++:  void cv::blur(Mat src, Mat& dst, Size ksize, Point anchor = Point(-1,-1), int borderType = BORDER_DEFAULT)
+    //
 
     /**
      * Blurs an image using the normalized box filter.
@@ -1424,11 +1688,6 @@ public class Imgproc {
         blur_1(src.nativeObj, dst.nativeObj, ksize.width, ksize.height, anchor.x, anchor.y);
     }
 
-
-    //
-    // C++:  void cv::blur(Mat src, Mat& dst, Size ksize, Point anchor = Point(-1,-1), int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Blurs an image using the normalized box filter.
      *
@@ -1450,6 +1709,11 @@ public class Imgproc {
         blur_2(src.nativeObj, dst.nativeObj, ksize.width, ksize.height);
     }
 
+
+    //
+    // C++:  void cv::stackBlur(Mat src, Mat& dst, Size ksize)
+    //
+
     /**
      * Blurs an image using the stackBlur.
      *
@@ -1469,6 +1733,11 @@ public class Imgproc {
     public static void stackBlur(Mat src, Mat dst, Size ksize) {
         stackBlur_0(src.nativeObj, dst.nativeObj, ksize.width, ksize.height);
     }
+
+
+    //
+    // C++:  void cv::filter2D(Mat src, Mat& dst, int ddepth, Mat kernel, Point anchor = Point(-1,-1), double delta = 0, int borderType = BORDER_DEFAULT)
+    //
 
     /**
      * Convolves an image with the kernel.
@@ -1505,11 +1774,6 @@ public class Imgproc {
         filter2D_0(src.nativeObj, dst.nativeObj, ddepth, kernel.nativeObj, anchor.x, anchor.y, delta, borderType);
     }
 
-
-    //
-    // C++:  void cv::stackBlur(Mat src, Mat& dst, Size ksize)
-    //
-
     /**
      * Convolves an image with the kernel.
      *
@@ -1543,11 +1807,6 @@ public class Imgproc {
     public static void filter2D(Mat src, Mat dst, int ddepth, Mat kernel, Point anchor, double delta) {
         filter2D_1(src.nativeObj, dst.nativeObj, ddepth, kernel.nativeObj, anchor.x, anchor.y, delta);
     }
-
-
-    //
-    // C++:  void cv::filter2D(Mat src, Mat& dst, int ddepth, Mat kernel, Point anchor = Point(-1,-1), double delta = 0, int borderType = BORDER_DEFAULT)
-    //
 
     /**
      * Convolves an image with the kernel.
@@ -1614,6 +1873,11 @@ public class Imgproc {
         filter2D_3(src.nativeObj, dst.nativeObj, ddepth, kernel.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::sepFilter2D(Mat src, Mat& dst, int ddepth, Mat kernelX, Mat kernelY, Point anchor = Point(-1,-1), double delta = 0, int borderType = BORDER_DEFAULT)
+    //
+
     /**
      * Applies a separable linear filter to an image.
      *
@@ -1657,11 +1921,6 @@ public class Imgproc {
         sepFilter2D_1(src.nativeObj, dst.nativeObj, ddepth, kernelX.nativeObj, kernelY.nativeObj, anchor.x, anchor.y, delta);
     }
 
-
-    //
-    // C++:  void cv::sepFilter2D(Mat src, Mat& dst, int ddepth, Mat kernelX, Mat kernelY, Point anchor = Point(-1,-1), double delta = 0, int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Applies a separable linear filter to an image.
      *
@@ -1700,6 +1959,11 @@ public class Imgproc {
     public static void sepFilter2D(Mat src, Mat dst, int ddepth, Mat kernelX, Mat kernelY) {
         sepFilter2D_3(src.nativeObj, dst.nativeObj, ddepth, kernelX.nativeObj, kernelY.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::Sobel(Mat src, Mat& dst, int ddepth, int dx, int dy, int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
+    //
 
     /**
      * Calculates the first, second, third, or mixed image derivatives using an extended Sobel operator.
@@ -1793,11 +2057,6 @@ public class Imgproc {
     public static void Sobel(Mat src, Mat dst, int ddepth, int dx, int dy, int ksize, double scale, double delta) {
         Sobel_1(src.nativeObj, dst.nativeObj, ddepth, dx, dy, ksize, scale, delta);
     }
-
-
-    //
-    // C++:  void cv::Sobel(Mat src, Mat& dst, int ddepth, int dx, int dy, int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
-    //
 
     /**
      * Calculates the first, second, third, or mixed image derivatives using an extended Sobel operator.
@@ -1931,6 +2190,11 @@ public class Imgproc {
         Sobel_4(src.nativeObj, dst.nativeObj, ddepth, dx, dy);
     }
 
+
+    //
+    // C++:  void cv::spatialGradient(Mat src, Mat& dx, Mat& dy, int ksize = 3, int borderType = BORDER_DEFAULT)
+    //
+
     /**
      * Calculates the first order image derivative in both x and y using a Sobel operator
      *
@@ -1976,11 +2240,6 @@ public class Imgproc {
         spatialGradient_1(src.nativeObj, dx.nativeObj, dy.nativeObj, ksize);
     }
 
-
-    //
-    // C++:  void cv::spatialGradient(Mat src, Mat& dx, Mat& dy, int ksize = 3, int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Calculates the first order image derivative in both x and y using a Sobel operator
      *
@@ -2001,6 +2260,11 @@ public class Imgproc {
     public static void spatialGradient(Mat src, Mat dx, Mat dy) {
         spatialGradient_2(src.nativeObj, dx.nativeObj, dy.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::Scharr(Mat src, Mat& dst, int ddepth, int dx, int dy, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
+    //
 
     /**
      * Calculates the first x- or y- image derivative using Scharr operator.
@@ -2055,11 +2319,6 @@ public class Imgproc {
         Scharr_1(src.nativeObj, dst.nativeObj, ddepth, dx, dy, scale, delta);
     }
 
-
-    //
-    // C++:  void cv::Scharr(Mat src, Mat& dst, int ddepth, int dx, int dy, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Calculates the first x- or y- image derivative using Scharr operator.
      *
@@ -2108,6 +2367,11 @@ public class Imgproc {
     public static void Scharr(Mat src, Mat dst, int ddepth, int dx, int dy) {
         Scharr_3(src.nativeObj, dst.nativeObj, ddepth, dx, dy);
     }
+
+
+    //
+    // C++:  void cv::Laplacian(Mat src, Mat& dst, int ddepth, int ksize = 1, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
+    //
 
     /**
      * Calculates the Laplacian of an image.
@@ -2163,11 +2427,6 @@ public class Imgproc {
     public static void Laplacian(Mat src, Mat dst, int ddepth, int ksize, double scale, double delta) {
         Laplacian_1(src.nativeObj, dst.nativeObj, ddepth, ksize, scale, delta);
     }
-
-
-    //
-    // C++:  void cv::Laplacian(Mat src, Mat& dst, int ddepth, int ksize = 1, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
-    //
 
     /**
      * Calculates the Laplacian of an image.
@@ -2244,6 +2503,11 @@ public class Imgproc {
         Laplacian_4(src.nativeObj, dst.nativeObj, ddepth);
     }
 
+
+    //
+    // C++:  void cv::Canny(Mat image, Mat& edges, double threshold1, double threshold2, int apertureSize = 3, bool L2gradient = false)
+    //
+
     /**
      * Finds edges in an image using the Canny algorithm CITE: Canny86 .
      *
@@ -2287,11 +2551,6 @@ public class Imgproc {
         Canny_1(image.nativeObj, edges.nativeObj, threshold1, threshold2, apertureSize);
     }
 
-
-    //
-    // C++:  void cv::Canny(Mat image, Mat& edges, double threshold1, double threshold2, int apertureSize = 3, bool L2gradient = false)
-    //
-
     /**
      * Finds edges in an image using the Canny algorithm CITE: Canny86 .
      *
@@ -2311,6 +2570,11 @@ public class Imgproc {
     public static void Canny(Mat image, Mat edges, double threshold1, double threshold2) {
         Canny_2(image.nativeObj, edges.nativeObj, threshold1, threshold2);
     }
+
+
+    //
+    // C++:  void cv::Canny(Mat dx, Mat dy, Mat& edges, double threshold1, double threshold2, bool L2gradient = false)
+    //
 
     /**
      * \overload
@@ -2351,7 +2615,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::Canny(Mat dx, Mat dy, Mat& edges, double threshold1, double threshold2, bool L2gradient = false)
+    // C++:  void cv::cornerMinEigenVal(Mat src, Mat& dst, int blockSize, int ksize = 3, int borderType = BORDER_DEFAULT)
     //
 
     /**
@@ -2389,11 +2653,6 @@ public class Imgproc {
         cornerMinEigenVal_1(src.nativeObj, dst.nativeObj, blockSize, ksize);
     }
 
-
-    //
-    // C++:  void cv::cornerMinEigenVal(Mat src, Mat& dst, int blockSize, int ksize = 3, int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Calculates the minimal eigenvalue of gradient matrices for corner detection.
      *
@@ -2409,6 +2668,11 @@ public class Imgproc {
     public static void cornerMinEigenVal(Mat src, Mat dst, int blockSize) {
         cornerMinEigenVal_2(src.nativeObj, dst.nativeObj, blockSize);
     }
+
+
+    //
+    // C++:  void cv::cornerHarris(Mat src, Mat& dst, int blockSize, int ksize, double k, int borderType = BORDER_DEFAULT)
+    //
 
     /**
      * Harris corner detector.
@@ -2459,7 +2723,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::cornerHarris(Mat src, Mat& dst, int blockSize, int ksize, double k, int borderType = BORDER_DEFAULT)
+    // C++:  void cv::cornerEigenValsAndVecs(Mat src, Mat& dst, int blockSize, int ksize, int borderType = BORDER_DEFAULT)
     //
 
     /**
@@ -2541,7 +2805,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::cornerEigenValsAndVecs(Mat src, Mat& dst, int blockSize, int ksize, int borderType = BORDER_DEFAULT)
+    // C++:  void cv::preCornerDetect(Mat src, Mat& dst, int ksize, int borderType = BORDER_DEFAULT)
     //
 
     /**
@@ -2601,7 +2865,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::preCornerDetect(Mat src, Mat& dst, int ksize, int borderType = BORDER_DEFAULT)
+    // C++:  void cv::cornerSubPix(Mat image, Mat& corners, Size winSize, Size zeroZone, TermCriteria criteria)
     //
 
     /**
@@ -2648,6 +2912,11 @@ public class Imgproc {
     public static void cornerSubPix(Mat image, Mat corners, Size winSize, Size zeroZone, TermCriteria criteria) {
         cornerSubPix_0(image.nativeObj, corners.nativeObj, winSize.width, winSize.height, zeroZone.width, zeroZone.height, criteria.type, criteria.maxCount, criteria.epsilon);
     }
+
+
+    //
+    // C++:  void cv::goodFeaturesToTrack(Mat image, vector_Point& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask = Mat(), int blockSize = 3, bool useHarrisDetector = false, double k = 0.04)
+    //
 
     /**
      * Determines strong corners on an image.
@@ -2710,11 +2979,6 @@ public class Imgproc {
         goodFeaturesToTrack_0(image.nativeObj, corners_mat.nativeObj, maxCorners, qualityLevel, minDistance, mask.nativeObj, blockSize, useHarrisDetector, k);
     }
 
-
-    //
-    // C++:  void cv::cornerSubPix(Mat image, Mat& corners, Size winSize, Size zeroZone, TermCriteria criteria)
-    //
-
     /**
      * Determines strong corners on an image.
      *
@@ -2774,11 +3038,6 @@ public class Imgproc {
         Mat corners_mat = corners;
         goodFeaturesToTrack_1(image.nativeObj, corners_mat.nativeObj, maxCorners, qualityLevel, minDistance, mask.nativeObj, blockSize, useHarrisDetector);
     }
-
-
-    //
-    // C++:  void cv::goodFeaturesToTrack(Mat image, vector_Point& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask = Mat(), int blockSize = 3, bool useHarrisDetector = false, double k = 0.04)
-    //
 
     /**
      * Determines strong corners on an image.
@@ -2954,6 +3213,11 @@ public class Imgproc {
         goodFeaturesToTrack_4(image.nativeObj, corners_mat.nativeObj, maxCorners, qualityLevel, minDistance);
     }
 
+
+    //
+    // C++:  void cv::goodFeaturesToTrack(Mat image, vector_Point& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, int blockSize, int gradientSize, bool useHarrisDetector = false, double k = 0.04)
+    //
+
     public static void goodFeaturesToTrack(Mat image, MatOfPoint corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, int blockSize, int gradientSize, boolean useHarrisDetector, double k) {
         Mat corners_mat = corners;
         goodFeaturesToTrack_5(image.nativeObj, corners_mat.nativeObj, maxCorners, qualityLevel, minDistance, mask.nativeObj, blockSize, gradientSize, useHarrisDetector, k);
@@ -2964,15 +3228,15 @@ public class Imgproc {
         goodFeaturesToTrack_6(image.nativeObj, corners_mat.nativeObj, maxCorners, qualityLevel, minDistance, mask.nativeObj, blockSize, gradientSize, useHarrisDetector);
     }
 
-
-    //
-    // C++:  void cv::goodFeaturesToTrack(Mat image, vector_Point& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, int blockSize, int gradientSize, bool useHarrisDetector = false, double k = 0.04)
-    //
-
     public static void goodFeaturesToTrack(Mat image, MatOfPoint corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, int blockSize, int gradientSize) {
         Mat corners_mat = corners;
         goodFeaturesToTrack_7(image.nativeObj, corners_mat.nativeObj, maxCorners, qualityLevel, minDistance, mask.nativeObj, blockSize, gradientSize);
     }
+
+
+    //
+    // C++:  void cv::goodFeaturesToTrack(Mat image, Mat& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, Mat& cornersQuality, int blockSize = 3, int gradientSize = 3, bool useHarrisDetector = false, double k = 0.04)
+    //
 
     /**
      * Same as above, but returns also quality measure of the detected corners.
@@ -3032,11 +3296,6 @@ public class Imgproc {
     public static void goodFeaturesToTrackWithQuality(Mat image, Mat corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, Mat cornersQuality, int blockSize, int gradientSize, boolean useHarrisDetector) {
         goodFeaturesToTrackWithQuality_1(image.nativeObj, corners.nativeObj, maxCorners, qualityLevel, minDistance, mask.nativeObj, cornersQuality.nativeObj, blockSize, gradientSize, useHarrisDetector);
     }
-
-
-    //
-    // C++:  void cv::goodFeaturesToTrack(Mat image, Mat& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, Mat& cornersQuality, int blockSize = 3, int gradientSize = 3, bool useHarrisDetector = false, double k = 0.04)
-    //
 
     /**
      * Same as above, but returns also quality measure of the detected corners.
@@ -3119,6 +3378,11 @@ public class Imgproc {
         goodFeaturesToTrackWithQuality_4(image.nativeObj, corners.nativeObj, maxCorners, qualityLevel, minDistance, mask.nativeObj, cornersQuality.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::HoughLines(Mat image, Mat& lines, double rho, double theta, int threshold, double srn = 0, double stn = 0, double min_theta = 0, double max_theta = CV_PI, bool use_edgeval = false)
+    //
+
     /**
      * Finds lines in a binary image using the standard Hough transform.
      *
@@ -3183,11 +3447,6 @@ public class Imgproc {
     public static void HoughLines(Mat image, Mat lines, double rho, double theta, int threshold, double srn, double stn, double min_theta, double max_theta) {
         HoughLines_1(image.nativeObj, lines.nativeObj, rho, theta, threshold, srn, stn, min_theta, max_theta);
     }
-
-
-    //
-    // C++:  void cv::HoughLines(Mat image, Mat& lines, double rho, double theta, int threshold, double srn = 0, double stn = 0, double min_theta = 0, double max_theta = CV_PI, bool use_edgeval = false)
-    //
 
     /**
      * Finds lines in a binary image using the standard Hough transform.
@@ -3307,6 +3566,11 @@ public class Imgproc {
         HoughLines_5(image.nativeObj, lines.nativeObj, rho, theta, threshold);
     }
 
+
+    //
+    // C++:  void cv::HoughLinesP(Mat image, Mat& lines, double rho, double theta, int threshold, double minLineLength = 0, double maxLineGap = 0)
+    //
+
     /**
      * Finds line segments in a binary image using the probabilistic Hough transform.
      *
@@ -3372,11 +3636,6 @@ public class Imgproc {
         HoughLinesP_1(image.nativeObj, lines.nativeObj, rho, theta, threshold, minLineLength);
     }
 
-
-    //
-    // C++:  void cv::HoughLinesP(Mat image, Mat& lines, double rho, double theta, int threshold, double minLineLength = 0, double maxLineGap = 0)
-    //
-
     /**
      * Finds line segments in a binary image using the probabilistic Hough transform.
      *
@@ -3408,6 +3667,11 @@ public class Imgproc {
         HoughLinesP_2(image.nativeObj, lines.nativeObj, rho, theta, threshold);
     }
 
+
+    //
+    // C++:  void cv::HoughLinesPointSet(Mat point, Mat& lines, int lines_max, int threshold, double min_rho, double max_rho, double rho_step, double min_theta, double max_theta, double theta_step)
+    //
+
     /**
      * Finds lines in a set of points using the standard Hough transform.
      *
@@ -3430,6 +3694,11 @@ public class Imgproc {
     public static void HoughLinesPointSet(Mat point, Mat lines, int lines_max, int threshold, double min_rho, double max_rho, double rho_step, double min_theta, double max_theta, double theta_step) {
         HoughLinesPointSet_0(point.nativeObj, lines.nativeObj, lines_max, threshold, min_rho, max_rho, rho_step, min_theta, max_theta, theta_step);
     }
+
+
+    //
+    // C++:  void cv::HoughCircles(Mat image, Mat& circles, int method, double dp, double minDist, double param1 = 100, double param2 = 100, int minRadius = 0, int maxRadius = 0)
+    //
 
     /**
      * Finds circles in a grayscale image using the Hough transform.
@@ -3479,11 +3748,6 @@ public class Imgproc {
         HoughCircles_0(image.nativeObj, circles.nativeObj, method, dp, minDist, param1, param2, minRadius, maxRadius);
     }
 
-
-    //
-    // C++:  void cv::HoughLinesPointSet(Mat point, Mat& lines, int lines_max, int threshold, double min_rho, double max_rho, double rho_step, double min_theta, double max_theta, double theta_step)
-    //
-
     /**
      * Finds circles in a grayscale image using the Hough transform.
      *
@@ -3530,11 +3794,6 @@ public class Imgproc {
     public static void HoughCircles(Mat image, Mat circles, int method, double dp, double minDist, double param1, double param2, int minRadius) {
         HoughCircles_1(image.nativeObj, circles.nativeObj, method, dp, minDist, param1, param2, minRadius);
     }
-
-
-    //
-    // C++:  void cv::HoughCircles(Mat image, Mat& circles, int method, double dp, double minDist, double param1 = 100, double param2 = 100, int minRadius = 0, int maxRadius = 0)
-    //
 
     /**
      * Finds circles in a grayscale image using the Hough transform.
@@ -3671,6 +3930,11 @@ public class Imgproc {
         HoughCircles_4(image.nativeObj, circles.nativeObj, method, dp, minDist);
     }
 
+
+    //
+    // C++:  void cv::erode(Mat src, Mat& dst, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
+    //
+
     /**
      * Erodes an image by using a specific structuring element.
      *
@@ -3723,11 +3987,6 @@ public class Imgproc {
     public static void erode(Mat src, Mat dst, Mat kernel, Point anchor, int iterations, int borderType) {
         erode_1(src.nativeObj, dst.nativeObj, kernel.nativeObj, anchor.x, anchor.y, iterations, borderType);
     }
-
-
-    //
-    // C++:  void cv::erode(Mat src, Mat& dst, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
-    //
 
     /**
      * Erodes an image by using a specific structuring element.
@@ -3801,6 +4060,11 @@ public class Imgproc {
         erode_4(src.nativeObj, dst.nativeObj, kernel.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::dilate(Mat src, Mat& dst, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
+    //
+
     /**
      * Dilates an image by using a specific structuring element.
      *
@@ -3851,11 +4115,6 @@ public class Imgproc {
     public static void dilate(Mat src, Mat dst, Mat kernel, Point anchor, int iterations, int borderType) {
         dilate_1(src.nativeObj, dst.nativeObj, kernel.nativeObj, anchor.x, anchor.y, iterations, borderType);
     }
-
-
-    //
-    // C++:  void cv::dilate(Mat src, Mat& dst, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
-    //
 
     /**
      * Dilates an image by using a specific structuring element.
@@ -3926,6 +4185,11 @@ public class Imgproc {
         dilate_4(src.nativeObj, dst.nativeObj, kernel.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::morphologyEx(Mat src, Mat& dst, int op, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
+    //
+
     /**
      * Performs advanced morphological transformations.
      *
@@ -3982,11 +4246,6 @@ public class Imgproc {
     public static void morphologyEx(Mat src, Mat dst, int op, Mat kernel, Point anchor, int iterations, int borderType) {
         morphologyEx_1(src.nativeObj, dst.nativeObj, op, kernel.nativeObj, anchor.x, anchor.y, iterations, borderType);
     }
-
-
-    //
-    // C++:  void cv::morphologyEx(Mat src, Mat& dst, int op, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
-    //
 
     /**
      * Performs advanced morphological transformations.
@@ -4066,6 +4325,11 @@ public class Imgproc {
         morphologyEx_4(src.nativeObj, dst.nativeObj, op, kernel.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::resize(Mat src, Mat& dst, Size dsize, double fx = 0, double fy = 0, int interpolation = INTER_LINEAR)
+    //
+
     /**
      * Resizes an image.
      *
@@ -4143,11 +4407,6 @@ public class Imgproc {
         resize_1(src.nativeObj, dst.nativeObj, dsize.width, dsize.height, fx, fy);
     }
 
-
-    //
-    // C++:  void cv::resize(Mat src, Mat& dst, Size dsize, double fx = 0, double fy = 0, int interpolation = INTER_LINEAR)
-    //
-
     /**
      * Resizes an image.
      *
@@ -4221,6 +4480,11 @@ public class Imgproc {
         resize_3(src.nativeObj, dst.nativeObj, dsize.width, dsize.height);
     }
 
+
+    //
+    // C++:  void cv::warpAffine(Mat src, Mat& dst, Mat M, Size dsize, int flags = INTER_LINEAR, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
+    //
+
     /**
      * Applies an affine transformation to an image.
      *
@@ -4278,11 +4542,6 @@ public class Imgproc {
         warpAffine_1(src.nativeObj, dst.nativeObj, M.nativeObj, dsize.width, dsize.height, flags, borderMode);
     }
 
-
-    //
-    // C++:  void cv::warpAffine(Mat src, Mat& dst, Mat M, Size dsize, int flags = INTER_LINEAR, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
-    //
-
     /**
      * Applies an affine transformation to an image.
      *
@@ -4335,6 +4594,11 @@ public class Imgproc {
     public static void warpAffine(Mat src, Mat dst, Mat M, Size dsize) {
         warpAffine_3(src.nativeObj, dst.nativeObj, M.nativeObj, dsize.width, dsize.height);
     }
+
+
+    //
+    // C++:  void cv::warpPerspective(Mat src, Mat& dst, Mat M, Size dsize, int flags = INTER_LINEAR, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
+    //
 
     /**
      * Applies a perspective transformation to an image.
@@ -4389,11 +4653,6 @@ public class Imgproc {
         warpPerspective_1(src.nativeObj, dst.nativeObj, M.nativeObj, dsize.width, dsize.height, flags, borderMode);
     }
 
-
-    //
-    // C++:  void cv::warpPerspective(Mat src, Mat& dst, Mat M, Size dsize, int flags = INTER_LINEAR, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
-    //
-
     /**
      * Applies a perspective transformation to an image.
      *
@@ -4442,6 +4701,11 @@ public class Imgproc {
     public static void warpPerspective(Mat src, Mat dst, Mat M, Size dsize) {
         warpPerspective_3(src.nativeObj, dst.nativeObj, M.nativeObj, dsize.width, dsize.height);
     }
+
+
+    //
+    // C++:  void cv::remap(Mat src, Mat& dst, Mat map1, Mat map2, int interpolation, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
+    //
 
     /**
      * Applies a generic geometrical transformation to an image.
@@ -4528,11 +4792,6 @@ public class Imgproc {
         remap_1(src.nativeObj, dst.nativeObj, map1.nativeObj, map2.nativeObj, interpolation, borderMode);
     }
 
-
-    //
-    // C++:  void cv::remap(Mat src, Mat& dst, Mat map1, Mat map2, int interpolation, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
-    //
-
     /**
      * Applies a generic geometrical transformation to an image.
      *
@@ -4573,6 +4832,11 @@ public class Imgproc {
     public static void remap(Mat src, Mat dst, Mat map1, Mat map2, int interpolation) {
         remap_2(src.nativeObj, dst.nativeObj, map1.nativeObj, map2.nativeObj, interpolation);
     }
+
+
+    //
+    // C++:  void cv::convertMaps(Mat map1, Mat map2, Mat& dstmap1, Mat& dstmap2, int dstmap1type, bool nninterpolation = false)
+    //
 
     /**
      * Converts image transformation maps from one representation to another.
@@ -4669,7 +4933,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::convertMaps(Mat map1, Mat map2, Mat& dstmap1, Mat& dstmap2, int dstmap1type, bool nninterpolation = false)
+    // C++:  Mat cv::getRotationMatrix2D(Point2f center, double angle, double scale)
     //
 
     /**
@@ -4697,6 +4961,11 @@ public class Imgproc {
         return new Mat(getRotationMatrix2D_0(center.x, center.y, angle, scale));
     }
 
+
+    //
+    // C++:  void cv::invertAffineTransform(Mat M, Mat& iM)
+    //
+
     /**
      * Inverts an affine transformation.
      *
@@ -4715,7 +4984,7 @@ public class Imgproc {
 
 
     //
-    // C++:  Mat cv::getRotationMatrix2D(Point2f center, double angle, double scale)
+    // C++:  Mat cv::getPerspectiveTransform(Mat src, Mat dst, int solveMethod = DECOMP_LU)
     //
 
     /**
@@ -4740,11 +5009,6 @@ public class Imgproc {
         return new Mat(getPerspectiveTransform_0(src.nativeObj, dst.nativeObj, solveMethod));
     }
 
-
-    //
-    // C++:  void cv::invertAffineTransform(Mat M, Mat& iM)
-    //
-
     /**
      * Calculates a perspective transform from four pairs of the corresponding points.
      *
@@ -4768,7 +5032,7 @@ public class Imgproc {
 
 
     //
-    // C++:  Mat cv::getPerspectiveTransform(Mat src, Mat dst, int solveMethod = DECOMP_LU)
+    // C++:  Mat cv::getAffineTransform(vector_Point2f src, vector_Point2f dst)
     //
 
     public static Mat getAffineTransform(MatOfPoint2f src, MatOfPoint2f dst) {
@@ -4776,6 +5040,11 @@ public class Imgproc {
         Mat dst_mat = dst;
         return new Mat(getAffineTransform_0(src_mat.nativeObj, dst_mat.nativeObj));
     }
+
+
+    //
+    // C++:  void cv::getRectSubPix(Mat image, Size patchSize, Point2f center, Mat& patch, int patchType = -1)
+    //
 
     /**
      * Retrieves a pixel rectangle from an image with sub-pixel accuracy.
@@ -4801,11 +5070,6 @@ public class Imgproc {
     public static void getRectSubPix(Mat image, Size patchSize, Point center, Mat patch, int patchType) {
         getRectSubPix_0(image.nativeObj, patchSize.width, patchSize.height, center.x, center.y, patch.nativeObj, patchType);
     }
-
-
-    //
-    // C++:  Mat cv::getAffineTransform(vector_Point2f src, vector_Point2f dst)
-    //
 
     /**
      * Retrieves a pixel rectangle from an image with sub-pixel accuracy.
@@ -4833,7 +5097,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::getRectSubPix(Mat image, Size patchSize, Point2f center, Mat& patch, int patchType = -1)
+    // C++:  void cv::logPolar(Mat src, Mat& dst, Point2f center, double M, int flags)
     //
 
     /**
@@ -4886,6 +5150,11 @@ public class Imgproc {
         logPolar_0(src.nativeObj, dst.nativeObj, center.x, center.y, M, flags);
     }
 
+
+    //
+    // C++:  void cv::linearPolar(Mat src, Mat& dst, Point2f center, double maxRadius, int flags)
+    //
+
     /**
      * Remaps an image to polar coordinates space.
      *
@@ -4937,7 +5206,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::logPolar(Mat src, Mat& dst, Point2f center, double M, int flags)
+    // C++:  void cv::warpPolar(Mat src, Mat& dst, Size dsize, Point2f center, double maxRadius, int flags)
     //
 
     /**
@@ -5062,7 +5331,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::linearPolar(Mat src, Mat& dst, Point2f center, double maxRadius, int flags)
+    // C++:  void cv::integral(Mat src, Mat& sum, Mat& sqsum, Mat& tilted, int sdepth = -1, int sqdepth = -1)
     //
 
     /**
@@ -5104,11 +5373,6 @@ public class Imgproc {
         integral3_0(src.nativeObj, sum.nativeObj, sqsum.nativeObj, tilted.nativeObj, sdepth, sqdepth);
     }
 
-
-    //
-    // C++:  void cv::warpPolar(Mat src, Mat& dst, Size dsize, Point2f center, double maxRadius, int flags)
-    //
-
     /**
      * Calculates the integral of an image.
      *
@@ -5147,11 +5411,6 @@ public class Imgproc {
         integral3_1(src.nativeObj, sum.nativeObj, sqsum.nativeObj, tilted.nativeObj, sdepth);
     }
 
-
-    //
-    // C++:  void cv::integral(Mat src, Mat& sum, Mat& sqsum, Mat& tilted, int sdepth = -1, int sqdepth = -1)
-    //
-
     /**
      * Calculates the integral of an image.
      *
@@ -5189,6 +5448,11 @@ public class Imgproc {
         integral3_2(src.nativeObj, sum.nativeObj, sqsum.nativeObj, tilted.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::integral(Mat src, Mat& sum, int sdepth = -1)
+    //
+
     public static void integral(Mat src, Mat sum, int sdepth) {
         integral_0(src.nativeObj, sum.nativeObj, sdepth);
     }
@@ -5199,7 +5463,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::integral(Mat src, Mat& sum, int sdepth = -1)
+    // C++:  void cv::integral(Mat src, Mat& sum, Mat& sqsum, int sdepth = -1, int sqdepth = -1)
     //
 
     public static void integral2(Mat src, Mat sum, Mat sqsum, int sdepth, int sqdepth) {
@@ -5210,14 +5474,14 @@ public class Imgproc {
         integral2_1(src.nativeObj, sum.nativeObj, sqsum.nativeObj, sdepth);
     }
 
-
-    //
-    // C++:  void cv::integral(Mat src, Mat& sum, Mat& sqsum, int sdepth = -1, int sqdepth = -1)
-    //
-
     public static void integral2(Mat src, Mat sum, Mat sqsum) {
         integral2_2(src.nativeObj, sum.nativeObj, sqsum.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::accumulate(Mat src, Mat& dst, Mat mask = Mat())
+    //
 
     /**
      * Adds an image to the accumulator image.
@@ -5264,7 +5528,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::accumulate(Mat src, Mat& dst, Mat mask = Mat())
+    // C++:  void cv::accumulateSquare(Mat src, Mat& dst, Mat mask = Mat())
     //
 
     /**
@@ -5310,7 +5574,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::accumulateSquare(Mat src, Mat& dst, Mat mask = Mat())
+    // C++:  void cv::accumulateProduct(Mat src1, Mat src2, Mat& dst, Mat mask = Mat())
     //
 
     /**
@@ -5356,7 +5620,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::accumulateProduct(Mat src1, Mat src2, Mat& dst, Mat mask = Mat())
+    // C++:  void cv::accumulateWeighted(Mat src, Mat& dst, double alpha, Mat mask = Mat())
     //
 
     /**
@@ -5406,7 +5670,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::accumulateWeighted(Mat src, Mat& dst, double alpha, Mat mask = Mat())
+    // C++:  Point2d cv::phaseCorrelate(Mat src1, Mat src2, Mat window = Mat(), double* response = 0)
     //
 
     /**
@@ -5519,11 +5783,6 @@ public class Imgproc {
         return new Point(phaseCorrelate_1(src1.nativeObj, src2.nativeObj, window.nativeObj));
     }
 
-
-    //
-    // C++:  Point2d cv::phaseCorrelate(Mat src1, Mat src2, Mat window = Mat(), double* response = 0)
-    //
-
     /**
      * The function is used to detect translational shifts that occur between two images.
      *
@@ -5576,6 +5835,11 @@ public class Imgproc {
         return new Point(phaseCorrelate_2(src1.nativeObj, src2.nativeObj));
     }
 
+
+    //
+    // C++:  Point2d cv::phaseCorrelateIterative(Mat src1, Mat src2, int L2size = 7, int maxIters = 10)
+    //
+
     /**
      * Detects translational shifts between two images.
      *
@@ -5613,11 +5877,6 @@ public class Imgproc {
         return new Point(phaseCorrelateIterative_1(src1.nativeObj, src2.nativeObj, L2size));
     }
 
-
-    //
-    // C++:  Point2d cv::phaseCorrelateIterative(Mat src1, Mat src2, int L2size = 7, int maxIters = 10)
-    //
-
     /**
      * Detects translational shifts between two images.
      *
@@ -5634,6 +5893,11 @@ public class Imgproc {
     public static Point phaseCorrelateIterative(Mat src1, Mat src2) {
         return new Point(phaseCorrelateIterative_2(src1.nativeObj, src2.nativeObj));
     }
+
+
+    //
+    // C++:  void cv::createHanningWindow(Mat& dst, Size winSize, int type)
+    //
 
     /**
      * This function computes a Hanning window coefficients in two dimensions.
@@ -5655,6 +5919,11 @@ public class Imgproc {
         createHanningWindow_0(dst.nativeObj, winSize.width, winSize.height, type);
     }
 
+
+    //
+    // C++:  void cv::divSpectrums(Mat a, Mat b, Mat& c, int flags, bool conjB = false)
+    //
+
     /**
      * Performs the per-element division of the first Fourier spectrum by the second Fourier spectrum.
      *
@@ -5672,11 +5941,6 @@ public class Imgproc {
     public static void divSpectrums(Mat a, Mat b, Mat c, int flags, boolean conjB) {
         divSpectrums_0(a.nativeObj, b.nativeObj, c.nativeObj, flags, conjB);
     }
-
-
-    //
-    // C++:  void cv::createHanningWindow(Mat& dst, Size winSize, int type)
-    //
 
     /**
      * Performs the per-element division of the first Fourier spectrum by the second Fourier spectrum.
@@ -5697,7 +5961,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::divSpectrums(Mat a, Mat b, Mat& c, int flags, bool conjB = false)
+    // C++:  double cv::threshold(Mat src, Mat& dst, double thresh, double maxval, int type)
     //
 
     /**
@@ -5730,6 +5994,11 @@ public class Imgproc {
         return threshold_0(src.nativeObj, dst.nativeObj, thresh, maxval, type);
     }
 
+
+    //
+    // C++:  double cv::thresholdWithMask(Mat src, Mat& dst, Mat mask, double thresh, double maxval, int type)
+    //
+
     /**
      * Same as #threshold, but with an optional mask
      *
@@ -5754,7 +6023,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::threshold(Mat src, Mat& dst, double thresh, double maxval, int type)
+    // C++:  void cv::adaptiveThreshold(Mat src, Mat& dst, double maxValue, int adaptiveMethod, int thresholdType, int blockSize, double C)
     //
 
     /**
@@ -5795,7 +6064,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::thresholdWithMask(Mat src, Mat& dst, Mat mask, double thresh, double maxval, int type)
+    // C++:  void cv::pyrDown(Mat src, Mat& dst, Size dstsize = Size(), int borderType = BORDER_DEFAULT)
     //
 
     /**
@@ -5822,11 +6091,6 @@ public class Imgproc {
         pyrDown_0(src.nativeObj, dst.nativeObj, dstsize.width, dstsize.height, borderType);
     }
 
-
-    //
-    // C++:  void cv::adaptiveThreshold(Mat src, Mat& dst, double maxValue, int adaptiveMethod, int thresholdType, int blockSize, double C)
-    //
-
     /**
      * Blurs an image and downsamples it.
      *
@@ -5850,11 +6114,6 @@ public class Imgproc {
         pyrDown_1(src.nativeObj, dst.nativeObj, dstsize.width, dstsize.height);
     }
 
-
-    //
-    // C++:  void cv::pyrDown(Mat src, Mat& dst, Size dstsize = Size(), int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Blurs an image and downsamples it.
      *
@@ -5876,6 +6135,11 @@ public class Imgproc {
     public static void pyrDown(Mat src, Mat dst) {
         pyrDown_2(src.nativeObj, dst.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::pyrUp(Mat src, Mat& dst, Size dstsize = Size(), int borderType = BORDER_DEFAULT)
+    //
 
     /**
      * Upsamples an image and then blurs it.
@@ -5920,11 +6184,6 @@ public class Imgproc {
         pyrUp_1(src.nativeObj, dst.nativeObj, dstsize.width, dstsize.height);
     }
 
-
-    //
-    // C++:  void cv::pyrUp(Mat src, Mat& dst, Size dstsize = Size(), int borderType = BORDER_DEFAULT)
-    //
-
     /**
      * Upsamples an image and then blurs it.
      *
@@ -5944,6 +6203,11 @@ public class Imgproc {
     public static void pyrUp(Mat src, Mat dst) {
         pyrUp_2(src.nativeObj, dst.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::calcHist(vector_Mat images, vector_int channels, Mat mask, Mat& hist, vector_int histSize, vector_float ranges, bool accumulate = false)
+    //
 
     /**
      *
@@ -5994,7 +6258,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::calcHist(vector_Mat images, vector_int channels, Mat mask, Mat& hist, vector_int histSize, vector_float ranges, bool accumulate = false)
+    // C++:  void cv::calcBackProject(vector_Mat images, vector_int channels, Mat hist, Mat& dst, vector_float ranges, double scale)
     //
 
     public static void calcBackProject(List<Mat> images, MatOfInt channels, Mat hist, Mat dst, MatOfFloat ranges, double scale) {
@@ -6003,6 +6267,11 @@ public class Imgproc {
         Mat ranges_mat = ranges;
         calcBackProject_0(images_mat.nativeObj, channels_mat.nativeObj, hist.nativeObj, dst.nativeObj, ranges_mat.nativeObj, scale);
     }
+
+
+    //
+    // C++:  double cv::compareHist(Mat H1, Mat H2, int method)
+    //
 
     /**
      * Compares two histograms.
@@ -6027,7 +6296,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::calcBackProject(vector_Mat images, vector_int channels, Mat hist, Mat& dst, vector_float ranges, double scale)
+    // C++:  void cv::equalizeHist(Mat src, Mat& dst)
     //
 
     /**
@@ -6062,7 +6331,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::compareHist(Mat H1, Mat H2, int method)
+    // C++:  Ptr_CLAHE cv::createCLAHE(double clipLimit = 40.0, Size tileGridSize = Size(8, 8))
     //
 
     /**
@@ -6077,11 +6346,6 @@ public class Imgproc {
         return CLAHE.__fromPtr__(createCLAHE_0(clipLimit, tileGridSize.width, tileGridSize.height));
     }
 
-
-    //
-    // C++:  void cv::equalizeHist(Mat src, Mat& dst)
-    //
-
     /**
      * Creates a smart pointer to a cv::CLAHE class and initializes it.
      *
@@ -6093,11 +6357,6 @@ public class Imgproc {
         return CLAHE.__fromPtr__(createCLAHE_1(clipLimit));
     }
 
-
-    //
-    // C++:  Ptr_CLAHE cv::createCLAHE(double clipLimit = 40.0, Size tileGridSize = Size(8, 8))
-    //
-
     /**
      * Creates a smart pointer to a cv::CLAHE class and initializes it.
      *
@@ -6107,6 +6366,11 @@ public class Imgproc {
     public static CLAHE createCLAHE() {
         return CLAHE.__fromPtr__(createCLAHE_2());
     }
+
+
+    //
+    // C++:  float cv::wrapperEMD(Mat signature1, Mat signature2, int distType, Mat cost = Mat(), Ptr_float& lowerBound = Ptr<float>(), Mat& flow = Mat())
+    //
 
     /**
      * Computes the "minimal work" distance between two weighted point configurations.
@@ -6185,11 +6449,6 @@ public class Imgproc {
         return EMD_1(signature1.nativeObj, signature2.nativeObj, distType, cost.nativeObj);
     }
 
-
-    //
-    // C++:  float cv::wrapperEMD(Mat signature1, Mat signature2, int distType, Mat cost = Mat(), Ptr_float& lowerBound = Ptr<float>(), Mat& flow = Mat())
-    //
-
     /**
      * Computes the "minimal work" distance between two weighted point configurations.
      *
@@ -6227,6 +6486,11 @@ public class Imgproc {
         return EMD_3(signature1.nativeObj, signature2.nativeObj, distType);
     }
 
+
+    //
+    // C++:  void cv::watershed(Mat image, Mat& markers)
+    //
+
     /**
      * Performs a marker-based image segmentation using the watershed algorithm.
      *
@@ -6255,6 +6519,11 @@ public class Imgproc {
     public static void watershed(Mat image, Mat markers) {
         watershed_0(image.nativeObj, markers.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::pyrMeanShiftFiltering(Mat src, Mat& dst, double sp, double sr, int maxLevel = 1, TermCriteria termcrit = TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS,5,1))
+    //
 
     /**
      * Performs initial step of meanshift segmentation of an image.
@@ -6297,11 +6566,6 @@ public class Imgproc {
         pyrMeanShiftFiltering_0(src.nativeObj, dst.nativeObj, sp, sr, maxLevel, termcrit.type, termcrit.maxCount, termcrit.epsilon);
     }
 
-
-    //
-    // C++:  void cv::watershed(Mat image, Mat& markers)
-    //
-
     /**
      * Performs initial step of meanshift segmentation of an image.
      *
@@ -6342,11 +6606,6 @@ public class Imgproc {
         pyrMeanShiftFiltering_1(src.nativeObj, dst.nativeObj, sp, sr, maxLevel);
     }
 
-
-    //
-    // C++:  void cv::pyrMeanShiftFiltering(Mat src, Mat& dst, double sp, double sr, int maxLevel = 1, TermCriteria termcrit = TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS,5,1))
-    //
-
     /**
      * Performs initial step of meanshift segmentation of an image.
      *
@@ -6385,6 +6644,11 @@ public class Imgproc {
     public static void pyrMeanShiftFiltering(Mat src, Mat dst, double sp, double sr) {
         pyrMeanShiftFiltering_2(src.nativeObj, dst.nativeObj, sp, sr);
     }
+
+
+    //
+    // C++:  void cv::grabCut(Mat img, Mat& mask, Rect rect, Mat& bgdModel, Mat& fgdModel, int iterCount, int mode = GC_EVAL)
+    //
 
     /**
      * Runs the GrabCut algorithm.
@@ -6433,7 +6697,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::grabCut(Mat img, Mat& mask, Rect rect, Mat& bgdModel, Mat& fgdModel, int iterCount, int mode = GC_EVAL)
+    // C++:  void cv::distanceTransform(Mat src, Mat& dst, Mat& labels, int distanceType, int maskSize, int labelType = DIST_LABEL_CCOMP)
     //
 
     /**
@@ -6579,7 +6843,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::distanceTransform(Mat src, Mat& dst, Mat& labels, int distanceType, int maskSize, int labelType = DIST_LABEL_CCOMP)
+    // C++:  void cv::distanceTransform(Mat src, Mat& dst, int distanceType, int maskSize, int dstType = CV_32F)
     //
 
     /**
@@ -6611,216 +6875,6 @@ public class Imgproc {
      */
     public static void distanceTransform(Mat src, Mat dst, int distanceType, int maskSize) {
         distanceTransform_1(src.nativeObj, dst.nativeObj, distanceType, maskSize);
-    }
-
-
-    //
-    // C++:  void cv::distanceTransform(Mat src, Mat& dst, int distanceType, int maskSize, int dstType = CV_32F)
-    //
-
-    /**
-     * Fills a connected component with the given color.
-     *
-     * The function cv::floodFill fills a connected component starting from the seed point with the specified
-     * color. The connectivity is determined by the color/brightness closeness of the neighbor pixels. The
-     * pixel at \((x,y)\) is considered to belong to the repainted domain if:
-     *
-     * <ul>
-     *   <li>
-     *  in case of a grayscale image and floating range
-     * \(\texttt{src} (x',y')- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} (x',y')+ \texttt{upDiff}\)
-     *   </li>
-     * </ul>
-     *
-     *
-     * <ul>
-     *   <li>
-     *  in case of a grayscale image and fixed range
-     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)+ \texttt{upDiff}\)
-     *   </li>
-     * </ul>
-     *
-     *
-     * <ul>
-     *   <li>
-     *  in case of a color image and floating range
-     * \(\texttt{src} (x',y')_r- \texttt{loDiff} _r \leq \texttt{src} (x,y)_r \leq \texttt{src} (x',y')_r+ \texttt{upDiff} _r,\)
-     * \(\texttt{src} (x',y')_g- \texttt{loDiff} _g \leq \texttt{src} (x,y)_g \leq \texttt{src} (x',y')_g+ \texttt{upDiff} _g\)
-     * and
-     * \(\texttt{src} (x',y')_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} (x',y')_b+ \texttt{upDiff} _b\)
-     *   </li>
-     * </ul>
-     *
-     *
-     * <ul>
-     *   <li>
-     *  in case of a color image and fixed range
-     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_r- \texttt{loDiff} _r \leq \texttt{src} (x,y)_r \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_r+ \texttt{upDiff} _r,\)
-     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_g- \texttt{loDiff} _g \leq \texttt{src} (x,y)_g \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_g+ \texttt{upDiff} _g\)
-     * and
-     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_b+ \texttt{upDiff} _b\)
-     *   </li>
-     * </ul>
-     *
-     *
-     * where \(src(x',y')\) is the value of one of pixel neighbors that is already known to belong to the
-     * component. That is, to be added to the connected component, a color/brightness of the pixel should
-     * be close enough to:
-     * <ul>
-     *   <li>
-     *  Color/brightness of one of its neighbors that already belong to the connected component in case
-     * of a floating range.
-     *   </li>
-     *   <li>
-     *  Color/brightness of the seed point in case of a fixed range.
-     *   </li>
-     * </ul>
-     *
-     * Use these functions to either mark a connected component with the specified color in-place, or build
-     * a mask and then extract the contour, or copy the region to another image, and so on.
-     *
-     * @param image Input/output 1- or 3-channel, 8-bit, or floating-point image. It is modified by the
-     * function unless the #FLOODFILL_MASK_ONLY flag is set in the second variant of the function. See
-     * the details below.
-     * @param mask Operation mask that should be a single-channel 8-bit image, 2 pixels wider and 2 pixels
-     * taller than image. If an empty Mat is passed it will be created automatically. Since this is both an
-     * input and output parameter, you must take responsibility of initializing it.
-     * Flood-filling cannot go across non-zero pixels in the input mask. For example,
-     * an edge detector output can be used as a mask to stop filling at edges. On output, pixels in the
-     * mask corresponding to filled pixels in the image are set to 1 or to the specified value in flags
-     * as described below. Additionally, the function fills the border of the mask with ones to simplify
-     * internal processing. It is therefore possible to use the same mask in multiple calls to the function
-     * to make sure the filled areas do not overlap.
-     * @param seedPoint Starting point.
-     * @param newVal New value of the repainted domain pixels.
-     * @param loDiff Maximal lower brightness/color difference between the currently observed pixel and
-     * one of its neighbors belonging to the component, or a seed pixel being added to the component.
-     * @param upDiff Maximal upper brightness/color difference between the currently observed pixel and
-     * one of its neighbors belonging to the component, or a seed pixel being added to the component.
-     * @param rect Optional output parameter set by the function to the minimum bounding rectangle of the
-     * repainted domain.
-     * @param flags Operation flags. The first 8 bits contain a connectivity value. The default value of
-     * 4 means that only the four nearest neighbor pixels (those that share an edge) are considered. A
-     * connectivity value of 8 means that the eight nearest neighbor pixels (those that share a corner)
-     * will be considered. The next 8 bits (8-16) contain a value between 1 and 255 with which to fill
-     * the mask (the default value is 1). For example, 4 | ( 255 &lt;&lt; 8 ) will consider 4 nearest
-     * neighbours and fill the mask with a value of 255. The following additional options occupy higher
-     * bits and therefore may be further combined with the connectivity and mask fill values using
-     * bit-wise or (|), see #FloodFillFlags.
-     *
-     * <b>Note:</b> Since the mask is larger than the filled image, a pixel \((x, y)\) in image corresponds to the
-     * pixel \((x+1, y+1)\) in the mask .
-     *
-     * SEE: findContours
-     * @return automatically generated
-     */
-    public static int floodFill(Mat image, Mat mask, Point seedPoint, Scalar newVal, Rect rect, Scalar loDiff, Scalar upDiff, int flags) {
-        double[] rect_out = new double[4];
-        int retVal = floodFill_0(image.nativeObj, mask.nativeObj, seedPoint.x, seedPoint.y, newVal.val[0], newVal.val[1], newVal.val[2], newVal.val[3], rect_out, loDiff.val[0], loDiff.val[1], loDiff.val[2], loDiff.val[3], upDiff.val[0], upDiff.val[1], upDiff.val[2], upDiff.val[3], flags);
-        if(rect!=null){ rect.x = (int)rect_out[0]; rect.y = (int)rect_out[1]; rect.width = (int)rect_out[2]; rect.height = (int)rect_out[3]; }
-        return retVal;
-    }
-
-    /**
-     * Fills a connected component with the given color.
-     *
-     * The function cv::floodFill fills a connected component starting from the seed point with the specified
-     * color. The connectivity is determined by the color/brightness closeness of the neighbor pixels. The
-     * pixel at \((x,y)\) is considered to belong to the repainted domain if:
-     *
-     * <ul>
-     *   <li>
-     *  in case of a grayscale image and floating range
-     * \(\texttt{src} (x',y')- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} (x',y')+ \texttt{upDiff}\)
-     *   </li>
-     * </ul>
-     *
-     *
-     * <ul>
-     *   <li>
-     *  in case of a grayscale image and fixed range
-     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)+ \texttt{upDiff}\)
-     *   </li>
-     * </ul>
-     *
-     *
-     * <ul>
-     *   <li>
-     *  in case of a color image and floating range
-     * \(\texttt{src} (x',y')_r- \texttt{loDiff} _r \leq \texttt{src} (x,y)_r \leq \texttt{src} (x',y')_r+ \texttt{upDiff} _r,\)
-     * \(\texttt{src} (x',y')_g- \texttt{loDiff} _g \leq \texttt{src} (x,y)_g \leq \texttt{src} (x',y')_g+ \texttt{upDiff} _g\)
-     * and
-     * \(\texttt{src} (x',y')_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} (x',y')_b+ \texttt{upDiff} _b\)
-     *   </li>
-     * </ul>
-     *
-     *
-     * <ul>
-     *   <li>
-     *  in case of a color image and fixed range
-     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_r- \texttt{loDiff} _r \leq \texttt{src} (x,y)_r \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_r+ \texttt{upDiff} _r,\)
-     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_g- \texttt{loDiff} _g \leq \texttt{src} (x,y)_g \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_g+ \texttt{upDiff} _g\)
-     * and
-     * \(\texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} ( \texttt{seedPoint} .x, \texttt{seedPoint} .y)_b+ \texttt{upDiff} _b\)
-     *   </li>
-     * </ul>
-     *
-     *
-     * where \(src(x',y')\) is the value of one of pixel neighbors that is already known to belong to the
-     * component. That is, to be added to the connected component, a color/brightness of the pixel should
-     * be close enough to:
-     * <ul>
-     *   <li>
-     *  Color/brightness of one of its neighbors that already belong to the connected component in case
-     * of a floating range.
-     *   </li>
-     *   <li>
-     *  Color/brightness of the seed point in case of a fixed range.
-     *   </li>
-     * </ul>
-     *
-     * Use these functions to either mark a connected component with the specified color in-place, or build
-     * a mask and then extract the contour, or copy the region to another image, and so on.
-     *
-     * @param image Input/output 1- or 3-channel, 8-bit, or floating-point image. It is modified by the
-     * function unless the #FLOODFILL_MASK_ONLY flag is set in the second variant of the function. See
-     * the details below.
-     * @param mask Operation mask that should be a single-channel 8-bit image, 2 pixels wider and 2 pixels
-     * taller than image. If an empty Mat is passed it will be created automatically. Since this is both an
-     * input and output parameter, you must take responsibility of initializing it.
-     * Flood-filling cannot go across non-zero pixels in the input mask. For example,
-     * an edge detector output can be used as a mask to stop filling at edges. On output, pixels in the
-     * mask corresponding to filled pixels in the image are set to 1 or to the specified value in flags
-     * as described below. Additionally, the function fills the border of the mask with ones to simplify
-     * internal processing. It is therefore possible to use the same mask in multiple calls to the function
-     * to make sure the filled areas do not overlap.
-     * @param seedPoint Starting point.
-     * @param newVal New value of the repainted domain pixels.
-     * @param loDiff Maximal lower brightness/color difference between the currently observed pixel and
-     * one of its neighbors belonging to the component, or a seed pixel being added to the component.
-     * @param upDiff Maximal upper brightness/color difference between the currently observed pixel and
-     * one of its neighbors belonging to the component, or a seed pixel being added to the component.
-     * @param rect Optional output parameter set by the function to the minimum bounding rectangle of the
-     * repainted domain.
-     * 4 means that only the four nearest neighbor pixels (those that share an edge) are considered. A
-     * connectivity value of 8 means that the eight nearest neighbor pixels (those that share a corner)
-     * will be considered. The next 8 bits (8-16) contain a value between 1 and 255 with which to fill
-     * the mask (the default value is 1). For example, 4 | ( 255 &lt;&lt; 8 ) will consider 4 nearest
-     * neighbours and fill the mask with a value of 255. The following additional options occupy higher
-     * bits and therefore may be further combined with the connectivity and mask fill values using
-     * bit-wise or (|), see #FloodFillFlags.
-     *
-     * <b>Note:</b> Since the mask is larger than the filled image, a pixel \((x, y)\) in image corresponds to the
-     * pixel \((x+1, y+1)\) in the mask .
-     *
-     * SEE: findContours
-     * @return automatically generated
-     */
-    public static int floodFill(Mat image, Mat mask, Point seedPoint, Scalar newVal, Rect rect, Scalar loDiff, Scalar upDiff) {
-        double[] rect_out = new double[4];
-        int retVal = floodFill_1(image.nativeObj, mask.nativeObj, seedPoint.x, seedPoint.y, newVal.val[0], newVal.val[1], newVal.val[2], newVal.val[3], rect_out, loDiff.val[0], loDiff.val[1], loDiff.val[2], loDiff.val[3], upDiff.val[0], upDiff.val[1], upDiff.val[2], upDiff.val[3]);
-        if(rect!=null){ rect.x = (int)rect_out[0]; rect.y = (int)rect_out[1]; rect.width = (int)rect_out[2]; rect.height = (int)rect_out[3]; }
-        return retVal;
     }
 
 
@@ -7030,6 +7084,40 @@ public class Imgproc {
     }
 
     /**
+     * Finds a circle of the minimum area enclosing a 2D point set.
+     *
+     * The function finds the minimal enclosing circle of a 2D point set using an iterative algorithm.
+     *
+     * @param points Input vector of 2D points, stored in std::vector&lt;&gt; or Mat
+     * @param center Output center of the circle.
+     * @param radius Output radius of the circle.
+     */
+    public static void minEnclosingCircle(MatOfPoint2f points, Point center, float[] radius) {
+        Mat points_mat = points;
+        double[] center_out = new double[2];
+        double[] radius_out = new double[1];
+        minEnclosingCircle_0(points_mat.nativeObj, center_out, radius_out);
+        if(center!=null){ center.x = center_out[0]; center.y = center_out[1]; }
+        if(radius!=null) radius[0] = (float)radius_out[0];
+    }
+
+    /**
+     *
+     * @param imgRect Image rectangle.
+     * @param pt1 First line point.
+     * @param pt2 Second line point.
+     * @return automatically generated
+     */
+    public static boolean clipLine(Rect imgRect, Point pt1, Point pt2) {
+        double[] pt1_out = new double[2];
+        double[] pt2_out = new double[2];
+        boolean retVal = clipLine_0(imgRect.x, imgRect.y, imgRect.width, imgRect.height, pt1.x, pt1.y, pt1_out, pt2.x, pt2.y, pt2_out);
+        if(pt1!=null){ pt1.x = pt1_out[0]; pt1.y = pt1_out[1]; }
+        if(pt2!=null){ pt2.x = pt2_out[0]; pt2.y = pt2_out[1]; }
+        return retVal;
+    }
+
+    /**
      * Fills a connected component with the given color.
      *
      * The function cv::floodFill fills a connected component starting from the seed point with the specified
@@ -7125,6 +7213,11 @@ public class Imgproc {
         return floodFill_4(image.nativeObj, mask.nativeObj, seedPoint.x, seedPoint.y, newVal.val[0], newVal.val[1], newVal.val[2], newVal.val[3]);
     }
 
+
+    //
+    // C++:  void cv::blendLinear(Mat src1, Mat src2, Mat weights1, Mat weights2, Mat& dst)
+    //
+
     /**
      *
      *
@@ -7138,6 +7231,11 @@ public class Imgproc {
     public static void blendLinear(Mat src1, Mat src2, Mat weights1, Mat weights2, Mat dst) {
         blendLinear_0(src1.nativeObj, src2.nativeObj, weights1.nativeObj, weights2.nativeObj, dst.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::cvtColor(Mat src, Mat& dst, int code, int dstCn = 0, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
+    //
 
     /**
      * Converts an image from one color space to another.
@@ -7195,11 +7293,6 @@ public class Imgproc {
         cvtColor_0(src.nativeObj, dst.nativeObj, code, dstCn, hint);
     }
 
-
-    //
-    // C++:  void cv::blendLinear(Mat src1, Mat src2, Mat weights1, Mat weights2, Mat& dst)
-    //
-
     /**
      * Converts an image from one color space to another.
      *
@@ -7255,11 +7348,6 @@ public class Imgproc {
         cvtColor_1(src.nativeObj, dst.nativeObj, code, dstCn);
     }
 
-
-    //
-    // C++:  void cv::cvtColor(Mat src, Mat& dst, int code, int dstCn = 0, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
-    //
-
     /**
      * Converts an image from one color space to another.
      *
@@ -7313,6 +7401,11 @@ public class Imgproc {
     public static void cvtColor(Mat src, Mat dst, int code) {
         cvtColor_2(src.nativeObj, dst.nativeObj, code);
     }
+
+
+    //
+    // C++:  void cv::cvtColorTwoPlane(Mat src1, Mat src2, Mat& dst, int code, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
+    //
 
     /**
      * Converts an image from one color space to another where the source image is
@@ -7399,7 +7492,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::cvtColorTwoPlane(Mat src1, Mat src2, Mat& dst, int code, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
+    // C++:  void cv::demosaicing(Mat src, Mat& dst, int code, int dstCn = 0)
     //
 
     /**
@@ -7507,7 +7600,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::demosaicing(Mat src, Mat& dst, int code, int dstCn = 0)
+    // C++:  Moments cv::moments(Mat array, bool binaryImage = false)
     //
 
     /**
@@ -7577,12 +7670,17 @@ public class Imgproc {
 
 
     //
-    // C++:  Moments cv::moments(Mat array, bool binaryImage = false)
+    // C++:  void cv::HuMoments(Moments m, Mat& hu)
     //
 
     public static void HuMoments(Moments m, Mat hu) {
         HuMoments_0(m.m00, m.m10, m.m01, m.m20, m.m11, m.m02, m.m30, m.m21, m.m12, m.m03, hu.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::matchTemplate(Mat image, Mat templ, Mat& result, int method, Mat mask = Mat())
+    //
 
     /**
      * Compares a template against overlapped image regions.
@@ -7616,11 +7714,6 @@ public class Imgproc {
     public static void matchTemplate(Mat image, Mat templ, Mat result, int method, Mat mask) {
         matchTemplate_0(image.nativeObj, templ.nativeObj, result.nativeObj, method, mask.nativeObj);
     }
-
-
-    //
-    // C++:  void cv::HuMoments(Moments m, Mat& hu)
-    //
 
     /**
      * Compares a template against overlapped image regions.
@@ -7656,7 +7749,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::matchTemplate(Mat image, Mat templ, Mat& result, int method, Mat mask = Mat())
+    // C++:  int cv::connectedComponents(Mat image, Mat& labels, int connectivity, int ltype, int ccltype)
     //
 
     /**
@@ -7683,6 +7776,11 @@ public class Imgproc {
         return connectedComponentsWithAlgorithm_0(image.nativeObj, labels.nativeObj, connectivity, ltype, ccltype);
     }
 
+
+    //
+    // C++:  int cv::connectedComponents(Mat image, Mat& labels, int connectivity = 8, int ltype = CV_32S)
+    //
+
     /**
      *
      *
@@ -7696,11 +7794,6 @@ public class Imgproc {
         return connectedComponents_0(image.nativeObj, labels.nativeObj, connectivity, ltype);
     }
 
-
-    //
-    // C++:  int cv::connectedComponents(Mat image, Mat& labels, int connectivity, int ltype, int ccltype)
-    //
-
     /**
      *
      *
@@ -7713,11 +7806,6 @@ public class Imgproc {
         return connectedComponents_1(image.nativeObj, labels.nativeObj, connectivity);
     }
 
-
-    //
-    // C++:  int cv::connectedComponents(Mat image, Mat& labels, int connectivity = 8, int ltype = CV_32S)
-    //
-
     /**
      *
      *
@@ -7728,6 +7816,11 @@ public class Imgproc {
     public static int connectedComponents(Mat image, Mat labels) {
         return connectedComponents_2(image.nativeObj, labels.nativeObj);
     }
+
+
+    //
+    // C++:  int cv::connectedComponentsWithStats(Mat image, Mat& labels, Mat& stats, Mat& centroids, int connectivity, int ltype, int ccltype)
+    //
 
     /**
      * computes the connected components labeled image of boolean image and also produces a statistics output for each label
@@ -7758,6 +7851,11 @@ public class Imgproc {
         return connectedComponentsWithStatsWithAlgorithm_0(image.nativeObj, labels.nativeObj, stats.nativeObj, centroids.nativeObj, connectivity, ltype, ccltype);
     }
 
+
+    //
+    // C++:  int cv::connectedComponentsWithStats(Mat image, Mat& labels, Mat& stats, Mat& centroids, int connectivity = 8, int ltype = CV_32S)
+    //
+
     /**
      *
      * @param image the 8-bit single-channel image to be labeled
@@ -7775,11 +7873,6 @@ public class Imgproc {
         return connectedComponentsWithStats_0(image.nativeObj, labels.nativeObj, stats.nativeObj, centroids.nativeObj, connectivity, ltype);
     }
 
-
-    //
-    // C++:  int cv::connectedComponentsWithStats(Mat image, Mat& labels, Mat& stats, Mat& centroids, int connectivity, int ltype, int ccltype)
-    //
-
     /**
      *
      * @param image the 8-bit single-channel image to be labeled
@@ -7796,11 +7889,6 @@ public class Imgproc {
         return connectedComponentsWithStats_1(image.nativeObj, labels.nativeObj, stats.nativeObj, centroids.nativeObj, connectivity);
     }
 
-
-    //
-    // C++:  int cv::connectedComponentsWithStats(Mat image, Mat& labels, Mat& stats, Mat& centroids, int connectivity = 8, int ltype = CV_32S)
-    //
-
     /**
      *
      * @param image the 8-bit single-channel image to be labeled
@@ -7815,6 +7903,11 @@ public class Imgproc {
     public static int connectedComponentsWithStats(Mat image, Mat labels, Mat stats, Mat centroids) {
         return connectedComponentsWithStats_2(image.nativeObj, labels.nativeObj, stats.nativeObj, centroids.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::findContours(Mat image, vector_vector_Point& contours, Mat& hierarchy, int mode, int method, Point offset = Point())
+    //
 
     /**
      * Finds contours in a binary image.
@@ -7885,7 +7978,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::findContours(Mat image, vector_vector_Point& contours, Mat& hierarchy, int mode, int method, Point offset = Point())
+    // C++:  void cv::findContoursLinkRuns(Mat image, vector_Mat& contours, Mat& hierarchy)
     //
 
     public static void findContoursLinkRuns(Mat image, List<Mat> contours, Mat hierarchy) {
@@ -7894,6 +7987,11 @@ public class Imgproc {
         Converters.Mat_to_vector_Mat(contours_mat, contours);
         contours_mat.release();
     }
+
+
+    //
+    // C++:  void cv::findContoursLinkRuns(Mat image, vector_Mat& contours)
+    //
 
     public static void findContoursLinkRuns(Mat image, List<Mat> contours) {
         Mat contours_mat = new Mat();
@@ -7904,7 +8002,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::findContoursLinkRuns(Mat image, vector_Mat& contours, Mat& hierarchy)
+    // C++:  void cv::approxPolyDP(vector_Point2f curve, vector_Point2f& approxCurve, double epsilon, bool closed)
     //
 
     /**
@@ -7929,7 +8027,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::findContoursLinkRuns(Mat image, vector_Mat& contours)
+    // C++:  void cv::approxPolyN(Mat curve, Mat& approxCurve, int nsides, float epsilon_percentage = -1.0, bool ensure_convex = true)
     //
 
     /**
@@ -7955,11 +8053,6 @@ public class Imgproc {
         approxPolyN_0(curve.nativeObj, approxCurve.nativeObj, nsides, epsilon_percentage, ensure_convex);
     }
 
-
-    //
-    // C++:  void cv::approxPolyDP(vector_Point2f curve, vector_Point2f& approxCurve, double epsilon, bool closed)
-    //
-
     /**
      * Approximates a polygon with a convex hull with a specified accuracy and number of sides.
      *
@@ -7982,11 +8075,6 @@ public class Imgproc {
         approxPolyN_1(curve.nativeObj, approxCurve.nativeObj, nsides, epsilon_percentage);
     }
 
-
-    //
-    // C++:  void cv::approxPolyN(Mat curve, Mat& approxCurve, int nsides, float epsilon_percentage = -1.0, bool ensure_convex = true)
-    //
-
     /**
      * Approximates a polygon with a convex hull with a specified accuracy and number of sides.
      *
@@ -8008,6 +8096,11 @@ public class Imgproc {
         approxPolyN_2(curve.nativeObj, approxCurve.nativeObj, nsides);
     }
 
+
+    //
+    // C++:  double cv::arcLength(vector_Point2f curve, bool closed)
+    //
+
     /**
      * Calculates a contour perimeter or a curve length.
      *
@@ -8021,6 +8114,11 @@ public class Imgproc {
         Mat curve_mat = curve;
         return arcLength_0(curve_mat.nativeObj, closed);
     }
+
+
+    //
+    // C++:  Rect cv::boundingRect(Mat array)
+    //
 
     /**
      * Calculates the up-right bounding rectangle of a point set or non-zero pixels of gray-scale image.
@@ -8037,7 +8135,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::arcLength(vector_Point2f curve, bool closed)
+    // C++:  double cv::contourArea(Mat contour, bool oriented = false)
     //
 
     /**
@@ -8076,11 +8174,6 @@ public class Imgproc {
         return contourArea_0(contour.nativeObj, oriented);
     }
 
-
-    //
-    // C++:  Rect cv::boundingRect(Mat array)
-    //
-
     /**
      * Calculates a contour area.
      *
@@ -8118,7 +8211,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::contourArea(Mat contour, bool oriented = false)
+    // C++:  RotatedRect cv::minAreaRect(vector_Point2f points)
     //
 
     /**
@@ -8140,6 +8233,11 @@ public class Imgproc {
         return new RotatedRect(minAreaRect_0(points_mat.nativeObj));
     }
 
+
+    //
+    // C++:  void cv::boxPoints(RotatedRect box, Mat& points)
+    //
+
     /**
      * Finds the four vertices of a rotated rect. Useful to draw the rotated rectangle.
      *
@@ -8159,30 +8257,14 @@ public class Imgproc {
 
 
     //
-    // C++:  RotatedRect cv::minAreaRect(vector_Point2f points)
+    // C++:  void cv::minEnclosingCircle(vector_Point2f points, Point2f& center, float& radius)
     //
 
-    /**
-     * Finds a circle of the minimum area enclosing a 2D point set.
-     *
-     * The function finds the minimal enclosing circle of a 2D point set using an iterative algorithm.
-     *
-     * @param points Input vector of 2D points, stored in std::vector&lt;&gt; or Mat
-     * @param center Output center of the circle.
-     * @param radius Output radius of the circle.
-     */
-    public static void minEnclosingCircle(MatOfPoint2f points, Point center, float[] radius) {
-        Mat points_mat = points;
-        double[] center_out = new double[2];
-        double[] radius_out = new double[1];
-        minEnclosingCircle_0(points_mat.nativeObj, center_out, radius_out);
-        if(center!=null){ center.x = center_out[0]; center.y = center_out[1]; }
-        if(radius!=null) radius[0] = (float)radius_out[0];
-    }
+
 
 
     //
-    // C++:  void cv::boxPoints(RotatedRect box, Mat& points)
+    // C++:  double cv::minEnclosingTriangle(Mat points, Mat& triangle)
     //
 
     /**
@@ -8212,7 +8294,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::minEnclosingCircle(vector_Point2f points, Point2f& center, float& radius)
+    // C++:  double cv::minEnclosingConvexPolygon(Mat points, Mat& polygon, int k)
     //
 
     /**
@@ -8241,7 +8323,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::minEnclosingTriangle(Mat points, Mat& triangle)
+    // C++:  double cv::matchShapes(Mat contour1, Mat contour2, int method, double parameter)
     //
 
     /**
@@ -8261,7 +8343,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::minEnclosingConvexPolygon(Mat points, Mat& polygon, int k)
+    // C++:  void cv::convexHull(vector_Point points, vector_int& hull, bool clockwise = false,  _hidden_  returnPoints = true)
     //
 
     /**
@@ -8297,11 +8379,6 @@ public class Imgproc {
         convexHull_0(points_mat.nativeObj, hull_mat.nativeObj, clockwise);
     }
 
-
-    //
-    // C++:  double cv::matchShapes(Mat contour1, Mat contour2, int method, double parameter)
-    //
-
     /**
      * Finds the convex hull of a point set.
      *
@@ -8336,7 +8413,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::convexHull(vector_Point points, vector_int& hull, bool clockwise = false,  _hidden_  returnPoints = true)
+    // C++:  void cv::convexityDefects(vector_Point contour, vector_int convexhull, vector_Vec4i& convexityDefects)
     //
 
     /**
@@ -8364,6 +8441,11 @@ public class Imgproc {
         convexityDefects_0(contour_mat.nativeObj, convexhull_mat.nativeObj, convexityDefects_mat.nativeObj);
     }
 
+
+    //
+    // C++:  bool cv::isContourConvex(vector_Point contour)
+    //
+
     /**
      * Tests a contour convexity.
      *
@@ -8380,7 +8462,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::convexityDefects(vector_Point contour, vector_int convexhull, vector_Vec4i& convexityDefects)
+    // C++:  float cv::intersectConvexConvex(Mat p1, Mat p2, Mat& p12, bool handleNested = true)
     //
 
     /**
@@ -8401,11 +8483,6 @@ public class Imgproc {
         return intersectConvexConvex_0(p1.nativeObj, p2.nativeObj, p12.nativeObj, handleNested);
     }
 
-
-    //
-    // C++:  bool cv::isContourConvex(vector_Point contour)
-    //
-
     /**
      * Finds intersection of two convex polygons
      *
@@ -8425,7 +8502,7 @@ public class Imgproc {
 
 
     //
-    // C++:  float cv::intersectConvexConvex(Mat p1, Mat p2, Mat& p12, bool handleNested = true)
+    // C++:  RotatedRect cv::fitEllipse(vector_Point2f points)
     //
 
     /**
@@ -8447,6 +8524,11 @@ public class Imgproc {
         Mat points_mat = points;
         return new RotatedRect(fitEllipse_0(points_mat.nativeObj));
     }
+
+
+    //
+    // C++:  RotatedRect cv::fitEllipseAMS(Mat points)
+    //
 
     /**
      * Fits an ellipse around a set of 2D points.
@@ -8494,7 +8576,7 @@ public class Imgproc {
 
 
     //
-    // C++:  RotatedRect cv::fitEllipse(vector_Point2f points)
+    // C++:  RotatedRect cv::fitEllipseDirect(Mat points)
     //
 
     /**
@@ -8550,7 +8632,7 @@ public class Imgproc {
 
 
     //
-    // C++:  RotatedRect cv::fitEllipseAMS(Mat points)
+    // C++:  void cv::getClosestEllipsePoints(RotatedRect ellipse_params, Mat points, Mat& closest_pts)
     //
 
     /**
@@ -8572,7 +8654,7 @@ public class Imgproc {
 
 
     //
-    // C++:  RotatedRect cv::fitEllipseDirect(Mat points)
+    // C++:  void cv::fitLine(Mat points, Mat& line, int distType, double param, double reps, double aeps)
     //
 
     /**
@@ -8630,7 +8712,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::getClosestEllipsePoints(RotatedRect ellipse_params, Mat points, Mat& closest_pts)
+    // C++:  double cv::pointPolygonTest(vector_Point2f contour, Point2f pt, bool measureDist)
     //
 
     /**
@@ -8658,7 +8740,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::fitLine(Mat points, Mat& line, int distType, double param, double reps, double aeps)
+    // C++:  int cv::rotatedRectangleIntersection(RotatedRect rect1, RotatedRect rect2, Mat& intersectingRegion)
     //
 
     /**
@@ -8683,7 +8765,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::pointPolygonTest(vector_Point2f contour, Point2f pt, bool measureDist)
+    // C++:  Ptr_GeneralizedHoughBallard cv::createGeneralizedHoughBallard()
     //
 
     /**
@@ -8696,7 +8778,7 @@ public class Imgproc {
 
 
     //
-    // C++:  int cv::rotatedRectangleIntersection(RotatedRect rect1, RotatedRect rect2, Mat& intersectingRegion)
+    // C++:  Ptr_GeneralizedHoughGuil cv::createGeneralizedHoughGuil()
     //
 
     /**
@@ -8709,7 +8791,7 @@ public class Imgproc {
 
 
     //
-    // C++:  Ptr_GeneralizedHoughBallard cv::createGeneralizedHoughBallard()
+    // C++:  void cv::applyColorMap(Mat src, Mat& dst, int colormap)
     //
 
     /**
@@ -8725,7 +8807,7 @@ public class Imgproc {
 
 
     //
-    // C++:  Ptr_GeneralizedHoughGuil cv::createGeneralizedHoughGuil()
+    // C++:  void cv::applyColorMap(Mat src, Mat& dst, Mat userColor)
     //
 
     /**
@@ -8741,7 +8823,7 @@ public class Imgproc {
 
 
     //
-    // C++:  void cv::applyColorMap(Mat src, Mat& dst, int colormap)
+    // C++:  void cv::line(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
     //
 
     /**
@@ -8764,11 +8846,6 @@ public class Imgproc {
         line_0(img.nativeObj, pt1.x, pt1.y, pt2.x, pt2.y, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType, shift);
     }
 
-
-    //
-    // C++:  void cv::applyColorMap(Mat src, Mat& dst, Mat userColor)
-    //
-
     /**
      * Draws a line segment connecting two points.
      *
@@ -8787,11 +8864,6 @@ public class Imgproc {
     public static void line(Mat img, Point pt1, Point pt2, Scalar color, int thickness, int lineType) {
         line_1(img.nativeObj, pt1.x, pt1.y, pt2.x, pt2.y, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType);
     }
-
-
-    //
-    // C++:  void cv::line(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
-    //
 
     /**
      * Draws a line segment connecting two points.
@@ -8828,6 +8900,11 @@ public class Imgproc {
         line_3(img.nativeObj, pt1.x, pt1.y, pt2.x, pt2.y, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
 
+
+    //
+    // C++:  void cv::arrowedLine(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int line_type = 8, int shift = 0, double tipLength = 0.1)
+    //
+
     /**
      * Draws an arrow segment pointing from the first point to the second one.
      *
@@ -8862,11 +8939,6 @@ public class Imgproc {
     public static void arrowedLine(Mat img, Point pt1, Point pt2, Scalar color, int thickness, int line_type, int shift) {
         arrowedLine_1(img.nativeObj, pt1.x, pt1.y, pt2.x, pt2.y, color.val[0], color.val[1], color.val[2], color.val[3], thickness, line_type, shift);
     }
-
-
-    //
-    // C++:  void cv::arrowedLine(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int line_type = 8, int shift = 0, double tipLength = 0.1)
-    //
 
     /**
      * Draws an arrow segment pointing from the first point to the second one.
@@ -8913,6 +8985,11 @@ public class Imgproc {
         arrowedLine_4(img.nativeObj, pt1.x, pt1.y, pt2.x, pt2.y, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
 
+
+    //
+    // C++:  void cv::rectangle(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
+    //
+
     /**
      * Draws a simple, thick, or filled up-right rectangle.
      *
@@ -8950,11 +9027,6 @@ public class Imgproc {
         rectangle_1(img.nativeObj, pt1.x, pt1.y, pt2.x, pt2.y, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType);
     }
 
-
-    //
-    // C++:  void cv::rectangle(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
-    //
-
     /**
      * Draws a simple, thick, or filled up-right rectangle.
      *
@@ -8988,6 +9060,11 @@ public class Imgproc {
         rectangle_3(img.nativeObj, pt1.x, pt1.y, pt2.x, pt2.y, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
 
+
+    //
+    // C++:  void cv::rectangle(Mat& img, Rect rec, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
+    //
+
     /**
      *
      *
@@ -9019,11 +9096,6 @@ public class Imgproc {
         rectangle_5(img.nativeObj, rec.x, rec.y, rec.width, rec.height, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType);
     }
 
-
-    //
-    // C++:  void cv::rectangle(Mat& img, Rect rec, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
-    //
-
     /**
      *
      *
@@ -9050,6 +9122,11 @@ public class Imgproc {
     public static void rectangle(Mat img, Rect rec, Scalar color) {
         rectangle_7(img.nativeObj, rec.x, rec.y, rec.width, rec.height, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
+
+
+    //
+    // C++:  void cv::circle(Mat& img, Point center, int radius, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
+    //
 
     /**
      * Draws a circle.
@@ -9084,11 +9161,6 @@ public class Imgproc {
         circle_1(img.nativeObj, center.x, center.y, radius, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType);
     }
 
-
-    //
-    // C++:  void cv::circle(Mat& img, Point center, int radius, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
-    //
-
     /**
      * Draws a circle.
      *
@@ -9117,6 +9189,11 @@ public class Imgproc {
     public static void circle(Mat img, Point center, int radius, Scalar color) {
         circle_3(img.nativeObj, center.x, center.y, radius, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
+
+
+    //
+    // C++:  void cv::ellipse(Mat& img, Point center, Size axes, double angle, double startAngle, double endAngle, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
+    //
 
     /**
      * Draws a simple or thick elliptic arc or fills an ellipse sector.
@@ -9177,11 +9254,6 @@ public class Imgproc {
         ellipse_1(img.nativeObj, center.x, center.y, axes.width, axes.height, angle, startAngle, endAngle, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType);
     }
 
-
-    //
-    // C++:  void cv::ellipse(Mat& img, Point center, Size axes, double angle, double startAngle, double endAngle, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
-    //
-
     /**
      * Draws a simple or thick elliptic arc or fills an ellipse sector.
      *
@@ -9237,6 +9309,11 @@ public class Imgproc {
         ellipse_3(img.nativeObj, center.x, center.y, axes.width, axes.height, angle, startAngle, endAngle, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
 
+
+    //
+    // C++:  void cv::ellipse(Mat& img, RotatedRect box, Scalar color, int thickness = 1, int lineType = LINE_8)
+    //
+
     /**
      *
      * @param img Image.
@@ -9264,11 +9341,6 @@ public class Imgproc {
         ellipse_5(img.nativeObj, box.center.x, box.center.y, box.size.width, box.size.height, box.angle, color.val[0], color.val[1], color.val[2], color.val[3], thickness);
     }
 
-
-    //
-    // C++:  void cv::ellipse(Mat& img, RotatedRect box, Scalar color, int thickness = 1, int lineType = LINE_8)
-    //
-
     /**
      *
      * @param img Image.
@@ -9280,6 +9352,11 @@ public class Imgproc {
     public static void ellipse(Mat img, RotatedRect box, Scalar color) {
         ellipse_6(img.nativeObj, box.center.x, box.center.y, box.size.width, box.size.height, box.angle, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
+
+
+    //
+    // C++:  void cv::drawMarker(Mat& img, Point position, Scalar color, int markerType = MARKER_CROSS, int markerSize = 20, int thickness = 1, int line_type = 8)
+    //
 
     /**
      * Draws a marker on a predefined position in an image.
@@ -9315,11 +9392,6 @@ public class Imgproc {
     public static void drawMarker(Mat img, Point position, Scalar color, int markerType, int markerSize, int thickness) {
         drawMarker_1(img.nativeObj, position.x, position.y, color.val[0], color.val[1], color.val[2], color.val[3], markerType, markerSize, thickness);
     }
-
-
-    //
-    // C++:  void cv::drawMarker(Mat& img, Point position, Scalar color, int markerType = MARKER_CROSS, int markerSize = 20, int thickness = 1, int line_type = 8)
-    //
 
     /**
      * Draws a marker on a predefined position in an image.
@@ -9366,6 +9438,11 @@ public class Imgproc {
         drawMarker_4(img.nativeObj, position.x, position.y, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
 
+
+    //
+    // C++:  void cv::fillConvexPoly(Mat& img, vector_Point points, Scalar color, int lineType = LINE_8, int shift = 0)
+    //
+
     /**
      * Fills a convex polygon.
      *
@@ -9403,11 +9480,6 @@ public class Imgproc {
         fillConvexPoly_1(img.nativeObj, points_mat.nativeObj, color.val[0], color.val[1], color.val[2], color.val[3], lineType);
     }
 
-
-    //
-    // C++:  void cv::fillConvexPoly(Mat& img, vector_Point points, Scalar color, int lineType = LINE_8, int shift = 0)
-    //
-
     /**
      * Fills a convex polygon.
      *
@@ -9424,6 +9496,11 @@ public class Imgproc {
         Mat points_mat = points;
         fillConvexPoly_2(img.nativeObj, points_mat.nativeObj, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
+
+
+    //
+    // C++:  void cv::fillPoly(Mat& img, vector_vector_Point pts, Scalar color, int lineType = LINE_8, int shift = 0, Point offset = Point())
+    //
 
     /**
      * Fills the area bounded by one or more polygons.
@@ -9464,11 +9541,6 @@ public class Imgproc {
         fillPoly_1(img.nativeObj, pts_mat.nativeObj, color.val[0], color.val[1], color.val[2], color.val[3], lineType, shift);
     }
 
-
-    //
-    // C++:  void cv::fillPoly(Mat& img, vector_vector_Point pts, Scalar color, int lineType = LINE_8, int shift = 0, Point offset = Point())
-    //
-
     /**
      * Fills the area bounded by one or more polygons.
      *
@@ -9503,6 +9575,11 @@ public class Imgproc {
         Mat pts_mat = Converters.vector_vector_Point_to_Mat(pts, pts_tmplm);
         fillPoly_3(img.nativeObj, pts_mat.nativeObj, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
+
+
+    //
+    // C++:  void cv::polylines(Mat& img, vector_vector_Point pts, bool isClosed, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
+    //
 
     /**
      * Draws several polygonal curves.
@@ -9543,11 +9620,6 @@ public class Imgproc {
         polylines_1(img.nativeObj, pts_mat.nativeObj, isClosed, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType);
     }
 
-
-    //
-    // C++:  void cv::polylines(Mat& img, vector_vector_Point pts, bool isClosed, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
-    //
-
     /**
      * Draws several polygonal curves.
      *
@@ -9582,6 +9654,11 @@ public class Imgproc {
         Mat pts_mat = Converters.vector_vector_Point_to_Mat(pts, pts_tmplm);
         polylines_3(img.nativeObj, pts_mat.nativeObj, isClosed, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
+
+
+    //
+    // C++:  void cv::drawContours(Mat& image, vector_vector_Point contours, int contourIdx, Scalar color, int thickness = 1, int lineType = LINE_8, Mat hierarchy = Mat(), int maxLevel = INT_MAX, Point offset = Point())
+    //
 
     /**
      * Draws contours outlines or filled contours.
@@ -9651,11 +9728,6 @@ public class Imgproc {
         Mat contours_mat = Converters.vector_vector_Point_to_Mat(contours, contours_tmplm);
         drawContours_1(image.nativeObj, contours_mat.nativeObj, contourIdx, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType, hierarchy.nativeObj, maxLevel);
     }
-
-
-    //
-    // C++:  void cv::drawContours(Mat& image, vector_vector_Point contours, int contourIdx, Scalar color, int thickness = 1, int lineType = LINE_8, Mat hierarchy = Mat(), int maxLevel = INT_MAX, Point offset = Point())
-    //
 
     /**
      * Draws contours outlines or filled contours.
@@ -9783,21 +9855,17 @@ public class Imgproc {
         drawContours_5(image.nativeObj, contours_mat.nativeObj, contourIdx, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
 
-    /**
-     *
-     * @param imgRect Image rectangle.
-     * @param pt1 First line point.
-     * @param pt2 Second line point.
-     * @return automatically generated
-     */
-    public static boolean clipLine(Rect imgRect, Point pt1, Point pt2) {
-        double[] pt1_out = new double[2];
-        double[] pt2_out = new double[2];
-        boolean retVal = clipLine_0(imgRect.x, imgRect.y, imgRect.width, imgRect.height, pt1.x, pt1.y, pt1_out, pt2.x, pt2.y, pt2_out);
-        if(pt1!=null){ pt1.x = pt1_out[0]; pt1.y = pt1_out[1]; }
-        if(pt2!=null){ pt2.x = pt2_out[0]; pt2.y = pt2_out[1]; }
-        return retVal;
-    }
+
+    //
+    // C++:  bool cv::clipLine(Rect imgRect, Point& pt1, Point& pt2)
+    //
+
+
+
+
+    //
+    // C++:  void cv::ellipse2Poly(Point center, Size axes, int angle, int arcStart, int arcEnd, int delta, vector_Point& pts)
+    //
 
     /**
      * Approximates an elliptic arc with a polyline.
@@ -9821,7 +9889,7 @@ public class Imgproc {
 
 
     //
-    // C++:  bool cv::clipLine(Rect imgRect, Point& pt1, Point& pt2)
+    // C++:  void cv::putText(Mat& img, String text, Point org, int fontFace, double fontScale, Scalar color, int thickness = 1, int lineType = LINE_8, bool bottomLeftOrigin = false)
     //
 
     /**
@@ -9859,11 +9927,6 @@ public class Imgproc {
         putText_0(img.nativeObj, text, org.x, org.y, fontFace, fontScale, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType, bottomLeftOrigin);
     }
 
-
-    //
-    // C++:  void cv::ellipse2Poly(Point center, Size axes, int angle, int arcStart, int arcEnd, int delta, vector_Point& pts)
-    //
-
     /**
      * Draws a text string.
      *
@@ -9897,11 +9960,6 @@ public class Imgproc {
     public static void putText(Mat img, String text, Point org, int fontFace, double fontScale, Scalar color, int thickness, int lineType) {
         putText_1(img.nativeObj, text, org.x, org.y, fontFace, fontScale, color.val[0], color.val[1], color.val[2], color.val[3], thickness, lineType);
     }
-
-
-    //
-    // C++:  void cv::putText(Mat& img, String text, Point org, int fontFace, double fontScale, Scalar color, int thickness = 1, int lineType = LINE_8, bool bottomLeftOrigin = false)
-    //
 
     /**
      * Draws a text string.
@@ -9968,6 +10026,11 @@ public class Imgproc {
         putText_3(img.nativeObj, text, org.x, org.y, fontFace, fontScale, color.val[0], color.val[1], color.val[2], color.val[3]);
     }
 
+
+    //
+    // C++:  double cv::getFontScaleFromHeight(int fontFace, int pixelHeight, int thickness = 1)
+    //
+
     /**
      * Calculates the font-specific size to use to achieve a given height in pixels.
      *
@@ -9997,7 +10060,7 @@ public class Imgproc {
 
 
     //
-    // C++:  double cv::getFontScaleFromHeight(int fontFace, int pixelHeight, int thickness = 1)
+    // C++:  void cv::HoughLinesWithAccumulator(Mat image, Mat& lines, double rho, double theta, int threshold, double srn = 0, double stn = 0, double min_theta = 0, double max_theta = CV_PI, bool use_edgeval = false)
     //
 
     /**
@@ -10040,11 +10103,6 @@ public class Imgproc {
     public static void HoughLinesWithAccumulator(Mat image, Mat lines, double rho, double theta, int threshold, double srn, double stn, double min_theta, double max_theta) {
         HoughLinesWithAccumulator_1(image.nativeObj, lines.nativeObj, rho, theta, threshold, srn, stn, min_theta, max_theta);
     }
-
-
-    //
-    // C++:  void cv::HoughLinesWithAccumulator(Mat image, Mat& lines, double rho, double theta, int threshold, double srn = 0, double stn = 0, double min_theta = 0, double max_theta = CV_PI, bool use_edgeval = false)
-    //
 
     /**
      * Finds lines in a binary image using the standard Hough transform and get accumulator.
@@ -10116,6 +10174,11 @@ public class Imgproc {
         HoughLinesWithAccumulator_5(image.nativeObj, lines.nativeObj, rho, theta, threshold);
     }
 
+
+    //
+    // C++:  void cv::HoughCirclesWithAccumulator(Mat image, Mat& circles, int method, double dp, double minDist, double param1 = 100, double param2 = 100, int minRadius = 0, int maxRadius = 0)
+    //
+
     /**
      * Finds circles in a grayscale image using the Hough transform and get accumulator.
      *
@@ -10154,11 +10217,6 @@ public class Imgproc {
     public static void HoughCirclesWithAccumulator(Mat image, Mat circles, int method, double dp, double minDist, double param1, double param2, int minRadius) {
         HoughCirclesWithAccumulator_1(image.nativeObj, circles.nativeObj, method, dp, minDist, param1, param2, minRadius);
     }
-
-
-    //
-    // C++:  void cv::HoughCirclesWithAccumulator(Mat image, Mat& circles, int method, double dp, double minDist, double param1 = 100, double param2 = 100, int minRadius = 0, int maxRadius = 0)
-    //
 
     /**
      * Finds circles in a grayscale image using the Hough transform and get accumulator.
@@ -10211,6 +10269,8 @@ public class Imgproc {
         HoughCirclesWithAccumulator_4(image.nativeObj, circles.nativeObj, method, dp, minDist);
     }
 
+
+
 // C++: Size getTextSize(const String& text, int fontFace, double fontScale, int thickness, int* baseLine);
 //javadoc:getTextSize(text, fontFace, fontScale, thickness, baseLine)
 public static Size getTextSize(String text, int fontFace, double fontScale, int thickness, int[] baseLine) {
@@ -10220,47 +10280,36 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
     return retVal;
 }
 
+
+
+
     // C++:  Ptr_LineSegmentDetector cv::createLineSegmentDetector(int refine = LSD_REFINE_STD, double scale = 0.8, double sigma_scale = 0.6, double quant = 2.0, double ang_th = 22.5, double log_eps = 0, double density_th = 0.7, int n_bins = 1024)
     private static native long createLineSegmentDetector_0(int refine, double scale, double sigma_scale, double quant, double ang_th, double log_eps, double density_th, int n_bins);
-
     private static native long createLineSegmentDetector_1(int refine, double scale, double sigma_scale, double quant, double ang_th, double log_eps, double density_th);
-
     private static native long createLineSegmentDetector_2(int refine, double scale, double sigma_scale, double quant, double ang_th, double log_eps);
-
     private static native long createLineSegmentDetector_3(int refine, double scale, double sigma_scale, double quant, double ang_th);
-
     private static native long createLineSegmentDetector_4(int refine, double scale, double sigma_scale, double quant);
-
     private static native long createLineSegmentDetector_5(int refine, double scale, double sigma_scale);
-
     private static native long createLineSegmentDetector_6(int refine, double scale);
-
     private static native long createLineSegmentDetector_7(int refine);
-
     private static native long createLineSegmentDetector_8();
 
     // C++:  Mat cv::getGaussianKernel(int ksize, double sigma, int ktype = CV_64F)
     private static native long getGaussianKernel_0(int ksize, double sigma, int ktype);
-
     private static native long getGaussianKernel_1(int ksize, double sigma);
 
     // C++:  void cv::getDerivKernels(Mat& kx, Mat& ky, int dx, int dy, int ksize, bool normalize = false, int ktype = CV_32F)
     private static native void getDerivKernels_0(long kx_nativeObj, long ky_nativeObj, int dx, int dy, int ksize, boolean normalize, int ktype);
-
     private static native void getDerivKernels_1(long kx_nativeObj, long ky_nativeObj, int dx, int dy, int ksize, boolean normalize);
-
     private static native void getDerivKernels_2(long kx_nativeObj, long ky_nativeObj, int dx, int dy, int ksize);
 
     // C++:  Mat cv::getGaborKernel(Size ksize, double sigma, double theta, double lambd, double gamma, double psi = CV_PI*0.5, int ktype = CV_64F)
     private static native long getGaborKernel_0(double ksize_width, double ksize_height, double sigma, double theta, double lambd, double gamma, double psi, int ktype);
-
     private static native long getGaborKernel_1(double ksize_width, double ksize_height, double sigma, double theta, double lambd, double gamma, double psi);
-
     private static native long getGaborKernel_2(double ksize_width, double ksize_height, double sigma, double theta, double lambd, double gamma);
 
     // C++:  Mat cv::getStructuringElement(int shape, Size ksize, Point anchor = Point(-1,-1))
     private static native long getStructuringElement_0(int shape, double ksize_width, double ksize_height, double anchor_x, double anchor_y);
-
     private static native long getStructuringElement_1(int shape, double ksize_width, double ksize_height);
 
     // C++:  void cv::medianBlur(Mat src, Mat& dst, int ksize)
@@ -10268,41 +10317,29 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::GaussianBlur(Mat src, Mat& dst, Size ksize, double sigmaX, double sigmaY = 0, int borderType = BORDER_DEFAULT, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
     private static native void GaussianBlur_0(long src_nativeObj, long dst_nativeObj, double ksize_width, double ksize_height, double sigmaX, double sigmaY, int borderType, int hint);
-
     private static native void GaussianBlur_1(long src_nativeObj, long dst_nativeObj, double ksize_width, double ksize_height, double sigmaX, double sigmaY, int borderType);
-
     private static native void GaussianBlur_2(long src_nativeObj, long dst_nativeObj, double ksize_width, double ksize_height, double sigmaX, double sigmaY);
-
     private static native void GaussianBlur_3(long src_nativeObj, long dst_nativeObj, double ksize_width, double ksize_height, double sigmaX);
 
     // C++:  void cv::bilateralFilter(Mat src, Mat& dst, int d, double sigmaColor, double sigmaSpace, int borderType = BORDER_DEFAULT)
     private static native void bilateralFilter_0(long src_nativeObj, long dst_nativeObj, int d, double sigmaColor, double sigmaSpace, int borderType);
-
     private static native void bilateralFilter_1(long src_nativeObj, long dst_nativeObj, int d, double sigmaColor, double sigmaSpace);
 
     // C++:  void cv::boxFilter(Mat src, Mat& dst, int ddepth, Size ksize, Point anchor = Point(-1,-1), bool normalize = true, int borderType = BORDER_DEFAULT)
     private static native void boxFilter_0(long src_nativeObj, long dst_nativeObj, int ddepth, double ksize_width, double ksize_height, double anchor_x, double anchor_y, boolean normalize, int borderType);
-
     private static native void boxFilter_1(long src_nativeObj, long dst_nativeObj, int ddepth, double ksize_width, double ksize_height, double anchor_x, double anchor_y, boolean normalize);
-
     private static native void boxFilter_2(long src_nativeObj, long dst_nativeObj, int ddepth, double ksize_width, double ksize_height, double anchor_x, double anchor_y);
-
     private static native void boxFilter_3(long src_nativeObj, long dst_nativeObj, int ddepth, double ksize_width, double ksize_height);
 
     // C++:  void cv::sqrBoxFilter(Mat src, Mat& dst, int ddepth, Size ksize, Point anchor = Point(-1, -1), bool normalize = true, int borderType = BORDER_DEFAULT)
     private static native void sqrBoxFilter_0(long src_nativeObj, long dst_nativeObj, int ddepth, double ksize_width, double ksize_height, double anchor_x, double anchor_y, boolean normalize, int borderType);
-
     private static native void sqrBoxFilter_1(long src_nativeObj, long dst_nativeObj, int ddepth, double ksize_width, double ksize_height, double anchor_x, double anchor_y, boolean normalize);
-
     private static native void sqrBoxFilter_2(long src_nativeObj, long dst_nativeObj, int ddepth, double ksize_width, double ksize_height, double anchor_x, double anchor_y);
-
     private static native void sqrBoxFilter_3(long src_nativeObj, long dst_nativeObj, int ddepth, double ksize_width, double ksize_height);
 
     // C++:  void cv::blur(Mat src, Mat& dst, Size ksize, Point anchor = Point(-1,-1), int borderType = BORDER_DEFAULT)
     private static native void blur_0(long src_nativeObj, long dst_nativeObj, double ksize_width, double ksize_height, double anchor_x, double anchor_y, int borderType);
-
     private static native void blur_1(long src_nativeObj, long dst_nativeObj, double ksize_width, double ksize_height, double anchor_x, double anchor_y);
-
     private static native void blur_2(long src_nativeObj, long dst_nativeObj, double ksize_width, double ksize_height);
 
     // C++:  void cv::stackBlur(Mat src, Mat& dst, Size ksize)
@@ -10310,92 +10347,65 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::filter2D(Mat src, Mat& dst, int ddepth, Mat kernel, Point anchor = Point(-1,-1), double delta = 0, int borderType = BORDER_DEFAULT)
     private static native void filter2D_0(long src_nativeObj, long dst_nativeObj, int ddepth, long kernel_nativeObj, double anchor_x, double anchor_y, double delta, int borderType);
-
     private static native void filter2D_1(long src_nativeObj, long dst_nativeObj, int ddepth, long kernel_nativeObj, double anchor_x, double anchor_y, double delta);
-
     private static native void filter2D_2(long src_nativeObj, long dst_nativeObj, int ddepth, long kernel_nativeObj, double anchor_x, double anchor_y);
-
     private static native void filter2D_3(long src_nativeObj, long dst_nativeObj, int ddepth, long kernel_nativeObj);
 
     // C++:  void cv::sepFilter2D(Mat src, Mat& dst, int ddepth, Mat kernelX, Mat kernelY, Point anchor = Point(-1,-1), double delta = 0, int borderType = BORDER_DEFAULT)
     private static native void sepFilter2D_0(long src_nativeObj, long dst_nativeObj, int ddepth, long kernelX_nativeObj, long kernelY_nativeObj, double anchor_x, double anchor_y, double delta, int borderType);
-
     private static native void sepFilter2D_1(long src_nativeObj, long dst_nativeObj, int ddepth, long kernelX_nativeObj, long kernelY_nativeObj, double anchor_x, double anchor_y, double delta);
-
     private static native void sepFilter2D_2(long src_nativeObj, long dst_nativeObj, int ddepth, long kernelX_nativeObj, long kernelY_nativeObj, double anchor_x, double anchor_y);
-
     private static native void sepFilter2D_3(long src_nativeObj, long dst_nativeObj, int ddepth, long kernelX_nativeObj, long kernelY_nativeObj);
 
     // C++:  void cv::Sobel(Mat src, Mat& dst, int ddepth, int dx, int dy, int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
     private static native void Sobel_0(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy, int ksize, double scale, double delta, int borderType);
-
     private static native void Sobel_1(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy, int ksize, double scale, double delta);
-
     private static native void Sobel_2(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy, int ksize, double scale);
-
     private static native void Sobel_3(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy, int ksize);
-
     private static native void Sobel_4(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy);
 
     // C++:  void cv::spatialGradient(Mat src, Mat& dx, Mat& dy, int ksize = 3, int borderType = BORDER_DEFAULT)
     private static native void spatialGradient_0(long src_nativeObj, long dx_nativeObj, long dy_nativeObj, int ksize, int borderType);
-
     private static native void spatialGradient_1(long src_nativeObj, long dx_nativeObj, long dy_nativeObj, int ksize);
-
     private static native void spatialGradient_2(long src_nativeObj, long dx_nativeObj, long dy_nativeObj);
 
     // C++:  void cv::Scharr(Mat src, Mat& dst, int ddepth, int dx, int dy, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
     private static native void Scharr_0(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy, double scale, double delta, int borderType);
-
     private static native void Scharr_1(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy, double scale, double delta);
-
     private static native void Scharr_2(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy, double scale);
-
     private static native void Scharr_3(long src_nativeObj, long dst_nativeObj, int ddepth, int dx, int dy);
 
     // C++:  void cv::Laplacian(Mat src, Mat& dst, int ddepth, int ksize = 1, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT)
     private static native void Laplacian_0(long src_nativeObj, long dst_nativeObj, int ddepth, int ksize, double scale, double delta, int borderType);
-
     private static native void Laplacian_1(long src_nativeObj, long dst_nativeObj, int ddepth, int ksize, double scale, double delta);
-
     private static native void Laplacian_2(long src_nativeObj, long dst_nativeObj, int ddepth, int ksize, double scale);
-
     private static native void Laplacian_3(long src_nativeObj, long dst_nativeObj, int ddepth, int ksize);
-
     private static native void Laplacian_4(long src_nativeObj, long dst_nativeObj, int ddepth);
 
     // C++:  void cv::Canny(Mat image, Mat& edges, double threshold1, double threshold2, int apertureSize = 3, bool L2gradient = false)
     private static native void Canny_0(long image_nativeObj, long edges_nativeObj, double threshold1, double threshold2, int apertureSize, boolean L2gradient);
-
     private static native void Canny_1(long image_nativeObj, long edges_nativeObj, double threshold1, double threshold2, int apertureSize);
-
     private static native void Canny_2(long image_nativeObj, long edges_nativeObj, double threshold1, double threshold2);
 
     // C++:  void cv::Canny(Mat dx, Mat dy, Mat& edges, double threshold1, double threshold2, bool L2gradient = false)
     private static native void Canny_3(long dx_nativeObj, long dy_nativeObj, long edges_nativeObj, double threshold1, double threshold2, boolean L2gradient);
-
     private static native void Canny_4(long dx_nativeObj, long dy_nativeObj, long edges_nativeObj, double threshold1, double threshold2);
 
     // C++:  void cv::cornerMinEigenVal(Mat src, Mat& dst, int blockSize, int ksize = 3, int borderType = BORDER_DEFAULT)
     private static native void cornerMinEigenVal_0(long src_nativeObj, long dst_nativeObj, int blockSize, int ksize, int borderType);
-
     private static native void cornerMinEigenVal_1(long src_nativeObj, long dst_nativeObj, int blockSize, int ksize);
-
     private static native void cornerMinEigenVal_2(long src_nativeObj, long dst_nativeObj, int blockSize);
 
     // C++:  void cv::cornerHarris(Mat src, Mat& dst, int blockSize, int ksize, double k, int borderType = BORDER_DEFAULT)
     private static native void cornerHarris_0(long src_nativeObj, long dst_nativeObj, int blockSize, int ksize, double k, int borderType);
-
     private static native void cornerHarris_1(long src_nativeObj, long dst_nativeObj, int blockSize, int ksize, double k);
 
     // C++:  void cv::cornerEigenValsAndVecs(Mat src, Mat& dst, int blockSize, int ksize, int borderType = BORDER_DEFAULT)
     private static native void cornerEigenValsAndVecs_0(long src_nativeObj, long dst_nativeObj, int blockSize, int ksize, int borderType);
-
     private static native void cornerEigenValsAndVecs_1(long src_nativeObj, long dst_nativeObj, int blockSize, int ksize);
 
     // C++:  void cv::preCornerDetect(Mat src, Mat& dst, int ksize, int borderType = BORDER_DEFAULT)
     private static native void preCornerDetect_0(long src_nativeObj, long dst_nativeObj, int ksize, int borderType);
-
     private static native void preCornerDetect_1(long src_nativeObj, long dst_nativeObj, int ksize);
 
     // C++:  void cv::cornerSubPix(Mat image, Mat& corners, Size winSize, Size zeroZone, TermCriteria criteria)
@@ -10403,51 +10413,34 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::goodFeaturesToTrack(Mat image, vector_Point& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask = Mat(), int blockSize = 3, bool useHarrisDetector = false, double k = 0.04)
     private static native void goodFeaturesToTrack_0(long image_nativeObj, long corners_mat_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, int blockSize, boolean useHarrisDetector, double k);
-
     private static native void goodFeaturesToTrack_1(long image_nativeObj, long corners_mat_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, int blockSize, boolean useHarrisDetector);
-
     private static native void goodFeaturesToTrack_2(long image_nativeObj, long corners_mat_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, int blockSize);
-
     private static native void goodFeaturesToTrack_3(long image_nativeObj, long corners_mat_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj);
-
     private static native void goodFeaturesToTrack_4(long image_nativeObj, long corners_mat_nativeObj, int maxCorners, double qualityLevel, double minDistance);
 
     // C++:  void cv::goodFeaturesToTrack(Mat image, vector_Point& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, int blockSize, int gradientSize, bool useHarrisDetector = false, double k = 0.04)
     private static native void goodFeaturesToTrack_5(long image_nativeObj, long corners_mat_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, int blockSize, int gradientSize, boolean useHarrisDetector, double k);
-
     private static native void goodFeaturesToTrack_6(long image_nativeObj, long corners_mat_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, int blockSize, int gradientSize, boolean useHarrisDetector);
-
     private static native void goodFeaturesToTrack_7(long image_nativeObj, long corners_mat_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, int blockSize, int gradientSize);
 
     // C++:  void cv::goodFeaturesToTrack(Mat image, Mat& corners, int maxCorners, double qualityLevel, double minDistance, Mat mask, Mat& cornersQuality, int blockSize = 3, int gradientSize = 3, bool useHarrisDetector = false, double k = 0.04)
     private static native void goodFeaturesToTrackWithQuality_0(long image_nativeObj, long corners_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, long cornersQuality_nativeObj, int blockSize, int gradientSize, boolean useHarrisDetector, double k);
-
     private static native void goodFeaturesToTrackWithQuality_1(long image_nativeObj, long corners_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, long cornersQuality_nativeObj, int blockSize, int gradientSize, boolean useHarrisDetector);
-
     private static native void goodFeaturesToTrackWithQuality_2(long image_nativeObj, long corners_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, long cornersQuality_nativeObj, int blockSize, int gradientSize);
-
     private static native void goodFeaturesToTrackWithQuality_3(long image_nativeObj, long corners_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, long cornersQuality_nativeObj, int blockSize);
-
     private static native void goodFeaturesToTrackWithQuality_4(long image_nativeObj, long corners_nativeObj, int maxCorners, double qualityLevel, double minDistance, long mask_nativeObj, long cornersQuality_nativeObj);
 
     // C++:  void cv::HoughLines(Mat image, Mat& lines, double rho, double theta, int threshold, double srn = 0, double stn = 0, double min_theta = 0, double max_theta = CV_PI, bool use_edgeval = false)
     private static native void HoughLines_0(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn, double stn, double min_theta, double max_theta, boolean use_edgeval);
-
     private static native void HoughLines_1(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn, double stn, double min_theta, double max_theta);
-
     private static native void HoughLines_2(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn, double stn, double min_theta);
-
     private static native void HoughLines_3(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn, double stn);
-
     private static native void HoughLines_4(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn);
-
     private static native void HoughLines_5(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold);
 
     // C++:  void cv::HoughLinesP(Mat image, Mat& lines, double rho, double theta, int threshold, double minLineLength = 0, double maxLineGap = 0)
     private static native void HoughLinesP_0(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double minLineLength, double maxLineGap);
-
     private static native void HoughLinesP_1(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double minLineLength);
-
     private static native void HoughLinesP_2(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold);
 
     // C++:  void cv::HoughLinesPointSet(Mat point, Mat& lines, int lines_max, int threshold, double min_rho, double max_rho, double rho_step, double min_theta, double max_theta, double theta_step)
@@ -10455,85 +10448,57 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::HoughCircles(Mat image, Mat& circles, int method, double dp, double minDist, double param1 = 100, double param2 = 100, int minRadius = 0, int maxRadius = 0)
     private static native void HoughCircles_0(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist, double param1, double param2, int minRadius, int maxRadius);
-
     private static native void HoughCircles_1(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist, double param1, double param2, int minRadius);
-
     private static native void HoughCircles_2(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist, double param1, double param2);
-
     private static native void HoughCircles_3(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist, double param1);
-
     private static native void HoughCircles_4(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist);
 
     // C++:  void cv::erode(Mat src, Mat& dst, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
     private static native void erode_0(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations, int borderType, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
-
     private static native void erode_1(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations, int borderType);
-
     private static native void erode_2(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations);
-
     private static native void erode_3(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj, double anchor_x, double anchor_y);
-
     private static native void erode_4(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj);
 
     // C++:  void cv::dilate(Mat src, Mat& dst, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
     private static native void dilate_0(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations, int borderType, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
-
     private static native void dilate_1(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations, int borderType);
-
     private static native void dilate_2(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations);
-
     private static native void dilate_3(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj, double anchor_x, double anchor_y);
-
     private static native void dilate_4(long src_nativeObj, long dst_nativeObj, long kernel_nativeObj);
 
     // C++:  void cv::morphologyEx(Mat src, Mat& dst, int op, Mat kernel, Point anchor = Point(-1,-1), int iterations = 1, int borderType = BORDER_CONSTANT, Scalar borderValue = morphologyDefaultBorderValue())
     private static native void morphologyEx_0(long src_nativeObj, long dst_nativeObj, int op, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations, int borderType, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
-
     private static native void morphologyEx_1(long src_nativeObj, long dst_nativeObj, int op, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations, int borderType);
-
     private static native void morphologyEx_2(long src_nativeObj, long dst_nativeObj, int op, long kernel_nativeObj, double anchor_x, double anchor_y, int iterations);
-
     private static native void morphologyEx_3(long src_nativeObj, long dst_nativeObj, int op, long kernel_nativeObj, double anchor_x, double anchor_y);
-
     private static native void morphologyEx_4(long src_nativeObj, long dst_nativeObj, int op, long kernel_nativeObj);
 
     // C++:  void cv::resize(Mat src, Mat& dst, Size dsize, double fx = 0, double fy = 0, int interpolation = INTER_LINEAR)
     private static native void resize_0(long src_nativeObj, long dst_nativeObj, double dsize_width, double dsize_height, double fx, double fy, int interpolation);
-
     private static native void resize_1(long src_nativeObj, long dst_nativeObj, double dsize_width, double dsize_height, double fx, double fy);
-
     private static native void resize_2(long src_nativeObj, long dst_nativeObj, double dsize_width, double dsize_height, double fx);
-
     private static native void resize_3(long src_nativeObj, long dst_nativeObj, double dsize_width, double dsize_height);
 
     // C++:  void cv::warpAffine(Mat src, Mat& dst, Mat M, Size dsize, int flags = INTER_LINEAR, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
     private static native void warpAffine_0(long src_nativeObj, long dst_nativeObj, long M_nativeObj, double dsize_width, double dsize_height, int flags, int borderMode, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
-
     private static native void warpAffine_1(long src_nativeObj, long dst_nativeObj, long M_nativeObj, double dsize_width, double dsize_height, int flags, int borderMode);
-
     private static native void warpAffine_2(long src_nativeObj, long dst_nativeObj, long M_nativeObj, double dsize_width, double dsize_height, int flags);
-
     private static native void warpAffine_3(long src_nativeObj, long dst_nativeObj, long M_nativeObj, double dsize_width, double dsize_height);
 
     // C++:  void cv::warpPerspective(Mat src, Mat& dst, Mat M, Size dsize, int flags = INTER_LINEAR, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
     private static native void warpPerspective_0(long src_nativeObj, long dst_nativeObj, long M_nativeObj, double dsize_width, double dsize_height, int flags, int borderMode, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
-
     private static native void warpPerspective_1(long src_nativeObj, long dst_nativeObj, long M_nativeObj, double dsize_width, double dsize_height, int flags, int borderMode);
-
     private static native void warpPerspective_2(long src_nativeObj, long dst_nativeObj, long M_nativeObj, double dsize_width, double dsize_height, int flags);
-
     private static native void warpPerspective_3(long src_nativeObj, long dst_nativeObj, long M_nativeObj, double dsize_width, double dsize_height);
 
     // C++:  void cv::remap(Mat src, Mat& dst, Mat map1, Mat map2, int interpolation, int borderMode = BORDER_CONSTANT, Scalar borderValue = Scalar())
     private static native void remap_0(long src_nativeObj, long dst_nativeObj, long map1_nativeObj, long map2_nativeObj, int interpolation, int borderMode, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
-
     private static native void remap_1(long src_nativeObj, long dst_nativeObj, long map1_nativeObj, long map2_nativeObj, int interpolation, int borderMode);
-
     private static native void remap_2(long src_nativeObj, long dst_nativeObj, long map1_nativeObj, long map2_nativeObj, int interpolation);
 
     // C++:  void cv::convertMaps(Mat map1, Mat map2, Mat& dstmap1, Mat& dstmap2, int dstmap1type, bool nninterpolation = false)
     private static native void convertMaps_0(long map1_nativeObj, long map2_nativeObj, long dstmap1_nativeObj, long dstmap2_nativeObj, int dstmap1type, boolean nninterpolation);
-
     private static native void convertMaps_1(long map1_nativeObj, long map2_nativeObj, long dstmap1_nativeObj, long dstmap2_nativeObj, int dstmap1type);
 
     // C++:  Mat cv::getRotationMatrix2D(Point2f center, double angle, double scale)
@@ -10544,7 +10509,6 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  Mat cv::getPerspectiveTransform(Mat src, Mat dst, int solveMethod = DECOMP_LU)
     private static native long getPerspectiveTransform_0(long src_nativeObj, long dst_nativeObj, int solveMethod);
-
     private static native long getPerspectiveTransform_1(long src_nativeObj, long dst_nativeObj);
 
     // C++:  Mat cv::getAffineTransform(vector_Point2f src, vector_Point2f dst)
@@ -10552,7 +10516,6 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::getRectSubPix(Mat image, Size patchSize, Point2f center, Mat& patch, int patchType = -1)
     private static native void getRectSubPix_0(long image_nativeObj, double patchSize_width, double patchSize_height, double center_x, double center_y, long patch_nativeObj, int patchType);
-
     private static native void getRectSubPix_1(long image_nativeObj, double patchSize_width, double patchSize_height, double center_x, double center_y, long patch_nativeObj);
 
     // C++:  void cv::logPolar(Mat src, Mat& dst, Point2f center, double M, int flags)
@@ -10566,55 +10529,42 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::integral(Mat src, Mat& sum, Mat& sqsum, Mat& tilted, int sdepth = -1, int sqdepth = -1)
     private static native void integral3_0(long src_nativeObj, long sum_nativeObj, long sqsum_nativeObj, long tilted_nativeObj, int sdepth, int sqdepth);
-
     private static native void integral3_1(long src_nativeObj, long sum_nativeObj, long sqsum_nativeObj, long tilted_nativeObj, int sdepth);
-
     private static native void integral3_2(long src_nativeObj, long sum_nativeObj, long sqsum_nativeObj, long tilted_nativeObj);
 
     // C++:  void cv::integral(Mat src, Mat& sum, int sdepth = -1)
     private static native void integral_0(long src_nativeObj, long sum_nativeObj, int sdepth);
-
     private static native void integral_1(long src_nativeObj, long sum_nativeObj);
 
     // C++:  void cv::integral(Mat src, Mat& sum, Mat& sqsum, int sdepth = -1, int sqdepth = -1)
     private static native void integral2_0(long src_nativeObj, long sum_nativeObj, long sqsum_nativeObj, int sdepth, int sqdepth);
-
     private static native void integral2_1(long src_nativeObj, long sum_nativeObj, long sqsum_nativeObj, int sdepth);
-
     private static native void integral2_2(long src_nativeObj, long sum_nativeObj, long sqsum_nativeObj);
 
     // C++:  void cv::accumulate(Mat src, Mat& dst, Mat mask = Mat())
     private static native void accumulate_0(long src_nativeObj, long dst_nativeObj, long mask_nativeObj);
-
     private static native void accumulate_1(long src_nativeObj, long dst_nativeObj);
 
     // C++:  void cv::accumulateSquare(Mat src, Mat& dst, Mat mask = Mat())
     private static native void accumulateSquare_0(long src_nativeObj, long dst_nativeObj, long mask_nativeObj);
-
     private static native void accumulateSquare_1(long src_nativeObj, long dst_nativeObj);
 
     // C++:  void cv::accumulateProduct(Mat src1, Mat src2, Mat& dst, Mat mask = Mat())
     private static native void accumulateProduct_0(long src1_nativeObj, long src2_nativeObj, long dst_nativeObj, long mask_nativeObj);
-
     private static native void accumulateProduct_1(long src1_nativeObj, long src2_nativeObj, long dst_nativeObj);
 
     // C++:  void cv::accumulateWeighted(Mat src, Mat& dst, double alpha, Mat mask = Mat())
     private static native void accumulateWeighted_0(long src_nativeObj, long dst_nativeObj, double alpha, long mask_nativeObj);
-
     private static native void accumulateWeighted_1(long src_nativeObj, long dst_nativeObj, double alpha);
 
     // C++:  Point2d cv::phaseCorrelate(Mat src1, Mat src2, Mat window = Mat(), double* response = 0)
     private static native double[] phaseCorrelate_0(long src1_nativeObj, long src2_nativeObj, long window_nativeObj, double[] response_out);
-
     private static native double[] phaseCorrelate_1(long src1_nativeObj, long src2_nativeObj, long window_nativeObj);
-
     private static native double[] phaseCorrelate_2(long src1_nativeObj, long src2_nativeObj);
 
     // C++:  Point2d cv::phaseCorrelateIterative(Mat src1, Mat src2, int L2size = 7, int maxIters = 10)
     private static native double[] phaseCorrelateIterative_0(long src1_nativeObj, long src2_nativeObj, int L2size, int maxIters);
-
     private static native double[] phaseCorrelateIterative_1(long src1_nativeObj, long src2_nativeObj, int L2size);
-
     private static native double[] phaseCorrelateIterative_2(long src1_nativeObj, long src2_nativeObj);
 
     // C++:  void cv::createHanningWindow(Mat& dst, Size winSize, int type)
@@ -10622,7 +10572,6 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::divSpectrums(Mat a, Mat b, Mat& c, int flags, bool conjB = false)
     private static native void divSpectrums_0(long a_nativeObj, long b_nativeObj, long c_nativeObj, int flags, boolean conjB);
-
     private static native void divSpectrums_1(long a_nativeObj, long b_nativeObj, long c_nativeObj, int flags);
 
     // C++:  double cv::threshold(Mat src, Mat& dst, double thresh, double maxval, int type)
@@ -10636,21 +10585,16 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::pyrDown(Mat src, Mat& dst, Size dstsize = Size(), int borderType = BORDER_DEFAULT)
     private static native void pyrDown_0(long src_nativeObj, long dst_nativeObj, double dstsize_width, double dstsize_height, int borderType);
-
     private static native void pyrDown_1(long src_nativeObj, long dst_nativeObj, double dstsize_width, double dstsize_height);
-
     private static native void pyrDown_2(long src_nativeObj, long dst_nativeObj);
 
     // C++:  void cv::pyrUp(Mat src, Mat& dst, Size dstsize = Size(), int borderType = BORDER_DEFAULT)
     private static native void pyrUp_0(long src_nativeObj, long dst_nativeObj, double dstsize_width, double dstsize_height, int borderType);
-
     private static native void pyrUp_1(long src_nativeObj, long dst_nativeObj, double dstsize_width, double dstsize_height);
-
     private static native void pyrUp_2(long src_nativeObj, long dst_nativeObj);
 
     // C++:  void cv::calcHist(vector_Mat images, vector_int channels, Mat mask, Mat& hist, vector_int histSize, vector_float ranges, bool accumulate = false)
     private static native void calcHist_0(long images_mat_nativeObj, long channels_mat_nativeObj, long mask_nativeObj, long hist_nativeObj, long histSize_mat_nativeObj, long ranges_mat_nativeObj, boolean accumulate);
-
     private static native void calcHist_1(long images_mat_nativeObj, long channels_mat_nativeObj, long mask_nativeObj, long hist_nativeObj, long histSize_mat_nativeObj, long ranges_mat_nativeObj);
 
     // C++:  void cv::calcBackProject(vector_Mat images, vector_int channels, Mat hist, Mat& dst, vector_float ranges, double scale)
@@ -10664,16 +10608,12 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  Ptr_CLAHE cv::createCLAHE(double clipLimit = 40.0, Size tileGridSize = Size(8, 8))
     private static native long createCLAHE_0(double clipLimit, double tileGridSize_width, double tileGridSize_height);
-
     private static native long createCLAHE_1(double clipLimit);
-
     private static native long createCLAHE_2();
 
     // C++:  float cv::wrapperEMD(Mat signature1, Mat signature2, int distType, Mat cost = Mat(), Ptr_float& lowerBound = Ptr<float>(), Mat& flow = Mat())
     private static native float EMD_0(long signature1_nativeObj, long signature2_nativeObj, int distType, long cost_nativeObj, long flow_nativeObj);
-
     private static native float EMD_1(long signature1_nativeObj, long signature2_nativeObj, int distType, long cost_nativeObj);
-
     private static native float EMD_3(long signature1_nativeObj, long signature2_nativeObj, int distType);
 
     // C++:  void cv::watershed(Mat image, Mat& markers)
@@ -10681,35 +10621,26 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::pyrMeanShiftFiltering(Mat src, Mat& dst, double sp, double sr, int maxLevel = 1, TermCriteria termcrit = TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS,5,1))
     private static native void pyrMeanShiftFiltering_0(long src_nativeObj, long dst_nativeObj, double sp, double sr, int maxLevel, int termcrit_type, int termcrit_maxCount, double termcrit_epsilon);
-
     private static native void pyrMeanShiftFiltering_1(long src_nativeObj, long dst_nativeObj, double sp, double sr, int maxLevel);
-
     private static native void pyrMeanShiftFiltering_2(long src_nativeObj, long dst_nativeObj, double sp, double sr);
 
     // C++:  void cv::grabCut(Mat img, Mat& mask, Rect rect, Mat& bgdModel, Mat& fgdModel, int iterCount, int mode = GC_EVAL)
     private static native void grabCut_0(long img_nativeObj, long mask_nativeObj, int rect_x, int rect_y, int rect_width, int rect_height, long bgdModel_nativeObj, long fgdModel_nativeObj, int iterCount, int mode);
-
     private static native void grabCut_1(long img_nativeObj, long mask_nativeObj, int rect_x, int rect_y, int rect_width, int rect_height, long bgdModel_nativeObj, long fgdModel_nativeObj, int iterCount);
 
     // C++:  void cv::distanceTransform(Mat src, Mat& dst, Mat& labels, int distanceType, int maskSize, int labelType = DIST_LABEL_CCOMP)
     private static native void distanceTransformWithLabels_0(long src_nativeObj, long dst_nativeObj, long labels_nativeObj, int distanceType, int maskSize, int labelType);
-
     private static native void distanceTransformWithLabels_1(long src_nativeObj, long dst_nativeObj, long labels_nativeObj, int distanceType, int maskSize);
 
     // C++:  void cv::distanceTransform(Mat src, Mat& dst, int distanceType, int maskSize, int dstType = CV_32F)
     private static native void distanceTransform_0(long src_nativeObj, long dst_nativeObj, int distanceType, int maskSize, int dstType);
-
     private static native void distanceTransform_1(long src_nativeObj, long dst_nativeObj, int distanceType, int maskSize);
 
     // C++:  int cv::floodFill(Mat& image, Mat& mask, Point seedPoint, Scalar newVal, Rect* rect = 0, Scalar loDiff = Scalar(), Scalar upDiff = Scalar(), int flags = 4)
     private static native int floodFill_0(long image_nativeObj, long mask_nativeObj, double seedPoint_x, double seedPoint_y, double newVal_val0, double newVal_val1, double newVal_val2, double newVal_val3, double[] rect_out, double loDiff_val0, double loDiff_val1, double loDiff_val2, double loDiff_val3, double upDiff_val0, double upDiff_val1, double upDiff_val2, double upDiff_val3, int flags);
-
     private static native int floodFill_1(long image_nativeObj, long mask_nativeObj, double seedPoint_x, double seedPoint_y, double newVal_val0, double newVal_val1, double newVal_val2, double newVal_val3, double[] rect_out, double loDiff_val0, double loDiff_val1, double loDiff_val2, double loDiff_val3, double upDiff_val0, double upDiff_val1, double upDiff_val2, double upDiff_val3);
-
     private static native int floodFill_2(long image_nativeObj, long mask_nativeObj, double seedPoint_x, double seedPoint_y, double newVal_val0, double newVal_val1, double newVal_val2, double newVal_val3, double[] rect_out, double loDiff_val0, double loDiff_val1, double loDiff_val2, double loDiff_val3);
-
     private static native int floodFill_3(long image_nativeObj, long mask_nativeObj, double seedPoint_x, double seedPoint_y, double newVal_val0, double newVal_val1, double newVal_val2, double newVal_val3, double[] rect_out);
-
     private static native int floodFill_4(long image_nativeObj, long mask_nativeObj, double seedPoint_x, double seedPoint_y, double newVal_val0, double newVal_val1, double newVal_val2, double newVal_val3);
 
     // C++:  void cv::blendLinear(Mat src1, Mat src2, Mat weights1, Mat weights2, Mat& dst)
@@ -10717,24 +10648,19 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::cvtColor(Mat src, Mat& dst, int code, int dstCn = 0, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
     private static native void cvtColor_0(long src_nativeObj, long dst_nativeObj, int code, int dstCn, int hint);
-
     private static native void cvtColor_1(long src_nativeObj, long dst_nativeObj, int code, int dstCn);
-
     private static native void cvtColor_2(long src_nativeObj, long dst_nativeObj, int code);
 
     // C++:  void cv::cvtColorTwoPlane(Mat src1, Mat src2, Mat& dst, int code, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT)
     private static native void cvtColorTwoPlane_0(long src1_nativeObj, long src2_nativeObj, long dst_nativeObj, int code, int hint);
-
     private static native void cvtColorTwoPlane_1(long src1_nativeObj, long src2_nativeObj, long dst_nativeObj, int code);
 
     // C++:  void cv::demosaicing(Mat src, Mat& dst, int code, int dstCn = 0)
     private static native void demosaicing_0(long src_nativeObj, long dst_nativeObj, int code, int dstCn);
-
     private static native void demosaicing_1(long src_nativeObj, long dst_nativeObj, int code);
 
     // C++:  Moments cv::moments(Mat array, bool binaryImage = false)
     private static native double[] moments_0(long array_nativeObj, boolean binaryImage);
-
     private static native double[] moments_1(long array_nativeObj);
 
     // C++:  void cv::HuMoments(Moments m, Mat& hu)
@@ -10742,7 +10668,6 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::matchTemplate(Mat image, Mat templ, Mat& result, int method, Mat mask = Mat())
     private static native void matchTemplate_0(long image_nativeObj, long templ_nativeObj, long result_nativeObj, int method, long mask_nativeObj);
-
     private static native void matchTemplate_1(long image_nativeObj, long templ_nativeObj, long result_nativeObj, int method);
 
     // C++:  int cv::connectedComponents(Mat image, Mat& labels, int connectivity, int ltype, int ccltype)
@@ -10750,9 +10675,7 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  int cv::connectedComponents(Mat image, Mat& labels, int connectivity = 8, int ltype = CV_32S)
     private static native int connectedComponents_0(long image_nativeObj, long labels_nativeObj, int connectivity, int ltype);
-
     private static native int connectedComponents_1(long image_nativeObj, long labels_nativeObj, int connectivity);
-
     private static native int connectedComponents_2(long image_nativeObj, long labels_nativeObj);
 
     // C++:  int cv::connectedComponentsWithStats(Mat image, Mat& labels, Mat& stats, Mat& centroids, int connectivity, int ltype, int ccltype)
@@ -10760,14 +10683,11 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  int cv::connectedComponentsWithStats(Mat image, Mat& labels, Mat& stats, Mat& centroids, int connectivity = 8, int ltype = CV_32S)
     private static native int connectedComponentsWithStats_0(long image_nativeObj, long labels_nativeObj, long stats_nativeObj, long centroids_nativeObj, int connectivity, int ltype);
-
     private static native int connectedComponentsWithStats_1(long image_nativeObj, long labels_nativeObj, long stats_nativeObj, long centroids_nativeObj, int connectivity);
-
     private static native int connectedComponentsWithStats_2(long image_nativeObj, long labels_nativeObj, long stats_nativeObj, long centroids_nativeObj);
 
     // C++:  void cv::findContours(Mat image, vector_vector_Point& contours, Mat& hierarchy, int mode, int method, Point offset = Point())
     private static native void findContours_0(long image_nativeObj, long contours_mat_nativeObj, long hierarchy_nativeObj, int mode, int method, double offset_x, double offset_y);
-
     private static native void findContours_1(long image_nativeObj, long contours_mat_nativeObj, long hierarchy_nativeObj, int mode, int method);
 
     // C++:  void cv::findContoursLinkRuns(Mat image, vector_Mat& contours, Mat& hierarchy)
@@ -10781,9 +10701,7 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::approxPolyN(Mat curve, Mat& approxCurve, int nsides, float epsilon_percentage = -1.0, bool ensure_convex = true)
     private static native void approxPolyN_0(long curve_nativeObj, long approxCurve_nativeObj, int nsides, float epsilon_percentage, boolean ensure_convex);
-
     private static native void approxPolyN_1(long curve_nativeObj, long approxCurve_nativeObj, int nsides, float epsilon_percentage);
-
     private static native void approxPolyN_2(long curve_nativeObj, long approxCurve_nativeObj, int nsides);
 
     // C++:  double cv::arcLength(vector_Point2f curve, bool closed)
@@ -10794,7 +10712,6 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  double cv::contourArea(Mat contour, bool oriented = false)
     private static native double contourArea_0(long contour_nativeObj, boolean oriented);
-
     private static native double contourArea_1(long contour_nativeObj);
 
     // C++:  RotatedRect cv::minAreaRect(vector_Point2f points)
@@ -10817,7 +10734,6 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::convexHull(vector_Point points, vector_int& hull, bool clockwise = false,  _hidden_  returnPoints = true)
     private static native void convexHull_0(long points_mat_nativeObj, long hull_mat_nativeObj, boolean clockwise);
-
     private static native void convexHull_2(long points_mat_nativeObj, long hull_mat_nativeObj);
 
     // C++:  void cv::convexityDefects(vector_Point contour, vector_int convexhull, vector_Vec4i& convexityDefects)
@@ -10828,7 +10744,6 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  float cv::intersectConvexConvex(Mat p1, Mat p2, Mat& p12, bool handleNested = true)
     private static native float intersectConvexConvex_0(long p1_nativeObj, long p2_nativeObj, long p12_nativeObj, boolean handleNested);
-
     private static native float intersectConvexConvex_1(long p1_nativeObj, long p2_nativeObj, long p12_nativeObj);
 
     // C++:  RotatedRect cv::fitEllipse(vector_Point2f points)
@@ -10866,114 +10781,76 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::line(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
     private static native void line_0(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, int shift);
-
     private static native void line_1(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void line_2(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void line_3(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::arrowedLine(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int line_type = 8, int shift = 0, double tipLength = 0.1)
     private static native void arrowedLine_0(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int line_type, int shift, double tipLength);
-
     private static native void arrowedLine_1(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int line_type, int shift);
-
     private static native void arrowedLine_2(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int line_type);
-
     private static native void arrowedLine_3(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void arrowedLine_4(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::rectangle(Mat& img, Point pt1, Point pt2, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
     private static native void rectangle_0(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, int shift);
-
     private static native void rectangle_1(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void rectangle_2(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void rectangle_3(long img_nativeObj, double pt1_x, double pt1_y, double pt2_x, double pt2_y, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::rectangle(Mat& img, Rect rec, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
     private static native void rectangle_4(long img_nativeObj, int rec_x, int rec_y, int rec_width, int rec_height, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, int shift);
-
     private static native void rectangle_5(long img_nativeObj, int rec_x, int rec_y, int rec_width, int rec_height, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void rectangle_6(long img_nativeObj, int rec_x, int rec_y, int rec_width, int rec_height, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void rectangle_7(long img_nativeObj, int rec_x, int rec_y, int rec_width, int rec_height, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::circle(Mat& img, Point center, int radius, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
     private static native void circle_0(long img_nativeObj, double center_x, double center_y, int radius, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, int shift);
-
     private static native void circle_1(long img_nativeObj, double center_x, double center_y, int radius, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void circle_2(long img_nativeObj, double center_x, double center_y, int radius, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void circle_3(long img_nativeObj, double center_x, double center_y, int radius, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::ellipse(Mat& img, Point center, Size axes, double angle, double startAngle, double endAngle, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
     private static native void ellipse_0(long img_nativeObj, double center_x, double center_y, double axes_width, double axes_height, double angle, double startAngle, double endAngle, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, int shift);
-
     private static native void ellipse_1(long img_nativeObj, double center_x, double center_y, double axes_width, double axes_height, double angle, double startAngle, double endAngle, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void ellipse_2(long img_nativeObj, double center_x, double center_y, double axes_width, double axes_height, double angle, double startAngle, double endAngle, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void ellipse_3(long img_nativeObj, double center_x, double center_y, double axes_width, double axes_height, double angle, double startAngle, double endAngle, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::ellipse(Mat& img, RotatedRect box, Scalar color, int thickness = 1, int lineType = LINE_8)
     private static native void ellipse_4(long img_nativeObj, double box_center_x, double box_center_y, double box_size_width, double box_size_height, double box_angle, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void ellipse_5(long img_nativeObj, double box_center_x, double box_center_y, double box_size_width, double box_size_height, double box_angle, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void ellipse_6(long img_nativeObj, double box_center_x, double box_center_y, double box_size_width, double box_size_height, double box_angle, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::drawMarker(Mat& img, Point position, Scalar color, int markerType = MARKER_CROSS, int markerSize = 20, int thickness = 1, int line_type = 8)
     private static native void drawMarker_0(long img_nativeObj, double position_x, double position_y, double color_val0, double color_val1, double color_val2, double color_val3, int markerType, int markerSize, int thickness, int line_type);
-
     private static native void drawMarker_1(long img_nativeObj, double position_x, double position_y, double color_val0, double color_val1, double color_val2, double color_val3, int markerType, int markerSize, int thickness);
-
     private static native void drawMarker_2(long img_nativeObj, double position_x, double position_y, double color_val0, double color_val1, double color_val2, double color_val3, int markerType, int markerSize);
-
     private static native void drawMarker_3(long img_nativeObj, double position_x, double position_y, double color_val0, double color_val1, double color_val2, double color_val3, int markerType);
-
     private static native void drawMarker_4(long img_nativeObj, double position_x, double position_y, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::fillConvexPoly(Mat& img, vector_Point points, Scalar color, int lineType = LINE_8, int shift = 0)
     private static native void fillConvexPoly_0(long img_nativeObj, long points_mat_nativeObj, double color_val0, double color_val1, double color_val2, double color_val3, int lineType, int shift);
-
     private static native void fillConvexPoly_1(long img_nativeObj, long points_mat_nativeObj, double color_val0, double color_val1, double color_val2, double color_val3, int lineType);
-
     private static native void fillConvexPoly_2(long img_nativeObj, long points_mat_nativeObj, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::fillPoly(Mat& img, vector_vector_Point pts, Scalar color, int lineType = LINE_8, int shift = 0, Point offset = Point())
     private static native void fillPoly_0(long img_nativeObj, long pts_mat_nativeObj, double color_val0, double color_val1, double color_val2, double color_val3, int lineType, int shift, double offset_x, double offset_y);
-
     private static native void fillPoly_1(long img_nativeObj, long pts_mat_nativeObj, double color_val0, double color_val1, double color_val2, double color_val3, int lineType, int shift);
-
     private static native void fillPoly_2(long img_nativeObj, long pts_mat_nativeObj, double color_val0, double color_val1, double color_val2, double color_val3, int lineType);
-
     private static native void fillPoly_3(long img_nativeObj, long pts_mat_nativeObj, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::polylines(Mat& img, vector_vector_Point pts, bool isClosed, Scalar color, int thickness = 1, int lineType = LINE_8, int shift = 0)
     private static native void polylines_0(long img_nativeObj, long pts_mat_nativeObj, boolean isClosed, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, int shift);
-
     private static native void polylines_1(long img_nativeObj, long pts_mat_nativeObj, boolean isClosed, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void polylines_2(long img_nativeObj, long pts_mat_nativeObj, boolean isClosed, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void polylines_3(long img_nativeObj, long pts_mat_nativeObj, boolean isClosed, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  void cv::drawContours(Mat& image, vector_vector_Point contours, int contourIdx, Scalar color, int thickness = 1, int lineType = LINE_8, Mat hierarchy = Mat(), int maxLevel = INT_MAX, Point offset = Point())
     private static native void drawContours_0(long image_nativeObj, long contours_mat_nativeObj, int contourIdx, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, long hierarchy_nativeObj, int maxLevel, double offset_x, double offset_y);
-
     private static native void drawContours_1(long image_nativeObj, long contours_mat_nativeObj, int contourIdx, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, long hierarchy_nativeObj, int maxLevel);
-
     private static native void drawContours_2(long image_nativeObj, long contours_mat_nativeObj, int contourIdx, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, long hierarchy_nativeObj);
-
     private static native void drawContours_3(long image_nativeObj, long contours_mat_nativeObj, int contourIdx, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void drawContours_4(long image_nativeObj, long contours_mat_nativeObj, int contourIdx, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void drawContours_5(long image_nativeObj, long contours_mat_nativeObj, int contourIdx, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  bool cv::clipLine(Rect imgRect, Point& pt1, Point& pt2)
@@ -10984,44 +10861,28 @@ public static Size getTextSize(String text, int fontFace, double fontScale, int 
 
     // C++:  void cv::putText(Mat& img, String text, Point org, int fontFace, double fontScale, Scalar color, int thickness = 1, int lineType = LINE_8, bool bottomLeftOrigin = false)
     private static native void putText_0(long img_nativeObj, String text, double org_x, double org_y, int fontFace, double fontScale, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType, boolean bottomLeftOrigin);
-
     private static native void putText_1(long img_nativeObj, String text, double org_x, double org_y, int fontFace, double fontScale, double color_val0, double color_val1, double color_val2, double color_val3, int thickness, int lineType);
-
     private static native void putText_2(long img_nativeObj, String text, double org_x, double org_y, int fontFace, double fontScale, double color_val0, double color_val1, double color_val2, double color_val3, int thickness);
-
     private static native void putText_3(long img_nativeObj, String text, double org_x, double org_y, int fontFace, double fontScale, double color_val0, double color_val1, double color_val2, double color_val3);
 
     // C++:  double cv::getFontScaleFromHeight(int fontFace, int pixelHeight, int thickness = 1)
     private static native double getFontScaleFromHeight_0(int fontFace, int pixelHeight, int thickness);
-
     private static native double getFontScaleFromHeight_1(int fontFace, int pixelHeight);
 
     // C++:  void cv::HoughLinesWithAccumulator(Mat image, Mat& lines, double rho, double theta, int threshold, double srn = 0, double stn = 0, double min_theta = 0, double max_theta = CV_PI, bool use_edgeval = false)
     private static native void HoughLinesWithAccumulator_0(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn, double stn, double min_theta, double max_theta, boolean use_edgeval);
-
     private static native void HoughLinesWithAccumulator_1(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn, double stn, double min_theta, double max_theta);
-
     private static native void HoughLinesWithAccumulator_2(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn, double stn, double min_theta);
-
     private static native void HoughLinesWithAccumulator_3(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn, double stn);
-
     private static native void HoughLinesWithAccumulator_4(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold, double srn);
-
     private static native void HoughLinesWithAccumulator_5(long image_nativeObj, long lines_nativeObj, double rho, double theta, int threshold);
 
     // C++:  void cv::HoughCirclesWithAccumulator(Mat image, Mat& circles, int method, double dp, double minDist, double param1 = 100, double param2 = 100, int minRadius = 0, int maxRadius = 0)
     private static native void HoughCirclesWithAccumulator_0(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist, double param1, double param2, int minRadius, int maxRadius);
-
     private static native void HoughCirclesWithAccumulator_1(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist, double param1, double param2, int minRadius);
-
     private static native void HoughCirclesWithAccumulator_2(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist, double param1, double param2);
-
     private static native void HoughCirclesWithAccumulator_3(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist, double param1);
-
     private static native void HoughCirclesWithAccumulator_4(long image_nativeObj, long circles_nativeObj, int method, double dp, double minDist);
-
 private static native double[] n_getTextSize(String text, int fontFace, double fontScale, int thickness, int[] baseLine);
-
-
 
 }

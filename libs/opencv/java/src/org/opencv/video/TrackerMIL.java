@@ -45,17 +45,19 @@ public class TrackerMIL extends Tracker {
         return TrackerMIL.__fromPtr__(create_1());
     }
 
-    // C++: static Ptr_TrackerMIL cv::TrackerMIL::create(TrackerMIL_Params parameters = TrackerMIL::Params())
-    private static native long create_0(long parameters_nativeObj);
-
-    private static native long create_1();
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
 
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++: static Ptr_TrackerMIL cv::TrackerMIL::create(TrackerMIL_Params parameters = TrackerMIL::Params())
+    private static native long create_0(long parameters_nativeObj);
+    private static native long create_1();
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

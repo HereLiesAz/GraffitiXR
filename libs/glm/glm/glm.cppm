@@ -4,8 +4,8 @@ module;
 // #define GLM_EXT_INLINE_NAMESPACE to inline glm::ext into glm
 // #define GLM_GTX_INLINE_NAMESPACE to inline glm::gtx into glm
 
-#include "./glm.hpp"
-#include "./ext.hpp"
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
 
 export module glm;
 
@@ -2634,9 +2634,6 @@ export namespace glm {
 		using glm::tanh;
 		using glm::third;
 		using glm::three_over_two_pi;
-		using glm::toMat3;
-		using glm::toMat4;
-		using glm::toQuat;
 		using glm::translate;
 		using glm::transpose;
 		using glm::triangleNormal;

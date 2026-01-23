@@ -19,16 +19,16 @@ public class FlannBasedMatcher extends DescriptorMatcher {
 
     protected FlannBasedMatcher(long addr) { super(addr); }
 
-    public FlannBasedMatcher() {
-        super(FlannBasedMatcher_0());
-    }
+    // internal usage only
+    public static FlannBasedMatcher __fromPtr__(long addr) { return new FlannBasedMatcher(addr); }
 
     //
     // C++:   cv::FlannBasedMatcher::FlannBasedMatcher(Ptr_flann_IndexParams indexParams = makePtr<flann::KDTreeIndexParams>(), Ptr_flann_SearchParams searchParams = makePtr<flann::SearchParams>())
     //
 
-    // internal usage only
-    public static FlannBasedMatcher __fromPtr__(long addr) { return new FlannBasedMatcher(addr); }
+    public FlannBasedMatcher() {
+        super(FlannBasedMatcher_0());
+    }
 
 
     //
@@ -39,6 +39,14 @@ public class FlannBasedMatcher extends DescriptorMatcher {
         return FlannBasedMatcher.__fromPtr__(create_0());
     }
 
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
     // C++:   cv::FlannBasedMatcher::FlannBasedMatcher(Ptr_flann_IndexParams indexParams = makePtr<flann::KDTreeIndexParams>(), Ptr_flann_SearchParams searchParams = makePtr<flann::SearchParams>())
     private static native long FlannBasedMatcher_0();
 
@@ -47,10 +55,5 @@ public class FlannBasedMatcher extends DescriptorMatcher {
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

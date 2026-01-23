@@ -25,6 +25,13 @@ public class TextDetectionModel_DB extends TextDetectionModel {
 
     protected TextDetectionModel_DB(long addr) { super(addr); }
 
+    // internal usage only
+    public static TextDetectionModel_DB __fromPtr__(long addr) { return new TextDetectionModel_DB(addr); }
+
+    //
+    // C++:   cv::dnn::TextDetectionModel_DB::TextDetectionModel_DB(Net network)
+    //
+
     /**
      * Create text detection algorithm from deep learning network.
      * @param network Net object.
@@ -33,8 +40,9 @@ public class TextDetectionModel_DB extends TextDetectionModel {
         super(TextDetectionModel_DB_0(network.getNativeObjAddr()));
     }
 
+
     //
-    // C++:   cv::dnn::TextDetectionModel_DB::TextDetectionModel_DB(Net network)
+    // C++:   cv::dnn::TextDetectionModel_DB::TextDetectionModel_DB(string model, string config = "")
     //
 
     /**
@@ -47,11 +55,6 @@ public class TextDetectionModel_DB extends TextDetectionModel {
         super(TextDetectionModel_DB_1(model, config));
     }
 
-
-    //
-    // C++:   cv::dnn::TextDetectionModel_DB::TextDetectionModel_DB(string model, string config = "")
-    //
-
     /**
      * Create text detection model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -61,68 +64,103 @@ public class TextDetectionModel_DB extends TextDetectionModel {
         super(TextDetectionModel_DB_2(model));
     }
 
-    // internal usage only
-    public static TextDetectionModel_DB __fromPtr__(long addr) { return new TextDetectionModel_DB(addr); }
-
 
     //
     // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setBinaryThreshold(float binaryThreshold)
     //
 
-    // C++:   cv::dnn::TextDetectionModel_DB::TextDetectionModel_DB(Net network)
-    private static native long TextDetectionModel_DB_0(long network_nativeObj);
+    public float getBinaryThreshold() {
+        return getBinaryThreshold_0(nativeObj);
+    }
 
 
     //
     // C++:  float cv::dnn::TextDetectionModel_DB::getBinaryThreshold()
     //
 
-    // C++:   cv::dnn::TextDetectionModel_DB::TextDetectionModel_DB(string model, string config = "")
-    private static native long TextDetectionModel_DB_1(String model, String config);
+    public TextDetectionModel_DB setBinaryThreshold(float binaryThreshold) {
+        return new TextDetectionModel_DB(setBinaryThreshold_0(nativeObj, binaryThreshold));
+    }
 
 
     //
     // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setPolygonThreshold(float polygonThreshold)
     //
 
-    private static native long TextDetectionModel_DB_2(String model);
+    public float getPolygonThreshold() {
+        return getPolygonThreshold_0(nativeObj);
+    }
 
 
     //
     // C++:  float cv::dnn::TextDetectionModel_DB::getPolygonThreshold()
     //
 
-    // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setBinaryThreshold(float binaryThreshold)
-    private static native long setBinaryThreshold_0(long nativeObj, float binaryThreshold);
+    public TextDetectionModel_DB setPolygonThreshold(float polygonThreshold) {
+        return new TextDetectionModel_DB(setPolygonThreshold_0(nativeObj, polygonThreshold));
+    }
 
 
     //
     // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setUnclipRatio(double unclipRatio)
     //
 
-    // C++:  float cv::dnn::TextDetectionModel_DB::getBinaryThreshold()
-    private static native float getBinaryThreshold_0(long nativeObj);
+    public double getUnclipRatio() {
+        return getUnclipRatio_0(nativeObj);
+    }
 
 
     //
     // C++:  double cv::dnn::TextDetectionModel_DB::getUnclipRatio()
     //
 
-    // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setPolygonThreshold(float polygonThreshold)
-    private static native long setPolygonThreshold_0(long nativeObj, float polygonThreshold);
+    public TextDetectionModel_DB setUnclipRatio(double unclipRatio) {
+        return new TextDetectionModel_DB(setUnclipRatio_0(nativeObj, unclipRatio));
+    }
 
 
     //
     // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setMaxCandidates(int maxCandidates)
     //
 
-    // C++:  float cv::dnn::TextDetectionModel_DB::getPolygonThreshold()
-    private static native float getPolygonThreshold_0(long nativeObj);
+    public int getMaxCandidates() {
+        return getMaxCandidates_0(nativeObj);
+    }
 
 
     //
     // C++:  int cv::dnn::TextDetectionModel_DB::getMaxCandidates()
     //
+
+    public TextDetectionModel_DB setMaxCandidates(int maxCandidates) {
+        return new TextDetectionModel_DB(setMaxCandidates_0(nativeObj, maxCandidates));
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
+    // C++:   cv::dnn::TextDetectionModel_DB::TextDetectionModel_DB(Net network)
+    private static native long TextDetectionModel_DB_0(long network_nativeObj);
+
+    // C++:   cv::dnn::TextDetectionModel_DB::TextDetectionModel_DB(string model, string config = "")
+    private static native long TextDetectionModel_DB_1(String model, String config);
+    private static native long TextDetectionModel_DB_2(String model);
+
+    // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setBinaryThreshold(float binaryThreshold)
+    private static native long setBinaryThreshold_0(long nativeObj, float binaryThreshold);
+
+    // C++:  float cv::dnn::TextDetectionModel_DB::getBinaryThreshold()
+    private static native float getBinaryThreshold_0(long nativeObj);
+
+    // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setPolygonThreshold(float polygonThreshold)
+    private static native long setPolygonThreshold_0(long nativeObj, float polygonThreshold);
+
+    // C++:  float cv::dnn::TextDetectionModel_DB::getPolygonThreshold()
+    private static native float getPolygonThreshold_0(long nativeObj);
 
     // C++:  TextDetectionModel_DB cv::dnn::TextDetectionModel_DB::setUnclipRatio(double unclipRatio)
     private static native long setUnclipRatio_0(long nativeObj, double unclipRatio);
@@ -138,42 +176,5 @@ public class TextDetectionModel_DB extends TextDetectionModel {
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    public float getBinaryThreshold() {
-        return getBinaryThreshold_0(nativeObj);
-    }
-
-    public TextDetectionModel_DB setBinaryThreshold(float binaryThreshold) {
-        return new TextDetectionModel_DB(setBinaryThreshold_0(nativeObj, binaryThreshold));
-    }
-
-    public float getPolygonThreshold() {
-        return getPolygonThreshold_0(nativeObj);
-    }
-
-    public TextDetectionModel_DB setPolygonThreshold(float polygonThreshold) {
-        return new TextDetectionModel_DB(setPolygonThreshold_0(nativeObj, polygonThreshold));
-    }
-
-    public double getUnclipRatio() {
-        return getUnclipRatio_0(nativeObj);
-    }
-
-    public TextDetectionModel_DB setUnclipRatio(double unclipRatio) {
-        return new TextDetectionModel_DB(setUnclipRatio_0(nativeObj, unclipRatio));
-    }
-
-    public int getMaxCandidates() {
-        return getMaxCandidates_0(nativeObj);
-    }
-
-    public TextDetectionModel_DB setMaxCandidates(int maxCandidates) {
-        return new TextDetectionModel_DB(setMaxCandidates_0(nativeObj, maxCandidates));
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

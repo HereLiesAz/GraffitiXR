@@ -24,9 +24,25 @@ public class CascadeClassifier {
       
     }
 
+    // internal usage only
+    public static CascadeClassifier __fromPtr__(long addr) { return new CascadeClassifier(addr); }
+
+    public static boolean convert(String oldcascade, String newcascade) {
+        return convert_0(oldcascade, newcascade);
+    }
+
+    //
+    // C++:   cv::CascadeClassifier::CascadeClassifier()
+    //
+
     public CascadeClassifier() {
         nativeObj = CascadeClassifier_0();
     }
+
+
+    //
+    // C++:   cv::CascadeClassifier::CascadeClassifier(String filename)
+    //
 
     /**
      * Loads a classifier from a file.
@@ -37,143 +53,10 @@ public class CascadeClassifier {
         nativeObj = CascadeClassifier_1(filename);
     }
 
-    //
-    // C++:   cv::CascadeClassifier::CascadeClassifier()
-    //
-
-    // internal usage only
-    public static CascadeClassifier __fromPtr__(long addr) { return new CascadeClassifier(addr); }
-
-
-    //
-    // C++:   cv::CascadeClassifier::CascadeClassifier(String filename)
-    //
-
-    public static boolean convert(String oldcascade, String newcascade) {
-        return convert_0(oldcascade, newcascade);
-    }
-
 
     //
     // C++:  bool cv::CascadeClassifier::empty()
     //
-
-    // C++:   cv::CascadeClassifier::CascadeClassifier()
-    private static native long CascadeClassifier_0();
-
-
-    //
-    // C++:  bool cv::CascadeClassifier::load(String filename)
-    //
-
-    // C++:   cv::CascadeClassifier::CascadeClassifier(String filename)
-    private static native long CascadeClassifier_1(String filename);
-
-
-    //
-    // C++:  bool cv::CascadeClassifier::read(FileNode node)
-    //
-
-    // Unknown type 'FileNode' (I), skipping the function
-
-
-    //
-    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size())
-    //
-
-    // C++:  bool cv::CascadeClassifier::empty()
-    private static native boolean empty_0(long nativeObj);
-
-    // C++:  bool cv::CascadeClassifier::load(String filename)
-    private static native boolean load_0(long nativeObj, String filename);
-
-    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size())
-    private static native void detectMultiScale_0(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height, double maxSize_width, double maxSize_height);
-
-    private static native void detectMultiScale_1(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height);
-
-    private static native void detectMultiScale_2(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor, int minNeighbors, int flags);
-
-    private static native void detectMultiScale_3(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor, int minNeighbors);
-
-
-    //
-    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, vector_int& numDetections, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size())
-    //
-
-    private static native void detectMultiScale_4(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor);
-
-    private static native void detectMultiScale_5(long nativeObj, long image_nativeObj, long objects_mat_nativeObj);
-
-    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, vector_int& numDetections, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size())
-    private static native void detectMultiScale2_0(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height, double maxSize_width, double maxSize_height);
-
-    private static native void detectMultiScale2_1(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height);
-
-    private static native void detectMultiScale2_2(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor, int minNeighbors, int flags);
-
-    private static native void detectMultiScale2_3(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor, int minNeighbors);
-
-
-    //
-    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, vector_int& rejectLevels, vector_double& levelWeights, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size(), bool outputRejectLevels = false)
-    //
-
-    private static native void detectMultiScale2_4(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor);
-
-    private static native void detectMultiScale2_5(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj);
-
-    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, vector_int& rejectLevels, vector_double& levelWeights, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size(), bool outputRejectLevels = false)
-    private static native void detectMultiScale3_0(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height, double maxSize_width, double maxSize_height, boolean outputRejectLevels);
-
-    private static native void detectMultiScale3_1(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height, double maxSize_width, double maxSize_height);
-
-    private static native void detectMultiScale3_2(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height);
-
-    private static native void detectMultiScale3_3(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors, int flags);
-
-    private static native void detectMultiScale3_4(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors);
-
-
-    //
-    // C++:  bool cv::CascadeClassifier::isOldFormatCascade()
-    //
-
-    private static native void detectMultiScale3_5(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor);
-
-
-    //
-    // C++:  Size cv::CascadeClassifier::getOriginalWindowSize()
-    //
-
-    private static native void detectMultiScale3_6(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj);
-
-
-    //
-    // C++:  int cv::CascadeClassifier::getFeatureType()
-    //
-
-    // C++:  bool cv::CascadeClassifier::isOldFormatCascade()
-    private static native boolean isOldFormatCascade_0(long nativeObj);
-
-
-    //
-    // C++: static bool cv::CascadeClassifier::convert(String oldcascade, String newcascade)
-    //
-
-    // C++:  Size cv::CascadeClassifier::getOriginalWindowSize()
-    private static native double[] getOriginalWindowSize_0(long nativeObj);
-
-    // C++:  int cv::CascadeClassifier::getFeatureType()
-    private static native int getFeatureType_0(long nativeObj);
-
-    // C++: static bool cv::CascadeClassifier::convert(String oldcascade, String newcascade)
-    private static native boolean convert_0(String oldcascade, String newcascade);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    public long getNativeObjAddr() { return nativeObj; }
 
     /**
      * Checks whether the classifier has been loaded.
@@ -182,6 +65,11 @@ public class CascadeClassifier {
     public boolean empty() {
         return empty_0(nativeObj);
     }
+
+
+    //
+    // C++:  bool cv::CascadeClassifier::load(String filename)
+    //
 
     /**
      * Loads a classifier from a file.
@@ -194,6 +82,18 @@ public class CascadeClassifier {
     public boolean load(String filename) {
         return load_0(nativeObj, filename);
     }
+
+
+    //
+    // C++:  bool cv::CascadeClassifier::read(FileNode node)
+    //
+
+    // Unknown type 'FileNode' (I), skipping the function
+
+
+    //
+    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size())
+    //
 
     /**
      * Detects objects of different sizes in the input image. The detected objects are returned as a list
@@ -299,6 +199,11 @@ public class CascadeClassifier {
         Mat objects_mat = objects;
         detectMultiScale_5(nativeObj, image.nativeObj, objects_mat.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, vector_int& numDetections, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size())
+    //
 
     /**
      *
@@ -416,6 +321,11 @@ public class CascadeClassifier {
         Mat numDetections_mat = numDetections;
         detectMultiScale2_5(nativeObj, image.nativeObj, objects_mat.nativeObj, numDetections_mat.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, vector_int& rejectLevels, vector_double& levelWeights, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size(), bool outputRejectLevels = false)
+    //
 
     /**
      *
@@ -641,21 +551,112 @@ public class CascadeClassifier {
         detectMultiScale3_6(nativeObj, image.nativeObj, objects_mat.nativeObj, rejectLevels_mat.nativeObj, levelWeights_mat.nativeObj);
     }
 
+
+    //
+    // C++:  bool cv::CascadeClassifier::isOldFormatCascade()
+    //
+
     public boolean isOldFormatCascade() {
         return isOldFormatCascade_0(nativeObj);
     }
+
+
+    //
+    // C++:  Size cv::CascadeClassifier::getOriginalWindowSize()
+    //
 
     public Size getOriginalWindowSize() {
         return new Size(getOriginalWindowSize_0(nativeObj));
     }
 
+
+    //
+    // C++:  int cv::CascadeClassifier::getFeatureType()
+    //
+
     public int getFeatureType() {
         return getFeatureType_0(nativeObj);
     }
+
+
+    //
+    // C++: static bool cv::CascadeClassifier::convert(String oldcascade, String newcascade)
+    //
+
+    // C++:   cv::CascadeClassifier::CascadeClassifier()
+    private static native long CascadeClassifier_0();
+
 
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+    // C++:   cv::CascadeClassifier::CascadeClassifier(String filename)
+    private static native long CascadeClassifier_1(String filename);
+
+    // C++:  bool cv::CascadeClassifier::empty()
+    private static native boolean empty_0(long nativeObj);
+
+    // C++:  bool cv::CascadeClassifier::load(String filename)
+    private static native boolean load_0(long nativeObj, String filename);
+
+    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size())
+    private static native void detectMultiScale_0(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height, double maxSize_width, double maxSize_height);
+
+    private static native void detectMultiScale_1(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height);
+
+    private static native void detectMultiScale_2(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor, int minNeighbors, int flags);
+
+    private static native void detectMultiScale_3(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor, int minNeighbors);
+
+    private static native void detectMultiScale_4(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, double scaleFactor);
+
+    private static native void detectMultiScale_5(long nativeObj, long image_nativeObj, long objects_mat_nativeObj);
+
+    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, vector_int& numDetections, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size())
+    private static native void detectMultiScale2_0(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height, double maxSize_width, double maxSize_height);
+
+    private static native void detectMultiScale2_1(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height);
+
+    private static native void detectMultiScale2_2(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor, int minNeighbors, int flags);
+
+    private static native void detectMultiScale2_3(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor, int minNeighbors);
+
+    private static native void detectMultiScale2_4(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj, double scaleFactor);
+
+    private static native void detectMultiScale2_5(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long numDetections_mat_nativeObj);
+
+    // C++:  void cv::CascadeClassifier::detectMultiScale(Mat image, vector_Rect& objects, vector_int& rejectLevels, vector_double& levelWeights, double scaleFactor = 1.1, int minNeighbors = 3, int flags = 0, Size minSize = Size(), Size maxSize = Size(), bool outputRejectLevels = false)
+    private static native void detectMultiScale3_0(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height, double maxSize_width, double maxSize_height, boolean outputRejectLevels);
+
+    private static native void detectMultiScale3_1(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height, double maxSize_width, double maxSize_height);
+
+    private static native void detectMultiScale3_2(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors, int flags, double minSize_width, double minSize_height);
+
+    private static native void detectMultiScale3_3(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors, int flags);
+
+    private static native void detectMultiScale3_4(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor, int minNeighbors);
+
+    private static native void detectMultiScale3_5(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj, double scaleFactor);
+
+    private static native void detectMultiScale3_6(long nativeObj, long image_nativeObj, long objects_mat_nativeObj, long rejectLevels_mat_nativeObj, long levelWeights_mat_nativeObj);
+
+    // C++:  bool cv::CascadeClassifier::isOldFormatCascade()
+    private static native boolean isOldFormatCascade_0(long nativeObj);
+
+    // C++:  Size cv::CascadeClassifier::getOriginalWindowSize()
+    private static native double[] getOriginalWindowSize_0(long nativeObj);
+
+    // C++:  int cv::CascadeClassifier::getFeatureType()
+    private static native int getFeatureType_0(long nativeObj);
+
+    // C++: static bool cv::CascadeClassifier::convert(String oldcascade, String newcascade)
+    private static native boolean convert_0(String oldcascade, String newcascade);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public long getNativeObjAddr() { return nativeObj; }
 
 }

@@ -23,116 +23,6 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
     // C++:  int cv::BackgroundSubtractorKNN::getHistory()
     //
 
-    // C++:  int cv::BackgroundSubtractorKNN::getHistory()
-    private static native int getHistory_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractorKNN::setHistory(int history)
-    //
-
-    // C++:  void cv::BackgroundSubtractorKNN::setHistory(int history)
-    private static native void setHistory_0(long nativeObj, int history);
-
-
-    //
-    // C++:  int cv::BackgroundSubtractorKNN::getNSamples()
-    //
-
-    // C++:  int cv::BackgroundSubtractorKNN::getNSamples()
-    private static native int getNSamples_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractorKNN::setNSamples(int _nN)
-    //
-
-    // C++:  void cv::BackgroundSubtractorKNN::setNSamples(int _nN)
-    private static native void setNSamples_0(long nativeObj, int _nN);
-
-
-    //
-    // C++:  double cv::BackgroundSubtractorKNN::getDist2Threshold()
-    //
-
-    // C++:  double cv::BackgroundSubtractorKNN::getDist2Threshold()
-    private static native double getDist2Threshold_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractorKNN::setDist2Threshold(double _dist2Threshold)
-    //
-
-    // C++:  void cv::BackgroundSubtractorKNN::setDist2Threshold(double _dist2Threshold)
-    private static native void setDist2Threshold_0(long nativeObj, double _dist2Threshold);
-
-
-    //
-    // C++:  int cv::BackgroundSubtractorKNN::getkNNSamples()
-    //
-
-    // C++:  int cv::BackgroundSubtractorKNN::getkNNSamples()
-    private static native int getkNNSamples_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractorKNN::setkNNSamples(int _nkNN)
-    //
-
-    // C++:  void cv::BackgroundSubtractorKNN::setkNNSamples(int _nkNN)
-    private static native void setkNNSamples_0(long nativeObj, int _nkNN);
-
-
-    //
-    // C++:  bool cv::BackgroundSubtractorKNN::getDetectShadows()
-    //
-
-    // C++:  bool cv::BackgroundSubtractorKNN::getDetectShadows()
-    private static native boolean getDetectShadows_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractorKNN::setDetectShadows(bool detectShadows)
-    //
-
-    // C++:  void cv::BackgroundSubtractorKNN::setDetectShadows(bool detectShadows)
-    private static native void setDetectShadows_0(long nativeObj, boolean detectShadows);
-
-
-    //
-    // C++:  int cv::BackgroundSubtractorKNN::getShadowValue()
-    //
-
-    // C++:  int cv::BackgroundSubtractorKNN::getShadowValue()
-    private static native int getShadowValue_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractorKNN::setShadowValue(int value)
-    //
-
-    // C++:  void cv::BackgroundSubtractorKNN::setShadowValue(int value)
-    private static native void setShadowValue_0(long nativeObj, int value);
-
-
-    //
-    // C++:  double cv::BackgroundSubtractorKNN::getShadowThreshold()
-    //
-
-    // C++:  double cv::BackgroundSubtractorKNN::getShadowThreshold()
-    private static native double getShadowThreshold_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractorKNN::setShadowThreshold(double threshold)
-    //
-
-    // C++:  void cv::BackgroundSubtractorKNN::setShadowThreshold(double threshold)
-    private static native void setShadowThreshold_0(long nativeObj, double threshold);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     /**
      * Returns the number of last frames that affect the background model
      * @return automatically generated
@@ -140,6 +30,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
     public int getHistory() {
         return getHistory_0(nativeObj);
     }
+
+
+    //
+    // C++:  void cv::BackgroundSubtractorKNN::setHistory(int history)
+    //
 
     /**
      * Sets the number of last frames that affect the background model
@@ -149,6 +44,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
         setHistory_0(nativeObj, history);
     }
 
+
+    //
+    // C++:  int cv::BackgroundSubtractorKNN::getNSamples()
+    //
+
     /**
      * Returns the number of data samples in the background model
      * @return automatically generated
@@ -156,6 +56,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
     public int getNSamples() {
         return getNSamples_0(nativeObj);
     }
+
+
+    //
+    // C++:  void cv::BackgroundSubtractorKNN::setNSamples(int _nN)
+    //
 
     /**
      * Sets the number of data samples in the background model.
@@ -166,6 +71,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
     public void setNSamples(int _nN) {
         setNSamples_0(nativeObj, _nN);
     }
+
+
+    //
+    // C++:  double cv::BackgroundSubtractorKNN::getDist2Threshold()
+    //
 
     /**
      * Returns the threshold on the squared distance between the pixel and the sample
@@ -178,6 +88,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
         return getDist2Threshold_0(nativeObj);
     }
 
+
+    //
+    // C++:  void cv::BackgroundSubtractorKNN::setDist2Threshold(double _dist2Threshold)
+    //
+
     /**
      * Sets the threshold on the squared distance
      * @param _dist2Threshold automatically generated
@@ -185,6 +100,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
     public void setDist2Threshold(double _dist2Threshold) {
         setDist2Threshold_0(nativeObj, _dist2Threshold);
     }
+
+
+    //
+    // C++:  int cv::BackgroundSubtractorKNN::getkNNSamples()
+    //
 
     /**
      * Returns the number of neighbours, the k in the kNN.
@@ -197,6 +117,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
         return getkNNSamples_0(nativeObj);
     }
 
+
+    //
+    // C++:  void cv::BackgroundSubtractorKNN::setkNNSamples(int _nkNN)
+    //
+
     /**
      * Sets the k in the kNN. How many nearest neighbours need to match.
      * @param _nkNN automatically generated
@@ -204,6 +129,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
     public void setkNNSamples(int _nkNN) {
         setkNNSamples_0(nativeObj, _nkNN);
     }
+
+
+    //
+    // C++:  bool cv::BackgroundSubtractorKNN::getDetectShadows()
+    //
 
     /**
      * Returns the shadow detection flag
@@ -216,6 +146,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
         return getDetectShadows_0(nativeObj);
     }
 
+
+    //
+    // C++:  void cv::BackgroundSubtractorKNN::setDetectShadows(bool detectShadows)
+    //
+
     /**
      * Enables or disables shadow detection
      * @param detectShadows automatically generated
@@ -223,6 +158,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
     public void setDetectShadows(boolean detectShadows) {
         setDetectShadows_0(nativeObj, detectShadows);
     }
+
+
+    //
+    // C++:  int cv::BackgroundSubtractorKNN::getShadowValue()
+    //
 
     /**
      * Returns the shadow value
@@ -235,6 +175,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
         return getShadowValue_0(nativeObj);
     }
 
+
+    //
+    // C++:  void cv::BackgroundSubtractorKNN::setShadowValue(int value)
+    //
+
     /**
      * Sets the shadow value
      * @param value automatically generated
@@ -242,6 +187,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
     public void setShadowValue(int value) {
         setShadowValue_0(nativeObj, value);
     }
+
+
+    //
+    // C++:  double cv::BackgroundSubtractorKNN::getShadowThreshold()
+    //
 
     /**
      * Returns the shadow threshold
@@ -256,6 +206,11 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
         return getShadowThreshold_0(nativeObj);
     }
 
+
+    //
+    // C++:  void cv::BackgroundSubtractorKNN::setShadowThreshold(double threshold)
+    //
+
     /**
      * Sets the shadow threshold
      * @param threshold automatically generated
@@ -264,9 +219,57 @@ public class BackgroundSubtractorKNN extends BackgroundSubtractor {
         setShadowThreshold_0(nativeObj, threshold);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:  int cv::BackgroundSubtractorKNN::getHistory()
+    private static native int getHistory_0(long nativeObj);
+
+    // C++:  void cv::BackgroundSubtractorKNN::setHistory(int history)
+    private static native void setHistory_0(long nativeObj, int history);
+
+    // C++:  int cv::BackgroundSubtractorKNN::getNSamples()
+    private static native int getNSamples_0(long nativeObj);
+
+    // C++:  void cv::BackgroundSubtractorKNN::setNSamples(int _nN)
+    private static native void setNSamples_0(long nativeObj, int _nN);
+
+    // C++:  double cv::BackgroundSubtractorKNN::getDist2Threshold()
+    private static native double getDist2Threshold_0(long nativeObj);
+
+    // C++:  void cv::BackgroundSubtractorKNN::setDist2Threshold(double _dist2Threshold)
+    private static native void setDist2Threshold_0(long nativeObj, double _dist2Threshold);
+
+    // C++:  int cv::BackgroundSubtractorKNN::getkNNSamples()
+    private static native int getkNNSamples_0(long nativeObj);
+
+    // C++:  void cv::BackgroundSubtractorKNN::setkNNSamples(int _nkNN)
+    private static native void setkNNSamples_0(long nativeObj, int _nkNN);
+
+    // C++:  bool cv::BackgroundSubtractorKNN::getDetectShadows()
+    private static native boolean getDetectShadows_0(long nativeObj);
+
+    // C++:  void cv::BackgroundSubtractorKNN::setDetectShadows(bool detectShadows)
+    private static native void setDetectShadows_0(long nativeObj, boolean detectShadows);
+
+    // C++:  int cv::BackgroundSubtractorKNN::getShadowValue()
+    private static native int getShadowValue_0(long nativeObj);
+
+    // C++:  void cv::BackgroundSubtractorKNN::setShadowValue(int value)
+    private static native void setShadowValue_0(long nativeObj, int value);
+
+    // C++:  double cv::BackgroundSubtractorKNN::getShadowThreshold()
+    private static native double getShadowThreshold_0(long nativeObj);
+
+    // C++:  void cv::BackgroundSubtractorKNN::setShadowThreshold(double threshold)
+    private static native void setShadowThreshold_0(long nativeObj, double threshold);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

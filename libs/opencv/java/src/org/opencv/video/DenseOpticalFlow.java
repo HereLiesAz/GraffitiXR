@@ -21,20 +21,6 @@ public class DenseOpticalFlow extends Algorithm {
     // C++:  void cv::DenseOpticalFlow::calc(Mat I0, Mat I1, Mat& flow)
     //
 
-    // C++:  void cv::DenseOpticalFlow::calc(Mat I0, Mat I1, Mat& flow)
-    private static native void calc_0(long nativeObj, long I0_nativeObj, long I1_nativeObj, long flow_nativeObj);
-
-
-    //
-    // C++:  void cv::DenseOpticalFlow::collectGarbage()
-    //
-
-    // C++:  void cv::DenseOpticalFlow::collectGarbage()
-    private static native void collectGarbage_0(long nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     /**
      * Calculates an optical flow.
      *
@@ -46,6 +32,11 @@ public class DenseOpticalFlow extends Algorithm {
         calc_0(nativeObj, I0.nativeObj, I1.nativeObj, flow.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::DenseOpticalFlow::collectGarbage()
+    //
+
     /**
      * Releases all inner buffers.
      */
@@ -53,9 +44,21 @@ public class DenseOpticalFlow extends Algorithm {
         collectGarbage_0(nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:  void cv::DenseOpticalFlow::calc(Mat I0, Mat I1, Mat& flow)
+    private static native void calc_0(long nativeObj, long I0_nativeObj, long I1_nativeObj, long flow_nativeObj);
+
+    // C++:  void cv::DenseOpticalFlow::collectGarbage()
+    private static native void collectGarbage_0(long nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

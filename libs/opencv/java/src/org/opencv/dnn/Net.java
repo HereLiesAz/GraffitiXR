@@ -47,6 +47,14 @@ public class Net {
     // C++:   cv::dnn::Net::Net()
     //
 
+    // C++:   cv::dnn::Net::Net()
+    private static native long Net_0();
+
+
+    //
+    // C++: static Net cv::dnn::Net::readFromModelOptimizer(String xml, String bin)
+    //
+
     /**
      * Create a network from Intel's Model Optimizer intermediate representation (IR).
      * @param xml XML configuration file with network's topology.
@@ -61,7 +69,7 @@ public class Net {
 
 
     //
-    // C++: static Net cv::dnn::Net::readFromModelOptimizer(String xml, String bin)
+    // C++: static Net cv::dnn::Net::readFromModelOptimizer(vector_uchar bufferModelConfig, vector_uchar bufferWeights)
     //
 
     /**
@@ -78,43 +86,60 @@ public class Net {
 
 
     //
-    // C++: static Net cv::dnn::Net::readFromModelOptimizer(vector_uchar bufferModelConfig, vector_uchar bufferWeights)
-    //
-
-    // C++:   cv::dnn::Net::Net()
-    private static native long Net_0();
-
-
-    //
     // C++:  bool cv::dnn::Net::empty()
     //
 
-    // C++: static Net cv::dnn::Net::readFromModelOptimizer(String xml, String bin)
-    private static native long readFromModelOptimizer_0(String xml, String bin);
+    /**
+     * Returns true if there are no layers in the network.
+     * @return automatically generated
+     */
+    public boolean empty() {
+        return empty_0(nativeObj);
+    }
 
 
     //
     // C++:  String cv::dnn::Net::dump()
     //
 
-    // C++: static Net cv::dnn::Net::readFromModelOptimizer(vector_uchar bufferModelConfig, vector_uchar bufferWeights)
-    private static native long readFromModelOptimizer_1(long bufferModelConfig_mat_nativeObj, long bufferWeights_mat_nativeObj);
+    /**
+     * Dump net to String
+     * @return String with structure, hyperparameters, backend, target and fusion
+     * Call method after setInput(). To see correct backend, target and fusion run after forward().
+     */
+    public String dump() {
+        return dump_0(nativeObj);
+    }
 
 
     //
     // C++:  void cv::dnn::Net::dumpToFile(String path)
     //
 
-    // C++:  bool cv::dnn::Net::empty()
-    private static native boolean empty_0(long nativeObj);
+    /**
+     * Dump net structure, hyperparameters, backend, target and fusion to dot file
+     * @param path   path to output file with .dot extension
+     * SEE: dump()
+     */
+    public void dumpToFile(String path) {
+        dumpToFile_0(nativeObj, path);
+    }
 
 
     //
     // C++:  void cv::dnn::Net::dumpToPbtxt(String path)
     //
 
-    // C++:  String cv::dnn::Net::dump()
-    private static native String dump_0(long nativeObj);
+    /**
+     * Dump net structure, hyperparameters, backend, target and fusion to pbtxt file
+     * @param path   path to output file with .pbtxt extension
+     *
+     * Use Netron (https://netron.app) to open the target file to visualize the model.
+     * Call method after setInput(). To see correct backend, target and fusion run after forward().
+     */
+    public void dumpToPbtxt(String path) {
+        dumpToPbtxt_0(nativeObj, path);
+    }
 
 
     //
@@ -135,392 +160,6 @@ public class Net {
     // C++:  int cv::dnn::Net::getLayerId(String layer)
     //
 
-    // C++:  void cv::dnn::Net::dumpToFile(String path)
-    private static native void dumpToFile_0(long nativeObj, String path);
-
-
-    //
-    // C++:  vector_String cv::dnn::Net::getLayerNames()
-    //
-
-    // C++:  void cv::dnn::Net::dumpToPbtxt(String path)
-    private static native void dumpToPbtxt_0(long nativeObj, String path);
-
-
-    //
-    // C++:  Ptr_Layer cv::dnn::Net::getLayer(int layerId)
-    //
-
-    // C++:  int cv::dnn::Net::getLayerId(String layer)
-    private static native int getLayerId_0(long nativeObj, String layer);
-
-
-    //
-    // C++:  Ptr_Layer cv::dnn::Net::getLayer(String layerName)
-    //
-
-    // C++:  vector_String cv::dnn::Net::getLayerNames()
-    private static native List<String> getLayerNames_0(long nativeObj);
-
-
-    //
-    // C++:  Ptr_Layer cv::dnn::Net::getLayer(LayerId layerId)
-    //
-
-    // C++:  Ptr_Layer cv::dnn::Net::getLayer(int layerId)
-    private static native long getLayer_0(long nativeObj, int layerId);
-
-
-    //
-    // C++:  void cv::dnn::Net::connect(String outPin, String inpPin)
-    //
-
-    // C++:  Ptr_Layer cv::dnn::Net::getLayer(String layerName)
-    private static native long getLayer_1(long nativeObj, String layerName);
-
-
-    //
-    // C++:  int cv::dnn::Net::registerOutput(string outputName, int layerId, int outputPort)
-    //
-
-    // C++:  Ptr_Layer cv::dnn::Net::getLayer(LayerId layerId)
-    private static native long getLayer_2(long nativeObj, long layerId_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::Net::setInputsNames(vector_String inputBlobNames)
-    //
-
-    // C++:  void cv::dnn::Net::connect(String outPin, String inpPin)
-    private static native void connect_0(long nativeObj, String outPin, String inpPin);
-
-
-    //
-    // C++:  void cv::dnn::Net::setInputShape(String inputName, MatShape shape)
-    //
-
-    // C++:  int cv::dnn::Net::registerOutput(string outputName, int layerId, int outputPort)
-    private static native int registerOutput_0(long nativeObj, String outputName, int layerId, int outputPort);
-
-
-    //
-    // C++:  Mat cv::dnn::Net::forward(String outputName = String())
-    //
-
-    // C++:  void cv::dnn::Net::setInputsNames(vector_String inputBlobNames)
-    private static native void setInputsNames_0(long nativeObj, List<String> inputBlobNames);
-
-    // C++:  void cv::dnn::Net::setInputShape(String inputName, MatShape shape)
-    private static native void setInputShape_0(long nativeObj, String inputName, long shape_mat_nativeObj);
-
-
-    //
-    // C++:  AsyncArray cv::dnn::Net::forwardAsync(String outputName = String())
-    //
-
-    // Return type 'AsyncArray' is not supported, skipping the function
-
-
-    //
-    // C++:  void cv::dnn::Net::forward(vector_Mat& outputBlobs, String outputName = String())
-    //
-
-    // C++:  Mat cv::dnn::Net::forward(String outputName = String())
-    private static native long forward_0(long nativeObj, String outputName);
-
-    private static native long forward_1(long nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::Net::forward(vector_Mat& outputBlobs, vector_String outBlobNames)
-    //
-
-    // C++:  void cv::dnn::Net::forward(vector_Mat& outputBlobs, String outputName = String())
-    private static native void forward_2(long nativeObj, long outputBlobs_mat_nativeObj, String outputName);
-
-
-    //
-    // C++:  void cv::dnn::Net::forward(vector_vector_Mat& outputBlobs, vector_String outBlobNames)
-    //
-
-    private static native void forward_3(long nativeObj, long outputBlobs_mat_nativeObj);
-
-
-    //
-    // C++:  Net cv::dnn::Net::quantize(vector_Mat calibData, int inputsDtype, int outputsDtype, bool perChannel = true)
-    //
-
-    // C++:  void cv::dnn::Net::forward(vector_Mat& outputBlobs, vector_String outBlobNames)
-    private static native void forward_4(long nativeObj, long outputBlobs_mat_nativeObj, List<String> outBlobNames);
-
-    // C++:  void cv::dnn::Net::forward(vector_vector_Mat& outputBlobs, vector_String outBlobNames)
-    private static native void forwardAndRetrieve_0(long nativeObj, long outputBlobs_mat_nativeObj, List<String> outBlobNames);
-
-
-    //
-    // C++:  void cv::dnn::Net::getInputDetails(vector_float& scales, vector_int& zeropoints)
-    //
-
-    // C++:  Net cv::dnn::Net::quantize(vector_Mat calibData, int inputsDtype, int outputsDtype, bool perChannel = true)
-    private static native long quantize_0(long nativeObj, long calibData_mat_nativeObj, int inputsDtype, int outputsDtype, boolean perChannel);
-
-
-    //
-    // C++:  void cv::dnn::Net::getOutputDetails(vector_float& scales, vector_int& zeropoints)
-    //
-
-    private static native long quantize_1(long nativeObj, long calibData_mat_nativeObj, int inputsDtype, int outputsDtype);
-
-
-    //
-    // C++:  void cv::dnn::Net::setHalideScheduler(String scheduler)
-    //
-
-    // C++:  void cv::dnn::Net::getInputDetails(vector_float& scales, vector_int& zeropoints)
-    private static native void getInputDetails_0(long nativeObj, long scales_mat_nativeObj, long zeropoints_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::Net::setPreferableBackend(int backendId)
-    //
-
-    // C++:  void cv::dnn::Net::getOutputDetails(vector_float& scales, vector_int& zeropoints)
-    private static native void getOutputDetails_0(long nativeObj, long scales_mat_nativeObj, long zeropoints_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::Net::setPreferableTarget(int targetId)
-    //
-
-    // C++:  void cv::dnn::Net::setHalideScheduler(String scheduler)
-    private static native void setHalideScheduler_0(long nativeObj, String scheduler);
-
-
-    //
-    // C++:  void cv::dnn::Net::setInput(Mat blob, String name = "", double scalefactor = 1.0, Scalar mean = Scalar())
-    //
-
-    // C++:  void cv::dnn::Net::setPreferableBackend(int backendId)
-    private static native void setPreferableBackend_0(long nativeObj, int backendId);
-
-    // C++:  void cv::dnn::Net::setPreferableTarget(int targetId)
-    private static native void setPreferableTarget_0(long nativeObj, int targetId);
-
-    // C++:  void cv::dnn::Net::setInput(Mat blob, String name = "", double scalefactor = 1.0, Scalar mean = Scalar())
-    private static native void setInput_0(long nativeObj, long blob_nativeObj, String name, double scalefactor, double mean_val0, double mean_val1, double mean_val2, double mean_val3);
-
-    private static native void setInput_1(long nativeObj, long blob_nativeObj, String name, double scalefactor);
-
-
-    //
-    // C++:  void cv::dnn::Net::setParam(int layer, int numParam, Mat blob)
-    //
-
-    private static native void setInput_2(long nativeObj, long blob_nativeObj, String name);
-
-
-    //
-    // C++:  void cv::dnn::Net::setParam(String layerName, int numParam, Mat blob)
-    //
-
-    private static native void setInput_3(long nativeObj, long blob_nativeObj);
-
-
-    //
-    // C++:  Mat cv::dnn::Net::getParam(int layer, int numParam = 0)
-    //
-
-    // C++:  void cv::dnn::Net::setParam(int layer, int numParam, Mat blob)
-    private static native void setParam_0(long nativeObj, int layer, int numParam, long blob_nativeObj);
-
-    // C++:  void cv::dnn::Net::setParam(String layerName, int numParam, Mat blob)
-    private static native void setParam_1(long nativeObj, String layerName, int numParam, long blob_nativeObj);
-
-
-    //
-    // C++:  Mat cv::dnn::Net::getParam(String layerName, int numParam = 0)
-    //
-
-    // C++:  Mat cv::dnn::Net::getParam(int layer, int numParam = 0)
-    private static native long getParam_0(long nativeObj, int layer, int numParam);
-
-    private static native long getParam_1(long nativeObj, int layer);
-
-
-    //
-    // C++:  vector_int cv::dnn::Net::getUnconnectedOutLayers()
-    //
-
-    // C++:  Mat cv::dnn::Net::getParam(String layerName, int numParam = 0)
-    private static native long getParam_2(long nativeObj, String layerName, int numParam);
-
-
-    //
-    // C++:  vector_String cv::dnn::Net::getUnconnectedOutLayersNames()
-    //
-
-    private static native long getParam_3(long nativeObj, String layerName);
-
-
-    //
-    // C++:  void cv::dnn::Net::getLayersShapes(vector_MatShape netInputShapes, vector_int& layersIds, vector_vector_MatShape& inLayersShapes, vector_vector_MatShape& outLayersShapes)
-    //
-
-    // C++:  vector_int cv::dnn::Net::getUnconnectedOutLayers()
-    private static native long getUnconnectedOutLayers_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::Net::getLayersShapes(MatShape netInputShape, vector_int& layersIds, vector_vector_MatShape& inLayersShapes, vector_vector_MatShape& outLayersShapes)
-    //
-
-    // C++:  vector_String cv::dnn::Net::getUnconnectedOutLayersNames()
-    private static native List<String> getUnconnectedOutLayersNames_0(long nativeObj);
-
-
-    //
-    // C++:  int64 cv::dnn::Net::getFLOPS(vector_MatShape netInputShapes)
-    //
-
-    // C++:  void cv::dnn::Net::getLayersShapes(vector_MatShape netInputShapes, vector_int& layersIds, vector_vector_MatShape& inLayersShapes, vector_vector_MatShape& outLayersShapes)
-    private static native void getLayersShapes_0(long nativeObj, long netInputShapes_mat_nativeObj, long layersIds_mat_nativeObj, long inLayersShapes_mat_nativeObj, long outLayersShapes_mat_nativeObj);
-
-
-    //
-    // C++:  int64 cv::dnn::Net::getFLOPS(MatShape netInputShape)
-    //
-
-    // C++:  void cv::dnn::Net::getLayersShapes(MatShape netInputShape, vector_int& layersIds, vector_vector_MatShape& inLayersShapes, vector_vector_MatShape& outLayersShapes)
-    private static native void getLayersShapes_1(long nativeObj, long netInputShape_mat_nativeObj, long layersIds_mat_nativeObj, long inLayersShapes_mat_nativeObj, long outLayersShapes_mat_nativeObj);
-
-
-    //
-    // C++:  int64 cv::dnn::Net::getFLOPS(int layerId, vector_MatShape netInputShapes)
-    //
-
-    // C++:  int64 cv::dnn::Net::getFLOPS(vector_MatShape netInputShapes)
-    private static native long getFLOPS_0(long nativeObj, long netInputShapes_mat_nativeObj);
-
-
-    //
-    // C++:  int64 cv::dnn::Net::getFLOPS(int layerId, MatShape netInputShape)
-    //
-
-    // C++:  int64 cv::dnn::Net::getFLOPS(MatShape netInputShape)
-    private static native long getFLOPS_1(long nativeObj, long netInputShape_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::Net::getLayerTypes(vector_String& layersTypes)
-    //
-
-    // C++:  int64 cv::dnn::Net::getFLOPS(int layerId, vector_MatShape netInputShapes)
-    private static native long getFLOPS_2(long nativeObj, int layerId, long netInputShapes_mat_nativeObj);
-
-
-    //
-    // C++:  int cv::dnn::Net::getLayersCount(String layerType)
-    //
-
-    // C++:  int64 cv::dnn::Net::getFLOPS(int layerId, MatShape netInputShape)
-    private static native long getFLOPS_3(long nativeObj, int layerId, long netInputShape_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::Net::getMemoryConsumption(MatShape netInputShape, size_t& weights, size_t& blobs)
-    //
-
-    // C++:  void cv::dnn::Net::getLayerTypes(vector_String& layersTypes)
-    private static native void getLayerTypes_0(long nativeObj, List<String> layersTypes);
-
-
-    //
-    // C++:  void cv::dnn::Net::getMemoryConsumption(int layerId, vector_MatShape netInputShapes, size_t& weights, size_t& blobs)
-    //
-
-    // C++:  int cv::dnn::Net::getLayersCount(String layerType)
-    private static native int getLayersCount_0(long nativeObj, String layerType);
-
-
-    //
-    // C++:  void cv::dnn::Net::getMemoryConsumption(int layerId, MatShape netInputShape, size_t& weights, size_t& blobs)
-    //
-
-    // C++:  void cv::dnn::Net::getMemoryConsumption(MatShape netInputShape, size_t& weights, size_t& blobs)
-    private static native void getMemoryConsumption_0(long nativeObj, long netInputShape_mat_nativeObj, double[] weights_out, double[] blobs_out);
-
-
-    //
-    // C++:  void cv::dnn::Net::enableFusion(bool fusion)
-    //
-
-    // C++:  void cv::dnn::Net::getMemoryConsumption(int layerId, vector_MatShape netInputShapes, size_t& weights, size_t& blobs)
-    private static native void getMemoryConsumption_1(long nativeObj, int layerId, long netInputShapes_mat_nativeObj, double[] weights_out, double[] blobs_out);
-
-
-    //
-    // C++:  void cv::dnn::Net::enableWinograd(bool useWinograd)
-    //
-
-    // C++:  void cv::dnn::Net::getMemoryConsumption(int layerId, MatShape netInputShape, size_t& weights, size_t& blobs)
-    private static native void getMemoryConsumption_2(long nativeObj, int layerId, long netInputShape_mat_nativeObj, double[] weights_out, double[] blobs_out);
-
-
-    //
-    // C++:  int64 cv::dnn::Net::getPerfProfile(vector_double& timings)
-    //
-
-    // C++:  void cv::dnn::Net::enableFusion(bool fusion)
-    private static native void enableFusion_0(long nativeObj, boolean fusion);
-
-    // C++:  void cv::dnn::Net::enableWinograd(bool useWinograd)
-    private static native void enableWinograd_0(long nativeObj, boolean useWinograd);
-
-    // C++:  int64 cv::dnn::Net::getPerfProfile(vector_double& timings)
-    private static native long getPerfProfile_0(long nativeObj, long timings_mat_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    public long getNativeObjAddr() { return nativeObj; }
-
-    /**
-     * Returns true if there are no layers in the network.
-     * @return automatically generated
-     */
-    public boolean empty() {
-        return empty_0(nativeObj);
-    }
-
-    /**
-     * Dump net to String
-     * @return String with structure, hyperparameters, backend, target and fusion
-     * Call method after setInput(). To see correct backend, target and fusion run after forward().
-     */
-    public String dump() {
-        return dump_0(nativeObj);
-    }
-
-    /**
-     * Dump net structure, hyperparameters, backend, target and fusion to dot file
-     * @param path   path to output file with .dot extension
-     * SEE: dump()
-     */
-    public void dumpToFile(String path) {
-        dumpToFile_0(nativeObj, path);
-    }
-
-    /**
-     * Dump net structure, hyperparameters, backend, target and fusion to pbtxt file
-     * @param path   path to output file with .pbtxt extension
-     *
-     * Use Netron (https://netron.app) to open the target file to visualize the model.
-     * Call method after setInput(). To see correct backend, target and fusion run after forward().
-     */
-    public void dumpToPbtxt(String path) {
-        dumpToPbtxt_0(nativeObj, path);
-    }
-
     /**
      * Converts string name of the layer to the integer identifier.
      * @return id of the layer, or -1 if the layer wasn't found.
@@ -530,9 +169,19 @@ public class Net {
         return getLayerId_0(nativeObj, layer);
     }
 
+
+    //
+    // C++:  vector_String cv::dnn::Net::getLayerNames()
+    //
+
     public List<String> getLayerNames() {
         return getLayerNames_0(nativeObj);
     }
+
+
+    //
+    // C++:  Ptr_Layer cv::dnn::Net::getLayer(int layerId)
+    //
 
     /**
      * Returns pointer to layer with specified id or name which the network use.
@@ -542,6 +191,11 @@ public class Net {
     public Layer getLayer(int layerId) {
         return Layer.__fromPtr__(getLayer_0(nativeObj, layerId));
     }
+
+
+    //
+    // C++:  Ptr_Layer cv::dnn::Net::getLayer(String layerName)
+    //
 
     /**
      *
@@ -554,6 +208,11 @@ public class Net {
         return Layer.__fromPtr__(getLayer_1(nativeObj, layerName));
     }
 
+
+    //
+    // C++:  Ptr_Layer cv::dnn::Net::getLayer(LayerId layerId)
+    //
+
     /**
      *
      * @deprecated to be removed
@@ -564,6 +223,11 @@ public class Net {
     public Layer getLayer(DictValue layerId) {
         return Layer.__fromPtr__(getLayer_2(nativeObj, layerId.getNativeObjAddr()));
     }
+
+
+    //
+    // C++:  void cv::dnn::Net::connect(String outPin, String inpPin)
+    //
 
     /**
      * Connects output of the first layer to input of the second layer.
@@ -583,6 +247,11 @@ public class Net {
         connect_0(nativeObj, outPin, inpPin);
     }
 
+
+    //
+    // C++:  int cv::dnn::Net::registerOutput(string outputName, int layerId, int outputPort)
+    //
+
     /**
      * Registers network output with name
      *
@@ -598,6 +267,11 @@ public class Net {
         return registerOutput_0(nativeObj, outputName, layerId, outputPort);
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::setInputsNames(vector_String inputBlobNames)
+    //
+
     /**
      * Sets outputs names of the network input pseudo layer.
      *
@@ -611,6 +285,11 @@ public class Net {
         setInputsNames_0(nativeObj, inputBlobNames);
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::setInputShape(String inputName, MatShape shape)
+    //
+
     /**
      * Specify shape of network input.
      * @param inputName automatically generated
@@ -620,6 +299,11 @@ public class Net {
         Mat shape_mat = shape;
         setInputShape_0(nativeObj, inputName, shape_mat.nativeObj);
     }
+
+
+    //
+    // C++:  Mat cv::dnn::Net::forward(String outputName = String())
+    //
 
     /**
      * Runs forward pass to compute output of layer with name {@code outputName}.
@@ -639,6 +323,18 @@ public class Net {
     public Mat forward() {
         return new Mat(forward_1(nativeObj));
     }
+
+
+    //
+    // C++:  AsyncArray cv::dnn::Net::forwardAsync(String outputName = String())
+    //
+
+    // Return type 'AsyncArray' is not supported, skipping the function
+
+
+    //
+    // C++:  void cv::dnn::Net::forward(vector_Mat& outputBlobs, String outputName = String())
+    //
 
     /**
      * Runs forward pass to compute output of layer with name {@code outputName}.
@@ -665,6 +361,11 @@ public class Net {
         outputBlobs_mat.release();
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::forward(vector_Mat& outputBlobs, vector_String outBlobNames)
+    //
+
     /**
      * Runs forward pass to compute outputs of layers listed in {@code outBlobNames}.
      * @param outputBlobs contains blobs for first outputs of specified layers.
@@ -677,6 +378,11 @@ public class Net {
         outputBlobs_mat.release();
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::forward(vector_vector_Mat& outputBlobs, vector_String outBlobNames)
+    //
+
     /**
      * Runs forward pass to compute outputs of layers listed in {@code outBlobNames}.
      * @param outputBlobs contains all output blobs for each layer specified in {@code outBlobNames}.
@@ -688,6 +394,11 @@ public class Net {
         Converters.Mat_to_vector_vector_Mat(outputBlobs_mat, outputBlobs);
         outputBlobs_mat.release();
     }
+
+
+    //
+    // C++:  Net cv::dnn::Net::quantize(vector_Mat calibData, int inputsDtype, int outputsDtype, bool perChannel = true)
+    //
 
     /**
      * Returns a quantized Net from a floating-point Net.
@@ -716,6 +427,11 @@ public class Net {
         return new Net(quantize_1(nativeObj, calibData_mat.nativeObj, inputsDtype, outputsDtype));
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::getInputDetails(vector_float& scales, vector_int& zeropoints)
+    //
+
     /**
      * Returns input scale and zeropoint for a quantized Net.
      * @param scales output parameter for returning input scales.
@@ -727,6 +443,11 @@ public class Net {
         getInputDetails_0(nativeObj, scales_mat.nativeObj, zeropoints_mat.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::getOutputDetails(vector_float& scales, vector_int& zeropoints)
+    //
+
     /**
      * Returns output scale and zeropoint for a quantized Net.
      * @param scales output parameter for returning output scales.
@@ -737,6 +458,11 @@ public class Net {
         Mat zeropoints_mat = zeropoints;
         getOutputDetails_0(nativeObj, scales_mat.nativeObj, zeropoints_mat.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::dnn::Net::setHalideScheduler(String scheduler)
+    //
 
     /**
      * Compile Halide layers.
@@ -751,6 +477,11 @@ public class Net {
         setHalideScheduler_0(nativeObj, scheduler);
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::setPreferableBackend(int backendId)
+    //
+
     /**
      * Ask network to use specific computation backend where it supported.
      * @param backendId backend identifier.
@@ -759,6 +490,11 @@ public class Net {
     public void setPreferableBackend(int backendId) {
         setPreferableBackend_0(nativeObj, backendId);
     }
+
+
+    //
+    // C++:  void cv::dnn::Net::setPreferableTarget(int targetId)
+    //
 
     /**
      * Ask network to make computations on specific target device.
@@ -780,6 +516,11 @@ public class Net {
     public void setPreferableTarget(int targetId) {
         setPreferableTarget_0(nativeObj, targetId);
     }
+
+
+    //
+    // C++:  void cv::dnn::Net::setInput(Mat blob, String name = "", double scalefactor = 1.0, Scalar mean = Scalar())
+    //
 
     /**
      * Sets the new input value for the network
@@ -839,6 +580,11 @@ public class Net {
         setInput_3(nativeObj, blob.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::setParam(int layer, int numParam, Mat blob)
+    //
+
     /**
      * Sets the new value for the learned param of the layer.
      * @param layer name or id of the layer.
@@ -852,9 +598,19 @@ public class Net {
         setParam_0(nativeObj, layer, numParam, blob.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::setParam(String layerName, int numParam, Mat blob)
+    //
+
     public void setParam(String layerName, int numParam, Mat blob) {
         setParam_1(nativeObj, layerName, numParam, blob.nativeObj);
     }
+
+
+    //
+    // C++:  Mat cv::dnn::Net::getParam(int layer, int numParam = 0)
+    //
 
     /**
      * Returns parameter blob of the layer.
@@ -877,6 +633,11 @@ public class Net {
         return new Mat(getParam_1(nativeObj, layer));
     }
 
+
+    //
+    // C++:  Mat cv::dnn::Net::getParam(String layerName, int numParam = 0)
+    //
+
     public Mat getParam(String layerName, int numParam) {
         return new Mat(getParam_2(nativeObj, layerName, numParam));
     }
@@ -884,6 +645,11 @@ public class Net {
     public Mat getParam(String layerName) {
         return new Mat(getParam_3(nativeObj, layerName));
     }
+
+
+    //
+    // C++:  vector_int cv::dnn::Net::getUnconnectedOutLayers()
+    //
 
     /**
      * Returns indexes of layers with unconnected outputs.
@@ -895,6 +661,11 @@ public class Net {
         return MatOfInt.fromNativeAddr(getUnconnectedOutLayers_0(nativeObj));
     }
 
+
+    //
+    // C++:  vector_String cv::dnn::Net::getUnconnectedOutLayersNames()
+    //
+
     /**
      * Returns names of layers with unconnected outputs.
      *
@@ -904,6 +675,11 @@ public class Net {
     public List<String> getUnconnectedOutLayersNames() {
         return getUnconnectedOutLayersNames_0(nativeObj);
     }
+
+
+    //
+    // C++:  void cv::dnn::Net::getLayersShapes(vector_MatShape netInputShapes, vector_int& layersIds, vector_vector_MatShape& inLayersShapes, vector_vector_MatShape& outLayersShapes)
+    //
 
     /**
      * Returns input and output shapes for all layers in loaded model;
@@ -927,6 +703,11 @@ public class Net {
         outLayersShapes_mat.release();
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::getLayersShapes(MatShape netInputShape, vector_int& layersIds, vector_vector_MatShape& inLayersShapes, vector_vector_MatShape& outLayersShapes)
+    //
+
     public void getLayersShapes(MatOfInt netInputShape, MatOfInt layersIds, List<List<MatOfInt>> inLayersShapes, List<List<MatOfInt>> outLayersShapes) {
         Mat netInputShape_mat = netInputShape;
         Mat layersIds_mat = layersIds;
@@ -939,6 +720,11 @@ public class Net {
         outLayersShapes_mat.release();
     }
 
+
+    //
+    // C++:  int64 cv::dnn::Net::getFLOPS(vector_MatShape netInputShapes)
+    //
+
     /**
      * Computes FLOP for whole loaded model with specified input shapes.
      * @param netInputShapes vector of shapes for all net inputs.
@@ -949,20 +735,40 @@ public class Net {
         return getFLOPS_0(nativeObj, netInputShapes_mat.nativeObj);
     }
 
+
+    //
+    // C++:  int64 cv::dnn::Net::getFLOPS(MatShape netInputShape)
+    //
+
     public long getFLOPS(MatOfInt netInputShape) {
         Mat netInputShape_mat = netInputShape;
         return getFLOPS_1(nativeObj, netInputShape_mat.nativeObj);
     }
+
+
+    //
+    // C++:  int64 cv::dnn::Net::getFLOPS(int layerId, vector_MatShape netInputShapes)
+    //
 
     public long getFLOPS(int layerId, List<MatOfInt> netInputShapes) {
         Mat netInputShapes_mat = Converters.vector_MatShape_to_Mat(netInputShapes);
         return getFLOPS_2(nativeObj, layerId, netInputShapes_mat.nativeObj);
     }
 
+
+    //
+    // C++:  int64 cv::dnn::Net::getFLOPS(int layerId, MatShape netInputShape)
+    //
+
     public long getFLOPS(int layerId, MatOfInt netInputShape) {
         Mat netInputShape_mat = netInputShape;
         return getFLOPS_3(nativeObj, layerId, netInputShape_mat.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::dnn::Net::getLayerTypes(vector_String& layersTypes)
+    //
 
     /**
      * Returns list of types for layer used in model.
@@ -971,6 +777,11 @@ public class Net {
     public void getLayerTypes(List<String> layersTypes) {
         getLayerTypes_0(nativeObj, layersTypes);
     }
+
+
+    //
+    // C++:  int cv::dnn::Net::getLayersCount(String layerType)
+    //
 
     /**
      * Returns count of layers of specified type.
@@ -981,6 +792,11 @@ public class Net {
         return getLayersCount_0(nativeObj, layerType);
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::getMemoryConsumption(MatShape netInputShape, size_t& weights, size_t& blobs)
+    //
+
     public void getMemoryConsumption(MatOfInt netInputShape, long[] weights, long[] blobs) {
         Mat netInputShape_mat = netInputShape;
         double[] weights_out = new double[1];
@@ -989,6 +805,11 @@ public class Net {
         if(weights!=null) weights[0] = (long)weights_out[0];
         if(blobs!=null) blobs[0] = (long)blobs_out[0];
     }
+
+
+    //
+    // C++:  void cv::dnn::Net::getMemoryConsumption(int layerId, vector_MatShape netInputShapes, size_t& weights, size_t& blobs)
+    //
 
     public void getMemoryConsumption(int layerId, List<MatOfInt> netInputShapes, long[] weights, long[] blobs) {
         Mat netInputShapes_mat = Converters.vector_MatShape_to_Mat(netInputShapes);
@@ -999,6 +820,11 @@ public class Net {
         if(blobs!=null) blobs[0] = (long)blobs_out[0];
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::getMemoryConsumption(int layerId, MatShape netInputShape, size_t& weights, size_t& blobs)
+    //
+
     public void getMemoryConsumption(int layerId, MatOfInt netInputShape, long[] weights, long[] blobs) {
         Mat netInputShape_mat = netInputShape;
         double[] weights_out = new double[1];
@@ -1008,6 +834,11 @@ public class Net {
         if(blobs!=null) blobs[0] = (long)blobs_out[0];
     }
 
+
+    //
+    // C++:  void cv::dnn::Net::enableFusion(bool fusion)
+    //
+
     /**
      * Enables or disables layer fusion in the network.
      * @param fusion true to enable the fusion, false to disable. The fusion is enabled by default.
@@ -1015,6 +846,11 @@ public class Net {
     public void enableFusion(boolean fusion) {
         enableFusion_0(nativeObj, fusion);
     }
+
+
+    //
+    // C++:  void cv::dnn::Net::enableWinograd(bool useWinograd)
+    //
 
     /**
      * Enables or disables the Winograd compute branch. The Winograd compute branch can speed up
@@ -1024,6 +860,11 @@ public class Net {
     public void enableWinograd(boolean useWinograd) {
         enableWinograd_0(nativeObj, useWinograd);
     }
+
+
+    //
+    // C++:  int64 cv::dnn::Net::getPerfProfile(vector_double& timings)
+    //
 
     /**
      * Returns overall time for inference and timings (in ticks) for layers.
@@ -1039,9 +880,169 @@ public class Net {
         return getPerfProfile_0(nativeObj, timings_mat.nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+    // C++: static Net cv::dnn::Net::readFromModelOptimizer(String xml, String bin)
+    private static native long readFromModelOptimizer_0(String xml, String bin);
+
+    // C++: static Net cv::dnn::Net::readFromModelOptimizer(vector_uchar bufferModelConfig, vector_uchar bufferWeights)
+    private static native long readFromModelOptimizer_1(long bufferModelConfig_mat_nativeObj, long bufferWeights_mat_nativeObj);
+
+    // C++:  bool cv::dnn::Net::empty()
+    private static native boolean empty_0(long nativeObj);
+
+    // C++:  String cv::dnn::Net::dump()
+    private static native String dump_0(long nativeObj);
+
+    // C++:  void cv::dnn::Net::dumpToFile(String path)
+    private static native void dumpToFile_0(long nativeObj, String path);
+
+    // C++:  void cv::dnn::Net::dumpToPbtxt(String path)
+    private static native void dumpToPbtxt_0(long nativeObj, String path);
+
+    // C++:  int cv::dnn::Net::getLayerId(String layer)
+    private static native int getLayerId_0(long nativeObj, String layer);
+
+    // C++:  vector_String cv::dnn::Net::getLayerNames()
+    private static native List<String> getLayerNames_0(long nativeObj);
+
+    // C++:  Ptr_Layer cv::dnn::Net::getLayer(int layerId)
+    private static native long getLayer_0(long nativeObj, int layerId);
+
+    // C++:  Ptr_Layer cv::dnn::Net::getLayer(String layerName)
+    private static native long getLayer_1(long nativeObj, String layerName);
+
+    // C++:  Ptr_Layer cv::dnn::Net::getLayer(LayerId layerId)
+    private static native long getLayer_2(long nativeObj, long layerId_nativeObj);
+
+    // C++:  void cv::dnn::Net::connect(String outPin, String inpPin)
+    private static native void connect_0(long nativeObj, String outPin, String inpPin);
+
+    // C++:  int cv::dnn::Net::registerOutput(string outputName, int layerId, int outputPort)
+    private static native int registerOutput_0(long nativeObj, String outputName, int layerId, int outputPort);
+
+    // C++:  void cv::dnn::Net::setInputsNames(vector_String inputBlobNames)
+    private static native void setInputsNames_0(long nativeObj, List<String> inputBlobNames);
+
+    // C++:  void cv::dnn::Net::setInputShape(String inputName, MatShape shape)
+    private static native void setInputShape_0(long nativeObj, String inputName, long shape_mat_nativeObj);
+
+    // C++:  Mat cv::dnn::Net::forward(String outputName = String())
+    private static native long forward_0(long nativeObj, String outputName);
+
+    private static native long forward_1(long nativeObj);
+
+    // C++:  void cv::dnn::Net::forward(vector_Mat& outputBlobs, String outputName = String())
+    private static native void forward_2(long nativeObj, long outputBlobs_mat_nativeObj, String outputName);
+
+    private static native void forward_3(long nativeObj, long outputBlobs_mat_nativeObj);
+
+    // C++:  void cv::dnn::Net::forward(vector_Mat& outputBlobs, vector_String outBlobNames)
+    private static native void forward_4(long nativeObj, long outputBlobs_mat_nativeObj, List<String> outBlobNames);
+
+    // C++:  void cv::dnn::Net::forward(vector_vector_Mat& outputBlobs, vector_String outBlobNames)
+    private static native void forwardAndRetrieve_0(long nativeObj, long outputBlobs_mat_nativeObj, List<String> outBlobNames);
+
+    // C++:  Net cv::dnn::Net::quantize(vector_Mat calibData, int inputsDtype, int outputsDtype, bool perChannel = true)
+    private static native long quantize_0(long nativeObj, long calibData_mat_nativeObj, int inputsDtype, int outputsDtype, boolean perChannel);
+
+    private static native long quantize_1(long nativeObj, long calibData_mat_nativeObj, int inputsDtype, int outputsDtype);
+
+    // C++:  void cv::dnn::Net::getInputDetails(vector_float& scales, vector_int& zeropoints)
+    private static native void getInputDetails_0(long nativeObj, long scales_mat_nativeObj, long zeropoints_mat_nativeObj);
+
+    // C++:  void cv::dnn::Net::getOutputDetails(vector_float& scales, vector_int& zeropoints)
+    private static native void getOutputDetails_0(long nativeObj, long scales_mat_nativeObj, long zeropoints_mat_nativeObj);
+
+    // C++:  void cv::dnn::Net::setHalideScheduler(String scheduler)
+    private static native void setHalideScheduler_0(long nativeObj, String scheduler);
+
+    // C++:  void cv::dnn::Net::setPreferableBackend(int backendId)
+    private static native void setPreferableBackend_0(long nativeObj, int backendId);
+
+    // C++:  void cv::dnn::Net::setPreferableTarget(int targetId)
+    private static native void setPreferableTarget_0(long nativeObj, int targetId);
+
+    // C++:  void cv::dnn::Net::setInput(Mat blob, String name = "", double scalefactor = 1.0, Scalar mean = Scalar())
+    private static native void setInput_0(long nativeObj, long blob_nativeObj, String name, double scalefactor, double mean_val0, double mean_val1, double mean_val2, double mean_val3);
+
+    private static native void setInput_1(long nativeObj, long blob_nativeObj, String name, double scalefactor);
+
+    private static native void setInput_2(long nativeObj, long blob_nativeObj, String name);
+
+    private static native void setInput_3(long nativeObj, long blob_nativeObj);
+
+    // C++:  void cv::dnn::Net::setParam(int layer, int numParam, Mat blob)
+    private static native void setParam_0(long nativeObj, int layer, int numParam, long blob_nativeObj);
+
+    // C++:  void cv::dnn::Net::setParam(String layerName, int numParam, Mat blob)
+    private static native void setParam_1(long nativeObj, String layerName, int numParam, long blob_nativeObj);
+
+    // C++:  Mat cv::dnn::Net::getParam(int layer, int numParam = 0)
+    private static native long getParam_0(long nativeObj, int layer, int numParam);
+
+    private static native long getParam_1(long nativeObj, int layer);
+
+    // C++:  Mat cv::dnn::Net::getParam(String layerName, int numParam = 0)
+    private static native long getParam_2(long nativeObj, String layerName, int numParam);
+
+    private static native long getParam_3(long nativeObj, String layerName);
+
+    // C++:  vector_int cv::dnn::Net::getUnconnectedOutLayers()
+    private static native long getUnconnectedOutLayers_0(long nativeObj);
+
+    // C++:  vector_String cv::dnn::Net::getUnconnectedOutLayersNames()
+    private static native List<String> getUnconnectedOutLayersNames_0(long nativeObj);
+
+    // C++:  void cv::dnn::Net::getLayersShapes(vector_MatShape netInputShapes, vector_int& layersIds, vector_vector_MatShape& inLayersShapes, vector_vector_MatShape& outLayersShapes)
+    private static native void getLayersShapes_0(long nativeObj, long netInputShapes_mat_nativeObj, long layersIds_mat_nativeObj, long inLayersShapes_mat_nativeObj, long outLayersShapes_mat_nativeObj);
+
+    // C++:  void cv::dnn::Net::getLayersShapes(MatShape netInputShape, vector_int& layersIds, vector_vector_MatShape& inLayersShapes, vector_vector_MatShape& outLayersShapes)
+    private static native void getLayersShapes_1(long nativeObj, long netInputShape_mat_nativeObj, long layersIds_mat_nativeObj, long inLayersShapes_mat_nativeObj, long outLayersShapes_mat_nativeObj);
+
+    // C++:  int64 cv::dnn::Net::getFLOPS(vector_MatShape netInputShapes)
+    private static native long getFLOPS_0(long nativeObj, long netInputShapes_mat_nativeObj);
+
+    // C++:  int64 cv::dnn::Net::getFLOPS(MatShape netInputShape)
+    private static native long getFLOPS_1(long nativeObj, long netInputShape_mat_nativeObj);
+
+    // C++:  int64 cv::dnn::Net::getFLOPS(int layerId, vector_MatShape netInputShapes)
+    private static native long getFLOPS_2(long nativeObj, int layerId, long netInputShapes_mat_nativeObj);
+
+    // C++:  int64 cv::dnn::Net::getFLOPS(int layerId, MatShape netInputShape)
+    private static native long getFLOPS_3(long nativeObj, int layerId, long netInputShape_mat_nativeObj);
+
+    // C++:  void cv::dnn::Net::getLayerTypes(vector_String& layersTypes)
+    private static native void getLayerTypes_0(long nativeObj, List<String> layersTypes);
+
+    // C++:  int cv::dnn::Net::getLayersCount(String layerType)
+    private static native int getLayersCount_0(long nativeObj, String layerType);
+
+    // C++:  void cv::dnn::Net::getMemoryConsumption(MatShape netInputShape, size_t& weights, size_t& blobs)
+    private static native void getMemoryConsumption_0(long nativeObj, long netInputShape_mat_nativeObj, double[] weights_out, double[] blobs_out);
+
+    // C++:  void cv::dnn::Net::getMemoryConsumption(int layerId, vector_MatShape netInputShapes, size_t& weights, size_t& blobs)
+    private static native void getMemoryConsumption_1(long nativeObj, int layerId, long netInputShapes_mat_nativeObj, double[] weights_out, double[] blobs_out);
+
+    // C++:  void cv::dnn::Net::getMemoryConsumption(int layerId, MatShape netInputShape, size_t& weights, size_t& blobs)
+    private static native void getMemoryConsumption_2(long nativeObj, int layerId, long netInputShape_mat_nativeObj, double[] weights_out, double[] blobs_out);
+
+    // C++:  void cv::dnn::Net::enableFusion(bool fusion)
+    private static native void enableFusion_0(long nativeObj, boolean fusion);
+
+    // C++:  void cv::dnn::Net::enableWinograd(bool useWinograd)
+    private static native void enableWinograd_0(long nativeObj, boolean useWinograd);
+
+    // C++:  int64 cv::dnn::Net::getPerfProfile(vector_double& timings)
+    private static native long getPerfProfile_0(long nativeObj, long timings_mat_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public long getNativeObjAddr() { return nativeObj; }
 
 }

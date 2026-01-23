@@ -20,8 +20,14 @@ public class ParamGrid {
       
     }
 
+    public long getNativeObjAddr() { return nativeObj; }
+
     // internal usage only
     public static ParamGrid __fromPtr__(long addr) { return new ParamGrid(addr); }
+
+    //
+    // C++: static Ptr_ParamGrid cv::ml::ParamGrid::create(double minVal = 0., double maxVal = 0., double logstep = 1.)
+    //
 
     /**
      * Creates a ParamGrid Ptr that can be given to the %SVM::trainAuto method
@@ -34,10 +40,6 @@ public class ParamGrid {
     public static ParamGrid create(double minVal, double maxVal, double logstep) {
         return ParamGrid.__fromPtr__(create_0(minVal, maxVal, logstep));
     }
-
-    //
-    // C++: static Ptr_ParamGrid cv::ml::ParamGrid::create(double minVal = 0., double maxVal = 0., double logstep = 1.)
-    //
 
     /**
      * Creates a ParamGrid Ptr that can be given to the %SVM::trainAuto method
@@ -69,50 +71,79 @@ public class ParamGrid {
         return ParamGrid.__fromPtr__(create_3());
     }
 
-    // C++: static Ptr_ParamGrid cv::ml::ParamGrid::create(double minVal = 0., double maxVal = 0., double logstep = 1.)
-    private static native long create_0(double minVal, double maxVal, double logstep);
-
 
     //
     // C++: double ParamGrid::minVal
     //
 
-    private static native long create_1(double minVal, double maxVal);
+    public double get_minVal() {
+        return get_minVal_0(nativeObj);
+    }
 
 
     //
     // C++: void ParamGrid::minVal
     //
 
-    private static native long create_2(double minVal);
+    public void set_minVal(double minVal) {
+        set_minVal_0(nativeObj, minVal);
+    }
 
 
     //
     // C++: double ParamGrid::maxVal
     //
 
-    private static native long create_3();
+    public double get_maxVal() {
+        return get_maxVal_0(nativeObj);
+    }
 
 
     //
     // C++: void ParamGrid::maxVal
     //
 
-    // C++: double ParamGrid::minVal
-    private static native double get_minVal_0(long nativeObj);
+    public void set_maxVal(double maxVal) {
+        set_maxVal_0(nativeObj, maxVal);
+    }
 
 
     //
     // C++: double ParamGrid::logStep
     //
 
-    // C++: void ParamGrid::minVal
-    private static native void set_minVal_0(long nativeObj, double minVal);
+    public double get_logStep() {
+        return get_logStep_0(nativeObj);
+    }
 
 
     //
     // C++: void ParamGrid::logStep
     //
+
+    public void set_logStep(double logStep) {
+        set_logStep_0(nativeObj, logStep);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
+    // C++: static Ptr_ParamGrid cv::ml::ParamGrid::create(double minVal = 0., double maxVal = 0., double logstep = 1.)
+    private static native long create_0(double minVal, double maxVal, double logstep);
+    private static native long create_1(double minVal, double maxVal);
+    private static native long create_2(double minVal);
+    private static native long create_3();
+
+    // C++: double ParamGrid::minVal
+    private static native double get_minVal_0(long nativeObj);
+
+    // C++: void ParamGrid::minVal
+    private static native void set_minVal_0(long nativeObj, double minVal);
 
     // C++: double ParamGrid::maxVal
     private static native double get_maxVal_0(long nativeObj);
@@ -128,36 +159,5 @@ public class ParamGrid {
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    public long getNativeObjAddr() { return nativeObj; }
-
-    public double get_minVal() {
-        return get_minVal_0(nativeObj);
-    }
-
-    public void set_minVal(double minVal) {
-        set_minVal_0(nativeObj, minVal);
-    }
-
-    public double get_maxVal() {
-        return get_maxVal_0(nativeObj);
-    }
-
-    public void set_maxVal(double maxVal) {
-        set_maxVal_0(nativeObj, maxVal);
-    }
-
-    public double get_logStep() {
-        return get_logStep_0(nativeObj);
-    }
-
-    public void set_logStep(double logStep) {
-        set_logStep_0(nativeObj, logStep);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

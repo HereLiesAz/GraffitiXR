@@ -27,6 +27,13 @@ public class DetectionModel extends Model {
 
     protected DetectionModel(long addr) { super(addr); }
 
+    // internal usage only
+    public static DetectionModel __fromPtr__(long addr) { return new DetectionModel(addr); }
+
+    //
+    // C++:   cv::dnn::DetectionModel::DetectionModel(String model, String config = "")
+    //
+
     /**
      * Create detection model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -37,10 +44,6 @@ public class DetectionModel extends Model {
         super(DetectionModel_0(model, config));
     }
 
-    //
-    // C++:   cv::dnn::DetectionModel::DetectionModel(String model, String config = "")
-    //
-
     /**
      * Create detection model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -49,6 +52,11 @@ public class DetectionModel extends Model {
     public DetectionModel(String model) {
         super(DetectionModel_1(model));
     }
+
+
+    //
+    // C++:   cv::dnn::DetectionModel::DetectionModel(Net network)
+    //
 
     /**
      * Create model from deep learning network.
@@ -60,59 +68,8 @@ public class DetectionModel extends Model {
 
 
     //
-    // C++:   cv::dnn::DetectionModel::DetectionModel(Net network)
-    //
-
-    // internal usage only
-    public static DetectionModel __fromPtr__(long addr) { return new DetectionModel(addr); }
-
-
-    //
     // C++:  DetectionModel cv::dnn::DetectionModel::setNmsAcrossClasses(bool value)
     //
-
-    // C++:   cv::dnn::DetectionModel::DetectionModel(String model, String config = "")
-    private static native long DetectionModel_0(String model, String config);
-
-
-    //
-    // C++:  bool cv::dnn::DetectionModel::getNmsAcrossClasses()
-    //
-
-    private static native long DetectionModel_1(String model);
-
-
-    //
-    // C++:  void cv::dnn::DetectionModel::detect(Mat frame, vector_int& classIds, vector_float& confidences, vector_Rect& boxes, float confThreshold = 0.5f, float nmsThreshold = 0.0f)
-    //
-
-    // C++:   cv::dnn::DetectionModel::DetectionModel(Net network)
-    private static native long DetectionModel_2(long network_nativeObj);
-
-    // C++:  DetectionModel cv::dnn::DetectionModel::setNmsAcrossClasses(bool value)
-    private static native long setNmsAcrossClasses_0(long nativeObj, boolean value);
-
-    // C++:  bool cv::dnn::DetectionModel::getNmsAcrossClasses()
-    private static native boolean getNmsAcrossClasses_0(long nativeObj);
-
-    // C++:  void cv::dnn::DetectionModel::detect(Mat frame, vector_int& classIds, vector_float& confidences, vector_Rect& boxes, float confThreshold = 0.5f, float nmsThreshold = 0.0f)
-    private static native void detect_0(long nativeObj, long frame_nativeObj, long classIds_mat_nativeObj, long confidences_mat_nativeObj, long boxes_mat_nativeObj, float confThreshold, float nmsThreshold);
-
-    private static native void detect_1(long nativeObj, long frame_nativeObj, long classIds_mat_nativeObj, long confidences_mat_nativeObj, long boxes_mat_nativeObj, float confThreshold);
-
-    private static native void detect_2(long nativeObj, long frame_nativeObj, long classIds_mat_nativeObj, long confidences_mat_nativeObj, long boxes_mat_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    /**
-     * Getter for nmsAcrossClasses. This variable defaults to false,
-     * such that when non max suppression is used during the detect() function, it will do so only per-class
-     * @return automatically generated
-     */
-    public boolean getNmsAcrossClasses() {
-        return getNmsAcrossClasses_0(nativeObj);
-    }
 
     /**
      * nmsAcrossClasses defaults to false,
@@ -124,6 +81,19 @@ public class DetectionModel extends Model {
     public DetectionModel setNmsAcrossClasses(boolean value) {
         return new DetectionModel(setNmsAcrossClasses_0(nativeObj, value));
     }
+
+
+    //
+    // C++:  bool cv::dnn::DetectionModel::getNmsAcrossClasses()
+    //
+
+    // C++:   cv::dnn::DetectionModel::DetectionModel(String model, String config = "")
+    private static native long DetectionModel_0(String model, String config);
+
+
+    //
+    // C++:  void cv::dnn::DetectionModel::detect(Mat frame, vector_int& classIds, vector_float& confidences, vector_Rect& boxes, float confThreshold = 0.5f, float nmsThreshold = 0.0f)
+    //
 
     /**
      * Given the {@code input} frame, create input blob, run net and return result detections.
@@ -170,9 +140,40 @@ public class DetectionModel extends Model {
         detect_2(nativeObj, frame.nativeObj, classIds_mat.nativeObj, confidences_mat.nativeObj, boxes_mat.nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
+    }
+
+    private static native long DetectionModel_1(String model);
+
+    // C++:   cv::dnn::DetectionModel::DetectionModel(Net network)
+    private static native long DetectionModel_2(long network_nativeObj);
+
+    // C++:  DetectionModel cv::dnn::DetectionModel::setNmsAcrossClasses(bool value)
+    private static native long setNmsAcrossClasses_0(long nativeObj, boolean value);
+
+    // C++:  bool cv::dnn::DetectionModel::getNmsAcrossClasses()
+    private static native boolean getNmsAcrossClasses_0(long nativeObj);
+
+    // C++:  void cv::dnn::DetectionModel::detect(Mat frame, vector_int& classIds, vector_float& confidences, vector_Rect& boxes, float confThreshold = 0.5f, float nmsThreshold = 0.0f)
+    private static native void detect_0(long nativeObj, long frame_nativeObj, long classIds_mat_nativeObj, long confidences_mat_nativeObj, long boxes_mat_nativeObj, float confThreshold, float nmsThreshold);
+
+    private static native void detect_1(long nativeObj, long frame_nativeObj, long classIds_mat_nativeObj, long confidences_mat_nativeObj, long boxes_mat_nativeObj, float confThreshold);
+
+    private static native void detect_2(long nativeObj, long frame_nativeObj, long classIds_mat_nativeObj, long confidences_mat_nativeObj, long boxes_mat_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    /**
+     * Getter for nmsAcrossClasses. This variable defaults to false,
+     * such that when non max suppression is used during the detect() function, it will do so only per-class
+     * @return automatically generated
+     */
+    public boolean getNmsAcrossClasses() {
+        return getNmsAcrossClasses_0(nativeObj);
     }
 
 }

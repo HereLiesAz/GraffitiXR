@@ -30,22 +30,6 @@ protected IStreamReader() { nativeObj = 0; }
     // C++:  long long cv::IStreamReader::read(byte[] buffer, long long size)
     //
 
-    // C++:  long long cv::IStreamReader::read(byte[] buffer, long long size)
-    private static native long read_0(long nativeObj, byte[] buffer, long size);
-
-
-    //
-    // C++:  long long cv::IStreamReader::seek(long long offset, int origin)
-    //
-
-    // C++:  long long cv::IStreamReader::seek(long long offset, int origin)
-    private static native long seek_0(long nativeObj, long offset, int origin);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    public long getNativeObjAddr() { return nativeObj; }
-
     /**
      * Read bytes from stream
      *
@@ -57,6 +41,11 @@ protected IStreamReader() { nativeObj = 0; }
     public long read(byte[] buffer, long size) {
         return read_0(nativeObj, buffer, size);
     }
+
+
+    //
+    // C++:  long long cv::IStreamReader::seek(long long offset, int origin)
+    //
 
     /**
      * Sets the stream position
@@ -71,9 +60,21 @@ protected IStreamReader() { nativeObj = 0; }
         return seek_0(nativeObj, offset, origin);
     }
 
+    // C++:  long long cv::IStreamReader::read(byte[] buffer, long long size)
+    private static native long read_0(long nativeObj, byte[] buffer, long size);
+
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+    // C++:  long long cv::IStreamReader::seek(long long offset, int origin)
+    private static native long seek_0(long nativeObj, long offset, int origin);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public long getNativeObjAddr() { return nativeObj; }
 
 }

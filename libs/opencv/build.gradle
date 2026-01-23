@@ -126,6 +126,10 @@ android {
             buildConfig true
         }
     }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -142,7 +146,7 @@ android {
                 doNotStrip '**/*.so'  // controlled by OpenCV CMake scripts
             }
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
         }
     }
 

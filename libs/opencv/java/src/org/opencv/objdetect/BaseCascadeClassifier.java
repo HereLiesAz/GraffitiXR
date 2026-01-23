@@ -14,12 +14,14 @@ public class BaseCascadeClassifier extends Algorithm {
     // internal usage only
     public static BaseCascadeClassifier __fromPtr__(long addr) { return new BaseCascadeClassifier(addr); }
 
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

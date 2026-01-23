@@ -48,6 +48,16 @@ public class VideoCapture {
       
     }
 
+    // internal usage only
+    public static VideoCapture __fromPtr__(long addr) { return new VideoCapture(addr); }
+
+    // C++:   cv::VideoCapture::VideoCapture()
+    private static native long VideoCapture_0();
+
+    //
+    // C++:   cv::VideoCapture::VideoCapture()
+    //
+
     /**
      * Default constructor
      *     <b>Note:</b> In REF: videoio_c "C API", when you finished working with video, release CvCapture structure with
@@ -57,6 +67,11 @@ public class VideoCapture {
     public VideoCapture() {
         nativeObj = VideoCapture_0();
     }
+
+
+    //
+    // C++:   cv::VideoCapture::VideoCapture(String filename, int apiPreference = CAP_ANY)
+    //
 
     /**
      *
@@ -87,10 +102,6 @@ public class VideoCapture {
     public VideoCapture(String filename, int apiPreference) {
         nativeObj = VideoCapture_1(filename, apiPreference);
     }
-
-    //
-    // C++:   cv::VideoCapture::VideoCapture()
-    //
 
     /**
      *
@@ -123,7 +134,7 @@ public class VideoCapture {
 
 
     //
-    // C++:   cv::VideoCapture::VideoCapture(String filename, int apiPreference = CAP_ANY)
+    // C++:   cv::VideoCapture::VideoCapture(String filename, int apiPreference, vector_int params)
     //
 
     /**
@@ -141,6 +152,11 @@ public class VideoCapture {
         nativeObj = VideoCapture_3(filename, apiPreference, params_mat.nativeObj);
     }
 
+
+    //
+    // C++:   cv::VideoCapture::VideoCapture(int index, int apiPreference = CAP_ANY)
+    //
+
     /**
      *
      *      Opens a camera for video capturing
@@ -155,11 +171,6 @@ public class VideoCapture {
     public VideoCapture(int index, int apiPreference) {
         nativeObj = VideoCapture_4(index, apiPreference);
     }
-
-
-    //
-    // C++:   cv::VideoCapture::VideoCapture(String filename, int apiPreference, vector_int params)
-    //
 
     /**
      *
@@ -177,7 +188,7 @@ public class VideoCapture {
 
 
     //
-    // C++:   cv::VideoCapture::VideoCapture(int index, int apiPreference = CAP_ANY)
+    // C++:   cv::VideoCapture::VideoCapture(int index, int apiPreference, vector_int params)
     //
 
     /**
@@ -195,6 +206,11 @@ public class VideoCapture {
         nativeObj = VideoCapture_6(index, apiPreference, params_mat.nativeObj);
     }
 
+
+    //
+    // C++:   cv::VideoCapture::VideoCapture(Ptr_IStreamReader source, int apiPreference, vector_int params)
+    //
+
     /**
      *
      *     Opens a video using data stream.
@@ -209,22 +225,6 @@ public class VideoCapture {
         Mat params_mat = params;
         nativeObj = VideoCapture_7(source, apiPreference, params_mat.nativeObj);
     }
-
-
-    //
-    // C++:   cv::VideoCapture::VideoCapture(int index, int apiPreference, vector_int params)
-    //
-
-    // internal usage only
-    public static VideoCapture __fromPtr__(long addr) { return new VideoCapture(addr); }
-
-
-    //
-    // C++:   cv::VideoCapture::VideoCapture(Ptr_IStreamReader source, int apiPreference, vector_int params)
-    //
-
-    // C++:   cv::VideoCapture::VideoCapture()
-    private static native long VideoCapture_0();
 
 
     //
@@ -275,81 +275,215 @@ public class VideoCapture {
     // C++:  bool cv::VideoCapture::isOpened()
     //
 
-    // C++:  bool cv::VideoCapture::open(String filename, int apiPreference = CAP_ANY)
-    private static native boolean open_0(long nativeObj, String filename, int apiPreference);
+    /**
+     * Returns true if video capturing has been initialized already.
+     *
+     *     If the previous call to VideoCapture constructor or VideoCapture::open() succeeded, the method returns
+     *     true.
+     * @return automatically generated
+     */
+    public boolean isOpened() {
+        return isOpened_0(nativeObj);
+    }
 
 
     //
     // C++:  void cv::VideoCapture::release()
     //
 
-    private static native boolean open_1(long nativeObj, String filename);
+    /**
+     * Closes video file or capturing device.
+     *
+     *     The method is automatically called by subsequent VideoCapture::open and by VideoCapture
+     *     destructor.
+     *
+     *     The C function also deallocates memory and clears \*capture pointer.
+     */
+    public void release() {
+        release_0(nativeObj);
+    }
 
 
     //
     // C++:  bool cv::VideoCapture::grab()
     //
 
-    // C++:  bool cv::VideoCapture::open(String filename, int apiPreference, vector_int params)
-    private static native boolean open_2(long nativeObj, String filename, int apiPreference, long params_mat_nativeObj);
+    /**
+     * Grabs the next frame from video file or capturing device.
+     *
+     *     @return {@code true} (non-zero) in the case of success.
+     *
+     *     The method/function grabs the next frame from video file or camera and returns true (non-zero) in
+     *     the case of success.
+     *
+     *     The primary use of the function is in multi-camera environments, especially when the cameras do not
+     *     have hardware synchronization. That is, you call VideoCapture::grab() for each camera and after that
+     *     call the slower method VideoCapture::retrieve() to decode and get frame from each camera. This way
+     *     the overhead on demosaicing or motion jpeg decompression etc. is eliminated and the retrieved frames
+     *     from different cameras will be closer in time.
+     *
+     *     Also, when a connected camera is multi-head (for example, a stereo camera or a Kinect device), the
+     *     correct way of retrieving data from it is to call VideoCapture::grab() first and then call
+     *     VideoCapture::retrieve() one or more times with different values of the channel parameter.
+     *
+     *     REF: tutorial_kinect_openni
+     */
+    public boolean grab() {
+        return grab_0(nativeObj);
+    }
 
 
     //
     // C++:  bool cv::VideoCapture::retrieve(Mat& image, int flag = 0)
     //
 
-    // C++:  bool cv::VideoCapture::open(int index, int apiPreference = CAP_ANY)
-    private static native boolean open_3(long nativeObj, int index, int apiPreference);
+    /**
+     * Decodes and returns the grabbed video frame.
+     *
+     *     @param flag it could be a frame index or a driver specific flag
+     *     @return {@code false} if no frames has been grabbed
+     *
+     *     The method decodes and returns the just grabbed frame. If no frames has been grabbed
+     *     (camera has been disconnected, or there are no more frames in video file), the method returns false
+     *     and the function returns an empty image (with %cv::Mat, test it with Mat::empty()).
+     *
+     *     SEE: read()
+     *
+     *     <b>Note:</b> In REF: videoio_c "C API", functions cvRetrieveFrame() and cv.RetrieveFrame() return image stored inside the video
+     *     capturing structure. It is not allowed to modify or release the image! You can copy the frame using
+     *     cvCloneImage and then do whatever you want with the copy.
+     * @param image automatically generated
+     */
+    public boolean retrieve(Mat image, int flag) {
+        return retrieve_0(nativeObj, image.nativeObj, flag);
+    }
 
-    private static native boolean open_4(long nativeObj, int index);
+    /**
+     * Decodes and returns the grabbed video frame.
+     *
+     *     @return {@code false} if no frames has been grabbed
+     *
+     *     The method decodes and returns the just grabbed frame. If no frames has been grabbed
+     *     (camera has been disconnected, or there are no more frames in video file), the method returns false
+     *     and the function returns an empty image (with %cv::Mat, test it with Mat::empty()).
+     *
+     *     SEE: read()
+     *
+     *     <b>Note:</b> In REF: videoio_c "C API", functions cvRetrieveFrame() and cv.RetrieveFrame() return image stored inside the video
+     *     capturing structure. It is not allowed to modify or release the image! You can copy the frame using
+     *     cvCloneImage and then do whatever you want with the copy.
+     * @param image automatically generated
+     */
+    public boolean retrieve(Mat image) {
+        return retrieve_1(nativeObj, image.nativeObj);
+    }
 
 
     //
     // C++:  bool cv::VideoCapture::read(Mat& image)
     //
 
-    // C++:  bool cv::VideoCapture::open(int index, int apiPreference, vector_int params)
-    private static native boolean open_5(long nativeObj, int index, int apiPreference, long params_mat_nativeObj);
+    /**
+     * Grabs, decodes and returns the next video frame.
+     *
+     *     @return {@code false} if no frames has been grabbed
+     *
+     *     The method/function combines VideoCapture::grab() and VideoCapture::retrieve() in one call. This is the
+     *     most convenient method for reading video files or capturing data from decode and returns the just
+     *     grabbed frame. If no frames has been grabbed (camera has been disconnected, or there are no more
+     *     frames in video file), the method returns false and the function returns empty image (with %cv::Mat, test it with Mat::empty()).
+     *
+     *     <b>Note:</b> In REF: videoio_c "C API", functions cvRetrieveFrame() and cv.RetrieveFrame() return image stored inside the video
+     *     capturing structure. It is not allowed to modify or release the image! You can copy the frame using
+     *     cvCloneImage and then do whatever you want with the copy.
+     * @param image automatically generated
+     */
+    public boolean read(Mat image) {
+        return read_0(nativeObj, image.nativeObj);
+    }
 
 
     //
     // C++:  bool cv::VideoCapture::set(int propId, double value)
     //
 
-    // C++:  bool cv::VideoCapture::open(Ptr_IStreamReader source, int apiPreference, vector_int params)
-    private static native boolean open_6(long nativeObj, IStreamReader source, int apiPreference, long params_mat_nativeObj);
+    /**
+     * Sets a property in the VideoCapture.
+     *
+     *     @param propId Property identifier from cv::VideoCaptureProperties (eg. cv::CAP_PROP_POS_MSEC, cv::CAP_PROP_POS_FRAMES, ...)
+     *     or one from REF: videoio_flags_others
+     *     @param value Value of the property.
+     *     @return {@code true} if the property is supported by backend used by the VideoCapture instance.
+     *     <b>Note:</b> Even if it returns {@code true} this doesn't ensure that the property
+     *     value has been accepted by the capture device. See note in VideoCapture::get()
+     */
+    public boolean set(int propId, double value) {
+        return set_0(nativeObj, propId, value);
+    }
 
 
     //
     // C++:  double cv::VideoCapture::get(int propId)
     //
 
-    // C++:  bool cv::VideoCapture::isOpened()
-    private static native boolean isOpened_0(long nativeObj);
+    /**
+     * Returns the specified VideoCapture property
+     *
+     *     @param propId Property identifier from cv::VideoCaptureProperties (eg. cv::CAP_PROP_POS_MSEC, cv::CAP_PROP_POS_FRAMES, ...)
+     *     or one from REF: videoio_flags_others
+     *     @return Value for the specified property. Value 0 is returned when querying a property that is
+     *     not supported by the backend used by the VideoCapture instance.
+     *
+     *     <b>Note:</b> Reading / writing properties involves many layers. Some unexpected result might happens
+     *     along this chain.
+     *     <code>
+     *     VideoCapture -&gt; API Backend -&gt; Operating System -&gt; Device Driver -&gt; Device Hardware
+     *     </code>
+     *     The returned value might be different from what really used by the device or it could be encoded
+     *     using device dependent rules (eg. steps or percentage). Effective behaviour depends from device
+     *     driver and API Backend
+     */
+    public double get(int propId) {
+        return get_0(nativeObj, propId);
+    }
 
 
     //
     // C++:  String cv::VideoCapture::getBackendName()
     //
 
-    // C++:  void cv::VideoCapture::release()
-    private static native void release_0(long nativeObj);
+    /**
+     * Returns used backend API name
+     *
+     *      <b>Note:</b> Stream should be opened.
+     * @return automatically generated
+     */
+    public String getBackendName() {
+        return getBackendName_0(nativeObj);
+    }
 
 
     //
     // C++:  void cv::VideoCapture::setExceptionMode(bool enable)
     //
 
-    // C++:  bool cv::VideoCapture::grab()
-    private static native boolean grab_0(long nativeObj);
+    /**
+     * Switches exceptions mode
+     *
+     * methods raise exceptions if not successful instead of returning an error code
+     * @param enable automatically generated
+     */
+    public void setExceptionMode(boolean enable) {
+        setExceptionMode_0(nativeObj, enable);
+    }
 
 
     //
     // C++:  bool cv::VideoCapture::getExceptionMode()
     //
 
-    // C++:  bool cv::VideoCapture::retrieve(Mat& image, int flag = 0)
-    private static native boolean retrieve_0(long nativeObj, long image_nativeObj, int flag);
+    // C++:  bool cv::VideoCapture::open(String filename, int apiPreference = CAP_ANY)
+    private static native boolean open_0(long nativeObj, String filename, int apiPreference);
 
 
     //
@@ -357,6 +491,40 @@ public class VideoCapture {
     //
 
     // Unknown type 'vector_VideoCapture' (I), skipping the function
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+    private static native boolean open_1(long nativeObj, String filename);
+
+    // C++:  bool cv::VideoCapture::open(String filename, int apiPreference, vector_int params)
+    private static native boolean open_2(long nativeObj, String filename, int apiPreference, long params_mat_nativeObj);
+
+    // C++:  bool cv::VideoCapture::open(int index, int apiPreference = CAP_ANY)
+    private static native boolean open_3(long nativeObj, int index, int apiPreference);
+
+    private static native boolean open_4(long nativeObj, int index);
+
+    // C++:  bool cv::VideoCapture::open(int index, int apiPreference, vector_int params)
+    private static native boolean open_5(long nativeObj, int index, int apiPreference, long params_mat_nativeObj);
+
+    // C++:  bool cv::VideoCapture::open(Ptr_IStreamReader source, int apiPreference, vector_int params)
+    private static native boolean open_6(long nativeObj, IStreamReader source, int apiPreference, long params_mat_nativeObj);
+
+    // C++:  bool cv::VideoCapture::isOpened()
+    private static native boolean isOpened_0(long nativeObj);
+
+    // C++:  void cv::VideoCapture::release()
+    private static native void release_0(long nativeObj);
+
+    // C++:  bool cv::VideoCapture::grab()
+    private static native boolean grab_0(long nativeObj);
+
+    // C++:  bool cv::VideoCapture::retrieve(Mat& image, int flag = 0)
+    private static native boolean retrieve_0(long nativeObj, long image_nativeObj, int flag);
 
     private static native boolean retrieve_1(long nativeObj, long image_nativeObj);
 
@@ -505,175 +673,8 @@ public class VideoCapture {
         return open_6(nativeObj, source, apiPreference, params_mat.nativeObj);
     }
 
-    /**
-     * Returns true if video capturing has been initialized already.
-     *
-     *     If the previous call to VideoCapture constructor or VideoCapture::open() succeeded, the method returns
-     *     true.
-     * @return automatically generated
-     */
-    public boolean isOpened() {
-        return isOpened_0(nativeObj);
-    }
-
-    /**
-     * Closes video file or capturing device.
-     *
-     *     The method is automatically called by subsequent VideoCapture::open and by VideoCapture
-     *     destructor.
-     *
-     *     The C function also deallocates memory and clears \*capture pointer.
-     */
-    public void release() {
-        release_0(nativeObj);
-    }
-
-    /**
-     * Grabs the next frame from video file or capturing device.
-     *
-     *     @return {@code true} (non-zero) in the case of success.
-     *
-     *     The method/function grabs the next frame from video file or camera and returns true (non-zero) in
-     *     the case of success.
-     *
-     *     The primary use of the function is in multi-camera environments, especially when the cameras do not
-     *     have hardware synchronization. That is, you call VideoCapture::grab() for each camera and after that
-     *     call the slower method VideoCapture::retrieve() to decode and get frame from each camera. This way
-     *     the overhead on demosaicing or motion jpeg decompression etc. is eliminated and the retrieved frames
-     *     from different cameras will be closer in time.
-     *
-     *     Also, when a connected camera is multi-head (for example, a stereo camera or a Kinect device), the
-     *     correct way of retrieving data from it is to call VideoCapture::grab() first and then call
-     *     VideoCapture::retrieve() one or more times with different values of the channel parameter.
-     *
-     *     REF: tutorial_kinect_openni
-     */
-    public boolean grab() {
-        return grab_0(nativeObj);
-    }
-
-    /**
-     * Decodes and returns the grabbed video frame.
-     *
-     *     @param flag it could be a frame index or a driver specific flag
-     *     @return {@code false} if no frames has been grabbed
-     *
-     *     The method decodes and returns the just grabbed frame. If no frames has been grabbed
-     *     (camera has been disconnected, or there are no more frames in video file), the method returns false
-     *     and the function returns an empty image (with %cv::Mat, test it with Mat::empty()).
-     *
-     *     SEE: read()
-     *
-     *     <b>Note:</b> In REF: videoio_c "C API", functions cvRetrieveFrame() and cv.RetrieveFrame() return image stored inside the video
-     *     capturing structure. It is not allowed to modify or release the image! You can copy the frame using
-     *     cvCloneImage and then do whatever you want with the copy.
-     * @param image automatically generated
-     */
-    public boolean retrieve(Mat image, int flag) {
-        return retrieve_0(nativeObj, image.nativeObj, flag);
-    }
-
-    /**
-     * Decodes and returns the grabbed video frame.
-     *
-     *     @return {@code false} if no frames has been grabbed
-     *
-     *     The method decodes and returns the just grabbed frame. If no frames has been grabbed
-     *     (camera has been disconnected, or there are no more frames in video file), the method returns false
-     *     and the function returns an empty image (with %cv::Mat, test it with Mat::empty()).
-     *
-     *     SEE: read()
-     *
-     *     <b>Note:</b> In REF: videoio_c "C API", functions cvRetrieveFrame() and cv.RetrieveFrame() return image stored inside the video
-     *     capturing structure. It is not allowed to modify or release the image! You can copy the frame using
-     *     cvCloneImage and then do whatever you want with the copy.
-     * @param image automatically generated
-     */
-    public boolean retrieve(Mat image) {
-        return retrieve_1(nativeObj, image.nativeObj);
-    }
-
-    /**
-     * Grabs, decodes and returns the next video frame.
-     *
-     *     @return {@code false} if no frames has been grabbed
-     *
-     *     The method/function combines VideoCapture::grab() and VideoCapture::retrieve() in one call. This is the
-     *     most convenient method for reading video files or capturing data from decode and returns the just
-     *     grabbed frame. If no frames has been grabbed (camera has been disconnected, or there are no more
-     *     frames in video file), the method returns false and the function returns empty image (with %cv::Mat, test it with Mat::empty()).
-     *
-     *     <b>Note:</b> In REF: videoio_c "C API", functions cvRetrieveFrame() and cv.RetrieveFrame() return image stored inside the video
-     *     capturing structure. It is not allowed to modify or release the image! You can copy the frame using
-     *     cvCloneImage and then do whatever you want with the copy.
-     * @param image automatically generated
-     */
-    public boolean read(Mat image) {
-        return read_0(nativeObj, image.nativeObj);
-    }
-
-    /**
-     * Sets a property in the VideoCapture.
-     *
-     *     @param propId Property identifier from cv::VideoCaptureProperties (eg. cv::CAP_PROP_POS_MSEC, cv::CAP_PROP_POS_FRAMES, ...)
-     *     or one from REF: videoio_flags_others
-     *     @param value Value of the property.
-     *     @return {@code true} if the property is supported by backend used by the VideoCapture instance.
-     *     <b>Note:</b> Even if it returns {@code true} this doesn't ensure that the property
-     *     value has been accepted by the capture device. See note in VideoCapture::get()
-     */
-    public boolean set(int propId, double value) {
-        return set_0(nativeObj, propId, value);
-    }
-
-    /**
-     * Returns the specified VideoCapture property
-     *
-     *     @param propId Property identifier from cv::VideoCaptureProperties (eg. cv::CAP_PROP_POS_MSEC, cv::CAP_PROP_POS_FRAMES, ...)
-     *     or one from REF: videoio_flags_others
-     *     @return Value for the specified property. Value 0 is returned when querying a property that is
-     *     not supported by the backend used by the VideoCapture instance.
-     *
-     *     <b>Note:</b> Reading / writing properties involves many layers. Some unexpected result might happens
-     *     along this chain.
-     *     <code>
-     *     VideoCapture -&gt; API Backend -&gt; Operating System -&gt; Device Driver -&gt; Device Hardware
-     *     </code>
-     *     The returned value might be different from what really used by the device or it could be encoded
-     *     using device dependent rules (eg. steps or percentage). Effective behaviour depends from device
-     *     driver and API Backend
-     */
-    public double get(int propId) {
-        return get_0(nativeObj, propId);
-    }
-
-    /**
-     * Returns used backend API name
-     *
-     *      <b>Note:</b> Stream should be opened.
-     * @return automatically generated
-     */
-    public String getBackendName() {
-        return getBackendName_0(nativeObj);
-    }
-
     public boolean getExceptionMode() {
         return getExceptionMode_0(nativeObj);
-    }
-
-    /**
-     * Switches exceptions mode
-     *
-     * methods raise exceptions if not successful instead of returning an error code
-     * @param enable automatically generated
-     */
-    public void setExceptionMode(boolean enable) {
-        setExceptionMode_0(nativeObj, enable);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
     }
 
 }

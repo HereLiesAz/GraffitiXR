@@ -24,55 +24,58 @@ public class TonemapMantiuk extends Tonemap {
     // C++:  float cv::TonemapMantiuk::getScale()
     //
 
-    // C++:  float cv::TonemapMantiuk::getScale()
-    private static native float getScale_0(long nativeObj);
+    public float getScale() {
+        return getScale_0(nativeObj);
+    }
 
 
     //
     // C++:  void cv::TonemapMantiuk::setScale(float scale)
     //
 
-    // C++:  void cv::TonemapMantiuk::setScale(float scale)
-    private static native void setScale_0(long nativeObj, float scale);
+    public void setScale(float scale) {
+        setScale_0(nativeObj, scale);
+    }
 
 
     //
     // C++:  float cv::TonemapMantiuk::getSaturation()
     //
 
-    // C++:  float cv::TonemapMantiuk::getSaturation()
-    private static native float getSaturation_0(long nativeObj);
+    public float getSaturation() {
+        return getSaturation_0(nativeObj);
+    }
 
 
     //
     // C++:  void cv::TonemapMantiuk::setSaturation(float saturation)
     //
+
+    public void setSaturation(float saturation) {
+        setSaturation_0(nativeObj, saturation);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
+    // C++:  float cv::TonemapMantiuk::getScale()
+    private static native float getScale_0(long nativeObj);
+
+    // C++:  void cv::TonemapMantiuk::setScale(float scale)
+    private static native void setScale_0(long nativeObj, float scale);
+
+    // C++:  float cv::TonemapMantiuk::getSaturation()
+    private static native float getSaturation_0(long nativeObj);
 
     // C++:  void cv::TonemapMantiuk::setSaturation(float saturation)
     private static native void setSaturation_0(long nativeObj, float saturation);
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    public float getScale() {
-        return getScale_0(nativeObj);
-    }
-
-    public void setScale(float scale) {
-        setScale_0(nativeObj, scale);
-    }
-
-    public float getSaturation() {
-        return getSaturation_0(nativeObj);
-    }
-
-    public void setSaturation(float saturation) {
-        setSaturation_0(nativeObj, saturation);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

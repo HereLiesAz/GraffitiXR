@@ -19,6 +19,13 @@ public class SegmentationModel extends Model {
 
     protected SegmentationModel(long addr) { super(addr); }
 
+    // internal usage only
+    public static SegmentationModel __fromPtr__(long addr) { return new SegmentationModel(addr); }
+
+    //
+    // C++:   cv::dnn::SegmentationModel::SegmentationModel(String model, String config = "")
+    //
+
     /**
      * Create segmentation model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -29,10 +36,6 @@ public class SegmentationModel extends Model {
         super(SegmentationModel_0(model, config));
     }
 
-    //
-    // C++:   cv::dnn::SegmentationModel::SegmentationModel(String model, String config = "")
-    //
-
     /**
      * Create segmentation model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -41,6 +44,11 @@ public class SegmentationModel extends Model {
     public SegmentationModel(String model) {
         super(SegmentationModel_1(model));
     }
+
+
+    //
+    // C++:   cv::dnn::SegmentationModel::SegmentationModel(Net network)
+    //
 
     /**
      * Create model from deep learning network.
@@ -52,30 +60,8 @@ public class SegmentationModel extends Model {
 
 
     //
-    // C++:   cv::dnn::SegmentationModel::SegmentationModel(Net network)
-    //
-
-    // internal usage only
-    public static SegmentationModel __fromPtr__(long addr) { return new SegmentationModel(addr); }
-
-
-    //
     // C++:  void cv::dnn::SegmentationModel::segment(Mat frame, Mat& mask)
     //
-
-    // C++:   cv::dnn::SegmentationModel::SegmentationModel(String model, String config = "")
-    private static native long SegmentationModel_0(String model, String config);
-
-    private static native long SegmentationModel_1(String model);
-
-    // C++:   cv::dnn::SegmentationModel::SegmentationModel(Net network)
-    private static native long SegmentationModel_2(long network_nativeObj);
-
-    // C++:  void cv::dnn::SegmentationModel::segment(Mat frame, Mat& mask)
-    private static native void segment_0(long nativeObj, long frame_nativeObj, long mask_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
 
     /**
      * Given the {@code input} frame, create input blob, run net
@@ -86,9 +72,25 @@ public class SegmentationModel extends Model {
         segment_0(nativeObj, frame.nativeObj, mask.nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:   cv::dnn::SegmentationModel::SegmentationModel(String model, String config = "")
+    private static native long SegmentationModel_0(String model, String config);
+    private static native long SegmentationModel_1(String model);
+
+    // C++:   cv::dnn::SegmentationModel::SegmentationModel(Net network)
+    private static native long SegmentationModel_2(long network_nativeObj);
+
+    // C++:  void cv::dnn::SegmentationModel::segment(Mat frame, Mat& mask)
+    private static native void segment_0(long nativeObj, long frame_nativeObj, long mask_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

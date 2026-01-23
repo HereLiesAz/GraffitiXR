@@ -21,6 +21,11 @@ import org.opencv.video.BackgroundSubtractorMOG2;
 
 public class Video {
 
+    private static final int
+            CV_LKFLOW_INITIAL_GUESSES = 4,
+            CV_LKFLOW_GET_MIN_EIGENVALS = 8;
+
+
     // C++: enum <unnamed>
     public static final int
             OPTFLOW_USE_INITIAL_FLOW = 4,
@@ -30,6 +35,8 @@ public class Video {
             MOTION_EUCLIDEAN = 1,
             MOTION_AFFINE = 2,
             MOTION_HOMOGRAPHY = 3;
+
+
     // C++: enum MODE (cv.detail.TrackerSamplerCSC.MODE)
     public static final int
             TrackerSamplerCSC_MODE_INIT_POS = 1,
@@ -37,9 +44,6 @@ public class Video {
             TrackerSamplerCSC_MODE_TRACK_POS = 3,
             TrackerSamplerCSC_MODE_TRACK_NEG = 4,
             TrackerSamplerCSC_MODE_DETECT = 5;
-    private static final int
-            CV_LKFLOW_INITIAL_GUESSES = 4,
-            CV_LKFLOW_GET_MIN_EIGENVALS = 8;
 
 
     //

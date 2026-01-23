@@ -150,6 +150,8 @@ public class Imgcodecs {
             IMWRITE_PAM_FORMAT_GRAYSCALE_ALPHA = 3,
             IMWRITE_PAM_FORMAT_RGB = 4,
             IMWRITE_PAM_FORMAT_RGB_ALPHA = 5;
+
+
     // C++: enum ImwritePNGFlags (cv.ImwritePNGFlags)
     public static final int
             IMWRITE_PNG_STRATEGY_DEFAULT = 0,
@@ -165,6 +167,11 @@ public class Imgcodecs {
             IMWRITE_PNG_FILTER_PAETH = 128,
             IMWRITE_PNG_FAST_FILTERS = (IMWRITE_PNG_FILTER_NONE | IMWRITE_PNG_FILTER_SUB | IMWRITE_PNG_FILTER_UP),
             IMWRITE_PNG_ALL_FILTERS = (IMWRITE_PNG_FAST_FILTERS | IMWRITE_PNG_FILTER_AVG | IMWRITE_PNG_FILTER_PAETH);
+
+
+
+
+
     // C++: enum ImwriteTiffCompressionFlags (cv.ImwriteTiffCompressionFlags)
     public static final int
             IMWRITE_TIFF_COMPRESSION_NONE = 1,
@@ -200,16 +207,25 @@ public class Imgcodecs {
             IMWRITE_TIFF_COMPRESSION_ZSTD = 50000,
             IMWRITE_TIFF_COMPRESSION_WEBP = 50001,
             IMWRITE_TIFF_COMPRESSION_JXL = 50002;
+
+
     // C++: enum ImwriteTiffPredictorFlags (cv.ImwriteTiffPredictorFlags)
     public static final int
             IMWRITE_TIFF_PREDICTOR_NONE = 1,
             IMWRITE_TIFF_PREDICTOR_HORIZONTAL = 2,
             IMWRITE_TIFF_PREDICTOR_FLOATINGPOINT = 3;
+
+
     // C++: enum ImwriteTiffResolutionUnitFlags (cv.ImwriteTiffResolutionUnitFlags)
     public static final int
             IMWRITE_TIFF_RESOLUTION_UNIT_NONE = 1,
             IMWRITE_TIFF_RESOLUTION_UNIT_INCH = 2,
             IMWRITE_TIFF_RESOLUTION_UNIT_CENTIMETER = 3;
+
+
+    //
+    // C++:  Mat cv::imread(String filename, int flags = IMREAD_COLOR_BGR)
+    //
 
     /**
      * Loads an image from a file.
@@ -319,11 +335,6 @@ public class Imgcodecs {
         return new Mat(imread_0(filename, flags));
     }
 
-
-    //
-    // C++:  Mat cv::imread(String filename, int flags = IMREAD_COLOR_BGR)
-    //
-
     /**
      * Loads an image from a file.
      *
@@ -431,6 +442,11 @@ public class Imgcodecs {
         return new Mat(imread_1(filename));
     }
 
+
+    //
+    // C++:  void cv::imread(String filename, Mat& dst, int flags = IMREAD_COLOR_BGR)
+    //
+
     /**
      * Loads an image from a file.
      *
@@ -445,11 +461,6 @@ public class Imgcodecs {
         imread_2(filename, dst.nativeObj, flags);
     }
 
-
-    //
-    // C++:  void cv::imread(String filename, Mat& dst, int flags = IMREAD_COLOR_BGR)
-    //
-
     /**
      * Loads an image from a file.
      *
@@ -462,6 +473,11 @@ public class Imgcodecs {
     public static void imread(String filename, Mat dst) {
         imread_3(filename, dst.nativeObj);
     }
+
+
+    //
+    // C++:  Mat cv::imreadWithMetadata(String filename, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
+    //
 
     /**
      * Reads an image from a file along with associated metadata.
@@ -487,11 +503,6 @@ public class Imgcodecs {
         return retVal;
     }
 
-
-    //
-    // C++:  Mat cv::imreadWithMetadata(String filename, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
-    //
-
     /**
      * Reads an image from a file along with associated metadata.
      *
@@ -515,6 +526,11 @@ public class Imgcodecs {
         return retVal;
     }
 
+
+    //
+    // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int flags = IMREAD_ANYCOLOR)
+    //
+
     /**
      * Loads a multi-page image from a file.
      *
@@ -533,11 +549,6 @@ public class Imgcodecs {
         return retVal;
     }
 
-
-    //
-    // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int flags = IMREAD_ANYCOLOR)
-    //
-
     /**
      * Loads a multi-page image from a file.
      *
@@ -554,6 +565,11 @@ public class Imgcodecs {
         mats_mat.release();
         return retVal;
     }
+
+
+    //
+    // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int start, int count, int flags = IMREAD_ANYCOLOR)
+    //
 
     /**
      * Loads images of a multi-page image from a file.
@@ -575,11 +591,6 @@ public class Imgcodecs {
         return retVal;
     }
 
-
-    //
-    // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int start, int count, int flags = IMREAD_ANYCOLOR)
-    //
-
     /**
      * Loads images of a multi-page image from a file.
      *
@@ -599,6 +610,11 @@ public class Imgcodecs {
         return retVal;
     }
 
+
+    //
+    // C++:  bool cv::imreadanimation(String filename, Animation& animation, int start = 0, int count = INT16_MAX)
+    //
+
     /**
      * Loads frames from an animated image file into an Animation structure.
      *
@@ -614,11 +630,6 @@ public class Imgcodecs {
     public static boolean imreadanimation(String filename, Animation animation, int start, int count) {
         return imreadanimation_0(filename, animation.getNativeObjAddr(), start, count);
     }
-
-
-    //
-    // C++:  bool cv::imreadanimation(String filename, Animation& animation, int start = 0, int count = INT16_MAX)
-    //
 
     /**
      * Loads frames from an animated image file into an Animation structure.
@@ -649,6 +660,11 @@ public class Imgcodecs {
         return imreadanimation_2(filename, animation.getNativeObjAddr());
     }
 
+
+    //
+    // C++:  bool cv::imdecodeanimation(Mat buf, Animation& animation, int start = 0, int count = INT16_MAX)
+    //
+
     /**
      * Loads frames from an animated image buffer into an Animation structure.
      *
@@ -664,11 +680,6 @@ public class Imgcodecs {
     public static boolean imdecodeanimation(Mat buf, Animation animation, int start, int count) {
         return imdecodeanimation_0(buf.nativeObj, animation.getNativeObjAddr(), start, count);
     }
-
-
-    //
-    // C++:  bool cv::imdecodeanimation(Mat buf, Animation& animation, int start = 0, int count = INT16_MAX)
-    //
 
     /**
      * Loads frames from an animated image buffer into an Animation structure.
@@ -699,6 +710,11 @@ public class Imgcodecs {
         return imdecodeanimation_2(buf.nativeObj, animation.getNativeObjAddr());
     }
 
+
+    //
+    // C++:  bool cv::imwriteanimation(String filename, Animation animation, vector_int params = std::vector<int>())
+    //
+
     /**
      * Saves an Animation to a specified file.
      *
@@ -717,11 +733,6 @@ public class Imgcodecs {
         return imwriteanimation_0(filename, animation.getNativeObjAddr(), params_mat.nativeObj);
     }
 
-
-    //
-    // C++:  bool cv::imwriteanimation(String filename, Animation animation, vector_int params = std::vector<int>())
-    //
-
     /**
      * Saves an Animation to a specified file.
      *
@@ -737,6 +748,11 @@ public class Imgcodecs {
     public static boolean imwriteanimation(String filename, Animation animation) {
         return imwriteanimation_1(filename, animation.getNativeObjAddr());
     }
+
+
+    //
+    // C++:  bool cv::imencodeanimation(String ext, Animation animation, vector_uchar& buf, vector_int params = std::vector<int>())
+    //
 
     /**
      * Encodes an Animation to a memory buffer.
@@ -763,11 +779,6 @@ public class Imgcodecs {
         return imencodeanimation_0(ext, animation.getNativeObjAddr(), buf_mat.nativeObj, params_mat.nativeObj);
     }
 
-
-    //
-    // C++:  bool cv::imencodeanimation(String ext, Animation animation, vector_uchar& buf, vector_int params = std::vector<int>())
-    //
-
     /**
      * Encodes an Animation to a memory buffer.
      *
@@ -791,6 +802,11 @@ public class Imgcodecs {
         return imencodeanimation_1(ext, animation.getNativeObjAddr(), buf_mat.nativeObj);
     }
 
+
+    //
+    // C++:  size_t cv::imcount(String filename, int flags = IMREAD_ANYCOLOR)
+    //
+
     /**
      * Returns the number of images inside the given file
      *
@@ -805,11 +821,6 @@ public class Imgcodecs {
         return imcount_0(filename, flags);
     }
 
-
-    //
-    // C++:  size_t cv::imcount(String filename, int flags = IMREAD_ANYCOLOR)
-    //
-
     /**
      * Returns the number of images inside the given file
      *
@@ -822,6 +833,11 @@ public class Imgcodecs {
     public static long imcount(String filename) {
         return imcount_1(filename);
     }
+
+
+    //
+    // C++:  bool cv::imwrite(String filename, Mat img, vector_int params = std::vector<int>())
+    //
 
     /**
      * Saves an image to a specified file.
@@ -943,11 +959,6 @@ public class Imgcodecs {
         return imwrite_0(filename, img.nativeObj, params_mat.nativeObj);
     }
 
-
-    //
-    // C++:  bool cv::imwrite(String filename, Mat img, vector_int params = std::vector<int>())
-    //
-
     /**
      * Saves an image to a specified file.
      *
@@ -1066,6 +1077,11 @@ public class Imgcodecs {
         return imwrite_1(filename, img.nativeObj);
     }
 
+
+    //
+    // C++:  bool cv::imwriteWithMetadata(String filename, Mat img, vector_int metadataTypes, vector_Mat metadata, vector_int params = std::vector<int>())
+    //
+
     /**
      * Saves an image to a specified file with metadata
      *
@@ -1084,11 +1100,6 @@ public class Imgcodecs {
         return imwriteWithMetadata_0(filename, img.nativeObj, metadataTypes_mat.nativeObj, metadata_mat.nativeObj, params_mat.nativeObj);
     }
 
-
-    //
-    // C++:  bool cv::imwriteWithMetadata(String filename, Mat img, vector_int metadataTypes, vector_Mat metadata, vector_int params = std::vector<int>())
-    //
-
     /**
      * Saves an image to a specified file with metadata
      *
@@ -1105,21 +1116,26 @@ public class Imgcodecs {
         return imwriteWithMetadata_1(filename, img.nativeObj, metadataTypes_mat.nativeObj, metadata_mat.nativeObj);
     }
 
+
+    //
+    // C++:  bool cv::imwritemulti(String filename, vector_Mat img, vector_int params = std::vector<int>())
+    //
+
     public static boolean imwritemulti(String filename, List<Mat> img, MatOfInt params) {
         Mat img_mat = Converters.vector_Mat_to_Mat(img);
         Mat params_mat = params;
         return imwritemulti_0(filename, img_mat.nativeObj, params_mat.nativeObj);
     }
 
-
-    //
-    // C++:  bool cv::imwritemulti(String filename, vector_Mat img, vector_int params = std::vector<int>())
-    //
-
     public static boolean imwritemulti(String filename, List<Mat> img) {
         Mat img_mat = Converters.vector_Mat_to_Mat(img);
         return imwritemulti_1(filename, img_mat.nativeObj);
     }
+
+
+    //
+    // C++:  Mat cv::imdecode(Mat buf, int flags)
+    //
 
     /**
      * Reads an image from a buffer in memory.
@@ -1140,7 +1156,7 @@ public class Imgcodecs {
 
 
     //
-    // C++:  Mat cv::imdecode(Mat buf, int flags)
+    // C++:  Mat cv::imdecodeWithMetadata(Mat buf, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
     //
 
     /**
@@ -1168,11 +1184,6 @@ public class Imgcodecs {
         return retVal;
     }
 
-
-    //
-    // C++:  Mat cv::imdecodeWithMetadata(Mat buf, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
-    //
-
     /**
      * Reads an image from a memory buffer and extracts associated metadata.
      *
@@ -1197,6 +1208,11 @@ public class Imgcodecs {
         return retVal;
     }
 
+
+    //
+    // C++:  bool cv::imdecodemulti(Mat buf, int flags, vector_Mat& mats, Range range = Range::all())
+    //
+
     /**
      * Reads a multi-page image from a buffer in memory.
      *
@@ -1220,11 +1236,6 @@ public class Imgcodecs {
         return retVal;
     }
 
-
-    //
-    // C++:  bool cv::imdecodemulti(Mat buf, int flags, vector_Mat& mats, Range range = Range::all())
-    //
-
     /**
      * Reads a multi-page image from a buffer in memory.
      *
@@ -1247,6 +1258,11 @@ public class Imgcodecs {
         return retVal;
     }
 
+
+    //
+    // C++:  bool cv::imencode(String ext, Mat img, vector_uchar& buf, vector_int params = std::vector<int>())
+    //
+
     /**
      * Encodes an image into a memory buffer.
      *
@@ -1265,11 +1281,6 @@ public class Imgcodecs {
         return imencode_0(ext, img.nativeObj, buf_mat.nativeObj, params_mat.nativeObj);
     }
 
-
-    //
-    // C++:  bool cv::imencode(String ext, Mat img, vector_uchar& buf, vector_int params = std::vector<int>())
-    //
-
     /**
      * Encodes an image into a memory buffer.
      *
@@ -1285,6 +1296,11 @@ public class Imgcodecs {
         Mat buf_mat = buf;
         return imencode_1(ext, img.nativeObj, buf_mat.nativeObj);
     }
+
+
+    //
+    // C++:  bool cv::imencodeWithMetadata(String ext, Mat img, vector_int metadataTypes, vector_Mat metadata, vector_uchar& buf, vector_int params = std::vector<int>())
+    //
 
     /**
      * Encodes an image into a memory buffer.
@@ -1308,11 +1324,6 @@ public class Imgcodecs {
         return imencodeWithMetadata_0(ext, img.nativeObj, metadataTypes_mat.nativeObj, metadata_mat.nativeObj, buf_mat.nativeObj, params_mat.nativeObj);
     }
 
-
-    //
-    // C++:  bool cv::imencodeWithMetadata(String ext, Mat img, vector_int metadataTypes, vector_Mat metadata, vector_uchar& buf, vector_int params = std::vector<int>())
-    //
-
     /**
      * Encodes an image into a memory buffer.
      *
@@ -1333,6 +1344,11 @@ public class Imgcodecs {
         return imencodeWithMetadata_1(ext, img.nativeObj, metadataTypes_mat.nativeObj, metadata_mat.nativeObj, buf_mat.nativeObj);
     }
 
+
+    //
+    // C++:  bool cv::imencodemulti(String ext, vector_Mat imgs, vector_uchar& buf, vector_int params = std::vector<int>())
+    //
+
     /**
      * Encodes array of images into a memory buffer.
      *
@@ -1352,11 +1368,6 @@ public class Imgcodecs {
         return imencodemulti_0(ext, imgs_mat.nativeObj, buf_mat.nativeObj, params_mat.nativeObj);
     }
 
-
-    //
-    // C++:  bool cv::imencodemulti(String ext, vector_Mat imgs, vector_uchar& buf, vector_int params = std::vector<int>())
-    //
-
     /**
      * Encodes array of images into a memory buffer.
      *
@@ -1373,6 +1384,11 @@ public class Imgcodecs {
         Mat buf_mat = buf;
         return imencodemulti_1(ext, imgs_mat.nativeObj, buf_mat.nativeObj);
     }
+
+
+    //
+    // C++:  bool cv::haveImageReader(String filename)
+    //
 
     /**
      * Checks if the specified image file can be decoded by OpenCV.
@@ -1395,7 +1411,7 @@ public class Imgcodecs {
 
 
     //
-    // C++:  bool cv::haveImageReader(String filename)
+    // C++:  bool cv::haveImageWriter(String filename)
     //
 
     /**
@@ -1418,77 +1434,60 @@ public class Imgcodecs {
     }
 
 
-    //
-    // C++:  bool cv::haveImageWriter(String filename)
-    //
+
 
     // C++:  Mat cv::imread(String filename, int flags = IMREAD_COLOR_BGR)
     private static native long imread_0(String filename, int flags);
-
     private static native long imread_1(String filename);
 
     // C++:  void cv::imread(String filename, Mat& dst, int flags = IMREAD_COLOR_BGR)
     private static native void imread_2(String filename, long dst_nativeObj, int flags);
-
     private static native void imread_3(String filename, long dst_nativeObj);
 
     // C++:  Mat cv::imreadWithMetadata(String filename, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
     private static native long imreadWithMetadata_0(String filename, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj, int flags);
-
     private static native long imreadWithMetadata_1(String filename, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj);
 
     // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int flags = IMREAD_ANYCOLOR)
     private static native boolean imreadmulti_0(String filename, long mats_mat_nativeObj, int flags);
-
     private static native boolean imreadmulti_1(String filename, long mats_mat_nativeObj);
 
     // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int start, int count, int flags = IMREAD_ANYCOLOR)
     private static native boolean imreadmulti_2(String filename, long mats_mat_nativeObj, int start, int count, int flags);
-
     private static native boolean imreadmulti_3(String filename, long mats_mat_nativeObj, int start, int count);
 
     // C++:  bool cv::imreadanimation(String filename, Animation& animation, int start = 0, int count = INT16_MAX)
     private static native boolean imreadanimation_0(String filename, long animation_nativeObj, int start, int count);
-
     private static native boolean imreadanimation_1(String filename, long animation_nativeObj, int start);
-
     private static native boolean imreadanimation_2(String filename, long animation_nativeObj);
 
     // C++:  bool cv::imdecodeanimation(Mat buf, Animation& animation, int start = 0, int count = INT16_MAX)
     private static native boolean imdecodeanimation_0(long buf_nativeObj, long animation_nativeObj, int start, int count);
-
     private static native boolean imdecodeanimation_1(long buf_nativeObj, long animation_nativeObj, int start);
-
     private static native boolean imdecodeanimation_2(long buf_nativeObj, long animation_nativeObj);
 
     // C++:  bool cv::imwriteanimation(String filename, Animation animation, vector_int params = std::vector<int>())
     private static native boolean imwriteanimation_0(String filename, long animation_nativeObj, long params_mat_nativeObj);
-
     private static native boolean imwriteanimation_1(String filename, long animation_nativeObj);
 
     // C++:  bool cv::imencodeanimation(String ext, Animation animation, vector_uchar& buf, vector_int params = std::vector<int>())
     private static native boolean imencodeanimation_0(String ext, long animation_nativeObj, long buf_mat_nativeObj, long params_mat_nativeObj);
-
     private static native boolean imencodeanimation_1(String ext, long animation_nativeObj, long buf_mat_nativeObj);
 
     // C++:  size_t cv::imcount(String filename, int flags = IMREAD_ANYCOLOR)
     private static native long imcount_0(String filename, int flags);
-
     private static native long imcount_1(String filename);
 
     // C++:  bool cv::imwrite(String filename, Mat img, vector_int params = std::vector<int>())
     private static native boolean imwrite_0(String filename, long img_nativeObj, long params_mat_nativeObj);
-
     private static native boolean imwrite_1(String filename, long img_nativeObj);
 
     // C++:  bool cv::imwriteWithMetadata(String filename, Mat img, vector_int metadataTypes, vector_Mat metadata, vector_int params = std::vector<int>())
     private static native boolean imwriteWithMetadata_0(String filename, long img_nativeObj, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj, long params_mat_nativeObj);
-
     private static native boolean imwriteWithMetadata_1(String filename, long img_nativeObj, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj);
 
     // C++:  bool cv::imwritemulti(String filename, vector_Mat img, vector_int params = std::vector<int>())
     private static native boolean imwritemulti_0(String filename, long img_mat_nativeObj, long params_mat_nativeObj);
-
     private static native boolean imwritemulti_1(String filename, long img_mat_nativeObj);
 
     // C++:  Mat cv::imdecode(Mat buf, int flags)
@@ -1496,27 +1495,22 @@ public class Imgcodecs {
 
     // C++:  Mat cv::imdecodeWithMetadata(Mat buf, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
     private static native long imdecodeWithMetadata_0(long buf_nativeObj, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj, int flags);
-
     private static native long imdecodeWithMetadata_1(long buf_nativeObj, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj);
 
     // C++:  bool cv::imdecodemulti(Mat buf, int flags, vector_Mat& mats, Range range = Range::all())
     private static native boolean imdecodemulti_0(long buf_nativeObj, int flags, long mats_mat_nativeObj, int range_start, int range_end);
-
     private static native boolean imdecodemulti_1(long buf_nativeObj, int flags, long mats_mat_nativeObj);
 
     // C++:  bool cv::imencode(String ext, Mat img, vector_uchar& buf, vector_int params = std::vector<int>())
     private static native boolean imencode_0(String ext, long img_nativeObj, long buf_mat_nativeObj, long params_mat_nativeObj);
-
     private static native boolean imencode_1(String ext, long img_nativeObj, long buf_mat_nativeObj);
 
     // C++:  bool cv::imencodeWithMetadata(String ext, Mat img, vector_int metadataTypes, vector_Mat metadata, vector_uchar& buf, vector_int params = std::vector<int>())
     private static native boolean imencodeWithMetadata_0(String ext, long img_nativeObj, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj, long buf_mat_nativeObj, long params_mat_nativeObj);
-
     private static native boolean imencodeWithMetadata_1(String ext, long img_nativeObj, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj, long buf_mat_nativeObj);
 
     // C++:  bool cv::imencodemulti(String ext, vector_Mat imgs, vector_uchar& buf, vector_int params = std::vector<int>())
     private static native boolean imencodemulti_0(String ext, long imgs_mat_nativeObj, long buf_mat_nativeObj, long params_mat_nativeObj);
-
     private static native boolean imencodemulti_1(String ext, long imgs_mat_nativeObj, long buf_mat_nativeObj);
 
     // C++:  bool cv::haveImageReader(String filename)
@@ -1524,7 +1518,5 @@ public class Imgcodecs {
 
     // C++:  bool cv::haveImageWriter(String filename)
     private static native boolean haveImageWriter_0(String filename);
-
-
 
 }

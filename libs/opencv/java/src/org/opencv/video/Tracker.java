@@ -18,28 +18,15 @@ public class Tracker {
       
     }
 
-    // internal usage only
-    public static Tracker __fromPtr__(long addr) { return new Tracker(addr); }
-
     // C++:  void cv::Tracker::init(Mat image, Rect boundingBox)
     private static native void init_0(long nativeObj, long image_nativeObj, int boundingBox_x, int boundingBox_y, int boundingBox_width, int boundingBox_height);
 
+    // internal usage only
+    public static Tracker __fromPtr__(long addr) { return new Tracker(addr); }
+
     //
     // C++:  void cv::Tracker::init(Mat image, Rect boundingBox)
     //
-
-    // C++:  bool cv::Tracker::update(Mat image, Rect& boundingBox)
-    private static native boolean update_0(long nativeObj, long image_nativeObj, double[] boundingBox_out);
-
-
-    //
-    // C++:  bool cv::Tracker::update(Mat image, Rect& boundingBox)
-    //
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    public long getNativeObjAddr() { return nativeObj; }
 
     /**
      * Initialize the tracker with a known bounding box that surrounded the target
@@ -49,6 +36,25 @@ public class Tracker {
     public void init(Mat image, Rect boundingBox) {
         init_0(nativeObj, image.nativeObj, boundingBox.x, boundingBox.y, boundingBox.width, boundingBox.height);
     }
+
+
+    //
+    // C++:  bool cv::Tracker::update(Mat image, Rect& boundingBox)
+    //
+
+    // C++:  bool cv::Tracker::update(Mat image, Rect& boundingBox)
+    private static native boolean update_0(long nativeObj, long image_nativeObj, double[] boundingBox_out);
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public long getNativeObjAddr() { return nativeObj; }
 
     /**
      * Update the tracker, find the new most likely bounding box for the target
@@ -65,11 +71,6 @@ public class Tracker {
         boolean retVal = update_0(nativeObj, image.nativeObj, boundingBox_out);
         if(boundingBox!=null){ boundingBox.x = (int)boundingBox_out[0]; boundingBox.y = (int)boundingBox_out[1]; boundingBox.width = (int)boundingBox_out[2]; boundingBox.height = (int)boundingBox_out[3]; }
         return retVal;
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
     }
 
 }

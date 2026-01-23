@@ -97,26 +97,6 @@ public class TrackerVit extends Tracker {
     // C++:  float cv::TrackerVit::getTrackingScore()
     //
 
-    // C++: static Ptr_TrackerVit cv::TrackerVit::create(TrackerVit_Params parameters = TrackerVit::Params())
-    private static native long create_0(long parameters_nativeObj);
-
-    private static native long create_1();
-
-    // C++: static Ptr_TrackerVit cv::TrackerVit::create(Net model, Scalar meanvalue = Scalar(0.485, 0.456, 0.406), Scalar stdvalue = Scalar(0.229, 0.224, 0.225), float tracking_score_threshold = 0.20f)
-    private static native long create_2(long model_nativeObj, double meanvalue_val0, double meanvalue_val1, double meanvalue_val2, double meanvalue_val3, double stdvalue_val0, double stdvalue_val1, double stdvalue_val2, double stdvalue_val3, float tracking_score_threshold);
-
-    private static native long create_3(long model_nativeObj, double meanvalue_val0, double meanvalue_val1, double meanvalue_val2, double meanvalue_val3, double stdvalue_val0, double stdvalue_val1, double stdvalue_val2, double stdvalue_val3);
-
-    private static native long create_4(long model_nativeObj, double meanvalue_val0, double meanvalue_val1, double meanvalue_val2, double meanvalue_val3);
-
-    private static native long create_5(long model_nativeObj);
-
-    // C++:  float cv::TrackerVit::getTrackingScore()
-    private static native float getTrackingScore_0(long nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     /**
      * Return tracking score
      * @return automatically generated
@@ -125,9 +105,28 @@ public class TrackerVit extends Tracker {
         return getTrackingScore_0(nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++: static Ptr_TrackerVit cv::TrackerVit::create(TrackerVit_Params parameters = TrackerVit::Params())
+    private static native long create_0(long parameters_nativeObj);
+    private static native long create_1();
+
+    // C++: static Ptr_TrackerVit cv::TrackerVit::create(Net model, Scalar meanvalue = Scalar(0.485, 0.456, 0.406), Scalar stdvalue = Scalar(0.229, 0.224, 0.225), float tracking_score_threshold = 0.20f)
+    private static native long create_2(long model_nativeObj, double meanvalue_val0, double meanvalue_val1, double meanvalue_val2, double meanvalue_val3, double stdvalue_val0, double stdvalue_val1, double stdvalue_val2, double stdvalue_val3, float tracking_score_threshold);
+    private static native long create_3(long model_nativeObj, double meanvalue_val0, double meanvalue_val1, double meanvalue_val2, double meanvalue_val3, double stdvalue_val0, double stdvalue_val1, double stdvalue_val2, double stdvalue_val3);
+    private static native long create_4(long model_nativeObj, double meanvalue_val0, double meanvalue_val1, double meanvalue_val2, double meanvalue_val3);
+    private static native long create_5(long model_nativeObj);
+
+    // C++:  float cv::TrackerVit::getTrackingScore()
+    private static native float getTrackingScore_0(long nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

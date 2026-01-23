@@ -19,6 +19,11 @@ import org.opencv.utils.Converters;
  */
 public class EM extends StatModel {
 
+    protected EM(long addr) { super(addr); }
+
+    // internal usage only
+    public static EM __fromPtr__(long addr) { return new EM(addr); }
+
     // C++: enum <unnamed>
     public static final int
             DEFAULT_NCLUSTERS = 5,
@@ -26,6 +31,8 @@ public class EM extends StatModel {
             START_E_STEP = 1,
             START_M_STEP = 2,
             START_AUTO_STEP = 0;
+
+
     // C++: enum Types (cv.ml.EM.Types)
     public static final int
             COV_MAT_SPHERICAL = 0,
@@ -33,208 +40,10 @@ public class EM extends StatModel {
             COV_MAT_GENERIC = 2,
             COV_MAT_DEFAULT = COV_MAT_DIAGONAL;
 
-    protected EM(long addr) { super(addr); }
-
-    // internal usage only
-    public static EM __fromPtr__(long addr) { return new EM(addr); }
-
 
     //
     // C++:  int cv::ml::EM::getClustersNumber()
     //
-
-    /**
-     * Creates empty %EM model.
-     *     The model should be trained then using StatModel::train(traindata, flags) method. Alternatively, you
-     *     can use one of the EM::train\* methods or load it from file using Algorithm::load&lt;EM&gt;(filename).
-     * @return automatically generated
-     */
-    public static EM create() {
-        return EM.__fromPtr__(create_0());
-    }
-
-
-    //
-    // C++:  void cv::ml::EM::setClustersNumber(int val)
-    //
-
-    /**
-     * Loads and creates a serialized EM from a file
-     *
-     * Use EM::save to serialize and store an EM to disk.
-     * Load the EM from this file again, by calling this function with the path to the file.
-     * Optionally specify the node for the file containing the classifier
-     *
-     * @param filepath path to serialized EM
-     * @param nodeName name of node containing the classifier
-     * @return automatically generated
-     */
-    public static EM load(String filepath, String nodeName) {
-        return EM.__fromPtr__(load_0(filepath, nodeName));
-    }
-
-
-    //
-    // C++:  int cv::ml::EM::getCovarianceMatrixType()
-    //
-
-    /**
-     * Loads and creates a serialized EM from a file
-     *
-     * Use EM::save to serialize and store an EM to disk.
-     * Load the EM from this file again, by calling this function with the path to the file.
-     * Optionally specify the node for the file containing the classifier
-     *
-     * @param filepath path to serialized EM
-     * @return automatically generated
-     */
-    public static EM load(String filepath) {
-        return EM.__fromPtr__(load_1(filepath));
-    }
-
-
-    //
-    // C++:  void cv::ml::EM::setCovarianceMatrixType(int val)
-    //
-
-    // C++:  int cv::ml::EM::getClustersNumber()
-    private static native int getClustersNumber_0(long nativeObj);
-
-
-    //
-    // C++:  TermCriteria cv::ml::EM::getTermCriteria()
-    //
-
-    // C++:  void cv::ml::EM::setClustersNumber(int val)
-    private static native void setClustersNumber_0(long nativeObj, int val);
-
-
-    //
-    // C++:  void cv::ml::EM::setTermCriteria(TermCriteria val)
-    //
-
-    // C++:  int cv::ml::EM::getCovarianceMatrixType()
-    private static native int getCovarianceMatrixType_0(long nativeObj);
-
-
-    //
-    // C++:  Mat cv::ml::EM::getWeights()
-    //
-
-    // C++:  void cv::ml::EM::setCovarianceMatrixType(int val)
-    private static native void setCovarianceMatrixType_0(long nativeObj, int val);
-
-
-    //
-    // C++:  Mat cv::ml::EM::getMeans()
-    //
-
-    // C++:  TermCriteria cv::ml::EM::getTermCriteria()
-    private static native double[] getTermCriteria_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::ml::EM::getCovs(vector_Mat& covs)
-    //
-
-    // C++:  void cv::ml::EM::setTermCriteria(TermCriteria val)
-    private static native void setTermCriteria_0(long nativeObj, int val_type, int val_maxCount, double val_epsilon);
-
-
-    //
-    // C++:  float cv::ml::EM::predict(Mat samples, Mat& results = Mat(), int flags = 0)
-    //
-
-    // C++:  Mat cv::ml::EM::getWeights()
-    private static native long getWeights_0(long nativeObj);
-
-    // C++:  Mat cv::ml::EM::getMeans()
-    private static native long getMeans_0(long nativeObj);
-
-    // C++:  void cv::ml::EM::getCovs(vector_Mat& covs)
-    private static native void getCovs_0(long nativeObj, long covs_mat_nativeObj);
-
-
-    //
-    // C++:  Vec2d cv::ml::EM::predict2(Mat sample, Mat& probs)
-    //
-
-    // C++:  float cv::ml::EM::predict(Mat samples, Mat& results = Mat(), int flags = 0)
-    private static native float predict_0(long nativeObj, long samples_nativeObj, long results_nativeObj, int flags);
-
-
-    //
-    // C++:  bool cv::ml::EM::trainEM(Mat samples, Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
-    //
-
-    private static native float predict_1(long nativeObj, long samples_nativeObj, long results_nativeObj);
-
-    private static native float predict_2(long nativeObj, long samples_nativeObj);
-
-    // C++:  Vec2d cv::ml::EM::predict2(Mat sample, Mat& probs)
-    private static native double[] predict2_0(long nativeObj, long sample_nativeObj, long probs_nativeObj);
-
-    // C++:  bool cv::ml::EM::trainEM(Mat samples, Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
-    private static native boolean trainEM_0(long nativeObj, long samples_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj, long probs_nativeObj);
-
-
-    //
-    // C++:  bool cv::ml::EM::trainE(Mat samples, Mat means0, Mat covs0 = Mat(), Mat weights0 = Mat(), Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
-    //
-
-    private static native boolean trainEM_1(long nativeObj, long samples_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj);
-
-    private static native boolean trainEM_2(long nativeObj, long samples_nativeObj, long logLikelihoods_nativeObj);
-
-    private static native boolean trainEM_3(long nativeObj, long samples_nativeObj);
-
-    // C++:  bool cv::ml::EM::trainE(Mat samples, Mat means0, Mat covs0 = Mat(), Mat weights0 = Mat(), Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
-    private static native boolean trainE_0(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj, long weights0_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj, long probs_nativeObj);
-
-    private static native boolean trainE_1(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj, long weights0_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj);
-
-    private static native boolean trainE_2(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj, long weights0_nativeObj, long logLikelihoods_nativeObj);
-
-
-    //
-    // C++:  bool cv::ml::EM::trainM(Mat samples, Mat probs0, Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
-    //
-
-    private static native boolean trainE_3(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj, long weights0_nativeObj);
-
-    private static native boolean trainE_4(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj);
-
-    private static native boolean trainE_5(long nativeObj, long samples_nativeObj, long means0_nativeObj);
-
-    // C++:  bool cv::ml::EM::trainM(Mat samples, Mat probs0, Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
-    private static native boolean trainM_0(long nativeObj, long samples_nativeObj, long probs0_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj, long probs_nativeObj);
-
-
-    //
-    // C++: static Ptr_EM cv::ml::EM::create()
-    //
-
-    private static native boolean trainM_1(long nativeObj, long samples_nativeObj, long probs0_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj);
-
-
-    //
-    // C++: static Ptr_EM cv::ml::EM::load(String filepath, String nodeName = String())
-    //
-
-    private static native boolean trainM_2(long nativeObj, long samples_nativeObj, long probs0_nativeObj, long logLikelihoods_nativeObj);
-
-    private static native boolean trainM_3(long nativeObj, long samples_nativeObj, long probs0_nativeObj);
-
-    // C++: static Ptr_EM cv::ml::EM::create()
-    private static native long create_0();
-
-    // C++: static Ptr_EM cv::ml::EM::load(String filepath, String nodeName = String())
-    private static native long load_0(String filepath, String nodeName);
-
-    private static native long load_1(String filepath);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
 
     /**
      * SEE: setClustersNumber
@@ -244,6 +53,11 @@ public class EM extends StatModel {
         return getClustersNumber_0(nativeObj);
     }
 
+
+    //
+    // C++:  void cv::ml::EM::setClustersNumber(int val)
+    //
+
     /**
      *  getClustersNumber SEE: getClustersNumber
      * @param val automatically generated
@@ -251,6 +65,11 @@ public class EM extends StatModel {
     public void setClustersNumber(int val) {
         setClustersNumber_0(nativeObj, val);
     }
+
+
+    //
+    // C++:  int cv::ml::EM::getCovarianceMatrixType()
+    //
 
     /**
      * SEE: setCovarianceMatrixType
@@ -260,6 +79,11 @@ public class EM extends StatModel {
         return getCovarianceMatrixType_0(nativeObj);
     }
 
+
+    //
+    // C++:  void cv::ml::EM::setCovarianceMatrixType(int val)
+    //
+
     /**
      *  getCovarianceMatrixType SEE: getCovarianceMatrixType
      * @param val automatically generated
@@ -267,6 +91,11 @@ public class EM extends StatModel {
     public void setCovarianceMatrixType(int val) {
         setCovarianceMatrixType_0(nativeObj, val);
     }
+
+
+    //
+    // C++:  TermCriteria cv::ml::EM::getTermCriteria()
+    //
 
     /**
      * SEE: setTermCriteria
@@ -276,6 +105,11 @@ public class EM extends StatModel {
         return new TermCriteria(getTermCriteria_0(nativeObj));
     }
 
+
+    //
+    // C++:  void cv::ml::EM::setTermCriteria(TermCriteria val)
+    //
+
     /**
      *  getTermCriteria SEE: getTermCriteria
      * @param val automatically generated
@@ -283,6 +117,11 @@ public class EM extends StatModel {
     public void setTermCriteria(TermCriteria val) {
         setTermCriteria_0(nativeObj, val.type, val.maxCount, val.epsilon);
     }
+
+
+    //
+    // C++:  Mat cv::ml::EM::getWeights()
+    //
 
     /**
      * Returns weights of the mixtures
@@ -294,6 +133,11 @@ public class EM extends StatModel {
         return new Mat(getWeights_0(nativeObj));
     }
 
+
+    //
+    // C++:  Mat cv::ml::EM::getMeans()
+    //
+
     /**
      * Returns the cluster centers (means of the Gaussian mixture)
      *
@@ -304,6 +148,11 @@ public class EM extends StatModel {
     public Mat getMeans() {
         return new Mat(getMeans_0(nativeObj));
     }
+
+
+    //
+    // C++:  void cv::ml::EM::getCovs(vector_Mat& covs)
+    //
 
     /**
      * Returns covariation matrices
@@ -318,6 +167,11 @@ public class EM extends StatModel {
         Converters.Mat_to_vector_Mat(covs_mat, covs);
         covs_mat.release();
     }
+
+
+    //
+    // C++:  float cv::ml::EM::predict(Mat samples, Mat& results = Mat(), int flags = 0)
+    //
 
     /**
      * Returns posterior probabilities for the provided samples
@@ -355,6 +209,11 @@ public class EM extends StatModel {
         return predict_2(nativeObj, samples.nativeObj);
     }
 
+
+    //
+    // C++:  Vec2d cv::ml::EM::predict2(Mat sample, Mat& probs)
+    //
+
     /**
      * Returns a likelihood logarithm value and an index of the most probable mixture component
      *     for the given sample.
@@ -372,6 +231,11 @@ public class EM extends StatModel {
     public double[] predict2(Mat sample, Mat probs) {
         return predict2_0(nativeObj, sample.nativeObj, probs.nativeObj);
     }
+
+
+    //
+    // C++:  bool cv::ml::EM::trainEM(Mat samples, Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
+    //
 
     /**
      * Estimate the Gaussian mixture parameters from a samples set.
@@ -502,6 +366,11 @@ public class EM extends StatModel {
     public boolean trainEM(Mat samples) {
         return trainEM_3(nativeObj, samples.nativeObj);
     }
+
+
+    //
+    // C++:  bool cv::ml::EM::trainE(Mat samples, Mat means0, Mat covs0 = Mat(), Mat weights0 = Mat(), Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
+    //
 
     /**
      * Estimate the Gaussian mixture parameters from a samples set.
@@ -686,6 +555,11 @@ public class EM extends StatModel {
         return trainE_5(nativeObj, samples.nativeObj, means0.nativeObj);
     }
 
+
+    //
+    // C++:  bool cv::ml::EM::trainM(Mat samples, Mat probs0, Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
+    //
+
     /**
      * Estimate the Gaussian mixture parameters from a samples set.
      *
@@ -776,9 +650,126 @@ public class EM extends StatModel {
         return trainM_3(nativeObj, samples.nativeObj, probs0.nativeObj);
     }
 
+
+    //
+    // C++: static Ptr_EM cv::ml::EM::create()
+    //
+
+    /**
+     * Creates empty %EM model.
+     *     The model should be trained then using StatModel::train(traindata, flags) method. Alternatively, you
+     *     can use one of the EM::train\* methods or load it from file using Algorithm::load&lt;EM&gt;(filename).
+     * @return automatically generated
+     */
+    public static EM create() {
+        return EM.__fromPtr__(create_0());
+    }
+
+
+    //
+    // C++: static Ptr_EM cv::ml::EM::load(String filepath, String nodeName = String())
+    //
+
+    /**
+     * Loads and creates a serialized EM from a file
+     *
+     * Use EM::save to serialize and store an EM to disk.
+     * Load the EM from this file again, by calling this function with the path to the file.
+     * Optionally specify the node for the file containing the classifier
+     *
+     * @param filepath path to serialized EM
+     * @param nodeName name of node containing the classifier
+     * @return automatically generated
+     */
+    public static EM load(String filepath, String nodeName) {
+        return EM.__fromPtr__(load_0(filepath, nodeName));
+    }
+
+    /**
+     * Loads and creates a serialized EM from a file
+     *
+     * Use EM::save to serialize and store an EM to disk.
+     * Load the EM from this file again, by calling this function with the path to the file.
+     * Optionally specify the node for the file containing the classifier
+     *
+     * @param filepath path to serialized EM
+     * @return automatically generated
+     */
+    public static EM load(String filepath) {
+        return EM.__fromPtr__(load_1(filepath));
+    }
+
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:  int cv::ml::EM::getClustersNumber()
+    private static native int getClustersNumber_0(long nativeObj);
+
+    // C++:  void cv::ml::EM::setClustersNumber(int val)
+    private static native void setClustersNumber_0(long nativeObj, int val);
+
+    // C++:  int cv::ml::EM::getCovarianceMatrixType()
+    private static native int getCovarianceMatrixType_0(long nativeObj);
+
+    // C++:  void cv::ml::EM::setCovarianceMatrixType(int val)
+    private static native void setCovarianceMatrixType_0(long nativeObj, int val);
+
+    // C++:  TermCriteria cv::ml::EM::getTermCriteria()
+    private static native double[] getTermCriteria_0(long nativeObj);
+
+    // C++:  void cv::ml::EM::setTermCriteria(TermCriteria val)
+    private static native void setTermCriteria_0(long nativeObj, int val_type, int val_maxCount, double val_epsilon);
+
+    // C++:  Mat cv::ml::EM::getWeights()
+    private static native long getWeights_0(long nativeObj);
+
+    // C++:  Mat cv::ml::EM::getMeans()
+    private static native long getMeans_0(long nativeObj);
+
+    // C++:  void cv::ml::EM::getCovs(vector_Mat& covs)
+    private static native void getCovs_0(long nativeObj, long covs_mat_nativeObj);
+
+    // C++:  float cv::ml::EM::predict(Mat samples, Mat& results = Mat(), int flags = 0)
+    private static native float predict_0(long nativeObj, long samples_nativeObj, long results_nativeObj, int flags);
+    private static native float predict_1(long nativeObj, long samples_nativeObj, long results_nativeObj);
+    private static native float predict_2(long nativeObj, long samples_nativeObj);
+
+    // C++:  Vec2d cv::ml::EM::predict2(Mat sample, Mat& probs)
+    private static native double[] predict2_0(long nativeObj, long sample_nativeObj, long probs_nativeObj);
+
+    // C++:  bool cv::ml::EM::trainEM(Mat samples, Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
+    private static native boolean trainEM_0(long nativeObj, long samples_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj, long probs_nativeObj);
+    private static native boolean trainEM_1(long nativeObj, long samples_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj);
+    private static native boolean trainEM_2(long nativeObj, long samples_nativeObj, long logLikelihoods_nativeObj);
+    private static native boolean trainEM_3(long nativeObj, long samples_nativeObj);
+
+    // C++:  bool cv::ml::EM::trainE(Mat samples, Mat means0, Mat covs0 = Mat(), Mat weights0 = Mat(), Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
+    private static native boolean trainE_0(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj, long weights0_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj, long probs_nativeObj);
+    private static native boolean trainE_1(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj, long weights0_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj);
+    private static native boolean trainE_2(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj, long weights0_nativeObj, long logLikelihoods_nativeObj);
+    private static native boolean trainE_3(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj, long weights0_nativeObj);
+    private static native boolean trainE_4(long nativeObj, long samples_nativeObj, long means0_nativeObj, long covs0_nativeObj);
+    private static native boolean trainE_5(long nativeObj, long samples_nativeObj, long means0_nativeObj);
+
+    // C++:  bool cv::ml::EM::trainM(Mat samples, Mat probs0, Mat& logLikelihoods = Mat(), Mat& labels = Mat(), Mat& probs = Mat())
+    private static native boolean trainM_0(long nativeObj, long samples_nativeObj, long probs0_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj, long probs_nativeObj);
+    private static native boolean trainM_1(long nativeObj, long samples_nativeObj, long probs0_nativeObj, long logLikelihoods_nativeObj, long labels_nativeObj);
+    private static native boolean trainM_2(long nativeObj, long samples_nativeObj, long probs0_nativeObj, long logLikelihoods_nativeObj);
+    private static native boolean trainM_3(long nativeObj, long samples_nativeObj, long probs0_nativeObj);
+
+    // C++: static Ptr_EM cv::ml::EM::create()
+    private static native long create_0();
+
+    // C++: static Ptr_EM cv::ml::EM::load(String filepath, String nodeName = String())
+    private static native long load_0(String filepath, String nodeName);
+    private static native long load_1(String filepath);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

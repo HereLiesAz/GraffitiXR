@@ -15,6 +15,13 @@ public class BOWKMeansTrainer extends BOWTrainer {
 
     protected BOWKMeansTrainer(long addr) { super(addr); }
 
+    // internal usage only
+    public static BOWKMeansTrainer __fromPtr__(long addr) { return new BOWKMeansTrainer(addr); }
+
+    //
+    // C++:   cv::BOWKMeansTrainer::BOWKMeansTrainer(int clusterCount, TermCriteria termcrit = TermCriteria(), int attempts = 3, int flags = KMEANS_PP_CENTERS)
+    //
+
     /**
      * The constructor.
      *
@@ -27,10 +34,6 @@ public class BOWKMeansTrainer extends BOWTrainer {
     public BOWKMeansTrainer(int clusterCount, TermCriteria termcrit, int attempts, int flags) {
         super(BOWKMeansTrainer_0(clusterCount, termcrit.type, termcrit.maxCount, termcrit.epsilon, attempts, flags));
     }
-
-    //
-    // C++:   cv::BOWKMeansTrainer::BOWKMeansTrainer(int clusterCount, TermCriteria termcrit = TermCriteria(), int attempts = 3, int flags = KMEANS_PP_CENTERS)
-    //
 
     /**
      * The constructor.
@@ -65,26 +68,36 @@ public class BOWKMeansTrainer extends BOWTrainer {
         super(BOWKMeansTrainer_3(clusterCount));
     }
 
-    // internal usage only
-    public static BOWKMeansTrainer __fromPtr__(long addr) { return new BOWKMeansTrainer(addr); }
-
 
     //
     // C++:  Mat cv::BOWKMeansTrainer::cluster()
     //
 
-    // C++:   cv::BOWKMeansTrainer::BOWKMeansTrainer(int clusterCount, TermCriteria termcrit = TermCriteria(), int attempts = 3, int flags = KMEANS_PP_CENTERS)
-    private static native long BOWKMeansTrainer_0(int clusterCount, int termcrit_type, int termcrit_maxCount, double termcrit_epsilon, int attempts, int flags);
+    public Mat cluster() {
+        return new Mat(cluster_0(nativeObj));
+    }
 
 
     //
     // C++:  Mat cv::BOWKMeansTrainer::cluster(Mat descriptors)
     //
 
+    public Mat cluster(Mat descriptors) {
+        return new Mat(cluster_1(nativeObj, descriptors.nativeObj));
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
+    // C++:   cv::BOWKMeansTrainer::BOWKMeansTrainer(int clusterCount, TermCriteria termcrit = TermCriteria(), int attempts = 3, int flags = KMEANS_PP_CENTERS)
+    private static native long BOWKMeansTrainer_0(int clusterCount, int termcrit_type, int termcrit_maxCount, double termcrit_epsilon, int attempts, int flags);
     private static native long BOWKMeansTrainer_1(int clusterCount, int termcrit_type, int termcrit_maxCount, double termcrit_epsilon, int attempts);
-
     private static native long BOWKMeansTrainer_2(int clusterCount, int termcrit_type, int termcrit_maxCount, double termcrit_epsilon);
-
     private static native long BOWKMeansTrainer_3(int clusterCount);
 
     // C++:  Mat cv::BOWKMeansTrainer::cluster()
@@ -95,18 +108,5 @@ public class BOWKMeansTrainer extends BOWTrainer {
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    public Mat cluster() {
-        return new Mat(cluster_0(nativeObj));
-    }
-
-    public Mat cluster(Mat descriptors) {
-        return new Mat(cluster_1(nativeObj, descriptors.nativeObj));
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

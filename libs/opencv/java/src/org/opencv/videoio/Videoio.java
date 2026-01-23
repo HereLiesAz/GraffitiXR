@@ -328,6 +328,8 @@ public class Videoio {
             CAP_OBSENSOR_DEPTH_MAP = 0,
             CAP_OBSENSOR_BGR_IMAGE = 1,
             CAP_OBSENSOR_IR_IMAGE = 2;
+
+
     // C++: enum VideoCaptureOBSensorProperties (cv.VideoCaptureOBSensorProperties)
     public static final int
             CAP_PROP_OBSENSOR_INTRINSIC_FX = 26001,
@@ -352,6 +354,11 @@ public class Videoio {
             CAP_OBSENSOR_IMAGE_GENERATOR = 1 << 28,
             CAP_OBSENSOR_IR_GENERATOR = 1 << 27,
             CAP_OBSENSOR_GENERATORS_MASK = CAP_OBSENSOR_DEPTH_GENERATOR + CAP_OBSENSOR_IMAGE_GENERATOR + CAP_OBSENSOR_IR_GENERATOR;
+
+
+
+
+
     // C++: enum VideoCaptureProperties (cv.VideoCaptureProperties)
     public static final int
             CAP_PROP_POS_MSEC = 0,
@@ -426,6 +433,8 @@ public class Videoio {
             CAP_PROP_N_THREADS = 70,
             CAP_PROP_PTS = 71,
             CAP_PROP_DTS_DELAY = 72;
+
+
     // C++: enum VideoWriterProperties (cv.VideoWriterProperties)
     public static final int
             VIDEOWRITER_PROP_QUALITY = 1,
@@ -442,6 +451,11 @@ public class Videoio {
             VIDEOWRITER_PROP_PTS = 12,
             VIDEOWRITER_PROP_DTS_DELAY = 13;
 
+
+    //
+    // C++:  String cv::videoio_registry::getBackendName(VideoCaptureAPIs api)
+    //
+
     /**
      * Returns backend API name or "UnknownVideoAPI(xxx)"
      * @param api backend ID (#VideoCaptureAPIs)
@@ -453,7 +467,7 @@ public class Videoio {
 
 
     //
-    // C++:  String cv::videoio_registry::getBackendName(VideoCaptureAPIs api)
+    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getBackends()
     //
 
     /**
@@ -466,7 +480,7 @@ public class Videoio {
 
 
     //
-    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getBackends()
+    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getCameraBackends()
     //
 
     /**
@@ -479,7 +493,7 @@ public class Videoio {
 
 
     //
-    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getCameraBackends()
+    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getStreamBackends()
     //
 
     /**
@@ -492,7 +506,7 @@ public class Videoio {
 
 
     //
-    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getStreamBackends()
+    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getStreamBufferedBackends()
     //
 
     /**
@@ -505,7 +519,7 @@ public class Videoio {
 
 
     //
-    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getStreamBufferedBackends()
+    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getWriterBackends()
     //
 
     /**
@@ -518,7 +532,7 @@ public class Videoio {
 
 
     //
-    // C++:  vector_VideoCaptureAPIs cv::videoio_registry::getWriterBackends()
+    // C++:  bool cv::videoio_registry::hasBackend(VideoCaptureAPIs api)
     //
 
     /**
@@ -532,7 +546,7 @@ public class Videoio {
 
 
     //
-    // C++:  bool cv::videoio_registry::hasBackend(VideoCaptureAPIs api)
+    // C++:  bool cv::videoio_registry::isBackendBuiltIn(VideoCaptureAPIs api)
     //
 
     /**
@@ -546,7 +560,7 @@ public class Videoio {
 
 
     //
-    // C++:  bool cv::videoio_registry::isBackendBuiltIn(VideoCaptureAPIs api)
+    // C++:  string cv::videoio_registry::getCameraBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
     //
 
     /**
@@ -567,7 +581,7 @@ public class Videoio {
 
 
     //
-    // C++:  string cv::videoio_registry::getCameraBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
+    // C++:  string cv::videoio_registry::getStreamBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
     //
 
     /**
@@ -588,7 +602,7 @@ public class Videoio {
 
 
     //
-    // C++:  string cv::videoio_registry::getStreamBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
+    // C++:  string cv::videoio_registry::getStreamBufferedBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
     //
 
     /**
@@ -609,7 +623,7 @@ public class Videoio {
 
 
     //
-    // C++:  string cv::videoio_registry::getStreamBufferedBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
+    // C++:  string cv::videoio_registry::getWriterBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
     //
 
     /**
@@ -629,9 +643,7 @@ public class Videoio {
     }
 
 
-    //
-    // C++:  string cv::videoio_registry::getWriterBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
-    //
+
 
     // C++:  String cv::videoio_registry::getBackendName(VideoCaptureAPIs api)
     private static native String getBackendName_0(int api);
@@ -668,7 +680,5 @@ public class Videoio {
 
     // C++:  string cv::videoio_registry::getWriterBackendPluginVersion(VideoCaptureAPIs api, int& version_ABI, int& version_API)
     private static native String getWriterBackendPluginVersion_0(int api, double[] version_ABI_out, double[] version_API_out);
-
-
 
 }

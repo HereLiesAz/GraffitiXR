@@ -24,32 +24,6 @@ public class BackgroundSubtractor extends Algorithm {
     // C++:  void cv::BackgroundSubtractor::apply(Mat image, Mat& fgmask, double learningRate = -1)
     //
 
-    // C++:  void cv::BackgroundSubtractor::apply(Mat image, Mat& fgmask, double learningRate = -1)
-    private static native void apply_0(long nativeObj, long image_nativeObj, long fgmask_nativeObj, double learningRate);
-
-    private static native void apply_1(long nativeObj, long image_nativeObj, long fgmask_nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractor::apply(Mat image, Mat knownForegroundMask, Mat& fgmask, double learningRate = -1)
-    //
-
-    // C++:  void cv::BackgroundSubtractor::apply(Mat image, Mat knownForegroundMask, Mat& fgmask, double learningRate = -1)
-    private static native void apply_2(long nativeObj, long image_nativeObj, long knownForegroundMask_nativeObj, long fgmask_nativeObj, double learningRate);
-
-    private static native void apply_3(long nativeObj, long image_nativeObj, long knownForegroundMask_nativeObj, long fgmask_nativeObj);
-
-
-    //
-    // C++:  void cv::BackgroundSubtractor::getBackgroundImage(Mat& backgroundImage)
-    //
-
-    // C++:  void cv::BackgroundSubtractor::getBackgroundImage(Mat& backgroundImage)
-    private static native void getBackgroundImage_0(long nativeObj, long backgroundImage_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     /**
      * Computes a foreground mask.
      *
@@ -76,6 +50,11 @@ public class BackgroundSubtractor extends Algorithm {
     public void apply(Mat image, Mat fgmask) {
         apply_1(nativeObj, image.nativeObj, fgmask.nativeObj);
     }
+
+
+    //
+    // C++:  void cv::BackgroundSubtractor::apply(Mat image, Mat knownForegroundMask, Mat& fgmask, double learningRate = -1)
+    //
 
     /**
      * Computes a foreground mask with known foreground mask input.
@@ -112,6 +91,11 @@ public class BackgroundSubtractor extends Algorithm {
         apply_3(nativeObj, image.nativeObj, knownForegroundMask.nativeObj, fgmask.nativeObj);
     }
 
+
+    //
+    // C++:  void cv::BackgroundSubtractor::getBackgroundImage(Mat& backgroundImage)
+    //
+
     /**
      * Computes a background image.
      *
@@ -124,9 +108,26 @@ public class BackgroundSubtractor extends Algorithm {
         getBackgroundImage_0(nativeObj, backgroundImage.nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:  void cv::BackgroundSubtractor::apply(Mat image, Mat& fgmask, double learningRate = -1)
+    private static native void apply_0(long nativeObj, long image_nativeObj, long fgmask_nativeObj, double learningRate);
+    private static native void apply_1(long nativeObj, long image_nativeObj, long fgmask_nativeObj);
+
+    // C++:  void cv::BackgroundSubtractor::apply(Mat image, Mat knownForegroundMask, Mat& fgmask, double learningRate = -1)
+    private static native void apply_2(long nativeObj, long image_nativeObj, long knownForegroundMask_nativeObj, long fgmask_nativeObj, double learningRate);
+    private static native void apply_3(long nativeObj, long image_nativeObj, long knownForegroundMask_nativeObj, long fgmask_nativeObj);
+
+    // C++:  void cv::BackgroundSubtractor::getBackgroundImage(Mat& backgroundImage)
+    private static native void getBackgroundImage_0(long nativeObj, long backgroundImage_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

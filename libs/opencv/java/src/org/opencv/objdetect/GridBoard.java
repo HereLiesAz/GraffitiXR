@@ -19,6 +19,13 @@ public class GridBoard extends Board {
 
     protected GridBoard(long addr) { super(addr); }
 
+    // internal usage only
+    public static GridBoard __fromPtr__(long addr) { return new GridBoard(addr); }
+
+    //
+    // C++:   cv::aruco::GridBoard::GridBoard(Size size, float markerLength, float markerSeparation, Dictionary dictionary, Mat ids = Mat())
+    //
+
     /**
      * GridBoard constructor
      *
@@ -32,10 +39,6 @@ public class GridBoard extends Board {
         super(GridBoard_0(size.width, size.height, markerLength, markerSeparation, dictionary.getNativeObjAddr(), ids.nativeObj));
     }
 
-    //
-    // C++:   cv::aruco::GridBoard::GridBoard(Size size, float markerLength, float markerSeparation, Dictionary dictionary, Mat ids = Mat())
-    //
-
     /**
      * GridBoard constructor
      *
@@ -48,28 +51,44 @@ public class GridBoard extends Board {
         super(GridBoard_1(size.width, size.height, markerLength, markerSeparation, dictionary.getNativeObjAddr()));
     }
 
-    // internal usage only
-    public static GridBoard __fromPtr__(long addr) { return new GridBoard(addr); }
-
 
     //
     // C++:  Size cv::aruco::GridBoard::getGridSize()
     //
 
-    // C++:   cv::aruco::GridBoard::GridBoard(Size size, float markerLength, float markerSeparation, Dictionary dictionary, Mat ids = Mat())
-    private static native long GridBoard_0(double size_width, double size_height, float markerLength, float markerSeparation, long dictionary_nativeObj, long ids_nativeObj);
+    public Size getGridSize() {
+        return new Size(getGridSize_0(nativeObj));
+    }
 
 
     //
     // C++:  float cv::aruco::GridBoard::getMarkerLength()
     //
 
-    private static native long GridBoard_1(double size_width, double size_height, float markerLength, float markerSeparation, long dictionary_nativeObj);
+    public float getMarkerLength() {
+        return getMarkerLength_0(nativeObj);
+    }
 
 
     //
     // C++:  float cv::aruco::GridBoard::getMarkerSeparation()
     //
+
+    public float getMarkerSeparation() {
+        return getMarkerSeparation_0(nativeObj);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
+    // C++:   cv::aruco::GridBoard::GridBoard(Size size, float markerLength, float markerSeparation, Dictionary dictionary, Mat ids = Mat())
+    private static native long GridBoard_0(double size_width, double size_height, float markerLength, float markerSeparation, long dictionary_nativeObj, long ids_nativeObj);
+    private static native long GridBoard_1(double size_width, double size_height, float markerLength, float markerSeparation, long dictionary_nativeObj);
 
     // C++:  Size cv::aruco::GridBoard::getGridSize()
     private static native double[] getGridSize_0(long nativeObj);
@@ -82,22 +101,5 @@ public class GridBoard extends Board {
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    public Size getGridSize() {
-        return new Size(getGridSize_0(nativeObj));
-    }
-
-    public float getMarkerLength() {
-        return getMarkerLength_0(nativeObj);
-    }
-
-    public float getMarkerSeparation() {
-        return getMarkerSeparation_0(nativeObj);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

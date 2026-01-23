@@ -22,68 +22,6 @@ public class CLAHE extends Algorithm {
     // C++:  void cv::CLAHE::apply(Mat src, Mat& dst)
     //
 
-    // C++:  void cv::CLAHE::apply(Mat src, Mat& dst)
-    private static native void apply_0(long nativeObj, long src_nativeObj, long dst_nativeObj);
-
-
-    //
-    // C++:  void cv::CLAHE::setClipLimit(double clipLimit)
-    //
-
-    // C++:  void cv::CLAHE::setClipLimit(double clipLimit)
-    private static native void setClipLimit_0(long nativeObj, double clipLimit);
-
-
-    //
-    // C++:  double cv::CLAHE::getClipLimit()
-    //
-
-    // C++:  double cv::CLAHE::getClipLimit()
-    private static native double getClipLimit_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::CLAHE::setTilesGridSize(Size tileGridSize)
-    //
-
-    // C++:  void cv::CLAHE::setTilesGridSize(Size tileGridSize)
-    private static native void setTilesGridSize_0(long nativeObj, double tileGridSize_width, double tileGridSize_height);
-
-
-    //
-    // C++:  Size cv::CLAHE::getTilesGridSize()
-    //
-
-    // C++:  Size cv::CLAHE::getTilesGridSize()
-    private static native double[] getTilesGridSize_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::CLAHE::setBitShift(int bitShift)
-    //
-
-    // C++:  void cv::CLAHE::setBitShift(int bitShift)
-    private static native void setBitShift_0(long nativeObj, int bitShift);
-
-
-    //
-    // C++:  int cv::CLAHE::getBitShift()
-    //
-
-    // C++:  int cv::CLAHE::getBitShift()
-    private static native int getBitShift_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::CLAHE::collectGarbage()
-    //
-
-    // C++:  void cv::CLAHE::collectGarbage()
-    private static native void collectGarbage_0(long nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     /**
      * Equalizes the histogram of a grayscale image using Contrast Limited Adaptive Histogram Equalization.
      *
@@ -94,9 +32,10 @@ public class CLAHE extends Algorithm {
         apply_0(nativeObj, src.nativeObj, dst.nativeObj);
     }
 
-    public double getClipLimit() {
-        return getClipLimit_0(nativeObj);
-    }
+
+    //
+    // C++:  void cv::CLAHE::setClipLimit(double clipLimit)
+    //
 
     /**
      * Sets threshold for contrast limiting.
@@ -107,9 +46,18 @@ public class CLAHE extends Algorithm {
         setClipLimit_0(nativeObj, clipLimit);
     }
 
-    public Size getTilesGridSize() {
-        return new Size(getTilesGridSize_0(nativeObj));
-    }
+
+    //
+    // C++:  double cv::CLAHE::getClipLimit()
+    //
+
+    // C++:  void cv::CLAHE::apply(Mat src, Mat& dst)
+    private static native void apply_0(long nativeObj, long src_nativeObj, long dst_nativeObj);
+
+
+    //
+    // C++:  void cv::CLAHE::setTilesGridSize(Size tileGridSize)
+    //
 
     /**
      * Sets size of grid for histogram equalization. Input image will be divided into
@@ -121,6 +69,27 @@ public class CLAHE extends Algorithm {
         setTilesGridSize_0(nativeObj, tileGridSize.width, tileGridSize.height);
     }
 
+
+    //
+    // C++:  Size cv::CLAHE::getTilesGridSize()
+    //
+
+    // C++:  void cv::CLAHE::setClipLimit(double clipLimit)
+    private static native void setClipLimit_0(long nativeObj, double clipLimit);
+
+
+    //
+    // C++:  void cv::CLAHE::setBitShift(int bitShift)
+    //
+
+    // C++:  double cv::CLAHE::getClipLimit()
+    private static native double getClipLimit_0(long nativeObj);
+
+
+    //
+    // C++:  int cv::CLAHE::getBitShift()
+    //
+
     /**
      * Returns the bit shift parameter for histogram bins.
      *
@@ -130,6 +99,47 @@ public class CLAHE extends Algorithm {
         return getBitShift_0(nativeObj);
     }
 
+
+    //
+    // C++:  void cv::CLAHE::collectGarbage()
+    //
+
+    public void collectGarbage() {
+        collectGarbage_0(nativeObj);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+    // C++:  void cv::CLAHE::setTilesGridSize(Size tileGridSize)
+    private static native void setTilesGridSize_0(long nativeObj, double tileGridSize_width, double tileGridSize_height);
+
+    // C++:  Size cv::CLAHE::getTilesGridSize()
+    private static native double[] getTilesGridSize_0(long nativeObj);
+
+    // C++:  void cv::CLAHE::setBitShift(int bitShift)
+    private static native void setBitShift_0(long nativeObj, int bitShift);
+
+    // C++:  int cv::CLAHE::getBitShift()
+    private static native int getBitShift_0(long nativeObj);
+
+    // C++:  void cv::CLAHE::collectGarbage()
+    private static native void collectGarbage_0(long nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public double getClipLimit() {
+        return getClipLimit_0(nativeObj);
+    }
+
+    public Size getTilesGridSize() {
+        return new Size(getTilesGridSize_0(nativeObj));
+    }
+
     /**
      * Sets bit shift parameter for histogram bins.
      *
@@ -137,15 +147,6 @@ public class CLAHE extends Algorithm {
      */
     public void setBitShift(int bitShift) {
         setBitShift_0(nativeObj, bitShift);
-    }
-
-    public void collectGarbage() {
-        collectGarbage_0(nativeObj);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
     }
 
 }

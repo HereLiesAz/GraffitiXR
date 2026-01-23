@@ -22,47 +22,32 @@ public class GeneralizedHoughBallard extends GeneralizedHough {
     // C++:  void cv::GeneralizedHoughBallard::setLevels(int levels)
     //
 
-    // C++:  void cv::GeneralizedHoughBallard::setLevels(int levels)
-    private static native void setLevels_0(long nativeObj, int levels);
-
-
-    //
-    // C++:  int cv::GeneralizedHoughBallard::getLevels()
-    //
-
-    // C++:  int cv::GeneralizedHoughBallard::getLevels()
-    private static native int getLevels_0(long nativeObj);
-
-
-    //
-    // C++:  void cv::GeneralizedHoughBallard::setVotesThreshold(int votesThreshold)
-    //
-
-    // C++:  void cv::GeneralizedHoughBallard::setVotesThreshold(int votesThreshold)
-    private static native void setVotesThreshold_0(long nativeObj, int votesThreshold);
-
-
-    //
-    // C++:  int cv::GeneralizedHoughBallard::getVotesThreshold()
-    //
-
-    // C++:  int cv::GeneralizedHoughBallard::getVotesThreshold()
-    private static native int getVotesThreshold_0(long nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     public int getLevels() {
         return getLevels_0(nativeObj);
     }
+
+
+    //
+    // C++:  int cv::GeneralizedHoughBallard::getLevels()
+    //
 
     public void setLevels(int levels) {
         setLevels_0(nativeObj, levels);
     }
 
+
+    //
+    // C++:  void cv::GeneralizedHoughBallard::setVotesThreshold(int votesThreshold)
+    //
+
     public int getVotesThreshold() {
         return getVotesThreshold_0(nativeObj);
     }
+
+
+    //
+    // C++:  int cv::GeneralizedHoughBallard::getVotesThreshold()
+    //
 
     public void setVotesThreshold(int votesThreshold) {
         setVotesThreshold_0(nativeObj, votesThreshold);
@@ -72,5 +57,22 @@ public class GeneralizedHoughBallard extends GeneralizedHough {
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:  void cv::GeneralizedHoughBallard::setLevels(int levels)
+    private static native void setLevels_0(long nativeObj, int levels);
+
+    // C++:  int cv::GeneralizedHoughBallard::getLevels()
+    private static native int getLevels_0(long nativeObj);
+
+    // C++:  void cv::GeneralizedHoughBallard::setVotesThreshold(int votesThreshold)
+    private static native void setVotesThreshold_0(long nativeObj, int votesThreshold);
+
+    // C++:  int cv::GeneralizedHoughBallard::getVotesThreshold()
+    private static native int getVotesThreshold_0(long nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

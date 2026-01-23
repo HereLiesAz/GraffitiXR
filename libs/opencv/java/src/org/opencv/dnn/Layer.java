@@ -27,68 +27,6 @@ public class Layer extends Algorithm {
     // C++:  void cv::dnn::Layer::finalize(vector_Mat inputs, vector_Mat& outputs)
     //
 
-    // C++:  void cv::dnn::Layer::finalize(vector_Mat inputs, vector_Mat& outputs)
-    private static native void finalize_0(long nativeObj, long inputs_mat_nativeObj, long outputs_mat_nativeObj);
-
-
-    //
-    // C++:  void cv::dnn::Layer::run(vector_Mat inputs, vector_Mat& outputs, vector_Mat& internals)
-    //
-
-    // C++:  void cv::dnn::Layer::run(vector_Mat inputs, vector_Mat& outputs, vector_Mat& internals)
-    private static native void run_0(long nativeObj, long inputs_mat_nativeObj, long outputs_mat_nativeObj, long internals_mat_nativeObj);
-
-
-    //
-    // C++:  int cv::dnn::Layer::outputNameToIndex(String outputName)
-    //
-
-    // C++:  int cv::dnn::Layer::outputNameToIndex(String outputName)
-    private static native int outputNameToIndex_0(long nativeObj, String outputName);
-
-
-    //
-    // C++: vector_Mat Layer::blobs
-    //
-
-    // C++: vector_Mat Layer::blobs
-    private static native long get_blobs_0(long nativeObj);
-
-
-    //
-    // C++: void Layer::blobs
-    //
-
-    // C++: void Layer::blobs
-    private static native void set_blobs_0(long nativeObj, long blobs_mat_nativeObj);
-
-
-    //
-    // C++: String Layer::name
-    //
-
-    // C++: String Layer::name
-    private static native String get_name_0(long nativeObj);
-
-
-    //
-    // C++: String Layer::type
-    //
-
-    // C++: String Layer::type
-    private static native String get_type_0(long nativeObj);
-
-
-    //
-    // C++: int Layer::preferableTarget
-    //
-
-    // C++: int Layer::preferableTarget
-    private static native int get_preferableTarget_0(long nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     /**
      * Computes and sets internal parameters according to inputs, outputs and blobs.
      * @param outputs vector of already allocated output blobs
@@ -104,6 +42,11 @@ public class Layer extends Algorithm {
         Converters.Mat_to_vector_Mat(outputs_mat, outputs);
         outputs_mat.release();
     }
+
+
+    //
+    // C++:  void cv::dnn::Layer::run(vector_Mat inputs, vector_Mat& outputs, vector_Mat& internals)
+    //
 
     /**
      * Allocates layer and computes output.
@@ -124,6 +67,11 @@ public class Layer extends Algorithm {
         internals_mat.release();
     }
 
+
+    //
+    // C++:  int cv::dnn::Layer::outputNameToIndex(String outputName)
+    //
+
     /**
      * Returns index of output blob in output array.
      * SEE: inputNameToIndex()
@@ -134,6 +82,11 @@ public class Layer extends Algorithm {
         return outputNameToIndex_0(nativeObj, outputName);
     }
 
+
+    //
+    // C++: vector_Mat Layer::blobs
+    //
+
     public List<Mat> get_blobs() {
         List<Mat> retVal = new ArrayList<Mat>();
         Mat retValMat = new Mat(get_blobs_0(nativeObj));
@@ -141,26 +94,76 @@ public class Layer extends Algorithm {
         return retVal;
     }
 
+
+    //
+    // C++: void Layer::blobs
+    //
+
     public void set_blobs(List<Mat> blobs) {
         Mat blobs_mat = Converters.vector_Mat_to_Mat(blobs);
         set_blobs_0(nativeObj, blobs_mat.nativeObj);
     }
 
+
+    //
+    // C++: String Layer::name
+    //
+
     public String get_name() {
         return get_name_0(nativeObj);
     }
+
+
+    //
+    // C++: String Layer::type
+    //
 
     public String get_type() {
         return get_type_0(nativeObj);
     }
 
+
+    //
+    // C++: int Layer::preferableTarget
+    //
+
     public int get_preferableTarget() {
         return get_preferableTarget_0(nativeObj);
     }
+
 
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:  void cv::dnn::Layer::finalize(vector_Mat inputs, vector_Mat& outputs)
+    private static native void finalize_0(long nativeObj, long inputs_mat_nativeObj, long outputs_mat_nativeObj);
+
+    // C++:  void cv::dnn::Layer::run(vector_Mat inputs, vector_Mat& outputs, vector_Mat& internals)
+    private static native void run_0(long nativeObj, long inputs_mat_nativeObj, long outputs_mat_nativeObj, long internals_mat_nativeObj);
+
+    // C++:  int cv::dnn::Layer::outputNameToIndex(String outputName)
+    private static native int outputNameToIndex_0(long nativeObj, String outputName);
+
+    // C++: vector_Mat Layer::blobs
+    private static native long get_blobs_0(long nativeObj);
+
+    // C++: void Layer::blobs
+    private static native void set_blobs_0(long nativeObj, long blobs_mat_nativeObj);
+
+    // C++: String Layer::name
+    private static native String get_name_0(long nativeObj);
+
+    // C++: String Layer::type
+    private static native String get_type_0(long nativeObj);
+
+    // C++: int Layer::preferableTarget
+    private static native int get_preferableTarget_0(long nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

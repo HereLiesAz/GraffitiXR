@@ -104,44 +104,23 @@ public class SimpleBlobDetector extends Feature2D {
     // C++:  SimpleBlobDetector_Params cv::SimpleBlobDetector::getParams()
     //
 
-    private static native long create_1();
-
-
-    //
-    // C++:  String cv::SimpleBlobDetector::getDefaultName()
-    //
-
-    // C++:  void cv::SimpleBlobDetector::setParams(SimpleBlobDetector_Params params)
-    private static native void setParams_0(long nativeObj, long params_nativeObj);
-
-
-    //
-    // C++:  vector_vector_Point cv::SimpleBlobDetector::getBlobContours()
-    //
-
-    // C++:  SimpleBlobDetector_Params cv::SimpleBlobDetector::getParams()
-    private static native long getParams_0(long nativeObj);
-
-    // C++:  String cv::SimpleBlobDetector::getDefaultName()
-    private static native String getDefaultName_0(long nativeObj);
-
-    // C++:  vector_vector_Point cv::SimpleBlobDetector::getBlobContours()
-    private static native long getBlobContours_0(long nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
     public SimpleBlobDetector_Params getParams() {
         return new SimpleBlobDetector_Params(getParams_0(nativeObj));
     }
 
-    public void setParams(SimpleBlobDetector_Params params) {
-        setParams_0(nativeObj, params.getNativeObjAddr());
-    }
+
+    //
+    // C++:  String cv::SimpleBlobDetector::getDefaultName()
+    //
 
     public String getDefaultName() {
         return getDefaultName_0(nativeObj);
     }
+
+
+    //
+    // C++:  vector_vector_Point cv::SimpleBlobDetector::getBlobContours()
+    //
 
     /**
      * Returns the contours of the blobs detected during the last call to detect().
@@ -156,9 +135,31 @@ public class SimpleBlobDetector extends Feature2D {
         return retVal;
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
+    }
+
+    private static native long create_1();
+
+    // C++:  void cv::SimpleBlobDetector::setParams(SimpleBlobDetector_Params params)
+    private static native void setParams_0(long nativeObj, long params_nativeObj);
+
+    // C++:  SimpleBlobDetector_Params cv::SimpleBlobDetector::getParams()
+    private static native long getParams_0(long nativeObj);
+
+    // C++:  String cv::SimpleBlobDetector::getDefaultName()
+    private static native String getDefaultName_0(long nativeObj);
+
+    // C++:  vector_vector_Point cv::SimpleBlobDetector::getBlobContours()
+    private static native long getBlobContours_0(long nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public void setParams(SimpleBlobDetector_Params params) {
+        setParams_0(nativeObj, params.getNativeObjAddr());
     }
 
 }

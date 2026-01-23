@@ -34,61 +34,99 @@ public class TrackerNano_Params {
     // C++: string TrackerNano_Params::backbone
     //
 
-    // C++: string TrackerNano_Params::backbone
-    private static native String get_backbone_0(long nativeObj);
+    public String get_backbone() {
+        return get_backbone_0(nativeObj);
+    }
 
 
     //
     // C++: void TrackerNano_Params::backbone
     //
 
-    // C++: void TrackerNano_Params::backbone
-    private static native void set_backbone_0(long nativeObj, String backbone);
+    public void set_backbone(String backbone) {
+        set_backbone_0(nativeObj, backbone);
+    }
 
 
     //
     // C++: string TrackerNano_Params::neckhead
     //
 
-    // C++: string TrackerNano_Params::neckhead
-    private static native String get_neckhead_0(long nativeObj);
+    public String get_neckhead() {
+        return get_neckhead_0(nativeObj);
+    }
 
 
     //
     // C++: void TrackerNano_Params::neckhead
     //
 
-    // C++: void TrackerNano_Params::neckhead
-    private static native void set_neckhead_0(long nativeObj, String neckhead);
+    public void set_neckhead(String neckhead) {
+        set_neckhead_0(nativeObj, neckhead);
+    }
 
 
     //
     // C++: int TrackerNano_Params::backend
     //
 
-    // C++: int TrackerNano_Params::backend
-    private static native int get_backend_0(long nativeObj);
+    public int get_backend() {
+        return get_backend_0(nativeObj);
+    }
 
 
     //
     // C++: void TrackerNano_Params::backend
     //
 
-    // C++: void TrackerNano_Params::backend
-    private static native void set_backend_0(long nativeObj, int backend);
+    public void set_backend(int backend) {
+        set_backend_0(nativeObj, backend);
+    }
 
 
     //
     // C++: int TrackerNano_Params::target
     //
 
-    // C++: int TrackerNano_Params::target
-    private static native int get_target_0(long nativeObj);
+    public int get_target() {
+        return get_target_0(nativeObj);
+    }
 
 
     //
     // C++: void TrackerNano_Params::target
     //
+
+    public void set_target(int target) {
+        set_target_0(nativeObj, target);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+    // C++: string TrackerNano_Params::backbone
+    private static native String get_backbone_0(long nativeObj);
+
+    // C++: void TrackerNano_Params::backbone
+    private static native void set_backbone_0(long nativeObj, String backbone);
+
+    // C++: string TrackerNano_Params::neckhead
+    private static native String get_neckhead_0(long nativeObj);
+
+    // C++: void TrackerNano_Params::neckhead
+    private static native void set_neckhead_0(long nativeObj, String neckhead);
+
+    // C++: int TrackerNano_Params::backend
+    private static native int get_backend_0(long nativeObj);
+
+    // C++: void TrackerNano_Params::backend
+    private static native void set_backend_0(long nativeObj, int backend);
+
+    // C++: int TrackerNano_Params::target
+    private static native int get_target_0(long nativeObj);
 
     // C++: void TrackerNano_Params::target
     private static native void set_target_0(long nativeObj, int target);
@@ -97,42 +135,5 @@ public class TrackerNano_Params {
     private static native void delete(long nativeObj);
 
     public long getNativeObjAddr() { return nativeObj; }
-
-    public String get_backbone() {
-        return get_backbone_0(nativeObj);
-    }
-
-    public void set_backbone(String backbone) {
-        set_backbone_0(nativeObj, backbone);
-    }
-
-    public String get_neckhead() {
-        return get_neckhead_0(nativeObj);
-    }
-
-    public void set_neckhead(String neckhead) {
-        set_neckhead_0(nativeObj, neckhead);
-    }
-
-    public int get_backend() {
-        return get_backend_0(nativeObj);
-    }
-
-    public void set_backend(int backend) {
-        set_backend_0(nativeObj, backend);
-    }
-
-    public int get_target() {
-        return get_target_0(nativeObj);
-    }
-
-    public void set_target(int target) {
-        set_target_0(nativeObj, target);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

@@ -34,29 +34,51 @@ public class TrackerGOTURN_Params {
     // C++: string TrackerGOTURN_Params::modelTxt
     //
 
-    // C++: string TrackerGOTURN_Params::modelTxt
-    private static native String get_modelTxt_0(long nativeObj);
+    public String get_modelTxt() {
+        return get_modelTxt_0(nativeObj);
+    }
 
 
     //
     // C++: void TrackerGOTURN_Params::modelTxt
     //
 
-    // C++: void TrackerGOTURN_Params::modelTxt
-    private static native void set_modelTxt_0(long nativeObj, String modelTxt);
+    public void set_modelTxt(String modelTxt) {
+        set_modelTxt_0(nativeObj, modelTxt);
+    }
 
 
     //
     // C++: string TrackerGOTURN_Params::modelBin
     //
 
-    // C++: string TrackerGOTURN_Params::modelBin
-    private static native String get_modelBin_0(long nativeObj);
+    public String get_modelBin() {
+        return get_modelBin_0(nativeObj);
+    }
 
 
     //
     // C++: void TrackerGOTURN_Params::modelBin
     //
+
+    public void set_modelBin(String modelBin) {
+        set_modelBin_0(nativeObj, modelBin);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+    // C++: string TrackerGOTURN_Params::modelTxt
+    private static native String get_modelTxt_0(long nativeObj);
+
+    // C++: void TrackerGOTURN_Params::modelTxt
+    private static native void set_modelTxt_0(long nativeObj, String modelTxt);
+
+    // C++: string TrackerGOTURN_Params::modelBin
+    private static native String get_modelBin_0(long nativeObj);
 
     // C++: void TrackerGOTURN_Params::modelBin
     private static native void set_modelBin_0(long nativeObj, String modelBin);
@@ -65,26 +87,5 @@ public class TrackerGOTURN_Params {
     private static native void delete(long nativeObj);
 
     public long getNativeObjAddr() { return nativeObj; }
-
-    public String get_modelTxt() {
-        return get_modelTxt_0(nativeObj);
-    }
-
-    public void set_modelTxt(String modelTxt) {
-        set_modelTxt_0(nativeObj, modelTxt);
-    }
-
-    public String get_modelBin() {
-        return get_modelBin_0(nativeObj);
-    }
-
-    public void set_modelBin(String modelBin) {
-        set_modelBin_0(nativeObj, modelBin);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

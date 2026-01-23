@@ -196,164 +196,262 @@ public class MSER extends Feature2D {
     // C++:  void cv::MSER::detectRegions(Mat image, vector_vector_Point& msers, vector_Rect& bboxes)
     //
 
-    // C++: static Ptr_MSER cv::MSER::create(int delta = 5, int min_area = 60, int max_area = 14400, double max_variation = 0.25, double min_diversity = .2, int max_evolution = 200, double area_threshold = 1.01, double min_margin = 0.003, int edge_blur_size = 5)
-    private static native long create_0(int delta, int min_area, int max_area, double max_variation, double min_diversity, int max_evolution, double area_threshold, double min_margin, int edge_blur_size);
+    /**
+     * Detect %MSER regions
+     *
+     *     @param image input image (8UC1, 8UC3 or 8UC4, must be greater or equal than 3x3)
+     *     @param msers resulting list of point sets
+     *     @param bboxes resulting bounding boxes
+     */
+    public void detectRegions(Mat image, List<MatOfPoint> msers, MatOfRect bboxes) {
+        Mat msers_mat = new Mat();
+        Mat bboxes_mat = bboxes;
+        detectRegions_0(nativeObj, image.nativeObj, msers_mat.nativeObj, bboxes_mat.nativeObj);
+        Converters.Mat_to_vector_vector_Point(msers_mat, msers);
+        msers_mat.release();
+    }
 
 
     //
     // C++:  void cv::MSER::setDelta(int delta)
     //
 
-    private static native long create_1(int delta, int min_area, int max_area, double max_variation, double min_diversity, int max_evolution, double area_threshold, double min_margin);
+    public int getDelta() {
+        return getDelta_0(nativeObj);
+    }
 
 
     //
     // C++:  int cv::MSER::getDelta()
     //
 
-    private static native long create_2(int delta, int min_area, int max_area, double max_variation, double min_diversity, int max_evolution, double area_threshold);
+    public void setDelta(int delta) {
+        setDelta_0(nativeObj, delta);
+    }
 
 
     //
     // C++:  void cv::MSER::setMinArea(int minArea)
     //
 
-    private static native long create_3(int delta, int min_area, int max_area, double max_variation, double min_diversity, int max_evolution);
+    public int getMinArea() {
+        return getMinArea_0(nativeObj);
+    }
 
 
     //
     // C++:  int cv::MSER::getMinArea()
     //
 
-    private static native long create_4(int delta, int min_area, int max_area, double max_variation, double min_diversity);
+    public void setMinArea(int minArea) {
+        setMinArea_0(nativeObj, minArea);
+    }
 
 
     //
     // C++:  void cv::MSER::setMaxArea(int maxArea)
     //
 
-    private static native long create_5(int delta, int min_area, int max_area, double max_variation);
+    public int getMaxArea() {
+        return getMaxArea_0(nativeObj);
+    }
 
 
     //
     // C++:  int cv::MSER::getMaxArea()
     //
 
-    private static native long create_6(int delta, int min_area, int max_area);
+    public void setMaxArea(int maxArea) {
+        setMaxArea_0(nativeObj, maxArea);
+    }
 
 
     //
     // C++:  void cv::MSER::setMaxVariation(double maxVariation)
     //
 
-    private static native long create_7(int delta, int min_area);
+    public double getMaxVariation() {
+        return getMaxVariation_0(nativeObj);
+    }
 
 
     //
     // C++:  double cv::MSER::getMaxVariation()
     //
 
-    private static native long create_8(int delta);
+    public void setMaxVariation(double maxVariation) {
+        setMaxVariation_0(nativeObj, maxVariation);
+    }
 
 
     //
     // C++:  void cv::MSER::setMinDiversity(double minDiversity)
     //
 
-    private static native long create_9();
+    public double getMinDiversity() {
+        return getMinDiversity_0(nativeObj);
+    }
 
 
     //
     // C++:  double cv::MSER::getMinDiversity()
     //
 
-    // C++:  void cv::MSER::detectRegions(Mat image, vector_vector_Point& msers, vector_Rect& bboxes)
-    private static native void detectRegions_0(long nativeObj, long image_nativeObj, long msers_mat_nativeObj, long bboxes_mat_nativeObj);
+    public void setMinDiversity(double minDiversity) {
+        setMinDiversity_0(nativeObj, minDiversity);
+    }
 
 
     //
     // C++:  void cv::MSER::setMaxEvolution(int maxEvolution)
     //
 
-    // C++:  void cv::MSER::setDelta(int delta)
-    private static native void setDelta_0(long nativeObj, int delta);
+    public int getMaxEvolution() {
+        return getMaxEvolution_0(nativeObj);
+    }
 
 
     //
     // C++:  int cv::MSER::getMaxEvolution()
     //
 
-    // C++:  int cv::MSER::getDelta()
-    private static native int getDelta_0(long nativeObj);
+    public void setMaxEvolution(int maxEvolution) {
+        setMaxEvolution_0(nativeObj, maxEvolution);
+    }
 
 
     //
     // C++:  void cv::MSER::setAreaThreshold(double areaThreshold)
     //
 
-    // C++:  void cv::MSER::setMinArea(int minArea)
-    private static native void setMinArea_0(long nativeObj, int minArea);
+    public double getAreaThreshold() {
+        return getAreaThreshold_0(nativeObj);
+    }
 
 
     //
     // C++:  double cv::MSER::getAreaThreshold()
     //
 
-    // C++:  int cv::MSER::getMinArea()
-    private static native int getMinArea_0(long nativeObj);
+    public void setAreaThreshold(double areaThreshold) {
+        setAreaThreshold_0(nativeObj, areaThreshold);
+    }
 
 
     //
     // C++:  void cv::MSER::setMinMargin(double min_margin)
     //
 
-    // C++:  void cv::MSER::setMaxArea(int maxArea)
-    private static native void setMaxArea_0(long nativeObj, int maxArea);
+    public double getMinMargin() {
+        return getMinMargin_0(nativeObj);
+    }
 
 
     //
     // C++:  double cv::MSER::getMinMargin()
     //
 
-    // C++:  int cv::MSER::getMaxArea()
-    private static native int getMaxArea_0(long nativeObj);
+    public void setMinMargin(double min_margin) {
+        setMinMargin_0(nativeObj, min_margin);
+    }
 
 
     //
     // C++:  void cv::MSER::setEdgeBlurSize(int edge_blur_size)
     //
 
-    // C++:  void cv::MSER::setMaxVariation(double maxVariation)
-    private static native void setMaxVariation_0(long nativeObj, double maxVariation);
+    public int getEdgeBlurSize() {
+        return getEdgeBlurSize_0(nativeObj);
+    }
 
 
     //
     // C++:  int cv::MSER::getEdgeBlurSize()
     //
 
-    // C++:  double cv::MSER::getMaxVariation()
-    private static native double getMaxVariation_0(long nativeObj);
+    public void setEdgeBlurSize(int edge_blur_size) {
+        setEdgeBlurSize_0(nativeObj, edge_blur_size);
+    }
 
 
     //
     // C++:  void cv::MSER::setPass2Only(bool f)
     //
 
-    // C++:  void cv::MSER::setMinDiversity(double minDiversity)
-    private static native void setMinDiversity_0(long nativeObj, double minDiversity);
+    public boolean getPass2Only() {
+        return getPass2Only_0(nativeObj);
+    }
 
 
     //
     // C++:  bool cv::MSER::getPass2Only()
     //
 
-    // C++:  double cv::MSER::getMinDiversity()
-    private static native double getMinDiversity_0(long nativeObj);
+    public void setPass2Only(boolean f) {
+        setPass2Only_0(nativeObj, f);
+    }
 
 
     //
     // C++:  String cv::MSER::getDefaultName()
     //
+
+    public String getDefaultName() {
+        return getDefaultName_0(nativeObj);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
+    // C++: static Ptr_MSER cv::MSER::create(int delta = 5, int min_area = 60, int max_area = 14400, double max_variation = 0.25, double min_diversity = .2, int max_evolution = 200, double area_threshold = 1.01, double min_margin = 0.003, int edge_blur_size = 5)
+    private static native long create_0(int delta, int min_area, int max_area, double max_variation, double min_diversity, int max_evolution, double area_threshold, double min_margin, int edge_blur_size);
+    private static native long create_1(int delta, int min_area, int max_area, double max_variation, double min_diversity, int max_evolution, double area_threshold, double min_margin);
+    private static native long create_2(int delta, int min_area, int max_area, double max_variation, double min_diversity, int max_evolution, double area_threshold);
+    private static native long create_3(int delta, int min_area, int max_area, double max_variation, double min_diversity, int max_evolution);
+    private static native long create_4(int delta, int min_area, int max_area, double max_variation, double min_diversity);
+    private static native long create_5(int delta, int min_area, int max_area, double max_variation);
+    private static native long create_6(int delta, int min_area, int max_area);
+    private static native long create_7(int delta, int min_area);
+    private static native long create_8(int delta);
+    private static native long create_9();
+
+    // C++:  void cv::MSER::detectRegions(Mat image, vector_vector_Point& msers, vector_Rect& bboxes)
+    private static native void detectRegions_0(long nativeObj, long image_nativeObj, long msers_mat_nativeObj, long bboxes_mat_nativeObj);
+
+    // C++:  void cv::MSER::setDelta(int delta)
+    private static native void setDelta_0(long nativeObj, int delta);
+
+    // C++:  int cv::MSER::getDelta()
+    private static native int getDelta_0(long nativeObj);
+
+    // C++:  void cv::MSER::setMinArea(int minArea)
+    private static native void setMinArea_0(long nativeObj, int minArea);
+
+    // C++:  int cv::MSER::getMinArea()
+    private static native int getMinArea_0(long nativeObj);
+
+    // C++:  void cv::MSER::setMaxArea(int maxArea)
+    private static native void setMaxArea_0(long nativeObj, int maxArea);
+
+    // C++:  int cv::MSER::getMaxArea()
+    private static native int getMaxArea_0(long nativeObj);
+
+    // C++:  void cv::MSER::setMaxVariation(double maxVariation)
+    private static native void setMaxVariation_0(long nativeObj, double maxVariation);
+
+    // C++:  double cv::MSER::getMaxVariation()
+    private static native double getMaxVariation_0(long nativeObj);
+
+    // C++:  void cv::MSER::setMinDiversity(double minDiversity)
+    private static native void setMinDiversity_0(long nativeObj, double minDiversity);
+
+    // C++:  double cv::MSER::getMinDiversity()
+    private static native double getMinDiversity_0(long nativeObj);
 
     // C++:  void cv::MSER::setMaxEvolution(int maxEvolution)
     private static native void setMaxEvolution_0(long nativeObj, int maxEvolution);
@@ -390,109 +488,5 @@ public class MSER extends Feature2D {
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    /**
-     * Detect %MSER regions
-     *
-     *     @param image input image (8UC1, 8UC3 or 8UC4, must be greater or equal than 3x3)
-     *     @param msers resulting list of point sets
-     *     @param bboxes resulting bounding boxes
-     */
-    public void detectRegions(Mat image, List<MatOfPoint> msers, MatOfRect bboxes) {
-        Mat msers_mat = new Mat();
-        Mat bboxes_mat = bboxes;
-        detectRegions_0(nativeObj, image.nativeObj, msers_mat.nativeObj, bboxes_mat.nativeObj);
-        Converters.Mat_to_vector_vector_Point(msers_mat, msers);
-        msers_mat.release();
-    }
-
-    public int getDelta() {
-        return getDelta_0(nativeObj);
-    }
-
-    public void setDelta(int delta) {
-        setDelta_0(nativeObj, delta);
-    }
-
-    public int getMinArea() {
-        return getMinArea_0(nativeObj);
-    }
-
-    public void setMinArea(int minArea) {
-        setMinArea_0(nativeObj, minArea);
-    }
-
-    public int getMaxArea() {
-        return getMaxArea_0(nativeObj);
-    }
-
-    public void setMaxArea(int maxArea) {
-        setMaxArea_0(nativeObj, maxArea);
-    }
-
-    public double getMaxVariation() {
-        return getMaxVariation_0(nativeObj);
-    }
-
-    public void setMaxVariation(double maxVariation) {
-        setMaxVariation_0(nativeObj, maxVariation);
-    }
-
-    public double getMinDiversity() {
-        return getMinDiversity_0(nativeObj);
-    }
-
-    public void setMinDiversity(double minDiversity) {
-        setMinDiversity_0(nativeObj, minDiversity);
-    }
-
-    public int getMaxEvolution() {
-        return getMaxEvolution_0(nativeObj);
-    }
-
-    public void setMaxEvolution(int maxEvolution) {
-        setMaxEvolution_0(nativeObj, maxEvolution);
-    }
-
-    public double getAreaThreshold() {
-        return getAreaThreshold_0(nativeObj);
-    }
-
-    public void setAreaThreshold(double areaThreshold) {
-        setAreaThreshold_0(nativeObj, areaThreshold);
-    }
-
-    public double getMinMargin() {
-        return getMinMargin_0(nativeObj);
-    }
-
-    public void setMinMargin(double min_margin) {
-        setMinMargin_0(nativeObj, min_margin);
-    }
-
-    public int getEdgeBlurSize() {
-        return getEdgeBlurSize_0(nativeObj);
-    }
-
-    public void setEdgeBlurSize(int edge_blur_size) {
-        setEdgeBlurSize_0(nativeObj, edge_blur_size);
-    }
-
-    public boolean getPass2Only() {
-        return getPass2Only_0(nativeObj);
-    }
-
-    public void setPass2Only(boolean f) {
-        setPass2Only_0(nativeObj, f);
-    }
-
-    public String getDefaultName() {
-        return getDefaultName_0(nativeObj);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

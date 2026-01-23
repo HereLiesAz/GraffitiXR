@@ -23,6 +23,13 @@ public class KeypointsModel extends Model {
 
     protected KeypointsModel(long addr) { super(addr); }
 
+    // internal usage only
+    public static KeypointsModel __fromPtr__(long addr) { return new KeypointsModel(addr); }
+
+    //
+    // C++:   cv::dnn::KeypointsModel::KeypointsModel(String model, String config = "")
+    //
+
     /**
      * Create keypoints model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -33,10 +40,6 @@ public class KeypointsModel extends Model {
         super(KeypointsModel_0(model, config));
     }
 
-    //
-    // C++:   cv::dnn::KeypointsModel::KeypointsModel(String model, String config = "")
-    //
-
     /**
      * Create keypoints model from network represented in one of the supported formats.
      * An order of {@code model} and {@code config} arguments does not matter.
@@ -45,6 +48,11 @@ public class KeypointsModel extends Model {
     public KeypointsModel(String model) {
         super(KeypointsModel_1(model));
     }
+
+
+    //
+    // C++:   cv::dnn::KeypointsModel::KeypointsModel(Net network)
+    //
 
     /**
      * Create model from deep learning network.
@@ -56,32 +64,8 @@ public class KeypointsModel extends Model {
 
 
     //
-    // C++:   cv::dnn::KeypointsModel::KeypointsModel(Net network)
-    //
-
-    // internal usage only
-    public static KeypointsModel __fromPtr__(long addr) { return new KeypointsModel(addr); }
-
-
-    //
     // C++:  vector_Point2f cv::dnn::KeypointsModel::estimate(Mat frame, float thresh = 0.5)
     //
-
-    // C++:   cv::dnn::KeypointsModel::KeypointsModel(String model, String config = "")
-    private static native long KeypointsModel_0(String model, String config);
-
-    private static native long KeypointsModel_1(String model);
-
-    // C++:   cv::dnn::KeypointsModel::KeypointsModel(Net network)
-    private static native long KeypointsModel_2(long network_nativeObj);
-
-    // C++:  vector_Point2f cv::dnn::KeypointsModel::estimate(Mat frame, float thresh = 0.5)
-    private static native long estimate_0(long nativeObj, long frame_nativeObj, float thresh);
-
-    private static native long estimate_1(long nativeObj, long frame_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
 
     /**
      * Given the {@code input} frame, create input blob, run net
@@ -104,9 +88,26 @@ public class KeypointsModel extends Model {
         return MatOfPoint2f.fromNativeAddr(estimate_1(nativeObj, frame.nativeObj));
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:   cv::dnn::KeypointsModel::KeypointsModel(String model, String config = "")
+    private static native long KeypointsModel_0(String model, String config);
+    private static native long KeypointsModel_1(String model);
+
+    // C++:   cv::dnn::KeypointsModel::KeypointsModel(Net network)
+    private static native long KeypointsModel_2(long network_nativeObj);
+
+    // C++:  vector_Point2f cv::dnn::KeypointsModel::estimate(Mat frame, float thresh = 0.5)
+    private static native long estimate_0(long nativeObj, long frame_nativeObj, float thresh);
+    private static native long estimate_1(long nativeObj, long frame_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

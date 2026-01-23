@@ -16,6 +16,13 @@ public class BarcodeDetector extends GraphicalCodeDetector {
 
     protected BarcodeDetector(long addr) { super(addr); }
 
+    // internal usage only
+    public static BarcodeDetector __fromPtr__(long addr) { return new BarcodeDetector(addr); }
+
+    //
+    // C++:   cv::barcode::BarcodeDetector::BarcodeDetector()
+    //
+
     /**
      * Initialize the BarcodeDetector.
      */
@@ -23,8 +30,9 @@ public class BarcodeDetector extends GraphicalCodeDetector {
         super(BarcodeDetector_0());
     }
 
+
     //
-    // C++:   cv::barcode::BarcodeDetector::BarcodeDetector()
+    // C++:   cv::barcode::BarcodeDetector::BarcodeDetector(string prototxt_path, string model_path)
     //
 
     /**
@@ -40,86 +48,8 @@ public class BarcodeDetector extends GraphicalCodeDetector {
 
 
     //
-    // C++:   cv::barcode::BarcodeDetector::BarcodeDetector(string prototxt_path, string model_path)
-    //
-
-    // internal usage only
-    public static BarcodeDetector __fromPtr__(long addr) { return new BarcodeDetector(addr); }
-
-
-    //
     // C++:  bool cv::barcode::BarcodeDetector::decodeWithType(Mat img, Mat points, vector_string& decoded_info, vector_string& decoded_type)
     //
-
-    // C++:   cv::barcode::BarcodeDetector::BarcodeDetector()
-    private static native long BarcodeDetector_0();
-
-
-    //
-    // C++:  bool cv::barcode::BarcodeDetector::detectAndDecodeWithType(Mat img, vector_string& decoded_info, vector_string& decoded_type, Mat& points = Mat())
-    //
-
-    // C++:   cv::barcode::BarcodeDetector::BarcodeDetector(string prototxt_path, string model_path)
-    private static native long BarcodeDetector_1(String prototxt_path, String model_path);
-
-    // C++:  bool cv::barcode::BarcodeDetector::decodeWithType(Mat img, Mat points, vector_string& decoded_info, vector_string& decoded_type)
-    private static native boolean decodeWithType_0(long nativeObj, long img_nativeObj, long points_nativeObj, List<String> decoded_info, List<String> decoded_type);
-
-
-    //
-    // C++:  double cv::barcode::BarcodeDetector::getDownsamplingThreshold()
-    //
-
-    // C++:  bool cv::barcode::BarcodeDetector::detectAndDecodeWithType(Mat img, vector_string& decoded_info, vector_string& decoded_type, Mat& points = Mat())
-    private static native boolean detectAndDecodeWithType_0(long nativeObj, long img_nativeObj, List<String> decoded_info, List<String> decoded_type, long points_nativeObj);
-
-
-    //
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDownsamplingThreshold(double thresh)
-    //
-
-    private static native boolean detectAndDecodeWithType_1(long nativeObj, long img_nativeObj, List<String> decoded_info, List<String> decoded_type);
-
-
-    //
-    // C++:  void cv::barcode::BarcodeDetector::getDetectorScales(vector_float& sizes)
-    //
-
-    // C++:  double cv::barcode::BarcodeDetector::getDownsamplingThreshold()
-    private static native double getDownsamplingThreshold_0(long nativeObj);
-
-
-    //
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDetectorScales(vector_float sizes)
-    //
-
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDownsamplingThreshold(double thresh)
-    private static native long setDownsamplingThreshold_0(long nativeObj, double thresh);
-
-
-    //
-    // C++:  double cv::barcode::BarcodeDetector::getGradientThreshold()
-    //
-
-    // C++:  void cv::barcode::BarcodeDetector::getDetectorScales(vector_float& sizes)
-    private static native void getDetectorScales_0(long nativeObj, long sizes_mat_nativeObj);
-
-
-    //
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setGradientThreshold(double thresh)
-    //
-
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDetectorScales(vector_float sizes)
-    private static native long setDetectorScales_0(long nativeObj, long sizes_mat_nativeObj);
-
-    // C++:  double cv::barcode::BarcodeDetector::getGradientThreshold()
-    private static native double getGradientThreshold_0(long nativeObj);
-
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setGradientThreshold(double thresh)
-    private static native long setGradientThreshold_0(long nativeObj, double thresh);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
 
     /**
      * Decodes barcode in image once it's found by the detect() method.
@@ -135,6 +65,11 @@ public class BarcodeDetector extends GraphicalCodeDetector {
     public boolean decodeWithType(Mat img, Mat points, List<String> decoded_info, List<String> decoded_type) {
         return decodeWithType_0(nativeObj, img.nativeObj, points.nativeObj, decoded_info, decoded_type);
     }
+
+
+    //
+    // C++:  bool cv::barcode::BarcodeDetector::detectAndDecodeWithType(Mat img, vector_string& decoded_info, vector_string& decoded_type, Mat& points = Mat())
+    //
 
     /**
      * Both detects and decodes barcode
@@ -161,6 +96,11 @@ public class BarcodeDetector extends GraphicalCodeDetector {
         return detectAndDecodeWithType_1(nativeObj, img.nativeObj, decoded_info, decoded_type);
     }
 
+
+    //
+    // C++:  double cv::barcode::BarcodeDetector::getDownsamplingThreshold()
+    //
+
     /**
      * Get detector downsampling threshold.
      *
@@ -169,6 +109,11 @@ public class BarcodeDetector extends GraphicalCodeDetector {
     public double getDownsamplingThreshold() {
         return getDownsamplingThreshold_0(nativeObj);
     }
+
+
+    //
+    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDownsamplingThreshold(double thresh)
+    //
 
     /**
      * Set detector downsampling threshold.
@@ -184,6 +129,11 @@ public class BarcodeDetector extends GraphicalCodeDetector {
         return new BarcodeDetector(setDownsamplingThreshold_0(nativeObj, thresh));
     }
 
+
+    //
+    // C++:  void cv::barcode::BarcodeDetector::getDetectorScales(vector_float& sizes)
+    //
+
     /**
      * Returns detector box filter sizes.
      *
@@ -193,6 +143,11 @@ public class BarcodeDetector extends GraphicalCodeDetector {
         Mat sizes_mat = sizes;
         getDetectorScales_0(nativeObj, sizes_mat.nativeObj);
     }
+
+
+    //
+    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDetectorScales(vector_float sizes)
+    //
 
     /**
      * Set detector box filter sizes.
@@ -208,6 +163,11 @@ public class BarcodeDetector extends GraphicalCodeDetector {
         return new BarcodeDetector(setDetectorScales_0(nativeObj, sizes_mat.nativeObj));
     }
 
+
+    //
+    // C++:  double cv::barcode::BarcodeDetector::getGradientThreshold()
+    //
+
     /**
      * Get detector gradient magnitude threshold.
      *
@@ -216,6 +176,11 @@ public class BarcodeDetector extends GraphicalCodeDetector {
     public double getGradientThreshold() {
         return getGradientThreshold_0(nativeObj);
     }
+
+
+    //
+    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setGradientThreshold(double thresh)
+    //
 
     /**
      * Set detector gradient magnitude threshold.
@@ -230,9 +195,46 @@ public class BarcodeDetector extends GraphicalCodeDetector {
         return new BarcodeDetector(setGradientThreshold_0(nativeObj, thresh));
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
     }
+
+
+
+    // C++:   cv::barcode::BarcodeDetector::BarcodeDetector()
+    private static native long BarcodeDetector_0();
+
+    // C++:   cv::barcode::BarcodeDetector::BarcodeDetector(string prototxt_path, string model_path)
+    private static native long BarcodeDetector_1(String prototxt_path, String model_path);
+
+    // C++:  bool cv::barcode::BarcodeDetector::decodeWithType(Mat img, Mat points, vector_string& decoded_info, vector_string& decoded_type)
+    private static native boolean decodeWithType_0(long nativeObj, long img_nativeObj, long points_nativeObj, List<String> decoded_info, List<String> decoded_type);
+
+    // C++:  bool cv::barcode::BarcodeDetector::detectAndDecodeWithType(Mat img, vector_string& decoded_info, vector_string& decoded_type, Mat& points = Mat())
+    private static native boolean detectAndDecodeWithType_0(long nativeObj, long img_nativeObj, List<String> decoded_info, List<String> decoded_type, long points_nativeObj);
+    private static native boolean detectAndDecodeWithType_1(long nativeObj, long img_nativeObj, List<String> decoded_info, List<String> decoded_type);
+
+    // C++:  double cv::barcode::BarcodeDetector::getDownsamplingThreshold()
+    private static native double getDownsamplingThreshold_0(long nativeObj);
+
+    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDownsamplingThreshold(double thresh)
+    private static native long setDownsamplingThreshold_0(long nativeObj, double thresh);
+
+    // C++:  void cv::barcode::BarcodeDetector::getDetectorScales(vector_float& sizes)
+    private static native void getDetectorScales_0(long nativeObj, long sizes_mat_nativeObj);
+
+    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDetectorScales(vector_float sizes)
+    private static native long setDetectorScales_0(long nativeObj, long sizes_mat_nativeObj);
+
+    // C++:  double cv::barcode::BarcodeDetector::getGradientThreshold()
+    private static native double getGradientThreshold_0(long nativeObj);
+
+    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setGradientThreshold(double thresh)
+    private static native long setGradientThreshold_0(long nativeObj, double thresh);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
 
 }

@@ -23,6 +23,13 @@ public class CharucoBoard extends Board {
 
     protected CharucoBoard(long addr) { super(addr); }
 
+    // internal usage only
+    public static CharucoBoard __fromPtr__(long addr) { return new CharucoBoard(addr); }
+
+    //
+    // C++:   cv::aruco::CharucoBoard::CharucoBoard(Size size, float squareLength, float markerLength, Dictionary dictionary, Mat ids = Mat())
+    //
+
     /**
      * CharucoBoard constructor
      *
@@ -37,10 +44,6 @@ public class CharucoBoard extends Board {
         super(CharucoBoard_0(size.width, size.height, squareLength, markerLength, dictionary.getNativeObjAddr(), ids.nativeObj));
     }
 
-    //
-    // C++:   cv::aruco::CharucoBoard::CharucoBoard(Size size, float squareLength, float markerLength, Dictionary dictionary, Mat ids = Mat())
-    //
-
     /**
      * CharucoBoard constructor
      *
@@ -54,76 +57,10 @@ public class CharucoBoard extends Board {
         super(CharucoBoard_1(size.width, size.height, squareLength, markerLength, dictionary.getNativeObjAddr()));
     }
 
-    // internal usage only
-    public static CharucoBoard __fromPtr__(long addr) { return new CharucoBoard(addr); }
-
 
     //
     // C++:  void cv::aruco::CharucoBoard::setLegacyPattern(bool legacyPattern)
     //
-
-    // C++:   cv::aruco::CharucoBoard::CharucoBoard(Size size, float squareLength, float markerLength, Dictionary dictionary, Mat ids = Mat())
-    private static native long CharucoBoard_0(double size_width, double size_height, float squareLength, float markerLength, long dictionary_nativeObj, long ids_nativeObj);
-
-
-    //
-    // C++:  bool cv::aruco::CharucoBoard::getLegacyPattern()
-    //
-
-    private static native long CharucoBoard_1(double size_width, double size_height, float squareLength, float markerLength, long dictionary_nativeObj);
-
-
-    //
-    // C++:  Size cv::aruco::CharucoBoard::getChessboardSize()
-    //
-
-    // C++:  void cv::aruco::CharucoBoard::setLegacyPattern(bool legacyPattern)
-    private static native void setLegacyPattern_0(long nativeObj, boolean legacyPattern);
-
-
-    //
-    // C++:  float cv::aruco::CharucoBoard::getSquareLength()
-    //
-
-    // C++:  bool cv::aruco::CharucoBoard::getLegacyPattern()
-    private static native boolean getLegacyPattern_0(long nativeObj);
-
-
-    //
-    // C++:  float cv::aruco::CharucoBoard::getMarkerLength()
-    //
-
-    // C++:  Size cv::aruco::CharucoBoard::getChessboardSize()
-    private static native double[] getChessboardSize_0(long nativeObj);
-
-
-    //
-    // C++:  vector_Point3f cv::aruco::CharucoBoard::getChessboardCorners()
-    //
-
-    // C++:  float cv::aruco::CharucoBoard::getSquareLength()
-    private static native float getSquareLength_0(long nativeObj);
-
-
-    //
-    // C++:  bool cv::aruco::CharucoBoard::checkCharucoCornersCollinear(Mat charucoIds)
-    //
-
-    // C++:  float cv::aruco::CharucoBoard::getMarkerLength()
-    private static native float getMarkerLength_0(long nativeObj);
-
-    // C++:  vector_Point3f cv::aruco::CharucoBoard::getChessboardCorners()
-    private static native long getChessboardCorners_0(long nativeObj);
-
-    // C++:  bool cv::aruco::CharucoBoard::checkCharucoCornersCollinear(Mat charucoIds)
-    private static native boolean checkCharucoCornersCollinear_0(long nativeObj, long charucoIds_nativeObj);
-
-    // native support for java finalize() or cleaner
-    private static native void delete(long nativeObj);
-
-    public boolean getLegacyPattern() {
-        return getLegacyPattern_0(nativeObj);
-    }
 
     /**
      * set legacy chessboard pattern.
@@ -140,17 +77,45 @@ public class CharucoBoard extends Board {
         setLegacyPattern_0(nativeObj, legacyPattern);
     }
 
+
+    //
+    // C++:  bool cv::aruco::CharucoBoard::getLegacyPattern()
+    //
+
+    // C++:   cv::aruco::CharucoBoard::CharucoBoard(Size size, float squareLength, float markerLength, Dictionary dictionary, Mat ids = Mat())
+    private static native long CharucoBoard_0(double size_width, double size_height, float squareLength, float markerLength, long dictionary_nativeObj, long ids_nativeObj);
+
+
+    //
+    // C++:  Size cv::aruco::CharucoBoard::getChessboardSize()
+    //
+
     public Size getChessboardSize() {
         return new Size(getChessboardSize_0(nativeObj));
     }
+
+
+    //
+    // C++:  float cv::aruco::CharucoBoard::getSquareLength()
+    //
 
     public float getSquareLength() {
         return getSquareLength_0(nativeObj);
     }
 
+
+    //
+    // C++:  float cv::aruco::CharucoBoard::getMarkerLength()
+    //
+
     public float getMarkerLength() {
         return getMarkerLength_0(nativeObj);
     }
+
+
+    //
+    // C++:  vector_Point3f cv::aruco::CharucoBoard::getChessboardCorners()
+    //
 
     /**
      * get CharucoBoard::chessboardCorners
@@ -159,6 +124,11 @@ public class CharucoBoard extends Board {
     public MatOfPoint3f getChessboardCorners() {
         return MatOfPoint3f.fromNativeAddr(getChessboardCorners_0(nativeObj));
     }
+
+
+    //
+    // C++:  bool cv::aruco::CharucoBoard::checkCharucoCornersCollinear(Mat charucoIds)
+    //
 
     /**
      * check whether the ChArUco markers are collinear
@@ -176,9 +146,40 @@ public class CharucoBoard extends Board {
         return checkCharucoCornersCollinear_0(nativeObj, charucoIds.nativeObj);
     }
 
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
+    }
+
+    private static native long CharucoBoard_1(double size_width, double size_height, float squareLength, float markerLength, long dictionary_nativeObj);
+
+    // C++:  void cv::aruco::CharucoBoard::setLegacyPattern(bool legacyPattern)
+    private static native void setLegacyPattern_0(long nativeObj, boolean legacyPattern);
+
+    // C++:  bool cv::aruco::CharucoBoard::getLegacyPattern()
+    private static native boolean getLegacyPattern_0(long nativeObj);
+
+    // C++:  Size cv::aruco::CharucoBoard::getChessboardSize()
+    private static native double[] getChessboardSize_0(long nativeObj);
+
+    // C++:  float cv::aruco::CharucoBoard::getSquareLength()
+    private static native float getSquareLength_0(long nativeObj);
+
+    // C++:  float cv::aruco::CharucoBoard::getMarkerLength()
+    private static native float getMarkerLength_0(long nativeObj);
+
+    // C++:  vector_Point3f cv::aruco::CharucoBoard::getChessboardCorners()
+    private static native long getChessboardCorners_0(long nativeObj);
+
+    // C++:  bool cv::aruco::CharucoBoard::checkCharucoCornersCollinear(Mat charucoIds)
+    private static native boolean checkCharucoCornersCollinear_0(long nativeObj, long charucoIds_nativeObj);
+
+    // native support for java finalize() or cleaner
+    private static native void delete(long nativeObj);
+
+    public boolean getLegacyPattern() {
+        return getLegacyPattern_0(nativeObj);
     }
 
 }

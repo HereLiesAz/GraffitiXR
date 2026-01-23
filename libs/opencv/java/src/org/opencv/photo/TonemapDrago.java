@@ -28,55 +28,58 @@ public class TonemapDrago extends Tonemap {
     // C++:  float cv::TonemapDrago::getSaturation()
     //
 
-    // C++:  float cv::TonemapDrago::getSaturation()
-    private static native float getSaturation_0(long nativeObj);
+    public float getSaturation() {
+        return getSaturation_0(nativeObj);
+    }
 
 
     //
     // C++:  void cv::TonemapDrago::setSaturation(float saturation)
     //
 
-    // C++:  void cv::TonemapDrago::setSaturation(float saturation)
-    private static native void setSaturation_0(long nativeObj, float saturation);
+    public void setSaturation(float saturation) {
+        setSaturation_0(nativeObj, saturation);
+    }
 
 
     //
     // C++:  float cv::TonemapDrago::getBias()
     //
 
-    // C++:  float cv::TonemapDrago::getBias()
-    private static native float getBias_0(long nativeObj);
+    public float getBias() {
+        return getBias_0(nativeObj);
+    }
 
 
     //
     // C++:  void cv::TonemapDrago::setBias(float bias)
     //
+
+    public void setBias(float bias) {
+        setBias_0(nativeObj, bias);
+    }
+
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
+    // C++:  float cv::TonemapDrago::getSaturation()
+    private static native float getSaturation_0(long nativeObj);
+
+    // C++:  void cv::TonemapDrago::setSaturation(float saturation)
+    private static native void setSaturation_0(long nativeObj, float saturation);
+
+    // C++:  float cv::TonemapDrago::getBias()
+    private static native float getBias_0(long nativeObj);
 
     // C++:  void cv::TonemapDrago::setBias(float bias)
     private static native void setBias_0(long nativeObj, float bias);
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    public float getSaturation() {
-        return getSaturation_0(nativeObj);
-    }
-
-    public void setSaturation(float saturation) {
-        setSaturation_0(nativeObj, saturation);
-    }
-
-    public float getBias() {
-        return getBias_0(nativeObj);
-    }
-
-    public void setBias(float bias) {
-        setBias_0(nativeObj, bias);
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }

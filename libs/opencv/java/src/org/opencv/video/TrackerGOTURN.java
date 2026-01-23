@@ -67,9 +67,16 @@ public class TrackerGOTURN extends Tracker {
         return TrackerGOTURN.__fromPtr__(create_2(model.getNativeObjAddr()));
     }
 
+
+    @Override
+    protected void finalize() throws Throwable {
+        delete(nativeObj);
+    }
+
+
+
     // C++: static Ptr_TrackerGOTURN cv::TrackerGOTURN::create(TrackerGOTURN_Params parameters = TrackerGOTURN::Params())
     private static native long create_0(long parameters_nativeObj);
-
     private static native long create_1();
 
     // C++: static Ptr_TrackerGOTURN cv::TrackerGOTURN::create(Net model)
@@ -77,10 +84,5 @@ public class TrackerGOTURN extends Tracker {
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
-
-    @Override
-    protected void finalize() throws Throwable {
-        delete(nativeObj);
-    }
 
 }
