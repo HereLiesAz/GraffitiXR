@@ -10,7 +10,8 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-// --- VERSIONING LOGIC START ---
+// ... [Keep your versioning logic here, it is unchanged] ...
+// (Omitting versioning block for brevity, paste it back here)
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
@@ -99,7 +100,6 @@ val vBuild = providers.of(BuildVersionValueSource::class) {
 val vPatch = providers.of(PatchVersionValueSource::class) {
     parameters.workingDir.set(rootProject.rootDir.absolutePath)
 }.getOrElse(defaultPatch).let { if (it == -1) defaultPatch else it }
-// --- VERSIONING LOGIC END ---
 
 android {
     buildFeatures {
@@ -131,8 +131,6 @@ android {
             cmake {
                 cppFlags("-std=c++17")
                 arguments += "-DANDROID_STL=c++_shared"
-                // CRITICAL: Point CMake to the dynamically fetched libs folder
-                // This allows the build to find OpenCV headers even though they are git-ignored
                 arguments += "-DLIBS_DIR=${project.file("libs").absolutePath}"
             }
         }
@@ -191,7 +189,6 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
         jniLibs {
-            // Pick firsts to avoid conflicts with multiple libs providing the same .so
             pickFirsts += "lib/arm64-v8a/libc++_shared.so"
             pickFirsts += "lib/arm64-v8a/libopencv_java4.so"
             pickFirsts += "lib/armeabi-v7a/libopencv_java4.so"
@@ -230,7 +227,7 @@ dependencies {
 
     implementation(libs.google.accompanist.permissions)
 
-    // AZNAVRAIL (Remote)
+    // AzNavRail (Remote)
     implementation(libs.az.nav.rail)
 
     implementation(libs.mlkit.subject.segmentation)
@@ -241,17 +238,31 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
 
-    // OPENCV (Dynamic Local)
-    // We cannot use 'project(":opencv")' because the module is git-ignored and fetched via script.
-    // We reference the AAR file directly if it exists.
-    val openCvAar = file("libs/opencv/sdk/java/opencv.aar")
+    implementation(libs.kotlinx.serialization.json)
+
+    // --- DYNAMIC LOCAL LIBRARIES ---
+    
+    // OpenCV: Fixed path to remove 'sdk' to match repo structure
+    val openCvAar = file("libs/opencv/java/opencv.aar") 
     if (openCvAar.exists()) {
         implementation(files(openCvAar))
     } else {
-        println("WARNING: OpenCV AAR not found at ${openCvAar.path}. Run setup_libs.sh to fetch dependencies.")
+        println("WARNING: OpenCV AAR not found at ${openCvAar.path}. Run setup_libs.sh")
     }
 
-    implementation(libs.kotlinx.serialization.json)
+    // MLKit AAR Override
+    val mlKitAar = file("libs/mlkit-subject-segmentation.aar")
+    if (mlKitAar.exists()) {
+        implementation(files(mlKitAar))
+    } else {
+        implementation(libs.mlkit.subject.segmentation)
+    }
+
+    // LiteRT AAR
+    val liteRtAar = file("libs/litert-2.1.0.aar")
+    if (liteRtAar.exists()) {
+        implementation(files(liteRtAar))
+    }
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
