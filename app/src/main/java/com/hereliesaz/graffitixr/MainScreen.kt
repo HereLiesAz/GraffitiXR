@@ -62,31 +62,8 @@ import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.graffitixr.EditorMode.ADJUST
-import com.hereliesaz.graffitixr.EditorMode.AR
-import com.hereliesaz.graffitixr.EditorMode.BALANCE
-import com.hereliesaz.graffitixr.EditorMode.CROP
-import com.hereliesaz.graffitixr.EditorMode.DRAW
-import com.hereliesaz.graffitixr.EditorMode.ISOLATE
-import com.hereliesaz.graffitixr.EditorMode.OUTLINE
-import com.hereliesaz.graffitixr.EditorMode.OVERLAY
-import com.hereliesaz.graffitixr.EditorMode.PROJECT
-import com.hereliesaz.graffitixr.EditorMode.STATIC
-import com.hereliesaz.graffitixr.EditorMode.TRACE
-import com.hereliesaz.graffitixr.composables.AdjustmentsPanel
-import com.hereliesaz.graffitixr.composables.CustomHelpOverlay
-import com.hereliesaz.graffitixr.composables.DrawingCanvas
-import com.hereliesaz.graffitixr.composables.GestureFeedback
-import com.hereliesaz.graffitixr.composables.MockupScreen
-import com.hereliesaz.graffitixr.composables.OverlayScreen
-import com.hereliesaz.graffitixr.composables.ProjectLibraryScreen
-import com.hereliesaz.graffitixr.composables.RotationAxisFeedback
-import com.hereliesaz.graffitixr.composables.SettingsScreen
-import com.hereliesaz.graffitixr.composables.TapFeedbackEffect
-import com.hereliesaz.graffitixr.composables.TargetCreationOverlay
-import com.hereliesaz.graffitixr.composables.TargetRefinementScreen
-import com.hereliesaz.graffitixr.composables.TraceScreen
-import com.hereliesaz.graffitixr.composables.UnwarpScreen
+import com.hereliesaz.graffitixr.EditorMode.*
+import com.hereliesaz.graffitixr.composables.*
 import com.hereliesaz.graffitixr.data.CaptureEvent
 import com.hereliesaz.graffitixr.data.FeedbackEvent
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
@@ -102,8 +79,6 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun MainScreen(viewModel: MainViewModel, navController: NavController) {
-    // We use a local NavHost for top-level screens like Surveyor, Library, Settings.
-    // The "Editor" (AR/Overlay) is the home destination.
     val localNavController = rememberNavController()
     val navBackStackEntry by localNavController.currentBackStackEntryAsState()
     val currentNavRoute = navBackStackEntry?.destination?.route
@@ -120,7 +95,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     var hasSelectedModeOnce by remember { mutableStateOf(false) }
     var gestureInProgress by remember { mutableStateOf(false) }
 
-    // Helper to reset dialog states
     val resetDialogs = remember {
         {
             showSliderDialog = null
@@ -128,7 +102,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
-    // Launchers
     val overlayImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onOverlayImageSelected(it) } }
@@ -141,7 +114,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri -> uri?.let { viewModel.exportProjectToUri(it) } }
 
-    // Image Picker Request Handler
     LaunchedEffect(uiState.showImagePicker) {
         if (uiState.showImagePicker) {
             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -150,12 +122,11 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 
     LaunchedEffect(uiState.editorMode) {
-        if (uiState.editorMode == EditorMode.TRACE && uiState.overlayImageUri == null) {
+        if (uiState.editorMode == TRACE && uiState.overlayImageUri == null) {
             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
     }
 
-    // Helper for automation
     val onModeSelected = remember(viewModel, hasSelectedModeOnce) {
         { mode: EditorMode ->
             viewModel.onEditorModeChanged(mode)
@@ -163,23 +134,20 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
             if (!hasSelectedModeOnce) {
                 hasSelectedModeOnce = true
-                if (mode == EditorMode.AR) {
+                if (mode == AR) {
                     viewModel.onCreateTargetClicked()
                 }
             }
         }
     }
 
-    // Capture theme color for AzNavRail
     val activeHighlightColor = remember(uiState.activeColorSeed) {
         val colors = listOf(Color.Green, Color.Magenta, Color.Cyan)
         colors[kotlin.math.abs(uiState.activeColorSeed) % colors.size]
     }
 
-    // Preload strings to avoid Composable calls in lambdas
     val navStrings = rememberNavStrings()
 
-    // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
         viewModel.feedbackEvent.collect { event ->
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -208,7 +176,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
-    // Capture Event Handler (PixelCopy)
     LaunchedEffect(viewModel, context) {
         viewModel.captureEvent.collect { event ->
             when (event) {
@@ -221,8 +188,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         }
                     }
                 }
-                is CaptureEvent.CaptureSuccess -> { /* Handle success if needed */ }
-                is CaptureEvent.CaptureFailure -> { /* Handle failure if needed */ }
+                is CaptureEvent.CaptureSuccess -> { }
+                is CaptureEvent.CaptureFailure -> { }
             }
         }
     }
@@ -232,7 +199,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     AzHostActivityLayout(
         navController = localNavController
     ) {
-        // Rail Definition (Only if visible)
         if (isRailVisible) {
                 azTheme(
                     activeColor = activeHighlightColor,
@@ -250,14 +216,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 )
 
                 azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
-                azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(EditorMode.AR) })
-                azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = { onModeSelected(EditorMode.OVERLAY) })
-                azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = { onModeSelected(EditorMode.STATIC) })
-                azRailSubItem(id = "trace_mode", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = { onModeSelected(EditorMode.TRACE) })
+                azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(AR) })
+                azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = { onModeSelected(OVERLAY) })
+                azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = { onModeSelected(STATIC) })
+                azRailSubItem(id = "trace_mode", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = { onModeSelected(TRACE) })
 
                 azDivider()
 
-                if (uiState.editorMode == EditorMode.AR) {
+                if (uiState.editorMode == AR) {
                     azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
 
                     azRailSubItem(
@@ -297,7 +263,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
 
-                // Dynamic Layers
                 val layers = uiState.layers
                 val visualLayers = layers.reversed()
 
@@ -317,7 +282,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                             viewModel.onLayerReordered(logicalOrder)
                         }
                     ) {
-                        // Hidden Menu
                         inputItem(
                             hint = "Rename"
                         ) { newName ->
@@ -342,7 +306,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     }
                 }
 
-                if (uiState.editorMode == EditorMode.STATIC) {
+                if (uiState.editorMode == STATIC) {
                     azRailSubItem(id = "background", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
                         resetDialogs()
                         backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -363,7 +327,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     })
                     azDivider()
 
-                    if (uiState.editorMode == EditorMode.STATIC) {
+                    if (uiState.editorMode == STATIC) {
                         azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
                             showSliderDialog = null; showColorBalanceDialog = false
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -425,14 +389,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     resetDialogs()
                 }
 
-                if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) {
+                if (uiState.editorMode == AR || uiState.editorMode == OVERLAY) {
                     azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
                         viewModel.onToggleFlashlight()
                         resetDialogs()
                     })
                 }
 
-                if (uiState.editorMode == EditorMode.TRACE) {
+                if (uiState.editorMode == TRACE) {
                     azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
                         viewModel.setTouchLocked(true)
                         resetDialogs()
@@ -440,13 +404,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // ------------------------------------------------------------------------------------
-            // LAYER 0: BACKGROUND (EDGE-TO-EDGE)
-            // Z-Index: 0 (Rendered First)
-            // Constraints: No Safe Zone Padding. Draws under system bars.
-            // ------------------------------------------------------------------------------------
+            // BACKGROUND LAYER (Edge-to-Edge)
             background(weight = 0) {
-                // This Box fills the entire screen, including behind the notch and nav bar.
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                     MainContentLayer(
                         uiState = uiState,
@@ -457,15 +416,10 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // ------------------------------------------------------------------------------------
-            // LAYER 1: ONSCREEN UI (SAFE)
-            // Z-Index: 1 (Rendered Second)
-            // Constraints: Safe Zone Padding enforced by AzHostActivityLayout.
-            // ------------------------------------------------------------------------------------
+            // ONSCREEN UI (Safe)
             onscreen(alignment = Alignment.Center) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     
-                    // UI Content Navigation
                     AzNavHost(
                         startDestination = "editor"
                     ) {
@@ -541,7 +495,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         }
                     }
 
-                    // GLOBAL OVERLAYS (Must stay safe from edges)
                     TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
 
                     UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
@@ -568,8 +521,9 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 }
 
-// ... (Rest of file: EditorContent, MainContentLayer, etc. remains unchanged from previous versions, 
-// just ensure MainContentLayer is NOT in onscreen block)
+// ... rest of the file stays effectively the same as provided previously
+// EditorContent, MainContentLayer, TargetCreationFlow, etc.
+// Just ensuring no duplications or import issues.
 @Composable
 fun EditorContent(
     viewModel: MainViewModel,
@@ -595,20 +549,15 @@ fun EditorContent(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-    // Safe Zone Calculations (Top/Bottom 10%) - Manually adding to internal panels if needed
-    // AzHostActivityLayout handles the container padding, but if specific internal elements need
-    // extra spacing (like status bar avoidance inside the safe area), it's calculated here.
     val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
     val screenHeight = configuration.screenHeightDp.dp
-    // Note: AzHost already applies ~10-20% padding. These calcs might add *additional* padding 
-    // relative to the safe container. Ensure logic matches design intent.
     val topSafePadding = (screenHeight * 0.05f).coerceAtLeast(16.dp) 
     val bottomSafePadding = (screenHeight * 0.05f).coerceAtLeast(16.dp)
 
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
-        if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
+        if (uiState.editorMode == AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
             StatusOverlay(
                 qualityWarning = uiState.qualityWarning,
                 arState = uiState.arState,
@@ -780,7 +729,6 @@ private fun MainContentLayer(
                 )
             }
 
-            // Fallback for tool modes to ensure content is visible
             CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(
                 uiState = uiState,
                 onScaleChanged = onScaleChanged,
