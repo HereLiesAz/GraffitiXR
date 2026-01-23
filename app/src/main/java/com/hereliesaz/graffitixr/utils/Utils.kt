@@ -1,5 +1,8 @@
 package com.hereliesaz.graffitixr.utils
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.util.Log
 import org.opencv.android.OpenCVLoader
@@ -30,4 +33,10 @@ fun resizeBitmapForArCore(bitmap: Bitmap): Bitmap {
     val height = (bitmap.height * ratio).toInt()
 
     return Bitmap.createScaledBitmap(bitmap, width, height, true)
+}
+
+tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
