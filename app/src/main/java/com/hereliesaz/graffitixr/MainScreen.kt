@@ -70,6 +70,7 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
+// DELETED: Illegal imports of utils.azTheme, utils.azConfig, utils.azAdvanced
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -404,7 +405,12 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // BACKGROUND LAYER (Edge-to-Edge)
+            // --------------------------------------------------------------------------------
+            // LAYER 0: BACKGROUND (Edge-to-Edge)
+            // Z-Index: 0
+            // Content: MainContentLayer (AR/Images)
+            // Constraints: No Safe Zone Padding. Draws under system bars.
+            // --------------------------------------------------------------------------------
             background(weight = 0) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                     MainContentLayer(
@@ -416,7 +422,12 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // ONSCREEN UI (Safe)
+            // --------------------------------------------------------------------------------
+            // LAYER 1: ONSCREEN UI (Safe)
+            // Z-Index: 1
+            // Content: Editor Panels, Settings, Overlays
+            // Constraints: Safe Zone Padding enforced by AzHostActivityLayout.
+            // --------------------------------------------------------------------------------
             onscreen(alignment = Alignment.Center) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     
@@ -495,6 +506,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         }
                     }
 
+                    // Global Overlays
                     TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
 
                     UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
@@ -521,9 +533,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 }
 
-// ... rest of the file stays effectively the same as provided previously
-// EditorContent, MainContentLayer, TargetCreationFlow, etc.
-// Just ensuring no duplications or import issues.
+// ... (Rest of file remains unchanged as logic is internal to composables)
 @Composable
 fun EditorContent(
     viewModel: MainViewModel,
@@ -729,6 +739,7 @@ private fun MainContentLayer(
                 )
             }
 
+            // Fallback for tool modes to ensure content is visible
             CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(
                 uiState = uiState,
                 onScaleChanged = onScaleChanged,
