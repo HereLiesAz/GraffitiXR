@@ -44,6 +44,9 @@ fun MappingScreen(
     // Capture GLSurfaceView to manage lifecycle
     var glSurfaceView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
+    // State for safe UI access
+    val latestCameraPose = remember { mutableStateOf<Pose?>(null) }
+
     // UI State
     val mappingQuality by slamManager.mappingQuality.collectAsState()
     val isHosting by slamManager.isHosting.collectAsState()
@@ -66,6 +69,11 @@ fun MappingScreen(
             showMiniMap = true
             showGuide = false
             onSessionUpdated = { session, frame ->
+                // Always update the latest pose if tracking
+                if (frame.camera.trackingState == TrackingState.TRACKING) {
+                    latestCameraPose.value = frame.camera.pose
+                }
+
                 if (isMappingState.value) {
                     val now = System.currentTimeMillis()
                     if (now - lastUpdateTime > 500) {
@@ -155,10 +163,11 @@ fun MappingScreen(
                                     isHosting = isHosting,
                                     onCaptureComplete = {
                                         val session = arRenderer.session
-                                        if (session != null) {
+                                        val cameraPose = latestCameraPose.value
+                                        if (session != null && cameraPose != null) {
                                             // The user is happy with the map.
                                             // Create an anchor exactly where the device is NOW.
-                                            val cameraPose = session.update().camera.pose
+
                                             // We place the anchor slightly in front (0.5m) to ensure stability
                                             val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
                                             val anchorPose = cameraPose.compose(forwardOffset)
@@ -180,6 +189,8 @@ fun MappingScreen(
                                                     }
                                                 )
                                             }
+                                        } else {
+                                            Toast.makeText(context, "Tracking not ready", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     onExit = onExit
