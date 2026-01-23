@@ -475,12 +475,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
             // Background Content (Full Screen)
             background(weight = 0) {
-                MainContentLayer(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    gestureInProgress = gestureInProgress,
-                    onGestureToggle = { gestureInProgress = it }
-                )
+                // Background layer intentionally left empty as content is rendered in onscreen block
             }
 
             // OnScreen Content
