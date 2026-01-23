@@ -43,7 +43,9 @@ fun CustomHelpOverlay(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.7f)) // Semi-transparent black
             .clickable { onDismiss() } // Tap anywhere to dismiss
-            .padding(start = 100.dp, end = 16.dp, top = 16.dp, bottom = 16.dp), // Avoid rail area
+            // VIOLATION FIX: Removed manual 'start = 100.dp'.
+            // The AzHostActivityLayout 'onscreen' block handles rail padding automatically.
+            .padding(16.dp), 
         contentAlignment = Alignment.CenterStart
     ) {
         Column(
