@@ -3,10 +3,9 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
-import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge // REQUIRED for AzNavRail Strict Layouts
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -29,13 +28,10 @@ class MainActivity : ComponentActivity() {
         // Initialize OpenCV early
         ensureOpenCVLoaded()
 
-        // Hide system UI for immersive mode
-        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+        // 1. ENABLE EDGE-TO-EDGE
+        // This allows the "background" layer of AzHostActivityLayout to draw
+        // behind the system navigation and status bars.
+        enableEdgeToEdge()
 
         // Request Permissions (Camera + Location)
         val permissionsToRequest = mutableListOf<String>()
