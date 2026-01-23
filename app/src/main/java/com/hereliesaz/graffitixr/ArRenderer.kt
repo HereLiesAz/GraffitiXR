@@ -69,6 +69,10 @@ class ArRenderer(
 
     @Volatile
     var session: Session? = null
+
+    @Volatile
+    private var isSessionPaused = true
+
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var isAnchorReplacementAllowed: Boolean = true // Default to true to allow initial placement
     var showMiniMap: Boolean = false
@@ -227,11 +231,13 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        if (session == null) return
+        if (session == null || isSessionPaused) return
 
         displayRotationHelper.updateSessionIfNeeded(session!!)
 
         try {
+            if (isSessionPaused) return
+
             session!!.setCameraTextureName(backgroundTextureId)
             val frame = session!!.update()
             onSessionUpdated?.invoke(session!!, frame)
@@ -421,6 +427,7 @@ class ArRenderer(
                     }
                 }
             }
+            isSessionPaused = false
             session?.resume()
         } catch (e: CameraNotAvailableException) {
             Log.e("ArRenderer", "Camera not available. Please restart the app.", e)
@@ -430,6 +437,7 @@ class ArRenderer(
     }
 
     fun onPause() {
+        isSessionPaused = true
         displayRotationHelper.onPause()
         session?.pause()
     }

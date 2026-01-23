@@ -41,6 +41,9 @@ fun MappingScreen(
     // The Manager (The Brain)
     val slamManager = remember { SlamManager() }
 
+    // Capture GLSurfaceView to manage lifecycle
+    var glSurfaceView by remember { mutableStateOf<GLSurfaceView?>(null) }
+
     // UI State
     val mappingQuality by slamManager.mappingQuality.collectAsState()
     val isHosting by slamManager.isHosting.collectAsState()
@@ -81,8 +84,14 @@ fun MappingScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> arRenderer.onResume(context as Activity)
-                Lifecycle.Event.ON_PAUSE -> arRenderer.onPause()
+                Lifecycle.Event.ON_RESUME -> {
+                    arRenderer.onResume(context as Activity)
+                    glSurfaceView?.onResume()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    arRenderer.onPause()
+                    glSurfaceView?.onPause()
+                }
                 Lifecycle.Event.ON_DESTROY -> arRenderer.cleanup()
                 else -> {}
             }
@@ -90,6 +99,8 @@ fun MappingScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            arRenderer.onPause()
+            glSurfaceView?.onPause()
             arRenderer.cleanup()
         }
     }
@@ -117,6 +128,7 @@ fun MappingScreen(
                             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                             setRenderer(arRenderer)
                             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                            glSurfaceView = this
                         }
                     }
                 )
