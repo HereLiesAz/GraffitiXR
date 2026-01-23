@@ -34,15 +34,15 @@ val fetchDependencies by tasks.registering(Exec::class) {
 }
 
 // Cleanup Task
-val cleanLibs by tasks.registering(Delete::class) {
-    description = "Nukes transient dependencies from app/libs."
-    group = "graffiti"
-    delete(file("libs/opencv"))
-    delete(file("libs/glm"))
-    delete(file("libs/litert_npu_runtime_libraries"))
-    delete(file("libs/litert-2.1.0.aar"))
-    delete(file("libs/mlkit-subject-segmentation.aar"))
-}
+//val cleanLibs by tasks.registering(Delete::class) {
+//    description = "Nukes transient dependencies from /libs."
+//    group = "graffiti"
+//    delete(rootProject.file("libs/opencv"))
+//    delete(rootProject.file("libs/glm"))
+//    delete(rootProject.file("libs/litert_npu_runtime_libraries"))
+//    delete(rootProject.file("libs/litert-2.1.0.aar"))
+//    delete(rootProject.file("libs/mlkit-subject-segmentation.aar"))
+//}
 
 // Hook Fetching to PreBuild
 // Removed to allow manual management of dependencies via setup_libs.sh
@@ -147,7 +147,7 @@ android {
             cmake {
                 cppFlags("-std=c++17")
                 arguments += "-DANDROID_STL=c++_shared"
-                arguments += "-DLIBS_DIR=${project.file("libs").absolutePath}"
+                arguments += "-DLIBS_DIR=${rootProject.file("libs").absolutePath}"
             }
         }
     }
@@ -252,22 +252,16 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     // --- DYNAMIC LOCAL LIBRARIES ---
-    // We use files() here. If the files don't exist at config time (which causes the null folder error),
-    // we fallback to a safe provider or just 'files()' which resolves lazily.
-
-    // To properly fix "Null extracted folder" for missing AARs, we ensure the directory exists
-    // or we pass a reference that Gradle evaluates later.
-
     // OpenCV
     if (findProject(":opencv") != null) {
         implementation(project(":opencv"))
     }
 
     // MLKit Subject Segmentation
-    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+    implementation(libs.mlkit.subject.segmentation)
 
     // LiteRT
-    implementation("com.google.ai.edge.litert:litert:2.1.0")
+    implementation(libs.litert)
 
     // Selfie Segmentation (Standard remote)
     implementation(libs.segmentation.selfie)

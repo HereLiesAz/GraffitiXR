@@ -15,8 +15,8 @@ dependencyResolutionManagement {
         // --- DYNAMIC LOCAL REPOSITORIES ---
         // These allow Gradle to find the AARs fetched by setup_libs
         flatDir {
-            dirs("app/libs")                   // For MLKit, LiteRT
-            dirs("app/libs/opencv/java")       // For OpenCV
+            dirs("libs")                   // For MLKit, LiteRT
+            dirs("libs/opencv/native/jni") // For OpenCV
         }
     }
 }
@@ -24,9 +24,9 @@ dependencyResolutionManagement {
 rootProject.name = "GraffitiXR"
 include(":app")
 
-val opencvSdk = file("app/libs/opencv/sdk")
+val opencvSdk = file("libs/opencv")
 // Check for build.gradle to ensure it's a valid project, preventing errors on empty dirs
-if (file("app/libs/opencv/sdk/build.gradle").exists()) {
+if (file("libs/opencv/build.gradle").exists()) {
     include(":opencv")
     project(":opencv").projectDir = opencvSdk
 }
