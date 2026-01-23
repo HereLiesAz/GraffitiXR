@@ -2,27 +2,30 @@
 $ErrorActionPreference = "Stop"
 Write-Host "Setting up dependencies in root /libs/..." -ForegroundColor Cyan
 
+# 1. Ensure libs exists
 if (-not (Test-Path "libs")) { New-Item -ItemType Directory -Path "libs" | Out-Null }
 
+# 2. Fetch from dependencies branch
 Write-Host "Fetching dependencies branch..."
 git fetch origin dependencies
 
-# --- OpenCV ---
-Write-Host "Restoring OpenCV..."
+# 3. Restore OpenCV
+Write-Host "Restoring OpenCV to libs/opencv..."
 if (Test-Path "libs/opencv") { Remove-Item -Recurse -Force "libs/opencv" }
 if (Test-Path "opencv") { Remove-Item -Recurse -Force "opencv" }
 
 git checkout origin/dependencies -- opencv
 Move-Item -Path "opencv" -Destination "libs/opencv"
 
-# PATCH: Fix deprecated Proguard file and JVM target in OpenCV
+# 4. Patch OpenCV build.gradle (CRITICAL FIX)
 $opencvBuildGradle = "libs/opencv/build.gradle"
 if (Test-Path $opencvBuildGradle) {
-    Write-Host "Patching OpenCV build.gradle..."
+    Write-Host "Patching $opencvBuildGradle..."
     $content = Get-Content $opencvBuildGradle -Raw
 
-    # Force replace the exact string causing the error
-    $content = $content.Replace("proguard-android.txt", "proguard-android-optimize.txt")
+    # Replace the unsupported Proguard file
+    $content = $content.Replace("'proguard-android.txt'", "'proguard-android-optimize.txt'")
+    $content = $content.Replace('"proguard-android.txt"', '"proguard-android-optimize.txt"')
 
     # Ensure Kotlin JVM Target 17
     if ($content -notmatch "jvmTarget") {
@@ -30,11 +33,12 @@ if (Test-Path $opencvBuildGradle) {
         $content = $content -replace "compileOptions \{", "kotlinOptions {`n        jvmTarget = `"17`"`n    }`n`n    compileOptions {"
     }
 
+    # Force write with UTF8 encoding (no BOM)
     [System.IO.File]::WriteAllText((Resolve-Path $opencvBuildGradle), $content)
-    Write-Host "Patch applied to $opencvBuildGradle"
+    Write-Host "Patch applied successfully." -ForegroundColor Green
 }
 
-# --- GLM ---
+# 5. Restore GLM
 Write-Host "Restoring GLM..."
 if (Test-Path "libs/glm") { Remove-Item -Recurse -Force "libs/glm" }
 New-Item -ItemType Directory -Path "libs/glm" | Out-Null
@@ -45,8 +49,8 @@ Move-Item -Path "glm_temp/glm-1.0.1/glm" -Destination "libs/glm/glm"
 Remove-Item -Recurse -Force "glm_temp"
 Remove-Item -Force $glmZip
 
-# --- LiteRT & MLKit ---
-Write-Host "Restoring LiteRT and MLKit AARs..."
+# 6. Restore AARs
+Write-Host "Restoring LiteRT and MLKit..."
 if (Test-Path "libs/litert-2.1.0.aar") { Remove-Item -Force "libs/litert-2.1.0.aar" }
 if (Test-Path "libs/mlkit-subject-segmentation.aar") { Remove-Item -Force "libs/mlkit-subject-segmentation.aar" }
 
@@ -54,4 +58,5 @@ git checkout origin/dependencies -- litert-2.1.0.aar mlkit-subject-segmentation.
 Move-Item -Path "litert-2.1.0.aar" -Destination "libs/"
 Move-Item -Path "mlkit-subject-segmentation.aar" -Destination "libs/"
 
-Write-Host "Dependencies setup complete. Please Sync Gradle." -ForegroundColor Green
+Write-Host "All libraries installed in /libs/ and patched." -ForegroundColor Green
+Write-Host "Please Sync Gradle in Android Studio now."
