@@ -259,7 +259,9 @@ dependencies {
     // or we pass a reference that Gradle evaluates later.
 
     // OpenCV
-    implementation(project(":opencv"))
+    if (findProject(":opencv") != null) {
+        implementation(project(":opencv"))
+    }
 
     // MLKit Subject Segmentation
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")

@@ -24,5 +24,9 @@ dependencyResolutionManagement {
 rootProject.name = "GraffitiXR"
 include(":app")
 
-include(":opencv")
-project(":opencv").projectDir = file("app/libs/opencv/sdk")
+val opencvSdk = file("app/libs/opencv/sdk")
+// Check for build.gradle to ensure it's a valid project, preventing errors on empty dirs
+if (file("app/libs/opencv/sdk/build.gradle").exists()) {
+    include(":opencv")
+    project(":opencv").projectDir = opencvSdk
+}
