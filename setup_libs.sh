@@ -1,78 +1,66 @@
 #!/bin/bash
-set -e
 
-echo "Setting up dependencies..."
+# Configuration
+REPO_URL="https://github.com/hereliesaz/graffitixr.git"
+BRANCH="dependencies"
+TARGET_DIR="app/libs"
 
-# Ensure app/libs exists
-mkdir -p app/libs
+echo "=============================================="
+echo "  GraffitiXR Dependency Fetcher"
+echo "  Source: $BRANCH branch"
+echo "  Target: $TARGET_DIR (Git Ignored)"
+echo "=============================================="
 
-# Fetch dependencies branch
-git fetch origin dependencies
+# Ensure target directory exists
+mkdir -p "$TARGET_DIR"
 
-# --- OpenCV ---
-echo "Restoring OpenCV..."
-# Remove existing to avoid conflicts
-rm -rf opencv app/libs/opencv
-
-# Checkout 'opencv' folder from root of dependencies branch
-git checkout origin/dependencies -- opencv
-
-# Create expected directory structure app/libs/opencv/sdk
-mkdir -p app/libs/opencv
-
-# Move checked out 'opencv' folder to 'app/libs/opencv/sdk'
-mv opencv app/libs/opencv/sdk
-
-# Patch OpenCV build.gradle
-if [ -f "app/libs/opencv/sdk/build.gradle" ]; then
-    echo "Patching OpenCV build.gradle..."
-     if [[ "$OSTYPE" == "darwin"* ]]; then
-             sed -i '' 's/proguard-android.txt/proguard-android-optimize.txt/g' "app/libs/opencv/sdk/build.gradle"
-        else
-             sed -i 's/proguard-android.txt/proguard-android-optimize.txt/g' "app/libs/opencv/sdk/build.gradle"
-        fi
-
-     # Add kotlinOptions { jvmTarget = '17' } before buildTypes to fix JVM target incompatibility
-     # We check if it's already there to avoid duplication if run multiple times (though we nuked the folder above, so it's fresh)
-     if ! grep -q "jvmTarget = '17'" "app/libs/opencv/sdk/build.gradle"; then
-         echo "Adding kotlinOptions to OpenCV build.gradle..."
-         awk '/buildTypes \{/ { print "    kotlinOptions {\n        jvmTarget = \04717\047\n    }\n" } { print }' "app/libs/opencv/sdk/build.gradle" > temp_gradle && mv temp_gradle "app/libs/opencv/sdk/build.gradle"
-     fi
+# Check dependencies
+if ! command -v git &> /dev/null; then
+    echo "Error: git is not installed."
+    exit 1
 fi
 
-# --- GLM ---
-echo "Restoring GLM..."
-rm -rf app/libs/glm
-mkdir -p app/libs/glm
+# Create a temporary directory for the raw branch pull
+TEMP_DIR=$(mktemp -d)
+echo "Fetching dependencies branch to temp storage..."
 
-# Download GLM 1.0.1
-echo "Downloading GLM 1.0.1..."
-curl -L -o glm.zip https://github.com/g-truc/glm/archive/refs/tags/1.0.1.zip
-unzip -q glm.zip
+# Shallow clone to save bandwidth
+git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TEMP_DIR"
 
-# Move 'glm' folder from the extracted directory to app/libs/glm
-# Structure is glm-1.0.1/glm
-mv glm-1.0.1/glm app/libs/glm/glm
+if [ $? -eq 0 ]; then
+    echo "Download successful. Syncing SDKs..."
 
-# Cleanup GLM temp files
-rm -rf glm-1.0.1 glm.zip
+    # Sync ONLY the specific heavy libraries that are listed in .gitignore
+    # This prevents random branch files (like READMEs) from cluttering app/libs
+    
+    # 1. OpenCV
+    if [ -d "$TEMP_DIR/opencv" ]; then
+        echo "Updating OpenCV..."
+        rm -rf "$TARGET_DIR/opencv"
+        cp -r "$TEMP_DIR/opencv" "$TARGET_DIR/"
+    fi
 
-# --- LiteRT ---
-echo "Restoring LiteRT..."
-rm -rf app/libs/litert
-mkdir -p app/libs/litert
+    # 2. GLM
+    if [ -d "$TEMP_DIR/glm" ]; then
+        echo "Updating GLM..."
+        rm -rf "$TARGET_DIR/glm"
+        cp -r "$TEMP_DIR/glm" "$TARGET_DIR/"
+    fi
+    
+    # 3. LiteRT (if present)
+    if [ -d "$TEMP_DIR/litert" ]; then
+        echo "Updating LiteRT..."
+        rm -rf "$TARGET_DIR/litert"
+        cp -r "$TEMP_DIR/litert" "$TARGET_DIR/"
+    fi
 
-# Checkout litert aar
-git checkout origin/dependencies -- litert-2.1.0.aar
-
-mv litert-2.1.0.aar app/libs/litert/
-
-# Also check for 'litert_npu_runtime_libraries' folder if it exists
-if git ls-tree origin/dependencies | grep -q "litert_npu_runtime_libraries"; then
-    echo "Restoring LiteRT NPU libraries..."
-    rm -rf litert_npu_runtime_libraries
-    git checkout origin/dependencies -- litert_npu_runtime_libraries
-    mv litert_npu_runtime_libraries app/libs/litert/
+    # Cleanup temp
+    rm -rf "$TEMP_DIR"
+    
+    echo "Success! Libraries installed in $TARGET_DIR."
+    echo "Note: These folders are ignored by .gitignore and will not be committed."
+else
+    echo "Failed to fetch dependencies branch."
+    rm -rf "$TEMP_DIR"
+    exit 1
 fi
-
-echo "Dependencies setup complete."
