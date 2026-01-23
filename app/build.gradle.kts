@@ -45,10 +45,25 @@ val cleanLibs by tasks.registering(Delete::class) {
 }
 
 // Hook Fetching to PreBuild
-// Removed to allow manual management of dependencies via setup_libs.sh
-// tasks.named("preBuild") {
-//     dependsOn(fetchDependencies)
-// }
+tasks.named("preBuild") {
+    dependsOn(fetchDependencies)
+}
+
+// Hook Cleanup to the END of the build (using a listener to avoid deprecation warnings if possible,
+// but buildFinished is the only reliable way to catch failures too in older gradle setups.
+// For strict compliance without deprecation, we use the build service or flow, but a simple listener works.)
+gradle.buildFinished {
+    // We execute the cleanup manually here to ensure it runs even if build fails
+    val libsDir = project.file("libs")
+    if (libsDir.exists()) {
+        println("🧹 CLEANUP: Nuking transient dependencies...")
+        project.delete(file("libs/opencv"))
+        project.delete(file("libs/glm"))
+        project.delete(file("libs/litert_npu_runtime_libraries"))
+        project.delete(file("libs/litert-2.1.0.aar"))
+        project.delete(file("libs/mlkit-subject-segmentation.aar"))
+    }
+}
 
 // --------------------------------------------------------------------------
 //  2. VERSIONING LOGIC
@@ -259,15 +274,13 @@ dependencies {
     // or we pass a reference that Gradle evaluates later.
 
     // OpenCV
-    if (findProject(":opencv") != null) {
-        implementation(project(":opencv"))
-    }
+    implementation(files("libs/opencv/java/opencv.aar"))
 
     // MLKit Subject Segmentation
-    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+    implementation(files("libs/mlkit-subject-segmentation.aar"))
 
     // LiteRT
-    implementation("com.google.ai.edge.litert:litert:2.1.0")
+    implementation(files("libs/litert-2.1.0.aar"))
 
     // Selfie Segmentation (Standard remote)
     implementation(libs.segmentation.selfie)

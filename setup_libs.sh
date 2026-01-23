@@ -1,34 +1,24 @@
 #!/bin/bash
+set -e
 
-# Configuration
-REPO_URL="https://github.com/hereliesaz/graffitixr.git"
-BRANCH="dependencies"
-TARGET_DIR="app/libs"
+echo "Setting up dependencies..."
 
-echo "=============================================="
-echo "  GraffitiXR Dependency Fetcher"
-echo "  Source: $BRANCH branch"
-echo "  Target: $TARGET_DIR (Git Ignored)"
-echo "=============================================="
+# Ensure app/libs exists
+mkdir -p app/libs
 
-# Ensure target directory exists
-mkdir -p "$TARGET_DIR"
+# Fetch dependencies branch
+git fetch origin dependencies
 
-# Check dependencies
-if ! command -v git &> /dev/null; then
-    echo "Error: git is not installed."
-    exit 1
-fi
+# --- OpenCV ---
+echo "Restoring OpenCV..."
+# Remove existing to avoid conflicts
+rm -rf opencv app/libs/opencv
 
-# Create a temporary directory for the raw branch pull
-TEMP_DIR=$(mktemp -d)
-echo "Fetching dependencies branch to temp storage..."
+# Checkout 'opencv' folder from root of dependencies branch
+git checkout origin/dependencies -- opencv
 
-# Shallow clone to save bandwidth
-git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TEMP_DIR"
-
-if [ $? -eq 0 ]; then
-    echo "Download successful. Syncing SDKs..."
+# Create expected directory structure app/libs/opencv
+mkdir -p app/libs/opencv
 
     # Sync ONLY the specific heavy libraries that are listed in .gitignore
     # This prevents random branch files (like READMEs) from cluttering app/libs
@@ -84,7 +74,12 @@ if [ $? -eq 0 ]; then
         cp -r "$TEMP_DIR/glm" "$TARGET_DIR/"
     fi
     
-    # 3. LiteRT - Removed in favor of remote dependency
+    # 3. LiteRT (if present)
+    if [ -d "$TEMP_DIR/litert" ]; then
+        echo "Updating LiteRT..."
+        rm -rf "$TARGET_DIR/litert"
+        cp -r "$TEMP_DIR/litert" "$TARGET_DIR/"
+    fi
 
     # Cleanup temp
     rm -rf "$TEMP_DIR"
@@ -96,3 +91,39 @@ else
     rm -rf "$TEMP_DIR"
     exit 1
 fi
+
+# --- GLM ---
+echo "Restoring GLM..."
+rm -rf app/libs/glm
+mkdir -p app/libs/glm
+
+# Download GLM 1.0.1
+echo "Downloading GLM 1.0.1..."
+curl -L -o glm.zip https://github.com/g-truc/glm/archive/refs/tags/1.0.1.zip
+unzip -q glm.zip
+
+# Move 'glm' folder
+mv glm-1.0.1/glm app/libs/glm/glm
+rm -rf glm-1.0.1 glm.zip
+
+# --- LiteRT ---
+echo "Restoring LiteRT..."
+rm -f app/libs/litert-2.1.0.aar
+git checkout origin/dependencies -- litert-2.1.0.aar
+mv litert-2.1.0.aar app/libs/
+
+# LiteRT NPU Libraries
+if git ls-tree origin/dependencies | grep -q "litert_npu_runtime_libraries"; then
+    echo "Restoring LiteRT NPU libraries..."
+    rm -rf app/libs/litert_npu_runtime_libraries
+    git checkout origin/dependencies -- litert_npu_runtime_libraries
+    mv litert_npu_runtime_libraries app/libs/
+fi
+
+# --- MLKit Subject Segmentation ---
+echo "Restoring MLKit Subject Segmentation..."
+rm -f app/libs/mlkit-subject-segmentation.aar
+git checkout origin/dependencies -- mlkit-subject-segmentation.aar
+mv mlkit-subject-segmentation.aar app/libs/
+
+echo "Dependencies setup complete."

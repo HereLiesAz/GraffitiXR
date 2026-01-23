@@ -17,6 +17,8 @@ dependencyResolutionManagement {
         flatDir {
             dirs("app/libs")                   // For MLKit, LiteRT
             dirs("app/libs/opencv/java")       // For OpenCV
+     // For MLKit, LiteRT
+            dirs("app/libs/opencv/sdk/java")        // For OpenCV (Adjusted path)
         }
     }
 }
