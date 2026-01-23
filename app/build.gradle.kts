@@ -222,11 +222,6 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    implementation(libs.androidx.xr.runtime)
-    implementation(libs.androidx.xr.scenecore)
-    implementation(libs.androidx.xr.compose)
-    implementation(libs.androidx.xr.compose.material3)
-    implementation(libs.androidx.xr.arcore)
     implementation(libs.google.accompanist.permissions)
 
     implementation(libs.az.nav.rail)
