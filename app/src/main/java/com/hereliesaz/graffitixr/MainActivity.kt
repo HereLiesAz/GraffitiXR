@@ -5,7 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge // REQUIRED for AzNavRail Strict Layouts
+import androidx.activity.enableEdgeToEdge // REQUIRED: Enforces Edge-to-Edge
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -29,8 +29,8 @@ class MainActivity : ComponentActivity() {
         ensureOpenCVLoaded()
 
         // 1. ENABLE EDGE-TO-EDGE
-        // This allows the "background" layer of AzHostActivityLayout to draw
-        // behind the system navigation and status bars.
+        // This is mandatory for AzHostActivityLayout to correctly manage
+        // the "background" (under bars) vs "onscreen" (safe area) layers.
         enableEdgeToEdge()
 
         // Request Permissions (Camera + Location)
