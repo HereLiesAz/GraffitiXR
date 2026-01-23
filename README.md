@@ -36,5 +36,27 @@ Everything stays on the device. A project file is a zipped container holding:
 * **Computer Vision:** OpenCV 4.x (Local Fingerprinting)
 * **Rendering:** OpenGL ES 3.0
 
+## 🏗️ Build Instructions
+
+To build the project locally, you must first fetch the large dependencies (OpenCV, etc.) which are managed in a separate branch.
+
+1.  **Fetch Dependencies:**
+    Run the setup script in the root directory:
+    ```bash
+    # Linux / macOS
+    chmod +x setup_libs.sh
+    ./setup_libs.sh
+
+    # Windows
+    ./setup_libs.ps1
+    ```
+    This will download and configure OpenCV and other libraries into `app/libs`.
+
+2.  **Build with Gradle:**
+    Open the project in Android Studio or run via command line:
+    ```bash
+    ./gradlew assembleDebug
+    ```
+
 ---
 *Built with spray paint and code in New Orleans.*

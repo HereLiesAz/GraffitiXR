@@ -37,7 +37,44 @@ if [ $? -eq 0 ]; then
     if [ -d "$TEMP_DIR/opencv" ]; then
         echo "Updating OpenCV..."
         rm -rf "$TARGET_DIR/opencv"
-        cp -r "$TEMP_DIR/opencv" "$TARGET_DIR/"
+        mkdir -p "$TARGET_DIR/opencv/sdk"
+        cp -r "$TEMP_DIR/opencv/"* "$TARGET_DIR/opencv/sdk/"
+
+        # PATCH: Fix deprecated Proguard file
+        OPENCV_BUILD_GRADLE="$TARGET_DIR/opencv/sdk/build.gradle"
+        if [ -f "$OPENCV_BUILD_GRADLE" ]; then
+            echo "Patching OpenCV build.gradle..."
+
+            # 1. Use proguard-android-optimize.txt
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s/proguard-android.txt/proguard-android-optimize.txt/g" "$OPENCV_BUILD_GRADLE"
+            else
+                sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" "$OPENCV_BUILD_GRADLE"
+            fi
+
+            # 2. Add JVM Target 17 for Kotlin
+            # We append it to the end of the android block or just append to file if simple
+            # But the file structure is complex. Let's just append it to the android block if we can find it.
+            # Simpler: Just append the kotlinOptions block inside the android block using a known anchor.
+
+            # Check if kotlinOptions is missing
+            if ! grep -q "jvmTarget" "$OPENCV_BUILD_GRADLE"; then
+                echo "Adding Kotlin JVM Target 17..."
+                 if [[ "$OSTYPE" == "darwin"* ]]; then
+                    sed -i '' '/compileOptions {/i\
+    kotlinOptions {\
+        jvmTarget = "17"\
+    }\
+' "$OPENCV_BUILD_GRADLE"
+                else
+                    sed -i '/compileOptions {/i\
+    kotlinOptions {\
+        jvmTarget = "17"\
+    }\
+' "$OPENCV_BUILD_GRADLE"
+                fi
+            fi
+        fi
     fi
 
     # 2. GLM
@@ -47,12 +84,7 @@ if [ $? -eq 0 ]; then
         cp -r "$TEMP_DIR/glm" "$TARGET_DIR/"
     fi
     
-    # 3. LiteRT (if present)
-    if [ -d "$TEMP_DIR/litert" ]; then
-        echo "Updating LiteRT..."
-        rm -rf "$TARGET_DIR/litert"
-        cp -r "$TEMP_DIR/litert" "$TARGET_DIR/"
-    fi
+    # 3. LiteRT - Removed in favor of remote dependency
 
     # Cleanup temp
     rm -rf "$TEMP_DIR"

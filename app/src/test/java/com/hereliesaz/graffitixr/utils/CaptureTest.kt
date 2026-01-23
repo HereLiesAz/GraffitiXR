@@ -2,6 +2,9 @@ package com.hereliesaz.graffitixr.utils
 
 import android.app.Activity
 import android.graphics.Bitmap
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.view.Window
 import io.mockk.every
@@ -20,6 +23,13 @@ class CaptureTest {
     @Before
     fun setUp() {
         mockkStatic(Bitmap::class)
+        mockkStatic(Log::class)
+        every { Log.w(any(), any<String>()) } returns 0
+        every { Log.e(any(), any()) } returns 0
+        every { Log.e(any(), any(), any()) } returns 0
+
+        mockkStatic(Looper::class)
+        every { Looper.getMainLooper() } returns mockk()
     }
 
     @After
