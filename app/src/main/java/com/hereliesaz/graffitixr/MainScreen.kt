@@ -72,6 +72,7 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
+import com.hereliesaz.graffitixr.utils.findActivity
 // REMOVED: import com.hereliesaz.graffitixr.utils.azTheme
 // REMOVED: import com.hereliesaz.graffitixr.utils.azConfig
 // REMOVED: import com.hereliesaz.graffitixr.utils.azAdvanced
@@ -185,7 +186,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         viewModel.captureEvent.collect { event ->
             when (event) {
                 is CaptureEvent.RequestCapture -> {
-                    (context as? Activity)?.let { activity ->
+                    context.findActivity()?.let { activity ->
                         captureWindow(activity) { bitmap ->
                             bitmap?.let {
                                 viewModel.saveCapturedBitmap(it)
