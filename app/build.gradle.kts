@@ -10,14 +10,68 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-// ... [Keep your versioning logic here, it is unchanged] ...
-// (Omitting versioning block for brevity, paste it back here)
+// --------------------------------------------------------------------------
+//  TRANSIENT DEPENDENCY MANAGEMENT
+// --------------------------------------------------------------------------
+
+// 1. Define the Task to Fetch Dependencies
+val fetchDependencies by tasks.registering(Exec::class) {
+    description = "Fetches dependencies from the 'dependencies' branch via script."
+    group = "graffiti"
+
+    val isWindows = System.getProperty("os.name").lowercase().contains("win")
+    val scriptName = if (isWindows) "setup_libs.ps1" else "setup_libs.sh"
+    val scriptFile = rootProject.file(scriptName)
+
+    workingDir = rootProject.rootDir
+
+    if (isWindows) {
+        commandLine("powershell", "-ExecutionPolicy", "Bypass", "-File", scriptFile.absolutePath)
+    } else {
+        // Ensure script is executable
+        if (scriptFile.exists() && !scriptFile.canExecute()) {
+            scriptFile.setExecutable(true)
+        }
+        commandLine("bash", scriptFile.absolutePath)
+    }
+}
+
+// 2. Ensure Dependencies are Fetched BEFORE Build
+tasks.named("preBuild") {
+    dependsOn(fetchDependencies)
+}
+
+// 3. Clean Up Dependencies AFTER Build (Success or Failure)
+gradle.buildFinished {
+    val libsDir = project.file("libs") // Resolves to app/libs
+    if (libsDir.exists()) {
+        println("🧹 CLEANUP: Removing transient dependencies from app/libs...")
+
+        // List of transient artifacts to destroy
+        val transients = listOf(
+            "opencv",
+            "glm",
+            "litert_npu_runtime_libraries",
+            "litert-2.1.0.aar",
+            "mlkit-subject-segmentation.aar"
+        )
+
+        transients.forEach { name ->
+            val target = File(libsDir, name)
+            if (target.exists()) {
+                if (target.isDirectory) target.deleteRecursively() else target.delete()
+            }
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+//  VERSIONING LOGIC
+// --------------------------------------------------------------------------
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
-        localPropertiesFile.inputStream().use { fis ->
-            load(fis)
-        }
+        localPropertiesFile.inputStream().use { load(it) }
     }
 }
 
@@ -51,9 +105,7 @@ abstract class BuildVersionValueSource : ValueSource<Int, BuildVersionValueSourc
                 standardOutput = output
             }
             String(output.toByteArray()).trim().toInt()
-        } catch (e: Exception) {
-            -1
-        }
+        } catch (e: Exception) { -1 }
     }
 }
 
@@ -84,12 +136,8 @@ abstract class PatchVersionValueSource : ValueSource<Int, PatchVersionValueSourc
                     standardOutput = countOutput
                 }
                 String(countOutput.toByteArray()).trim().toInt()
-            } else {
-                -1
-            }
-        } catch (e: Exception) {
-            -1
-        }
+            } else { -1 }
+        } catch (e: Exception) { -1 }
     }
 }
 
@@ -101,6 +149,9 @@ val vPatch = providers.of(PatchVersionValueSource::class) {
     parameters.workingDir.set(rootProject.rootDir.absolutePath)
 }.getOrElse(defaultPatch).let { if (it == -1) defaultPatch else it }
 
+// --------------------------------------------------------------------------
+//  ANDROID CONFIG
+// --------------------------------------------------------------------------
 android {
     buildFeatures {
         buildConfig = true
@@ -120,17 +171,15 @@ android {
         resValue("string", "arcore_api_key", arcoreApiKey)
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
+        vectorDrawables { useSupportLibrary = true }
         multiDexEnabled = true
-        ndk {
-            abiFilters.add("arm64-v8a")
-        }
+        ndk { abiFilters.add("arm64-v8a") }
+
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17")
                 arguments += "-DANDROID_STL=c++_shared"
+                // Point CMake to app/libs. We rely on 'fetchDependencies' to populate this.
                 arguments += "-DLIBS_DIR=${project.file("libs").absolutePath}"
             }
         }
@@ -162,10 +211,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
@@ -185,9 +231,7 @@ android {
     }
 
     packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
+        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
         jniLibs {
             pickFirsts += "lib/arm64-v8a/libc++_shared.so"
             pickFirsts += "lib/arm64-v8a/libopencv_java4.so"
@@ -198,6 +242,9 @@ android {
     }
 }
 
+// --------------------------------------------------------------------------
+//  DEPENDENCIES
+// --------------------------------------------------------------------------
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -217,7 +264,6 @@ dependencies {
     implementation(libs.coil.compose)
 
     implementation(libs.androidx.constraintlayout)
-
     implementation(libs.arcore.client)
 
     implementation(libs.androidx.camera.core)
@@ -227,11 +273,9 @@ dependencies {
 
     implementation(libs.google.accompanist.permissions)
 
-    // AzNavRail (Remote)
+    // Remote AzNavRail (Strict)
     implementation(libs.az.nav.rail)
 
-    implementation(libs.mlkit.subject.segmentation)
-    implementation(libs.segmentation.selfie)
     implementation(libs.play.services.base)
     implementation(libs.play.services.location)
 
@@ -240,29 +284,21 @@ dependencies {
 
     implementation(libs.kotlinx.serialization.json)
 
-    // --- DYNAMIC LOCAL LIBRARIES ---
-    
-    // OpenCV: Fixed path to remove 'sdk' to match repo structure
-    val openCvAar = file("libs/opencv/java/opencv.aar") 
-    if (openCvAar.exists()) {
-        implementation(files(openCvAar))
-    } else {
-        println("WARNING: OpenCV AAR not found at ${openCvAar.path}. Run setup_libs.sh")
-    }
+    // --- DYNAMIC LOCAL LIBRARIES (Checked at Build Time) ---
+    // We do NOT check for existence here ('if exists').
+    // We trust the 'fetchDependencies' task to put them there.
 
-    // MLKit AAR Override
-    val mlKitAar = file("libs/mlkit-subject-segmentation.aar")
-    if (mlKitAar.exists()) {
-        implementation(files(mlKitAar))
-    } else {
-        implementation(libs.mlkit.subject.segmentation)
-    }
+    // OpenCV
+    implementation(files("libs/opencv/java/opencv.aar"))
 
-    // LiteRT AAR
-    val liteRtAar = file("libs/litert-2.1.0.aar")
-    if (liteRtAar.exists()) {
-        implementation(files(liteRtAar))
-    }
+    // MLKit Subject Segmentation (Local)
+    implementation(files("libs/mlkit-subject-segmentation.aar"))
+
+    // LiteRT
+    implementation(files("libs/litert-2.1.0.aar"))
+
+    // Selfie Segmentation
+    implementation(libs.segmentation.selfie)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
