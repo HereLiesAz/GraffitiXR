@@ -14,8 +14,8 @@ endif()
 message(STATUS "Native build looking for libs in: ${LIBS_DIR}")
 
 # --- OPENCV CONFIGURATION ---
-# FIX: Point strictly to 'sdk/native/jni'. Do NOT append ABI folders here.
-set(OpenCV_DIR "${LIBS_DIR}/opencv/sdk/native/jni")
+# FIX: Path aligned to branch structure (removed 'sdk')
+set(OpenCV_DIR "${LIBS_DIR}/opencv/native/jni")
 
 if(EXISTS "${OpenCV_DIR}/OpenCVConfig.cmake")
     find_package(OpenCV REQUIRED)
@@ -29,7 +29,7 @@ find_package(OpenMP REQUIRED)
 
 # --- SOURCE FILES ---
 add_library(
-        graffitixr # Matches project name, usually good practice
+        graffitixr
         SHARED
         GraffitiJNI.cpp
         MobileGS.cpp
@@ -40,26 +40,26 @@ target_include_directories(
     graffitixr PRIVATE
     include
     ${OpenCV_INCLUDE_DIRS}
-    ${LIBS_DIR}/glm # Use LIBS_DIR for GLM too
+    ${LIBS_DIR}/glm
 )
 
 # --- SYSTEM LIBRARIES ---
 find_library(log-lib log)
 find_library(android-lib android)
-find_library(gles3-lib GLESv3) # Use GLESv3 for better graphics support if available
+find_library(gles3-lib GLESv3)
 
 # --- LINKING ---
 target_link_libraries(
         graffitixr
         
         # External
-        ${OpenCV_LIBS}      # This automatically links the correct native .so for the ABI
+        ${OpenCV_LIBS}
         OpenMP::OpenMP_CXX
         
         # System
         ${log-lib}
         ${android-lib}
         ${gles3-lib}
-        jnigraphics         # Often needed for bitmap manipulation
+        jnigraphics
         EGL
 )
