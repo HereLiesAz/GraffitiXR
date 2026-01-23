@@ -9,31 +9,25 @@ if (-not (Test-Path "libs")) { New-Item -ItemType Directory -Path "libs" | Out-N
 Write-Host "Fetching dependencies branch..."
 git fetch origin dependencies
 
-# 3. Restore OpenCV
-Write-Host "Restoring OpenCV to libs/opencv..."
+# 3. Restore OpenCV (CRITICAL: Must be in an 'sdk' subfolder for CMake paths to resolve)
+Write-Host "Restoring OpenCV to libs/opencv/sdk..."
 if (Test-Path "libs/opencv") { Remove-Item -Recurse -Force "libs/opencv" }
 if (Test-Path "opencv") { Remove-Item -Recurse -Force "opencv" }
 
 git checkout origin/dependencies -- opencv
-Move-Item -Path "opencv" -Destination "libs/opencv"
+New-Item -ItemType Directory -Path "libs/opencv" | Out-Null
+Move-Item -Path "opencv" -Destination "libs/opencv/sdk"
 
-# 4. Patch OpenCV build.gradle (CRITICAL FIX)
-$opencvBuildGradle = "libs/opencv/build.gradle"
+# 4. Patch OpenCV build.gradle
+$opencvBuildGradle = "libs/opencv/sdk/build.gradle"
 if (Test-Path $opencvBuildGradle) {
     Write-Host "Patching $opencvBuildGradle..."
     $content = Get-Content $opencvBuildGradle -Raw
-
-    # Replace the unsupported Proguard file
     $content = $content.Replace("'proguard-android.txt'", "'proguard-android-optimize.txt'")
     $content = $content.Replace('"proguard-android.txt"', '"proguard-android-optimize.txt"')
-
-    # Ensure Kotlin JVM Target 17
     if ($content -notmatch "jvmTarget") {
-        Write-Host "Adding Kotlin JVM Target 17..."
         $content = $content -replace "compileOptions \{", "kotlinOptions {`n        jvmTarget = `"17`"`n    }`n`n    compileOptions {"
     }
-
-    # Force write with UTF8 encoding (no BOM)
     [System.IO.File]::WriteAllText((Resolve-Path $opencvBuildGradle), $content)
     Write-Host "Patch applied successfully." -ForegroundColor Green
 }
@@ -53,7 +47,6 @@ Remove-Item -Force $glmZip
 Write-Host "Restoring LiteRT and MLKit..."
 if (Test-Path "libs/litert-2.1.0.aar") { Remove-Item -Force "libs/litert-2.1.0.aar" }
 if (Test-Path "libs/mlkit-subject-segmentation.aar") { Remove-Item -Force "libs/mlkit-subject-segmentation.aar" }
-
 git checkout origin/dependencies -- litert-2.1.0.aar mlkit-subject-segmentation.aar
 Move-Item -Path "litert-2.1.0.aar" -Destination "libs/"
 Move-Item -Path "mlkit-subject-segmentation.aar" -Destination "libs/"

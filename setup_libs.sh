@@ -10,17 +10,23 @@ mkdir -p libs
 git fetch origin dependencies
 
 # --- OpenCV ---
-echo "Restoring OpenCV..."
+# CRITICAL: OpenCV expects to be in an 'sdk' subfolder for its internal CMake relative paths to work.
+echo "Restoring OpenCV to libs/opencv/sdk..."
 rm -rf opencv libs/opencv
+mkdir -p libs/opencv
+
+# Checkout 'opencv' folder from dependencies branch
 git checkout origin/dependencies -- opencv
-mv opencv libs/opencv
+
+# Move contents to libs/opencv/sdk
+mv opencv libs/opencv/sdk
 
 # PATCH: Fix deprecated Proguard file and JVM target in OpenCV
-OPENCV_BUILD_GRADLE="libs/opencv/build.gradle"
+OPENCV_BUILD_GRADLE="libs/opencv/sdk/build.gradle"
 if [ -f "$OPENCV_BUILD_GRADLE" ]; then
     echo "Patching OpenCV build.gradle..."
 
-    # Use a robust sed command to replace the Proguard file reference
+    # Replace proguard-android.txt with proguard-android-optimize.txt
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' "s/proguard-android.txt/proguard-android-optimize.txt/g" "$OPENCV_BUILD_GRADLE"
     else
