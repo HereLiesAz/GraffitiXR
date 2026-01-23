@@ -4,6 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -20,6 +23,9 @@ fun ArView(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Capture GLSurfaceView to manage lifecycle
+    var glSurfaceView by remember { mutableStateOf<android.opengl.GLSurfaceView?>(null) }
 
     // Instantiate Renderer with callbacks to VM
     val arRenderer = remember {
@@ -51,9 +57,11 @@ fun ArView(
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     arRenderer.onResume(activity)
+                    glSurfaceView?.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     arRenderer.onPause()
+                    glSurfaceView?.onPause()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
                     arRenderer.cleanup()
@@ -67,6 +75,7 @@ fun ArView(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             arRenderer.onPause()
+            glSurfaceView?.onPause()
             arRenderer.cleanup()
         }
     }
@@ -79,6 +88,7 @@ fun ArView(
                 setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                 setRenderer(arRenderer)
                 renderMode = android.opengl.GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                glSurfaceView = this
             }
         },
         modifier = Modifier.pointerInput(Unit) {
