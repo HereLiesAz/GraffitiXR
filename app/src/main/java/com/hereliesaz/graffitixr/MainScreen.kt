@@ -21,20 +21,15 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,8 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
@@ -60,14 +53,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.composable
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
-import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
@@ -102,9 +93,6 @@ import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
-import com.hereliesaz.graffitixr.utils.azTheme
-import com.hereliesaz.graffitixr.utils.azConfig
-import com.hereliesaz.graffitixr.utils.azAdvanced
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -190,27 +178,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
     // Preload strings to avoid Composable calls in lambdas
     val navStrings = rememberNavStrings()
-
-    // Calculate current route for NavRail highlighting
-    val currentRoute = remember(uiState.editorMode, showSliderDialog, showColorBalanceDialog, uiState.isMarkingProgress, uiState.isCapturingTarget, showInfoScreen, uiState.activeLayerId, uiState.isMappingMode, currentNavRoute) {
-        when {
-            currentNavRoute == "settings" -> "settings_sub"
-            currentNavRoute == "project_library" -> "load_project"
-            currentNavRoute == "surveyor" -> "surveyor"
-            showInfoScreen -> "help"
-            showSliderDialog == "Adjust" -> "adjust"
-            showColorBalanceDialog -> "color_balance"
-            uiState.isMarkingProgress -> "mark_progress"
-            uiState.isMappingMode -> "neural_scan"
-            uiState.isCapturingTarget -> "create_target"
-            uiState.activeLayerId != null -> "layer_${uiState.activeLayerId}"
-            uiState.editorMode == EditorMode.AR -> "ar"
-            uiState.editorMode == EditorMode.OVERLAY -> "ghost_mode"
-            uiState.editorMode == EditorMode.STATIC -> "mockup"
-            uiState.editorMode == EditorMode.TRACE -> "trace_mode"
-            else -> null
-        }
-    }
 
     // Haptic Feedback Handler
     LaunchedEffect(viewModel, context) {
@@ -473,13 +440,13 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // Background Content (Full Screen)
+            // ------------------------------------------------------------------------------------
+            // LAYER 0: BACKGROUND (EDGE-TO-EDGE)
+            // Z-Index: 0 (Rendered First)
+            // Constraints: No Safe Zone Padding. Draws under system bars.
+            // ------------------------------------------------------------------------------------
             background(weight = 0) {
-                // Background layer intentionally left empty as content is rendered in onscreen block
-            }
-
-            // OnScreen Content
-            onscreen(alignment = Alignment.Center) {
+                // This Box fills the entire screen, including behind the notch and nav bar.
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                     MainContentLayer(
                         uiState = uiState,
@@ -487,7 +454,18 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         gestureInProgress = gestureInProgress,
                         onGestureToggle = { gestureInProgress = it }
                     )
+                }
+            }
 
+            // ------------------------------------------------------------------------------------
+            // LAYER 1: ONSCREEN UI (SAFE)
+            // Z-Index: 1 (Rendered Second)
+            // Constraints: Safe Zone Padding enforced by AzHostActivityLayout.
+            // ------------------------------------------------------------------------------------
+            onscreen(alignment = Alignment.Center) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    
+                    // UI Content Navigation
                     AzNavHost(
                         startDestination = "editor"
                     ) {
@@ -521,8 +499,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         )
                     }
                     composable("project_library") {
-                        // ... same logic ...
-                        // Ensure projects are loaded
                         LaunchedEffect(Unit) {
                             viewModel.loadAvailableProjects(context)
                         }
@@ -542,7 +518,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                                     localNavController.popBackStack()
                                 }
                             )
-                            // Add a back button or rely on system back
                             AzButton(
                                 text = "Back",
                                 onClick = { localNavController.popBackStack() },
@@ -566,7 +541,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         }
                     }
 
-                    // GLOBAL OVERLAYS (Inside Safe Zone)
+                    // GLOBAL OVERLAYS (Must stay safe from edges)
                     TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
 
                     UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
@@ -585,7 +560,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                         }
                     }
 
-                    // Progress Overlay (Flash)
                     if (uiState.isCapturingTarget) {
                         CaptureAnimation()
                     }
@@ -594,6 +568,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     }
 }
 
+// ... (Rest of file: EditorContent, MainContentLayer, etc. remains unchanged from previous versions, 
+// just ensure MainContentLayer is NOT in onscreen block)
 @Composable
 fun EditorContent(
     viewModel: MainViewModel,
@@ -619,11 +595,15 @@ fun EditorContent(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-    // Safe Zone Calculations (Top/Bottom 10%)
+    // Safe Zone Calculations (Top/Bottom 10%) - Manually adding to internal panels if needed
+    // AzHostActivityLayout handles the container padding, but if specific internal elements need
+    // extra spacing (like status bar avoidance inside the safe area), it's calculated here.
     val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
     val screenHeight = configuration.screenHeightDp.dp
-    val topSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateTopPadding() + 16.dp)
-    val bottomSafePadding = (screenHeight * 0.1f).coerceAtLeast(safeInsets.calculateBottomPadding() + 16.dp)
+    // Note: AzHost already applies ~10-20% padding. These calcs might add *additional* padding 
+    // relative to the safe container. Ensure logic matches design intent.
+    val topSafePadding = (screenHeight * 0.05f).coerceAtLeast(16.dp) 
+    val bottomSafePadding = (screenHeight * 0.05f).coerceAtLeast(16.dp)
 
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
@@ -646,7 +626,7 @@ fun EditorContent(
                 uiState = uiState,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = topSafePadding + 20.dp) // Below status
+                    .padding(top = topSafePadding + 20.dp)
                     .zIndex(3f),
                 isVisible = gestureInProgress
             )
@@ -659,7 +639,6 @@ fun EditorContent(
             )
         }
 
-        // ADJUSTMENTS PANEL
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -672,7 +651,7 @@ fun EditorContent(
                 showKnobs = showSliderDialog == "Adjust",
                 showColorBalance = showColorBalanceDialog,
                 isLandscape = isLandscape,
-                screenHeight = this@BoxWithConstraints.maxHeight, // Pass full height
+                screenHeight = this@BoxWithConstraints.maxHeight,
                 onOpacityChange = onOpacityChange,
                 onBrightnessChange = onBrightnessChange,
                 onContrastChange = onContrastChange,
@@ -725,7 +704,6 @@ fun EditorContent(
     }
 }
 
-// ... rest of the file (MainContentLayer, TargetCreationFlow, etc.) stays mostly same ...
 @Composable
 private fun MainContentLayer(
     uiState: UiState,
@@ -733,7 +711,6 @@ private fun MainContentLayer(
     gestureInProgress: Boolean,
     onGestureToggle: (Boolean) -> Unit
 ) {
-   // ... existing code ...
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -816,7 +793,6 @@ private fun MainContentLayer(
                 onGestureEnd = onGestureEnd
             )
             PROJECT -> {
-                // Fallback, should be handled by nav graph
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black))
             }
         }
