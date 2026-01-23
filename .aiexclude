@@ -1,0 +1,47 @@
+# AI Exclude file for GraffitiXR
+
+# DO NOT EXCLUDE:
+# .aiexclude (Allow AI to see its own configuration)
+# .gitignore (Allow AI to see general project exclusions)
+!.aiexclude
+!.gitignore
+
+# Project Specific Exclusions
+.gradle/
+build/
+.cxx/
+.idea/
+.kotlin/
+.jbeval/
+.vscode/
+.qodo/
+.github/
+
+# Local/Private data
+local.properties
+*.jks
+*.keystore
+google-services.json
+
+# Transient Build Dependencies (Managed by setup_libs scripts)
+libs/opencv/
+libs/glm/
+libs/litert/
+libs/mlkit-subject-segmentation/
+libs/*.aar
+
+# Large Binary Artifacts
+*.apk
+*.aab
+*.log
+*.hprof
+
+# Documentation Meta
+AGENTS.md
+docs/architecture.md
+docs/TODO.md
+# (Other docs are okay for context, but keep it lean)
+
+# Backups
+project_backup_*
+backup.ps1

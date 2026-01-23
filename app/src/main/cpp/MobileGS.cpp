@@ -8,7 +8,8 @@
 #define TAG "MobileGS"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 
-// --- UPDATED SHADERS FOR QUADS (BILLBOARDS) ---
+const float CONFIDENCE_THRESHOLD = 0.5f;
+const float CONFIDENCE_INCREMENT = 0.1f;
 
 const char* VS_SRC = R"(#version 300 es
 // Instanced Attributes (Per Splat)
@@ -45,7 +46,6 @@ void main() {
     // 3. Expand vertex
     // aQuadVert is (-0.5, -0.5) to (0.5, 0.5)
     vec3 vertexOffset = (right * aQuadVert.x + up * aQuadVert.y) * aInstanceScale;
-
     vec3 finalPos = aInstancePos + vertexOffset;
 
     gl_Position = uProj * uView * vec4(finalPos, 1.0);
@@ -87,15 +87,20 @@ void main() {
 })";
 
 MobileGS::MobileGS() :
-        mIsInitialized(false),
+        mProgram(0),
+        mVAO(0), mVBO(0), mQuadVBO(0),
+        mBgProgram(0),
+        mBgVAO(0), mBgVBO(0), mBgTexture(0),
+        mViewMatrix(1.0f),
+        mProjMatrix(1.0f),
+        mSortViewMatrix(1.0f),
         mSortRunning(false),
         mStopThread(false),
         mSortResultReady(false),
         mNewBgAvailable(false),
-        mBgTexture(0)
+        mHasBgData(false),
+        mIsInitialized(false)
 {
-    mViewMatrix = glm::mat4(1.0f);
-    mProjMatrix = glm::mat4(1.0f);
     mLastUpdateTime = std::chrono::steady_clock::now();
     mSortThread = std::thread(&MobileGS::sortThreadLoop, this);
 }
@@ -115,7 +120,6 @@ MobileGS::~MobileGS() {
         glDeleteVertexArrays(1, &mVAO);
         // Clean up Quad buffers
         glDeleteBuffers(1, &mQuadVBO);
-
         glDeleteBuffers(1, &mBgVBO);
         glDeleteVertexArrays(1, &mBgVAO);
         glDeleteTextures(1, &mBgTexture);
@@ -136,16 +140,14 @@ void MobileGS::updateCamera(const float* viewMtx, const float* projMtx) {
 
 void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height) {
     auto now = std::chrono::steady_clock::now();
-    long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastUpdateTime).count();
-    if (elapsed < 66) return;
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastUpdateTime).count() < 50) return;
     mLastUpdateTime = now;
 
     std::lock_guard<std::mutex> lock(mDataMutex);
-
     glm::mat4 invView = glm::inverse(mViewMatrix);
     float fy = mProjMatrix[1][1];
     float fx = mProjMatrix[0][0];
-    int step = 16;
+    int step = 12;
 
     cv::Mat bgFrame;
     {
@@ -155,13 +157,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
 
     for (int y = 0; y < height; y += step) {
         const unsigned short* rowPtr = depthMap.ptr<unsigned short>(y);
-
         for (int x = 0; x < width; x += step) {
             unsigned short d_raw = rowPtr[x];
-            if (d_raw == 0 || d_raw > 4000) continue;
+            if (d_raw == 0 || d_raw > 3500) continue;
 
             float z = d_raw * 0.001f;
-
             float ndc_x = ((float)x / width) * 2.0f - 1.0f;
             float ndc_y = 1.0f - ((float)y / height) * 2.0f;
 
@@ -179,43 +179,27 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
             key.z = static_cast<int>(std::floor(worldPos.z / VOXEL_SIZE));
 
             auto it = mVoxelGrid.find(key);
-
             if (it != mVoxelGrid.end()) {
-                int idx = it->second;
-                SplatGaussian& g = mRenderGaussians[idx];
-                g.opacity = std::min(1.0f, g.opacity + 0.1f);
+                SplatGaussian& g = mRenderGaussians[it->second];
+                g.opacity = std::min(1.0f, g.opacity + CONFIDENCE_INCREMENT);
                 g.position = glm::mix(g.position, glm::vec3(worldPos), 0.1f);
-
-                if (!bgFrame.empty()) {
-                    int imgX = (int)((float)x / width * bgFrame.cols);
-                    int imgY = (int)((float)y / height * bgFrame.rows);
-                    if (imgX >=0 && imgX < bgFrame.cols && imgY >=0 && imgY < bgFrame.rows) {
-                        const cv::Vec4b& col = bgFrame.at<cv::Vec4b>(imgY, imgX);
-                        glm::vec3 newCol = glm::vec3(col[0]/255.0f, col[1]/255.0f, col[2]/255.0f);
-                        g.color = glm::mix(g.color, newCol, 0.1f);
-                    }
-                }
-            } else {
-                if (mRenderGaussians.size() >= MAX_POINTS) continue;
-
+            } else if (mRenderGaussians.size() < MAX_POINTS) {
                 SplatGaussian g;
                 g.position = glm::vec3(worldPos);
-                g.scale = glm::vec3(VOXEL_SIZE * 1.5f);
-                g.opacity = 0.2f;
+                g.scale = glm::vec3(VOXEL_SIZE * 1.8f);
+                g.opacity = CONFIDENCE_INCREMENT;
+                g.color = glm::vec3(0.7f);
 
                 if (!bgFrame.empty()) {
                     int imgX = (int)((float)x / width * bgFrame.cols);
                     int imgY = (int)((float)y / height * bgFrame.rows);
-                    if (imgX >=0 && imgX < bgFrame.cols && imgY >=0 && imgY < bgFrame.rows) {
-                        const cv::Vec4b& col = bgFrame.at<cv::Vec4b>(imgY, imgX);
-                        g.color = glm::vec3(col[0]/255.0f, col[1]/255.0f, col[2]/255.0f);
-                    } else {
-                        g.color = glm::vec3(0.5f);
+                    if (imgX >= 0 && imgX < bgFrame.cols && imgY >= 0 && imgY < bgFrame.rows) {
+                        const cv::Vec3b& col = bgFrame.at<cv::Vec3b>(imgY, imgX);
+                        g.color = glm::vec3(col[2]/255.0f, col[1]/255.0f, col[0]/255.0f);
                     }
                 } else {
                     g.color = glm::vec3(0.0f, 1.0f, 0.5f);
                 }
-
                 mRenderGaussians.push_back(g);
                 mVoxelGrid[key] = mRenderGaussians.size() - 1;
             }
@@ -227,6 +211,7 @@ void MobileGS::setBackgroundFrame(const cv::Mat& frame) {
     std::lock_guard<std::mutex> lock(mBgMutex);
     frame.copyTo(mPendingBgFrame);
     mNewBgAvailable = true;
+    mHasBgData = true;
 }
 
 void MobileGS::compileShaders() {
@@ -276,10 +261,14 @@ void MobileGS::compileShaders() {
 
     // Stride is 8 floats: Pos(3), Color(3), Scale(1), Opacity(1)
     int stride = 8 * sizeof(float);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-    glVertexAttribDivisor(0, 1); // Step once per instance
+    for(int i=0; i<4; ++i) {
+        glEnableVertexAttribArray(i);
+        int size = (i == 0 || i == 1) ? 3 : 1;
+        int offset = (i == 0) ? 0 : (i == 1) ? 3 : (i == 2) ? 6 : 7;
+        glVertexAttribPointer(i, size, GL_FLOAT, GL_FALSE, stride, (void*)(offset * sizeof(float)));
+        glVertexAttribDivisor(i, 1);
+    }
+    glBindVertexArray(0);
 
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3*sizeof(float)));
@@ -325,17 +314,14 @@ void MobileGS::compileShaders() {
 void MobileGS::uploadBgTexture() {
     std::lock_guard<std::mutex> lock(mBgMutex);
     if (!mNewBgAvailable || mPendingBgFrame.empty()) return;
-
     glBindTexture(GL_TEXTURE_2D, mBgTexture);
-    GLint format = GL_RGB;
-    if (mPendingBgFrame.channels() == 4) format = GL_RGBA;
-    else if (mPendingBgFrame.channels() == 1) format = GL_LUMINANCE;
-
+    GLint format = (mPendingBgFrame.channels() == 4) ? GL_RGBA : (mPendingBgFrame.channels() == 3) ? GL_RGB : GL_LUMINANCE;
     glTexImage2D(GL_TEXTURE_2D, 0, format, mPendingBgFrame.cols, mPendingBgFrame.rows, 0, format, GL_UNSIGNED_BYTE, mPendingBgFrame.data);
     mNewBgAvailable = false;
 }
 
 void MobileGS::drawBackground() {
+    if (!mHasBgData) return;
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
     glUseProgram(mBgProgram);
@@ -354,15 +340,13 @@ void MobileGS::sortThreadLoop() {
             mSortCV.wait(lock, [this] { return mStopThread || mSortRunning; });
             if (mStopThread) return;
         }
-
         {
             std::lock_guard<std::mutex> dataLock(mDataMutex);
             if (mSortListBack.size() != mRenderGaussians.size()) {
                 mSortListBack.resize(mRenderGaussians.size());
-                for(size_t i=0; i<mSortListBack.size(); ++i) mSortListBack[i].index = i;
+                for(size_t i=0; i<mSortListBack.size(); ++i) mSortListBack[i].index = (int)i;
             }
         }
-
         glm::mat4 view = mSortViewMatrix;
         std::vector<float> depths;
         {
@@ -372,8 +356,7 @@ void MobileGS::sortThreadLoop() {
                 int idx = mSortListBack[i].index;
                 if (idx >= mRenderGaussians.size()) { depths.push_back(0); continue; }
                 const auto& p = mRenderGaussians[idx].position;
-                float z = view[0][2] * p.x + view[1][2] * p.y + view[2][2] * p.z + view[3][2];
-                depths.push_back(z);
+                mSortListBack[i].depth = view[0][2] * p.x + view[1][2] * p.y + view[2][2] * p.z + view[3][2];
             }
         }
 
@@ -384,7 +367,6 @@ void MobileGS::sortThreadLoop() {
         std::sort(mSortListBack.begin(), mSortListBack.end(), [](const Sortable& a, const Sortable& b){
             return a.depth > b.depth;
         });
-
         mSortResultReady = true;
         mSortRunning = false;
     }
@@ -392,72 +374,48 @@ void MobileGS::sortThreadLoop() {
 
 void MobileGS::draw() {
     if (!mIsInitialized) initialize();
-
     uploadBgTexture();
     drawBackground();
 
     std::vector<float> data;
     bool useSort = false;
     size_t count = 0;
-
     {
         std::lock_guard<std::mutex> lock(mDataMutex);
         if (mRenderGaussians.empty()) return;
 
-        count = mRenderGaussians.size();
-        if (mSortResultReady) {
-            std::swap(mSortListFront, mSortListBack);
-            mSortResultReady = false;
-        }
-
+        if (mSortResultReady) { std::swap(mSortListFront, mSortListBack); mSortResultReady = false; }
         if (!mSortRunning) {
-            {
-                std::lock_guard<std::mutex> sortLock(mSortMutex);
-                mSortViewMatrix = mViewMatrix;
-                mSortRunning = true;
-            }
+            { std::lock_guard<std::mutex> sortLock(mSortMutex); mSortViewMatrix = mViewMatrix; mSortRunning = true; }
             mSortCV.notify_one();
         }
 
-        data.reserve(count * 8);
-        useSort = (mSortListFront.size() == count);
-
-        for(size_t i = 0; i < count; ++i) {
+        bool useSort = (mSortListFront.size() == mRenderGaussians.size());
+        for(size_t i = 0; i < mRenderGaussians.size(); ++i) {
             const auto& g = mRenderGaussians[useSort ? mSortListFront[i].index : i];
-            data.push_back(g.position.x);
-            data.push_back(g.position.y);
-            data.push_back(g.position.z);
-            data.push_back(g.color.x);
-            data.push_back(g.color.y);
-            data.push_back(g.color.z);
-            data.push_back(g.scale.x);
-            data.push_back(g.opacity);
+            if (g.opacity < CONFIDENCE_THRESHOLD) continue;
+            data.push_back(g.position.x); data.push_back(g.position.y); data.push_back(g.position.z);
+            data.push_back(g.color.x); data.push_back(g.color.y); data.push_back(g.color.z);
+            data.push_back(g.scale.x); data.push_back(g.opacity);
+            count++;
         }
     }
 
+    if (count == 0) return;
     glEnable(GL_DEPTH_TEST);
     glUseProgram(mProgram);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, &mViewMatrix[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uProj"), 1, GL_FALSE, &mProjMatrix[0][0]);
-
-    // We need Camera Position for billboarding
-    glm::mat4 invView = glm::inverse(mViewMatrix);
-    glm::vec3 camPos = glm::vec3(invView[3]);
+    glm::vec3 camPos = glm::vec3(glm::inverse(mViewMatrix)[3]);
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, &camPos[0]);
 
     glBindVertexArray(mVAO);
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
     glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_DYNAMIC_DRAW);
-
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    // INSTANCED DRAWING: 4 vertices (the quad) drawn N times
-    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, count);
-
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)count);
     glDisable(GL_BLEND);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
 }
 
 void MobileGS::clear() {
@@ -470,12 +428,9 @@ bool MobileGS::saveModel(const std::string& path) {
     std::lock_guard<std::mutex> lock(mDataMutex);
     std::ofstream out(path, std::ios::binary);
     if (!out) return false;
-
     size_t count = mRenderGaussians.size();
     out.write(reinterpret_cast<const char*>(&count), sizeof(count));
-    if (count > 0) {
-        out.write(reinterpret_cast<const char*>(mRenderGaussians.data()), count * sizeof(SplatGaussian));
-    }
+    if (count > 0) out.write(reinterpret_cast<const char*>(mRenderGaussians.data()), (std::streamsize)(count * sizeof(SplatGaussian)));
     return true;
 }
 
@@ -483,23 +438,16 @@ bool MobileGS::loadModel(const std::string& path) {
     std::lock_guard<std::mutex> lock(mDataMutex);
     std::ifstream in(path, std::ios::binary);
     if (!in) return false;
-
     size_t count = 0;
     in.read(reinterpret_cast<char*>(&count), sizeof(count));
     if (count > MAX_POINTS) count = MAX_POINTS;
-
     mRenderGaussians.resize(count);
     mVoxelGrid.clear();
-
     if (count > 0) {
-        in.read(reinterpret_cast<char*>(mRenderGaussians.data()), count * sizeof(SplatGaussian));
-
-        for (int i=0; i<count; ++i) {
+        in.read(reinterpret_cast<char*>(mRenderGaussians.data()), (std::streamsize)(count * sizeof(SplatGaussian)));
+        for (int i=0; i<(int)count; ++i) {
             const auto& g = mRenderGaussians[i];
-            VoxelKey key;
-            key.x = static_cast<int>(std::floor(g.position.x / VOXEL_SIZE));
-            key.y = static_cast<int>(std::floor(g.position.y / VOXEL_SIZE));
-            key.z = static_cast<int>(std::floor(g.position.z / VOXEL_SIZE));
+            VoxelKey key = { (int)std::floor(g.position.x/VOXEL_SIZE), (int)std::floor(g.position.y/VOXEL_SIZE), (int)std::floor(g.position.z/VOXEL_SIZE) };
             mVoxelGrid[key] = i;
         }
     }
