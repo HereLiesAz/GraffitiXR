@@ -3,27 +3,34 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Path
 import android.location.Location
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.graffitixr.data.*
+import com.hereliesaz.graffitixr.data.CaptureEvent
+import com.hereliesaz.graffitixr.data.FeedbackEvent
+import com.hereliesaz.graffitixr.data.GpsData
+import com.hereliesaz.graffitixr.data.OverlayLayer
+import com.hereliesaz.graffitixr.data.ProjectData
+import com.hereliesaz.graffitixr.data.RefinementPath
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
-import com.hereliesaz.graffitixr.utils.ImageProcessingUtils
 import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import kotlin.random.Random
 
-class MainViewModel(
+class MainViewModel @JvmOverloads constructor(
     application: Application,
     private val projectManager: ProjectManager = ProjectManager()
 ) : AndroidViewModel(application) {
