@@ -5,6 +5,7 @@
 #include <thread>
 #include <condition_variable>
 #include <atomic>
+#include <cstdint>
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
 #include <opencv2/core/mat.hpp>
@@ -45,6 +46,7 @@ public:
     void updateCamera(const float* viewMtx, const float* projMtx);
     void processDepthFrame(const cv::Mat& depthMap, int width, int height);
     void setBackgroundFrame(const cv::Mat& frame);
+    void processImage(const cv::Mat& image, int width, int height, int64_t timestamp);
 
     void draw();
     bool saveModel(const std::string& path);
@@ -88,6 +90,7 @@ private:
     std::atomic<bool> mNewBgAvailable;
     std::atomic<bool> mHasBgData;
     std::atomic<bool> mIsInitialized;
+    int64_t mPendingTimestamp;
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
     std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;

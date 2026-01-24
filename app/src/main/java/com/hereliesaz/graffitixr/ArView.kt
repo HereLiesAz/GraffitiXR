@@ -58,10 +58,12 @@ fun ArView(
                 Lifecycle.Event.ON_RESUME -> {
                     arRenderer.onResume(activity)
                     glSurfaceView?.onResume()
+                    viewModel.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     arRenderer.onPause()
                     glSurfaceView?.onPause()
+                    viewModel.onPause()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
                     arRenderer.cleanup()

@@ -119,7 +119,8 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
             fingerprint = fingerprintObj,
             drawingPaths = serializableDrawingPaths,
             progressPercentage = state.progressPercentage,
-            layers = state.layers
+            layers = state.layers,
+            calibrationSnapshots = state.calibrationSnapshots
         )
 
         // 4. Save ProjectData to JSON
@@ -162,6 +163,7 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
                 progressPercentage = projectData.progressPercentage,
                 fingerprintJson = fingerprintJson,
                 layers = projectData.layers,
+                calibrationSnapshots = projectData.calibrationSnapshots,
 
                 // Active layer logic
                 activeLayerId = if (projectData.layers.isNotEmpty()) projectData.layers.first().id else null
