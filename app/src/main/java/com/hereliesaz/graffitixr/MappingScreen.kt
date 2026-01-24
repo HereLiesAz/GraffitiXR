@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.SessionPausedException
 import java.util.concurrent.atomic.AtomicReference
 
 @Composable
@@ -157,6 +158,12 @@ fun MappingScreen(
                                     onCaptureComplete = {
                                         val session = arRenderer.session
                                         val cameraPose = latestCameraPose.value
+
+                                        if (arRenderer.isSessionPaused) {
+                                            Toast.makeText(context, "Session is paused. Cannot create anchor.", Toast.LENGTH_SHORT).show()
+                                            return@PhotoSphereCreationScreen
+                                        }
+
                                         if (session != null && cameraPose != null) {
                                             // The user is happy with the map.
                                             // Create an anchor exactly where the device is NOW.

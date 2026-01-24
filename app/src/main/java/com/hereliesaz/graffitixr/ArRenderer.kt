@@ -68,6 +68,9 @@ class ArRenderer(
 
     @Volatile
     var session: Session? = null
+    @Volatile
+    var isSessionPaused = true
+        private set
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var isAnchorReplacementAllowed: Boolean = true
     var showMiniMap: Boolean = false
@@ -394,6 +397,7 @@ class ArRenderer(
                 }
             }
             session?.resume()
+            isSessionPaused = false
         } catch (e: CameraNotAvailableException) {
             Log.e("ArRenderer", "Camera not available", e)
         } catch (e: Exception) {
@@ -404,6 +408,7 @@ class ArRenderer(
     fun onPause() {
         displayRotationHelper.onPause()
         session?.pause()
+        isSessionPaused = true
     }
 
     fun cleanup() {
