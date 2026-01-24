@@ -92,6 +92,7 @@ class ArRenderer(
     private val displayTransform = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
 
     private var capturePending = false
+    private var lastDepthUpdateTime = 0L
 
     fun updateLayers(newLayers: List<OverlayLayer>) {
         this.layers = newLayers
@@ -214,14 +215,13 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        if (session == null) return
-
-        displayRotationHelper.updateSessionIfNeeded(session!!)
+        val currentSession = session ?: return
+        displayRotationHelper.updateSessionIfNeeded(currentSession)
 
         try {
-            session!!.setCameraTextureName(backgroundTextureId)
-            val frame = session!!.update()
-            onSessionUpdated?.invoke(session!!, frame)
+            currentSession.setCameraTextureName(backgroundTextureId)
+            val frame = currentSession.update()
+            onSessionUpdated?.invoke(currentSession, frame)
             val camera = frame.camera
 
             handleTaps(frame, camera)
@@ -235,17 +235,24 @@ class ArRenderer(
             // Feed Native Engine
             slamManager.updateCamera(viewmtx, projmtx)
 
-            // Process Depth for MobileGS
-            if (frame.camera.trackingState == TrackingState.TRACKING) {
-                try {
-                    val depthImage = frame.acquireDepthImage16Bits()
-                    val depthBuffer = depthImage.planes[0].buffer
-                    val depthBytes = ByteArray(depthBuffer.remaining())
-                    depthBuffer.get(depthBytes)
-                    slamManager.feedDepth(depthBytes, depthImage.width, depthImage.height)
-                    depthImage.close()
-                } catch (e: Exception) {
-                    // Depth not always available
+            // Process Depth for MobileGS (Throttled to 10fps for performance)
+            if (camera.trackingState == TrackingState.TRACKING) {
+                val now = System.currentTimeMillis()
+                if (now - lastDepthUpdateTime > 100) {
+                    try {
+                        val depthImage = frame.acquireDepthImage16Bits()
+                        try {
+                            val depthBuffer = depthImage.planes[0].buffer
+                            val depthBytes = ByteArray(depthBuffer.remaining())
+                            depthBuffer.get(depthBytes)
+                            slamManager.feedDepth(depthBytes, depthImage.width, depthImage.height)
+                            lastDepthUpdateTime = now
+                        } finally {
+                            depthImage.close()
+                        }
+                    } catch (e: Exception) {
+                        // Depth not always available
+                    }
                 }
             }
 
@@ -263,7 +270,7 @@ class ArRenderer(
 
             if (hasTrackingPlane()) {
                 onPlanesDetected(true)
-                planeRenderer.drawPlanes(session!!.getAllTrackables(Plane::class.java), viewmtx, projmtx)
+                planeRenderer.drawPlanes(currentSession.getAllTrackables(Plane::class.java), viewmtx, projmtx)
             } else {
                 onPlanesDetected(false)
             }

@@ -40,13 +40,10 @@ fun MappingScreen(
 
     val slamManager = remember { SlamManager() }
 
-    // Thread-safe state to hold the latest camera pose from GL thread
-    val latestCameraPose = remember { AtomicReference<Pose?>(null) }
-
     // Capture GLSurfaceView to manage lifecycle
     var glSurfaceView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-    // State for safe UI access
+    // State for safe UI access (updated from GL thread, read by UI/callbacks)
     val latestCameraPose = remember { mutableStateOf<Pose?>(null) }
 
     // UI State

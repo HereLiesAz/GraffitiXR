@@ -7,23 +7,21 @@
 
 #define TAG "MobileGS"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-const float CONFIDENCE_THRESHOLD = 0.5f;
-const float CONFIDENCE_INCREMENT = 0.1f;
+const float CONFIDENCE_THRESHOLD = 0.6f;
+const float CONFIDENCE_INCREMENT = 0.05f;
 
 const char* VS_SRC = R"(#version 300 es
-// Instanced Attributes (Per Splat)
 layout(location = 0) in vec3 aInstancePos;
 layout(location = 1) in vec3 aInstanceColor;
 layout(location = 2) in float aInstanceScale;
 layout(location = 3) in float aInstanceOpacity;
-
-// Vertex Attributes (Per Quad Vertex)
 layout(location = 4) in vec2 aQuadVert;
 
 uniform mat4 uView;
 uniform mat4 uProj;
-uniform vec3 uCamPos; // Needed for billboarding
+uniform vec3 uCamPos;
 
 out vec3 vColor;
 out float vAlpha;
@@ -32,19 +30,13 @@ out vec2 vUv;
 void main() {
     vColor = aInstanceColor;
     vAlpha = aInstanceOpacity;
-    vUv = aQuadVert; // -0.5 to 0.5
+    vUv = aQuadVert;
 
-    // Billboarding Math:
-    // 1. Calculate direction from camera to instance center
     vec3 forward = normalize(aInstancePos - uCamPos);
-
-    // 2. Up vector (approximate) and Right vector
     vec3 up = vec3(0.0, 1.0, 0.0);
     vec3 right = normalize(cross(up, forward));
     up = cross(forward, right);
 
-    // 3. Expand vertex
-    // aQuadVert is (-0.5, -0.5) to (0.5, 0.5)
     vec3 vertexOffset = (right * aQuadVert.x + up * aQuadVert.y) * aInstanceScale;
     vec3 finalPos = aInstancePos + vertexOffset;
 
@@ -58,71 +50,33 @@ in float vAlpha;
 in vec2 vUv;
 out vec4 FragColor;
 void main() {
-    // Circular Falloff
-    float r2 = dot(vUv, vUv); // Range 0.0 to 0.5 approx (since UV is -0.5 to 0.5)
+    float r2 = dot(vUv, vUv);
     if (r2 > 0.25) discard;
-
-    // Soft Gaussian edge
     float alpha = exp(-r2 * 8.0) * vAlpha;
     FragColor = vec4(vColor, alpha);
 })";
 
-// Background Shaders remain the same...
-const char* BG_VS_SRC = R"(#version 300 es
-layout(location = 0) in vec2 aPos;
-layout(location = 1) in vec2 aTexCoord;
-out vec2 vTexCoord;
-void main() {
-    gl_Position = vec4(aPos, 0.0, 1.0);
-    vTexCoord = aTexCoord;
-})";
-
-const char* BG_FS_SRC = R"(#version 300 es
-precision mediump float;
-in vec2 vTexCoord;
-uniform sampler2D uTexture;
-out vec4 FragColor;
-void main() {
-    FragColor = texture(uTexture, vTexCoord);
-})";
-
 MobileGS::MobileGS() :
-        mProgram(0),
-        mVAO(0), mVBO(0), mQuadVBO(0),
-        mBgProgram(0),
-        mBgVAO(0), mBgVBO(0), mBgTexture(0),
-        mViewMatrix(1.0f),
-        mProjMatrix(1.0f),
-        mSortViewMatrix(1.0f),
-        mSortRunning(false),
-        mStopThread(false),
-        mSortResultReady(false),
-        mNewBgAvailable(false),
-        mHasBgData(false),
-        mIsInitialized(false)
+        mProgram(0), mVAO(0), mVBO(0), mQuadVBO(0),
+        mBgProgram(0), mBgVAO(0), mBgVBO(0), mBgTexture(0),
+        mViewMatrix(1.0f), mProjMatrix(1.0f), mSortViewMatrix(1.0f),
+        mSortRunning(false), mStopThread(false), mSortResultReady(false),
+        mNewBgAvailable(false), mHasBgData(false), mIsInitialized(false)
 {
     mLastUpdateTime = std::chrono::steady_clock::now();
     mSortThread = std::thread(&MobileGS::sortThreadLoop, this);
 }
 
 MobileGS::~MobileGS() {
-    {
-        std::lock_guard<std::mutex> lock(mSortMutex);
-        mStopThread = true;
-    }
-    mSortCV.notify_one();
+    mStopThread = true;
+    mSortCV.notify_all();
     if(mSortThread.joinable()) mSortThread.join();
 
     if (mIsInitialized) {
         glDeleteProgram(mProgram);
-        glDeleteProgram(mBgProgram);
         glDeleteBuffers(1, &mVBO);
         glDeleteVertexArrays(1, &mVAO);
-        // Clean up Quad buffers
         glDeleteBuffers(1, &mQuadVBO);
-        glDeleteBuffers(1, &mBgVBO);
-        glDeleteVertexArrays(1, &mBgVAO);
-        glDeleteTextures(1, &mBgTexture);
     }
 }
 
@@ -134,40 +88,40 @@ void MobileGS::initialize() {
 }
 
 void MobileGS::updateCamera(const float* viewMtx, const float* projMtx) {
+    std::lock_guard<std::mutex> lock(mDataMutex);
     memcpy(&mViewMatrix[0][0], viewMtx, 16 * sizeof(float));
     memcpy(&mProjMatrix[0][0], projMtx, 16 * sizeof(float));
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height) {
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastUpdateTime).count() < 50) return;
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastUpdateTime).count() < 100) return;
     mLastUpdateTime = now;
 
     std::lock_guard<std::mutex> lock(mDataMutex);
+    if (mProjMatrix[0][0] == 0) return;
+
     glm::mat4 invView = glm::inverse(mViewMatrix);
-    float fy = mProjMatrix[1][1];
-    float fx = mProjMatrix[0][0];
-    int step = 12;
+    // Standard GL Projection Matrix Principal Point Layout (p[2][0], p[2][1])
+    float p00 = mProjMatrix[0][0];
+    float p11 = mProjMatrix[1][1];
+    float p20 = mProjMatrix[2][0];
+    float p21 = mProjMatrix[2][1];
 
-    cv::Mat bgFrame;
-    {
-        std::lock_guard<std::mutex> bgLock(mBgMutex);
-        if (!mPendingBgFrame.empty()) bgFrame = mPendingBgFrame.clone();
-    }
-
+    int step = 20; // Drastically increased step to reduce load and "random points"
     for (int y = 0; y < height; y += step) {
-        const unsigned short* rowPtr = depthMap.ptr<unsigned short>(y);
+        const uint16_t* rowPtr = depthMap.ptr<uint16_t>(y);
         for (int x = 0; x < width; x += step) {
-            unsigned short d_raw = rowPtr[x];
-            if (d_raw == 0 || d_raw > 3500) continue;
+            uint16_t d_raw = rowPtr[x];
+            if (d_raw < 200 || d_raw > 2500) continue; // Tighter filter: 20cm to 2.5m
 
             float z = d_raw * 0.001f;
             float ndc_x = ((float)x / width) * 2.0f - 1.0f;
             float ndc_y = 1.0f - ((float)y / height) * 2.0f;
 
             glm::vec4 viewPos;
-            viewPos.x = -z * (ndc_x / fx);
-            viewPos.y = -z * (ndc_y / fy);
+            viewPos.x = (ndc_x + p20) * z / p00;
+            viewPos.y = (ndc_y + p21) * z / p11;
             viewPos.z = -z;
             viewPos.w = 1.0f;
 
@@ -188,31 +142,15 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
                 g.position = glm::vec3(worldPos);
                 g.scale = glm::vec3(VOXEL_SIZE * 1.8f);
                 g.opacity = CONFIDENCE_INCREMENT;
-                g.color = glm::vec3(0.7f);
-
-                if (!bgFrame.empty()) {
-                    int imgX = (int)((float)x / width * bgFrame.cols);
-                    int imgY = (int)((float)y / height * bgFrame.rows);
-                    if (imgX >= 0 && imgX < bgFrame.cols && imgY >= 0 && imgY < bgFrame.rows) {
-                        const cv::Vec3b& col = bgFrame.at<cv::Vec3b>(imgY, imgX);
-                        g.color = glm::vec3(col[2]/255.0f, col[1]/255.0f, col[0]/255.0f);
-                    }
-                } else {
-                    g.color = glm::vec3(0.0f, 1.0f, 0.5f);
-                }
+                g.color = glm::vec3(0.0f, 0.8f, 1.0f);
                 mRenderGaussians.push_back(g);
-                mVoxelGrid[key] = mRenderGaussians.size() - 1;
+                mVoxelGrid[key] = (int)(mRenderGaussians.size() - 1);
             }
         }
     }
 }
 
-void MobileGS::setBackgroundFrame(const cv::Mat& frame) {
-    std::lock_guard<std::mutex> lock(mBgMutex);
-    frame.copyTo(mPendingBgFrame);
-    mNewBgAvailable = true;
-    mHasBgData = true;
-}
+void MobileGS::setBackgroundFrame(const cv::Mat& frame) {}
 
 void MobileGS::compileShaders() {
     auto createProg = [](const char* vsSrc, const char* fsSrc) {
@@ -233,189 +171,150 @@ void MobileGS::compileShaders() {
 
     mProgram = createProg(VS_SRC, FS_SRC);
 
-    // 1. Instance Buffer (Splat Data)
     glGenVertexArrays(1, &mVAO);
     glGenBuffers(1, &mVBO);
-
-    // 2. Geometry Buffer (The single Quad)
     glGenBuffers(1, &mQuadVBO);
 
-    // Define the Quad Vertices (-0.5 to 0.5)
-    float quadVerts[] = {
-            -0.5f, -0.5f,
-            0.5f, -0.5f,
-            -0.5f,  0.5f,
-            0.5f,  0.5f
-    };
+    float quadVerts[] = { -0.5f,-0.5f, 0.5f,-0.5f, -0.5f,0.5f, 0.5f,0.5f };
 
     glBindVertexArray(mVAO);
-
-    // Bind Quad VBO to Attribute 4
     glBindBuffer(GL_ARRAY_BUFFER, mQuadVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
     glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    // Bind Instance VBO to Attributes 0,1,2,3
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
-
-    // Stride is 8 floats: Pos(3), Color(3), Scale(1), Opacity(1)
     int stride = 8 * sizeof(float);
     for(int i=0; i<4; ++i) {
         glEnableVertexAttribArray(i);
         int size = (i == 0 || i == 1) ? 3 : 1;
         int offset = (i == 0) ? 0 : (i == 1) ? 3 : (i == 2) ? 6 : 7;
-        glVertexAttribPointer(i, size, GL_FLOAT, GL_FALSE, stride, (void*)(offset * sizeof(float)));
+        glVertexAttribPointer(i, size, GL_FLOAT, GL_FALSE, stride, (void*)(uintptr_t)(offset * sizeof(float)));
         glVertexAttribDivisor(i, 1);
     }
     glBindVertexArray(0);
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3*sizeof(float)));
-    glVertexAttribDivisor(1, 1);
-
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (void*)(6*sizeof(float)));
-    glVertexAttribDivisor(2, 1);
-
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(7*sizeof(float)));
-    glVertexAttribDivisor(3, 1);
-
-    glBindVertexArray(0); // Unbind
-
-    // Background Setup
-    mBgProgram = createProg(BG_VS_SRC, BG_FS_SRC);
-    glGenVertexArrays(1, &mBgVAO);
-    glGenBuffers(1, &mBgVBO);
-
-    float bgVerts[] = {
-            -1, -1, 0, 1,
-            1, -1, 1, 1,
-            -1,  1, 0, 0,
-            1,  1, 1, 0
-    };
-    glBindVertexArray(mBgVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, mBgVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(bgVerts), bgVerts, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
-
-    glGenTextures(1, &mBgTexture);
-    glBindTexture(GL_TEXTURE_2D, mBgTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-}
-
-void MobileGS::uploadBgTexture() {
-    std::lock_guard<std::mutex> lock(mBgMutex);
-    if (!mNewBgAvailable || mPendingBgFrame.empty()) return;
-    glBindTexture(GL_TEXTURE_2D, mBgTexture);
-    GLint format = (mPendingBgFrame.channels() == 4) ? GL_RGBA : (mPendingBgFrame.channels() == 3) ? GL_RGB : GL_LUMINANCE;
-    glTexImage2D(GL_TEXTURE_2D, 0, format, mPendingBgFrame.cols, mPendingBgFrame.rows, 0, format, GL_UNSIGNED_BYTE, mPendingBgFrame.data);
-    mNewBgAvailable = false;
-}
-
-void MobileGS::drawBackground() {
-    if (!mHasBgData) return;
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    glUseProgram(mBgProgram);
-    glBindVertexArray(mBgVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, mBgTexture);
-    glUniform1i(glGetUniformLocation(mBgProgram, "uTexture"), 0);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glDepthMask(GL_TRUE);
 }
 
 void MobileGS::sortThreadLoop() {
-    while (true) {
+    while (!mStopThread) {
         {
             std::unique_lock<std::mutex> lock(mSortMutex);
-            mSortCV.wait(lock, [this] { return mStopThread || mSortRunning; });
+            mSortCV.wait(lock, [this] { return mStopThread || mSortRunning.load(); });
             if (mStopThread) return;
         }
+
+        std::vector<glm::vec3> positions;
+        glm::mat4 view;
         {
             std::lock_guard<std::mutex> dataLock(mDataMutex);
-            if (mSortListBack.size() != mRenderGaussians.size()) {
-                mSortListBack.resize(mRenderGaussians.size());
-                for(size_t i=0; i<mSortListBack.size(); ++i) mSortListBack[i].index = (int)i;
-            }
+            view = mSortViewMatrix;
+            positions.reserve(mRenderGaussians.size());
+            for(const auto& g : mRenderGaussians) positions.push_back(g.position);
         }
-        glm::mat4 view = mSortViewMatrix;
-        std::vector<float> depths;
-        {
+
+        if (!positions.empty()) {
+            std::vector<Sortable> sorted;
+            sorted.reserve(positions.size());
+            for(size_t i=0; i<positions.size(); ++i) {
+                const auto& p = positions[i];
+                float depth = view[0][2] * p.x + view[1][2] * p.y + view[2][2] * p.z + view[3][2];
+                sorted.push_back({(int)i, depth});
+            }
+            std::sort(sorted.begin(), sorted.end(), [](const Sortable& a, const Sortable& b){
+                return a.depth > b.depth;
+            });
+
             std::lock_guard<std::mutex> dataLock(mDataMutex);
-            depths.reserve(mSortListBack.size());
-            for(size_t i=0; i<mSortListBack.size(); ++i) {
-                int idx = mSortListBack[i].index;
-                if (idx >= mRenderGaussians.size()) { depths.push_back(0); continue; }
-                const auto& p = mRenderGaussians[idx].position;
-                mSortListBack[i].depth = view[0][2] * p.x + view[1][2] * p.y + view[2][2] * p.z + view[3][2];
-            }
+            mSortListBack = std::move(sorted);
+            mSortResultReady = true;
         }
-
-        for(size_t i=0; i<mSortListBack.size(); ++i) {
-            mSortListBack[i].depth = depths[i];
-        }
-
-        std::sort(mSortListBack.begin(), mSortListBack.end(), [](const Sortable& a, const Sortable& b){
-            return a.depth > b.depth;
-        });
-        mSortResultReady = true;
         mSortRunning = false;
     }
 }
 
 void MobileGS::draw() {
     if (!mIsInitialized) initialize();
-    uploadBgTexture();
-    drawBackground();
 
     std::vector<float> data;
-    bool useSort = false;
+    glm::mat4 view, proj;
     size_t count = 0;
+
     {
         std::lock_guard<std::mutex> lock(mDataMutex);
         if (mRenderGaussians.empty()) return;
 
-        if (mSortResultReady) { std::swap(mSortListFront, mSortListBack); mSortResultReady = false; }
-        if (!mSortRunning) {
-            { std::lock_guard<std::mutex> sortLock(mSortMutex); mSortViewMatrix = mViewMatrix; mSortRunning = true; }
-            mSortCV.notify_one();
+        view = mViewMatrix;
+        proj = mProjMatrix;
+
+        if (mSortResultReady.exchange(false)) {
+            mSortListFront = std::move(mSortListBack);
         }
 
-        bool useSort = (mSortListFront.size() == mRenderGaussians.size());
+        bool canUseSort = (mSortListFront.size() == mRenderGaussians.size());
+        data.reserve(mRenderGaussians.size() * 8);
         for(size_t i = 0; i < mRenderGaussians.size(); ++i) {
-            const auto& g = mRenderGaussians[useSort ? mSortListFront[i].index : i];
+            int idx = canUseSort ? mSortListFront[i].index : (int)i;
+            if (idx >= mRenderGaussians.size()) continue;
+            const auto& g = mRenderGaussians[idx];
             if (g.opacity < CONFIDENCE_THRESHOLD) continue;
+
             data.push_back(g.position.x); data.push_back(g.position.y); data.push_back(g.position.z);
             data.push_back(g.color.x); data.push_back(g.color.y); data.push_back(g.color.z);
             data.push_back(g.scale.x); data.push_back(g.opacity);
             count++;
         }
+
+        if (!mSortRunning) {
+            {
+                std::lock_guard<std::mutex> sortLock(mSortMutex);
+                mSortViewMatrix = mViewMatrix;
+                mSortRunning = true;
+            }
+            mSortCV.notify_one();
+        }
     }
 
     if (count == 0) return;
+
+    // Save ALL relevant GL State to prevent interfering with ARCore Background
+    GLint prevProgram, prevVAO, prevVBO, prevBlendSrc, prevBlendDst;
+    GLboolean prevDepthTest, prevBlend, prevCull;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevVBO);
+    glGetBooleanv(GL_DEPTH_TEST, &prevDepthTest);
+    glGetBooleanv(GL_BLEND, &prevBlend);
+    glGetBooleanv(GL_CULL_FACE, &prevCull);
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &prevBlendSrc);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &prevBlendDst);
+
     glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     glUseProgram(mProgram);
-    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, &mViewMatrix[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uProj"), 1, GL_FALSE, &mProjMatrix[0][0]);
-    glm::vec3 camPos = glm::vec3(glm::inverse(mViewMatrix)[3]);
+    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, &view[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uProj"), 1, GL_FALSE, &proj[0][0]);
+
+    glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, &camPos[0]);
 
     glBindVertexArray(mVAO);
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
-    glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_DYNAMIC_DRAW);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_STREAM_DRAW);
+
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)count);
-    glDisable(GL_BLEND);
+
+    // RESTORE GL State perfectly
+    glUseProgram(prevProgram);
+    glBindVertexArray(prevVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, prevVBO);
+    if (!prevDepthTest) glDisable(GL_DEPTH_TEST);
+    if (!prevBlend) glDisable(GL_BLEND);
+    else glBlendFunc(prevBlendSrc, prevBlendDst);
+    if (prevCull) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
 }
 
 void MobileGS::clear() {

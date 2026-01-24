@@ -4,6 +4,7 @@
 #include <mutex>
 #include <thread>
 #include <condition_variable>
+#include <atomic>
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
 #include <opencv2/core/mat.hpp>
@@ -77,15 +78,16 @@ private:
     std::thread mSortThread;
     std::mutex mSortMutex;
     std::condition_variable mSortCV;
-    bool mSortRunning;
-    bool mStopThread;
-    bool mSortResultReady;
+
+    std::atomic<bool> mSortRunning;
+    std::atomic<bool> mStopThread;
+    std::atomic<bool> mSortResultReady;
 
     std::mutex mDataMutex;
     std::mutex mBgMutex;
-    bool mNewBgAvailable;
-    bool mHasBgData; // New: track if we have ANY background data
-    bool mIsInitialized;
+    std::atomic<bool> mNewBgAvailable;
+    std::atomic<bool> mHasBgData;
+    std::atomic<bool> mIsInitialized;
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
     std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;
