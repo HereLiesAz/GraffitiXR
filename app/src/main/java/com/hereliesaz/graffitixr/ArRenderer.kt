@@ -51,7 +51,7 @@ class ArRenderer(
     val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
     private val onFrameCaptured: (Bitmap) -> Unit,
-    private val onAnchorCreated: () -> Unit,
+    private val onAnchorCreated: (Anchor) -> Unit,
     private val onProgressUpdated: (Float, Bitmap?) -> Unit,
     private val onTrackingFailure: (String?) -> Unit,
     private val onBoundsUpdated: (RectF) -> Unit
@@ -69,6 +69,7 @@ class ArRenderer(
     @Volatile
     var session: Session? = null
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
+    var anchorCreationPose: MutableState<Pose?>? = null
     var isAnchorReplacementAllowed: Boolean = true
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true
@@ -223,6 +224,13 @@ class ArRenderer(
             val frame = currentSession.update()
             onSessionUpdated?.invoke(currentSession, frame)
             val camera = frame.camera
+
+            // Handle anchor creation requests.
+            anchorCreationPose?.value?.let { pose ->
+                anchor = currentSession.createAnchor(pose)
+                onAnchorCreated(anchor!!)
+                anchorCreationPose?.value = null // Reset the request.
+            }
 
             handleTaps(frame, camera)
             backgroundRenderer.draw(frame)
