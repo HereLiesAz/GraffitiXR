@@ -16,9 +16,29 @@ class SlamManager {
     val isHosting = _isHosting.asStateFlow()
 
     // Lifecycle
-    external fun initNative()
+    private external fun initNativeJni()
     external fun initSLAM(vocabPath: String, settingsPath: String)
-    external fun destroyNative()
+    private external fun destroyNativeJni()
+
+    fun initNative() {
+        synchronized(Companion) {
+            if (refCount == 0) {
+                initNativeJni()
+            }
+            refCount++
+        }
+    }
+
+    fun destroyNative() {
+        synchronized(Companion) {
+            if (refCount > 0) {
+                refCount--
+                if (refCount == 0) {
+                    destroyNativeJni()
+                }
+            }
+        }
+    }
 
     // Sensors
     external fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray)
@@ -59,6 +79,8 @@ class SlamManager {
     }
 
     companion object {
+        private var refCount = 0
+
         init {
             try {
                 System.loadLibrary("graffiti-lib")

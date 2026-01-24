@@ -32,7 +32,7 @@ JNIEnv* getEnv() {
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_initNative(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
     if (!gMobileGS) {
         gMobileGS = new MobileGS();
         gMobileGS->initialize();
@@ -40,7 +40,7 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_initNative(JNIEnv *env, jobject 
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_destroyNative(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_destroyNativeJni(JNIEnv *env, jobject thiz) {
     if (gMobileGS) {
         delete gMobileGS;
         gMobileGS = nullptr;
