@@ -21,6 +21,7 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.slam.SlamManager
 import kotlinx.coroutines.launch
+import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -45,6 +46,7 @@ fun MappingScreen(
 
     // State for safe UI access (updated from GL thread, read by UI/callbacks)
     val latestCameraPose = remember { mutableStateOf<Pose?>(null) }
+    val anchorCreationPose = remember { mutableStateOf<Pose?>(null) }
 
     // UI State
     val mappingQuality by slamManager.mappingQuality.collectAsState()
@@ -58,11 +60,29 @@ fun MappingScreen(
             context = context,
             onPlanesDetected = {},
             onFrameCaptured = {},
-            onAnchorCreated = {},
             onProgressUpdated = { _, _ -> },
             onTrackingFailure = {},
-            onBoundsUpdated = {}
+            onBoundsUpdated = {},
+            anchorCreationPose = anchorCreationPose
         ).apply {
+            onAnchorCreated = { anchor: Anchor ->
+                val session = session
+                if (session != null) {
+                    scope.launch {
+                        slamManager.hostAnchor(
+                            session = session,
+                            anchor = anchor,
+                            onSuccess = { cloudId ->
+                                Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
+                                onMapSaved(cloudId)
+                            },
+                            onError = { error ->
+                                Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    }
+                }
+            }
             showMiniMap = true
             showGuide = false
             onSessionUpdated = { session, frame ->
@@ -155,30 +175,12 @@ fun MappingScreen(
                                     currentQuality = qualityEnum,
                                     isHosting = isHosting,
                                     onCaptureComplete = {
-                                        val session = arRenderer.session
                                         val cameraPose = latestCameraPose.value
-                                        if (session != null && cameraPose != null) {
-                                            // The user is happy with the map.
-                                            // Create an anchor exactly where the device is NOW.
-
-                                            // We place the anchor slightly in front (0.5m) to ensure stability
+                                        if (cameraPose != null) {
+                                            // Request anchor creation by updating the state.
+                                            // The actual anchor creation will happen in ArRenderer on the GL thread.
                                             val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
-                                            val anchorPose = cameraPose.compose(forwardOffset)
-                                            val anchor = session.createAnchor(anchorPose)
-
-                                            scope.launch {
-                                                slamManager.hostAnchor(
-                                                    session = session,
-                                                    anchor = anchor,
-                                                    onSuccess = { cloudId ->
-                                                        Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
-                                                        onMapSaved(cloudId)
-                                                    },
-                                                    onError = { error ->
-                                                        Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
-                                                    }
-                                                )
-                                            }
+                                            anchorCreationPose.value = cameraPose.compose(forwardOffset)
                                         } else {
                                             Toast.makeText(context, "Tracking not ready", Toast.LENGTH_SHORT).show()
                                         }
