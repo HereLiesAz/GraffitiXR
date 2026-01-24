@@ -412,13 +412,19 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
 
             // BACKGROUND LAYER (Edge-to-Edge)
             background(weight = 0) {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                    MainContentLayer(
-                        uiState = uiState,
-                        viewModel = viewModel,
-                        gestureInProgress = gestureInProgress,
-                        onGestureToggle = { gestureInProgress = it }
-                    )
+                // Prevent concurrent camera/AR sessions by only rendering MainContentLayer
+                // when in the editor route. This allows MappingScreen to have exclusive access.
+                if (currentNavRoute == "editor" || currentNavRoute == null) {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                        MainContentLayer(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            gestureInProgress = gestureInProgress,
+                            onGestureToggle = { gestureInProgress = it }
+                        )
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
                 }
             }
 
