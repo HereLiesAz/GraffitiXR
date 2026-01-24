@@ -164,20 +164,29 @@ fun MappingScreen(
                                             // We place the anchor slightly in front (0.5m) to ensure stability
                                             val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
                                             val anchorPose = cameraPose.compose(forwardOffset)
-                                            val anchor = session.createAnchor(anchorPose)
 
-                                            scope.launch {
-                                                slamManager.hostAnchor(
-                                                    session = session,
-                                                    anchor = anchor,
-                                                    onSuccess = { cloudId ->
-                                                        Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
-                                                        onMapSaved(cloudId)
-                                                    },
-                                                    onError = { error ->
-                                                        Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
-                                                    }
-                                                )
+                                            try {
+                                                val anchor = session.createAnchor(anchorPose)
+
+                                                scope.launch {
+                                                    slamManager.hostAnchor(
+                                                        session = session,
+                                                        anchor = anchor,
+                                                        onSuccess = { cloudId ->
+                                                            Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
+                                                            onMapSaved(cloudId)
+                                                        },
+                                                        onError = { error ->
+                                                            Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
+                                                        }
+                                                    )
+                                                }
+                                            } catch (e: com.google.ar.core.exceptions.SessionPausedException) {
+                                                android.util.Log.e("MappingScreen", "Session paused, cannot create anchor", e)
+                                                Toast.makeText(context, "Session paused. Please try again.", Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("MappingScreen", "Error creating anchor", e)
+                                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                                             }
                                         } else {
                                             Toast.makeText(context, "Tracking not ready", Toast.LENGTH_SHORT).show()
