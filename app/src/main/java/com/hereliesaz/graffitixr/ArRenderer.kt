@@ -9,6 +9,7 @@ import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
+import android.media.Image
 import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.core.content.ContextCompat
@@ -96,6 +97,11 @@ class ArRenderer(
 
     private var capturePending = false
     private var lastDepthUpdateTime = 0L
+
+    @Volatile
+    private var lastPose: Pose? = null
+
+    fun getLatestPose(): Pose? = lastPose
 
     fun updateLayers(newLayers: List<OverlayLayer>) {
         this.layers = newLayers
@@ -226,6 +232,7 @@ class ArRenderer(
             val frame = currentSession.update()
             onSessionUpdated?.invoke(currentSession, frame)
             val camera = frame.camera
+            lastPose = camera.pose
 
             anchorCreationPose?.value?.let { pose ->
                 currentSession.createAnchor(pose)?.let { newAnchor ->
@@ -244,6 +251,41 @@ class ArRenderer(
 
             // Feed Native Engine
             slamManager.updateCamera(viewmtx, projmtx)
+
+            // Feed Image to Native Engine (for VIO/SLAM)
+            try {
+                val image = frame.acquireCameraImage()
+                try {
+                    if (image.format == android.graphics.ImageFormat.YUV_420_888) {
+                        val width = image.width
+                        val height = image.height
+                        val plane = image.planes[0]
+                        val rowStride = plane.rowStride
+                        val buffer = plane.buffer
+
+                        val yBytes = if (rowStride == width) {
+                            // Fast path: direct copy
+                            val bytes = ByteArray(buffer.remaining())
+                            buffer.get(bytes)
+                            bytes
+                        } else {
+                            // Slow path: remove padding
+                            val bytes = ByteArray(width * height)
+                            for (row in 0 until height) {
+                                buffer.position(row * rowStride)
+                                buffer.get(bytes, row * width, width)
+                            }
+                            bytes
+                        }
+
+                        slamManager.processFrameNative(width, height, yBytes, frame.timestamp)
+                    }
+                } finally {
+                    image.close()
+                }
+            } catch (e: Exception) {
+                // Image not available or format issue
+            }
 
             // Process Depth for MobileGS (Throttled to 10fps for performance)
             if (camera.trackingState == TrackingState.TRACKING) {
@@ -405,6 +447,7 @@ class ArRenderer(
                 }
             }
             session?.resume()
+            isSessionPaused = false
         } catch (e: CameraNotAvailableException) {
             Log.e("ArRenderer", "Camera not available", e)
         } catch (e: Exception) {
@@ -415,6 +458,7 @@ class ArRenderer(
     fun onPause() {
         displayRotationHelper.onPause()
         session?.pause()
+        isSessionPaused = true
     }
 
     fun cleanup() {

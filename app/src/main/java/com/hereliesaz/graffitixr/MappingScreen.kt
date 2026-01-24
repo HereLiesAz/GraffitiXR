@@ -25,6 +25,7 @@ import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.SessionPausedException
 import java.util.concurrent.atomic.AtomicReference
 
 @Composable

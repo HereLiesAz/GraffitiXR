@@ -48,6 +48,7 @@ data class UiState(
     val targetCreationMode: TargetCreationMode = TargetCreationMode.SINGLE_IMAGE,
     val capturedTargetUris: List<Uri> = emptyList(),
     val capturedTargetImages: List<Bitmap> = emptyList(),
+    val calibrationSnapshots: List<com.hereliesaz.graffitixr.data.CalibrationSnapshot> = emptyList(),
     val targetMaskUri: Uri? = null,
     val gridRows: Int = 3,
     val gridCols: Int = 3,

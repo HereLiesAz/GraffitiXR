@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <opencv2/core.hpp>
 #include <android/log.h>
 #include "include/MobileGS.h"
@@ -70,6 +71,32 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_feedDepth(JNIEnv *env, jobject t
         gMobileGS->processDepthFrame(depthMap, width, height);
     }
     env->ReleaseByteArrayElements(depth_data, data, 0);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_feedImage(JNIEnv *env, jobject thiz,
+        jbyteArray image_data,
+        jint width, jint height) {
+    if (!gMobileGS) return;
+    jbyte* data = env->GetByteArrayElements(image_data, nullptr);
+    if (data != nullptr) {
+        cv::Mat img(height, width, CV_8UC1, (unsigned char*)data);
+        gMobileGS->setBackgroundFrame(img);
+    }
+    env->ReleaseByteArrayElements(image_data, data, 0);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_processFrameNative(JNIEnv *env, jobject thiz,
+        jint width, jint height,
+        jbyteArray data, jlong timestamp) {
+    if (!gMobileGS) return;
+    jbyte* rawData = env->GetByteArrayElements(data, nullptr);
+    if (rawData != nullptr) {
+        cv::Mat img(height, width, CV_8UC1, (unsigned char*)rawData);
+        gMobileGS->processImage(img, width, height, (int64_t)timestamp);
+    }
+    env->ReleaseByteArrayElements(data, rawData, 0);
 }
 
 JNIEXPORT void JNICALL

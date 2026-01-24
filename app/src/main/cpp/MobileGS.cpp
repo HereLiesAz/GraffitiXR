@@ -150,7 +150,20 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
     }
 }
 
-void MobileGS::setBackgroundFrame(const cv::Mat& frame) {}
+void MobileGS::setBackgroundFrame(const cv::Mat& frame) {
+    std::lock_guard<std::mutex> lock(mBgMutex);
+    frame.copyTo(mPendingBgFrame);
+    mNewBgAvailable = true;
+    mHasBgData = true;
+}
+
+void MobileGS::processImage(const cv::Mat& image, int width, int height, int64_t timestamp) {
+    std::lock_guard<std::mutex> lock(mBgMutex);
+    image.copyTo(mPendingBgFrame);
+    mPendingTimestamp = timestamp;
+    mNewBgAvailable = true;
+    mHasBgData = true;
+}
 
 void MobileGS::compileShaders() {
     auto createProg = [](const char* vsSrc, const char* fsSrc) {

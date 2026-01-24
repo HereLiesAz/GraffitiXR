@@ -3,17 +3,23 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.Location
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.graffitixr.data.CalibrationSnapshot
 import com.hereliesaz.graffitixr.data.CaptureEvent
 import com.hereliesaz.graffitixr.data.FeedbackEvent
 import com.hereliesaz.graffitixr.data.GpsData
 import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.data.RefinementPath
+import com.hereliesaz.graffitixr.data.SensorData
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
 import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.ProjectManager
@@ -56,6 +62,59 @@ class MainViewModel @JvmOverloads constructor(
 
     var arRenderer: ArRenderer? = null
 
+    // Sensor Logic for Automatic Calibration
+    private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private var currentSensorData: SensorData? = null
+    private var isSensorListening = false
+    private var stableStartTime = 0L
+    private var lastRotationVector: FloatArray? = null
+    private val STABILITY_THRESHOLD = 0.02f
+
+    private val sensorEventListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            event ?: return
+            if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
+                val rotationMatrix = FloatArray(9)
+                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                val orientation = FloatArray(3)
+                SensorManager.getOrientation(rotationMatrix, orientation)
+                currentSensorData = SensorData(orientation[0], orientation[1], orientation[2])
+
+                if (_uiState.value.isCapturingTarget && _uiState.value.captureStep.name.startsWith("CALIBRATION_POINT")) {
+                    val currentVector = event.values.clone()
+                    var isStable = false
+
+                    if (lastRotationVector != null) {
+                        var delta = 0f
+                        val size = minOf(currentVector.size, lastRotationVector!!.size, 4)
+                        for (i in 0 until size) {
+                            delta += kotlin.math.abs(currentVector[i] - lastRotationVector!![i])
+                        }
+                        if (delta < STABILITY_THRESHOLD) isStable = true
+                    } else {
+                        isStable = true
+                    }
+                    lastRotationVector = currentVector
+
+                    val now = System.currentTimeMillis()
+                    if (isStable) {
+                        if (stableStartTime == 0L) stableStartTime = now
+                        else if (now - stableStartTime > 2000) {
+                            onCalibrationPointCaptured()
+                            stableStartTime = 0L
+                            lastRotationVector = null
+                        }
+                    } else {
+                        stableStartTime = 0L
+                    }
+                } else {
+                    stableStartTime = 0L
+                }
+            }
+        }
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
     // History Stacks (Global Layer States)
     private val undoStack = ArrayDeque<List<OverlayLayer>>()
     private val redoStack = ArrayDeque<List<OverlayLayer>>()
@@ -63,7 +122,6 @@ class MainViewModel @JvmOverloads constructor(
 
     private var layerModsClipboard: OverlayLayer? = null
 
-    // ... (Existing helpers) ...
     private fun snapshotState() {
         if (undoStack.size >= MAX_HISTORY) undoStack.removeFirst()
         undoStack.addLast(_uiState.value.layers.toList())
@@ -83,7 +141,6 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    // ... (Existing adjustment methods) ...
     fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
     fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
     fun onContrastChanged(v: Float) = updateActiveLayer { it.copy(contrast = v) }
@@ -96,7 +153,6 @@ class MainViewModel @JvmOverloads constructor(
         layer.copy(blendMode = ImageUtils.getNextBlendMode(layer.blendMode))
     }
 
-    // ... (Existing background/outline methods) ...
     fun onRemoveBackgroundClicked() {
         val activeId = _uiState.value.activeLayerId ?: return
         val context = arRenderer?.context ?: return
@@ -167,7 +223,6 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    // ... (Layer Management) ...
     fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
     fun onLayerRenamed(id: String, name: String) {
         _uiState.update { state ->
@@ -199,7 +254,6 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    // NEW METHODS
     fun onLayerDuplicated(id: String) {
         snapshotState()
         val layer = _uiState.value.layers.find { it.id == id } ?: return
@@ -217,6 +271,7 @@ class MainViewModel @JvmOverloads constructor(
     }
 
     fun onCancelCaptureClicked() {
+        stopSensorListening()
         _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW) }
     }
 
@@ -234,7 +289,6 @@ class MainViewModel @JvmOverloads constructor(
         updateHistoryFlags()
     }
 
-    // ... (AR & UI Callbacks) ...
     fun onEditorModeChanged(mode: EditorMode) = _uiState.update { it.copy(editorMode = mode) }
     fun onScaleChanged(s: Float) = updateActiveLayer { it.copy(scale = it.scale * s) }
     fun onArObjectScaleChanged(s: Float) = onScaleChanged(s)
@@ -261,8 +315,21 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
     fun saveCapturedBitmap(b: Bitmap) {
-        _uiState.update { it.copy(capturedTargetImages = listOf(b), captureStep = CaptureStep.REVIEW) }
-        arRenderer?.triggerCapture()
+        _uiState.update { state ->
+            val isMultiImage = state.captureStep == CaptureStep.PHOTO_SEQUENCE ||
+                               state.targetCreationMode == TargetCreationMode.GUIDED_GRID ||
+                               state.targetCreationMode == TargetCreationMode.MULTI_POINT
+
+            val newImages = if (isMultiImage) state.capturedTargetImages + b else listOf(b)
+            val newStep = if (isMultiImage) state.captureStep else CaptureStep.REVIEW
+
+            state.copy(capturedTargetImages = newImages, captureStep = newStep)
+        }
+        if (_uiState.value.captureStep == CaptureStep.REVIEW) {
+             // Only trigger final capture if review is next? No, triggerCapture was called by ArRenderer.
+             // This method is CALLED by ArRenderer.onFrameCaptured.
+             // We just update state.
+        }
     }
 
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
@@ -277,7 +344,6 @@ class MainViewModel @JvmOverloads constructor(
     }
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
 
-    // Project Management
     fun loadAvailableProjects(context: Context) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -285,7 +351,6 @@ class MainViewModel @JvmOverloads constructor(
             val projects = projectIds.mapNotNull { id ->
                 projectManager.loadProjectMetadata(context, id)
             }
-            // Initial sort: Newest first
             val sorted = projects.sortedByDescending { it.lastModified }
             _uiState.update { it.copy(availableProjects = sorted, isLoading = false) }
         }
@@ -308,20 +373,13 @@ class MainViewModel @JvmOverloads constructor(
         if (projects.isEmpty()) return
 
         val sorted = if (userLocation != null) {
-            // Threshold for "same location" (e.g. 200 meters)
             val threshold = 200f
-
-            // Partition projects into "nearby" and "others"
             val (nearby, others) = projects.partition { project ->
                 val dist = getDistance(project.gpsData, userLocation)
                 dist != null && dist < threshold
             }
-
-            // Sort both lists by date (newest first)
             val sortedNearby = nearby.sortedByDescending { it.lastModified }
             val sortedOthers = others.sortedByDescending { it.lastModified }
-
-            // Combine: Nearby first, then others
             sortedNearby + sortedOthers
         } else {
             projects.sortedByDescending { it.lastModified }
@@ -345,11 +403,9 @@ class MainViewModel @JvmOverloads constructor(
                     loadedState.copy(
                         showProjectList = false,
                         currentProjectId = project.id,
-                        availableProjects = it.availableProjects // Preserve list
+                        availableProjects = it.availableProjects
                     )
                 }
-            } else {
-                // Handle error
             }
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -358,7 +414,7 @@ class MainViewModel @JvmOverloads constructor(
     fun autoSaveProject(context: Context, thumbnail: Bitmap? = null) {
         viewModelScope.launch {
             val currentState = _uiState.value
-            if (currentState.showProjectList) return@launch // Don't save if in menu
+            if (currentState.showProjectList) return@launch
 
             val projectId = currentState.currentProjectId ?: UUID.randomUUID().toString()
             if (currentState.currentProjectId == null) {
@@ -386,7 +442,7 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    fun onSaveClicked() {} // Triggered manually if needed
+    fun onSaveClicked() {}
     fun exportProjectToUri(u: Uri) {}
     fun onOnboardingComplete(m: EditorMode) = _uiState.update { it.copy(showOnboardingDialogForMode = null) }
     fun onFeedbackShown() = _uiState.update { it.copy(showRotationAxisFeedback = false) }
@@ -396,7 +452,13 @@ class MainViewModel @JvmOverloads constructor(
     fun setArPlanesDetected(d: Boolean) = _uiState.update { it.copy(isArPlanesDetected = d) }
     fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
     fun onFrameCaptured(b: Bitmap) {
-        _uiState.update { it.copy(capturedTargetImages = listOf(b), captureStep = CaptureStep.REVIEW) }
+        // ArRenderer calls this on main thread via invoke?
+        // Usually called from GL thread if not posted. ArRenderer constructor takes (Bitmap)->Unit.
+        // It calls it in onDrawFrame.
+        // If saveCapturedBitmap runs on GL thread, StateFlow update is safe but capturedTargetImages might have concurrency issues?
+        // StateFlow is thread safe.
+        // BUT saveCapturedBitmap uses update { ... }.
+        saveCapturedBitmap(b)
     }
     fun onProgressUpdate(p: Float, b: Bitmap?) {}
     fun onTrackingFailure(m: String?) {}
@@ -419,19 +481,33 @@ class MainViewModel @JvmOverloads constructor(
             TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1
             else -> CaptureStep.INSTRUCTION
         }
-        _uiState.update { it.copy(targetCreationMode = m, captureStep = nextStep) }
+        if (m == TargetCreationMode.MULTI_POINT_CALIBRATION) {
+             startSensorListening()
+        }
+        _uiState.update { it.copy(targetCreationMode = m, captureStep = nextStep, calibrationSnapshots = emptyList()) }
     }
     fun onGridConfigChanged(r: Int, c: Int) {
         _uiState.update { it.copy(gridRows = r, gridCols = c) }
     }
     fun onGpsDecision(e: Boolean) {
-        // Advance to next relevant step, e.g. INSTRUCTION
         _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
     }
     fun onPhotoSequenceFinished() {
+        stopSensorListening()
         _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) }
     }
     fun onCalibrationPointCaptured() {
+        val pose = arRenderer?.getLatestPose()
+        val poseMatrix = FloatArray(16)
+        pose?.toMatrix(poseMatrix, 0)
+
+        val snapshot = CalibrationSnapshot(
+            gpsData = _uiState.value.gpsData,
+            sensorData = currentSensorData,
+            poseMatrix = poseMatrix.toList(),
+            timestamp = System.currentTimeMillis()
+        )
+
         _uiState.update {
             val next = when(it.captureStep) {
                 CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
@@ -440,13 +516,19 @@ class MainViewModel @JvmOverloads constructor(
                 CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW
                 else -> it.captureStep
             }
-            it.copy(captureStep = next)
+            if (next == CaptureStep.REVIEW) stopSensorListening()
+
+            it.copy(
+                captureStep = next,
+                calibrationSnapshots = it.calibrationSnapshots + snapshot
+            )
         }
         viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
     }
     fun unwarpImage(l: List<Any>) {}
     fun onRetakeCapture() {
-        _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList()) }
+        stopSensorListening()
+        _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList(), calibrationSnapshots = emptyList()) }
     }
     fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
     fun onRefinementModeChanged(b: Boolean) {
@@ -471,8 +553,42 @@ class MainViewModel @JvmOverloads constructor(
             )
         }
     }
+
+    private fun startSensorListening() {
+        if (!isSensorListening) {
+            val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+            if (rotationSensor != null) {
+                sensorManager.registerListener(sensorEventListener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+                isSensorListening = true
+                stableStartTime = 0L
+            }
+        }
+    }
+
+    private fun stopSensorListening() {
+        if (isSensorListening) {
+            sensorManager.unregisterListener(sensorEventListener)
+            isSensorListening = false
+        }
+    }
+
+    fun onResume() {
+        // Resume sensors if we are in a calibration mode
+        if (_uiState.value.isCapturingTarget && _uiState.value.targetCreationMode == TargetCreationMode.MULTI_POINT_CALIBRATION) {
+            startSensorListening()
+        }
+    }
+
+    fun onPause() {
+        stopSensorListening()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopSensorListening()
+    }
+
     fun onMagicClicked() {
-        // Placeholder for magic align
         viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateDouble) }
     }
     fun checkForUpdates() {}
