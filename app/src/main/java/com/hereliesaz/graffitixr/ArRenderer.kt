@@ -11,6 +11,7 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.media.Image
 import android.util.Log
+import androidx.compose.runtime.MutableState
 import androidx.core.content.ContextCompat
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
@@ -53,10 +54,10 @@ class ArRenderer(
     val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
     private val onFrameCaptured: (Bitmap) -> Unit,
-    private val onAnchorCreated: () -> Unit,
     private val onProgressUpdated: (Float, Bitmap?) -> Unit,
     private val onTrackingFailure: (String?) -> Unit,
-    private val onBoundsUpdated: (RectF) -> Unit
+    private val onBoundsUpdated: (RectF) -> Unit,
+    val anchorCreationPose: MutableState<Pose?>? = null
 ) : GLSurfaceView.Renderer {
 
     private val sessionLock = ReentrantLock()
@@ -70,9 +71,7 @@ class ArRenderer(
 
     @Volatile
     var session: Session? = null
-    @Volatile
-    var isSessionPaused = true
-        private set
+    var onAnchorCreated: ((Anchor) -> Unit)? = null
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var isAnchorReplacementAllowed: Boolean = true
     var showMiniMap: Boolean = false
@@ -235,7 +234,14 @@ class ArRenderer(
             val camera = frame.camera
             lastPose = camera.pose
 
-            handleTaps(frame, camera)
+            anchorCreationPose?.value?.let { pose ->
+                currentSession.createAnchor(pose)?.let { newAnchor ->
+                    onAnchorCreated?.invoke(newAnchor)
+                }
+                anchorCreationPose.value = null // Consume the request
+            }
+
+            handleTaps(frame, camera, currentSession)
             backgroundRenderer.draw(frame)
 
             val projmtx = FloatArray(16)
@@ -390,7 +396,7 @@ class ArRenderer(
         }
     }
 
-    private fun handleTaps(frame: Frame, camera: com.google.ar.core.Camera) {
+    private fun handleTaps(frame: Frame, camera: com.google.ar.core.Camera, session: Session) {
         val tap = queuedSingleTaps.poll() ?: return
         if (camera.trackingState != TrackingState.TRACKING) return
 
@@ -402,8 +408,9 @@ class ArRenderer(
             ) {
                 if (isAnchorReplacementAllowed || anchor == null) {
                     anchor?.detach()
-                    anchor = hit.createAnchor()
-                    onAnchorCreated()
+                    val newAnchor = hit.createAnchor()
+                    anchor = newAnchor
+                    onAnchorCreated?.invoke(newAnchor)
                     break
                 }
             }
