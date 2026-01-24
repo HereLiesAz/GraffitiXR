@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.SessionPausedException
 import java.util.concurrent.atomic.AtomicReference
 
 @Composable
@@ -157,27 +158,37 @@ fun MappingScreen(
                                     onCaptureComplete = {
                                         val session = arRenderer.session
                                         val cameraPose = latestCameraPose.value
+
+                                        if (arRenderer.isSessionPaused) {
+                                            Toast.makeText(context, "Session is paused. Cannot create anchor.", Toast.LENGTH_SHORT).show()
+                                            return@PhotoSphereCreationScreen
+                                        }
+
                                         if (session != null && cameraPose != null) {
-                                            // The user is happy with the map.
-                                            // Create an anchor exactly where the device is NOW.
+                                            try {
+                                                // The user is happy with the map.
+                                                // Create an anchor exactly where the device is NOW.
 
-                                            // We place the anchor slightly in front (0.5m) to ensure stability
-                                            val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
-                                            val anchorPose = cameraPose.compose(forwardOffset)
-                                            val anchor = session.createAnchor(anchorPose)
+                                                // We place the anchor slightly in front (0.5m) to ensure stability
+                                                val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
+                                                val anchorPose = cameraPose.compose(forwardOffset)
+                                                val anchor = session.createAnchor(anchorPose)
 
-                                            scope.launch {
-                                                slamManager.hostAnchor(
-                                                    session = session,
-                                                    anchor = anchor,
-                                                    onSuccess = { cloudId ->
-                                                        Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
-                                                        onMapSaved(cloudId)
-                                                    },
-                                                    onError = { error ->
-                                                        Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
-                                                    }
-                                                )
+                                                scope.launch {
+                                                    slamManager.hostAnchor(
+                                                        session = session,
+                                                        anchor = anchor,
+                                                        onSuccess = { cloudId ->
+                                                            Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
+                                                            onMapSaved(cloudId)
+                                                        },
+                                                        onError = { error ->
+                                                            Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
+                                                        }
+                                                    )
+                                                }
+                                            } catch (e: SessionPausedException) {
+                                                Toast.makeText(context, "Error: Session was paused.", Toast.LENGTH_SHORT).show()
                                             }
                                         } else {
                                             Toast.makeText(context, "Tracking not ready", Toast.LENGTH_SHORT).show()
