@@ -76,6 +76,7 @@ class ArRenderer(
     var isAnchorReplacementAllowed: Boolean = true
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true
+    private var isSessionPaused: Boolean = true
 
     private var backgroundTextureId = -1
     private var viewportWidth = 1
