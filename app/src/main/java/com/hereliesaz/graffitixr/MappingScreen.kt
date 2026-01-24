@@ -51,7 +51,6 @@ fun MappingScreen(
     val isHosting by slamManager.isHosting.collectAsState()
     val isMappingState = remember { mutableStateOf(true) }
     var isMapping by isMappingState
-    val anchorCreationPose = remember { mutableStateOf<Pose?>(null) }
 
     val arRenderer = remember {
         var lastUpdateTime = 0L
@@ -156,15 +155,30 @@ fun MappingScreen(
                                     currentQuality = qualityEnum,
                                     isHosting = isHosting,
                                     onCaptureComplete = {
+                                        val session = arRenderer.session
                                         val cameraPose = latestCameraPose.value
-                                        if (cameraPose != null) {
+                                        if (session != null && cameraPose != null) {
                                             // The user is happy with the map.
-                                            // Request an anchor where the device is NOW.
+                                            // Create an anchor exactly where the device is NOW.
 
                                             // We place the anchor slightly in front (0.5m) to ensure stability
                                             val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
                                             val anchorPose = cameraPose.compose(forwardOffset)
-                                            anchorCreationPose.value = anchorPose
+                                            val anchor = session.createAnchor(anchorPose)
+
+                                            scope.launch {
+                                                slamManager.hostAnchor(
+                                                    session = session,
+                                                    anchor = anchor,
+                                                    onSuccess = { cloudId ->
+                                                        Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
+                                                        onMapSaved(cloudId)
+                                                    },
+                                                    onError = { error ->
+                                                        Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
+                                                    }
+                                                )
+                                            }
                                         } else {
                                             Toast.makeText(context, "Tracking not ready", Toast.LENGTH_SHORT).show()
                                         }
