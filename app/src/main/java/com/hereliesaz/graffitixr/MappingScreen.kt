@@ -165,13 +165,14 @@ fun MappingScreen(
                                         }
 
                                         if (session != null && cameraPose != null) {
-                                            try {
-                                                // The user is happy with the map.
-                                                // Create an anchor exactly where the device is NOW.
+                                            // The user is happy with the map.
+                                            // Create an anchor exactly where the device is NOW.
 
-                                                // We place the anchor slightly in front (0.5m) to ensure stability
-                                                val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
-                                                val anchorPose = cameraPose.compose(forwardOffset)
+                                            // We place the anchor slightly in front (0.5m) to ensure stability
+                                            val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
+                                            val anchorPose = cameraPose.compose(forwardOffset)
+
+                                            try {
                                                 val anchor = session.createAnchor(anchorPose)
 
                                                 scope.launch {
@@ -187,8 +188,12 @@ fun MappingScreen(
                                                         }
                                                     )
                                                 }
-                                            } catch (e: SessionPausedException) {
-                                                Toast.makeText(context, "Error: Session was paused.", Toast.LENGTH_SHORT).show()
+                                            } catch (e: com.google.ar.core.exceptions.SessionPausedException) {
+                                                android.util.Log.e("MappingScreen", "Session paused, cannot create anchor", e)
+                                                Toast.makeText(context, "Session paused. Please try again.", Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("MappingScreen", "Error creating anchor", e)
+                                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                                             }
                                         } else {
                                             Toast.makeText(context, "Tracking not ready", Toast.LENGTH_SHORT).show()
