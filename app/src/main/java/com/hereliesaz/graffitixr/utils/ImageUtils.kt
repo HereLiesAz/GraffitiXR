@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import com.google.firebase.installations.Utils
-import org.opencv.android.Utils
+import org.opencv.android.Utils as OpenCVUtils
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -26,7 +26,7 @@ object ImageUtils {
         val gray = Mat()
         val edges = Mat()
 
-        Utils.bitmapToMat(input, mat)
+        OpenCVUtils.bitmapToMat(input, mat)
         Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
         Imgproc.Canny(gray, edges, 50.0, 150.0)
 
@@ -44,7 +44,7 @@ object ImageUtils {
         Core.merge(channels, result)
 
         val output = Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(result, output)
+        OpenCVUtils.matToBitmap(result, output)
 
         mat.release()
         gray.release()
