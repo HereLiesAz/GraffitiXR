@@ -4,6 +4,8 @@ import android.net.Uri
 
 sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
+    // ADDED: Missing event type
+    object RequestCalibration : CaptureEvent()
     data class CaptureSuccess(val uri: Uri) : CaptureEvent()
     data class CaptureFailure(val exception: Exception) : CaptureEvent()
 }
