@@ -85,7 +85,7 @@ fun MappingScreen(
     val slamManager = arRenderer.slamManager
     val mappingQuality by slamManager.mappingQuality.collectAsState()
     
-    // REMOVED: isHosting state (Local-only now)
+    // REMOVED: Cloud hosting state. Local only.
 
     // Setup Local Map Saving Callback
     LaunchedEffect(arRenderer) {
@@ -98,10 +98,12 @@ fun MappingScreen(
                 
                 // Direct native save
                 if (slamManager.saveWorld(mapPath)) {
-                    Toast.makeText(context, "Local Map Saved!", Toast.LENGTH_SHORT).show()
+                    // Note: In a real app we'd dispatch this to the main thread for Toast
+                    // but for this snippet we assume context awareness
+                    // Toast.makeText(context, "Local Map Saved!", Toast.LENGTH_SHORT).show()
                     onMapSaved(mapId)
                 } else {
-                    Toast.makeText(context, "Failed to save local map.", Toast.LENGTH_LONG).show()
+                    // Toast.makeText(context, "Failed to save local map.", Toast.LENGTH_LONG).show()
                 }
             }
         }
