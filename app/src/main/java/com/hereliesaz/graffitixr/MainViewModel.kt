@@ -105,8 +105,8 @@ class MainViewModel(
                     snapshotState()
                     val processed = BackgroundRemover.removeBackground(original)
                     if (processed != null) {
-                        // FIX: Arguments swapped (Bitmap first, then Context)
-                        val newUri = ImageUtils.saveBitmapToCache(processed, context)
+                        // FIX: Corrected argument order (Context, Bitmap)
+                        val newUri = ImageUtils.saveBitmapToCache(context, processed)
                         updateActiveLayer { it.copy(uri = newUri) }
                     } else {
                         _feedbackEvent.send(FeedbackEvent.Toast("Background removal failed."))
@@ -127,8 +127,8 @@ class MainViewModel(
                 ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
                     snapshotState()
                     val processed = ImageProcessingUtils.createOutline(original)
-                    // FIX: Arguments swapped (Bitmap first, then Context)
-                    val newUri = ImageUtils.saveBitmapToCache(processed, context)
+                    // FIX: Corrected argument order (Context, Bitmap)
+                    val newUri = ImageUtils.saveBitmapToCache(context, processed)
                     updateActiveLayer { it.copy(uri = newUri) }
                 }
             }
