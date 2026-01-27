@@ -95,25 +95,32 @@ void MobileGS::updateCamera(const float* viewMtx, const float* projMtx) {
 
 void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height) {
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastUpdateTime).count() < 100) return;
+    // Decreased throttling to allow for smoother updates
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastUpdateTime).count() < 33) return;
     mLastUpdateTime = now;
 
     std::lock_guard<std::mutex> lock(mDataMutex);
     if (mProjMatrix[0][0] == 0) return;
 
+    // Trigger Garbage Collection if we are near the limit
+    if (mRenderGaussians.size() > MAX_POINTS * 0.9) {
+        pruneMap();
+    }
+
     glm::mat4 invView = glm::inverse(mViewMatrix);
-    // Standard GL Projection Matrix Principal Point Layout (p[2][0], p[2][1])
+    // Standard GL Projection Matrix Principal Point Layout
     float p00 = mProjMatrix[0][0];
     float p11 = mProjMatrix[1][1];
     float p20 = mProjMatrix[2][0];
     float p21 = mProjMatrix[2][1];
 
-    int step = 20; // Drastically increased step to reduce load and "random points"
+    // FIX: Reduced step size from 20 to 2 for higher resolution reconstruction
+    int step = 2; 
     for (int y = 0; y < height; y += step) {
         const uint16_t* rowPtr = depthMap.ptr<uint16_t>(y);
         for (int x = 0; x < width; x += step) {
             uint16_t d_raw = rowPtr[x];
-            if (d_raw < 200 || d_raw > 2500) continue; // Tighter filter: 20cm to 2.5m
+            if (d_raw < 200 || d_raw > 4000) continue; // Range: 20cm to 4.0m
 
             float z = d_raw * 0.001f;
             float ndc_x = ((float)x / width) * 2.0f - 1.0f;
@@ -142,12 +149,33 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
                 g.position = glm::vec3(worldPos);
                 g.scale = glm::vec3(VOXEL_SIZE * 1.8f);
                 g.opacity = CONFIDENCE_INCREMENT;
-                g.color = glm::vec3(0.0f, 0.8f, 1.0f);
+                g.color = glm::vec3(0.0f, 0.8f, 1.0f); // Cyan default
                 mRenderGaussians.push_back(g);
                 mVoxelGrid[key] = (int)(mRenderGaussians.size() - 1);
             }
         }
     }
+}
+
+void MobileGS::pruneMap() {
+    // Garbage Collector: Remove points with low confidence to make room for new data
+    std::vector<SplatGaussian> survived;
+    survived.reserve(mRenderGaussians.size());
+    mVoxelGrid.clear();
+
+    for (const auto& g : mRenderGaussians) {
+        if (g.opacity >= CONFIDENCE_THRESHOLD) {
+            survived.push_back(g);
+            VoxelKey key = { 
+                (int)std::floor(g.position.x/VOXEL_SIZE), 
+                (int)std::floor(g.position.y/VOXEL_SIZE), 
+                (int)std::floor(g.position.z/VOXEL_SIZE) 
+            };
+            mVoxelGrid[key] = (int)(survived.size() - 1);
+        }
+    }
+    mRenderGaussians = std::move(survived);
+    LOGI("Garbage Collection: Pruned to %zu points", mRenderGaussians.size());
 }
 
 void MobileGS::setBackgroundFrame(const cv::Mat& frame) {
@@ -158,11 +186,8 @@ void MobileGS::setBackgroundFrame(const cv::Mat& frame) {
 }
 
 void MobileGS::processImage(const cv::Mat& image, int width, int height, int64_t timestamp) {
-    std::lock_guard<std::mutex> lock(mBgMutex);
-    image.copyTo(mPendingBgFrame);
-    mPendingTimestamp = timestamp;
-    mNewBgAvailable = true;
-    mHasBgData = true;
+    // Just update the background for now, timestamp ignored in this version
+    setBackgroundFrame(image);
 }
 
 void MobileGS::compileShaders() {
@@ -230,6 +255,10 @@ void MobileGS::sortThreadLoop() {
             sorted.reserve(positions.size());
             for(size_t i=0; i<positions.size(); ++i) {
                 const auto& p = positions[i];
+                // Dot product with view direction (row 2 of view matrix is Forward Z)
+                // Actually in GLM column-major: view[2] is the Z column.
+                // Standard OpenGL View Matrix: Row 2 is Z axis.
+                // depth = -(view * pos).z
                 float depth = view[0][2] * p.x + view[1][2] * p.y + view[2][2] * p.z + view[3][2];
                 sorted.push_back({(int)i, depth});
             }
@@ -269,6 +298,7 @@ void MobileGS::draw() {
             int idx = canUseSort ? mSortListFront[i].index : (int)i;
             if (idx >= mRenderGaussians.size()) continue;
             const auto& g = mRenderGaussians[idx];
+            // Render only if confident
             if (g.opacity < CONFIDENCE_THRESHOLD) continue;
 
             data.push_back(g.position.x); data.push_back(g.position.y); data.push_back(g.position.z);
