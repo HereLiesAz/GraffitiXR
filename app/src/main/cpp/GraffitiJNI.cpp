@@ -68,7 +68,6 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_feedDepth(JNIEnv *env, jobject t
     env->ReleaseByteArrayElements(depth_data, data, 0);
 }
 
-// Consolidated method to match Kotlin
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCameraImage(JNIEnv *env, jobject thiz,
         jbyteArray image_data,
@@ -88,8 +87,6 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_drawFrame(JNIEnv *env, jobject t
         gMobileGS->draw();
     }
 }
-
-// --- MISSING IO METHODS IMPLEMENTED BELOW ---
 
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jstring path) {
@@ -114,6 +111,14 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_clearMap(JNIEnv *env, jobject th
     if (gMobileGS) {
         gMobileGS->clear();
     }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_getPointCount(JNIEnv *env, jobject thiz) {
+    if (gMobileGS) {
+        return gMobileGS->getPointCount();
+    }
+    return 0;
 }
 
 }
