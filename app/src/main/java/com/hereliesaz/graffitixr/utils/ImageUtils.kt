@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import com.google.firebase.installations.Utils
+import androidx.compose.ui.graphics.BlendMode
 import org.opencv.android.Utils as OpenCVUtils
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -20,8 +20,6 @@ object ImageUtils {
      * Generates a white outline on a transparent background from the input bitmap using Canny edge detection.
      */
     fun generateOutline(input: Bitmap): Bitmap {
-        // Ensure OpenCV loaded logic handled by Utils.kt or caller
-        // Using Canny Edge Detection
         val mat = Mat()
         val gray = Mat()
         val edges = Mat()
@@ -75,26 +73,26 @@ object ImageUtils {
         return Uri.fromFile(file)
     }
 
-    fun getNextBlendMode(current: androidx.compose.ui.graphics.BlendMode): androidx.compose.ui.graphics.BlendMode {
+    fun getNextBlendMode(current: BlendMode): BlendMode {
         val modes = listOf(
-            androidx.compose.ui.graphics.BlendMode.SrcOver,
-            androidx.compose.ui.graphics.BlendMode.Screen,
-            androidx.compose.ui.graphics.BlendMode.Multiply,
-            androidx.compose.ui.graphics.BlendMode.Overlay,
-            androidx.compose.ui.graphics.BlendMode.Darken,
-            androidx.compose.ui.graphics.BlendMode.Lighten,
-            androidx.compose.ui.graphics.BlendMode.ColorDodge,
-            androidx.compose.ui.graphics.BlendMode.ColorBurn,
-            androidx.compose.ui.graphics.BlendMode.Hardlight,
-            androidx.compose.ui.graphics.BlendMode.Softlight,
-            androidx.compose.ui.graphics.BlendMode.Difference,
-            androidx.compose.ui.graphics.BlendMode.Exclusion,
-            androidx.compose.ui.graphics.BlendMode.Hue,
-            androidx.compose.ui.graphics.BlendMode.Saturation,
-            androidx.compose.ui.graphics.BlendMode.Color,
-            androidx.compose.ui.graphics.BlendMode.Luminosity
+            BlendMode.SrcOver,
+            BlendMode.Screen,
+            BlendMode.Multiply,
+            BlendMode.Overlay,
+            BlendMode.Darken,
+            BlendMode.Lighten,
+            BlendMode.ColorDodge,
+            BlendMode.ColorBurn,
+            BlendMode.Hardlight,
+            BlendMode.Softlight,
+            BlendMode.Difference,
+            BlendMode.Exclusion,
+            BlendMode.Hue,
+            BlendMode.Saturation,
+            BlendMode.Color,
+            BlendMode.Luminosity
         )
         val index = modes.indexOf(current)
-        return modes.getOrElse((index + 1) % modes.size) { androidx.compose.ui.graphics.BlendMode.SrcOver }
+        return modes.getOrElse((index + 1) % modes.size) { BlendMode.SrcOver }
     }
 }
