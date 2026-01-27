@@ -93,6 +93,9 @@ private:
     std::atomic<bool> mHasBgData;
     std::atomic<bool> mIsInitialized;
     int64_t mPendingTimestamp;
+    
+    // ADDED: Missing member variable
+    int mFrameCount;
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
     std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;
