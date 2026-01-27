@@ -43,7 +43,7 @@ fun ArView(
                 }
                 viewModel.onArImagePlaced()
             }
-            viewModel.arRenderer = it
+            // REMOVED: viewModel.arRenderer = it (Memory Leak Fix)
         }
     }
 
