@@ -40,8 +40,6 @@ fun MappingScreen(
     val prefs = remember { context.getSharedPreferences("graffiti_settings", android.content.Context.MODE_PRIVATE) }
     val isRightHanded = remember { prefs.getBoolean("is_right_handed", true) }
 
-    val slamManager = remember { SlamManager() }
-
     // Capture GLSurfaceView to manage lifecycle
     var glSurfaceView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
@@ -49,12 +47,11 @@ fun MappingScreen(
     val latestCameraPose = remember { mutableStateOf<Pose?>(null) }
     val anchorCreationPose = remember { mutableStateOf<Pose?>(null) }
 
-    // UI State
-    val mappingQuality by slamManager.mappingQuality.collectAsState()
-    val isHosting by slamManager.isHosting.collectAsState()
     val isMappingState = remember { mutableStateOf(true) }
     var isMapping by isMappingState
 
+    // FIX: Initialize ArRenderer FIRST, then use ITS SlamManager.
+    // This ensures UI observes the same engine that receives camera data.
     val arRenderer = remember {
         var lastUpdateTime = 0L
         ArRenderer(
@@ -66,24 +63,6 @@ fun MappingScreen(
             onBoundsUpdated = {},
             anchorCreationPose = anchorCreationPose
         ).apply {
-            onAnchorCreated = { anchor: Anchor ->
-                val session = session
-                if (session != null) {
-                    scope.launch {
-                        slamManager.hostAnchor(
-                            session = session,
-                            anchor = anchor,
-                            onSuccess = { cloudId ->
-                                Toast.makeText(context, "Cloud Anchor Hosted!", Toast.LENGTH_SHORT).show()
-                                onMapSaved(cloudId)
-                            },
-                            onError = { error ->
-                                Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
-                            }
-                        )
-                    }
-                }
-            }
             showMiniMap = true
             showGuide = false
             onSessionUpdated = { session, frame ->
@@ -97,10 +76,45 @@ fun MappingScreen(
                     if (now - lastUpdateTime > 500) {
                         if (frame.camera.trackingState == TrackingState.TRACKING) {
                             val cameraPose = frame.camera.pose
-                            slamManager.updateFeatureMapQuality(session, cameraPose)
+                            // Now calling the correct instance inside ArRenderer
+                            this.slamManager.updateFeatureMapQuality(session, cameraPose)
                             lastUpdateTime = now
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // FIX: Wire UI state to the Renderer's SlamManager
+    val slamManager = arRenderer.slamManager
+    val mappingQuality by slamManager.mappingQuality.collectAsState()
+    val isHosting by slamManager.isHosting.collectAsState()
+
+    // Setup Anchor Hosting Callback
+    LaunchedEffect(arRenderer) {
+        arRenderer.onAnchorCreated = { anchor: Anchor ->
+            val session = arRenderer.session
+            if (session != null) {
+                scope.launch {
+                    slamManager.hostAnchor(
+                        session = session,
+                        anchor = anchor,
+                        onSuccess = { cloudId ->
+                            // Save the binary map to disk using the native engine
+                            // We use the cloudID as the filename for consistency
+                            val mapPath = java.io.File(context.filesDir, "$cloudId.map").absolutePath
+                            if (arRenderer.saveMap(mapPath)) {
+                                Toast.makeText(context, "Map & Anchor Saved!", Toast.LENGTH_SHORT).show()
+                                onMapSaved(cloudId)
+                            } else {
+                                Toast.makeText(context, "Anchor hosted, but Map save failed.", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        onError = { error ->
+                            Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
+                        }
+                    )
                 }
             }
         }
@@ -148,7 +162,7 @@ fun MappingScreen(
                     factory = { ctx ->
                         GLSurfaceView(ctx).apply {
                             preserveEGLContextOnPause = true
-                            setEGLContextClientVersion(3) // FIXED: Must be 3 for Splat Shaders
+                            setEGLContextClientVersion(3) // Required for MobileGS Shaders
                             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                             setRenderer(arRenderer)
                             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
@@ -178,8 +192,7 @@ fun MappingScreen(
                                     onCaptureComplete = {
                                         val cameraPose = latestCameraPose.value
                                         if (cameraPose != null) {
-                                            // Request anchor creation by updating the state.
-                                            // The actual anchor creation will happen in ArRenderer on the GL thread.
+                                            // Place anchor 0.5m in front of camera
                                             val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
                                             anchorCreationPose.value = cameraPose.compose(forwardOffset)
                                         } else {
