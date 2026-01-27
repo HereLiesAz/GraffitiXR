@@ -1,995 +1,426 @@
 package com.hereliesaz.graffitixr
 
+import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.location.Location
+import android.net.Uri
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import androidx.navigation.NavController
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.compose.composable
-import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.aznavrail.AzHostActivityLayout
-import com.hereliesaz.aznavrail.AzNavHost
-import com.hereliesaz.aznavrail.model.AzButtonShape
-import com.hereliesaz.aznavrail.model.AzDockingSide
-import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.graffitixr.EditorMode.*
-import com.hereliesaz.graffitixr.composables.*
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.hereliesaz.graffitixr.data.CalibrationSnapshot
 import com.hereliesaz.graffitixr.data.CaptureEvent
 import com.hereliesaz.graffitixr.data.FeedbackEvent
-import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
-import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
-import com.hereliesaz.graffitixr.ui.rememberNavStrings
-import com.hereliesaz.graffitixr.utils.captureWindow
-import com.hereliesaz.graffitixr.utils.findActivity
+import com.hereliesaz.graffitixr.data.GpsData
+import com.hereliesaz.graffitixr.data.OverlayLayer
+import com.hereliesaz.graffitixr.data.ProjectData
+import com.hereliesaz.graffitixr.data.RefinementPath
+import com.hereliesaz.graffitixr.data.SensorData
+import com.hereliesaz.graffitixr.utils.BackgroundRemover
+import com.hereliesaz.graffitixr.utils.ImageUtils
+import com.hereliesaz.graffitixr.utils.ProjectManager
+import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
+import kotlin.random.Random
+import kotlin.math.abs
 
-@Composable
-fun MainScreen(viewModel: MainViewModel, navController: NavController) {
-    val localNavController = rememberNavController()
-    val navBackStackEntry by localNavController.currentBackStackEntryAsState()
-    val currentNavRoute = navBackStackEntry?.destination?.route
+class MainViewModel @JvmOverloads constructor(
+    application: Application,
+    private val projectManager: ProjectManager = ProjectManager()
+) : AndroidViewModel(application) {
 
-    val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    private val prefs = application.getSharedPreferences("graffiti_settings", Context.MODE_PRIVATE)
+    private val _uiState = MutableStateFlow(UiState(
+        isRightHanded = prefs.getBoolean("is_right_handed", true),
+        activeColorSeed = Random.nextInt()
+    ))
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    // HOISTED STATE
-    var showSliderDialog by remember { mutableStateOf<String?>(null) }
-    var showColorBalanceDialog by remember { mutableStateOf(false) }
-    var showInfoScreen by remember { mutableStateOf(false) }
-    var hasSelectedModeOnce by remember { mutableStateOf(false) }
-    var gestureInProgress by remember { mutableStateOf(false) }
+    private val _feedbackEvent = Channel<FeedbackEvent>(Channel.BUFFERED)
+    val feedbackEvent = _feedbackEvent.receiveAsFlow()
 
-    val resetDialogs = remember {
-        {
-            showSliderDialog = null
-            showColorBalanceDialog = false
-        }
-    }
+    private val _captureEvent = Channel<CaptureEvent>(Channel.BUFFERED)
+    val captureEvent = _captureEvent.receiveAsFlow()
 
-    val overlayImagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri -> uri?.let { viewModel.onOverlayImageSelected(it) } }
+    private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
+    val tapFeedback = _tapFeedback.asStateFlow()
 
-    val backgroundImagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri -> uri?.let { viewModel.onBackgroundImageSelected(it) } }
+    private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
+    val artworkBounds = _artworkBounds.asStateFlow()
 
-    val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip")
-    ) { uri -> uri?.let { viewModel.exportProjectToUri(it) } }
+    // REMOVED: var arRenderer: ArRenderer? = null (Memory Leak)
 
-    LaunchedEffect(uiState.showImagePicker) {
-        if (uiState.showImagePicker) {
-            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            viewModel.onImagePickerShown()
-        }
-    }
+    // Sensor Logic for Automatic Calibration
+    private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private var currentSensorData: SensorData? = null
+    private var isSensorListening = false
+    private var stableStartTime = 0L
+    private var lastRotationVector: FloatArray? = null
+    private val STABILITY_THRESHOLD = 0.02f
 
-    LaunchedEffect(uiState.editorMode) {
-        if (uiState.editorMode == TRACE && uiState.overlayImageUri == null) {
-            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-        }
-    }
+    private val sensorEventListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            event ?: return
+            if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
+                val rotationMatrix = FloatArray(9)
+                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                val orientation = FloatArray(3)
+                SensorManager.getOrientation(rotationMatrix, orientation)
+                currentSensorData = SensorData(orientation[0], orientation[1], orientation[2])
 
-    val onModeSelected = remember(viewModel, hasSelectedModeOnce) {
-        { mode: EditorMode ->
-            viewModel.onEditorModeChanged(mode)
-            resetDialogs()
+                if (_uiState.value.isCapturingTarget && _uiState.value.captureStep.name.startsWith("CALIBRATION_POINT")) {
+                    val currentVector = event.values.clone()
+                    var isStable = false
 
-            if (!hasSelectedModeOnce) {
-                hasSelectedModeOnce = true
-                if (mode == AR) {
-                    viewModel.onCreateTargetClicked()
-                }
-            }
-        }
-    }
-
-    val activeHighlightColor = remember(uiState.activeColorSeed) {
-        val colors = listOf(Color.Green, Color.Magenta, Color.Cyan)
-        colors[kotlin.math.abs(uiState.activeColorSeed) % colors.size]
-    }
-
-    val navStrings = rememberNavStrings()
-
-    LaunchedEffect(viewModel, context) {
-        viewModel.feedbackEvent.collect { event ->
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-                vibratorManager.defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            }
-
-            if (vibrator.hasVibrator()) {
-                when (event) {
-                    is FeedbackEvent.VibrateSingle -> {
-                        vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-                    }
-                    is FeedbackEvent.VibrateDouble -> {
-                        val timing = longArrayOf(0, 50, 50, 50)
-                        val amplitude = intArrayOf(0, 255, 0, 255)
-                        vibrator.vibrate(VibrationEffect.createWaveform(timing, amplitude, -1))
-                    }
-                    is FeedbackEvent.Toast -> {
-                         android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(viewModel, context) {
-        viewModel.captureEvent.collect { event ->
-            when (event) {
-                is CaptureEvent.RequestCapture -> {
-                    context.findActivity()?.let { activity ->
-                        captureWindow(activity) { bitmap ->
-                            bitmap?.let {
-                                viewModel.saveCapturedBitmap(it)
-                            }
+                    if (lastRotationVector != null) {
+                        var delta = 0f
+                        val size = minOf(currentVector.size, lastRotationVector!!.size, 4)
+                        for (i in 0 until size) {
+                            delta += abs(currentVector[i] - lastRotationVector!![i])
                         }
+                        if (delta < STABILITY_THRESHOLD) isStable = true
+                    } else {
+                        isStable = true
                     }
-                }
-                is CaptureEvent.CaptureSuccess -> { }
-                is CaptureEvent.CaptureFailure -> { }
-                else -> {}
-            }
-        }
-    }
+                    lastRotationVector = currentVector
 
-    val isRailVisible = !uiState.hideUiForCapture && !uiState.isTouchLocked
-
-    AzHostActivityLayout(
-        navController = localNavController
-    ) {
-        if (isRailVisible) {
-                azTheme(
-                    activeColor = activeHighlightColor,
-                    defaultShape = AzButtonShape.RECTANGLE,
-                    headerIconShape = AzHeaderIconShape.ROUNDED
-                )
-                azConfig(
-                    packButtons = true,
-                    dockingSide = if (uiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
-                )
-                azAdvanced(
-                    isLoading = uiState.isLoading,
-                    infoScreen = showInfoScreen,
-                    onDismissInfoScreen = { showInfoScreen = false }
-                )
-
-                azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
-                azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = { onModeSelected(AR) })
-                azRailSubItem(id = "ghost_mode", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = { onModeSelected(OVERLAY) })
-                azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = { onModeSelected(STATIC) })
-                azRailSubItem(id = "trace_mode", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = { onModeSelected(TRACE) })
-
-                azDivider()
-
-                if (uiState.editorMode == AR) {
-                    azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
-
-                    azRailSubItem(
-                        id = "surveyor",
-                        hostId = "target_host",
-                        text = navStrings.surveyor,
-                        info = navStrings.surveyorInfo,
-                        onClick = {
-                            localNavController.navigate("surveyor")
-                            resetDialogs()
+                    val now = System.currentTimeMillis()
+                    if (isStable) {
+                        if (stableStartTime == 0L) stableStartTime = now
+                        else if (now - stableStartTime > 2000) {
+                            // EVENT-BASED: Request calibration instead of direct call
+                            viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCalibration) }
+                            stableStartTime = 0L
+                            lastRotationVector = null
                         }
-                    )
-
-                    azRailSubItem(id = "create_target", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
-                        viewModel.onCreateTargetClicked()
-                        resetDialogs()
-                    })
-                    azRailSubItem(id = "refine_target", hostId = "target_host", text = navStrings.refine, info = navStrings.refineInfo, onClick = {
-                        viewModel.onRefineTargetToggled()
-                        resetDialogs()
-                    })
-                    azRailSubItem(id = "mark_progress", hostId = "target_host", text = navStrings.update, info = navStrings.updateInfo, onClick = {
-                        viewModel.onMarkProgressToggled()
-                        resetDialogs()
-                    })
-
-                    azDivider()
-                }
-
-                azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
-
-                val openButtonText = if (uiState.layers.isNotEmpty()) "Add" else navStrings.open
-                val openButtonId = if (uiState.layers.isNotEmpty()) "add_layer" else "image"
-
-                azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
-                    resetDialogs()
-                    overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-
-                val layers = uiState.layers
-                val visualLayers = layers.reversed()
-
-                visualLayers.forEach { layer ->
-                    azRailRelocItem(
-                        id = "layer_${layer.id}",
-                        hostId = "design_host",
-                        text = layer.name,
-                        onClick = {
-                            if (uiState.activeLayerId != layer.id) {
-                                viewModel.onLayerActivated(layer.id)
-                            }
-                        },
-                        onRelocate = { _: Int, _: Int, newOrder: List<String> ->
-                            val rawIds = newOrder.map { it.removePrefix("layer_") }
-                            val logicalOrder = rawIds.reversed()
-                            viewModel.onLayerReordered(logicalOrder)
-                        }
-                    ) {
-                        inputItem(
-                            hint = "Rename"
-                        ) { newName ->
-                            viewModel.onLayerRenamed(layer.id, newName)
-                        }
-
-                        listItem(text = "Duplicate") {
-                            viewModel.onLayerDuplicated(layer.id)
-                        }
-
-                        listItem(text = "Copy Mods") {
-                            viewModel.copyLayerModifications(layer.id)
-                        }
-
-                        listItem(text = "Paste Mods") {
-                            viewModel.pasteLayerModifications(layer.id)
-                        }
-
-                        listItem(text = "Remove") {
-                            viewModel.onLayerRemoved(layer.id)
-                        }
-                    }
-                }
-
-                if (uiState.editorMode == STATIC) {
-                    azRailSubItem(id = "background", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
-                        resetDialogs()
-                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                }
-
-                if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
-                    azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
-                        viewModel.onRemoveBackgroundClicked(context)
-                        showSliderDialog = null; showColorBalanceDialog = false
-                        resetDialogs()
-                    })
-                    azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
-                        viewModel.onLineDrawingClicked(context)
-                        showSliderDialog = null; showColorBalanceDialog = false
-                        resetDialogs()
-                    })
-                    azDivider()
-
-                    if (uiState.editorMode == STATIC) {
-                        azRailSubItem(id = "background", hostId = "design_host", text = "Wall") {
-                            showSliderDialog = null; showColorBalanceDialog = false
-                            backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        }
-                    }
-                    azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                        showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
-                        showColorBalanceDialog = false
-                    }
-                    azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
-                        showColorBalanceDialog = true
-                        showSliderDialog = null
-                    }
-                    azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
-                        viewModel.onCycleBlendMode()
-                        showSliderDialog = null; showColorBalanceDialog = false
-                        resetDialogs()
-                    })
-
-                    azRailSubToggle(
-                        id = "lock_image",
-                        hostId = "design_host",
-                        isChecked = uiState.isImageLocked,
-                        toggleOnText = "Locked",
-                        toggleOffText = "Unlocked",
-                        info = "Prevent accidental moves",
-                        onClick = { viewModel.toggleImageLock() }
-                    )
-                }
-
-                azDivider()
-
-                azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
-                azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
-                    localNavController.navigate("settings")
-                    resetDialogs()
-                }
-                azRailSubItem(id = "new_project", hostId = "project_host", text = navStrings.new, info = navStrings.newInfo, onClick = {
-                    viewModel.onNewProject()
-                    resetDialogs()
-                })
-                azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
-                    createDocumentLauncher.launch("Project.gxr")
-                    resetDialogs()
-                }
-                azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
-                    localNavController.navigate("project_library")
-                    resetDialogs()
-                }
-                azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo, onClick = {
-                    viewModel.onSaveClicked()
-                    resetDialogs()
-                })
-
-                azDivider()
-
-                azRailItem(id = "help", text = "Help", info = "Show Help") {
-                    showInfoScreen = true
-                    resetDialogs()
-                }
-
-                if (uiState.editorMode == AR || uiState.editorMode == OVERLAY) {
-                    azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
-                        viewModel.onToggleFlashlight()
-                        resetDialogs()
-                    })
-                }
-
-                if (uiState.editorMode == TRACE) {
-                    azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
-                        viewModel.setTouchLocked(true)
-                        resetDialogs()
-                    })
-                }
-            }
-
-            // BACKGROUND LAYER
-            background(weight = 0) {
-                if (currentNavRoute == "editor" || currentNavRoute == null) {
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                        MainContentLayer(
-                            uiState = uiState,
-                            viewModel = viewModel,
-                            gestureInProgress = gestureInProgress,
-                            onGestureToggle = { gestureInProgress = it }
-                        )
+                    } else {
+                        stableStartTime = 0L
                     }
                 } else {
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                    stableStartTime = 0L
                 }
             }
-
-            // ONSCREEN UI
-            onscreen(alignment = Alignment.Center) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    
-                    AzNavHost(
-                        startDestination = "editor"
-                    ) {
-                        composable("editor") {
-                        EditorContent(
-                            viewModel = viewModel,
-                            uiState = uiState,
-                            gestureInProgress = gestureInProgress,
-                            showSliderDialog = showSliderDialog,
-                            showColorBalanceDialog = showColorBalanceDialog,
-                            onOpacityChange = viewModel::onOpacityChanged,
-                            onBrightnessChange = viewModel::onBrightnessChanged,
-                            onContrastChange = viewModel::onContrastChanged,
-                            onSaturationChange = viewModel::onSaturationChanged,
-                            onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                            onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-                            onColorBalanceBChange = viewModel::onColorBalanceBChanged,
-                            onUndo = viewModel::onUndoClicked,
-                            onRedo = viewModel::onRedoClicked,
-                            onMagicAlign = viewModel::onMagicClicked,
-                            onOnboardingComplete = viewModel::onOnboardingComplete,
-                            onDoubleTapHintDismissed = viewModel::onDoubleTapHintDismissed,
-                            onFeedbackShown = viewModel::onFeedbackShown,
-                            tapFeedback = viewModel.tapFeedback.collectAsState().value
-                        )
-                    }
-                    composable("surveyor") {
-                        MappingScreen(
-                            onMapSaved = { },
-                            onExit = { localNavController.popBackStack() }
-                        )
-                    }
-                    composable("project_library") {
-                        LaunchedEffect(Unit) {
-                            viewModel.loadAvailableProjects(context)
-                        }
-
-                        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                            ProjectLibraryScreen(
-                                projects = uiState.availableProjects,
-                                onLoadProject = { project ->
-                                    viewModel.openProject(project, context)
-                                    localNavController.popBackStack()
-                                },
-                                onDeleteProject = { projectId ->
-                                    viewModel.deleteProject(context, projectId)
-                                },
-                                onNewProject = {
-                                    viewModel.onNewProject()
-                                    localNavController.popBackStack()
-                                }
-                            )
-                            AzButton(
-                                text = "Back",
-                                onClick = { localNavController.popBackStack() },
-                                modifier = Modifier.align(Alignment.TopStart).padding(16.dp)
-                            )
-                        }
-                    }
-                        composable("settings") {
-                            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                                SettingsScreen(
-                                    currentVersion = BuildConfig.VERSION_NAME,
-                                    updateStatus = uiState.updateStatusMessage,
-                                    isCheckingForUpdate = uiState.isCheckingForUpdate,
-                                    isRightHanded = uiState.isRightHanded,
-                                    onHandednessChanged = viewModel::setHandedness,
-                                    onCheckForUpdates = viewModel::checkForUpdates,
-                                    onInstallUpdate = viewModel::installLatestUpdate,
-                                    onClose = { localNavController.popBackStack() }
-                                )
-                            }
-                        }
-                    }
-
-                    // Global Overlays
-                    TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
-
-                    UnlockInstructionsPopup(visible = uiState.showUnlockInstructions)
-
-                    if (showInfoScreen) {
-                        CustomHelpOverlay(
-                            uiState = uiState,
-                            navStrings = navStrings,
-                            onDismiss = { showInfoScreen = false }
-                        )
-                    }
-
-                    if (uiState.isCapturingTarget) {
-                        Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
-                            TargetCreationFlow(uiState, viewModel, context)
-                        }
-                    }
-
-                    if (uiState.isCapturingTarget) {
-                        CaptureAnimation()
-                    }
-                }
-            }
+        }
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
-}
 
-@Composable
-fun EditorContent(
-    viewModel: MainViewModel,
-    uiState: UiState,
-    gestureInProgress: Boolean,
-    showSliderDialog: String?,
-    showColorBalanceDialog: Boolean,
-    onOpacityChange: (Float) -> Unit,
-    onBrightnessChange: (Float) -> Unit,
-    onContrastChange: (Float) -> Unit,
-    onSaturationChange: (Float) -> Unit,
-    onColorBalanceRChange: (Float) -> Unit,
-    onColorBalanceGChange: (Float) -> Unit,
-    onColorBalanceBChange: (Float) -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onMagicAlign: () -> Unit,
-    onOnboardingComplete: (EditorMode) -> Unit,
-    onDoubleTapHintDismissed: () -> Unit,
-    onFeedbackShown: () -> Unit,
-    tapFeedback: com.hereliesaz.graffitixr.TapFeedback?
-) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    // History Stacks
+    private val undoStack = ArrayDeque<List<OverlayLayer>>()
+    private val redoStack = ArrayDeque<List<OverlayLayer>>()
+    private val MAX_HISTORY = 50
+    private var layerModsClipboard: OverlayLayer? = null
 
-    val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
-    val screenHeight = configuration.screenHeightDp.dp
-    val topSafePadding = (screenHeight * 0.05f).coerceAtLeast(16.dp) 
-    val bottomSafePadding = (screenHeight * 0.05f).coerceAtLeast(16.dp)
+    private fun snapshotState() {
+        if (undoStack.size >= MAX_HISTORY) undoStack.removeFirst()
+        undoStack.addLast(_uiState.value.layers.toList())
+        redoStack.clear()
+        updateHistoryFlags()
+    }
 
-    BoxWithConstraints(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        if (uiState.editorMode == AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
-            StatusOverlay(
-                qualityWarning = uiState.qualityWarning,
-                arState = uiState.arState,
-                isPlanesDetected = uiState.isArPlanesDetected,
-                isTargetCreated = uiState.isArTargetCreated,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = topSafePadding)
-                    .zIndex(10f)
-            )
-        }
+    private fun updateHistoryFlags() {
+        _uiState.update { it.copy(canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty()) }
+    }
 
-        if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
-            GestureFeedback(
-                uiState = uiState,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = topSafePadding + 20.dp)
-                    .zIndex(3f),
-                isVisible = gestureInProgress
-            )
-        }
-
-        if (uiState.isMarkingProgress) {
-            DrawingCanvas(
-                paths = uiState.drawingPaths,
-                onPathFinished = viewModel::onDrawingPathFinished
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = bottomSafePadding)
-                .zIndex(2f),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            AdjustmentsPanel(
-                uiState = uiState,
-                showKnobs = showSliderDialog == "Adjust",
-                showColorBalance = showColorBalanceDialog,
-                isLandscape = isLandscape,
-                screenHeight = this@BoxWithConstraints.maxHeight,
-                onOpacityChange = onOpacityChange,
-                onBrightnessChange = onBrightnessChange,
-                onContrastChange = onContrastChange,
-                onSaturationChange = onSaturationChange,
-                onColorBalanceRChange = onColorBalanceRChange,
-                onColorBalanceGChange = onColorBalanceGChange,
-                onColorBalanceBChange = onColorBalanceBChange,
-                onUndo = onUndo,
-                onRedo = onRedo,
-                onMagicAlign = onMagicAlign
-            )
-        }
-
-        uiState.showOnboardingDialogForMode?.let { mode ->
-            OnboardingDialog(
-                editorMode = mode,
-                onDismiss = {
-                    onOnboardingComplete(mode)
-                }
-            )
-        }
-
-        if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
-            RotationAxisFeedback(
-                axis = uiState.activeRotationAxis,
-                visible = uiState.showRotationAxisFeedback,
-                onFeedbackShown = onFeedbackShown,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = bottomSafePadding + 32.dp)
-                    .zIndex(4f)
-            )
-
-            TapFeedbackEffect(feedback = tapFeedback)
-
-            if (uiState.showDoubleTapHint) {
-                DoubleTapHintDialog(onDismissRequest = onDoubleTapHintDismissed)
-            }
-
-            if (uiState.isMarkingProgress) {
-                Text(
-                    text = "Progress: %.2f%%".format(uiState.progressPercentage),
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = topSafePadding)
-                        .zIndex(3f)
-                )
-            }
+    private fun updateActiveLayer(saveHistory: Boolean = false, block: (OverlayLayer) -> OverlayLayer) {
+        val activeId = _uiState.value.activeLayerId ?: return
+        if (saveHistory) snapshotState()
+        _uiState.update { state ->
+            state.copy(layers = state.layers.map { if (it.id == activeId) block(it) else it })
         }
     }
-}
 
-@Composable
-private fun MainContentLayer(
-    uiState: UiState,
-    viewModel: MainViewModel,
-    gestureInProgress: Boolean,
-    onGestureToggle: (Boolean) -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .zIndex(1f),
-        contentAlignment = Alignment.Center
-    ) {
-        val onScaleChanged: (Float) -> Unit = viewModel::onScaleChanged
-        val onOffsetChanged: (Offset) -> Unit = viewModel::onOffsetChanged
-        val onRotationZChanged: (Float) -> Unit = viewModel::onRotationZChanged
-        val onRotationXChanged: (Float) -> Unit = viewModel::onRotationXChanged
-        val onRotationYChanged: (Float) -> Unit = viewModel::onRotationYChanged
-        val onCycleRotationAxis: () -> Unit = viewModel::onCycleRotationAxis
-        val onGestureStart: () -> Unit = {
-            viewModel.onGestureStart()
-            onGestureToggle(true)
-        }
-        val onGestureEnd: () -> Unit = {
-            viewModel.onGestureEnd()
-            onGestureToggle(false)
-        }
+    fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
+    fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
+    fun onContrastChanged(v: Float) = updateActiveLayer { it.copy(contrast = v) }
+    fun onSaturationChanged(v: Float) = updateActiveLayer { it.copy(saturation = v) }
+    fun onColorBalanceRChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceR = v) }
+    fun onColorBalanceGChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceG = v) }
+    fun onColorBalanceBChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceB = v) }
 
-        when (uiState.editorMode) {
-            STATIC -> MockupScreen(
-                uiState = uiState,
-                onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
-                onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                onOpacityChanged = viewModel::onOpacityChanged,
-                onBrightnessChanged = viewModel::onBrightnessChanged,
-                onContrastChanged = viewModel::onContrastChanged,
-                onSaturationChanged = viewModel::onSaturationChanged,
-                onScaleChanged = onScaleChanged,
-                onOffsetChanged = onOffsetChanged,
-                onRotationZChanged = onRotationZChanged,
-                onRotationXChanged = onRotationXChanged,
-                onRotationYChanged = onRotationYChanged,
-                onCycleRotationAxis = onCycleRotationAxis,
-                onGestureStart = onGestureStart,
-                onGestureEnd = onGestureEnd
-            )
-            TRACE -> TraceScreen(
-                uiState = uiState,
-                onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                onScaleChanged = onScaleChanged,
-                onOffsetChanged = onOffsetChanged,
-                onRotationZChanged = onRotationZChanged,
-                onRotationXChanged = onRotationXChanged,
-                onRotationYChanged = onRotationYChanged,
-                onCycleRotationAxis = onCycleRotationAxis,
-                onGestureStart = onGestureStart,
-                onGestureEnd = onGestureEnd
-            )
-            OVERLAY -> OverlayScreen(
-                uiState = uiState,
-                onScaleChanged = onScaleChanged,
-                onOffsetChanged = onOffsetChanged,
-                onRotationZChanged = onRotationZChanged,
-                onRotationXChanged = onRotationXChanged,
-                onRotationYChanged = onRotationYChanged,
-                onCycleRotationAxis = onCycleRotationAxis,
-                onGestureStart = onGestureStart,
-                onGestureEnd = onGestureEnd
-            )
-            AR -> {
-                ARCameraScreen(
-                    viewModel = viewModel,
-                    onFrameCaptured = { viewModel.onFrameCaptured(it) }
-                )
-            }
-
-            // Fallback for tool modes to ensure content is visible
-            CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(
-                uiState = uiState,
-                onScaleChanged = onScaleChanged,
-                onOffsetChanged = onOffsetChanged,
-                onRotationZChanged = onRotationZChanged,
-                onRotationXChanged = onRotationXChanged,
-                onRotationYChanged = onRotationYChanged,
-                onCycleRotationAxis = onCycleRotationAxis,
-                onGestureStart = onGestureStart,
-                onGestureEnd = onGestureEnd
-            )
-            PROJECT -> {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-            }
-        }
+    fun onCycleBlendMode() = updateActiveLayer(saveHistory = true) { layer ->
+        layer.copy(blendMode = ImageUtils.getNextBlendMode(layer.blendMode))
     }
-}
 
-@Composable
-private fun TargetCreationFlow(
-    uiState: UiState,
-    viewModel: MainViewModel,
-    context: Context
-) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (uiState.captureStep == CaptureStep.REVIEW) {
-            val uri = uiState.capturedTargetUris.firstOrNull()
-            val imageBitmap by produceState<Bitmap?>(initialValue = null, uri) {
-                uri?.let {
-                    value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        val source = ImageDecoder.createSource(context.contentResolver, it)
-                        ImageDecoder.decodeBitmap(source)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+    fun onRemoveBackgroundClicked(context: Context) {
+        val activeId = _uiState.value.activeLayerId ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val activeLayer = _uiState.value.layers.find { it.id == activeId }
+                if (activeLayer != null) {
+                    val original = withContext(Dispatchers.IO) {
+                        ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
                     }
-                }
-            }
-
-            val maskUri = uiState.targetMaskUri
-            val maskBitmap by produceState<Bitmap?>(initialValue = null, maskUri) {
-                if (maskUri != null) {
-                    value = withContext(Dispatchers.IO) {
-                        com.hereliesaz.graffitixr.utils.ImageUtils.loadBitmapFromUri(context, maskUri)
-                    }
-                } else {
-                    value = null
-                }
-            }
-
-            TargetRefinementScreen(
-                targetImage = imageBitmap,
-                mask = maskBitmap,
-                keypoints = uiState.detectedKeypoints,
-                paths = uiState.refinementPaths,
-                isEraser = uiState.isRefinementEraser,
-                canUndo = uiState.canUndo,
-                canRedo = uiState.canRedo,
-                onPathAdded = viewModel::onRefinementPathAdded,
-                onModeChanged = { viewModel.onRefinementModeChanged(!it) },
-                onUndo = viewModel::onUndoClicked,
-                onRedo = viewModel::onRedoClicked,
-                onConfirm = { viewModel.onConfirmTargetCreation(null) }
-            )
-        } else if (uiState.captureStep == CaptureStep.RECTIFY) {
-            val uri = uiState.capturedTargetUris.firstOrNull()
-            val imageBitmap by produceState<Bitmap?>(initialValue = null, uri, uiState.capturedTargetImages) {
-                if (uiState.capturedTargetImages.isNotEmpty()) {
-                    value = uiState.capturedTargetImages.first()
-                } else if (uri != null) {
-                    value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        val source = ImageDecoder.createSource(context.contentResolver, uri)
-                        ImageDecoder.decodeBitmap(source)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                    }
-                }
-            }
-
-            UnwarpScreen(
-                isRightHanded = uiState.isRightHanded,
-                targetImage = imageBitmap,
-                onConfirm = viewModel::unwarpImage,
-                onRetake = viewModel::onRetakeCapture
-            )
-        } else {
-            TargetCreationOverlay(
-                isRightHanded = uiState.isRightHanded,
-                step = uiState.captureStep,
-                targetCreationMode = uiState.targetCreationMode,
-                gridRows = uiState.gridRows,
-                gridCols = uiState.gridCols,
-                qualityWarning = uiState.qualityWarning,
-                captureFailureTimestamp = uiState.captureFailureTimestamp,
-                onCaptureClick = {
-                    if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
-                        viewModel.onCalibrationPointCaptured(FloatArray(16)) // Stub for UI click, logic handled by event
-                    } else {
-                        viewModel.onCaptureShutterClicked()
-                    }
-                },
-                onCancelClick = viewModel::onCancelCaptureClicked,
-                onMethodSelected = viewModel::onTargetCreationMethodSelected,
-                onGridConfigChanged = viewModel::onGridConfigChanged,
-                onGpsDecision = viewModel::onGpsDecision,
-                onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
-            )
-        }
-    }
-}
-
-@Composable
-private fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
-    if (!isLocked) return
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .zIndex(100f)
-            .background(Color.Transparent)
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    var tapCount = 0
-                    var lastTapTime = 0L
-                    while (true) {
-                        val event = awaitPointerEvent(pass = PointerEventPass.Main)
-                        val change = event.changes.firstOrNull()
-                        if (change != null && change.changedToUp()) {
-                            val now = System.currentTimeMillis()
-                            if (now - lastTapTime < 500) {
-                                tapCount++
+                    if (original != null) {
+                        snapshotState()
+                        val processed = withContext(Dispatchers.IO) {
+                            val safeBitmap = if (original.config != Bitmap.Config.ARGB_8888 || original.isMutable.not()) {
+                                original.copy(Bitmap.Config.ARGB_8888, true)
                             } else {
-                                tapCount = 1
+                                original
                             }
-                            lastTapTime = now
-
-                            if (tapCount == 4) {
-                                onUnlockRequested()
-                                tapCount = 0
-                            }
+                            BackgroundRemover.removeBackground(context, safeBitmap)
                         }
-                        event.changes.forEach { it.consume() }
+                        if (processed != null) {
+                            val newUri = withContext(Dispatchers.IO) {
+                                ImageUtils.saveBitmapToCache(context, processed)
+                            }
+                            updateActiveLayer { it.copy(uri = newUri) }
+                        } else {
+                            _feedbackEvent.send(FeedbackEvent.Toast("Failed to remove background"))
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackEvent.send(FeedbackEvent.Toast("Error removing background"))
             }
-    )
-}
-
-@Composable
-fun StatusOverlay(
-    qualityWarning: String?,
-    arState: ArState,
-    isPlanesDetected: Boolean,
-    isTargetCreated: Boolean,
-    modifier: Modifier = Modifier
-) {
-    AnimatedVisibility(
-        visible = true,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = modifier
-    ) {
-        val backgroundColor = if (qualityWarning != null) Color.Red.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.5f)
-        val text = when {
-            qualityWarning != null -> qualityWarning
-            !isTargetCreated -> "Create a Grid to start."
-            arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."
-            arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."
-            arState == ArState.LOCKED -> "Looking for your Grid..."
-            arState == ArState.PLACED -> "Ready."
-            else -> ""
-        }
-
-        if (text.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .background(backgroundColor, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = text,
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            }
+            _uiState.update { it.copy(isLoading = false) }
         }
     }
-}
 
-@Composable
-private fun CaptureAnimation() {
-    var flashAlpha by remember { mutableFloatStateOf(0f) }
-    var shutterAlpha by remember { mutableFloatStateOf(0f) }
-
-    val animatedFlashAlpha by animateFloatAsState(
-        targetValue = flashAlpha,
-        animationSpec = tween(durationMillis = 200),
-        label = "Flash Animation"
-    )
-    val animatedShutterAlpha by animateFloatAsState(
-        targetValue = shutterAlpha,
-        animationSpec = tween(durationMillis = 300),
-        label = "Shutter Animation"
-    )
-
-    LaunchedEffect(Unit) {
-        shutterAlpha = 0.5f
-        delay(100)
-        flashAlpha = 1f
-        delay(50)
-        flashAlpha = 0f
-        delay(150)
-        shutterAlpha = 0f
+    fun onLineDrawingClicked(context: Context) {
+        val activeId = _uiState.value.activeLayerId ?: return
+        viewModelScope.launch {
+            if (!ensureOpenCVLoaded()) return@launch
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val activeLayer = _uiState.value.layers.find { it.id == activeId }
+                if (activeLayer != null) {
+                    val original = withContext(Dispatchers.IO) {
+                        ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
+                    }
+                    if (original != null) {
+                        snapshotState()
+                        val processed = withContext(Dispatchers.IO) {
+                            ImageUtils.generateOutline(original)
+                        }
+                        val newUri = withContext(Dispatchers.IO) {
+                            ImageUtils.saveBitmapToCache(context, processed)
+                        }
+                        updateActiveLayer { it.copy(uri = newUri) }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackEvent.send(FeedbackEvent.Toast("Failed to generate outline"))
+            }
+            _uiState.update { it.copy(isLoading = false) }
+        }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = animatedShutterAlpha))
-            .zIndex(10f)
-    )
+    // ... (Standard layer manipulations omitted for brevity but assumed present) ...
+    fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
+    fun onLayerRenamed(id: String, name: String) = _uiState.update { s -> s.copy(layers = s.layers.map { if(it.id==id) it.copy(name=name) else it }) }
+    fun onLayerReordered(newOrder: List<String>) { snapshotState(); val map = _uiState.value.layers.associateBy { it.id }; _uiState.update { it.copy(layers = newOrder.mapNotNull { map[it] }) } }
+    fun copyLayerModifications(id: String) { layerModsClipboard = _uiState.value.layers.find { it.id == id }; viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) } }
+    fun pasteLayerModifications(id: String) { layerModsClipboard?.let { t -> updateActiveLayer(true) { it.copy(opacity=t.opacity, brightness=t.brightness, contrast=t.contrast, saturation=t.saturation, colorBalanceR=t.colorBalanceR, colorBalanceG=t.colorBalanceG, colorBalanceB=t.colorBalanceB, scale=t.scale, rotationX=t.rotationX, rotationY=t.rotationY, rotationZ=t.rotationZ, blendMode=t.blendMode) }; viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateDouble) } } }
+    fun onLayerDuplicated(id: String) { snapshotState(); val l = _uiState.value.layers.find{it.id==id}?:return; val n=l.copy(id=UUID.randomUUID().toString(), name="${l.name} (Copy)"); _uiState.update{it.copy(layers=it.layers+n, activeLayerId=n.id)} }
+    fun onLayerRemoved(id: String) { snapshotState(); _uiState.update { s -> val n=s.layers.filter{it.id!=id}; s.copy(layers=n, activeLayerId=if(s.activeLayerId==id) n.firstOrNull()?.id else s.activeLayerId) } }
+    
+    fun onCancelCaptureClicked() {
+        stopSensorListening()
+        _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW) }
+    }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White.copy(alpha = animatedFlashAlpha))
-            .zIndex(11f)
-    )
-}
+    fun onUndoClicked() { if(undoStack.isNotEmpty()){ redoStack.addLast(_uiState.value.layers.toList()); _uiState.update{it.copy(layers=undoStack.removeLast())}; updateHistoryFlags() } }
+    fun onRedoClicked() { if(redoStack.isNotEmpty()){ undoStack.addLast(_uiState.value.layers.toList()); _uiState.update{it.copy(layers=redoStack.removeLast())}; updateHistoryFlags() } }
 
-@Composable
-fun UnlockInstructionsPopup(visible: Boolean) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
-        modifier = Modifier
-            .fillMaxSize()
-            .zIndex(200f)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 120.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Box(
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-            ) {
-                Text(
-                    text = "Press Volume Up & Down to unlock",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+    fun onEditorModeChanged(mode: EditorMode) = _uiState.update { it.copy(editorMode = mode) }
+    fun onScaleChanged(s: Float) = updateActiveLayer { it.copy(scale = it.scale * s) }
+    fun onArObjectScaleChanged(s: Float) = onScaleChanged(s)
+    fun onOffsetChanged(o: Offset) = updateActiveLayer { it.copy(offset = it.offset + o) }
+    fun onRotationXChanged(d: Float) = updateActiveLayer { it.copy(rotationX = it.rotationX + d) }
+    fun onRotationYChanged(d: Float) = updateActiveLayer { it.copy(rotationY = it.rotationY + d) }
+    fun onRotationZChanged(d: Float) = updateActiveLayer { it.copy(rotationZ = it.rotationZ + d) }
+    fun onCycleRotationAxis() = _uiState.update { s -> val n = when(s.activeRotationAxis){ RotationAxis.X->RotationAxis.Y; RotationAxis.Y->RotationAxis.Z; RotationAxis.Z->RotationAxis.X }; s.copy(activeRotationAxis=n, showRotationAxisFeedback=true) }
+
+    fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
+
+    fun onCaptureShutterClicked() {
+        val step = _uiState.value.captureStep
+        when (step) {
+            CaptureStep.GRID_CONFIG -> {
+                // Config done, show instructions
+                _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
+            }
+            CaptureStep.INSTRUCTION -> {
+                // FIXED: Start Button Pressed -> Move to Capture Phase
+                // Do not capture immediately; transition to the sequence.
+                val nextStep = if (_uiState.value.targetCreationMode == TargetCreationMode.CAPTURE || 
+                                   _uiState.value.targetCreationMode == TargetCreationMode.RECTIFY) {
+                    CaptureStep.FRONT 
+                } else {
+                    CaptureStep.PHOTO_SEQUENCE
+                }
+                _uiState.update { it.copy(captureStep = nextStep) }
+            }
+            else -> {
+                // For all other steps (FRONT, PHOTO_SEQUENCE, etc), actually capture.
+                viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
             }
         }
     }
+
+    fun saveCapturedBitmap(b: Bitmap) {
+        _uiState.update { state ->
+            val isMultiImage = state.captureStep == CaptureStep.PHOTO_SEQUENCE ||
+                               state.targetCreationMode == TargetCreationMode.GUIDED_GRID ||
+                               state.targetCreationMode == TargetCreationMode.MULTI_POINT
+
+            val newImages = if (isMultiImage) state.capturedTargetImages + b else listOf(b)
+            
+            // If single image mode, go to Review. If multi, stay on current step.
+            val newStep = if (isMultiImage) state.captureStep else CaptureStep.REVIEW
+
+            state.copy(capturedTargetImages = newImages, captureStep = newStep)
+        }
+    }
+
+    fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
+    fun setHandedness(rightHanded: Boolean) { prefs.edit().putBoolean("is_right_handed", rightHanded).apply(); _uiState.update { it.copy(isRightHanded = rightHanded) } }
+    fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
+    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) } } // Renderer observes state
+    fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
+
+    fun loadAvailableProjects(context: Context) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val projectIds = projectManager.getProjectList(context)
+            val projects = projectIds.mapNotNull { id -> projectManager.loadProjectMetadata(context, id) }
+            _uiState.update { it.copy(availableProjects = projects.sortedByDescending { p -> p.lastModified }, isLoading = false) }
+        }
+    }
+
+    fun updateCurrentLocation(location: Location) {
+        val gpsData = GpsData(location.latitude, location.longitude, location.altitude, location.accuracy, location.time)
+        _uiState.update { it.copy(gpsData = gpsData) }
+        sortProjects(location)
+    }
+
+    fun sortProjects(userLocation: Location?) {
+        val projects = _uiState.value.availableProjects
+        if (projects.isEmpty()) return
+        val sorted = if (userLocation != null) {
+            val (nearby, others) = projects.partition { 
+                val r = FloatArray(1); Location.distanceBetween(it.gpsData?.latitude?:0.0, it.gpsData?.longitude?:0.0, userLocation.latitude, userLocation.longitude, r); r[0] < 200 
+            }
+            nearby.sortedByDescending { it.lastModified } + others.sortedByDescending { it.lastModified }
+        } else { projects.sortedByDescending { it.lastModified } }
+        _uiState.update { it.copy(availableProjects = sorted) }
+    }
+
+    fun openProject(project: ProjectData, context: Context) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val loaded = projectManager.loadProject(context, project.id)
+            if (loaded != null) _uiState.update { loaded.copy(showProjectList=false, currentProjectId=project.id, availableProjects=it.availableProjects) }
+            _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    fun autoSaveProject(context: Context, thumbnail: Bitmap? = null) {
+        viewModelScope.launch {
+            val s = _uiState.value
+            if (s.showProjectList) return@launch
+            val pid = s.currentProjectId ?: UUID.randomUUID().toString()
+            if (s.currentProjectId == null) _uiState.update { it.copy(currentProjectId = pid) }
+            projectManager.saveProject(context, s, pid, thumbnail)
+        }
+    }
+
+    fun deleteProject(context: Context, pid: String) { projectManager.deleteProject(context, pid); loadAvailableProjects(context) }
+    fun onNewProject() { val r = _uiState.value.isRightHanded; _uiState.update { UiState(showProjectList=false, currentProjectId=UUID.randomUUID().toString(), isRightHanded=r, activeColorSeed=Random.nextInt()) } }
+
+    fun onSaveClicked() {}
+    fun exportProjectToUri(u: Uri) {}
+    fun onOnboardingComplete(m: EditorMode) = _uiState.update { it.copy(showOnboardingDialogForMode = null) }
+    fun onFeedbackShown() = _uiState.update { it.copy(showRotationAxisFeedback = false) }
+    fun onMarkProgressToggled() = _uiState.update { it.copy(isMarkingProgress = !it.isMarkingProgress) }
+    fun onDrawingPathFinished(p: List<Offset>) = _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(p)) }
+    fun updateArtworkBounds(b: android.graphics.RectF) = _artworkBounds.update { b }
+    fun setArPlanesDetected(d: Boolean) = _uiState.update { it.copy(isArPlanesDetected = d) }
+    fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
+    fun onFrameCaptured(b: Bitmap) { saveCapturedBitmap(b) }
+    fun onProgressUpdate(p: Float, b: Bitmap?) {}
+    fun onTrackingFailure(m: String?) {}
+    fun updateMappingScore(s: Float) = _uiState.update { it.copy(mappingQualityScore = s) }
+    fun finalizeMap() {}
+    fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
+    fun onOverlayImageSelected(u: Uri) { val l = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}"); _uiState.update { it.copy(layers = it.layers + l, activeLayerId = l.id, overlayImageUri = u) } }
+    fun onBackgroundImageSelected(u: Uri) = _uiState.update { it.copy(backgroundImageUri = u) }
+    fun onImagePickerShown() {}
+    fun onDoubleTapHintDismissed() {}
+    fun onGestureStart() {}
+    fun onGestureEnd() { snapshotState() }
+    fun onRefineTargetToggled() {}
+    fun onTargetCreationMethodSelected(m: TargetCreationMode) {
+        val next = when (m) { TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG; TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1; else -> CaptureStep.INSTRUCTION }
+        if(m==TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening()
+        _uiState.update { it.copy(targetCreationMode = m, captureStep = next, calibrationSnapshots = emptyList()) }
+    }
+    fun onGridConfigChanged(r: Int, c: Int) = _uiState.update { it.copy(gridRows = r, gridCols = c) }
+    fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
+    fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
+    
+    // UPDATED: Now receives the Pose Matrix from UI/Renderer
+    fun onCalibrationPointCaptured(poseMatrix: FloatArray? = null) {
+        val snapshot = CalibrationSnapshot(
+            gpsData = _uiState.value.gpsData,
+            sensorData = currentSensorData,
+            poseMatrix = poseMatrix?.toList(),
+            timestamp = System.currentTimeMillis()
+        )
+
+        _uiState.update {
+            val next = when(it.captureStep) {
+                CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
+                CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
+                CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
+                CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW
+                else -> it.captureStep
+            }
+            if (next == CaptureStep.REVIEW) stopSensorListening()
+            it.copy(captureStep = next, calibrationSnapshots = it.calibrationSnapshots + snapshot)
+        }
+        viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
+    }
+    
+    fun unwarpImage(l: List<Any>) {}
+    fun onRetakeCapture() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList(), calibrationSnapshots = emptyList()) } }
+    fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
+    fun onRefinementModeChanged(b: Boolean) = _uiState.update { it.copy(isRefinementEraser = b) }
+    
+    fun onConfirmTargetCreation(fingerprintJson: String?) {
+        if (fingerprintJson != null) _uiState.update { it.copy(fingerprintJson = fingerprintJson) }
+        _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
+    }
+
+    private fun startSensorListening() {
+        if (!isSensorListening) {
+            val s = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+            if (s != null) { sensorManager.registerListener(sensorEventListener, s, SensorManager.SENSOR_DELAY_GAME); isSensorListening = true; stableStartTime = 0L }
+        }
+    }
+    private fun stopSensorListening() { if (isSensorListening) { sensorManager.unregisterListener(sensorEventListener); isSensorListening = false } }
+
+    fun onResume() { if (_uiState.value.isCapturingTarget && _uiState.value.targetCreationMode == TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening() }
+    fun onPause() = stopSensorListening()
+    override fun onCleared() { super.onCleared(); stopSensorListening() }
+    fun onMagicClicked() { viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateDouble) } }
+    fun checkForUpdates() {}
+    fun installLatestUpdate() {}
 }
