@@ -9,7 +9,6 @@ import android.net.Uri
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
-import android.media.Image
 import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.core.content.ContextCompat
@@ -33,17 +32,19 @@ import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.locks.ReentrantLock
@@ -67,7 +68,9 @@ class ArRenderer(
     private val simpleQuadRenderer = SimpleQuadRenderer()
     private val miniMapRenderer = MiniMapRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
-    private val slamManager = SlamManager()
+    
+    // Core Engine Access
+    val slamManager = SlamManager()
 
     @Volatile
     var session: Session? = null
@@ -103,6 +106,11 @@ class ArRenderer(
     private var lastPose: Pose? = null
 
     fun getLatestPose(): Pose? = lastPose
+
+    // --- IO Pass-through for UI ---
+    fun saveMap(path: String): Boolean = slamManager.saveWorld(path)
+    fun loadMap(path: String): Boolean = slamManager.loadWorld(path)
+    fun clearMap() = slamManager.clearMap()
 
     fun updateLayers(newLayers: List<OverlayLayer>) {
         this.layers = newLayers
@@ -253,7 +261,7 @@ class ArRenderer(
             // Feed Native Engine
             slamManager.updateCamera(viewmtx, projmtx)
 
-            // Feed Image to Native Engine (for VIO/SLAM)
+            // Feed Image to Native Engine (Consolidated Logic)
             try {
                 val image = frame.acquireCameraImage()
                 try {
@@ -264,13 +272,12 @@ class ArRenderer(
                         val rowStride = plane.rowStride
                         val buffer = plane.buffer
 
+                        // Fast extraction
                         val yBytes = if (rowStride == width) {
-                            // Fast path: direct copy
                             val bytes = ByteArray(buffer.remaining())
                             buffer.get(bytes)
                             bytes
                         } else {
-                            // Slow path: remove padding
                             val bytes = ByteArray(width * height)
                             for (row in 0 until height) {
                                 buffer.position(row * rowStride)
@@ -278,20 +285,21 @@ class ArRenderer(
                             }
                             bytes
                         }
-
-                        slamManager.processFrameNative(width, height, yBytes, frame.timestamp)
+                        
+                        // Updated to match Step 1 API
+                        slamManager.updateCameraImage(yBytes, width, height, frame.timestamp)
                     }
                 } finally {
                     image.close()
                 }
             } catch (e: Exception) {
-                // Image not available or format issue
+                // Image not available
             }
 
-            // Process Depth for MobileGS (Throttled to 10fps for performance)
+            // Process Depth for MobileGS (Throttled for performance)
             if (camera.trackingState == TrackingState.TRACKING) {
                 val now = System.currentTimeMillis()
-                if (now - lastDepthUpdateTime > 100) {
+                if (now - lastDepthUpdateTime > 66) { // ~15 FPS cap
                     try {
                         val depthImage = frame.acquireDepthImage16Bits()
                         try {
@@ -314,6 +322,7 @@ class ArRenderer(
 
             val pointCloud = frame.acquirePointCloud()
             pointCloudRenderer.update(pointCloud)
+            // Optional: Hide default ARCore points if MobileGS is providing confident mapping
             pointCloudRenderer.draw(viewmtx, projmtx)
             
             if (showMiniMap) {
@@ -361,8 +370,7 @@ class ArRenderer(
 
             if (capturePending) {
                 capturePending = false
-                val bitmap = createBitmapFromGLSurface(0, 0, viewportWidth, viewportHeight)
-                bitmap?.let { onFrameCaptured(it) }
+                captureScreenshotAsync(viewportWidth, viewportHeight)
             }
 
         } catch (e: SessionPausedException) {
@@ -372,26 +380,53 @@ class ArRenderer(
         }
     }
 
-    private fun createBitmapFromGLSurface(x: Int, y: Int, w: Int, h: Int): Bitmap? {
-        val bitmapBuffer = java.nio.IntBuffer.allocate(w * h)
-        bitmapBuffer.position(0)
-        GLES20.glReadPixels(x, y, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, bitmapBuffer)
-        val bitmapSource = IntArray(w * h)
-        val offset1 = bitmapBuffer.array()
-        val offset2 = bitmapSource
+    // FIX: Optimized Capture using async processing
+    private fun captureScreenshotAsync(w: Int, h: Int) {
+        try {
+            val size = w * h * 4
+            val buffer = ByteBuffer.allocateDirect(size)
+            buffer.order(ByteOrder.nativeOrder())
+            
+            // This call is still on GL thread, but it's just a VRAM->RAM copy.
+            // The heavy lifting (pixel flip/swizzle) is moved to background.
+            GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer)
+            
+            rendererScope.launch(Dispatchers.Default) {
+                val bitmap = processRawScreenshot(buffer, w, h)
+                bitmap?.let { b -> onFrameCaptured(b) }
+            }
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Screenshot capture failed", e)
+        }
+    }
+
+    // Helper for async processing
+    private fun processRawScreenshot(buffer: ByteBuffer, w: Int, h: Int): Bitmap? {
+        val pixelArray = IntArray(w * h)
+        buffer.rewind()
+        val intBuf = buffer.asIntBuffer()
+        
+        // This loop is still heavy, but now it runs off the UI thread
         for (i in 0 until h) {
-            val offset1Index = i * w
-            val offset2Index = (h - i - 1) * w
+            val offsetSource = i * w
+            val offsetDest = (h - i - 1) * w // Vertical flip
             for (j in 0 until w) {
-                val texturePixel = offset1[offset1Index + j]
-                val blue = (texturePixel shr 16) and 0xff
-                val red = (texturePixel shl 16) and 0x00ff0000
-                val pixel = (texturePixel and -0xff0100) or red or blue
-                offset2[offset2Index + j] = pixel
+                val pixel = intBuf.get(offsetSource + j)
+                // GL is RGBA, Bitmap needs ARGB (or ABGR depending on arch)
+                // Manual swizzle: R(0-7) G(8-15) B(16-23) A(24-31)
+                // Target: A R G B
+                val r = (pixel) and 0xff
+                val g = (pixel shr 8) and 0xff
+                val b = (pixel shr 16) and 0xff
+                val a = (pixel shr 24) and 0xff
+                
+                // Reconstruct as ARGB
+                pixelArray[offsetDest + j] = (a shl 24) or (r shl 16) or (g shl 8) or b
             }
         }
+        
         return try {
-            Bitmap.createBitmap(offset2, 0, w, w, h, Bitmap.Config.ARGB_8888)
+            Bitmap.createBitmap(pixelArray, w, h, Bitmap.Config.ARGB_8888)
         } catch (e: Exception) {
             null
         }
@@ -438,7 +473,7 @@ class ArRenderer(
                         val config = Config(session)
                         config.focusMode = Config.FocusMode.AUTO
                         config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                        // ENABLE DEPTH
+                        // ENABLE DEPTH for MobileGS
                         if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                             config.depthMode = Config.DepthMode.AUTOMATIC
                         }
