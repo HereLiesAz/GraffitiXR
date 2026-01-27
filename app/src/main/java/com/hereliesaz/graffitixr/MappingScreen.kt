@@ -26,7 +26,7 @@ import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.SessionPausedException
-import java.util.concurrent.atomic.AtomicReference
+import java.util.UUID
 
 @Composable
 fun MappingScreen(
@@ -50,8 +50,6 @@ fun MappingScreen(
     val isMappingState = remember { mutableStateOf(true) }
     var isMapping by isMappingState
 
-    // FIX: Initialize ArRenderer FIRST, then use ITS SlamManager.
-    // This ensures UI observes the same engine that receives camera data.
     val arRenderer = remember {
         var lastUpdateTime = 0L
         ArRenderer(
@@ -66,7 +64,6 @@ fun MappingScreen(
             showMiniMap = true
             showGuide = false
             onSessionUpdated = { session, frame ->
-                // Always update the latest pose if tracking
                 if (frame.camera.trackingState == TrackingState.TRACKING) {
                     latestCameraPose.value = frame.camera.pose
                 }
@@ -76,7 +73,6 @@ fun MappingScreen(
                     if (now - lastUpdateTime > 500) {
                         if (frame.camera.trackingState == TrackingState.TRACKING) {
                             val cameraPose = frame.camera.pose
-                            // Now calling the correct instance inside ArRenderer
                             this.slamManager.updateFeatureMapQuality(session, cameraPose)
                             lastUpdateTime = now
                         }
@@ -86,35 +82,26 @@ fun MappingScreen(
         }
     }
 
-    // FIX: Wire UI state to the Renderer's SlamManager
     val slamManager = arRenderer.slamManager
     val mappingQuality by slamManager.mappingQuality.collectAsState()
-    val isHosting by slamManager.isHosting.collectAsState()
+    
+    // REMOVED: isHosting state (Local-only now)
 
-    // Setup Anchor Hosting Callback
+    // Setup Local Map Saving Callback
     LaunchedEffect(arRenderer) {
         arRenderer.onAnchorCreated = { anchor: Anchor ->
             val session = arRenderer.session
             if (session != null) {
-                scope.launch {
-                    slamManager.hostAnchor(
-                        session = session,
-                        anchor = anchor,
-                        onSuccess = { cloudId ->
-                            // Save the binary map to disk using the native engine
-                            // We use the cloudID as the filename for consistency
-                            val mapPath = java.io.File(context.filesDir, "$cloudId.map").absolutePath
-                            if (arRenderer.saveMap(mapPath)) {
-                                Toast.makeText(context, "Map & Anchor Saved!", Toast.LENGTH_SHORT).show()
-                                onMapSaved(cloudId)
-                            } else {
-                                Toast.makeText(context, "Anchor hosted, but Map save failed.", Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        onError = { error ->
-                            Toast.makeText(context, "Hosting Failed: $error", Toast.LENGTH_LONG).show()
-                        }
-                    )
+                // Generate a local ID
+                val mapId = UUID.randomUUID().toString()
+                val mapPath = java.io.File(context.filesDir, "$mapId.map").absolutePath
+                
+                // Direct native save
+                if (slamManager.saveWorld(mapPath)) {
+                    Toast.makeText(context, "Local Map Saved!", Toast.LENGTH_SHORT).show()
+                    onMapSaved(mapId)
+                } else {
+                    Toast.makeText(context, "Failed to save local map.", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -162,7 +149,7 @@ fun MappingScreen(
                     factory = { ctx ->
                         GLSurfaceView(ctx).apply {
                             preserveEGLContextOnPause = true
-                            setEGLContextClientVersion(3) // Required for MobileGS Shaders
+                            setEGLContextClientVersion(3)
                             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                             setRenderer(arRenderer)
                             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
@@ -188,11 +175,10 @@ fun MappingScreen(
                                 PhotoSphereCreationScreen(
                                     isRightHanded = isRightHanded,
                                     currentQuality = qualityEnum,
-                                    isHosting = isHosting,
+                                    isHosting = false, // Always false for local mode
                                     onCaptureComplete = {
                                         val cameraPose = latestCameraPose.value
                                         if (cameraPose != null) {
-                                            // Place anchor 0.5m in front of camera
                                             val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
                                             anchorCreationPose.value = cameraPose.compose(forwardOffset)
                                         } else {
