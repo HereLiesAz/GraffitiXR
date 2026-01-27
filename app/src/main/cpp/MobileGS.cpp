@@ -11,6 +11,7 @@
 
 const float CONFIDENCE_THRESHOLD = 0.6f;
 const float CONFIDENCE_INCREMENT = 0.05f;
+const float PRUNE_THRESHOLD = 0.3f; // More aggressive culling for low confidence noise
 
 const char* VS_SRC = R"(#version 300 es
 layout(location = 0) in vec3 aInstancePos;
@@ -61,7 +62,8 @@ MobileGS::MobileGS() :
         mBgProgram(0), mBgVAO(0), mBgVBO(0), mBgTexture(0),
         mViewMatrix(1.0f), mProjMatrix(1.0f), mSortViewMatrix(1.0f),
         mSortRunning(false), mStopThread(false), mSortResultReady(false),
-        mMapChanged(false), mNewBgAvailable(false), mHasBgData(false), mIsInitialized(false)
+        mMapChanged(false), mNewBgAvailable(false), mHasBgData(false), mIsInitialized(false),
+        mFrameCount(0)
 {
     mLastUpdateTime = std::chrono::steady_clock::now();
     mSortThread = std::thread(&MobileGS::sortThreadLoop, this);
@@ -84,7 +86,7 @@ void MobileGS::initialize() {
     if (mIsInitialized) return;
     compileShaders();
     mIsInitialized = true;
-    LOGI("MobileGS Initialized");
+    LOGI("MobileGS Initialized (GLES 3.0 Native)");
 }
 
 int MobileGS::getPointCount() {
@@ -100,32 +102,34 @@ void MobileGS::updateCamera(const float* viewMtx, const float* projMtx) {
 
 void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height) {
     auto now = std::chrono::steady_clock::now();
-    // Decreased throttling to allow for smoother updates
     if (std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastUpdateTime).count() < 33) return;
     mLastUpdateTime = now;
 
     std::lock_guard<std::mutex> lock(mDataMutex);
     if (mProjMatrix[0][0] == 0) return;
 
-    // Trigger Garbage Collection if we are near the limit
-    if (mRenderGaussians.size() > MAX_POINTS * 0.9) {
+    mFrameCount++;
+    // Garbage Collect every 500 frames or if we hit cap
+    if (mFrameCount % 500 == 0 || mRenderGaussians.size() > MAX_POINTS * 0.95) {
         pruneMap();
     }
 
     glm::mat4 invView = glm::inverse(mViewMatrix);
-    // Standard GL Projection Matrix Principal Point Layout
     float p00 = mProjMatrix[0][0];
     float p11 = mProjMatrix[1][1];
     float p20 = mProjMatrix[2][0];
     float p21 = mProjMatrix[2][1];
 
-    // FIX: Reduced step size from 20 to 2 for higher resolution reconstruction
-    int step = 2; 
+    // Dynamic Resolution: If we have too many points, sample less often to save CPU
+    int step = 2;
+    if (mRenderGaussians.size() > 20000) step = 3;
+    if (mRenderGaussians.size() > 40000) step = 4;
+
     for (int y = 0; y < height; y += step) {
         const uint16_t* rowPtr = depthMap.ptr<uint16_t>(y);
         for (int x = 0; x < width; x += step) {
             uint16_t d_raw = rowPtr[x];
-            if (d_raw < 200 || d_raw > 4000) continue; // Range: 20cm to 4.0m
+            if (d_raw < 200 || d_raw > 4000) continue; 
 
             float z = d_raw * 0.001f;
             float ndc_x = ((float)x / width) * 2.0f - 1.0f;
@@ -153,8 +157,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
                 SplatGaussian g;
                 g.position = glm::vec3(worldPos);
                 g.scale = glm::vec3(VOXEL_SIZE * 1.8f);
-                g.opacity = CONFIDENCE_INCREMENT;
-                g.color = glm::vec3(0.0f, 0.8f, 1.0f); // Cyan default
+                g.opacity = CONFIDENCE_INCREMENT; 
+                g.color = glm::vec3(0.0f, 0.8f, 1.0f);
                 mRenderGaussians.push_back(g);
                 mVoxelGrid[key] = (int)(mRenderGaussians.size() - 1);
             }
@@ -163,7 +167,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
 }
 
 void MobileGS::pruneMap() {
-    // FIX: Invalidate sort when changing the vector layout
     mMapChanged = true;
     
     std::vector<SplatGaussian> survived;
@@ -171,7 +174,9 @@ void MobileGS::pruneMap() {
     mVoxelGrid.clear();
 
     for (const auto& g : mRenderGaussians) {
-        if (g.opacity >= CONFIDENCE_THRESHOLD) {
+        // Keep if high confidence OR if it's a very new point (give it a chance to grow)
+        // But for this "fix", we stick to the requested logic: Prune weak points.
+        if (g.opacity >= PRUNE_THRESHOLD) {
             survived.push_back(g);
             VoxelKey key = { 
                 (int)std::floor(g.position.x/VOXEL_SIZE), 
@@ -181,8 +186,9 @@ void MobileGS::pruneMap() {
             mVoxelGrid[key] = (int)(survived.size() - 1);
         }
     }
+    size_t removed = mRenderGaussians.size() - survived.size();
     mRenderGaussians = std::move(survived);
-    LOGI("Garbage Collection: Pruned to %zu points", mRenderGaussians.size());
+    LOGI("Garbage Collection: Pruned %zu noise points", removed);
 }
 
 void MobileGS::setBackgroundFrame(const cv::Mat& frame) {
@@ -193,7 +199,6 @@ void MobileGS::setBackgroundFrame(const cv::Mat& frame) {
 }
 
 void MobileGS::processImage(const cv::Mat& image, int width, int height, int64_t timestamp) {
-    // Just update the background for now, timestamp ignored in this version
     setBackgroundFrame(image);
 }
 
@@ -241,6 +246,9 @@ void MobileGS::compileShaders() {
 }
 
 void MobileGS::sortThreadLoop() {
+    glm::vec3 lastSortPos(0.0f);
+    glm::vec3 lastSortDir(0.0f);
+
     while (!mStopThread) {
         {
             std::unique_lock<std::mutex> lock(mSortMutex);
@@ -248,24 +256,39 @@ void MobileGS::sortThreadLoop() {
             if (mStopThread) return;
         }
 
-        std::vector<glm::vec3> positions;
         glm::mat4 view;
+        std::vector<glm::vec3> positions;
+        
         {
             std::lock_guard<std::mutex> dataLock(mDataMutex);
             view = mSortViewMatrix;
+            // COPY positions to avoid holding lock during sort
             positions.reserve(mRenderGaussians.size());
             for(const auto& g : mRenderGaussians) positions.push_back(g.position);
         }
+
+        // OPTIMIZATION: Check delta.
+        glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
+        glm::vec3 camDir = glm::vec3(view[0][2], view[1][2], view[2][2]); // Forward Z
+        
+        float distDelta = glm::distance(camPos, lastSortPos);
+        float dirDelta = glm::dot(camDir, lastSortDir); // 1.0 = same dir
+
+        // Only sort if we moved > 5cm or rotated significantly
+        if (distDelta < 0.05f && dirDelta > 0.99f && !mMapChanged) {
+             // Skip sort, release thread
+             mSortRunning = false;
+             continue; 
+        }
+
+        lastSortPos = camPos;
+        lastSortDir = camDir;
 
         if (!positions.empty()) {
             std::vector<Sortable> sorted;
             sorted.reserve(positions.size());
             for(size_t i=0; i<positions.size(); ++i) {
                 const auto& p = positions[i];
-                // Dot product with view direction (row 2 of view matrix is Forward Z)
-                // Actually in GLM column-major: view[2] is the Z column.
-                // Standard OpenGL View Matrix: Row 2 is Z axis.
-                // depth = -(view * pos).z
                 float depth = view[0][2] * p.x + view[1][2] * p.y + view[2][2] * p.z + view[3][2];
                 sorted.push_back({(int)i, depth});
             }
@@ -274,12 +297,11 @@ void MobileGS::sortThreadLoop() {
             });
 
             std::lock_guard<std::mutex> dataLock(mDataMutex);
-            // If map changed while we were sorting, discard this result
             if (!mMapChanged) {
                 mSortListBack = std::move(sorted);
                 mSortResultReady = true;
             } else {
-                mMapChanged = false; // Reset flag, try again next frame
+                mMapChanged = false;
             }
         }
         mSortRunning = false;
@@ -310,8 +332,9 @@ void MobileGS::draw() {
             int idx = canUseSort ? mSortListFront[i].index : (int)i;
             if (idx >= mRenderGaussians.size()) continue;
             const auto& g = mRenderGaussians[idx];
-            // Render only if confident
-            if (g.opacity < CONFIDENCE_THRESHOLD) continue;
+            
+            // Only render if above threshold (Visual Cleanliness)
+            if (g.opacity < 0.2f) continue;
 
             data.push_back(g.position.x); data.push_back(g.position.y); data.push_back(g.position.z);
             data.push_back(g.color.x); data.push_back(g.color.y); data.push_back(g.color.z);
@@ -331,7 +354,7 @@ void MobileGS::draw() {
 
     if (count == 0) return;
 
-    // Save ALL relevant GL State to prevent interfering with ARCore Background
+    // Save GL State
     GLint prevProgram, prevVAO, prevVBO, prevBlendSrc, prevBlendDst;
     GLboolean prevDepthTest, prevBlend, prevCull;
     glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
@@ -362,7 +385,7 @@ void MobileGS::draw() {
 
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)count);
 
-    // RESTORE GL State perfectly
+    // Restore GL State
     glUseProgram(prevProgram);
     glBindVertexArray(prevVAO);
     glBindBuffer(GL_ARRAY_BUFFER, prevVBO);
@@ -376,6 +399,7 @@ void MobileGS::clear() {
     std::lock_guard<std::mutex> lock(mDataMutex);
     mRenderGaussians.clear();
     mVoxelGrid.clear();
+    mMapChanged = true;
 }
 
 bool MobileGS::saveModel(const std::string& path) {
@@ -405,5 +429,6 @@ bool MobileGS::loadModel(const std::string& path) {
             mVoxelGrid[key] = i;
         }
     }
+    mMapChanged = true;
     return true;
 }
