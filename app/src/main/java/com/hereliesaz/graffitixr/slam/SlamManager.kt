@@ -17,7 +17,6 @@ class SlamManager {
 
     // Lifecycle
     private external fun initNativeJni()
-    external fun initSLAM(vocabPath: String, settingsPath: String)
     private external fun destroyNativeJni()
 
     fun initNative() {
@@ -43,17 +42,15 @@ class SlamManager {
     // Sensors
     external fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray)
 
-    // Updated: matches feedImage in JNI
-    external fun feedImage(imageData: ByteArray, width: Int, height: Int)
-
-    external fun processFrameNative(width: Int, height: Int, data: ByteArray, timestamp: Long)
+    // Consolidated image feed (replaces feedImage/processFrameNative)
+    external fun updateCameraImage(imageData: ByteArray, width: Int, height: Int, timestamp: Long)
 
     external fun feedDepth(depthData: ByteArray, width: Int, height: Int)
 
     // Rendering
     external fun drawFrame()
 
-    // IO
+    // IO - Now actually implemented in C++
     external fun saveWorld(path: String): Boolean
     external fun loadWorld(path: String): Boolean
     external fun clearMap()
