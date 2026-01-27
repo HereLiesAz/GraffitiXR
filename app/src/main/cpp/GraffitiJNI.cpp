@@ -12,11 +12,6 @@
 static JavaVM* gVm = nullptr;
 static MobileGS* gMobileGS = nullptr;
 
-#ifdef HAS_ORB_SLAM3
-#include "System.h"
-static ORB_SLAM3::System* SLAM = nullptr;
-#endif
-
 extern "C" {
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -73,36 +68,51 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_feedDepth(JNIEnv *env, jobject t
     env->ReleaseByteArrayElements(depth_data, data, 0);
 }
 
+// Consolidated method to match Kotlin
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_feedImage(JNIEnv *env, jobject thiz,
+Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCameraImage(JNIEnv *env, jobject thiz,
         jbyteArray image_data,
-        jint width, jint height) {
+        jint width, jint height, jlong timestamp) {
     if (!gMobileGS) return;
     jbyte* data = env->GetByteArrayElements(image_data, nullptr);
     if (data != nullptr) {
         cv::Mat img(height, width, CV_8UC1, (unsigned char*)data);
-        gMobileGS->setBackgroundFrame(img);
-    }
-    env->ReleaseByteArrayElements(image_data, data, 0);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_processFrameNative(JNIEnv *env, jobject thiz,
-        jint width, jint height,
-        jbyteArray data, jlong timestamp) {
-    if (!gMobileGS) return;
-    jbyte* rawData = env->GetByteArrayElements(data, nullptr);
-    if (rawData != nullptr) {
-        cv::Mat img(height, width, CV_8UC1, (unsigned char*)rawData);
         gMobileGS->processImage(img, width, height, (int64_t)timestamp);
     }
-    env->ReleaseByteArrayElements(data, rawData, 0);
+    env->ReleaseByteArrayElements(image_data, data, 0);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_slam_SlamManager_drawFrame(JNIEnv *env, jobject thiz) {
     if (gMobileGS) {
         gMobileGS->draw();
+    }
+}
+
+// --- MISSING IO METHODS IMPLEMENTED BELOW ---
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jstring path) {
+    if (!gMobileGS) return false;
+    const char *nativePath = env->GetStringUTFChars(path, 0);
+    bool result = gMobileGS->saveModel(std::string(nativePath));
+    env->ReleaseStringUTFChars(path, nativePath);
+    return result;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jstring path) {
+    if (!gMobileGS) return false;
+    const char *nativePath = env->GetStringUTFChars(path, 0);
+    bool result = gMobileGS->loadModel(std::string(nativePath));
+    env->ReleaseStringUTFChars(path, nativePath);
+    return result;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_clearMap(JNIEnv *env, jobject thiz) {
+    if (gMobileGS) {
+        gMobileGS->clear();
     }
 }
 
