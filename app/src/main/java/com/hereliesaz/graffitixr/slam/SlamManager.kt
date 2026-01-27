@@ -41,32 +41,36 @@ class SlamManager {
 
     // Sensors
     external fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray)
-
-    // Consolidated image feed (replaces feedImage/processFrameNative)
     external fun updateCameraImage(imageData: ByteArray, width: Int, height: Int, timestamp: Long)
-
     external fun feedDepth(depthData: ByteArray, width: Int, height: Int)
 
     // Rendering
     external fun drawFrame()
 
-    // IO - Now actually implemented in C++
+    // IO
     external fun saveWorld(path: String): Boolean
     external fun loadWorld(path: String): Boolean
     external fun clearMap()
+    
+    // Metrics
+    external fun getPointCount(): Int
 
     fun updateFeatureMapQuality(session: Session, pose: Pose) {
-        // Mock logic: calculate quality based on tracking state or random for now
-        // In real impl, this would query native SLAM
-        _mappingQuality.value = 1.0f // Mock perfect quality
+        // REAL LOGIC: Quality is based on the number of confident scan points.
+        // Thresholds: < 1000 (Low), 1000-5000 (Medium), > 5000 (High)
+        val count = getPointCount()
+        
+        // Normalize 0..5000 to 0.0..1.0
+        val quality = (count / 5000f).coerceIn(0f, 1f)
+        _mappingQuality.value = quality
     }
 
     suspend fun hostAnchor(session: Session, anchor: Anchor, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
         _isHosting.value = true
         try {
-            // Mock hosting
+            // Mock hosting logic for now as we focus on local persistence
             kotlinx.coroutines.delay(1000)
-            val cloudId = "mock-cloud-anchor-id-${System.currentTimeMillis()}"
+            val cloudId = "local-map-${System.currentTimeMillis()}"
             onSuccess(cloudId)
         } catch (e: Exception) {
             onError(e.message ?: "Unknown error")
