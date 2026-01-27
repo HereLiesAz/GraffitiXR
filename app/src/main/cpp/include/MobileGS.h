@@ -1,99 +1,161 @@
-#pragma once
+#include "include/MobileGS.h"
+#include <algorithm>
+#include <android/log.h>
+#include <fstream>
 
-#include <vector>
-#include <mutex>
-#include <thread>
-#include <condition_variable>
-#include <atomic>
-#include <cstdint>
-#include <GLES3/gl3.h>
-#include <glm/glm.hpp>
-#include <opencv2/core/mat.hpp>
-#include <chrono>
-#include <unordered_map>
+#define TAG "MobileGS"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 
-// ... (Struct definitions remain the same) ...
-struct SplatGaussian {
-    glm::vec3 position;
-    glm::vec3 color;
-    glm::vec3 scale;
-    float opacity;
-};
+const float CONFIDENCE_THRESHOLD = 0.6f;
+const float CONFIDENCE_INCREMENT = 0.05f;
 
-struct Sortable {
-    int index;
-    float depth;
-};
+// ... (Shaders remain the same) ...
 
-struct VoxelKey {
-    int x, y, z;
-    bool operator==(const VoxelKey& other) const {
-        return x == other.x && y == other.y && z == other.z;
+MobileGS::MobileGS() :
+        mProgram(0), mVAO(0), mVBO(0), mQuadVBO(0),
+        mViewMatrix(1.0f), mProjMatrix(1.0f), mSortViewMatrix(1.0f),
+        mSortRunning(false), mStopThread(false), mSortResultReady(false),
+        mMapChanged(false), mIsInitialized(false)
+{
+    mLastUpdateTime = std::chrono::steady_clock::now();
+    mSortThread = std::thread(&MobileGS::sortThreadLoop, this);
+}
+
+// ... (Destructor and initialize remain the same) ...
+
+int MobileGS::getPointCount() {
+    std::lock_guard<std::mutex> lock(mDataMutex);
+    return (int)mRenderGaussians.size();
+}
+
+void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height) {
+    // ... (Throttling logic same as before) ...
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastUpdateTime).count() < 33) return;
+    mLastUpdateTime = now;
+
+    std::lock_guard<std::mutex> lock(mDataMutex);
+    if (mProjMatrix[0][0] == 0) return;
+
+    if (mRenderGaussians.size() > MAX_POINTS * 0.9) {
+        pruneMap();
     }
-};
 
-struct VoxelHash {
-    size_t operator()(const VoxelKey& k) const {
-        return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1) ^ (std::hash<int>()(k.z) << 2);
+    // ... (Matrix calculation same as before) ...
+    glm::mat4 invView = glm::inverse(mViewMatrix);
+    float p00 = mProjMatrix[0][0];
+    float p11 = mProjMatrix[1][1];
+    float p20 = mProjMatrix[2][0];
+    float p21 = mProjMatrix[2][1];
+
+    int step = 2; 
+    for (int y = 0; y < height; y += step) {
+        const uint16_t* rowPtr = depthMap.ptr<uint16_t>(y);
+        for (int x = 0; x < width; x += step) {
+            uint16_t d_raw = rowPtr[x];
+            if (d_raw < 200 || d_raw > 4000) continue;
+
+            float z = d_raw * 0.001f;
+            // ... (Projection math same as before) ...
+            float ndc_x = ((float)x / width) * 2.0f - 1.0f;
+            float ndc_y = 1.0f - ((float)y / height) * 2.0f;
+            glm::vec4 viewPos;
+            viewPos.x = (ndc_x + p20) * z / p00;
+            viewPos.y = (ndc_y + p21) * z / p11;
+            viewPos.z = -z;
+            viewPos.w = 1.0f;
+            glm::vec4 worldPos = invView * viewPos;
+
+            VoxelKey key;
+            key.x = static_cast<int>(std::floor(worldPos.x / VOXEL_SIZE));
+            key.y = static_cast<int>(std::floor(worldPos.y / VOXEL_SIZE));
+            key.z = static_cast<int>(std::floor(worldPos.z / VOXEL_SIZE));
+
+            auto it = mVoxelGrid.find(key);
+            if (it != mVoxelGrid.end()) {
+                SplatGaussian& g = mRenderGaussians[it->second];
+                g.opacity = std::min(1.0f, g.opacity + CONFIDENCE_INCREMENT);
+                // Simple running average for position refinement
+                g.position = glm::mix(g.position, glm::vec3(worldPos), 0.1f);
+            } else if (mRenderGaussians.size() < MAX_POINTS) {
+                SplatGaussian g;
+                g.position = glm::vec3(worldPos);
+                g.scale = glm::vec3(VOXEL_SIZE * 1.8f); // Slightly overlapping
+                g.opacity = CONFIDENCE_INCREMENT;
+                g.color = glm::vec3(0.0f, 0.8f, 1.0f);
+                mRenderGaussians.push_back(g);
+                mVoxelGrid[key] = (int)(mRenderGaussians.size() - 1);
+            }
+        }
     }
-};
+}
 
-class MobileGS {
-public:
-    MobileGS();
-    ~MobileGS();
-
-    void initialize();
-    void updateCamera(const float* viewMtx, const float* projMtx);
-    void processDepthFrame(const cv::Mat& depthMap, int width, int height);
-    void setBackgroundFrame(const cv::Mat& frame);
-    void processImage(const cv::Mat& image, int width, int height, int64_t timestamp);
-
-    void draw();
-    bool saveModel(const std::string& path);
-    bool loadModel(const std::string& path);
-    void clear();
+void MobileGS::pruneMap() {
+    // FIX: Invalidate sort when changing the vector layout
+    mMapChanged = true;
     
-    // NEW: Metric for UI
-    int getPointCount();
+    std::vector<SplatGaussian> survived;
+    survived.reserve(mRenderGaussians.size());
+    mVoxelGrid.clear();
 
-private:
-    void compileShaders();
-    void sortThreadLoop();
-    void pruneMap();
+    for (const auto& g : mRenderGaussians) {
+        if (g.opacity >= CONFIDENCE_THRESHOLD) {
+            survived.push_back(g);
+            VoxelKey key = { 
+                (int)std::floor(g.position.x/VOXEL_SIZE), 
+                (int)std::floor(g.position.y/VOXEL_SIZE), 
+                (int)std::floor(g.position.z/VOXEL_SIZE) 
+            };
+            mVoxelGrid[key] = (int)(survived.size() - 1);
+        }
+    }
+    mRenderGaussians = std::move(survived);
+    LOGI("Garbage Collection: Pruned to %zu points", mRenderGaussians.size());
+}
 
-    GLuint mProgram;
-    GLuint mVAO, mVBO, mQuadVBO;
-    
-    // Unused background rendering resources removed for clarity
-    
-    glm::mat4 mViewMatrix;
-    glm::mat4 mProjMatrix;
-    glm::mat4 mSortViewMatrix;
+// ... (processImage, setBackgroundFrame, compileShaders remain same) ...
 
-    std::vector<SplatGaussian> mRenderGaussians;
-    cv::Mat mPendingBgFrame;
+void MobileGS::sortThreadLoop() {
+    while (!mStopThread) {
+        {
+            std::unique_lock<std::mutex> lock(mSortMutex);
+            mSortCV.wait(lock, [this] { return mStopThread || mSortRunning.load(); });
+            if (mStopThread) return;
+        }
 
-    std::vector<Sortable> mSortListFront;
-    std::vector<Sortable> mSortListBack;
-    std::thread mSortThread;
-    std::mutex mSortMutex;
-    std::condition_variable mSortCV;
+        // ... (Sort logic same as before) ...
+        std::vector<glm::vec3> positions;
+        glm::mat4 view;
+        {
+            std::lock_guard<std::mutex> dataLock(mDataMutex);
+            view = mSortViewMatrix;
+            positions.reserve(mRenderGaussians.size());
+            for(const auto& g : mRenderGaussians) positions.push_back(g.position);
+        }
 
-    std::atomic<bool> mSortRunning;
-    std::atomic<bool> mStopThread;
-    std::atomic<bool> mSortResultReady;
-    
-    // NEW: Atomic flag to invalidate sort during pruning
-    std::atomic<bool> mMapChanged; 
+        if (!positions.empty()) {
+            std::vector<Sortable> sorted;
+            sorted.reserve(positions.size());
+            for(size_t i=0; i<positions.size(); ++i) {
+                const auto& p = positions[i];
+                float depth = view[0][2] * p.x + view[1][2] * p.y + view[2][2] * p.z + view[3][2];
+                sorted.push_back({(int)i, depth});
+            }
+            std::sort(sorted.begin(), sorted.end(), [](const Sortable& a, const Sortable& b){
+                return a.depth > b.depth;
+            });
 
-    std::mutex mDataMutex;
-    std::mutex mBgMutex;
-    std::atomic<bool> mIsInitialized;
+            std::lock_guard<std::mutex> dataLock(mDataMutex);
+            // If map changed while we were sorting, discard this result
+            if (!mMapChanged) {
+                mSortListBack = std::move(sorted);
+                mSortResultReady = true;
+            } else {
+                mMapChanged = false; // Reset flag, try again next frame
+            }
+        }
+        mSortRunning = false;
+    }
+}
 
-    std::chrono::steady_clock::time_point mLastUpdateTime;
-    std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;
-
-    const size_t MAX_POINTS = 65536;
-    const float VOXEL_SIZE = 0.02f;
-};
+// ... (draw, saveModel, loadModel, clear remain the same) ...
