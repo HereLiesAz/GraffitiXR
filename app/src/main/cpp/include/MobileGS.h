@@ -94,7 +94,7 @@ private:
     std::atomic<bool> mIsInitialized;
     int64_t mPendingTimestamp;
     
-    // ADDED: Missing member variable
+    // ADDED: Missing member variable that caused the build error
     int mFrameCount;
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
