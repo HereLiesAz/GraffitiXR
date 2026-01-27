@@ -15,6 +15,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.hereliesaz.graffitixr.data.CaptureEvent
 
 @Composable
 fun ArView(
@@ -27,7 +28,7 @@ fun ArView(
     // Capture GLSurfaceView to manage lifecycle
     var glSurfaceView by remember { mutableStateOf<android.opengl.GLSurfaceView?>(null) }
 
-    // Instantiate Renderer with callbacks to VM
+    // Instantiate Renderer
     val arRenderer = remember {
         ArRenderer(
             context = context,
@@ -43,12 +44,35 @@ fun ArView(
                 }
                 viewModel.onArImagePlaced()
             }
-            // REMOVED: viewModel.arRenderer = it (Fixes memory leak and compilation error)
+            // REMOVED: viewModel.arRenderer = it (Memory Leak Fix)
         }
     }
 
+    // Pass layer updates to renderer
     LaunchedEffect(uiState.layers) {
         arRenderer.updateLayers(uiState.layers)
+    }
+
+    // NEW: Handle Capture Events from ViewModel
+    LaunchedEffect(viewModel) {
+        viewModel.captureEvent.collect { event ->
+            when(event) {
+                is CaptureEvent.RequestCapture -> {
+                    // Trigger renderer frame capture
+                    arRenderer.triggerCapture()
+                }
+                is CaptureEvent.RequestCalibration -> {
+                    // Get latest pose and send back to ViewModel
+                    val pose = arRenderer.getLatestPose()
+                    if (pose != null) {
+                        val matrix = FloatArray(16)
+                        pose.toMatrix(matrix, 0)
+                        viewModel.onCalibrationPointCaptured(matrix)
+                    }
+                }
+                else -> {}
+            }
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
