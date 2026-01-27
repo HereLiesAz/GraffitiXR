@@ -1,12 +1,12 @@
 package com.hereliesaz.graffitixr
 
+import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Path
 import android.location.Location
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.data.*
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
@@ -20,8 +20,9 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class MainViewModel(
-    private val projectManager: ProjectManager = ProjectManager()
-) : ViewModel() {
+    application: Application,
+    private val projectManager: ProjectManager
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -38,8 +39,6 @@ class MainViewModel(
     private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
     val artworkBounds = _artworkBounds.asStateFlow()
 
-    // MEMORY LEAK WARNING: Holding ArRenderer here is dangerous if not cleared.
-    // Ensure onCleared() calls cleanup().
     var arRenderer: ArRenderer? = null
 
     // History Stacks (Global Layer States)
@@ -49,7 +48,16 @@ class MainViewModel(
 
     private var layerModsClipboard: OverlayLayer? = null
 
-    // FIX: Clean up renderer to prevent context leaks
+    // Lifecycle methods called by ArView
+    fun onResume() {
+        // Resume sensors or logic if needed
+    }
+
+    fun onPause() {
+        // Pause sensors or logic if needed
+        autoSaveProject(getApplication())
+    }
+
     override fun onCleared() {
         super.onCleared()
         arRenderer?.cleanup()
@@ -89,7 +97,7 @@ class MainViewModel(
 
     fun onRemoveBackgroundClicked() {
         val activeId = _uiState.value.activeLayerId ?: return
-        val context = arRenderer?.context ?: return
+        val context = getApplication<Application>()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             _uiState.value.layers.find { it.id == activeId }?.let { layer ->
@@ -110,7 +118,7 @@ class MainViewModel(
 
     fun onLineDrawingClicked() {
         val activeId = _uiState.value.activeLayerId ?: return
-        val context = arRenderer?.context ?: return
+        val context = getApplication<Application>()
         viewModelScope.launch {
             if (!ensureOpenCVLoaded()) return@launch
             _uiState.update { it.copy(isLoading = true) }
@@ -221,6 +229,11 @@ class MainViewModel(
         arRenderer?.setFlashlight(_uiState.value.isFlashlightOn)
     }
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
+
+    // Settings
+    fun setHandedness(isRight: Boolean) {
+        _uiState.update { it.copy(isRightHanded = isRight) }
+    }
 
     fun loadAvailableProjects(context: Context) {
         viewModelScope.launch {
