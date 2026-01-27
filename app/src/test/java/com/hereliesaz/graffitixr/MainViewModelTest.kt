@@ -46,7 +46,7 @@ class MainViewModelTest {
         every { editor.apply() } just Runs
         every { prefs.getBoolean("is_right_handed", true) } returns true
 
-        viewModel = MainViewModel(application, projectManager)
+        viewModel = MainViewModel(projectManager)
     }
 
     @After

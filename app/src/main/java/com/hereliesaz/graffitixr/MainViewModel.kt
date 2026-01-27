@@ -95,7 +95,7 @@ class MainViewModel(
             _uiState.value.layers.find { it.id == activeId }?.let { layer ->
                 ImageUtils.loadBitmapFromUri(context, layer.uri)?.let { original ->
                     snapshotState()
-                    val processed = BackgroundRemover.removeBackground(original)
+                    val processed = BackgroundRemover.removeBackground(context, original)
                     if (processed != null) {
                         val newUri = ImageUtils.saveBitmapToCache(context, processed)
                         updateActiveLayer { it.copy(uri = newUri) }
@@ -350,4 +350,8 @@ class MainViewModel(
     fun onMagicClicked() {}
     fun checkForUpdates() {}
     fun installLatestUpdate() {}
+
+    fun setHandedness(isRight: Boolean) = _uiState.update { it.copy(isRightHanded = isRight) }
+    fun onResume() {}
+    fun onPause() {}
 }

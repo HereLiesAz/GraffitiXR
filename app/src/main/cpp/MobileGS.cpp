@@ -1,4 +1,4 @@
-#include "include/MobileGS.h"
+#include "MobileGS.h"
 #include <algorithm>
 #include <android/log.h>
 #include <opencv2/imgproc.hpp>

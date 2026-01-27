@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <opencv2/core.hpp>
 #include <android/log.h>
-#include "include/MobileGS.h"
+#include "MobileGS.h"
 
 #define TAG "GraffitiJNI"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
