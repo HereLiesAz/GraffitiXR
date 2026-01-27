@@ -12,6 +12,7 @@
 #include <chrono>
 #include <unordered_map>
 
+// ... (Struct definitions remain the same) ...
 struct SplatGaussian {
     glm::vec3 position;
     glm::vec3 color;
@@ -52,21 +53,20 @@ public:
     bool saveModel(const std::string& path);
     bool loadModel(const std::string& path);
     void clear();
-
-    glm::mat4 getViewMatrix() const { return mViewMatrix; }
-    glm::mat4 getProjMatrix() const { return mProjMatrix; }
+    
+    // NEW: Metric for UI
+    int getPointCount();
 
 private:
     void compileShaders();
     void sortThreadLoop();
-    void pruneMap(); // NEW: Garbage collection
+    void pruneMap();
 
     GLuint mProgram;
     GLuint mVAO, mVBO, mQuadVBO;
-    GLuint mBgProgram;
-    GLuint mBgVAO, mBgVBO;
-    GLuint mBgTexture;
-
+    
+    // Unused background rendering resources removed for clarity
+    
     glm::mat4 mViewMatrix;
     glm::mat4 mProjMatrix;
     glm::mat4 mSortViewMatrix;
@@ -83,13 +83,13 @@ private:
     std::atomic<bool> mSortRunning;
     std::atomic<bool> mStopThread;
     std::atomic<bool> mSortResultReady;
+    
+    // NEW: Atomic flag to invalidate sort during pruning
+    std::atomic<bool> mMapChanged; 
 
     std::mutex mDataMutex;
     std::mutex mBgMutex;
-    std::atomic<bool> mNewBgAvailable;
-    std::atomic<bool> mHasBgData;
     std::atomic<bool> mIsInitialized;
-    int64_t mPendingTimestamp;
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
     std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;
