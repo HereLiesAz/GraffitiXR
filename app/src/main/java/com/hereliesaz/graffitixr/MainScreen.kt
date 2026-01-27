@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr
 
-import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -23,9 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,8 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset // <--- REQUIRED: Ensures onOffsetChanged works
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
@@ -73,16 +69,10 @@ import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
 import com.hereliesaz.graffitixr.utils.findActivity
-// REMOVED: import com.hereliesaz.graffitixr.utils.azTheme
-// REMOVED: import com.hereliesaz.graffitixr.utils.azConfig
-// REMOVED: import com.hereliesaz.graffitixr.utils.azAdvanced
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/**
- * The top-level UI composable for the GraffitiXR application.
- */
 @Composable
 fun MainScreen(viewModel: MainViewModel, navController: NavController) {
     val localNavController = rememberNavController()
@@ -196,6 +186,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
                 is CaptureEvent.CaptureSuccess -> { }
                 is CaptureEvent.CaptureFailure -> { }
+                else -> {}
             }
         }
     }
@@ -320,14 +311,14 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
 
                 if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
+                    // FIXED: Passed context to viewModel functions
                     azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
-                        viewModel.onRemoveBackgroundClicked()
+                        viewModel.onRemoveBackgroundClicked(context)
                         showSliderDialog = null; showColorBalanceDialog = false
-
                         resetDialogs()
                     })
                     azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
-                        viewModel.onLineDrawingClicked()
+                        viewModel.onLineDrawingClicked(context)
                         showSliderDialog = null; showColorBalanceDialog = false
                         resetDialogs()
                     })
@@ -410,10 +401,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // BACKGROUND LAYER (Edge-to-Edge)
+            // BACKGROUND LAYER
             background(weight = 0) {
-                // Prevent concurrent camera/AR sessions by only rendering MainContentLayer
-                // when in the editor route. This allows MappingScreen to have exclusive access.
                 if (currentNavRoute == "editor" || currentNavRoute == null) {
                     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                         MainContentLayer(
@@ -428,7 +417,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
             }
 
-            // ONSCREEN UI (Safe)
+            // ONSCREEN UI
             onscreen(alignment = Alignment.Center) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     
@@ -460,7 +449,7 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                     }
                     composable("surveyor") {
                         MappingScreen(
-                            onMapSaved = { /* Handle saved map if needed */ },
+                            onMapSaved = { },
                             onExit = { localNavController.popBackStack() }
                         )
                     }
@@ -733,9 +722,10 @@ private fun MainContentLayer(
                 onGestureEnd = onGestureEnd
             )
             AR -> {
-                ArView(
+                // FIXED: Swapped ArView for the corrected ARCameraScreen
+                ARCameraScreen(
                     viewModel = viewModel,
-                    uiState = uiState
+                    onFrameCaptured = { viewModel.onFrameCaptured(it) }
                 )
             }
 
@@ -758,6 +748,8 @@ private fun MainContentLayer(
     }
 }
 
+// ... rest of the file remains the same ...
+// (TargetCreationFlow, TouchLockOverlay, StatusOverlay, CaptureAnimation, UnlockInstructionsPopup are unchanged)
 @Composable
 private fun TargetCreationFlow(
     uiState: UiState,
@@ -837,7 +829,7 @@ private fun TargetCreationFlow(
                 captureFailureTimestamp = uiState.captureFailureTimestamp,
                 onCaptureClick = {
                     if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
-                        viewModel.onCalibrationPointCaptured()
+                        viewModel.onCalibrationPointCaptured(FloatArray(16)) // Stub for UI click, logic handled by event
                     } else {
                         viewModel.onCaptureShutterClicked()
                     }
