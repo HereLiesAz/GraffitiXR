@@ -12,9 +12,6 @@ class SlamManager {
     private val _mappingQuality = MutableStateFlow(0f)
     val mappingQuality = _mappingQuality.asStateFlow()
 
-    private val _isHosting = MutableStateFlow(false)
-    val isHosting = _isHosting.asStateFlow()
-
     // Lifecycle
     private external fun initNativeJni()
     private external fun destroyNativeJni()
@@ -56,27 +53,10 @@ class SlamManager {
     external fun getPointCount(): Int
 
     fun updateFeatureMapQuality(session: Session, pose: Pose) {
-        // REAL LOGIC: Quality is based on the number of confident scan points.
-        // Thresholds: < 1000 (Low), 1000-5000 (Medium), > 5000 (High)
         val count = getPointCount()
-        
-        // Normalize 0..5000 to 0.0..1.0
+        // Thresholds: < 1000 (Low), 1000-5000 (Medium), > 5000 (High)
         val quality = (count / 5000f).coerceIn(0f, 1f)
         _mappingQuality.value = quality
-    }
-
-    suspend fun hostAnchor(session: Session, anchor: Anchor, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
-        _isHosting.value = true
-        try {
-            // Mock hosting logic for now as we focus on local persistence
-            kotlinx.coroutines.delay(1000)
-            val cloudId = "local-map-${System.currentTimeMillis()}"
-            onSuccess(cloudId)
-        } catch (e: Exception) {
-            onError(e.message ?: "Unknown error")
-        } finally {
-            _isHosting.value = false
-        }
     }
 
     companion object {
