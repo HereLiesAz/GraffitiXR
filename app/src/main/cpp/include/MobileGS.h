@@ -59,8 +59,7 @@ public:
 private:
     void compileShaders();
     void sortThreadLoop();
-    void uploadBgTexture();
-    void drawBackground();
+    void pruneMap(); // NEW: Garbage collection
 
     GLuint mProgram;
     GLuint mVAO, mVBO, mQuadVBO;
