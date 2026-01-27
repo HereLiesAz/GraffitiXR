@@ -70,6 +70,7 @@ import com.hereliesaz.graffitixr.ui.rememberNavStrings
 import com.hereliesaz.graffitixr.utils.captureWindow
 import com.hereliesaz.graffitixr.utils.findActivity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay // ADDED: Missing import
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -141,8 +142,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
         }
     }
 
-    // UPDATED: Only capture window if NOT in AR mode.
-    // In AR mode, ArView handles the capture internally to get the camera frame.
     LaunchedEffect(viewModel, context) {
         viewModel.captureEvent.collect { event ->
             if (event is CaptureEvent.RequestCapture && uiState.editorMode != AR) {
@@ -296,7 +295,17 @@ fun EditorContent(
         if (uiState.isMarkingProgress) DrawingCanvas(uiState.drawingPaths, viewModel::onDrawingPathFinished)
 
         Box(Modifier.fillMaxSize().padding(bottom = bottomSafePadding).zIndex(2f), contentAlignment = Alignment.BottomCenter) {
-            AdjustmentsPanel(uiState, showSliderDialog == "Adjust", showColorBalanceDialog, isLandscape, maxHeight, onOpacityChange, onBrightnessChange, onContrastChange, onSaturationChange, onColorBalanceRChange, onColorBalanceGChange, onColorBalanceBChange, onUndo, onRedo, onMagicAlign)
+            // FIXED: Use this@BoxWithConstraints.maxHeight
+            AdjustmentsPanel(
+                uiState, 
+                showSliderDialog == "Adjust", 
+                showColorBalanceDialog, 
+                isLandscape, 
+                this@BoxWithConstraints.maxHeight, // Corrected receiver
+                onOpacityChange, onBrightnessChange, onContrastChange, onSaturationChange, 
+                onColorBalanceRChange, onColorBalanceGChange, onColorBalanceBChange, 
+                onUndo, onRedo, onMagicAlign
+            )
         }
         uiState.showOnboardingDialogForMode?.let { mode -> OnboardingDialog(mode) { onOnboardingComplete(mode) } }
         if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
@@ -321,8 +330,9 @@ private fun MainContentLayer(uiState: UiState, viewModel: MainViewModel, gesture
         val onEnd: () -> Unit = { viewModel.onGestureEnd(); onGestureToggle(false) }
 
         when (uiState.editorMode) {
-            STATIC -> MockupScreen(uiState, viewModel::onBackgroundImageSelected, viewModel::onOverlayImageSelected, viewModel::onOpacityChanged, viewModel::onBrightnessChanged, viewModel::onContrastChanged, viewModel::onSaturationChanged, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
-            TRACE -> TraceScreen(uiState, viewModel::onOverlayImageSelected, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
+            // FIXED: Swapped onScale and onOffset to match parameter order (Offset before Float)
+            STATIC -> MockupScreen(uiState, viewModel::onBackgroundImageSelected, viewModel::onOverlayImageSelected, viewModel::onOpacityChanged, viewModel::onBrightnessChanged, viewModel::onContrastChanged, viewModel::onSaturationChanged, onOffset, onScale, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
+            TRACE -> TraceScreen(uiState, viewModel::onOverlayImageSelected, onOffset, onScale, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
             OVERLAY -> OverlayScreen(uiState, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
             AR -> ArView(viewModel, uiState)
             CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(uiState, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
