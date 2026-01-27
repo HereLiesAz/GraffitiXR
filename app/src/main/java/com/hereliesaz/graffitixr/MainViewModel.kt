@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.RectF
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import kotlin.math.abs
 import kotlin.random.Random
 
 class MainViewModel @JvmOverloads constructor(
@@ -57,18 +59,19 @@ class MainViewModel @JvmOverloads constructor(
     private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
     val tapFeedback = _tapFeedback.asStateFlow()
 
-    private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
+    private val _artworkBounds = MutableStateFlow<RectF?>(null)
     val artworkBounds = _artworkBounds.asStateFlow()
-
-    var arRenderer: ArRenderer? = null
 
     // Sensor Logic for Automatic Calibration
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private var currentSensorData: SensorData? = null
     private var isSensorListening = false
-    private var stableStartTime = 0L
-    private var lastRotationVector: FloatArray? = null
-    private val STABILITY_THRESHOLD = 0.02f
+    
+    // Improved Stability Logic: Windowed Average
+    private val rotationHistory = ArrayDeque<FloatArray>()
+    private val HISTORY_SIZE = 15
+    private var stableFrameCount = 0
+    private val STABILITY_VARIANCE_LIMIT = 0.005f
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
@@ -82,33 +85,39 @@ class MainViewModel @JvmOverloads constructor(
 
                 if (_uiState.value.isCapturingTarget && _uiState.value.captureStep.name.startsWith("CALIBRATION_POINT")) {
                     val currentVector = event.values.clone()
-                    var isStable = false
+                    
+                    if (rotationHistory.size >= HISTORY_SIZE) rotationHistory.removeFirst()
+                    rotationHistory.addLast(currentVector)
 
-                    if (lastRotationVector != null) {
-                        var delta = 0f
-                        val size = minOf(currentVector.size, lastRotationVector!!.size, 4)
-                        for (i in 0 until size) {
-                            delta += kotlin.math.abs(currentVector[i] - lastRotationVector!![i])
+                    if (rotationHistory.size == HISTORY_SIZE) {
+                        // Calculate variance across history
+                        var maxVariance = 0f
+                        for (i in 0 until minOf(currentVector.size, 4)) {
+                            val values = rotationHistory.map { it[i] }
+                            val min = values.minOrNull() ?: 0f
+                            val max = values.maxOrNull() ?: 0f
+                            val diff = abs(max - min)
+                            if (diff > maxVariance) maxVariance = diff
                         }
-                        if (delta < STABILITY_THRESHOLD) isStable = true
-                    } else {
-                        isStable = true
-                    }
-                    lastRotationVector = currentVector
 
-                    val now = System.currentTimeMillis()
-                    if (isStable) {
-                        if (stableStartTime == 0L) stableStartTime = now
-                        else if (now - stableStartTime > 2000) {
-                            onCalibrationPointCaptured()
-                            stableStartTime = 0L
-                            lastRotationVector = null
+                        if (maxVariance < STABILITY_VARIANCE_LIMIT) {
+                            stableFrameCount++
+                            // Require 30 consecutive stable frames (~0.5s at 60hz) to confirm lock
+                            if (stableFrameCount > 30) {
+                                // We are stable, but we need the Pose. 
+                                // The generic onCalibrationPointCaptured() now requires Pose injection.
+                                // We trigger a capture event to the UI which will call back with the Pose.
+                                viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCalibration) }
+                                stableFrameCount = 0
+                                rotationHistory.clear()
+                            }
+                        } else {
+                            stableFrameCount = 0
                         }
-                    } else {
-                        stableStartTime = 0L
                     }
                 } else {
-                    stableStartTime = 0L
+                    stableFrameCount = 0
+                    rotationHistory.clear()
                 }
             }
         }
@@ -153,9 +162,9 @@ class MainViewModel @JvmOverloads constructor(
         layer.copy(blendMode = ImageUtils.getNextBlendMode(layer.blendMode))
     }
 
-    fun onRemoveBackgroundClicked() {
+    // Fixed: Takes Context as parameter to avoid leaking Activity
+    fun onRemoveBackgroundClicked(context: Context) {
         val activeId = _uiState.value.activeLayerId ?: return
-        val context = arRenderer?.context ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
@@ -176,7 +185,6 @@ class MainViewModel @JvmOverloads constructor(
                         }
                         if (processed != null) {
                             val newUri = withContext(Dispatchers.IO) {
-                                // CORRECTED: Context first, then Bitmap
                                 ImageUtils.saveBitmapToCache(context, processed)
                             }
                             updateActiveLayer { it.copy(uri = newUri) }
@@ -193,9 +201,9 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    fun onLineDrawingClicked() {
+    // Fixed: Takes Context as parameter
+    fun onLineDrawingClicked(context: Context) {
         val activeId = _uiState.value.activeLayerId ?: return
-        val context = arRenderer?.context ?: return
         viewModelScope.launch {
             if (!ensureOpenCVLoaded()) return@launch
             _uiState.update { it.copy(isLoading = true) }
@@ -211,7 +219,6 @@ class MainViewModel @JvmOverloads constructor(
                             ImageUtils.generateOutline(original)
                         }
                         val newUri = withContext(Dispatchers.IO) {
-                            // CORRECTED: Context first, then Bitmap
                             ImageUtils.saveBitmapToCache(context, processed)
                         }
                         updateActiveLayer { it.copy(uri = newUri) }
@@ -316,6 +323,7 @@ class MainViewModel @JvmOverloads constructor(
             viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
         }
     }
+    
     fun saveCapturedBitmap(b: Bitmap) {
         _uiState.update { state ->
             val isMultiImage = state.captureStep == CaptureStep.PHOTO_SEQUENCE ||
@@ -327,11 +335,6 @@ class MainViewModel @JvmOverloads constructor(
 
             state.copy(capturedTargetImages = newImages, captureStep = newStep)
         }
-        if (_uiState.value.captureStep == CaptureStep.REVIEW) {
-             // Only trigger final capture if review is next? No, triggerCapture was called by ArRenderer.
-             // This method is CALLED by ArRenderer.onFrameCaptured.
-             // We just update state.
-        }
     }
 
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
@@ -340,9 +343,10 @@ class MainViewModel @JvmOverloads constructor(
         _uiState.update { it.copy(isRightHanded = rightHanded) }
     }
     fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
+    
     fun onToggleFlashlight() {
         _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
-        arRenderer?.setFlashlight(_uiState.value.isFlashlightOn)
+        // Renderer observation logic must be in Compose/Activity
     }
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
 
@@ -450,16 +454,10 @@ class MainViewModel @JvmOverloads constructor(
     fun onFeedbackShown() = _uiState.update { it.copy(showRotationAxisFeedback = false) }
     fun onMarkProgressToggled() = _uiState.update { it.copy(isMarkingProgress = !it.isMarkingProgress) }
     fun onDrawingPathFinished(p: List<Offset>) = _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(p)) }
-    fun updateArtworkBounds(b: android.graphics.RectF) = _artworkBounds.update { b }
+    fun updateArtworkBounds(b: RectF) = _artworkBounds.update { b }
     fun setArPlanesDetected(d: Boolean) = _uiState.update { it.copy(isArPlanesDetected = d) }
     fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
     fun onFrameCaptured(b: Bitmap) {
-        // ArRenderer calls this on main thread via invoke?
-        // Usually called from GL thread if not posted. ArRenderer constructor takes (Bitmap)->Unit.
-        // It calls it in onDrawFrame.
-        // If saveCapturedBitmap runs on GL thread, StateFlow update is safe but capturedTargetImages might have concurrency issues?
-        // StateFlow is thread safe.
-        // BUT saveCapturedBitmap uses update { ... }.
         saveCapturedBitmap(b)
     }
     fun onProgressUpdate(p: Float, b: Bitmap?) {}
@@ -498,11 +496,9 @@ class MainViewModel @JvmOverloads constructor(
         stopSensorListening()
         _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) }
     }
-    fun onCalibrationPointCaptured() {
-        val pose = arRenderer?.getLatestPose()
-        val poseMatrix = FloatArray(16)
-        pose?.toMatrix(poseMatrix, 0)
 
+    // Fixed: Takes Pose Matrix explicitly
+    fun onCalibrationPointCaptured(poseMatrix: FloatArray) {
         val snapshot = CalibrationSnapshot(
             gpsData = _uiState.value.gpsData,
             sensorData = currentSensorData,
@@ -527,6 +523,7 @@ class MainViewModel @JvmOverloads constructor(
         }
         viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
     }
+    
     fun unwarpImage(l: List<Any>) {}
     fun onRetakeCapture() {
         stopSensorListening()
@@ -536,16 +533,10 @@ class MainViewModel @JvmOverloads constructor(
     fun onRefinementModeChanged(b: Boolean) {
         _uiState.update { it.copy(isRefinementEraser = b) }
     }
-    fun onConfirmTargetCreation() {
-        val captured = _uiState.value.capturedTargetImages.firstOrNull()
-        if (captured != null) {
-            viewModelScope.launch {
-                val fingerprint = arRenderer?.generateFingerprint(captured)
-                if (fingerprint != null) {
-                    val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.Fingerprint.serializer(), fingerprint)
-                    _uiState.update { it.copy(fingerprintJson = json) }
-                }
-            }
+    
+    fun onConfirmTargetCreation(fingerprintJson: String?) {
+        if (fingerprintJson != null) {
+             _uiState.update { it.copy(fingerprintJson = fingerprintJson) }
         }
         _uiState.update {
             it.copy(
@@ -562,7 +553,8 @@ class MainViewModel @JvmOverloads constructor(
             if (rotationSensor != null) {
                 sensorManager.registerListener(sensorEventListener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
                 isSensorListening = true
-                stableStartTime = 0L
+                stableFrameCount = 0
+                rotationHistory.clear()
             }
         }
     }
@@ -575,7 +567,6 @@ class MainViewModel @JvmOverloads constructor(
     }
 
     fun onResume() {
-        // Resume sensors if we are in a calibration mode
         if (_uiState.value.isCapturingTarget && _uiState.value.targetCreationMode == TargetCreationMode.MULTI_POINT_CALIBRATION) {
             startSensorListening()
         }
