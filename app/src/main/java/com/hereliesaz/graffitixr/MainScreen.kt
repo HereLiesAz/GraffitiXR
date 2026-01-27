@@ -311,7 +311,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
                 }
 
                 if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
-                    // FIXED: Passed context to viewModel functions
                     azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
                         viewModel.onRemoveBackgroundClicked(context)
                         showSliderDialog = null; showColorBalanceDialog = false
@@ -722,7 +721,6 @@ private fun MainContentLayer(
                 onGestureEnd = onGestureEnd
             )
             AR -> {
-                // FIXED: Swapped ArView for the corrected ARCameraScreen
                 ARCameraScreen(
                     viewModel = viewModel,
                     onFrameCaptured = { viewModel.onFrameCaptured(it) }
@@ -748,8 +746,6 @@ private fun MainContentLayer(
     }
 }
 
-// ... rest of the file remains the same ...
-// (TargetCreationFlow, TouchLockOverlay, StatusOverlay, CaptureAnimation, UnlockInstructionsPopup are unchanged)
 @Composable
 private fun TargetCreationFlow(
     uiState: UiState,
@@ -794,7 +790,7 @@ private fun TargetCreationFlow(
                 onModeChanged = { viewModel.onRefinementModeChanged(!it) },
                 onUndo = viewModel::onUndoClicked,
                 onRedo = viewModel::onRedoClicked,
-                onConfirm = viewModel::onConfirmTargetCreation
+                onConfirm = { viewModel.onConfirmTargetCreation(null) }
             )
         } else if (uiState.captureStep == CaptureStep.RECTIFY) {
             val uri = uiState.capturedTargetUris.firstOrNull()
