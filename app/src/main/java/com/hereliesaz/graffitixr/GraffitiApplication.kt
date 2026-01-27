@@ -9,60 +9,54 @@ class GraffitiApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Load OpenCV as early as possible to ensure native libraries are available for all threads
-        Log.d("GraffitiApplication", "Initializing OpenCV...")
+        // Load OpenCV early. We do this in onCreate rather than a static block
+        // to ensure the application context and native library paths are fully initialized.
+        Log.d(TAG, "Initializing OpenCV...")
+        initializeOpenCV()
+
+        // Initialize Crash Handler
+        Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
+    }
+
+    private fun initializeOpenCV() {
         val isLoaded = try {
-            // initLocal() is the standard way for modern OpenCV Android SDKs (4.5+)
+            // initLocal() is the standard for OpenCV 4.5+ (static linkage)
             if (OpenCVLoader.initLocal()) {
-                Log.i("GraffitiApplication", "OpenCVLoader.initLocal() successful")
+                Log.i(TAG, "OpenCVLoader.initLocal() successful")
                 true
             } else {
-                Log.w("GraffitiApplication", "OpenCVLoader.initLocal() failed, trying explicit System.loadLibrary...")
+                Log.w(TAG, "OpenCVLoader.initLocal() failed, attempting system load...")
                 loadOpenCVExplicitly()
             }
         } catch (e: Exception) {
-            Log.e("GraffitiApplication", "OpenCV initialization exception: ${e.message}", e)
+            Log.e(TAG, "OpenCV initialization exception", e)
             loadOpenCVExplicitly()
         }
 
         if (!isLoaded) {
-            Log.e("GraffitiApplication", "CRITICAL: OpenCV failed to load. AR fingerprinting and SLAM features will be disabled.")
+            Log.e(TAG, "CRITICAL: OpenCV failed to load. Computer Vision features will be unavailable.")
         }
-
-        Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
     }
 
     private fun loadOpenCVExplicitly(): Boolean {
         return try {
-            // Try loading the library by its common names
             System.loadLibrary("opencv_java4")
-            Log.i("GraffitiApplication", "System.loadLibrary(opencv_java4) successful")
+            Log.i(TAG, "System.loadLibrary(opencv_java4) successful")
             true
         } catch (e: UnsatisfiedLinkError) {
-            Log.e("GraffitiApplication", "opencv_java4 not found, trying opencv_java")
+            Log.w(TAG, "opencv_java4 not found, trying legacy opencv_java...")
             try {
                 System.loadLibrary("opencv_java")
-                Log.i("GraffitiApplication", "System.loadLibrary(opencv_java) successful")
+                Log.i(TAG, "System.loadLibrary(opencv_java) successful")
                 true
             } catch (e2: UnsatisfiedLinkError) {
-                Log.e("GraffitiApplication", "OpenCV loadLibrary failed completely: ${e2.message}")
+                Log.e(TAG, "FATAL: Could not load any OpenCV library.", e2)
                 false
             }
         }
     }
 
     companion object {
-        init {
-            // CRITICAL: Static block to ensure library is loaded even before Application.onCreate
-            // This is essential for preventing n_delete crashes on finalized Mats.
-            try {
-                if (!OpenCVLoader.initLocal()) {
-                    System.loadLibrary("opencv_java4")
-                }
-            } catch (e: Throwable) {
-                // If this fails, onCreate will try again more thoroughly
-                Log.e("GraffitiApplication", "Static OpenCV load failed", e)
-            }
-        }
+        private const val TAG = "GraffitiApplication"
     }
 }
