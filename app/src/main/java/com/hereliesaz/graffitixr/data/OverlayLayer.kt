@@ -1,39 +1,30 @@
 package com.hereliesaz.graffitixr.data
 
 import android.net.Uri
+import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
-import kotlinx.serialization.Serializable
+import kotlinx.parcelize.Parcelize
 import java.util.UUID
 
-@Serializable
+@Parcelize
 data class OverlayLayer(
     val id: String = UUID.randomUUID().toString(),
-    @Serializable(with = UriSerializer::class)
+    val name: String = "Layer",
     val uri: Uri,
-    val name: String,
-    val isVisible: Boolean = true,
-
-    // Transforms
-    val scale: Float = 1.0f,
-    val rotationX: Float = 0f,
-    val rotationY: Float = 0f,
-    val rotationZ: Float = 0f,
-    @Serializable(with = OffsetSerializer::class)
-    val offset: Offset = Offset.Zero,
-
-    // Adjustments
     val opacity: Float = 1.0f,
-    val brightness: Float = 0f,
-    val contrast: Float = 1.0f,
+    val brightness: Float = 0.0f,
+    val contrast: Float = 0.0f,
     val saturation: Float = 1.0f,
-
-    // Color Balance
-    val colorBalanceR: Float = 1.0f,
-    val colorBalanceG: Float = 1.0f,
-    val colorBalanceB: Float = 1.0f,
-
-    // Composition
-    @Serializable(with = BlendModeSerializer::class)
-    val blendMode: BlendMode = BlendMode.SrcOver
-)
+    val colorBalanceR: Float = 0.0f,
+    val colorBalanceG: Float = 0.0f,
+    val colorBalanceB: Float = 0.0f,
+    val scale: Float = 1.0f,
+    val rotationX: Float = 0.0f,
+    val rotationY: Float = 0.0f,
+    val rotationZ: Float = 0.0f,
+    val offset: Offset = Offset.Zero,
+    val blendMode: Int = 0, // 0 = Normal, 1 = Multiply, 2 = Screen, 3 = Overlay
+    val isVisible: Boolean = true,
+    // NEW: Store aspect ratio to prevent squashing
+    val aspectRatio: Float = 1.0f 
+) : Parcelable
