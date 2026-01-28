@@ -32,6 +32,8 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.ORB
 import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -87,6 +89,9 @@ class ArRenderer(
     private var captureNextFrame = false
     var showMiniMap = false
     var showGuide = true
+
+    private var viewportWidth = 0
+    private var viewportHeight = 0
 
     private var cachedYBuffer: ByteArray? = null
     private var cachedDepthBuffer: ByteArray? = null
@@ -159,6 +164,8 @@ class ArRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        viewportWidth = width
+        viewportHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
         GLES20.glViewport(0, 0, width, height)
     }
@@ -287,9 +294,32 @@ class ArRenderer(
 
         if (captureNextFrame) {
             captureNextFrame = false
+            captureBitmap()
         }
         
         onSessionUpdated?.invoke(session!!, frame)
+    }
+
+    private fun captureBitmap() {
+        try {
+            val width = viewportWidth
+            val height = viewportHeight
+            val buffer = ByteBuffer.allocateDirect(width * height * 4)
+            buffer.order(ByteOrder.nativeOrder())
+            GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer)
+
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bitmap.copyPixelsFromBuffer(buffer)
+
+            val matrix = android.graphics.Matrix()
+            matrix.preScale(1.0f, -1.0f)
+            val flippedBitmap = Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, false)
+            bitmap.recycle()
+
+            onFrameCaptured(flippedBitmap)
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Failed to capture frame", e)
+        }
     }
 
     private fun getLayerTransform(layer: LayerRendererData): FloatArray {
