@@ -52,6 +52,10 @@ class ArRenderer(
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var onAnchorCreated: ((Anchor) -> Unit)? = null
 
+    // Restore missing properties used by MappingScreen
+    var showMiniMap = false
+    var showGuide = false
+
     private var viewportWidth = -1
     private var viewportHeight = -1
     private var isFlashlightOn = false
@@ -70,7 +74,6 @@ class ArRenderer(
             imageRenderer.createOnGlThread()
             slamManager.initNative()
             
-            // Re-assign texture to session if it exists
             session?.setCameraTextureName(backgroundRenderer.textureId)
         } catch (e: IOException) {
             Log.e("ArRenderer", "Failed to initialize renderer", e)
@@ -89,8 +92,6 @@ class ArRenderer(
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
         val currentSession = session ?: return
-
-        // Ensure texture is set (safety for context loss)
         currentSession.setCameraTextureName(backgroundRenderer.textureId)
 
         displayRotationHelper.updateSessionIfNeeded(currentSession)
@@ -104,7 +105,6 @@ class ArRenderer(
             handleTaps(frame)
             handleCapture(frame)
 
-            // Draw the background
             backgroundRenderer.draw(frame)
 
             if (camera.trackingState == TrackingState.TRACKING) {
@@ -126,7 +126,8 @@ class ArRenderer(
                     )
                 }
 
-                // Render layers...
+                // Placeholder for layer rendering
+                layers.forEach { _ -> }
                 
                 slamManager.updateCamera(viewmtx, projmtx)
                 slamManager.draw()
@@ -209,7 +210,7 @@ class ArRenderer(
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     session!!.configure(config)
                 } else {
-                    return // Still waiting for install
+                    return 
                 }
             } catch (e: Exception) {
                 Log.e("ArRenderer", "ARCore Session creation failed", e)
@@ -222,8 +223,8 @@ class ArRenderer(
             session?.resume()
             displayRotationHelper.onResume()
         } catch (e: CameraNotAvailableException) {
-            Log.e("ArRenderer", "Camera not available. Try restarting the app.", e)
-            session = null // Reset so we can try again
+            Log.e("ArRenderer", "Camera not available", e)
+            session = null 
         }
     }
 
@@ -240,9 +241,6 @@ class ArRenderer(
 
     fun setFlashlight(on: Boolean) {
         isFlashlightOn = on
-        val currentSession = session ?: return
-        val config = currentSession.config
-        // Note: Flashlight requires specific camera configs in ARCore
     }
 
     fun triggerCapture() {
@@ -254,7 +252,6 @@ class ArRenderer(
     }
     
     fun generateFingerprint(bitmap: Bitmap): Fingerprint? {
-        // Implementation...
         return null
     }
 }
