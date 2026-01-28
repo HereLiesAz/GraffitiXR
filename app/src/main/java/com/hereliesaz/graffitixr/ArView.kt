@@ -53,6 +53,11 @@ fun ArView(
         arRenderer.updateLayers(uiState.layers)
     }
 
+    // Pass flashlight state
+    LaunchedEffect(uiState.isFlashlightOn) {
+        arRenderer.setFlashlight(uiState.isFlashlightOn)
+    }
+
     // NEW: Handle Capture Events from ViewModel
     LaunchedEffect(viewModel) {
         viewModel.captureEvent.collect { event ->
@@ -69,6 +74,10 @@ fun ArView(
                         pose.toMatrix(matrix, 0)
                         viewModel.onCalibrationPointCaptured(matrix)
                     }
+                }
+                is CaptureEvent.RequestFingerprint -> {
+                    val fingerprint = arRenderer.generateFingerprint(event.bitmap)
+                    viewModel.onFingerprintGenerated(fingerprint)
                 }
                 else -> {}
             }

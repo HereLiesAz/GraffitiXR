@@ -78,46 +78,40 @@ class SimpleQuadRenderer {
     }
 
     fun draw(
-        mvpMatrix: FloatArray,
-        modelViewMatrix: FloatArray,
-        bitmap: Bitmap,
+        viewMatrix: FloatArray,
+        projectionMatrix: FloatArray,
+        modelMatrix: FloatArray,
+        textureId: Int,
         opacity: Float,
         brightness: Float,
         r: Float, g: Float, b: Float,
-        depthTextureId: Int,
-        cameraTextureId: Int,
-        screenWidth: Float,
-        screenHeight: Float,
-        displayTransform: FloatArray,
         blendMode: BlendMode
     ) {
         GLES20.glUseProgram(quadProgram)
 
+        // Calculate matrices
+        val mvMatrix = FloatArray(16)
+        android.opengl.Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0)
+        val mvpMatrix = FloatArray(16)
+        android.opengl.Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0)
+
         // Upload texture
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0])
-        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
         GLES20.glUniform1i(textureParam, 0)
 
-        // Depth Texture (if available)
-        if (depthTextureId != -1) {
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, depthTextureId)
-            GLES20.glUniform1i(depthTextureParam, 1)
-        } else {
-            // Unbind or set to invalid unit if no depth
-            GLES20.glUniform1i(depthTextureParam, -1) // Shader must handle this
-        }
+        // Depth Texture (disabled)
+        GLES20.glUniform1i(depthTextureParam, -1)
 
         // Set Uniforms
         GLES20.glUniform1f(opacityParam, opacity)
         GLES20.glUniform1f(brightnessParam, brightness)
         GLES20.glUniform3f(colorBalanceParam, r, g, b)
-        GLES20.glUniform2f(resolutionParam, screenWidth, screenHeight)
-        GLES20.glUniformMatrix3fv(displayTransformParam, 1, false, displayTransform, 0)
+        GLES20.glUniform2f(resolutionParam, 1.0f, 1.0f) // Dummy
+        GLES20.glUniformMatrix3fv(displayTransformParam, 1, false, floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f), 0) // Identity
 
         GLES20.glUniformMatrix4fv(mvpMatrixParam, 1, false, mvpMatrix, 0)
-        GLES20.glUniformMatrix4fv(modelViewMatrixParam, 1, false, modelViewMatrix, 0)
+        GLES20.glUniformMatrix4fv(modelViewMatrixParam, 1, false, mvMatrix, 0)
 
         GLES20.glVertexAttribPointer(quadPositionParam, 3, GLES20.GL_FLOAT, false, 0, quadVertices)
         GLES20.glVertexAttribPointer(quadTexCoordParam, 2, GLES20.GL_FLOAT, false, 0, quadTexCoord)

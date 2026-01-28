@@ -18,14 +18,9 @@ import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.max
-import kotlin.math.pow
-import kotlin.math.sqrt
 
 object ImageUtils {
 
-    /**
-     * Generates a white outline on a transparent background from the input bitmap using Canny edge detection.
-     */
     fun generateOutline(input: Bitmap): Bitmap {
         val mat = Mat()
         val gray = Mat()
@@ -35,15 +30,13 @@ object ImageUtils {
         Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
         Imgproc.Canny(gray, edges, 50.0, 150.0)
 
-        // Create a black image for RGB channels
         val black = Mat(edges.size(), CvType.CV_8UC1, Scalar(0.0))
 
-        // Merge to create RGBA: R=Black, G=Black, B=Black, A=Edges (White=Opaque, Black=Transparent)
         val channels = java.util.ArrayList<Mat>()
-        channels.add(black) // R
-        channels.add(black) // G
-        channels.add(black) // B
-        channels.add(edges) // A
+        channels.add(black)
+        channels.add(black)
+        channels.add(black)
+        channels.add(edges)
 
         val result = Mat()
         Core.merge(channels, result)
@@ -60,63 +53,74 @@ object ImageUtils {
         return output
     }
 
-    /**
-     * Performs a perspective transformation on the bitmap.
-     * @param input The source bitmap.
-     * @param points normalized (0..1) corners in order: TL, TR, BR, BL.
-     */
     fun perspectiveTransform(input: Bitmap, points: List<Offset>): Bitmap? {
         if (points.size != 4) return null
 
         val srcMat = Mat()
         OpenCVUtils.bitmapToMat(input, srcMat)
 
-        val w = input.width.toFloat()
-        val h = input.height.toFloat()
+        val w = input.width.toDouble()
+        val h = input.height.toDouble()
 
-        // Convert normalized points to pixel coordinates
-        // Points are expected in order: TL, TR, BR, BL
-        val p0 = Point((points[0].x * w).toDouble(), (points[0].y * h).toDouble())
-        val p1 = Point((points[1].x * w).toDouble(), (points[1].y * h).toDouble())
-        val p2 = Point((points[2].x * w).toDouble(), (points[2].y * h).toDouble())
-        val p3 = Point((points[3].x * w).toDouble(), (points[3].y * h).toDouble())
+        val p0x = points[0].x.toDouble() * w
+        val p0y = points[0].y.toDouble() * h
+        val p0 = Point(p0x, p0y)
 
-        // Calculate output dimensions based on max side lengths
-        val widthTop = sqrt((p1.x - p0.x).pow(2) + (p1.y - p0.y).pow(2))
-        val widthBot = sqrt((p2.x - p3.x).pow(2) + (p2.y - p3.y).pow(2))
-        val maxWidth = max(widthTop, widthBot).toInt()
+        val p1x = points[1].x.toDouble() * w
+        val p1y = points[1].y.toDouble() * h
+        val p1 = Point(p1x, p1y)
 
-        val heightLeft = sqrt((p3.x - p0.x).pow(2) + (p3.y - p0.y).pow(2))
-        val heightRight = sqrt((p2.x - p1.x).pow(2) + (p2.y - p1.y).pow(2))
-        val maxHeight = max(heightLeft, heightRight).toInt()
+        val p2x = points[2].x.toDouble() * w
+        val p2y = points[2].y.toDouble() * h
+        val p2 = Point(p2x, p2y)
+
+        val p3x = points[3].x.toDouble() * w
+        val p3y = points[3].y.toDouble() * h
+        val p3 = Point(p3x, p3y)
+
+        // Calculate dimensions
+        val dxTop = p1.x - p0.x
+        val dyTop = p1.y - p0.y
+        val widthTop = Math.hypot(dxTop, dyTop)
+
+        val dxBot = p2.x - p3.x
+        val dyBot = p2.y - p3.y
+        val widthBot = Math.hypot(dxBot, dyBot)
+
+        val maxWidth = max(widthTop, widthBot)
+
+        val dxLeft = p3.x - p0.x
+        val dyLeft = p3.y - p0.y
+        val heightLeft = Math.hypot(dxLeft, dyLeft)
+
+        val dxRight = p2.x - p1.x
+        val dyRight = p2.y - p1.y
+        val heightRight = Math.hypot(dxRight, dyRight)
+
+        val maxHeight = max(heightLeft, heightRight)
 
         if (maxWidth <= 0 || maxHeight <= 0) {
             srcMat.release()
             return null
         }
 
-        // Source points from the image
         val src = MatOfPoint2f(p0, p1, p2, p3)
 
-        // Destination points (Rectangular)
         val dst = MatOfPoint2f(
             Point(0.0, 0.0),
-            Point(maxWidth.toDouble(), 0.0),
-            Point(maxWidth.toDouble(), maxHeight.toDouble),
-            Point(0.0, maxHeight.toDouble)
+            Point(maxWidth, 0.0),
+            Point(maxWidth, maxHeight),
+            Point(0.0, maxHeight)
         )
 
-        // Get transform matrix
         val transform = Imgproc.getPerspectiveTransform(src, dst)
-        val dstMat = Mat(Size(maxWidth.toDouble(), maxHeight.toDouble), srcMat.type())
+        val dstMat = Mat(Size(maxWidth, maxHeight), srcMat.type())
 
-        // Apply warp
         Imgproc.warpPerspective(srcMat, dstMat, transform, dstMat.size())
 
-        val output = Bitmap.createBitmap(maxWidth, maxHeight, Bitmap.Config.ARGB_8888)
+        val output = Bitmap.createBitmap(maxWidth.toInt(), maxHeight.toInt(), Bitmap.Config.ARGB_8888)
         OpenCVUtils.matToBitmap(dstMat, output)
 
-        // Cleanup
         srcMat.release()
         dstMat.release()
         src.release()
