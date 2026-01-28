@@ -3,58 +3,102 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.rememberNavController
+import com.hereliesaz.graffitixr.data.CaptureEvent
 import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.utils.LocationTracker
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
-    // Using the factory to ensure Application context is passed correctly
     private val viewModel: MainViewModel by viewModels {
         MainViewModelFactory(application)
     }
     
     private val PERMISSION_REQUEST_CODE = 1001
     private lateinit var locationTracker: LocationTracker
+    
+    // FIX: Activity holds the renderer, not ViewModel
+    private var arRenderer: ArRenderer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Safety check for OpenCV (Double check in Activity is harmless and safer)
         ensureOpenCVLoaded()
-
-        // 1. ENABLE EDGE-TO-EDGE
         enableEdgeToEdge()
 
-        // 2. Initialize Helpers
         locationTracker = LocationTracker(this)
-
-        // 3. Permissions & Data Loading
         checkAndRequestPermissions()
         viewModel.loadAvailableProjects(this)
 
-        // 4. Set UI
         setContent {
             val navController = rememberNavController()
             GraffitiXRTheme {
                 MainScreen(
                     viewModel = viewModel,
-                    navController = navController
+                    navController = navController,
+                    // FIX: Callback to capture the renderer instance when View creates it
+                    onRendererCreated = { renderer ->
+                        arRenderer = renderer
+                    }
                 )
+            }
+        }
+        
+        // FIX: Event Observer
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.captureEvent.collect { event ->
+                    when (event) {
+                        is CaptureEvent.RequestCapture -> arRenderer?.triggerCapture()
+                        is CaptureEvent.RequestCalibration -> {
+                            val pose = arRenderer?.getLatestPose()
+                            if (pose != null) {
+                                val matrix = FloatArray(16)
+                                pose.toMatrix(matrix, 0)
+                                viewModel.onCalibrationPointCaptured(matrix)
+                            }
+                        }
+                        is CaptureEvent.RequestFingerprint -> {
+                            val fp = arRenderer?.generateFingerprint(event.bitmap)
+                            viewModel.onFingerprintGenerated(fp)
+                        }
+                        is CaptureEvent.RequestMapSave -> {
+                            // FIX: Offload synchronous native save to IO thread
+                            val path = event.path
+                            val renderer = arRenderer
+                            if (renderer != null) {
+                                launch(Dispatchers.IO) {
+                                    val success = renderer.slamManager.saveWorld(path)
+                                    withContext(Dispatchers.Main) {
+                                        val msg = if (success) "Map saved" else "Save failed"
+                                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        // Resume location updates if we have permission
+        arRenderer?.onResume(this)
+        viewModel.onResume()
         if (locationTracker.hasPermissions()) {
             locationTracker.startLocationUpdates { location ->
                 viewModel.updateCurrentLocation(location)
@@ -64,10 +108,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Save battery by stopping GPS when not visible
+        arRenderer?.onPause()
+        viewModel.onPause()
         locationTracker.stopLocationUpdates()
-        
-        // Auto-save project state with a thumbnail
         com.hereliesaz.graffitixr.utils.captureWindow(this) { bitmap ->
             viewModel.autoSaveProject(this, bitmap)
         }
@@ -75,13 +118,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Final cleanup
+        arRenderer?.cleanup()
+        arRenderer = null // Drop reference
         locationTracker.stopLocationUpdates()
     }
 
     private fun checkAndRequestPermissions() {
         val permissionsToRequest = mutableListOf<String>()
-        
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.CAMERA)
         }
@@ -91,11 +134,9 @@ class MainActivity : ComponentActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
-
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), PERMISSION_REQUEST_CODE)
         } else {
-            // If we already have permissions, trigger the initial fetch
             fetchLocationAndSort()
         }
     }
@@ -111,7 +152,6 @@ class MainActivity : ComponentActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            // Re-check permissions after the dialog closes
             if (locationTracker.hasPermissions()) {
                 fetchLocationAndSort()
             }
