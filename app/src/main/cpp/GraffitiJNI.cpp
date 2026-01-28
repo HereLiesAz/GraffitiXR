@@ -7,10 +7,11 @@
 static JavaVM* g_vm = nullptr;
 MobileGS *gMobileGS = nullptr;
 
-// Helper to get JNIEnv on any thread
+// Helper to get JNIEnv on any thread and attach if necessary
 JNIEnv* getJniEnv() {
     JNIEnv* env = nullptr;
-    if (g_vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+    jint res = g_vm->GetEnv((void**)&env, JNI_VERSION_1_6);
+    if (res == JNI_EDETACHED) {
         if (g_vm->AttachCurrentThread(&env, nullptr) != 0) {
             return nullptr;
         }
