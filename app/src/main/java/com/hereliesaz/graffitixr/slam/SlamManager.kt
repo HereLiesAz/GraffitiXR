@@ -1,20 +1,22 @@
 package com.hereliesaz.graffitixr.slam
 
-import android.util.Log
+import com.google.ar.core.Pose
+import com.google.ar.core.Session
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import com.google.ar.core.Session
-import com.google.ar.core.Pose
-import com.google.ar.core.Anchor
 
 class SlamManager {
 
-    private val _mappingQuality = MutableStateFlow(0f)
+    private val _mappingQuality = MutableStateFlow(0.0f)
     val mappingQuality = _mappingQuality.asStateFlow()
 
-    // Lifecycle
-    private external fun initNativeJni()
-    private external fun destroyNativeJni()
+    companion object {
+        init {
+            System.loadLibrary("graffitixr")
+        }
+        
+        private var refCount = 0
+    }
 
     fun initNative() {
         synchronized(Companion) {
@@ -36,38 +38,39 @@ class SlamManager {
         }
     }
 
-    // Sensors
-    external fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray)
-    external fun updateCameraImage(imageData: ByteArray, width: Int, height: Int, timestamp: Long)
-    external fun feedDepth(depthData: ByteArray, width: Int, height: Int)
+    fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
+        updateCameraJni(viewMtx, projMtx)
+    }
 
-    // Rendering
-    external fun drawFrame()
+    fun draw() {
+        drawJni()
+    }
 
-    // IO
-    external fun saveWorld(path: String): Boolean
-    external fun loadWorld(path: String): Boolean
-    external fun clearMap()
-    
-    // Metrics
-    external fun getPointCount(): Int
+    fun getPointCount(): Int {
+        return getPointCountJni()
+    }
 
+    fun onSurfaceChanged(width: Int, height: Int) {
+        onSurfaceChangedJni(width, height)
+    }
+
+    // Placeholder for quality calculation
     fun updateFeatureMapQuality(session: Session, pose: Pose) {
+        // In a real implementation, you might query ARCore's estimate or native SLAM confidence
+        // For now, let's just simulate it based on point count or movement
         val count = getPointCount()
-        // Thresholds: < 1000 (Low), 1000-5000 (Medium), > 5000 (High)
         val quality = (count / 5000f).coerceIn(0f, 1f)
         _mappingQuality.value = quality
     }
 
-    companion object {
-        private var refCount = 0
+    // FIX: Returns Boolean now
+    external fun saveWorld(path: String): Boolean
+    external fun loadWorld(path: String): Boolean
 
-        init {
-            try {
-                System.loadLibrary("graffiti-lib")
-            } catch (e: UnsatisfiedLinkError) {
-                Log.e("SlamManager", "Failed to load native library: ${e.message}")
-            }
-        }
-    }
+    private external fun initNativeJni()
+    private external fun destroyNativeJni()
+    private external fun updateCameraJni(viewMtx: FloatArray, projMtx: FloatArray)
+    private external fun drawJni()
+    private external fun getPointCountJni(): Int
+    private external fun onSurfaceChangedJni(width: Int, height: Int)
 }
