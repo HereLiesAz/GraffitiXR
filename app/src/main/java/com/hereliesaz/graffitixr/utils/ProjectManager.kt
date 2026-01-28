@@ -48,6 +48,13 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
         }
     }
 
+    // FIX: Added missing method required by MainViewModel.finalizeMap()
+    fun getMapPath(context: Context, projectId: String): String {
+        val root = File(context.filesDir, "projects/$projectId")
+        if (!root.exists()) root.mkdirs()
+        return File(root, "map.bin").absolutePath
+    }
+
     suspend fun saveProject(context: Context, state: UiState, projectId: String, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()
@@ -56,12 +63,10 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
         val thumbnailUri = if (thumbnail != null) {
             val file = File(root, "thumbnail.png")
             FileOutputStream(file).use { out ->
-                // Resize for efficiency? Usually caller provides what they want
                 thumbnail.compress(Bitmap.CompressFormat.PNG, 80, out)
             }
             uriProvider.getUriForFile(file)
         } else {
-            // Check if existing thumbnail exists to preserve it
             val file = File(root, "thumbnail.png")
             if (file.exists()) uriProvider.getUriForFile(file) else null
         }
