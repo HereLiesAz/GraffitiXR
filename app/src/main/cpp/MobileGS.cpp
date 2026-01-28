@@ -241,8 +241,11 @@ void MobileGS::compileShaders() {
     glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
-    // Stride is sizeof(SplatGaussian) to allow GL to skip the timestamp data
+    // FIX: Stride is sizeof(SplatGaussian) to account for the timestamp field at the end
+    // Position (3) + Color (3) + Scale (1) + Opacity (1) = 8 floats (32 bytes)
+    // + creationTime (8 bytes) = 40 bytes stride
     int stride = sizeof(SplatGaussian);
+    
     for(int i=0; i<4; ++i) {
         glEnableVertexAttribArray(i);
         int size = (i == 0 || i == 1) ? 3 : 1;
@@ -327,7 +330,7 @@ void MobileGS::draw() {
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, &camPos[0]);
 
     // Update Instance Buffer
-    // Note: We upload the custom struct but GL ignores the 'creationTime' because we set stride=sizeof(SplatGaussian)
+    // Note: We upload the custom struct. GL ignores the 'creationTime' because of the stride.
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
     {
         std::lock_guard<std::mutex> lock(mDataMutex);
@@ -347,8 +350,8 @@ void MobileGS::clear() {
 }
 
 bool MobileGS::saveModel(const std::string& path) {
-    // FIX: Removed detached thread (Crash Fix).
-    // Now runs on the calling thread (Managed by Kotlin Coroutines).
+    // FIX: Removed unsafe detached thread.
+    // This is now synchronous. The caller (Kotlin) must invoke this from a background thread (Dispatchers.IO).
     std::lock_guard<std::mutex> lock(mDataMutex);
     std::ofstream out(path, std::ios::binary);
     if (!out) {
@@ -385,6 +388,4 @@ bool MobileGS::loadModel(const std::string& path) {
     }
     mMapChanged = true;
     return true;
-}
-
 }
