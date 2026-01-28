@@ -96,7 +96,7 @@ This document tracks the development status, future enhancements, and identified
 -   **[x] Automated Tests:**
     -   [x] Added a suite of unit tests for the `MainViewModel`.
 -   **[x] UI Refinements:**
-     -   [x] Refined the Adjustment Slider UI into an integrated, animated panel.
+    -   [x] Refined the Adjustment Slider UI into an integrated, animated panel.
 -   **[x] Enhance User Experience (UX):**
     -   [x] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
     -   [x] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
@@ -157,8 +157,8 @@ All items completed. Ready for the next phase of development.
 
 ## 🔴 High Priority (The Core)
 
-- [ ] **Voxel Map Culling:** The `MobileGS` engine currently keeps *all* points. We need a "Garbage Collector" pass that deletes points with `confidence < 5` after 60 seconds of inactivity to save RAM.
-- [ ] **Serialization Speed:** The `.map` save takes ~3 seconds for large walls. Move the `saveModel` C++ function to a background thread (std::async) to prevent UI freeze.
+- [x] **Voxel Map Culling:** The `MobileGS` engine now performs a "Garbage Collector" pass that deletes points with `opacity < 0.3` and `age > 2000ms` when the map buffer reaches 95% capacity.
+- [x] **Serialization Speed:** The `.map` save functionality has been moved to `Dispatchers.IO` in Kotlin, calling a synchronous C++ `saveModel` function to prevent UI freezes (ANRs).
 - [ ] **AzNavRail Haptics:** Add haptic feedback when scrolling through rail items so the user can "feel" the menu without looking.
 
 ## 🟡 Medium Priority (Features)

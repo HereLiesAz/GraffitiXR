@@ -53,3 +53,4 @@ google-services.json
 /app/src/main/cpp/include/glm/*
 
 build_log*.txt
+/gradle/gradle-daemon-jvm.properties

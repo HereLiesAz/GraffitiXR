@@ -12,9 +12,10 @@ These constants are defined in `MobileGS.h` and can be tweaked for performance v
 
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
-| `VOXEL_SIZE` | `0.005f` (5mm) | The physical size of a single splat. Smaller = more detail, higher RAM usage. |
-| `CONFIDENCE_THRESHOLD` | `5` | A voxel must be "seen" this many times before it is rendered/saved. Filters sensor noise. |
-| `MAX_SPLATS` | `100,000` | Hard limit on the instance buffer size to maintain 60 FPS on mid-range devices. |
+| `VOXEL_SIZE` | `0.02f` (20mm) | The physical size of a single splat. Tuned for wall-scale scanning. |
+| `CONFIDENCE_THRESHOLD` | `0.6f` | A voxel must reach this opacity before being considered "solid". |
+| `CONFIDENCE_INCREMENT` | `0.05f` | Opacity gained per frame of observation. |
+| `MAX_SPLATS` | `500,000` | Hard limit on the instance buffer size to maintain 60 FPS on mid-range devices. |
 | `CULL_DISTANCE` | `5.0f` (Meters) | Points further than 5m are ignored to keep the map local to the wall. |
 
 ## Sensor Input
