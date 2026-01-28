@@ -19,10 +19,10 @@
     
     <uses-feature
         android:name="android.hardware.camera"
-        android:required="false" />
+        android:required="true" />
     <uses-feature
         android:name="android.hardware.camera.ar"
-        android:required="false" />
+        android:required="true" />
 
     <application
         android:name=".GraffitiApplication"
@@ -57,7 +57,7 @@
 
         <meta-data
             android:name="com.google.ar.core"
-            android:value="optional"
+            android:value="required"
             tools:replace="android:value" />
         <meta-data android:name="com.google.android.ar.API_KEY" android:value="@string/arcore_api_key"/>
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="subject_segment" />
