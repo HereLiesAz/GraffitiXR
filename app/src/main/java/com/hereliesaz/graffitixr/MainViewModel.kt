@@ -62,7 +62,6 @@ class MainViewModel @JvmOverloads constructor(
     private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
     val artworkBounds = _artworkBounds.asStateFlow()
 
-    // Sensor Logic
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private var currentSensorData: SensorData? = null
     private var isSensorListening = false
@@ -115,7 +114,6 @@ class MainViewModel @JvmOverloads constructor(
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
 
-    // History Stacks
     private val undoStack = ArrayDeque<List<OverlayLayer>>()
     private val redoStack = ArrayDeque<List<OverlayLayer>>()
     private val MAX_HISTORY = 50
@@ -256,6 +254,7 @@ class MainViewModel @JvmOverloads constructor(
                 _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
             }
             CaptureStep.INSTRUCTION -> {
+                // LOGIC FIX: Advance to the correct next step instead of capturing immediately
                 val nextStep = when (mode) {
                     TargetCreationMode.GUIDED_GRID, TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
                     TargetCreationMode.RECTIFY -> CaptureStep.FRONT
@@ -286,7 +285,7 @@ class MainViewModel @JvmOverloads constructor(
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
     fun setHandedness(rightHanded: Boolean) { prefs.edit().putBoolean("is_right_handed", rightHanded).apply(); _uiState.update { it.copy(isRightHanded = rightHanded) } }
     fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
-    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) } } 
+    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) } }
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
 
     fun loadAvailableProjects(context: Context) {
@@ -354,7 +353,7 @@ class MainViewModel @JvmOverloads constructor(
     fun finalizeMap() {}
     fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
     
-    // UPDATED: Calculate aspect ratio on load
+    // UPDATED: Calculate aspect ratio
     fun onOverlayImageSelected(u: Uri) { 
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<Application>()
