@@ -318,50 +318,32 @@ class ArRenderer(
 
         if (captureNextFrame) {
             captureNextFrame = false
-            captureBitmapPBO()
+            captureBitmap()
         }
         
         onSessionUpdated?.invoke(session!!, frame)
     }
 
-    // FIX: Optimized PBO Capture to prevent UI thread blocking
-    private fun captureBitmapPBO() {
-        val width = viewportWidth
-        val height = viewportHeight
-        val size = width * height * 4
+    private fun captureBitmap() {
+        try {
+            val width = viewportWidth
+            val height = viewportHeight
+            val buffer = ByteBuffer.allocateDirect(width * height * 4)
+            buffer.order(ByteOrder.nativeOrder())
+            GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer)
 
-        if (!isPboInitialized) {
-            val buffers = IntArray(1)
-            GLES30.glGenBuffers(1, buffers, 0)
-            pboId = buffers[0]
-            GLES30.glBindBuffer(GLES30.GL_PIXEL_PACK_BUFFER, pboId)
-            GLES30.glBufferData(GLES30.GL_PIXEL_PACK_BUFFER, size, null, GLES30.GL_STREAM_READ)
-            GLES30.glBindBuffer(GLES30.GL_PIXEL_PACK_BUFFER, 0)
-            isPboInitialized = true
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bitmap.copyPixelsFromBuffer(buffer)
+
+            val matrix = android.graphics.Matrix()
+            matrix.preScale(1.0f, -1.0f)
+            val flippedBitmap = Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, false)
+            bitmap.recycle()
+
+            onFrameCaptured(flippedBitmap)
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Failed to capture frame", e)
         }
-
-        // Bind PBO and read pixels (This returns immediately)
-        GLES30.glBindBuffer(GLES30.GL_PIXEL_PACK_BUFFER, pboId)
-        GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, 0)
-
-        // Map buffer to CPU (Memory barrier implicit here)
-        val pboBuffer = GLES30.glMapBufferRange(
-            GLES30.GL_PIXEL_PACK_BUFFER, 0, size,
-            GLES30.GL_MAP_READ_BIT
-        ) as ByteBuffer
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        bitmap.copyPixelsFromBuffer(pboBuffer)
-
-        GLES30.glUnmapBuffer(GLES30.GL_PIXEL_PACK_BUFFER)
-        GLES30.glBindBuffer(GLES30.GL_PIXEL_PACK_BUFFER, 0)
-
-        val matrix = android.graphics.Matrix()
-        matrix.preScale(1.0f, -1.0f)
-        val flippedBitmap = Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, false)
-        bitmap.recycle()
-
-        onFrameCaptured(flippedBitmap)
     }
 
     private fun getLayerTransform(layer: LayerRendererData): FloatArray {
