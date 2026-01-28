@@ -248,6 +248,19 @@ class MainViewModel @JvmOverloads constructor(
     fun onRotationXChanged(d: Float) = updateActiveLayer { it.copy(rotationX = it.rotationX + d) }
     fun onRotationYChanged(d: Float) = updateActiveLayer { it.copy(rotationY = it.rotationY + d) }
     fun onRotationZChanged(d: Float) = updateActiveLayer { it.copy(rotationZ = it.rotationZ + d) }
+
+    fun setLayerTransform(scale: Float, offset: Offset, rotationX: Float, rotationY: Float, rotationZ: Float) {
+        updateActiveLayer(saveHistory = true) {
+            it.copy(
+                scale = scale,
+                offset = offset,
+                rotationX = rotationX,
+                rotationY = rotationY,
+                rotationZ = rotationZ
+            )
+        }
+    }
+
     fun onCycleRotationAxis() = _uiState.update { s -> val n = when(s.activeRotationAxis){ RotationAxis.X->RotationAxis.Y; RotationAxis.Y->RotationAxis.Z; RotationAxis.Z->RotationAxis.X }; s.copy(activeRotationAxis=n, showRotationAxisFeedback=true) }
 
     fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
