@@ -84,7 +84,7 @@ object BlendModeParceler : Parceler<BlendMode> {
             BlendMode.Saturation -> 26
             BlendMode.Color -> 27
             BlendMode.Luminosity -> 28
-            else -> 3 // SrcOver as default
+            else -> 3
         }
         parcel.writeInt(intValue)
     }

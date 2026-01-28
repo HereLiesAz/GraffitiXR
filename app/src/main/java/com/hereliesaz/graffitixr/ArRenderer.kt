@@ -10,6 +10,7 @@ import android.opengl.Matrix
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
+import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
@@ -19,12 +20,17 @@ import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.rendering.SimpleQuadRenderer
 import com.hereliesaz.graffitixr.slam.SlamManager
+import org.opencv.android.Utils as OpenCVUtils
+import org.opencv.core.Mat
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.features2d.ORB
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import javax.microedition.khronos.egl.EGLConfig
@@ -53,6 +59,7 @@ class ArRenderer(
     private val displayRotationHelper = com.hereliesaz.graffitixr.utils.DisplayRotationHelper(context)
     private var isSessionCreated = false
     private var anchor: Anchor? = null
+    private var lastKnownPose: Pose? = null
 
     // Layer Management (Thread-Safe)
     private val layerRenderers = ConcurrentHashMap<String, LayerRendererData>()
@@ -65,10 +72,15 @@ class ArRenderer(
         var rotationY: Float = 0.0f,
         var rotationZ: Float = 0.0f,
         var opacity: Float = 1.0f,
+        var brightness: Float = 0.0f,
+        var colorBalanceR: Float = 1.0f,
+        var colorBalanceG: Float = 1.0f,
+        var colorBalanceB: Float = 1.0f,
         var offsetX: Float = 0.0f,
         var offsetY: Float = 0.0f,
         var aspectRatio: Float = 1.0f,
-        var isVisible: Boolean = true
+        var isVisible: Boolean = true,
+        var blendMode: BlendMode = BlendMode.SrcOver
     )
 
     private val queuedTaps = java.util.concurrent.ArrayBlockingQueue<android.graphics.PointF>(16)
@@ -124,9 +136,9 @@ class ArRenderer(
     fun cleanup() {
         session?.close()
         session = null
-        layerRenderers.values.forEach { 
-            if (it.textureId != 0) {
-                val tex = IntArray(1) { it.textureId }
+        layerRenderers.values.forEach { layer ->
+            if (layer.textureId != 0) {
+                val tex = IntArray(1) { layer.textureId }
                 GLES20.glDeleteTextures(1, tex, 0)
             }
         }
@@ -135,8 +147,8 @@ class ArRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
-        backgroundRenderer.createOnGlThread(context)
-        planeRenderer.createOnGlThread(context, "models/trigrid.png")
+        backgroundRenderer.createOnGlThread()
+        planeRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread()
         simpleQuadRenderer.createOnGlThread()
         slamManager.initNative()
@@ -159,6 +171,7 @@ class ArRenderer(
 
         displayRotationHelper.updateSessionIfNeeded(session!!)
         val camera = frame.camera
+        lastKnownPose = camera.pose
 
         handleTap(frame, camera)
         
@@ -231,7 +244,7 @@ class ArRenderer(
             val planes = session!!.getAllTrackables(Plane::class.java)
             if (planes.isNotEmpty()) {
                 onPlanesDetected(true)
-                planeRenderer.drawPlanes(planes, camera.displayOrientedPose, projmtx)
+                planeRenderer.drawPlanes(planes, viewmtx, projmtx)
             } else {
                 onPlanesDetected(false)
             }
@@ -255,7 +268,11 @@ class ArRenderer(
                         modelMatrix,
                         layerData.textureId,
                         layerData.opacity,
-                        layerData.scale
+                        layerData.brightness,
+                        layerData.colorBalanceR,
+                        layerData.colorBalanceG,
+                        layerData.colorBalanceB,
+                        layerData.blendMode
                     )
                 }
             }
@@ -298,10 +315,15 @@ class ArRenderer(
             data.rotationY = layer.rotationY
             data.rotationZ = layer.rotationZ
             data.opacity = layer.opacity
+            data.brightness = layer.brightness
+            data.colorBalanceR = layer.colorBalanceR
+            data.colorBalanceG = layer.colorBalanceG
+            data.colorBalanceB = layer.colorBalanceB
             data.offsetX = layer.offset.x
             data.offsetY = layer.offset.y
             data.isVisible = layer.isVisible
             data.aspectRatio = layer.aspectRatio
+            data.blendMode = layer.blendMode
         }
     }
 
@@ -357,6 +379,52 @@ class ArRenderer(
     }
     
     fun getLatestPose(): Pose? {
-        return session?.update()?.camera?.pose
+        return lastKnownPose
+    }
+
+    fun setFlashlight(on: Boolean) {
+        val session = session ?: return
+        try {
+            val config = session.config
+            config.flashMode = if (on) Config.FlashMode.TORCH else Config.FlashMode.OFF
+            session.configure(config)
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Failed to set flashlight: ${e.message}")
+        }
+    }
+
+    fun generateFingerprint(bitmap: Bitmap): Fingerprint? {
+        val mat = Mat()
+        OpenCVUtils.bitmapToMat(bitmap, mat)
+
+        val orb = ORB.create()
+        val keypoints = MatOfKeyPoint()
+        val descriptors = Mat()
+
+        orb.detectAndCompute(mat, Mat(), keypoints, descriptors)
+
+        if (descriptors.empty()) {
+            mat.release()
+            keypoints.release()
+            descriptors.release()
+            return null
+        }
+
+        val descriptorsData = ByteArray(descriptors.rows() * descriptors.cols() * descriptors.elemSize().toInt())
+        descriptors.get(0, 0, descriptorsData)
+
+        val fingerprint = Fingerprint(
+            keypoints.toList(),
+            descriptorsData,
+            descriptors.rows(),
+            descriptors.cols(),
+            descriptors.type()
+        )
+
+        mat.release()
+        keypoints.release()
+        descriptors.release()
+
+        return fingerprint
     }
 }

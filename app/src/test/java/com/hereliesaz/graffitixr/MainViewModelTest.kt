@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
+import android.hardware.SensorManager
 import android.net.Uri
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import io.mockk.Runs
@@ -32,6 +33,7 @@ class MainViewModelTest {
     private val application: Application = mockk(relaxed = true)
     private val prefs: SharedPreferences = mockk(relaxed = true)
     private val editor: SharedPreferences.Editor = mockk(relaxed = true)
+    private val sensorManager: SensorManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -45,6 +47,8 @@ class MainViewModelTest {
         every { editor.putBoolean(any(), any()) } returns editor
         every { editor.apply() } just Runs
         every { prefs.getBoolean("is_right_handed", true) } returns true
+
+        every { application.getSystemService(Context.SENSOR_SERVICE) } returns sensorManager
 
         viewModel = MainViewModel(application, projectManager)
     }
