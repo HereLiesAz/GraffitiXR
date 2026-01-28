@@ -17,43 +17,48 @@ import java.util.HashMap
 class PointCloudRenderer {
     private val TAG = "PointCloudRenderer"
 
-    // Updated Vertex Shader: Passes confidence (a_Position.w) to the fragment shader
-    private val vertexShaderCode =
-        "uniform mat4 u_MvpMatrix;" +
-        "uniform float u_PointSize;" +
-        "attribute vec4 a_Position;" + // x, y, z, confidence
-        "varying float v_Confidence;" +
-        "void main() {" +
-        "   gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);" +
-        "   gl_PointSize = u_PointSize;" +
-        "   v_Confidence = a_Position.w;" + // Pass confidence to fragment
-        "}"
+    // Updated Vertex Shader: Using Raw String to prevent concatenation errors
+    private val vertexShaderCode = """
+        uniform mat4 u_MvpMatrix;
+        uniform float u_PointSize;
+        attribute vec4 a_Position; // x, y, z, confidence
+        varying float v_Confidence;
+        
+        void main() {
+           gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);
+           gl_PointSize = u_PointSize;
+           v_Confidence = a_Position.w;
+        }
+    """.trimIndent()
 
-    // Updated Fragment Shader: Color mixing based on confidence
-    private val fragmentShaderCode =
-        "precision mediump float;" +
-        "varying float v_Confidence;" +
-        "void main() {" +
-        "    vec2 coord = gl_PointCoord - vec2(0.5);" +
-        "    if (length(coord) > 0.5) discard;" +
-        "    " +
-        "    // Colors" +
-        "    vec3 cyan = vec3(0.0, 1.0, 1.0);" +
-        "    vec3 pink = vec3(1.0, 0.0, 0.8);" +
-        "    vec3 green = vec3(0.0, 1.0, 0.0);" +
-        "    " +
-        "    vec3 finalColor;" +
-        "    // Confidence is usually 0.0 to 1.0" +
-        "    if (v_Confidence < 0.5) {" +
-        "        // Transition Cyan -> Pink" +
-        "        finalColor = mix(cyan, pink, v_Confidence * 2.0);" +
-        "    } else {" +
-        "        // Transition Pink -> Green (Saved state)" +
-        "        finalColor = mix(pink, green, (v_Confidence - 0.5) * 2.0);" +
-        "    }" +
-        "    " +
-        "    gl_FragColor = vec4(finalColor, 1.0);" +
-        "}"
+    // Updated Fragment Shader: Fixed the comment bug by using Raw String
+    private val fragmentShaderCode = """
+        precision mediump float;
+        varying float v_Confidence;
+        
+        void main() {
+            vec2 coord = gl_PointCoord - vec2(0.5);
+            if (length(coord) > 0.5) discard;
+            
+            // Colors
+            vec3 cyan = vec3(0.0, 1.0, 1.0);
+            vec3 pink = vec3(1.0, 0.0, 0.8);
+            vec3 green = vec3(0.0, 1.0, 0.0);
+            
+            vec3 finalColor;
+            
+            // Confidence is usually 0.0 to 1.0
+            if (v_Confidence < 0.5) {
+                // Transition Cyan -> Pink
+                finalColor = mix(cyan, pink, v_Confidence * 2.0);
+            } else {
+                // Transition Pink -> Green (Saved state)
+                finalColor = mix(pink, green, (v_Confidence - 0.5) * 2.0);
+            }
+            
+            gl_FragColor = vec4(finalColor, 1.0);
+        }
+    """.trimIndent()
 
     private var program: Int = 0
     private var positionHandle: Int = 0
@@ -68,7 +73,7 @@ class PointCloudRenderer {
     // Local buffer: x, y, z, confidence
     private val localBuffer: FloatArray = FloatArray(maxPoints * 4)
     
-    // CHANGED: Map ID -> Index in localBuffer. Allows us to update existing points.
+    // Map ID -> Index in localBuffer. Allows us to update existing points.
     private val pointIdMap = HashMap<Int, Int>() 
 
     fun createOnGlThread() {
@@ -117,7 +122,6 @@ class PointCloudRenderer {
 
             if (pointIdMap.containsKey(id)) {
                 // UPDATE: If we have this point, but new confidence is higher, update it.
-                // This makes the point turn "Greener" over time.
                 val index = pointIdMap[id]!!
                 val offset = index * 4
                 val oldConf = localBuffer[offset + 3]
@@ -130,7 +134,7 @@ class PointCloudRenderer {
                     hasUpdates = true
                 }
             } else {
-                // NEW: Add if we have space
+                // Add if we have space
                 if (accumulatedPointCount < maxPoints) {
                     val index = accumulatedPointCount
                     pointIdMap[id] = index
@@ -148,7 +152,6 @@ class PointCloudRenderer {
         }
 
         // If we changed anything (new points OR updates), upload the active buffer range.
-        // We upload the whole active range because updates might be scattered.
         if (hasUpdates) {
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
             val byteBuffer = ByteBuffer.allocateDirect(accumulatedPointCount * 4 * 4)
@@ -178,7 +181,7 @@ class PointCloudRenderer {
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
 
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
-        GLES20.glUniform1f(pointSizeHandle, 15.0f) // Slightly larger for better visibility
+        GLES20.glUniform1f(pointSizeHandle, 15.0f) // Larger points for better visibility
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         // Stride is 16 (4 floats * 4 bytes). Data is x,y,z,conf.
