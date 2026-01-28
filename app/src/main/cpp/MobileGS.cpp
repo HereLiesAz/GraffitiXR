@@ -11,7 +11,7 @@
 
 const float CONFIDENCE_THRESHOLD = 0.6f;
 const float CONFIDENCE_INCREMENT = 0.05f;
-const float PRUNE_THRESHOLD = 0.3f; // More aggressive culling for low confidence noise
+const float PRUNE_THRESHOLD = 0.3f; 
 
 const char* VS_SRC = R"(#version 300 es
 layout(location = 0) in vec3 aInstancePos;
@@ -109,7 +109,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
     if (mProjMatrix[0][0] == 0) return;
 
     mFrameCount++;
-    // Garbage Collect every 500 frames or if we hit cap
     if (mFrameCount % 500 == 0 || mRenderGaussians.size() > MAX_POINTS * 0.95) {
         pruneMap();
     }
@@ -120,7 +119,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
     float p20 = mProjMatrix[2][0];
     float p21 = mProjMatrix[2][1];
 
-    // Dynamic Resolution: If we have too many points, sample less often to save CPU
     int step = 2;
     if (mRenderGaussians.size() > 20000) step = 3;
     if (mRenderGaussians.size() > 40000) step = 4;
@@ -174,8 +172,6 @@ void MobileGS::pruneMap() {
     mVoxelGrid.clear();
 
     for (const auto& g : mRenderGaussians) {
-        // Keep if high confidence OR if it's a very new point (give it a chance to grow)
-        // But for this "fix", we stick to the requested logic: Prune weak points.
         if (g.opacity >= PRUNE_THRESHOLD) {
             survived.push_back(g);
             VoxelKey key = { 
@@ -262,21 +258,17 @@ void MobileGS::sortThreadLoop() {
         {
             std::lock_guard<std::mutex> dataLock(mDataMutex);
             view = mSortViewMatrix;
-            // COPY positions to avoid holding lock during sort
             positions.reserve(mRenderGaussians.size());
             for(const auto& g : mRenderGaussians) positions.push_back(g.position);
         }
 
-        // OPTIMIZATION: Check delta.
         glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
-        glm::vec3 camDir = glm::vec3(view[0][2], view[1][2], view[2][2]); // Forward Z
+        glm::vec3 camDir = glm::vec3(view[0][2], view[1][2], view[2][2]); 
         
         float distDelta = glm::distance(camPos, lastSortPos);
-        float dirDelta = glm::dot(camDir, lastSortDir); // 1.0 = same dir
+        float dirDelta = glm::dot(camDir, lastSortDir);
 
-        // Only sort if we moved > 5cm or rotated significantly
         if (distDelta < 0.05f && dirDelta > 0.99f && !mMapChanged) {
-             // Skip sort, release thread
              mSortRunning = false;
              continue; 
         }
@@ -311,6 +303,11 @@ void MobileGS::sortThreadLoop() {
 void MobileGS::draw() {
     if (!mIsInitialized) initialize();
 
+    // DISABLED: User requested to hide the "representation of the world" (Blue Balls).
+    // The data is still collected, just not rendered.
+    return; 
+
+    /*
     std::vector<float> data;
     glm::mat4 view, proj;
     size_t count = 0;
@@ -333,7 +330,6 @@ void MobileGS::draw() {
             if (idx >= mRenderGaussians.size()) continue;
             const auto& g = mRenderGaussians[idx];
             
-            // Only render if above threshold (Visual Cleanliness)
             if (g.opacity < 0.2f) continue;
 
             data.push_back(g.position.x); data.push_back(g.position.y); data.push_back(g.position.z);
@@ -354,7 +350,6 @@ void MobileGS::draw() {
 
     if (count == 0) return;
 
-    // Save GL State
     GLint prevProgram, prevVAO, prevVBO, prevBlendSrc, prevBlendDst;
     GLboolean prevDepthTest, prevBlend, prevCull;
     glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
@@ -385,7 +380,6 @@ void MobileGS::draw() {
 
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)count);
 
-    // Restore GL State
     glUseProgram(prevProgram);
     glBindVertexArray(prevVAO);
     glBindBuffer(GL_ARRAY_BUFFER, prevVBO);
@@ -393,6 +387,7 @@ void MobileGS::draw() {
     if (!prevBlend) glDisable(GL_BLEND);
     else glBlendFunc(prevBlendSrc, prevBlendDst);
     if (prevCull) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+    */
 }
 
 void MobileGS::clear() {
