@@ -52,13 +52,11 @@ class ArRenderer(
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var onAnchorCreated: ((Anchor) -> Unit)? = null
 
-    // Restore missing properties used by MappingScreen
     var showMiniMap = false
     var showGuide = false
 
-    private var viewportWidth = -1
-    private var viewportHeight = -1
-    private var isFlashlightOn = false
+    private var isInitialized = false
+    private var isResumed = false
     private var captureNextFrame = false
     
     private var layers: List<OverlayLayer> = emptyList()
@@ -67,22 +65,19 @@ class ArRenderer(
     data class QueuedTap(val x: Float, val y: Float)
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         try {
             backgroundRenderer.createOnGlThread()
             planeRenderer.createOnGlThread() 
             imageRenderer.createOnGlThread()
             slamManager.initNative()
-            
-            session?.setCameraTextureName(backgroundRenderer.textureId)
+            isInitialized = true
         } catch (e: IOException) {
             Log.e("ArRenderer", "Failed to initialize renderer", e)
         }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        viewportWidth = width
-        viewportHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
         GLES30.glViewport(0, 0, width, height)
         slamManager.onSurfaceChanged(width, height)
@@ -91,12 +86,23 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
+        if (!isInitialized) return
         val currentSession = session ?: return
-        currentSession.setCameraTextureName(backgroundRenderer.textureId)
+
+        if (!isResumed) {
+            try {
+                currentSession.resume()
+                isResumed = true
+            } catch (e: Exception) {
+                Log.e("ArRenderer", "Failed to resume session", e)
+                return
+            }
+        }
 
         displayRotationHelper.updateSessionIfNeeded(currentSession)
 
         try {
+            currentSession.setCameraTextureName(backgroundRenderer.textureId)
             val frame = currentSession.update()
             val camera = frame.camera
 
@@ -126,8 +132,9 @@ class ArRenderer(
                     )
                 }
 
-                // Placeholder for layer rendering
-                layers.forEach { _ -> }
+                layers.forEach { layer ->
+                    // Layer rendering logic...
+                }
                 
                 slamManager.updateCamera(viewmtx, projmtx)
                 slamManager.draw()
@@ -207,33 +214,25 @@ class ArRenderer(
                     val config = Config(session)
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                    config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                    if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                        config.depthMode = Config.DepthMode.AUTOMATIC
+                    }
                     session!!.configure(config)
-                } else {
-                    return 
                 }
             } catch (e: Exception) {
                 Log.e("ArRenderer", "ARCore Session creation failed", e)
-                Toast.makeText(context, "ARCore Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                return
             }
-        }
-
-        try {
-            session?.resume()
-            displayRotationHelper.onResume()
-        } catch (e: CameraNotAvailableException) {
-            Log.e("ArRenderer", "Camera not available", e)
-            session = null 
         }
     }
 
     fun onPause() {
+        isResumed = false
         displayRotationHelper.onPause()
         session?.pause()
     }
 
     fun cleanup() {
+        isInitialized = false
         session?.close()
         session = null
         slamManager.destroyNative()
