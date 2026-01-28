@@ -42,7 +42,7 @@ class ArRenderer(
 
     var session: Session? = null
     var onAnchorCreated: ((Anchor) -> Unit)? = null
-    var onSessionUpdated: ((Session, Frame) -> Unit)? = null // Hook for mapping screen
+    var onSessionUpdated: ((Session, Frame) -> Unit)? = null 
 
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
@@ -55,7 +55,6 @@ class ArRenderer(
     private var anchor: Anchor? = null
 
     // Layer Management (Thread-Safe)
-    // Map of Layer ID -> Renderer Data
     private val layerRenderers = ConcurrentHashMap<String, LayerRendererData>()
 
     private data class LayerRendererData(
@@ -77,7 +76,6 @@ class ArRenderer(
     var showMiniMap = false
     var showGuide = true
 
-    // Cache buffers to prevent GC stutter
     private var cachedYBuffer: ByteArray? = null
     private var cachedDepthBuffer: ByteArray? = null
     private var lastDepthUpdateTime = 0L
@@ -126,7 +124,6 @@ class ArRenderer(
     fun cleanup() {
         session?.close()
         session = null
-        // Delete textures
         layerRenderers.values.forEach { 
             if (it.textureId != 0) {
                 val tex = IntArray(1) { it.textureId }
@@ -163,20 +160,16 @@ class ArRenderer(
         displayRotationHelper.updateSessionIfNeeded(session!!)
         val camera = frame.camera
 
-        // Handle Taps
         handleTap(frame, camera)
         
-        // Handle External Anchor Creation Request (from MappingScreen)
         anchorCreationPose?.value?.let { pose ->
             if (anchor == null) {
                 anchor = session?.createAnchor(pose)
                 onAnchorCreated?.invoke(anchor!!)
             }
-            anchorCreationPose.value = null // Consume event
+            anchorCreationPose.value = null 
         }
 
-        // --- Native Engine Feeds ---
-        // Feed Image
         try {
             val image = frame.acquireCameraImage()
             if (image.format == android.graphics.ImageFormat.YUV_420_888) {
@@ -204,7 +197,6 @@ class ArRenderer(
             image.close()
         } catch (e: Exception) { }
 
-        // Feed Depth
         if (camera.trackingState == TrackingState.TRACKING) {
             val now = System.currentTimeMillis()
             if (now - lastDepthUpdateTime > 66) {
@@ -223,7 +215,6 @@ class ArRenderer(
             }
         }
 
-        // Render Background
         backgroundRenderer.draw(frame)
 
         val projmtx = FloatArray(16)
@@ -231,13 +222,11 @@ class ArRenderer(
         val viewmtx = FloatArray(16)
         camera.getViewMatrix(viewmtx, 0)
 
-        // Render Points
         val pointCloud = frame.acquirePointCloud()
         pointCloudRenderer.update(pointCloud)
         pointCloudRenderer.draw(viewmtx, projmtx)
         pointCloud.close()
 
-        // Render Planes
         if (camera.trackingState == TrackingState.TRACKING) {
             val planes = session!!.getAllTrackables(Plane::class.java)
             if (planes.isNotEmpty()) {
@@ -248,7 +237,6 @@ class ArRenderer(
             }
         }
 
-        // Render Layers (Images)
         if (anchor != null && anchor!!.trackingState == TrackingState.TRACKING) {
             val anchorMatrix = FloatArray(16)
             anchor!!.pose.toMatrix(anchorMatrix, 0)
@@ -258,7 +246,7 @@ class ArRenderer(
                     val modelMatrix = FloatArray(16)
                     Matrix.multiplyMM(modelMatrix, 0, anchorMatrix, 0, getLayerTransform(layerData), 0)
                     
-                    // APPLY ASPECT RATIO HERE: Scale X by ratio
+                    // ASPECT RATIO FIX: Scale X by ratio
                     Matrix.scaleM(modelMatrix, 0, layerData.aspectRatio, 1.0f, 1.0f)
 
                     simpleQuadRenderer.draw(
@@ -273,48 +261,38 @@ class ArRenderer(
             }
         }
 
-        // Call Native Draw (Invisible but running)
         slamManager.updateCamera(viewmtx, projmtx)
         slamManager.drawFrame()
 
         if (captureNextFrame) {
             captureNextFrame = false
-            // Capture logic would go here (glReadPixels)
         }
         
-        // Notify listener
         onSessionUpdated?.invoke(session!!, frame)
     }
 
     private fun getLayerTransform(layer: LayerRendererData): FloatArray {
         val matrix = FloatArray(16)
         Matrix.setIdentityM(matrix, 0)
-        // Order: Translate -> Rotate -> Scale
         Matrix.translateM(matrix, 0, layer.offsetX, layer.offsetY, 0.0f)
         Matrix.rotateM(matrix, 0, layer.rotationZ, 0f, 0f, 1f)
         Matrix.rotateM(matrix, 0, layer.rotationY, 0f, 1f, 0f)
         Matrix.rotateM(matrix, 0, layer.rotationX, 1f, 0f, 0f)
-        // Base scale is applied in draw() separately or here. 
-        // We'll let simpleQuadRenderer handle the uniform scale to avoid affecting aspect ratio logic too early.
         return matrix
     }
 
     fun updateLayers(layers: List<OverlayLayer>) {
-        // 1. Remove layers that no longer exist
         val activeIds = layers.map { it.id }.toSet()
         layerRenderers.keys.removeIf { !activeIds.contains(it) }
 
-        // 2. Update or Create layers
         for (layer in layers) {
             val data = layerRenderers.getOrPut(layer.id) { LayerRendererData() }
 
-            // Check if URI changed (Expensive reload)
             if (data.currentUri != layer.uri.toString()) {
                 data.currentUri = layer.uri.toString()
                 data.textureId = loadTexture(context, layer.uri.toString())
             }
 
-            // Update Transforms (Cheap)
             data.scale = layer.scale
             data.rotationX = layer.rotationX
             data.rotationY = layer.rotationY
