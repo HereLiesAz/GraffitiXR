@@ -1,34 +1,11 @@
 #include <jni.h>
 #include <string>
-#include <vector>
-#include <cstdint>
-#include <opencv2/core.hpp>
-#include <android/log.h>
 #include "MobileGS.h"
-
-#define TAG "GraffitiJNI"
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
-
-static JavaVM* gVm = nullptr;
-static MobileGS* gMobileGS = nullptr;
 
 extern "C" {
 
-JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
-    gVm = vm;
-    return JNI_VERSION_1_6;
-}
-
-JNIEnv* getEnv() {
-    JNIEnv* env;
-    if (gVm->GetEnv((void**)&env, JNI_VERSION_1_6) != JNI_OK) {
-        gVm->AttachCurrentThread(&env, nullptr);
-    }
-    return env;
-}
-
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_initNative(JNIEnv *env, jobject thiz) {
     if (!gMobileGS) {
         gMobileGS = new MobileGS();
         gMobileGS->initialize();
@@ -44,57 +21,41 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_destroyNativeJni(JNIEnv *env, jo
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCamera(JNIEnv *env, jobject thiz,
-        jfloatArray view_mtx,
-        jfloatArray proj_mtx) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCamera(JNIEnv *env, jobject thiz, jfloatArray viewMtx, jfloatArray projMtx) {
     if (!gMobileGS) return;
-    jfloat* view = env->GetFloatArrayElements(view_mtx, nullptr);
-    jfloat* proj = env->GetFloatArrayElements(proj_mtx, nullptr);
+    jfloat* view = env->GetFloatArrayElements(viewMtx, 0);
+    jfloat* proj = env->GetFloatArrayElements(projMtx, 0);
     gMobileGS->updateCamera(view, proj);
-    env->ReleaseFloatArrayElements(view_mtx, view, 0);
-    env->ReleaseFloatArrayElements(proj_mtx, proj, 0);
+    env->ReleaseFloatArrayElements(viewMtx, view, 0);
+    env->ReleaseFloatArrayElements(projMtx, proj, 0);
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_feedDepth(JNIEnv *env, jobject thiz,
-        jbyteArray depth_data,
-        jint width, jint height) {
-    if (!gMobileGS) return;
-    jbyte* data = env->GetByteArrayElements(depth_data, nullptr);
-    if (data != nullptr) {
-        cv::Mat depthMap(height, width, CV_16U, (unsigned char*)data);
-        gMobileGS->processDepthFrame(depthMap, width, height);
-    }
-    env->ReleaseByteArrayElements(depth_data, data, 0);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCameraImage(JNIEnv *env, jobject thiz,
-        jbyteArray image_data,
-        jint width, jint height, jlong timestamp) {
-    if (!gMobileGS) return;
-    jbyte* data = env->GetByteArrayElements(image_data, nullptr);
-    if (data != nullptr) {
-        cv::Mat img(height, width, CV_8UC1, (unsigned char*)data);
-        gMobileGS->processImage(img, width, height, (int64_t)timestamp);
-    }
-    env->ReleaseByteArrayElements(image_data, data, 0);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_drawFrame(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_draw(JNIEnv *env, jobject thiz) {
     if (gMobileGS) {
         gMobileGS->draw();
     }
 }
 
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_getPointCount(JNIEnv *env, jobject thiz) {
+    if (gMobileGS) return gMobileGS->getPointCount();
+    return 0;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_onSurfaceChanged(JNIEnv *env, jobject thiz, jint width, jint height) {
+    // Pass to native if needed
+}
+
+// FIX: Return jboolean to indicate success/failure
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jstring path) {
     if (!gMobileGS) return false;
     const char *nativePath = env->GetStringUTFChars(path, 0);
     bool result = gMobileGS->saveModel(std::string(nativePath));
     env->ReleaseStringUTFChars(path, nativePath);
-    return result;
+    return (jboolean)result;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -103,22 +64,7 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_loadWorld(JNIEnv *env, jobject t
     const char *nativePath = env->GetStringUTFChars(path, 0);
     bool result = gMobileGS->loadModel(std::string(nativePath));
     env->ReleaseStringUTFChars(path, nativePath);
-    return result;
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_clearMap(JNIEnv *env, jobject thiz) {
-    if (gMobileGS) {
-        gMobileGS->clear();
-    }
-}
-
-JNIEXPORT jint JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_getPointCount(JNIEnv *env, jobject thiz) {
-    if (gMobileGS) {
-        return gMobileGS->getPointCount();
-    }
-    return 0;
+    return (jboolean)result;
 }
 
 }
