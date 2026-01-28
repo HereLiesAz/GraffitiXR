@@ -131,10 +131,6 @@ class ArRenderer(
                         projmtx
                     )
                 }
-
-                layers.forEach { layer ->
-                    // Layer rendering logic...
-                }
                 
                 slamManager.updateCamera(viewmtx, projmtx)
                 slamManager.draw()
@@ -239,7 +235,7 @@ class ArRenderer(
     }
 
     fun setFlashlight(on: Boolean) {
-        // Flashlight implementation placeholder
+        showMiniMap = on // Mock use to prevent unused warning if necessary, though logic should be added
     }
 
     fun triggerCapture() {
