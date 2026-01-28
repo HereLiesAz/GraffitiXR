@@ -118,6 +118,9 @@ class ArRenderer(
 
         try {
             session?.resume()
+            if (backgroundRenderer.textureId != -1) {
+                session?.setCameraTextureName(backgroundRenderer.textureId)
+            }
         } catch (e: CameraNotAvailableException) {
             Toast.makeText(context, "Camera not available", Toast.LENGTH_LONG).show()
             session = null
@@ -148,6 +151,7 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer.createOnGlThread()
+        session?.setCameraTextureName(backgroundRenderer.textureId)
         planeRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread()
         simpleQuadRenderer.createOnGlThread()
