@@ -24,11 +24,8 @@ import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -58,7 +55,6 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.composable
-import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.model.AzButtonShape
@@ -251,12 +247,18 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController, onRendere
                             viewModel::onFeedbackShown, viewModel.tapFeedback.collectAsState().value
                         )
                     }
-                    composable("surveyor") { MappingScreen({}, { localNavController.popBackStack() }) }
+                    composable("surveyor") { 
+                        MappingScreen(
+                            onMapSaved = { /* Optional surveyor save callback */ },
+                            onExit = { localNavController.popBackStack() },
+                            onRendererCreated = { /* Internal renderer handling */ }
+                        ) 
+                    }
                     composable("project_library") {
                         LaunchedEffect(Unit) { viewModel.loadAvailableProjects(context) }
                         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                             ProjectLibraryScreen(uiState.availableProjects, { viewModel.openProject(it, context); localNavController.popBackStack() }, { viewModel.deleteProject(context, it) }, { viewModel.onNewProject(); localNavController.popBackStack() })
-                            AzButton(text = "Back", onClick = { localNavController.popBackStack() }, modifier = Modifier.align(Alignment.TopStart).padding(16.dp))
+                            com.hereliesaz.aznavrail.AzButton(text = "Back", onClick = { localNavController.popBackStack() }, modifier = Modifier.align(Alignment.TopStart).padding(16.dp))
                         }
                     }
                     composable("settings") {
@@ -399,7 +401,85 @@ private fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, conte
     }
 }
 
-@Composable private fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) { if (!isLocked) return; Box(Modifier.fillMaxSize().zIndex(100f).background(Color.Transparent).pointerInput(Unit) { awaitPointerEventScope { var tapCount = 0; var lastTapTime = 0L; while (true) { val change = awaitPointerEvent(PointerEventPass.Main).changes.firstOrNull(); if (change != null && change.changedToUp()) { val now = System.currentTimeMillis(); if (now - lastTapTime < 500) tapCount++ else tapCount = 1; lastTapTime = now; if (tapCount == 4) { onUnlockRequested(); tapCount = 0 } }; awaitPointerEvent(PointerEventPass.Main).changes.forEach { it.consume() } } } }) }
-@Composable fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: Boolean, isTargetCreated: Boolean, modifier: Modifier) { AnimatedVisibility(true, enter = fadeIn(), exit = fadeOut(), modifier = modifier) { val bg = if (qualityWarning != null) Color.Red.copy(0.8f) else Color.Black.copy(0.5f); val txt = when { qualityWarning != null -> qualityWarning; !isTargetCreated -> "Create a Grid to start."; arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."; arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."; arState == ArState.LOCKED -> "Looking for your Grid..."; arState == ArState.PLACED -> "Ready."; else -> "" }; if (txt.isNotEmpty()) Box(Modifier.background(bg, RoundedCornerShape(8.dp)).padding(16.dp, 8.dp)) { Text(txt, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center) } } } }
-@Composable private fun CaptureAnimation() { var f by remember { mutableFloatStateOf(0f) }; var s by remember { mutableFloatStateOf(0f) }; val af by animateFloatAsState(f, tween(200)); val `as` by animateFloatAsState(s, tween(300)); LaunchedEffect(Unit) { s=0.5f; delay(100); f=1f; delay(50); f=0f; delay(150); s=0f }; Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = `as`)).zIndex(10f)); Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = af)).zIndex(11f)) }
-@Composable fun UnlockInstructionsPopup(visible: Boolean) { AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut() + slideOutVertically { it / 2 }, modifier = Modifier.fillMaxSize().zIndex(200f)) { Box(Modifier.fillMaxSize().padding(bottom = 120.dp), contentAlignment = Alignment.BottomCenter) { Box(Modifier.background(Color.Black.copy(0.8f), RoundedCornerShape(16.dp)).padding(24.dp, 16.dp)) { Text("Press Volume Up & Down to unlock", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center) } } } }
+@Composable
+private fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
+    if (!isLocked) return
+    Box(
+        Modifier
+            .fillMaxSize()
+            .zIndex(100f)
+            .background(Color.Transparent)
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    var tapCount = 0
+                    var lastTapTime = 0L
+                    while (true) {
+                        val change = awaitPointerEvent(PointerEventPass.Main).changes.firstOrNull()
+                        if (change != null && change.changedToUp()) {
+                            val now = System.currentTimeMillis()
+                            if (now - lastTapTime < 500) tapCount++ else tapCount = 1
+                            lastTapTime = now
+                            if (tapCount == 4) {
+                                onUnlockRequested()
+                                tapCount = 0
+                            }
+                        }
+                        awaitPointerEvent(PointerEventPass.Main).changes.forEach { it.consume() }
+                    }
+                }
+            }
+    )
+}
+
+@Composable
+fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: Boolean, isTargetCreated: Boolean, modifier: Modifier) {
+    AnimatedVisibility(true, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        val bg = if (qualityWarning != null) Color.Red.copy(0.8f) else Color.Black.copy(0.5f)
+        val txt = when {
+            qualityWarning != null -> qualityWarning
+            !isTargetCreated -> "Create a Grid to start."
+            arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."
+            arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."
+            arState == ArState.LOCKED -> "Looking for your Grid..."
+            arState == ArState.PLACED -> "Ready."
+            else -> ""
+        }
+        if (txt.isNotEmpty()) {
+            Box(Modifier.background(bg, RoundedCornerShape(8.dp)).padding(16.dp, 8.dp)) {
+                Text(txt, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CaptureAnimation() {
+    var f by remember { mutableFloatStateOf(0f) }
+    var s by remember { mutableFloatStateOf(0f) }
+    val af by animateFloatAsState(f, tween(200))
+    val `as` by animateFloatAsState(s, tween(300))
+    
+    LaunchedEffect(Unit) {
+        s = 0.5f
+        delay(100)
+        f = 1f
+        delay(50)
+        f = 0f
+        delay(150)
+        s = 0f
+    }
+    
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = `as`)).zIndex(10f))
+    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = af)).zIndex(11f))
+}
+
+@Composable
+fun UnlockInstructionsPopup(visible: Boolean) {
+    AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut() + slideOutVertically { it / 2 }, modifier = Modifier.fillMaxSize().zIndex(200f)) {
+        Box(Modifier.fillMaxSize().padding(bottom = 120.dp), contentAlignment = Alignment.BottomCenter) {
+            Box(Modifier.background(Color.Black.copy(0.8f), RoundedCornerShape(16.dp)).padding(24.dp, 16.dp)) {
+                Text("Press Volume Up & Down to unlock", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
