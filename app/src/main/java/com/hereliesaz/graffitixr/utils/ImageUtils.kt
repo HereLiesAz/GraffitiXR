@@ -17,7 +17,6 @@ import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.math.max
 
 object ImageUtils {
 
@@ -59,45 +58,45 @@ object ImageUtils {
         val srcMat = Mat()
         OpenCVUtils.bitmapToMat(input, srcMat)
 
-        val w = input.width.toDouble()
-        val h = input.height.toDouble()
+        val w: Double = input.width.toDouble()
+        val h: Double = input.height.toDouble()
 
-        val p0x = points[0].x.toDouble() * w
-        val p0y = points[0].y.toDouble() * h
+        val p0x: Double = points[0].x.toDouble() * w
+        val p0y: Double = points[0].y.toDouble() * h
         val p0 = Point(p0x, p0y)
 
-        val p1x = points[1].x.toDouble() * w
-        val p1y = points[1].y.toDouble() * h
+        val p1x: Double = points[1].x.toDouble() * w
+        val p1y: Double = points[1].y.toDouble() * h
         val p1 = Point(p1x, p1y)
 
-        val p2x = points[2].x.toDouble() * w
-        val p2y = points[2].y.toDouble() * h
+        val p2x: Double = points[2].x.toDouble() * w
+        val p2y: Double = points[2].y.toDouble() * h
         val p2 = Point(p2x, p2y)
 
-        val p3x = points[3].x.toDouble() * w
-        val p3y = points[3].y.toDouble() * h
+        val p3x: Double = points[3].x.toDouble() * w
+        val p3y: Double = points[3].y.toDouble() * h
         val p3 = Point(p3x, p3y)
 
         // Calculate dimensions
-        val dxTop = p1.x - p0.x
-        val dyTop = p1.y - p0.y
-        val widthTop = Math.hypot(dxTop, dyTop)
+        val dxTop: Double = p1.x - p0.x
+        val dyTop: Double = p1.y - p0.y
+        val widthTop: Double = Math.hypot(dxTop, dyTop)
 
-        val dxBot = p2.x - p3.x
-        val dyBot = p2.y - p3.y
-        val widthBot = Math.hypot(dxBot, dyBot)
+        val dxBot: Double = p2.x - p3.x
+        val dyBot: Double = p2.y - p3.y
+        val widthBot: Double = Math.hypot(dxBot, dyBot)
 
-        val maxWidth = max(widthTop, widthBot)
+        val maxWidth: Double = if (widthTop > widthBot) widthTop else widthBot
 
-        val dxLeft = p3.x - p0.x
-        val dyLeft = p3.y - p0.y
-        val heightLeft = Math.hypot(dxLeft, dyLeft)
+        val dxLeft: Double = p3.x - p0.x
+        val dyLeft: Double = p3.y - p0.y
+        val heightLeft: Double = Math.hypot(dxLeft, dyLeft)
 
-        val dxRight = p2.x - p1.x
-        val dyRight = p2.y - p1.y
-        val heightRight = Math.hypot(dxRight, dyRight)
+        val dxRight: Double = p2.x - p1.x
+        val dyRight: Double = p2.y - p1.y
+        val heightRight: Double = Math.hypot(dxRight, dyRight)
 
-        val maxHeight = max(heightLeft, heightRight)
+        val maxHeight: Double = if (heightLeft > heightRight) heightLeft else heightRight
 
         if (maxWidth <= 0 || maxHeight <= 0) {
             srcMat.release()
