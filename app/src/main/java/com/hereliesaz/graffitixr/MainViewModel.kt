@@ -156,7 +156,7 @@ class MainViewModel @JvmOverloads constructor(
 
     fun onRemoveBackgroundClicked() {
         val activeId = _uiState.value.activeLayerId ?: return
-        val context = arRenderer?.context ?: return
+        val context = getApplication<Application>()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
@@ -195,7 +195,7 @@ class MainViewModel @JvmOverloads constructor(
 
     fun onLineDrawingClicked() {
         val activeId = _uiState.value.activeLayerId ?: return
-        val context = arRenderer?.context ?: return
+        val context = getApplication<Application>()
         viewModelScope.launch {
             if (!ensureOpenCVLoaded()) return@launch
             _uiState.update { it.copy(isLoading = true) }
@@ -274,7 +274,7 @@ class MainViewModel @JvmOverloads constructor(
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
     fun setHandedness(rightHanded: Boolean) { prefs.edit().putBoolean("is_right_handed", rightHanded).apply(); _uiState.update { it.copy(isRightHanded = rightHanded) } }
     fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
-    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }; arRenderer?.setFlashlight(_uiState.value.isFlashlightOn) }
+    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) } }
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
 
     fun loadAvailableProjects(context: Context) {
@@ -356,10 +356,11 @@ class MainViewModel @JvmOverloads constructor(
     fun onGridConfigChanged(r: Int, c: Int) = _uiState.update { it.copy(gridRows = r, gridCols = c) }
     fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
     fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
-    fun onCalibrationPointCaptured() {
-        val pose = arRenderer?.getLatestPose()
-        val poseMatrix = FloatArray(16)
-        pose?.toMatrix(poseMatrix, 0)
+    fun onCalibrationPointCaptured(poseMatrix: FloatArray? = null) {
+        if (poseMatrix == null) {
+            viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCalibration) }
+            return
+        }
         val snapshot = CalibrationSnapshot(_uiState.value.gpsData, currentSensorData, poseMatrix.toList(), System.currentTimeMillis())
         _uiState.update {
             val next = when(it.captureStep) { CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2; CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3; CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4; CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW; else -> it.captureStep }
@@ -400,12 +401,17 @@ class MainViewModel @JvmOverloads constructor(
         val captured = _uiState.value.capturedTargetImages.firstOrNull()
         if (captured != null) {
             viewModelScope.launch {
-                val fingerprint = arRenderer?.generateFingerprint(captured)
-                if (fingerprint != null) {
-                    val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.Fingerprint.serializer(), fingerprint)
-                    _uiState.update { it.copy(fingerprintJson = json) }
-                }
+                _captureEvent.send(CaptureEvent.RequestFingerprint(captured))
             }
+        } else {
+            _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
+        }
+    }
+
+    fun onFingerprintGenerated(fingerprint: com.hereliesaz.graffitixr.data.Fingerprint?) {
+        if (fingerprint != null) {
+            val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.Fingerprint.serializer(), fingerprint)
+            _uiState.update { it.copy(fingerprintJson = json) }
         }
         _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
     }
