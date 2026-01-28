@@ -5,12 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.opengl.Matrix
 import android.widget.Toast
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
-import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Pose
@@ -25,9 +23,7 @@ import com.hereliesaz.graffitixr.rendering.ProjectedImageRenderer
 import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.ImageUtils
-import com.hereliesaz.graffitixr.utils.Texture
 import java.io.IOException
-import java.nio.ByteBuffer
 import java.util.Collections
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -49,18 +45,21 @@ class ArRenderer(
     
     val slamManager = SlamManager()
 
+    // Exposed for MappingScreen to hook into frame updates
+    var onSessionUpdated: ((Session, Frame) -> Unit)? = null
+    var onAnchorCreated: ((Anchor) -> Unit)? = null
+
+    // Configuration flags
+    var showMiniMap = false
+    var showGuide = false
+
     private var viewWidth = 0
     private var viewHeight = 0
-
     private var isFlashlightOn = false
     private var captureNextFrame = false
     
-    // Layers to render
     private var layers: List<OverlayLayer> = emptyList()
-    
-    // Tap handling
     private val queuedTaps = Collections.synchronizedList(ArrayList<QueuedTap>())
-    var onAnchorCreated: ((Anchor) -> Unit)? = null
 
     data class QueuedTap(val x: Float, val y: Float)
 
@@ -96,7 +95,10 @@ class ArRenderer(
             val frame = session!!.update()
             val camera = frame.camera
 
-            handleTaps(frame, camera)
+            // Notify listeners (MappingScreen)
+            onSessionUpdated?.invoke(session!!, frame)
+
+            handleTaps(frame)
             handleCapture(frame)
 
             backgroundRenderer.draw(frame)
@@ -106,13 +108,11 @@ class ArRenderer(
             val viewmtx = FloatArray(16)
             camera.getViewMatrix(viewmtx, 0)
 
-            val cameraPose = camera.pose
             val trackingState = camera.trackingState
 
             if (trackingState == TrackingState.TRACKING) {
                 onTrackingFailure(null)
                 
-                // Plane Detection Logic
                 val hasPlanes = session!!.getAllTrackables(Plane::class.java).any { it.trackingState == TrackingState.TRACKING }
                 onPlanesDetected(hasPlanes)
                 
@@ -120,24 +120,14 @@ class ArRenderer(
                     planeRenderer.drawPlanes(session!!.getAllTrackables(Plane::class.java), camera.displayOrientedPose, projmtx)
                 }
 
-                // Render Layers
+                // Render Layers (Simplified)
                 layers.forEach { layer ->
-                    // Logic to render layer anchors...
-                    // Simplified for brevity, assumes layer has an anchor logic or similar
+                    // Rendering logic would go here
                 }
                 
-                // SLAM Process
-                // Pass camera image to SLAM
-                // Note: Acquiring image can be expensive, do it only if needed
-                // val image = frame.acquireCameraImage()
-                // slamManager.processFrame(...)
-                // image.close()
-                
-                // Update Native Camera
                 slamManager.updateCamera(viewmtx, projmtx)
                 slamManager.draw()
                 
-                // Update Progress (Example logic)
                 val points = slamManager.getPointCount()
                 if (points > 0) {
                     val progress = (points / 10000f).coerceAtMost(1.0f) * 100
@@ -153,7 +143,7 @@ class ArRenderer(
         }
     }
 
-    private fun handleTaps(frame: Frame, camera: com.google.ar.core.Camera) {
+    private fun handleTaps(frame: Frame) {
         synchronized(queuedTaps) {
             while (queuedTaps.isNotEmpty()) {
                 val tap = queuedTaps.removeAt(0)
@@ -189,6 +179,15 @@ class ArRenderer(
 
     fun queueTap(x: Float, y: Float) {
         queuedTaps.add(QueuedTap(x, y))
+    }
+    
+    // Allow manual anchor creation (used by MappingScreen)
+    fun createAnchor(pose: Pose): Anchor? {
+        val anchor = session?.createAnchor(pose)
+        if (anchor != null) {
+            onAnchorCreated?.invoke(anchor)
+        }
+        return anchor
     }
 
     fun onResume(context: Context) {
@@ -232,13 +231,7 @@ class ArRenderer(
 
     fun setFlashlight(on: Boolean) {
         isFlashlightOn = on
-        val config = session?.config ?: return
-        if (on) {
-            // config.flashMode = Config.FlashMode.TORCH // Requires ARCore dependency update if not available
-        } else {
-            // config.flashMode = Config.FlashMode.OFF
-        }
-        // session?.configure(config)
+        // Flashlight logic...
     }
 
     fun triggerCapture() {
@@ -250,7 +243,6 @@ class ArRenderer(
     }
     
     fun generateFingerprint(bitmap: Bitmap): Fingerprint? {
-        // Placeholder for fingerprint logic
         return null
     }
 }
