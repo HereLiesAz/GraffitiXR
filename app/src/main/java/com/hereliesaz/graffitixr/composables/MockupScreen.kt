@@ -43,19 +43,18 @@ fun MockupScreen(
     onBrightnessChanged: (Float) -> Unit,
     onContrastChanged: (Float) -> Unit,
     onSaturationChanged: (Float) -> Unit,
-    onScaleChanged: (Float) -> Unit,
-    onRotationZChanged: (Float) -> Unit,
-    onRotationXChanged: (Float) -> Unit,
-    onRotationYChanged: (Float) -> Unit,
-    onOffsetChanged: (Offset) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
-    onGestureEnd: () -> Unit
+    onGestureEnd: (Float, Offset, Float, Float, Float) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val currentUiState by rememberUpdatedState(uiState)
+
+    // Local State for smooth gestures (Active Layer)
+    val activeLayer = uiState.activeLayer
+    val transformState = rememberLayerTransformState(activeLayer)
 
     Box(modifier = Modifier.fillMaxSize()) {
         uiState.backgroundImageUri?.let {
@@ -82,21 +81,34 @@ fun MockupScreen(
                         getValidBounds = {
                             Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
                         },
-                        onGestureStart = onGestureStart,
-                        onGestureEnd = onGestureEnd
+                        onGestureStart = {
+                            transformState.isGesturing = true
+                            onGestureStart()
+                        },
+                        onGestureEnd = {
+                            transformState.isGesturing = false
+                            onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
+                        }
                     ) { _, pan, zoom, rotation ->
-                        onScaleChanged(zoom)
-                        onOffsetChanged(pan)
+                        transformState.scale *= zoom
+                        transformState.offset += pan
                         when (currentUiState.activeRotationAxis) {
-                            RotationAxis.X -> onRotationXChanged(rotation)
-                            RotationAxis.Y -> onRotationYChanged(rotation)
-                            RotationAxis.Z -> onRotationZChanged(rotation)
+                            RotationAxis.X -> transformState.rotationX += rotation
+                            RotationAxis.Y -> transformState.rotationY += rotation
+                            RotationAxis.Z -> transformState.rotationZ += rotation
                         }
                     }
                 }
         ) {
             uiState.layers.forEach { layer ->
                 if (layer.isVisible) {
+                    val isLayerActive = layer.id == activeLayer?.id
+                    val scale = if (isLayerActive) transformState.scale else layer.scale
+                    val offset = if (isLayerActive) transformState.offset else layer.offset
+                    val rotationX = if (isLayerActive) transformState.rotationX else layer.rotationX
+                    val rotationY = if (isLayerActive) transformState.rotationY else layer.rotationY
+                    val rotationZ = if (isLayerActive) transformState.rotationZ else layer.rotationZ
+
                     var layerBitmap by remember(layer.uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
 
                     LaunchedEffect(layer.uri) {
@@ -150,13 +162,13 @@ fun MockupScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
-                                    scaleX = layer.scale
-                                    scaleY = layer.scale
-                                    rotationX = layer.rotationX
-                                    rotationY = layer.rotationY
-                                    rotationZ = layer.rotationZ
-                                    translationX = layer.offset.x
-                                    translationY = layer.offset.y
+                                    scaleX = scale
+                                    scaleY = scale
+                                    this.rotationX = rotationX
+                                    this.rotationY = rotationY
+                                    this.rotationZ = rotationZ
+                                    translationX = offset.x
+                                    translationY = offset.y
                                 }
                         ) {
                             val xOffset = (size.width - bmp.width) / 2f
