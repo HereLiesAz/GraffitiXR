@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,14 +45,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun OverlayScreen(
     uiState: UiState,
-    onScaleChanged: (Float) -> Unit,
-    onOffsetChanged: (Offset) -> Unit,
-    onRotationZChanged: (Float) -> Unit,
-    onRotationXChanged: (Float) -> Unit,
-    onRotationYChanged: (Float) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
-    onGestureEnd: () -> Unit,
+    onGestureEnd: (Float, Offset, Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -64,11 +60,14 @@ fun OverlayScreen(
 
     // Resolve Active Layer
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
-    val scale = activeLayer?.scale ?: 1f
-    val offset = activeLayer?.offset ?: Offset.Zero
-    val rotationX = activeLayer?.rotationX ?: 0f
-    val rotationY = activeLayer?.rotationY ?: 0f
-    val rotationZ = activeLayer?.rotationZ ?: 0f
+
+    val transformState = rememberLayerTransformState(activeLayer)
+    val scale = transformState.scale
+    val offset = transformState.offset
+    val rotationX = transformState.rotationX
+    val rotationY = transformState.rotationY
+    val rotationZ = transformState.rotationZ
+
     val opacity = activeLayer?.opacity ?: 1f
     val blendMode = activeLayer?.blendMode ?: BlendMode.SrcOver
     val contrast = activeLayer?.contrast ?: 1f
@@ -195,28 +194,29 @@ fun OverlayScreen(
 
                         detectSmartOverlayGestures(
                             getValidBounds = {
-                                val state = currentUiState
-                                val currentLayer = state.layers.find { it.id == state.activeLayerId } ?: state.layers.firstOrNull()
-                                val currentScale = currentLayer?.scale ?: 1f
-                                val currentOffset = currentLayer?.offset ?: Offset.Zero
-
-                                val imgWidth = bmp.width * currentScale
-                                val imgHeight = bmp.height * currentScale
-                                val centerX = size.width / 2f + currentOffset.x
-                                val centerY = size.height / 2f + currentOffset.y
+                                val imgWidth = bmp.width * transformState.scale
+                                val imgHeight = bmp.height * transformState.scale
+                                val centerX = size.width / 2f + transformState.offset.x
+                                val centerY = size.height / 2f + transformState.offset.y
                                 val left = centerX - imgWidth / 2f
                                 val top = centerY - imgHeight / 2f
                                 Rect(left, top, left + imgWidth, top + imgHeight)
                             },
-                            onGestureStart = onGestureStart,
-                            onGestureEnd = onGestureEnd
+                            onGestureStart = {
+                                transformState.isGesturing = true
+                                onGestureStart()
+                            },
+                            onGestureEnd = {
+                                transformState.isGesturing = false
+                                onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
+                            }
                         ) { _, pan, zoom, rotation ->
-                            onScaleChanged(zoom)
-                            onOffsetChanged(pan)
+                            transformState.scale *= zoom
+                            transformState.offset += pan
                             when (currentUiState.activeRotationAxis) {
-                                RotationAxis.X -> onRotationXChanged(rotation)
-                                RotationAxis.Y -> onRotationYChanged(rotation)
-                                RotationAxis.Z -> onRotationZChanged(rotation)
+                                RotationAxis.X -> transformState.rotationX += rotation
+                                RotationAxis.Y -> transformState.rotationY += rotation
+                                RotationAxis.Z -> transformState.rotationZ += rotation
                             }
                         }
                     }
