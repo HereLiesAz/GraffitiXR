@@ -32,6 +32,7 @@ This document tracks the development status, future enhancements, and identified
     -   [x] Create `UnwarpScreen` with 4-point corner selection and magnifier loop.
     -   [x] Integrate OpenCV `getPerspectiveTransform` and `warpPerspective` for image rectification.
     -   [x] Add entry point in `TargetCreationOverlay`.
+    -   [x] **Fix Grid Capture:** Implemented frame capture logic in `ArRenderer` to fix "Start" button unresponsiveness.
 
 ## **V1.13 Guided Target Creation (Completed)**
 
