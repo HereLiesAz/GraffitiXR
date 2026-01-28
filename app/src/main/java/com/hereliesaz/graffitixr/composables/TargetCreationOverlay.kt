@@ -267,7 +267,7 @@ fun TargetCreationOverlay(
                 ) {
                     val icon = when(step) {
                          CaptureStep.GRID_CONFIG -> Icons.Default.Check
-                         CaptureStep.GUIDED_CAPTURE -> Icons.Default.CameraAlt
+                         CaptureStep.GUIDED_CAPTURE -> Icons.Default.Check // FIX: Checkmark to confirm drawing is done
                          CaptureStep.INSTRUCTION -> null // Uses text "START"
                          CaptureStep.PHOTO_SEQUENCE -> Icons.Default.CameraAlt
                          else -> Icons.Default.CameraAlt
