@@ -119,8 +119,7 @@ fun ArView(
         factory = { ctx ->
             android.opengl.GLSurfaceView(ctx).apply {
                 preserveEGLContextOnPause = true
-                setEGLContextClientVersion(3)
-                // Standard configuration for ARCore
+                setEGLContextClientVersion(2) // Reverting to 2 for best compatibility with external textures
                 setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                 setRenderer(arRenderer)
                 renderMode = android.opengl.GLSurfaceView.RENDERMODE_CONTINUOUSLY
@@ -128,7 +127,6 @@ fun ArView(
             }
         },
         update = {
-            // Update reference if view is re-used/re-created
             glSurfaceViewRef = it
         },
         modifier = Modifier.pointerInput(Unit) {

@@ -118,9 +118,6 @@ class BackgroundRenderer {
         GLES20.glDisableVertexAttribArray(quadTexCoordParam)
         GLES20.glDepthMask(true)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
-        
-        GLES20.glUseProgram(0)
-        GLES20.glBindTexture(textureTarget, 0)
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {
@@ -147,24 +144,23 @@ class BackgroundRenderer {
             1.0f, 1.0f, 0.0f
         )
 
-        private const val VERTEX_SHADER = """#version 300 es
-            in vec4 a_Position;
-            in vec2 a_TexCoord;
-            out vec2 v_TexCoord;
+        private const val VERTEX_SHADER = """
+            attribute vec4 a_Position;
+            attribute vec2 a_TexCoord;
+            varying vec2 v_TexCoord;
             void main() {
                gl_Position = a_Position;
                v_TexCoord = a_TexCoord;
             }
         """
 
-        private const val FRAGMENT_SHADER = """#version 300 es
-            #extension GL_OES_EGL_image_external_essl3 : require
-            precision highp float;
-            in vec2 v_TexCoord;
+        private const val FRAGMENT_SHADER = """
+            #extension GL_OES_EGL_image_external : require
+            precision mediump float;
+            varying vec2 v_TexCoord;
             uniform samplerExternalOES u_Texture;
-            out vec4 fragColor;
             void main() {
-                fragColor = texture(u_Texture, v_TexCoord);
+                gl_FragColor = texture2D(u_Texture, v_TexCoord);
             }
         """
     }
