@@ -87,7 +87,7 @@ object ImageUtils {
         val dyBot = p2.y - p3.y
         val widthBot = Math.hypot(dxBot, dyBot)
 
-        val maxWidth = max(widthTop, widthBot).toInt()
+        val maxWidth = max(widthTop, widthBot)
 
         val dxLeft = p3.x - p0.x
         val dyLeft = p3.y - p0.y
@@ -97,7 +97,7 @@ object ImageUtils {
         val dyRight = p2.y - p1.y
         val heightRight = Math.hypot(dxRight, dyRight)
 
-        val maxHeight = max(heightLeft, heightRight).toInt()
+        val maxHeight = max(heightLeft, heightRight)
 
         if (maxWidth <= 0 || maxHeight <= 0) {
             srcMat.release()
@@ -108,17 +108,17 @@ object ImageUtils {
 
         val dst = MatOfPoint2f(
             Point(0.0, 0.0),
-            Point(maxWidth.toDouble(), 0.0),
-            Point(maxWidth.toDouble(), maxHeight.toDouble),
-            Point(0.0, maxHeight.toDouble)
+            Point(maxWidth, 0.0),
+            Point(maxWidth, maxHeight),
+            Point(0.0, maxHeight)
         )
 
         val transform = Imgproc.getPerspectiveTransform(src, dst)
-        val dstMat = Mat(Size(maxWidth.toDouble(), maxHeight.toDouble), srcMat.type())
+        val dstMat = Mat(Size(maxWidth, maxHeight), srcMat.type())
 
         Imgproc.warpPerspective(srcMat, dstMat, transform, dstMat.size())
 
-        val output = Bitmap.createBitmap(maxWidth, maxHeight, Bitmap.Config.ARGB_8888)
+        val output = Bitmap.createBitmap(maxWidth.toInt(), maxHeight.toInt(), Bitmap.Config.ARGB_8888)
         OpenCVUtils.matToBitmap(dstMat, output)
 
         srcMat.release()
