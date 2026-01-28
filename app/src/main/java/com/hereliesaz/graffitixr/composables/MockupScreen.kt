@@ -54,7 +54,7 @@ fun MockupScreen(
     val currentUiState by rememberUpdatedState(uiState)
 
     // Local State for smooth gestures (Active Layer)
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+    val activeLayer = uiState.activeLayer
     val transformState = rememberLayerTransformState(activeLayer)
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -103,7 +103,7 @@ fun MockupScreen(
         ) {
             uiState.layers.forEach { layer ->
                 if (layer.isVisible) {
-                    val isLayerActive = layer.id == uiState.activeLayerId
+                    val isLayerActive = layer.id == activeLayer?.id
                     val scale = if (isLayerActive) transformState.scale else layer.scale
                     val offset = if (isLayerActive) transformState.offset else layer.offset
                     val rotationX = if (isLayerActive) transformState.rotationX else layer.rotationX

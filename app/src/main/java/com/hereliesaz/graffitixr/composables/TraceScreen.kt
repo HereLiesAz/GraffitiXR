@@ -51,7 +51,7 @@ fun TraceScreen(
     val currentUiState by rememberUpdatedState(uiState)
 
     // Resolve Active Layer
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
+    val activeLayer = uiState.activeLayer
 
     val transformState = rememberLayerTransformState(activeLayer)
     val scale = transformState.scale

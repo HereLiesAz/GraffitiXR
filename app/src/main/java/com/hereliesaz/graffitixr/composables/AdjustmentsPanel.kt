@@ -56,8 +56,8 @@ fun AdjustmentsPanel(
     if (!isVisible) return
 
     // Layout Constants matching the project's UI design system
-    val portraitBottomKeepoutPercentage = 0.1f
-    val landscapeBottomPadding = 32.dp
+    val portraitBottomKeepoutPercentage = 0.0f
+    val landscapeBottomPadding = 16.dp
     val landscapeStartPadding = 80.dp
     val portraitStartPadding = 0.dp
     

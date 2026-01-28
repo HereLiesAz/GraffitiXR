@@ -79,4 +79,7 @@ data class UiState(
     // Updates
     val updateStatusMessage: String? = null,
     val isCheckingForUpdate: Boolean = false
-)
+) {
+    val activeLayer: OverlayLayer?
+        get() = layers.find { it.id == activeLayerId } ?: layers.firstOrNull()
+}
