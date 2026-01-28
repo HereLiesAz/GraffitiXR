@@ -21,6 +21,7 @@ import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.data.RefinementPath
 import com.hereliesaz.graffitixr.data.SensorData
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
+import com.hereliesaz.graffitixr.utils.GuideGenerator
 import com.hereliesaz.graffitixr.utils.ImageProcessingUtils
 import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.ProjectManager
@@ -250,14 +251,37 @@ class MainViewModel @JvmOverloads constructor(
     fun onCycleRotationAxis() = _uiState.update { s -> val n = when(s.activeRotationAxis){ RotationAxis.X->RotationAxis.Y; RotationAxis.Y->RotationAxis.Z; RotationAxis.Z->RotationAxis.X }; s.copy(activeRotationAxis=n, showRotationAxisFeedback=true) }
 
     fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
+    
     fun onCaptureShutterClicked() {
         val step = _uiState.value.captureStep
         if (step == CaptureStep.GRID_CONFIG) {
+            // FIX: Generate the Grid Overlay and move to drawing phase
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLoading = true) }
+                val rows = _uiState.value.gridRows
+                val cols = _uiState.value.gridCols
+                val bitmap = GuideGenerator.generateGrid(rows, cols)
+                val uri = withContext(Dispatchers.IO) {
+                    ImageUtils.saveBitmapToCache(getApplication(), bitmap)
+                }
+                val layer = OverlayLayer(uri = uri, name = "Grid Guide", opacity = 0.8f)
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        layers = it.layers + layer,
+                        activeLayerId = layer.id,
+                        captureStep = CaptureStep.GUIDED_CAPTURE // Go to drawing step
+                    ) 
+                }
+            }
+        } else if (step == CaptureStep.GUIDED_CAPTURE) {
+            // FIX: Done drawing, move to scanning instructions
             _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
         } else {
             viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
         }
     }
+
     fun saveCapturedBitmap(b: Bitmap) {
         _uiState.update { state ->
             val isMultiImage = state.captureStep == CaptureStep.PHOTO_SEQUENCE ||
@@ -331,15 +355,8 @@ class MainViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, currentProjectId = currentProjectId) }
             val context = getApplication<Application>()
-            
-            // Trigger a capture for the thumbnail via event
             _captureEvent.send(CaptureEvent.RequestCapture)
-            
-            // Note: Actual saving often waits for the thumbnail capture. 
-            // In this architecture, autoSaveProject handles the actual write.
-            // We force it here.
             projectManager.saveProject(context, _uiState.value, currentProjectId, null)
-            
             _uiState.update { it.copy(isLoading = false) }
             _feedbackEvent.send(FeedbackEvent.Toast("Project saved successfully"))
         }
@@ -352,7 +369,6 @@ class MainViewModel @JvmOverloads constructor(
             try {
                 val context = getApplication<Application>()
                 withContext(Dispatchers.IO) {
-                    // FIX: Corrected method name to match ProjectManager.kt
                     projectManager.exportProjectToUri(context, currentProjectId, u)
                 }
                 _feedbackEvent.send(FeedbackEvent.Toast("Project exported"))
@@ -375,9 +391,6 @@ class MainViewModel @JvmOverloads constructor(
     
     fun onProgressUpdate(p: Float, b: Bitmap?) {
         _uiState.update { it.copy(progressPercentage = p) }
-        if (b != null) {
-            // Save evolution image logic here if needed
-        }
     }
     
     fun onTrackingFailure(m: String?) {}
@@ -386,7 +399,6 @@ class MainViewModel @JvmOverloads constructor(
     fun finalizeMap() {
         val pid = _uiState.value.currentProjectId ?: return
         viewModelScope.launch {
-            // FIX: This method now exists in ProjectManager.kt
             val path = projectManager.getMapPath(getApplication(), pid)
             arRenderer?.slamManager?.saveWorld(path)
             _feedbackEvent.send(FeedbackEvent.Toast("Map finalized and saved"))
@@ -401,11 +413,40 @@ class MainViewModel @JvmOverloads constructor(
     fun onGestureStart() {}
     fun onGestureEnd() { snapshotState() }
     fun onRefineTargetToggled() {}
+    
     fun onTargetCreationMethodSelected(m: TargetCreationMode) {
-        val next = when (m) { TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG; TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1; else -> CaptureStep.INSTRUCTION }
-        if(m==TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening()
-        _uiState.update { it.copy(targetCreationMode = m, captureStep = next, calibrationSnapshots = emptyList()) }
+        val next = when (m) { 
+            TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
+            // FIX: Guided Points goes straight to drawing
+            TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
+            TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1
+            else -> CaptureStep.INSTRUCTION 
+        }
+        
+        if (m == TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening()
+        
+        if (m == TargetCreationMode.GUIDED_POINTS) {
+            // FIX: Generate Guide Points Overlay immediately
+            viewModelScope.launch {
+                val bitmap = GuideGenerator.generateFourXs()
+                val uri = withContext(Dispatchers.IO) {
+                    ImageUtils.saveBitmapToCache(getApplication(), bitmap)
+                }
+                val layer = OverlayLayer(uri = uri, name = "Guide Points", opacity = 0.8f)
+                _uiState.update { 
+                    it.copy(
+                        targetCreationMode = m,
+                        layers = it.layers + layer,
+                        activeLayerId = layer.id,
+                        captureStep = CaptureStep.GUIDED_CAPTURE
+                    ) 
+                }
+            }
+        } else {
+            _uiState.update { it.copy(targetCreationMode = m, captureStep = next, calibrationSnapshots = emptyList()) }
+        }
     }
+    
     fun onGridConfigChanged(r: Int, c: Int) = _uiState.update { it.copy(gridRows = r, gridCols = c) }
     fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
     fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
