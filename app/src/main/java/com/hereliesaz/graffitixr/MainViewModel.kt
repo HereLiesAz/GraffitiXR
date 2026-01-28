@@ -34,8 +34,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
-import kotlin.random.Random
 import kotlin.math.abs
+import kotlin.random.Random
 
 class MainViewModel @JvmOverloads constructor(
     application: Application,
@@ -61,9 +61,7 @@ class MainViewModel @JvmOverloads constructor(
     private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
     val artworkBounds = _artworkBounds.asStateFlow()
 
-    // REMOVED: var arRenderer: ArRenderer? = null (Memory Leak)
-
-    // Sensor Logic for Automatic Calibration
+    // Sensor Logic
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private var currentSensorData: SensorData? = null
     private var isSensorListening = false
@@ -101,7 +99,7 @@ class MainViewModel @JvmOverloads constructor(
                     if (isStable) {
                         if (stableStartTime == 0L) stableStartTime = now
                         else if (now - stableStartTime > 2000) {
-                            // EVENT-BASED: Request calibration instead of direct call
+                            // Event-based trigger for UI to capture pose
                             viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCalibration) }
                             stableStartTime = 0L
                             lastRotationVector = null
@@ -154,6 +152,7 @@ class MainViewModel @JvmOverloads constructor(
         layer.copy(blendMode = ImageUtils.getNextBlendMode(layer.blendMode))
     }
 
+    // UPDATED: Now requires context passed in
     fun onRemoveBackgroundClicked(context: Context) {
         val activeId = _uiState.value.activeLayerId ?: return
         viewModelScope.launch {
@@ -192,6 +191,7 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
+    // UPDATED: Now requires context passed in
     fun onLineDrawingClicked(context: Context) {
         val activeId = _uiState.value.activeLayerId ?: return
         viewModelScope.launch {
@@ -222,9 +222,8 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    // ... (Standard layer manipulations omitted for brevity but assumed present) ...
     fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
-    fun onLayerRenamed(id: String, name: String) = _uiState.update { s -> s.copy(layers = s.layers.map { if(it.id==id) it.copy(name=name) else it }) }
+    fun onLayerRenamed(id: String, name: String) = _uiState.update { s -> s.copy(layers = s.layers.map { if (it.id == id) it.copy(name = name) else it }) }
     fun onLayerReordered(newOrder: List<String>) { snapshotState(); val map = _uiState.value.layers.associateBy { it.id }; _uiState.update { it.copy(layers = newOrder.mapNotNull { map[it] }) } }
     fun copyLayerModifications(id: String) { layerModsClipboard = _uiState.value.layers.find { it.id == id }; viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) } }
     fun pasteLayerModifications(id: String) { layerModsClipboard?.let { t -> updateActiveLayer(true) { it.copy(opacity=t.opacity, brightness=t.brightness, contrast=t.contrast, saturation=t.saturation, colorBalanceR=t.colorBalanceR, colorBalanceG=t.colorBalanceG, colorBalanceB=t.colorBalanceB, scale=t.scale, rotationX=t.rotationX, rotationY=t.rotationY, rotationZ=t.rotationZ, blendMode=t.blendMode) }; viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateDouble) } } }
@@ -250,43 +249,48 @@ class MainViewModel @JvmOverloads constructor(
 
     fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
 
+    // FIXED: Correct logic for advancing steps
     fun onCaptureShutterClicked() {
         val step = _uiState.value.captureStep
+        val mode = _uiState.value.targetCreationMode
+
         when (step) {
             CaptureStep.GRID_CONFIG -> {
-                // Config done, show instructions
+                // Done configuring grid -> Go to instruction
                 _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
             }
             CaptureStep.INSTRUCTION -> {
-                // FIXED: Start Button Pressed -> Move to Capture Phase
-                // Do not capture immediately; transition to the sequence.
-                val nextStep = if (_uiState.value.targetCreationMode == TargetCreationMode.CAPTURE || 
-                                   _uiState.value.targetCreationMode == TargetCreationMode.RECTIFY) {
-                    CaptureStep.FRONT 
-                } else {
-                    CaptureStep.PHOTO_SEQUENCE
+                // "START" button pressed. Transition to the capture phase based on mode.
+                val nextStep = when (mode) {
+                    TargetCreationMode.GUIDED_GRID, TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
+                    TargetCreationMode.RECTIFY -> CaptureStep.FRONT
+                    TargetCreationMode.CAPTURE -> CaptureStep.PHOTO_SEQUENCE
+                    else -> CaptureStep.PHOTO_SEQUENCE
                 }
                 _uiState.update { it.copy(captureStep = nextStep) }
             }
             else -> {
-                // For all other steps (FRONT, PHOTO_SEQUENCE, etc), actually capture.
+                // For all other phases (Actual capture), take the photo.
                 viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
             }
         }
     }
 
+    // FIXED: Advance state based on step, not just "isMultiImage"
     fun saveCapturedBitmap(b: Bitmap) {
         _uiState.update { state ->
-            val isMultiImage = state.captureStep == CaptureStep.PHOTO_SEQUENCE ||
-                               state.targetCreationMode == TargetCreationMode.GUIDED_GRID ||
-                               state.targetCreationMode == TargetCreationMode.MULTI_POINT
-
-            val newImages = if (isMultiImage) state.capturedTargetImages + b else listOf(b)
+            val newImages = state.capturedTargetImages + b
             
-            // If single image mode, go to Review. If multi, stay on current step.
-            val newStep = if (isMultiImage) state.captureStep else CaptureStep.REVIEW
+            val nextStep = when (state.captureStep) {
+                // Single shot modes
+                CaptureStep.FRONT -> CaptureStep.RECTIFY
+                CaptureStep.GUIDED_CAPTURE -> CaptureStep.REVIEW // Assuming grid is single shot
+                // Multi shot modes (stay on step)
+                CaptureStep.PHOTO_SEQUENCE -> CaptureStep.PHOTO_SEQUENCE
+                else -> CaptureStep.REVIEW
+            }
 
-            state.copy(capturedTargetImages = newImages, captureStep = newStep)
+            state.copy(capturedTargetImages = newImages, captureStep = nextStep)
         }
     }
 
@@ -376,7 +380,7 @@ class MainViewModel @JvmOverloads constructor(
     fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
     fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
     
-    // UPDATED: Now receives the Pose Matrix from UI/Renderer
+    // UPDATED: Takes pose matrix from event, not renderer member
     fun onCalibrationPointCaptured(poseMatrix: FloatArray? = null) {
         val snapshot = CalibrationSnapshot(
             gpsData = _uiState.value.gpsData,
