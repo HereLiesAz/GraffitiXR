@@ -18,6 +18,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
@@ -295,7 +297,6 @@ fun EditorContent(
         if (uiState.isMarkingProgress) DrawingCanvas(uiState.drawingPaths, viewModel::onDrawingPathFinished)
 
         Box(Modifier.fillMaxSize().padding(bottom = bottomSafePadding).zIndex(2f), contentAlignment = Alignment.BottomCenter) {
-            // Fix: explicit receiver for maxHeight
             AdjustmentsPanel(uiState, showSliderDialog == "Adjust", showColorBalanceDialog, isLandscape, this@BoxWithConstraints.maxHeight, onOpacityChange, onBrightnessChange, onContrastChange, onSaturationChange, onColorBalanceRChange, onColorBalanceGChange, onColorBalanceBChange, onUndo, onRedo, onMagicAlign)
         }
         uiState.showOnboardingDialogForMode?.let { mode -> OnboardingDialog(mode) { onOnboardingComplete(mode) } }
@@ -321,7 +322,6 @@ private fun MainContentLayer(uiState: UiState, viewModel: MainViewModel, gesture
         val onEnd: () -> Unit = { viewModel.onGestureEnd(); onGestureToggle(false) }
 
         when (uiState.editorMode) {
-            // FIX: Using Named Arguments to strictly enforce parameter order
             STATIC -> MockupScreen(
                 uiState = uiState,
                 onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
@@ -351,9 +351,31 @@ private fun MainContentLayer(uiState: UiState, viewModel: MainViewModel, gesture
                 onGestureStart = onStart,
                 onGestureEnd = onEnd
             )
-            // OverlayScreen uses correct order already (Scale, Offset, Rot...)
             OVERLAY -> OverlayScreen(uiState, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
-            AR -> ArView(viewModel, uiState)
+            AR -> {
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, rotation ->
+                                if (!gestureInProgress) onStart()
+                                if (zoom != 1f) onScale(zoom)
+                                if (rotation != 0f) onRotZ(rotation)
+                                if (pan != Offset.Zero) onOffset(pan)
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            forEachGesture {
+                                awaitPointerEventScope {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    val up = waitForUpOrCancellation()
+                                    if (up != null) onEnd()
+                                }
+                            }
+                        }
+                ) {
+                    ArView(viewModel, uiState)
+                }
+            }
             CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(uiState, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
             PROJECT -> Box(Modifier.fillMaxSize().background(Color.Black))
         }
