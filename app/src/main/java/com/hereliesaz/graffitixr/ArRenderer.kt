@@ -23,6 +23,7 @@ import com.hereliesaz.graffitixr.rendering.ProjectedImageRenderer
 import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.ImageUtils
+import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import java.io.IOException
 import java.util.Collections
 import javax.microedition.khronos.egl.EGLConfig
@@ -43,13 +44,15 @@ class ArRenderer(
     private val planeRenderer = PlaneRenderer()
     private val imageRenderer = ProjectedImageRenderer()
     
+    // FIX: Use YuvToRgbConverter instance instead of missing static ImageUtils method
+    private val yuvConverter = YuvToRgbConverter(context)
+    private var captureBitmap: Bitmap? = null
+    
     val slamManager = SlamManager()
 
-    // Exposed for MappingScreen to hook into frame updates
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var onAnchorCreated: ((Anchor) -> Unit)? = null
 
-    // Configuration flags
     var showMiniMap = false
     var showGuide = false
 
@@ -66,9 +69,10 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         try {
-            backgroundRenderer.createOnGlThread(context)
-            planeRenderer.createOnGlThread(context, "models/trigrid.png")
-            imageRenderer.createOnGlThread(context)
+            // FIX: Removed arguments to match your renderer classes
+            backgroundRenderer.createOnGlThread()
+            planeRenderer.createOnGlThread() 
+            imageRenderer.createOnGlThread()
             slamManager.initNative()
         } catch (e: IOException) {
             e.printStackTrace()
@@ -95,7 +99,6 @@ class ArRenderer(
             val frame = session!!.update()
             val camera = frame.camera
 
-            // Notify listeners (MappingScreen)
             onSessionUpdated?.invoke(session!!, frame)
 
             handleTaps(frame)
@@ -117,12 +120,16 @@ class ArRenderer(
                 onPlanesDetected(hasPlanes)
                 
                 if (hasPlanes) {
-                    planeRenderer.drawPlanes(session!!.getAllTrackables(Plane::class.java), camera.displayOrientedPose, projmtx)
+                    // FIX: Passed viewmtx (FloatArray) instead of Pose object
+                    planeRenderer.drawPlanes(
+                        session!!.getAllTrackables(Plane::class.java), 
+                        viewmtx, 
+                        projmtx
+                    )
                 }
 
-                // Render Layers (Simplified)
                 layers.forEach { layer ->
-                    // Rendering logic would go here
+                    // Layer rendering logic...
                 }
                 
                 slamManager.updateCamera(viewmtx, projmtx)
@@ -164,9 +171,17 @@ class ArRenderer(
             captureNextFrame = false
             try {
                 val image = frame.acquireCameraImage()
-                val bitmap = ImageUtils.yuvToRgb(image, context)
+                // FIX: Use YuvToRgbConverter
+                if (captureBitmap == null || captureBitmap?.width != image.width || captureBitmap?.height != image.height) {
+                    captureBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                }
+                
+                captureBitmap?.let { bmp ->
+                    yuvConverter.yuvToRgb(image, bmp)
+                    onFrameCaptured(bmp) // Pass a copy if needed, or consume immediately
+                }
+                
                 image.close()
-                onFrameCaptured(bitmap)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -181,7 +196,6 @@ class ArRenderer(
         queuedTaps.add(QueuedTap(x, y))
     }
     
-    // Allow manual anchor creation (used by MappingScreen)
     fun createAnchor(pose: Pose): Anchor? {
         val anchor = session?.createAnchor(pose)
         if (anchor != null) {
@@ -231,6 +245,7 @@ class ArRenderer(
 
     fun setFlashlight(on: Boolean) {
         isFlashlightOn = on
+        val config = session?.config ?: return
         // Flashlight logic...
     }
 
