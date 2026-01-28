@@ -7,10 +7,15 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.HashMap
 
+/**
+ * Renders the raw ARCore feature points.
+ * - Point Size: 15.0f (Restored)
+ * - Color: Confidence-based gradient (Cyan -> Pink -> Green)
+ * - Shape: Circular (Restored)
+ */
 class PointCloudRenderer {
     private val TAG = "PointCloudRenderer"
 
-    // Raw string to prevent shader string crashes
     private val vertexShaderCode = """
         uniform mat4 u_MvpMatrix;
         uniform float u_PointSize;
@@ -27,7 +32,6 @@ class PointCloudRenderer {
         precision mediump float;
         varying float v_Confidence;
         void main() {
-            // RESTORED: Circle logic (ball shape)
             vec2 coord = gl_PointCoord - vec2(0.5);
             if (length(coord) > 0.5) discard;
             
@@ -131,7 +135,7 @@ class PointCloudRenderer {
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
 
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
-        GLES20.glUniform1f(pointSizeHandle, 15.0f) // RESTORED: Large size
+        GLES20.glUniform1f(pointSizeHandle, 15.0f) // RESTORED: Large size as requested
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         GLES20.glVertexAttribPointer(positionHandle, 4, GLES20.GL_FLOAT, false, 16, 0)
