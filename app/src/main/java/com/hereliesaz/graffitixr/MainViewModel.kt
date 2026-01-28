@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -246,7 +247,6 @@ class MainViewModel @JvmOverloads constructor(
 
     fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
 
-    // FIXED: Correct logic for advancing steps from INSTRUCTION
     fun onCaptureShutterClicked() {
         val step = _uiState.value.captureStep
         val mode = _uiState.value.targetCreationMode
@@ -256,7 +256,6 @@ class MainViewModel @JvmOverloads constructor(
                 _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
             }
             CaptureStep.INSTRUCTION -> {
-                // Transition to capture phase instead of taking immediate photo
                 val nextStep = when (mode) {
                     TargetCreationMode.GUIDED_GRID, TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
                     TargetCreationMode.RECTIFY -> CaptureStep.FRONT
@@ -271,18 +270,15 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    // FIXED: Advance state based on step type
     fun saveCapturedBitmap(b: Bitmap) {
         _uiState.update { state ->
             val newImages = state.capturedTargetImages + b
-            
             val nextStep = when (state.captureStep) {
                 CaptureStep.FRONT -> CaptureStep.RECTIFY
                 CaptureStep.GUIDED_CAPTURE -> CaptureStep.REVIEW
-                CaptureStep.PHOTO_SEQUENCE -> CaptureStep.PHOTO_SEQUENCE // Stay until "Done"
+                CaptureStep.PHOTO_SEQUENCE -> CaptureStep.PHOTO_SEQUENCE 
                 else -> CaptureStep.REVIEW
             }
-
             state.copy(capturedTargetImages = newImages, captureStep = nextStep)
         }
     }
@@ -357,7 +353,27 @@ class MainViewModel @JvmOverloads constructor(
     fun updateMappingScore(s: Float) = _uiState.update { it.copy(mappingQualityScore = s) }
     fun finalizeMap() {}
     fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
-    fun onOverlayImageSelected(u: Uri) { val l = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}"); _uiState.update { it.copy(layers = it.layers + l, activeLayerId = l.id, overlayImageUri = u) } }
+    
+    // UPDATED: Calculate aspect ratio on load
+    fun onOverlayImageSelected(u: Uri) { 
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            var ratio = 1.0f
+            try {
+                context.contentResolver.openInputStream(u)?.use { stream ->
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeStream(stream, null, options)
+                    if (options.outWidth > 0 && options.outHeight > 0) {
+                        ratio = options.outWidth.toFloat() / options.outHeight.toFloat()
+                    }
+                }
+            } catch (e: Exception) { e.printStackTrace() }
+
+            val l = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}", aspectRatio = ratio)
+            _uiState.update { it.copy(layers = it.layers + l, activeLayerId = l.id, overlayImageUri = u) } 
+        }
+    }
+    
     fun onBackgroundImageSelected(u: Uri) = _uiState.update { it.copy(backgroundImageUri = u) }
     fun onImagePickerShown() {}
     fun onDoubleTapHintDismissed() {}
@@ -373,7 +389,6 @@ class MainViewModel @JvmOverloads constructor(
     fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
     fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
     
-    // UPDATED: Takes pose matrix from event, not renderer member
     fun onCalibrationPointCaptured(poseMatrix: FloatArray? = null) {
         val snapshot = CalibrationSnapshot(
             gpsData = _uiState.value.gpsData,
