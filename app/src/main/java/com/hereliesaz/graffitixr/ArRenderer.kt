@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.opengl.GLES20
+import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
@@ -86,7 +87,13 @@ class ArRenderer(
     )
 
     private val queuedTaps = java.util.concurrent.ArrayBlockingQueue<android.graphics.PointF>(16)
+    
+    // PBO State for Async Capture
+    private var pboId = 0
+    private var pboBuffer: ByteBuffer? = null
+    private var isPboInitialized = false
     private var captureNextFrame = false
+    
     var showMiniMap = false
     var showGuide = true
 
@@ -142,8 +149,19 @@ class ArRenderer(
     }
 
     fun cleanup() {
+        // FIX: Race Condition. Stop native engine BEFORE deleting textures.
+        slamManager.destroyNative() 
+        
         session?.close()
         session = null
+        
+        // Cleanup PBO
+        if (pboId != 0) {
+            val buffers = IntArray(1) { pboId }
+            GLES20.glDeleteBuffers(1, buffers, 0)
+            pboId = 0
+        }
+
         layerRenderers.values.forEach { layer ->
             if (layer.textureId != 0) {
                 val tex = IntArray(1) { layer.textureId }
@@ -168,6 +186,14 @@ class ArRenderer(
         viewportHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
         GLES20.glViewport(0, 0, width, height)
+        
+        // Reset PBO on resize
+        isPboInitialized = false
+        if (pboId != 0) {
+            val buffers = IntArray(1) { pboId }
+            GLES20.glDeleteBuffers(1, buffers, 0)
+            pboId = 0
+        }
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -269,8 +295,6 @@ class ArRenderer(
                 if (layerData.isVisible && layerData.textureId != 0) {
                     val modelMatrix = FloatArray(16)
                     Matrix.multiplyMM(modelMatrix, 0, anchorMatrix, 0, getLayerTransform(layerData), 0)
-                    
-                    // ASPECT RATIO FIX: Scale X by ratio
                     Matrix.scaleM(modelMatrix, 0, layerData.aspectRatio, 1.0f, 1.0f)
 
                     simpleQuadRenderer.draw(
