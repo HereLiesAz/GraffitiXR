@@ -1,3 +1,7 @@
+{
+type: created file
+fileName: app/src/main/java/com/hereliesaz/graffitixr/MainViewModel.kt
+fullContent:
 package com.hereliesaz.graffitixr
 
 import android.app.Application
@@ -63,7 +67,8 @@ class MainViewModel @JvmOverloads constructor(
     private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
     val artworkBounds = _artworkBounds.asStateFlow()
 
-    var arRenderer: ArRenderer? = null
+    // FIX: Removed arRenderer reference to prevent memory leak
+    // var arRenderer: ArRenderer? = null
 
     // Sensor Logic
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -268,7 +273,6 @@ class MainViewModel @JvmOverloads constructor(
     fun onCaptureShutterClicked() {
         val step = _uiState.value.captureStep
         if (step == CaptureStep.GRID_CONFIG) {
-            // FIX: Generate the Grid Overlay and move to drawing phase
             viewModelScope.launch {
                 _uiState.update { it.copy(isLoading = true) }
                 val rows = _uiState.value.gridRows
@@ -288,7 +292,6 @@ class MainViewModel @JvmOverloads constructor(
                 }
             }
         } else if (step == CaptureStep.GUIDED_CAPTURE) {
-            // FIX: Done drawing, move to scanning instructions
             _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
         } else {
             viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
@@ -413,8 +416,10 @@ class MainViewModel @JvmOverloads constructor(
         val pid = _uiState.value.currentProjectId ?: return
         viewModelScope.launch {
             val path = projectManager.getMapPath(getApplication(), pid)
-            arRenderer?.slamManager?.saveWorld(path)
-            _feedbackEvent.send(FeedbackEvent.Toast("Map finalized and saved"))
+            // FIX: Replaced direct renderer call with event
+            _captureEvent.send(CaptureEvent.RequestMapSave(path))
+            // _feedbackEvent.send(FeedbackEvent.Toast("Map finalized and saved"))
+            // Feedback is now handled after save
         }
     }
     
@@ -430,7 +435,6 @@ class MainViewModel @JvmOverloads constructor(
     fun onTargetCreationMethodSelected(m: TargetCreationMode) {
         val next = when (m) { 
             TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
-            // FIX: Guided Points goes straight to drawing
             TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
             TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1
             else -> CaptureStep.INSTRUCTION 
@@ -439,7 +443,6 @@ class MainViewModel @JvmOverloads constructor(
         if (m == TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening()
         
         if (m == TargetCreationMode.GUIDED_POINTS) {
-            // FIX: Generate Guide Points Overlay immediately
             viewModelScope.launch {
                 val bitmap = GuideGenerator.generateFourXs()
                 val uri = withContext(Dispatchers.IO) {
