@@ -20,7 +20,14 @@ class MappingActivity : ComponentActivity() {
         setContent {
             GraffitiXRTheme {
                 MappingScreen(
-                    onBackClicked = { finish() },
+                    // FIX: Provide missing callbacks
+                    onMapSaved = { mapId -> 
+                        runOnUiThread {
+                            Toast.makeText(this, "Map Saved: $mapId", Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
+                    },
+                    onExit = { finish() },
                     onRendererCreated = { renderer ->
                         arRenderer = renderer
                     }
