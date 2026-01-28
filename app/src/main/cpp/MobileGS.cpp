@@ -1,3 +1,7 @@
+{
+type: created file
+fileName: app/src/main/cpp/MobileGS.cpp
+fullContent:
 #include "MobileGS.h"
 #include <algorithm>
 #include <android/log.h>
@@ -241,8 +245,11 @@ void MobileGS::compileShaders() {
     glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
-    // Stride is 8 floats: Pos(3) + Color(3) + Scale(1) + Opacity(1)
-    int stride = 8 * sizeof(float);
+    // FIX: Stride is sizeof(SplatGaussian) to account for the timestamp field at the end
+    // Position (3) + Color (3) + Scale (1) + Opacity (1) = 8 floats (32 bytes)
+    // + creationTime (8 bytes) = 40 bytes stride
+    int stride = sizeof(SplatGaussian);
+    
     for(int i=0; i<4; ++i) {
         glEnableVertexAttribArray(i);
         int size = (i == 0 || i == 1) ? 3 : 1;
@@ -327,7 +334,7 @@ void MobileGS::draw() {
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, &camPos[0]);
 
     // Update Instance Buffer
-    // Note: We upload the custom struct but GL ignores the 'creationTime' because we set stride=8 floats
+    // Note: We upload the custom struct. GL ignores the 'creationTime' because of the stride.
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
     {
         std::lock_guard<std::mutex> lock(mDataMutex);
@@ -347,21 +354,18 @@ void MobileGS::clear() {
 }
 
 bool MobileGS::saveModel(const std::string& path) {
-    // FIX: Async Save to prevent UI freeze (Fix #4)
-    // We launch a detached thread so the UI thread returns immediately.
-    // Note: This means 'true' only indicates "Save Started", not "Save Completed".
-    std::thread([this, path]() {
-        std::lock_guard<std::mutex> lock(mDataMutex);
-        std::ofstream out(path, std::ios::binary);
-        if (!out) {
-            LOGE("Failed to open file for saving: %s", path.c_str());
-            return;
-        }
-        size_t count = mRenderGaussians.size();
-        out.write(reinterpret_cast<const char*>(&count), sizeof(count));
-        if (count > 0) out.write(reinterpret_cast<const char*>(mRenderGaussians.data()), (std::streamsize)(count * sizeof(SplatGaussian)));
-        LOGI("Saved %zu points to %s", count, path.c_str());
-    }).detach();
+    // FIX: Removed unsafe detached thread.
+    // This is now synchronous. The caller (Kotlin) must invoke this from a background thread (Dispatchers.IO).
+    std::lock_guard<std::mutex> lock(mDataMutex);
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        LOGE("Failed to open file for saving: %s", path.c_str());
+        return false;
+    }
+    size_t count = mRenderGaussians.size();
+    out.write(reinterpret_cast<const char*>(&count), sizeof(count));
+    if (count > 0) out.write(reinterpret_cast<const char*>(mRenderGaussians.data()), (std::streamsize)(count * sizeof(SplatGaussian)));
+    LOGI("Saved %zu points to %s", count, path.c_str());
     
     return true;
 }
@@ -388,4 +392,6 @@ bool MobileGS::loadModel(const std::string& path) {
     }
     mMapChanged = true;
     return true;
+}
+
 }
