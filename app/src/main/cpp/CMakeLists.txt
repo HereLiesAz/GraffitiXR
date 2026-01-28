@@ -29,7 +29,7 @@ find_package(OpenMP REQUIRED)
 
 # --- SOURCE FILES ---
 add_library(
-        graffiti-lib
+        graffitixr
         SHARED
         GraffitiJNI.cpp
         MobileGS.cpp
@@ -37,7 +37,7 @@ add_library(
 
 # --- INCLUDE DIRECTORIES ---
 target_include_directories(
-    graffiti-lib PRIVATE
+    graffitixr PRIVATE
     include
     ${OpenCV_INCLUDE_DIRS}
     ${LIBS_DIR}/glm
@@ -50,7 +50,7 @@ find_library(gles3-lib GLESv3)
 
 # --- LINKING ---
 target_link_libraries(
-        graffiti-lib
+        graffitixr
         
         # External
         ${OpenCV_LIBS}
