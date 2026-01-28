@@ -10,7 +10,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-// Serializer for non-null Uri. Kotlinx handles Uri? automatically when using this.
 object UriSerializer : KSerializer<Uri> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Uri", PrimitiveKind.STRING)
 
@@ -49,7 +48,6 @@ object BlendModeSerializer : KSerializer<BlendMode> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("BlendMode", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: BlendMode) {
-        // Manually map to strings to avoid 'value class' issues and ensure stability
         val name = when (value) {
             BlendMode.Clear -> "Clear"
             BlendMode.Src -> "Src"
@@ -71,8 +69,8 @@ object BlendModeSerializer : KSerializer<BlendMode> {
             BlendMode.Lighten -> "Lighten"
             BlendMode.ColorDodge -> "ColorDodge"
             BlendMode.ColorBurn -> "ColorBurn"
-            BlendMode.Hardlight -> "Hardlight" // Fixed Casing
-            BlendMode.Softlight -> "Softlight" // Fixed Casing
+            BlendMode.Hardlight -> "Hardlight"
+            BlendMode.Softlight -> "Softlight"
             BlendMode.Difference -> "Difference"
             BlendMode.Exclusion -> "Exclusion"
             BlendMode.Multiply -> "Multiply"
@@ -107,8 +105,8 @@ object BlendModeSerializer : KSerializer<BlendMode> {
             "Lighten" -> BlendMode.Lighten
             "ColorDodge" -> BlendMode.ColorDodge
             "ColorBurn" -> BlendMode.ColorBurn
-            "Hardlight", "HardLight" -> BlendMode.Hardlight // Handle potential legacy casing
-            "Softlight", "SoftLight" -> BlendMode.Softlight // Handle potential legacy casing
+            "Hardlight", "HardLight" -> BlendMode.Hardlight
+            "Softlight", "SoftLight" -> BlendMode.Softlight
             "Difference" -> BlendMode.Difference
             "Exclusion" -> BlendMode.Exclusion
             "Multiply" -> BlendMode.Multiply

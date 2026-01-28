@@ -18,8 +18,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.forEachGesture
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
@@ -205,8 +207,8 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController) {
             }
 
             if (uiState.overlayImageUri != null || uiState.layers.isNotEmpty()) {
-                azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = { viewModel.onRemoveBackgroundClicked(context); showSliderDialog = null; showColorBalanceDialog = false; resetDialogs() })
-                azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = { viewModel.onLineDrawingClicked(context); showSliderDialog = null; showColorBalanceDialog = false; resetDialogs() })
+                azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = { viewModel.onRemoveBackgroundClicked(); showSliderDialog = null; showColorBalanceDialog = false; resetDialogs() })
+                azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = { viewModel.onLineDrawingClicked(); showSliderDialog = null; showColorBalanceDialog = false; resetDialogs() })
                 azDivider()
                 azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) { showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"; showColorBalanceDialog = false }
                 azRailSubItem(id = "color_balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) { showColorBalanceDialog = true; showSliderDialog = null }
@@ -389,7 +391,7 @@ private fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, conte
             val uri = uiState.capturedTargetUris.firstOrNull()
             val imageBitmap by produceState<Bitmap?>(null, uri) { uri?.let { value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, it)) else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri) } }
             val maskBitmap by produceState<Bitmap?>(null, uiState.targetMaskUri) { value = if (uiState.targetMaskUri != null) withContext(Dispatchers.IO) { com.hereliesaz.graffitixr.utils.ImageUtils.loadBitmapFromUri(context, uiState.targetMaskUri) } else null }
-            TargetRefinementScreen(imageBitmap, maskBitmap, uiState.detectedKeypoints, uiState.refinementPaths, uiState.isRefinementEraser, uiState.canUndo, uiState.canRedo, viewModel::onRefinementPathAdded, { viewModel.onRefinementModeChanged(!it) }, viewModel::onUndoClicked, viewModel::onRedoClicked) { viewModel.onConfirmTargetCreation(null) }
+            TargetRefinementScreen(imageBitmap, maskBitmap, uiState.detectedKeypoints, uiState.refinementPaths, uiState.isRefinementEraser, uiState.canUndo, uiState.canRedo, viewModel::onRefinementPathAdded, { viewModel.onRefinementModeChanged(!it) }, viewModel::onUndoClicked, viewModel::onRedoClicked) { viewModel.onConfirmTargetCreation() }
         } else if (uiState.captureStep == CaptureStep.RECTIFY) {
             val uri = uiState.capturedTargetUris.firstOrNull()
             val imageBitmap by produceState<Bitmap?>(null, uri, uiState.capturedTargetImages) { value = if (uiState.capturedTargetImages.isNotEmpty()) uiState.capturedTargetImages.first() else if (uri != null) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri) } else null }
