@@ -118,6 +118,10 @@ class BackgroundRenderer {
         GLES20.glDisableVertexAttribArray(quadTexCoordParam)
         GLES20.glDepthMask(true)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+        
+        // CLEANUP STATE
+        GLES20.glUseProgram(0)
+        GLES20.glBindTexture(textureTarget, 0)
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {
@@ -156,7 +160,7 @@ class BackgroundRenderer {
 
         private const val FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
-            precision mediump float;
+            precision highp float;
             varying vec2 v_TexCoord;
             uniform samplerExternalOES u_Texture;
             void main() {
