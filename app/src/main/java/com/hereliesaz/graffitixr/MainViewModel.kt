@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -22,6 +21,7 @@ import com.hereliesaz.graffitixr.data.ProjectData
 import com.hereliesaz.graffitixr.data.RefinementPath
 import com.hereliesaz.graffitixr.data.SensorData
 import com.hereliesaz.graffitixr.utils.BackgroundRemover
+import com.hereliesaz.graffitixr.utils.ImageProcessingUtils
 import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
@@ -62,6 +62,9 @@ class MainViewModel @JvmOverloads constructor(
     private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
     val artworkBounds = _artworkBounds.asStateFlow()
 
+    var arRenderer: ArRenderer? = null
+
+    // Sensor Logic
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private var currentSensorData: SensorData? = null
     private var isSensorListening = false
@@ -99,7 +102,7 @@ class MainViewModel @JvmOverloads constructor(
                     if (isStable) {
                         if (stableStartTime == 0L) stableStartTime = now
                         else if (now - stableStartTime > 2000) {
-                            viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCalibration) }
+                            onCalibrationPointCaptured()
                             stableStartTime = 0L
                             lastRotationVector = null
                         }
@@ -114,6 +117,7 @@ class MainViewModel @JvmOverloads constructor(
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
 
+    // History Stacks
     private val undoStack = ArrayDeque<List<OverlayLayer>>()
     private val redoStack = ArrayDeque<List<OverlayLayer>>()
     private val MAX_HISTORY = 50
@@ -150,8 +154,9 @@ class MainViewModel @JvmOverloads constructor(
         layer.copy(blendMode = ImageUtils.getNextBlendMode(layer.blendMode))
     }
 
-    fun onRemoveBackgroundClicked(context: Context) {
+    fun onRemoveBackgroundClicked() {
         val activeId = _uiState.value.activeLayerId ?: return
+        val context = arRenderer?.context ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
@@ -188,8 +193,9 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    fun onLineDrawingClicked(context: Context) {
+    fun onLineDrawingClicked() {
         val activeId = _uiState.value.activeLayerId ?: return
+        val context = arRenderer?.context ?: return
         viewModelScope.launch {
             if (!ensureOpenCVLoaded()) return@launch
             _uiState.update { it.copy(isLoading = true) }
@@ -244,48 +250,31 @@ class MainViewModel @JvmOverloads constructor(
     fun onCycleRotationAxis() = _uiState.update { s -> val n = when(s.activeRotationAxis){ RotationAxis.X->RotationAxis.Y; RotationAxis.Y->RotationAxis.Z; RotationAxis.Z->RotationAxis.X }; s.copy(activeRotationAxis=n, showRotationAxisFeedback=true) }
 
     fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
-
     fun onCaptureShutterClicked() {
         val step = _uiState.value.captureStep
-        val mode = _uiState.value.targetCreationMode
-
-        when (step) {
-            CaptureStep.GRID_CONFIG -> {
-                _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
-            }
-            CaptureStep.INSTRUCTION -> {
-                // LOGIC FIX: Advance to the correct next step instead of capturing immediately
-                val nextStep = when (mode) {
-                    TargetCreationMode.GUIDED_GRID, TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
-                    TargetCreationMode.RECTIFY -> CaptureStep.FRONT
-                    TargetCreationMode.CAPTURE -> CaptureStep.PHOTO_SEQUENCE
-                    else -> CaptureStep.PHOTO_SEQUENCE
-                }
-                _uiState.update { it.copy(captureStep = nextStep) }
-            }
-            else -> {
-                viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
-            }
+        if (step == CaptureStep.GRID_CONFIG) {
+            _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
+        } else {
+            viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
         }
     }
-
     fun saveCapturedBitmap(b: Bitmap) {
         _uiState.update { state ->
-            val newImages = state.capturedTargetImages + b
-            val nextStep = when (state.captureStep) {
-                CaptureStep.FRONT -> CaptureStep.RECTIFY
-                CaptureStep.GUIDED_CAPTURE -> CaptureStep.REVIEW
-                CaptureStep.PHOTO_SEQUENCE -> CaptureStep.PHOTO_SEQUENCE 
-                else -> CaptureStep.REVIEW
-            }
-            state.copy(capturedTargetImages = newImages, captureStep = nextStep)
+            val isMultiImage = state.captureStep == CaptureStep.PHOTO_SEQUENCE ||
+                               state.targetCreationMode == TargetCreationMode.GUIDED_GRID ||
+                               state.targetCreationMode == TargetCreationMode.MULTI_POINT
+
+            val newImages = if (isMultiImage) state.capturedTargetImages + b else listOf(b)
+            val newStep = if (isMultiImage) state.captureStep else CaptureStep.REVIEW
+
+            state.copy(capturedTargetImages = newImages, captureStep = newStep)
         }
     }
 
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
     fun setHandedness(rightHanded: Boolean) { prefs.edit().putBoolean("is_right_handed", rightHanded).apply(); _uiState.update { it.copy(isRightHanded = rightHanded) } }
     fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
-    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) } }
+    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }; arRenderer?.setFlashlight(_uiState.value.isFlashlightOn) }
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
 
     fun loadAvailableProjects(context: Context) {
@@ -352,27 +341,7 @@ class MainViewModel @JvmOverloads constructor(
     fun updateMappingScore(s: Float) = _uiState.update { it.copy(mappingQualityScore = s) }
     fun finalizeMap() {}
     fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
-    
-    // UPDATED: Calculate aspect ratio
-    fun onOverlayImageSelected(u: Uri) { 
-        viewModelScope.launch(Dispatchers.IO) {
-            val context = getApplication<Application>()
-            var ratio = 1.0f
-            try {
-                context.contentResolver.openInputStream(u)?.use { stream ->
-                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeStream(stream, null, options)
-                    if (options.outWidth > 0 && options.outHeight > 0) {
-                        ratio = options.outWidth.toFloat() / options.outHeight.toFloat()
-                    }
-                }
-            } catch (e: Exception) { e.printStackTrace() }
-
-            val l = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}", aspectRatio = ratio)
-            _uiState.update { it.copy(layers = it.layers + l, activeLayerId = l.id, overlayImageUri = u) } 
-        }
-    }
-    
+    fun onOverlayImageSelected(u: Uri) { val l = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}"); _uiState.update { it.copy(layers = it.layers + l, activeLayerId = l.id, overlayImageUri = u) } }
     fun onBackgroundImageSelected(u: Uri) = _uiState.update { it.copy(backgroundImageUri = u) }
     fun onImagePickerShown() {}
     fun onDoubleTapHintDismissed() {}
@@ -387,47 +356,62 @@ class MainViewModel @JvmOverloads constructor(
     fun onGridConfigChanged(r: Int, c: Int) = _uiState.update { it.copy(gridRows = r, gridCols = c) }
     fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
     fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
-    
-    fun onCalibrationPointCaptured(poseMatrix: FloatArray? = null) {
-        val snapshot = CalibrationSnapshot(
-            gpsData = _uiState.value.gpsData,
-            sensorData = currentSensorData,
-            poseMatrix = poseMatrix?.toList(),
-            timestamp = System.currentTimeMillis()
-        )
-
+    fun onCalibrationPointCaptured() {
+        val pose = arRenderer?.getLatestPose()
+        val poseMatrix = FloatArray(16)
+        pose?.toMatrix(poseMatrix, 0)
+        val snapshot = CalibrationSnapshot(_uiState.value.gpsData, currentSensorData, poseMatrix.toList(), System.currentTimeMillis())
         _uiState.update {
-            val next = when(it.captureStep) {
-                CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2
-                CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3
-                CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4
-                CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW
-                else -> it.captureStep
-            }
+            val next = when(it.captureStep) { CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2; CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3; CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4; CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW; else -> it.captureStep }
             if (next == CaptureStep.REVIEW) stopSensorListening()
             it.copy(captureStep = next, calibrationSnapshots = it.calibrationSnapshots + snapshot)
         }
         viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
     }
     
-    fun unwarpImage(l: List<Any>) {}
+    // NEW: Implementation of unwarp logic
+    fun unwarpImage(points: List<Offset>) {
+        val original = _uiState.value.capturedTargetImages.firstOrNull() ?: return
+        viewModelScope.launch {
+            if (!ensureOpenCVLoaded()) return@launch
+            _uiState.update { it.copy(isLoading = true) }
+            val unwarped = withContext(Dispatchers.IO) {
+                ImageProcessingUtils.unwarpImage(original, points)
+            }
+            if (unwarped != null) {
+                _uiState.update {
+                    it.copy(
+                        capturedTargetImages = listOf(unwarped),
+                        captureStep = CaptureStep.REVIEW,
+                        isLoading = false
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(isLoading = false) }
+                _feedbackEvent.send(FeedbackEvent.Toast("Failed to rectify image"))
+            }
+        }
+    }
+    
     fun onRetakeCapture() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList(), calibrationSnapshots = emptyList()) } }
     fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
     fun onRefinementModeChanged(b: Boolean) = _uiState.update { it.copy(isRefinementEraser = b) }
-    
-    fun onConfirmTargetCreation(fingerprintJson: String?) {
-        if (fingerprintJson != null) _uiState.update { it.copy(fingerprintJson = fingerprintJson) }
+    fun onConfirmTargetCreation() {
+        val captured = _uiState.value.capturedTargetImages.firstOrNull()
+        if (captured != null) {
+            viewModelScope.launch {
+                val fingerprint = arRenderer?.generateFingerprint(captured)
+                if (fingerprint != null) {
+                    val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.Fingerprint.serializer(), fingerprint)
+                    _uiState.update { it.copy(fingerprintJson = json) }
+                }
+            }
+        }
         _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
     }
 
-    private fun startSensorListening() {
-        if (!isSensorListening) {
-            val s = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
-            if (s != null) { sensorManager.registerListener(sensorEventListener, s, SensorManager.SENSOR_DELAY_GAME); isSensorListening = true; stableStartTime = 0L }
-        }
-    }
+    private fun startSensorListening() { if (!isSensorListening) { val s = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR); if (s != null) { sensorManager.registerListener(sensorEventListener, s, SensorManager.SENSOR_DELAY_GAME); isSensorListening = true; stableStartTime = 0L } } }
     private fun stopSensorListening() { if (isSensorListening) { sensorManager.unregisterListener(sensorEventListener); isSensorListening = false } }
-
     fun onResume() { if (_uiState.value.isCapturingTarget && _uiState.value.targetCreationMode == TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening() }
     fun onPause() = stopSensorListening()
     override fun onCleared() { super.onCleared(); stopSensorListening() }
