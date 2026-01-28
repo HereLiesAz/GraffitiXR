@@ -1,11 +1,29 @@
 #include <jni.h>
 #include <string>
+#include <pthread.h>
 #include "MobileGS.h"
 
-// FIX: Global pointer definition was missing
+// Global variables for JNI
+static JavaVM* g_vm = nullptr;
 MobileGS *gMobileGS = nullptr;
 
+// Helper to get JNIEnv on any thread
+JNIEnv* getJniEnv() {
+    JNIEnv* env = nullptr;
+    if (g_vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        if (g_vm->AttachCurrentThread(&env, nullptr) != 0) {
+            return nullptr;
+        }
+    }
+    return env;
+}
+
 extern "C" {
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+    g_vm = vm;
+    return JNI_VERSION_1_6;
+}
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_slam_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {

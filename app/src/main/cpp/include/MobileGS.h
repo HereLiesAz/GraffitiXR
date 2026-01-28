@@ -12,15 +12,17 @@
 #include <chrono>
 #include <unordered_map>
 
+// POD struct for GPU upload
 struct SplatGaussian {
     glm::vec3 position; // 0, 1, 2
     glm::vec3 color;    // 3, 4, 5
-    float scale;        // 6 (Changed from vec3 to match shader/stride)
+    float scale;        // 6
     float opacity;      // 7
-    
-    // Non-rendered data (will be ignored by GL stride if packed at end, 
-    // but better to keep struct clean. We will handle stride in CPP)
-    std::chrono::steady_clock::time_point creationTime; 
+};
+
+// Internal metadata
+struct SplatMetadata {
+    std::chrono::steady_clock::time_point creationTime;
 };
 
 struct Sortable {
@@ -66,18 +68,16 @@ private:
 
     GLuint mProgram;
     GLuint mVAO, mVBO, mQuadVBO;
-    GLuint mBgProgram;
-    GLuint mBgVAO, mBgVBO;
-    GLuint mBgTexture;
 
     glm::mat4 mViewMatrix;
     glm::mat4 mProjMatrix;
     glm::mat4 mSortViewMatrix;
 
     std::vector<SplatGaussian> mRenderGaussians;
+    std::vector<SplatMetadata> mGaussiansMetadata;
+
     cv::Mat mPendingBgFrame;
 
-    std::vector<Sortable> mSortListFront;
     std::vector<Sortable> mSortListBack;
     std::thread mSortThread;
     std::mutex mSortMutex;
@@ -94,14 +94,12 @@ private:
     std::atomic<bool> mNewBgAvailable;
     std::atomic<bool> mHasBgData;
     std::atomic<bool> mIsInitialized;
-    int64_t mPendingTimestamp;
-    
+
     int mFrameCount;
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
     std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;
 
     const size_t MAX_POINTS = 65536;
-    // FIX: Voxel Size changed to 5mm per Blueprint
-    const float VOXEL_SIZE = 0.005f; 
+    const float VOXEL_SIZE = 0.005f;
 };
