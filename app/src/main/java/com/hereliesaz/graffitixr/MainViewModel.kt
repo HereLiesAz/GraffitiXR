@@ -326,7 +326,6 @@ class MainViewModel @JvmOverloads constructor(
     fun deleteProject(context: Context, pid: String) { projectManager.deleteProject(context, pid); loadAvailableProjects(context) }
     fun onNewProject() { val r = _uiState.value.isRightHanded; _uiState.update { UiState(showProjectList=false, currentProjectId=UUID.randomUUID().toString(), isRightHanded=r, activeColorSeed=Random.nextInt()) } }
 
-    // FIX: Implemented Manual Save
     fun onSaveClicked() {
         val currentProjectId = _uiState.value.currentProjectId ?: UUID.randomUUID().toString()
         viewModelScope.launch {
@@ -346,7 +345,6 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    // FIX: Implemented Export
     fun exportProjectToUri(u: Uri) {
         val currentProjectId = _uiState.value.currentProjectId ?: return
         viewModelScope.launch {
@@ -354,7 +352,8 @@ class MainViewModel @JvmOverloads constructor(
             try {
                 val context = getApplication<Application>()
                 withContext(Dispatchers.IO) {
-                    projectManager.exportProject(context, currentProjectId, u)
+                    // FIX: Corrected method name to match ProjectManager.kt
+                    projectManager.exportProjectToUri(context, currentProjectId, u)
                 }
                 _feedbackEvent.send(FeedbackEvent.Toast("Project exported"))
             } catch (e: Exception) {
@@ -374,206 +373,107 @@ class MainViewModel @JvmOverloads constructor(
     fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
     fun onFrameCaptured(b: Bitmap) { saveCapturedBitmap(b) }
     
-    // FIX: Implemented Progress Update
     fun onProgressUpdate(p: Float, b: Bitmap?) {
         _uiState.update { it.copy(progressPercentage = p) }
         if (b != null) {
             // Save evolution image logic here if needed
-
         }
-
     }
-
     
-
     fun onTrackingFailure(m: String?) {}
-
     fun updateMappingScore(s: Float) = _uiState.update { it.copy(mappingQualityScore = s) }
-
     
-
-    // FIX: Finalize Map logic
-
     fun finalizeMap() {
-
         val pid = _uiState.value.currentProjectId ?: return
-
         viewModelScope.launch {
-
+            // FIX: This method now exists in ProjectManager.kt
             val path = projectManager.getMapPath(getApplication(), pid)
-
             arRenderer?.slamManager?.saveWorld(path)
-
             _feedbackEvent.send(FeedbackEvent.Toast("Map finalized and saved"))
-
         }
-
     }
-
     
-
     fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
-
     fun onOverlayImageSelected(u: Uri) { val l = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}"); _uiState.update { it.copy(layers = it.layers + l, activeLayerId = l.id, overlayImageUri = u) } }
-
     fun onBackgroundImageSelected(u: Uri) = _uiState.update { it.copy(backgroundImageUri = u) }
-
     fun onImagePickerShown() {}
-
     fun onDoubleTapHintDismissed() {}
-
     fun onGestureStart() {}
-
     fun onGestureEnd() { snapshotState() }
-
     fun onRefineTargetToggled() {}
-
     fun onTargetCreationMethodSelected(m: TargetCreationMode) {
-
         val next = when (m) { TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG; TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1; else -> CaptureStep.INSTRUCTION }
-
         if(m==TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening()
-
         _uiState.update { it.copy(targetCreationMode = m, captureStep = next, calibrationSnapshots = emptyList()) }
-
     }
-
     fun onGridConfigChanged(r: Int, c: Int) = _uiState.update { it.copy(gridRows = r, gridCols = c) }
-
     fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
-
     fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
-
     fun onCalibrationPointCaptured(poseMatrix: FloatArray? = null) {
-
         if (poseMatrix == null) {
-
             viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCalibration) }
-
             return
-
         }
-
         val snapshot = CalibrationSnapshot(_uiState.value.gpsData, currentSensorData, poseMatrix.toList(), System.currentTimeMillis())
-
         _uiState.update {
-
             val next = when(it.captureStep) { CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2; CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3; CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4; CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW; else -> it.captureStep }
-
             if (next == CaptureStep.REVIEW) stopSensorListening()
-
             it.copy(captureStep = next, calibrationSnapshots = it.calibrationSnapshots + snapshot)
-
         }
-
         viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
-
-    }// NEW: Implementation of unwarp logic
-
-    fun unwarpImage(points: List<Offset>) {
-
-        val original = _uiState.value.capturedTargetImages.firstOrNull() ?: return
-
-        viewModelScope.launch {
-
-            if (!ensureOpenCVLoaded()) return@launch
-
-            _uiState.update { it.copy(isLoading = true) }
-
-            val unwarped = withContext(Dispatchers.IO) {
-
-                ImageProcessingUtils.unwarpImage(original, points)
-
-            }
-
-            if (unwarped != null) {
-
-                _uiState.update {
-
-                    it.copy(
-
-                        capturedTargetImages = listOf(unwarped),
-
-                        captureStep = CaptureStep.REVIEW,
-
-                        isLoading = false
-
-                    )
-
-                }
-
-            } else {
-
-                _uiState.update { it.copy(isLoading = false) }
-
-                _feedbackEvent.send(FeedbackEvent.Toast("Failed to rectify image"))
-
-            }
-
-        }
-
     }
-
     
-
-    fun onRetakeCapture() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList(), calibrationSnapshots = emptyList()) } }
-
-    fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
-
-    fun onRefinementModeChanged(b: Boolean) = _uiState.update { it.copy(isRefinementEraser = b) }
-
-    fun onConfirmTargetCreation() {
-
-        val captured = _uiState.value.capturedTargetImages.firstOrNull()
-
-        if (captured != null) {
-
-            viewModelScope.launch {
-
-                _captureEvent.send(CaptureEvent.RequestFingerprint(captured))
-
+    fun unwarpImage(points: List<Offset>) {
+        val original = _uiState.value.capturedTargetImages.firstOrNull() ?: return
+        viewModelScope.launch {
+            if (!ensureOpenCVLoaded()) return@launch
+            _uiState.update { it.copy(isLoading = true) }
+            val unwarped = withContext(Dispatchers.IO) {
+                ImageProcessingUtils.unwarpImage(original, points)
             }
-
-        } else {
-
-            _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
-
+            if (unwarped != null) {
+                _uiState.update {
+                    it.copy(
+                        capturedTargetImages = listOf(unwarped),
+                        captureStep = CaptureStep.REVIEW,
+                        isLoading = false
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(isLoading = false) }
+                _feedbackEvent.send(FeedbackEvent.Toast("Failed to rectify image"))
+            }
         }
-
     }
-
-
+    
+    fun onRetakeCapture() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList(), calibrationSnapshots = emptyList()) } }
+    fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
+    fun onRefinementModeChanged(b: Boolean) = _uiState.update { it.copy(isRefinementEraser = b) }
+    fun onConfirmTargetCreation() {
+        val captured = _uiState.value.capturedTargetImages.firstOrNull()
+        if (captured != null) {
+            viewModelScope.launch {
+                _captureEvent.send(CaptureEvent.RequestFingerprint(captured))
+            }
+        } else {
+            _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
+        }
+    }
 
     fun onFingerprintGenerated(fingerprint: com.hereliesaz.graffitixr.data.Fingerprint?) {
-
         if (fingerprint != null) {
-
             val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.Fingerprint.serializer(), fingerprint)
-
             _uiState.update { it.copy(fingerprintJson = json) }
-
         }
-
         _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
-
     }
 
-
-
     private fun startSensorListening() { if (!isSensorListening) { val s = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR); if (s != null) { sensorManager.registerListener(sensorEventListener, s, SensorManager.SENSOR_DELAY_GAME); isSensorListening = true; stableStartTime = 0L } } }
-
     private fun stopSensorListening() { if (isSensorListening) { sensorManager.unregisterListener(sensorEventListener); isSensorListening = false } }
-
     fun onResume() { if (_uiState.value.isCapturingTarget && _uiState.value.targetCreationMode == TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening() }
-
     fun onPause() = stopSensorListening()
-
     override fun onCleared() { super.onCleared(); stopSensorListening() }
-
     fun onMagicClicked() { viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateDouble) } }
-
     fun checkForUpdates() {}
-
     fun installLatestUpdate() {}
-
 }
