@@ -239,7 +239,7 @@ class ArRenderer(
     }
 
     fun setFlashlight(on: Boolean) {
-        isFlashlightOn = on
+        // Flashlight implementation placeholder
     }
 
     fun triggerCapture() {
