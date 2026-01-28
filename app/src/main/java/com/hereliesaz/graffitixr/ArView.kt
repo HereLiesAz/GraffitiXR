@@ -26,10 +26,7 @@ fun ArView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Capture GLSurfaceView to manage lifecycle
-    var glSurfaceView by remember { mutableStateOf<android.opengl.GLSurfaceView?>(null) }
-
-    // Instantiate Renderer
+    // Instantiate Renderer once and keep it
     val arRenderer = remember {
         ArRenderer(
             context = context,
@@ -45,11 +42,13 @@ fun ArView(
                 }
                 viewModel.onArImagePlaced()
             }
-            // FIX: Removed viewModel.arRenderer assignment
         }
     }
     
-    // FIX: Report renderer instance to parent
+    // Capture GLSurfaceView to manage lifecycle
+    var glSurfaceViewRef by remember { mutableStateOf<android.opengl.GLSurfaceView?>(null) }
+
+    // Report renderer instance to parent
     LaunchedEffect(arRenderer) {
         onRendererCreated(arRenderer)
     }
@@ -64,16 +63,14 @@ fun ArView(
         arRenderer.setFlashlight(uiState.isFlashlightOn)
     }
 
-    // NEW: Handle Capture Events from ViewModel
+    // Handle Capture Events from ViewModel
     LaunchedEffect(viewModel) {
         viewModel.captureEvent.collect { event ->
             when(event) {
                 is CaptureEvent.RequestCapture -> {
-                    // Trigger renderer frame capture
                     arRenderer.triggerCapture()
                 }
                 is CaptureEvent.RequestCalibration -> {
-                    // Get latest pose and send back to ViewModel
                     val pose = arRenderer.getLatestPose()
                     if (pose != null) {
                         val matrix = FloatArray(16)
@@ -96,13 +93,11 @@ fun ArView(
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     arRenderer.onResume(activity)
-                    glSurfaceView?.onResume()
-                    viewModel.onResume()
+                    glSurfaceViewRef?.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     arRenderer.onPause()
-                    glSurfaceView?.onPause()
-                    viewModel.onPause()
+                    glSurfaceViewRef?.onPause()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
                     arRenderer.cleanup()
@@ -116,8 +111,7 @@ fun ArView(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             arRenderer.onPause()
-            glSurfaceView?.onPause()
-            arRenderer.cleanup()
+            glSurfaceViewRef?.onPause()
         }
     }
 
@@ -126,11 +120,16 @@ fun ArView(
             android.opengl.GLSurfaceView(ctx).apply {
                 preserveEGLContextOnPause = true
                 setEGLContextClientVersion(3)
+                // Standard configuration for ARCore
                 setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                 setRenderer(arRenderer)
                 renderMode = android.opengl.GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                glSurfaceView = this
+                glSurfaceViewRef = this
             }
+        },
+        update = {
+            // Update reference if view is re-used/re-created
+            glSurfaceViewRef = it
         },
         modifier = Modifier.pointerInput(Unit) {
             detectTapGestures(
