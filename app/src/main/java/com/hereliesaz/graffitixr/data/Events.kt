@@ -1,7 +1,3 @@
-{
-type: created file
-fileName: app/src/main/java/com/hereliesaz/graffitixr/data/Events.kt
-fullContent:
 package com.hereliesaz.graffitixr.data
 
 import android.graphics.Bitmap
@@ -18,5 +14,6 @@ sealed class CaptureEvent {
     object RequestCapture : CaptureEvent()
     object RequestCalibration : CaptureEvent()
     data class RequestFingerprint(val bitmap: Bitmap) : CaptureEvent()
-    data class RequestMapSave(val path: String) : CaptureEvent() // FIX: New event for uncoupling
+    // FIX: New event for uncoupling map saving
+    data class RequestMapSave(val path: String) : CaptureEvent()
 }
