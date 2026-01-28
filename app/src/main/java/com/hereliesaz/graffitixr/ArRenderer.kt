@@ -295,7 +295,7 @@ class ArRenderer(
                 if (layerData.isVisible && layerData.textureId != 0) {
                     val modelMatrix = FloatArray(16)
                     Matrix.multiplyMM(modelMatrix, 0, anchorMatrix, 0, getLayerTransform(layerData), 0)
-                    Matrix.scaleM(modelMatrix, 0, layerData.aspectRatio, 1.0f, 1.0f)
+                    Matrix.scaleM(modelMatrix, 0, layerData.aspectRatio * layerData.scale, layerData.scale, 1.0f)
 
                     simpleQuadRenderer.draw(
                         viewmtx,
