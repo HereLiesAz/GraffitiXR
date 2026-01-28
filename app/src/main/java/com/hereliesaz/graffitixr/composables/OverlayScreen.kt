@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,14 +45,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun OverlayScreen(
     uiState: UiState,
-    onScaleChanged: (Float) -> Unit,
-    onOffsetChanged: (Offset) -> Unit,
-    onRotationZChanged: (Float) -> Unit,
-    onRotationXChanged: (Float) -> Unit,
-    onRotationYChanged: (Float) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
-    onGestureEnd: () -> Unit,
+    onGestureEnd: (Float, Offset, Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -64,11 +60,32 @@ fun OverlayScreen(
 
     // Resolve Active Layer
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
-    val scale = activeLayer?.scale ?: 1f
-    val offset = activeLayer?.offset ?: Offset.Zero
-    val rotationX = activeLayer?.rotationX ?: 0f
-    val rotationY = activeLayer?.rotationY ?: 0f
-    val rotationZ = activeLayer?.rotationZ ?: 0f
+
+    // Local State for smooth gestures
+    var isGesturing by remember { mutableStateOf(false) }
+    var currentScale by remember { mutableFloatStateOf(activeLayer?.scale ?: 1f) }
+    var currentOffset by remember { mutableStateOf(activeLayer?.offset ?: Offset.Zero) }
+    var currentRotationX by remember { mutableFloatStateOf(activeLayer?.rotationX ?: 0f) }
+    var currentRotationY by remember { mutableFloatStateOf(activeLayer?.rotationY ?: 0f) }
+    var currentRotationZ by remember { mutableFloatStateOf(activeLayer?.rotationZ ?: 0f) }
+
+    // Sync state if not gesturing
+    LaunchedEffect(activeLayer) {
+        if (!isGesturing && activeLayer != null) {
+            currentScale = activeLayer.scale
+            currentOffset = activeLayer.offset
+            currentRotationX = activeLayer.rotationX
+            currentRotationY = activeLayer.rotationY
+            currentRotationZ = activeLayer.rotationZ
+        }
+    }
+
+    val scale = currentScale
+    val offset = currentOffset
+    val rotationX = currentRotationX
+    val rotationY = currentRotationY
+    val rotationZ = currentRotationZ
+
     val opacity = activeLayer?.opacity ?: 1f
     val blendMode = activeLayer?.blendMode ?: BlendMode.SrcOver
     val contrast = activeLayer?.contrast ?: 1f
@@ -195,11 +212,6 @@ fun OverlayScreen(
 
                         detectSmartOverlayGestures(
                             getValidBounds = {
-                                val state = currentUiState
-                                val currentLayer = state.layers.find { it.id == state.activeLayerId } ?: state.layers.firstOrNull()
-                                val currentScale = currentLayer?.scale ?: 1f
-                                val currentOffset = currentLayer?.offset ?: Offset.Zero
-
                                 val imgWidth = bmp.width * currentScale
                                 val imgHeight = bmp.height * currentScale
                                 val centerX = size.width / 2f + currentOffset.x
@@ -208,15 +220,21 @@ fun OverlayScreen(
                                 val top = centerY - imgHeight / 2f
                                 Rect(left, top, left + imgWidth, top + imgHeight)
                             },
-                            onGestureStart = onGestureStart,
-                            onGestureEnd = onGestureEnd
+                            onGestureStart = {
+                                isGesturing = true
+                                onGestureStart()
+                            },
+                            onGestureEnd = {
+                                isGesturing = false
+                                onGestureEnd(currentScale, currentOffset, currentRotationX, currentRotationY, currentRotationZ)
+                            }
                         ) { _, pan, zoom, rotation ->
-                            onScaleChanged(zoom)
-                            onOffsetChanged(pan)
+                            currentScale *= zoom
+                            currentOffset += pan
                             when (currentUiState.activeRotationAxis) {
-                                RotationAxis.X -> onRotationXChanged(rotation)
-                                RotationAxis.Y -> onRotationYChanged(rotation)
-                                RotationAxis.Z -> onRotationZChanged(rotation)
+                                RotationAxis.X -> currentRotationX += rotation
+                                RotationAxis.Y -> currentRotationY += rotation
+                                RotationAxis.Z -> currentRotationZ += rotation
                             }
                         }
                     }

@@ -317,11 +317,13 @@ private fun MainContentLayer(uiState: UiState, viewModel: MainViewModel, gesture
         val onScale: (Float) -> Unit = viewModel::onScaleChanged
         val onOffset: (Offset) -> Unit = viewModel::onOffsetChanged
         val onRotZ: (Float) -> Unit = viewModel::onRotationZChanged
-        val onRotX: (Float) -> Unit = viewModel::onRotationXChanged
-        val onRotY: (Float) -> Unit = viewModel::onRotationYChanged
         val onCycle: () -> Unit = viewModel::onCycleRotationAxis
         val onStart: () -> Unit = { viewModel.onGestureStart(); onGestureToggle(true) }
         val onEnd: () -> Unit = { viewModel.onGestureEnd(); onGestureToggle(false) }
+        val onOverlayGestureEnd: (Float, Offset, Float, Float, Float) -> Unit = { s, o, rx, ry, rz ->
+            viewModel.setLayerTransform(s, o, rx, ry, rz)
+            onGestureToggle(false)
+        }
 
         when (uiState.editorMode) {
             STATIC -> MockupScreen(
@@ -332,28 +334,18 @@ private fun MainContentLayer(uiState: UiState, viewModel: MainViewModel, gesture
                 onBrightnessChanged = viewModel::onBrightnessChanged,
                 onContrastChanged = viewModel::onContrastChanged,
                 onSaturationChanged = viewModel::onSaturationChanged,
-                onScaleChanged = onScale,
-                onRotationZChanged = onRotZ,
-                onRotationXChanged = onRotX,
-                onRotationYChanged = onRotY,
-                onOffsetChanged = onOffset,
                 onCycleRotationAxis = onCycle,
                 onGestureStart = onStart,
-                onGestureEnd = onEnd
+                onGestureEnd = onOverlayGestureEnd
             )
             TRACE -> TraceScreen(
                 uiState = uiState,
                 onOverlayImageSelected = viewModel::onOverlayImageSelected,
-                onScaleChanged = onScale,
-                onRotationZChanged = onRotZ,
-                onRotationXChanged = onRotX,
-                onRotationYChanged = onRotY,
-                onOffsetChanged = onOffset,
                 onCycleRotationAxis = onCycle,
                 onGestureStart = onStart,
-                onGestureEnd = onEnd
+                onGestureEnd = onOverlayGestureEnd
             )
-            OVERLAY -> OverlayScreen(uiState, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
+            OVERLAY -> OverlayScreen(uiState, onCycle, onStart, onOverlayGestureEnd)
             AR -> {
                 Box(
                     modifier = Modifier.fillMaxSize()
@@ -378,7 +370,7 @@ private fun MainContentLayer(uiState: UiState, viewModel: MainViewModel, gesture
                     ArView(viewModel, uiState)
                 }
             }
-            CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(uiState, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
+            CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(uiState, onCycle, onStart, onOverlayGestureEnd)
             PROJECT -> Box(Modifier.fillMaxSize().background(Color.Black))
         }
     }

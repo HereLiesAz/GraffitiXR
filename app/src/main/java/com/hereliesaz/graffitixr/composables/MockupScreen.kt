@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,19 +44,34 @@ fun MockupScreen(
     onBrightnessChanged: (Float) -> Unit,
     onContrastChanged: (Float) -> Unit,
     onSaturationChanged: (Float) -> Unit,
-    onScaleChanged: (Float) -> Unit,
-    onRotationZChanged: (Float) -> Unit,
-    onRotationXChanged: (Float) -> Unit,
-    onRotationYChanged: (Float) -> Unit,
-    onOffsetChanged: (Offset) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
-    onGestureEnd: () -> Unit
+    onGestureEnd: (Float, Offset, Float, Float, Float) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val currentUiState by rememberUpdatedState(uiState)
+
+    // Local State for smooth gestures (Active Layer)
+    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+    var isGesturing by remember { mutableStateOf(false) }
+    var currentScale by remember { mutableFloatStateOf(activeLayer?.scale ?: 1f) }
+    var currentOffset by remember { mutableStateOf(activeLayer?.offset ?: Offset.Zero) }
+    var currentRotationX by remember { mutableFloatStateOf(activeLayer?.rotationX ?: 0f) }
+    var currentRotationY by remember { mutableFloatStateOf(activeLayer?.rotationY ?: 0f) }
+    var currentRotationZ by remember { mutableFloatStateOf(activeLayer?.rotationZ ?: 0f) }
+
+    // Sync state if not gesturing
+    LaunchedEffect(activeLayer) {
+        if (!isGesturing && activeLayer != null) {
+            currentScale = activeLayer.scale
+            currentOffset = activeLayer.offset
+            currentRotationX = activeLayer.rotationX
+            currentRotationY = activeLayer.rotationY
+            currentRotationZ = activeLayer.rotationZ
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         uiState.backgroundImageUri?.let {
@@ -82,21 +98,34 @@ fun MockupScreen(
                         getValidBounds = {
                             Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
                         },
-                        onGestureStart = onGestureStart,
-                        onGestureEnd = onGestureEnd
+                        onGestureStart = {
+                            isGesturing = true
+                            onGestureStart()
+                        },
+                        onGestureEnd = {
+                            isGesturing = false
+                            onGestureEnd(currentScale, currentOffset, currentRotationX, currentRotationY, currentRotationZ)
+                        }
                     ) { _, pan, zoom, rotation ->
-                        onScaleChanged(zoom)
-                        onOffsetChanged(pan)
+                        currentScale *= zoom
+                        currentOffset += pan
                         when (currentUiState.activeRotationAxis) {
-                            RotationAxis.X -> onRotationXChanged(rotation)
-                            RotationAxis.Y -> onRotationYChanged(rotation)
-                            RotationAxis.Z -> onRotationZChanged(rotation)
+                            RotationAxis.X -> currentRotationX += rotation
+                            RotationAxis.Y -> currentRotationY += rotation
+                            RotationAxis.Z -> currentRotationZ += rotation
                         }
                     }
                 }
         ) {
             uiState.layers.forEach { layer ->
                 if (layer.isVisible) {
+                    val isLayerActive = layer.id == uiState.activeLayerId
+                    val scale = if (isLayerActive) currentScale else layer.scale
+                    val offset = if (isLayerActive) currentOffset else layer.offset
+                    val rotationX = if (isLayerActive) currentRotationX else layer.rotationX
+                    val rotationY = if (isLayerActive) currentRotationY else layer.rotationY
+                    val rotationZ = if (isLayerActive) currentRotationZ else layer.rotationZ
+
                     var layerBitmap by remember(layer.uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
 
                     LaunchedEffect(layer.uri) {
@@ -150,13 +179,13 @@ fun MockupScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
-                                    scaleX = layer.scale
-                                    scaleY = layer.scale
-                                    rotationX = layer.rotationX
-                                    rotationY = layer.rotationY
-                                    rotationZ = layer.rotationZ
-                                    translationX = layer.offset.x
-                                    translationY = layer.offset.y
+                                    scaleX = scale
+                                    scaleY = scale
+                                    this.rotationX = rotationX
+                                    this.rotationY = rotationY
+                                    this.rotationZ = rotationZ
+                                    translationX = offset.x
+                                    translationY = offset.y
                                 }
                         ) {
                             val xOffset = (size.width - bmp.width) / 2f
