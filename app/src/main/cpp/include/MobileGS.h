@@ -13,10 +13,14 @@
 #include <unordered_map>
 
 struct SplatGaussian {
-    glm::vec3 position;
-    glm::vec3 color;
-    glm::vec3 scale;
-    float opacity;
+    glm::vec3 position; // 0, 1, 2
+    glm::vec3 color;    // 3, 4, 5
+    float scale;        // 6 (Changed from vec3 to match shader/stride)
+    float opacity;      // 7
+    
+    // Non-rendered data (will be ignored by GL stride if packed at end, 
+    // but better to keep struct clean. We will handle stride in CPP)
+    std::chrono::steady_clock::time_point creationTime; 
 };
 
 struct Sortable {
@@ -53,7 +57,6 @@ public:
     bool loadModel(const std::string& path);
     void clear();
     
-    // NEW: Metric for UI
     int getPointCount();
 
 private:
@@ -84,7 +87,6 @@ private:
     std::atomic<bool> mStopThread;
     std::atomic<bool> mSortResultReady;
     
-    // NEW: Atomic flag to invalidate sort during pruning
     std::atomic<bool> mMapChanged; 
 
     std::mutex mDataMutex;
@@ -94,12 +96,12 @@ private:
     std::atomic<bool> mIsInitialized;
     int64_t mPendingTimestamp;
     
-    // ADDED: Missing member variable that caused the build error
     int mFrameCount;
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
     std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;
 
     const size_t MAX_POINTS = 65536;
-    const float VOXEL_SIZE = 0.02f;
+    // FIX: Voxel Size changed to 5mm per Blueprint
+    const float VOXEL_SIZE = 0.005f; 
 };
