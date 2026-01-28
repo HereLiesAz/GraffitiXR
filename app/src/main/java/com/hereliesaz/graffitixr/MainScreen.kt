@@ -295,7 +295,7 @@ fun EditorContent(
         if (uiState.isMarkingProgress) DrawingCanvas(uiState.drawingPaths, viewModel::onDrawingPathFinished)
 
         Box(Modifier.fillMaxSize().padding(bottom = bottomSafePadding).zIndex(2f), contentAlignment = Alignment.BottomCenter) {
-            // FIXED: Explicitly use this@BoxWithConstraints.maxHeight
+            // Fix: explicit receiver for maxHeight
             AdjustmentsPanel(uiState, showSliderDialog == "Adjust", showColorBalanceDialog, isLandscape, this@BoxWithConstraints.maxHeight, onOpacityChange, onBrightnessChange, onContrastChange, onSaturationChange, onColorBalanceRChange, onColorBalanceGChange, onColorBalanceBChange, onUndo, onRedo, onMagicAlign)
         }
         uiState.showOnboardingDialogForMode?.let { mode -> OnboardingDialog(mode) { onOnboardingComplete(mode) } }
@@ -321,9 +321,37 @@ private fun MainContentLayer(uiState: UiState, viewModel: MainViewModel, gesture
         val onEnd: () -> Unit = { viewModel.onGestureEnd(); onGestureToggle(false) }
 
         when (uiState.editorMode) {
-            // FIXED: Corrected argument order (onScale: Float, then onOffset: Offset)
-            STATIC -> MockupScreen(uiState, viewModel::onBackgroundImageSelected, viewModel::onOverlayImageSelected, viewModel::onOpacityChanged, viewModel::onBrightnessChanged, viewModel::onContrastChanged, viewModel::onSaturationChanged, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
-            TRACE -> TraceScreen(uiState, viewModel::onOverlayImageSelected, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
+            // FIX: Using Named Arguments to strictly enforce parameter order
+            STATIC -> MockupScreen(
+                uiState = uiState,
+                onBackgroundImageSelected = viewModel::onBackgroundImageSelected,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onOpacityChanged = viewModel::onOpacityChanged,
+                onBrightnessChanged = viewModel::onBrightnessChanged,
+                onContrastChanged = viewModel::onContrastChanged,
+                onSaturationChanged = viewModel::onSaturationChanged,
+                onScaleChanged = onScale,
+                onRotationZChanged = onRotZ,
+                onRotationXChanged = onRotX,
+                onRotationYChanged = onRotY,
+                onOffsetChanged = onOffset,
+                onCycleRotationAxis = onCycle,
+                onGestureStart = onStart,
+                onGestureEnd = onEnd
+            )
+            TRACE -> TraceScreen(
+                uiState = uiState,
+                onOverlayImageSelected = viewModel::onOverlayImageSelected,
+                onScaleChanged = onScale,
+                onRotationZChanged = onRotZ,
+                onRotationXChanged = onRotX,
+                onRotationYChanged = onRotY,
+                onOffsetChanged = onOffset,
+                onCycleRotationAxis = onCycle,
+                onGestureStart = onStart,
+                onGestureEnd = onEnd
+            )
+            // OverlayScreen uses correct order already (Scale, Offset, Rot...)
             OVERLAY -> OverlayScreen(uiState, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
             AR -> ArView(viewModel, uiState)
             CROP, ADJUST, DRAW, ISOLATE, BALANCE, OUTLINE -> OverlayScreen(uiState, onScale, onOffset, onRotZ, onRotX, onRotY, onCycle, onStart, onEnd)
