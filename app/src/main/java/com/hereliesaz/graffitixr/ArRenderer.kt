@@ -3,7 +3,7 @@ package com.hereliesaz.graffitixr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
-import android.opengl.GLES30
+import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.util.Log
 import android.widget.Toast
@@ -55,8 +55,9 @@ class ArRenderer(
     var showMiniMap = false
     var showGuide = false
 
-    private var isInitialized = false
-    private var isResumed = false
+    private var viewportWidth = -1
+    private var viewportHeight = -1
+    private var isFlashlightOn = false
     private var captureNextFrame = false
     
     private var layers: List<OverlayLayer> = emptyList()
@@ -65,39 +66,29 @@ class ArRenderer(
     data class QueuedTap(val x: Float, val y: Float)
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+        GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         try {
             backgroundRenderer.createOnGlThread()
             planeRenderer.createOnGlThread() 
             imageRenderer.createOnGlThread()
             slamManager.initNative()
-            isInitialized = true
         } catch (e: IOException) {
             Log.e("ArRenderer", "Failed to initialize renderer", e)
         }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        viewportWidth = width
+        viewportHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
-        GLES30.glViewport(0, 0, width, height)
+        GLES20.glViewport(0, 0, width, height)
         slamManager.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        if (!isInitialized) return
         val currentSession = session ?: return
-
-        if (!isResumed) {
-            try {
-                currentSession.resume()
-                isResumed = true
-            } catch (e: Exception) {
-                Log.e("ArRenderer", "Failed to resume session", e)
-                return
-            }
-        }
 
         displayRotationHelper.updateSessionIfNeeded(currentSession)
 
@@ -210,32 +201,35 @@ class ArRenderer(
                     val config = Config(session)
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                    if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
-                        config.depthMode = Config.DepthMode.AUTOMATIC
-                    }
                     session!!.configure(config)
                 }
             } catch (e: Exception) {
                 Log.e("ArRenderer", "ARCore Session creation failed", e)
             }
         }
+
+        try {
+            session?.resume()
+            displayRotationHelper.onResume()
+        } catch (e: CameraNotAvailableException) {
+            Log.e("ArRenderer", "Camera not available", e)
+            session = null
+        }
     }
 
     fun onPause() {
-        isResumed = false
         displayRotationHelper.onPause()
         session?.pause()
     }
 
     fun cleanup() {
-        isInitialized = false
         session?.close()
         session = null
         slamManager.destroyNative()
     }
 
     fun setFlashlight(on: Boolean) {
-        showMiniMap = on // Mock use to prevent unused warning if necessary, though logic should be added
+        isFlashlightOn = on
     }
 
     fun triggerCapture() {

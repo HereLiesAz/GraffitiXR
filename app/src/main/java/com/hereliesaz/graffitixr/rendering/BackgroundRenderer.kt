@@ -11,6 +11,7 @@ import java.nio.FloatBuffer
 
 class BackgroundRenderer {
     private lateinit var quadVertices: FloatBuffer
+    private lateinit var quadTexCoord: FloatBuffer
     private lateinit var quadTexCoordTransformed: FloatBuffer
     private lateinit var quadCoords2D: FloatBuffer
 
@@ -25,10 +26,6 @@ class BackgroundRenderer {
     private var hasTransformedCoords = false
 
     fun createOnGlThread() {
-        if (textureId != -1) {
-            GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
-        }
-
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
         textureId = textures[0]
@@ -39,26 +36,40 @@ class BackgroundRenderer {
         GLES20.glTexParameteri(textureTarget, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
 
         val numVertices = 4
-        val bbVertices = ByteBuffer.allocateDirect(numVertices * 3 * 4)
-        bbVertices.order(ByteOrder.nativeOrder())
-        quadVertices = bbVertices.asFloatBuffer()
-        quadVertices.put(QUAD_COORDS)
-        quadVertices.position(0)
+        if (!::quadVertices.isInitialized) {
+            val bbVertices = ByteBuffer.allocateDirect(numVertices * 3 * 4)
+            bbVertices.order(ByteOrder.nativeOrder())
+            quadVertices = bbVertices.asFloatBuffer()
+            quadVertices.put(QUAD_COORDS)
+            quadVertices.position(0)
+        }
 
-        val bbCoords2D = ByteBuffer.allocateDirect(numVertices * 2 * 4)
-        bbCoords2D.order(ByteOrder.nativeOrder())
-        quadCoords2D = bbCoords2D.asFloatBuffer()
-        quadCoords2D.put(floatArrayOf(
-            -1.0f, -1.0f,
-            -1.0f, 1.0f,
-            1.0f, -1.0f,
-            1.0f, 1.0f
-        ))
-        quadCoords2D.position(0)
+        if (!::quadCoords2D.isInitialized) {
+            val bbCoords2D = ByteBuffer.allocateDirect(numVertices * 2 * 4)
+            bbCoords2D.order(ByteOrder.nativeOrder())
+            quadCoords2D = bbCoords2D.asFloatBuffer()
+            quadCoords2D.put(floatArrayOf(
+                -1.0f, -1.0f,
+                -1.0f, 1.0f,
+                1.0f, -1.0f,
+                1.0f, 1.0f
+            ))
+            quadCoords2D.position(0)
+        }
 
-        val bbTexCoordsTransformed = ByteBuffer.allocateDirect(numVertices * 2 * 4)
-        bbTexCoordsTransformed.order(ByteOrder.nativeOrder())
-        quadTexCoordTransformed = bbTexCoordsTransformed.asFloatBuffer()
+        if (!::quadTexCoord.isInitialized) {
+            val bbTexCoords = ByteBuffer.allocateDirect(numVertices * 2 * 4)
+            bbTexCoords.order(ByteOrder.nativeOrder())
+            quadTexCoord = bbTexCoords.asFloatBuffer()
+            quadTexCoord.put(QUAD_TEXCOORDS)
+            quadTexCoord.position(0)
+        }
+
+        if (!::quadTexCoordTransformed.isInitialized) {
+            val bbTexCoordsTransformed = ByteBuffer.allocateDirect(numVertices * 2 * 4)
+            bbTexCoordsTransformed.order(ByteOrder.nativeOrder())
+            quadTexCoordTransformed = bbTexCoordsTransformed.asFloatBuffer()
+        }
 
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER)
         val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER)
@@ -82,8 +93,6 @@ class BackgroundRenderer {
     }
 
     fun draw(frame: Frame) {
-        if (textureId == -1) return
-
         if (frame.hasDisplayGeometryChanged() || !hasTransformedCoords) {
             quadCoords2D.position(0)
             quadTexCoordTransformed.position(0)
@@ -118,10 +127,6 @@ class BackgroundRenderer {
         GLES20.glDisableVertexAttribArray(quadTexCoordParam)
         GLES20.glDepthMask(true)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
-        
-        // CLEANUP STATE
-        GLES20.glUseProgram(0)
-        GLES20.glBindTexture(textureTarget, 0)
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {
@@ -148,6 +153,13 @@ class BackgroundRenderer {
             1.0f, 1.0f, 0.0f
         )
 
+        private val QUAD_TEXCOORDS = floatArrayOf(
+            0.0f, 1.0f,
+            0.0f, 0.0f,
+            1.0f, 1.0f,
+            1.0f, 0.0f
+        )
+
         private const val VERTEX_SHADER = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;
@@ -160,7 +172,7 @@ class BackgroundRenderer {
 
         private const val FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
-            precision highp float;
+            precision mediump float;
             varying vec2 v_TexCoord;
             uniform samplerExternalOES u_Texture;
             void main() {
