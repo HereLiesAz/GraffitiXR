@@ -99,7 +99,6 @@ class MainViewModel @JvmOverloads constructor(
                     if (isStable) {
                         if (stableStartTime == 0L) stableStartTime = now
                         else if (now - stableStartTime > 2000) {
-                            // Event-based trigger for UI to capture pose
                             viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCalibration) }
                             stableStartTime = 0L
                             lastRotationVector = null
@@ -152,7 +151,6 @@ class MainViewModel @JvmOverloads constructor(
         layer.copy(blendMode = ImageUtils.getNextBlendMode(layer.blendMode))
     }
 
-    // UPDATED: Now requires context passed in
     fun onRemoveBackgroundClicked(context: Context) {
         val activeId = _uiState.value.activeLayerId ?: return
         viewModelScope.launch {
@@ -191,7 +189,6 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
-    // UPDATED: Now requires context passed in
     fun onLineDrawingClicked(context: Context) {
         val activeId = _uiState.value.activeLayerId ?: return
         viewModelScope.launch {
@@ -249,18 +246,17 @@ class MainViewModel @JvmOverloads constructor(
 
     fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
 
-    // FIXED: Correct logic for advancing steps
+    // FIXED: Correct logic for advancing steps from INSTRUCTION
     fun onCaptureShutterClicked() {
         val step = _uiState.value.captureStep
         val mode = _uiState.value.targetCreationMode
 
         when (step) {
             CaptureStep.GRID_CONFIG -> {
-                // Done configuring grid -> Go to instruction
                 _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
             }
             CaptureStep.INSTRUCTION -> {
-                // "START" button pressed. Transition to the capture phase based on mode.
+                // Transition to capture phase instead of taking immediate photo
                 val nextStep = when (mode) {
                     TargetCreationMode.GUIDED_GRID, TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
                     TargetCreationMode.RECTIFY -> CaptureStep.FRONT
@@ -270,23 +266,20 @@ class MainViewModel @JvmOverloads constructor(
                 _uiState.update { it.copy(captureStep = nextStep) }
             }
             else -> {
-                // For all other phases (Actual capture), take the photo.
                 viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCapture) }
             }
         }
     }
 
-    // FIXED: Advance state based on step, not just "isMultiImage"
+    // FIXED: Advance state based on step type
     fun saveCapturedBitmap(b: Bitmap) {
         _uiState.update { state ->
             val newImages = state.capturedTargetImages + b
             
             val nextStep = when (state.captureStep) {
-                // Single shot modes
                 CaptureStep.FRONT -> CaptureStep.RECTIFY
-                CaptureStep.GUIDED_CAPTURE -> CaptureStep.REVIEW // Assuming grid is single shot
-                // Multi shot modes (stay on step)
-                CaptureStep.PHOTO_SEQUENCE -> CaptureStep.PHOTO_SEQUENCE
+                CaptureStep.GUIDED_CAPTURE -> CaptureStep.REVIEW
+                CaptureStep.PHOTO_SEQUENCE -> CaptureStep.PHOTO_SEQUENCE // Stay until "Done"
                 else -> CaptureStep.REVIEW
             }
 
@@ -297,7 +290,7 @@ class MainViewModel @JvmOverloads constructor(
     fun setTouchLocked(l: Boolean) = _uiState.update { it.copy(isTouchLocked = l) }
     fun setHandedness(rightHanded: Boolean) { prefs.edit().putBoolean("is_right_handed", rightHanded).apply(); _uiState.update { it.copy(isRightHanded = rightHanded) } }
     fun toggleImageLock() = _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
-    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) } } // Renderer observes state
+    fun onToggleFlashlight() { _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) } } 
     fun toggleMappingMode() = _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
 
     fun loadAvailableProjects(context: Context) {
