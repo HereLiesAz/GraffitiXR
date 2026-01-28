@@ -8,7 +8,7 @@ MobileGS *gMobileGS = nullptr;
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_initNative(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
     if (!gMobileGS) {
         gMobileGS = new MobileGS();
         gMobileGS->initialize();
@@ -24,7 +24,7 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_destroyNativeJni(JNIEnv *env, jo
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCamera(JNIEnv *env, jobject thiz, jfloatArray viewMtx, jfloatArray projMtx) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCameraJni(JNIEnv *env, jobject thiz, jfloatArray viewMtx, jfloatArray projMtx) {
     if (!gMobileGS) return;
     jfloat* view = env->GetFloatArrayElements(viewMtx, 0);
     jfloat* proj = env->GetFloatArrayElements(projMtx, 0);
@@ -34,25 +34,25 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCamera(JNIEnv *env, jobjec
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_draw(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_drawJni(JNIEnv *env, jobject thiz) {
     if (gMobileGS) {
         gMobileGS->draw();
     }
 }
 
 JNIEXPORT jint JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_getPointCount(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz) {
     if (gMobileGS) return gMobileGS->getPointCount();
     return 0;
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_onSurfaceChanged(JNIEnv *env, jobject thiz, jint width, jint height) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jint width, jint height) {
     // Pass to native if needed
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jstring path) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorldJni(JNIEnv *env, jobject thiz, jstring path) {
     if (!gMobileGS) return false;
     const char *nativePath = env->GetStringUTFChars(path, 0);
     bool result = gMobileGS->saveModel(std::string(nativePath));
@@ -61,7 +61,7 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject t
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jstring path) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_loadWorldJni(JNIEnv *env, jobject thiz, jstring path) {
     if (!gMobileGS) return false;
     const char *nativePath = env->GetStringUTFChars(path, 0);
     bool result = gMobileGS->loadModel(std::string(nativePath));
