@@ -37,14 +37,9 @@ import kotlinx.coroutines.launch
 fun TraceScreen(
     uiState: UiState,
     onOverlayImageSelected: (Uri) -> Unit,
-    onScaleChanged: (Float) -> Unit,
-    onRotationZChanged: (Float) -> Unit,
-    onRotationXChanged: (Float) -> Unit,
-    onRotationYChanged: (Float) -> Unit,
-    onOffsetChanged: (Offset) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
-    onGestureEnd: () -> Unit
+    onGestureEnd: (Float, Offset, Float, Float, Float) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -55,107 +50,96 @@ fun TraceScreen(
     val currentUiState by rememberUpdatedState(uiState)
 
     // Resolve Active Layer
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
-    val scale = activeLayer?.scale ?: 1f
-    val offset = activeLayer?.offset ?: Offset.Zero
-    val rotationX = activeLayer?.rotationX ?: 0f
-    val rotationY = activeLayer?.rotationY ?: 0f
-    val rotationZ = activeLayer?.rotationZ ?: 0f
-    val opacity = activeLayer?.opacity ?: 1f
-    val blendMode = activeLayer?.blendMode ?: BlendMode.SrcOver
-    val contrast = activeLayer?.contrast ?: 1f
-    val saturation = activeLayer?.saturation ?: 1f
-    val colorBalanceR = activeLayer?.colorBalanceR ?: 1f
-    val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
-    val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
+    val activeLayer = uiState.activeLayer
 
-    val colorMatrix = remember(saturation, contrast, colorBalanceR, colorBalanceG, colorBalanceB) {
-        ColorMatrix().apply {
-            setToSaturation(saturation)
-            val contrastMatrix = ColorMatrix(
-                floatArrayOf(
-                    contrast, 0f, 0f, 0f, (1 - contrast) * 128,
-                    0f, contrast, 0f, 0f, (1 - contrast) * 128,
-                    0f, 0f, contrast, 0f, (1 - contrast) * 128,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-            val colorBalanceMatrix = ColorMatrix(
-                floatArrayOf(
-                    colorBalanceR, 0f, 0f, 0f, 0f,
-                    0f, colorBalanceG, 0f, 0f, 0f,
-                    0f, 0f, colorBalanceB, 0f, 0f,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-            timesAssign(contrastMatrix)
-            timesAssign(colorBalanceMatrix)
-        }
-    }
+    val transformState = rememberLayerTransformState(activeLayer)
+    val scale = transformState.scale
+    val offset = transformState.offset
+    val rotationX = transformState.rotationX
+    val rotationY = transformState.rotationY
+    val rotationZ = transformState.rotationZ
 
     Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        activeLayer?.uri?.let { uri ->
-            var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { containerSize = it }
+            .clipToBounds()
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+            }
+            .pointerInput(activeLayer?.id) { // Re-bind gestures if active layer changes
+                val activeId = activeLayer?.id ?: return@pointerInput
 
-            LaunchedEffect(uri) {
-                coroutineScope.launch {
-                    val request = ImageRequest.Builder(context)
-                        .data(uri)
-                        .build()
-                    val result =
-                        (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                    imageBitmap = result
+                detectSmartOverlayGestures(
+                    getValidBounds = {
+                        // For bounding box, we assume the layer fills/centers reasonably or use 0-size as fallback
+                        Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
+                    },
+                    onGestureStart = {
+                        transformState.isGesturing = true
+                        onGestureStart()
+                    },
+                    onGestureEnd = {
+                        transformState.isGesturing = false
+                        onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
+                    }
+                ) { _, pan, zoom, rotation ->
+                    transformState.scale *= zoom
+                    transformState.offset += pan
+                    when (currentUiState.activeRotationAxis) {
+                        RotationAxis.X -> transformState.rotationX += rotation
+                        RotationAxis.Y -> transformState.rotationY += rotation
+                        RotationAxis.Z -> transformState.rotationZ += rotation
+                    }
                 }
             }
+    ) {
+        uiState.layers.forEach { layer ->
+            if (layer.isVisible) {
+                val isLayerActive = layer.id == activeLayer?.id
+                val scale = if (isLayerActive) transformState.scale else layer.scale
+                val offset = if (isLayerActive) transformState.offset else layer.offset
+                val rotationX = if (isLayerActive) transformState.rotationX else layer.rotationX
+                val rotationY = if (isLayerActive) transformState.rotationY else layer.rotationY
+                val rotationZ = if (isLayerActive) transformState.rotationZ else layer.rotationZ
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .onSizeChanged { containerSize = it }
-                    .clipToBounds()
-                    // Layer 1: Double Tap (Must be first to intercept)
-                    .pointerInput(Unit) {
-                        detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                var layerBitmap by remember(layer.uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+                LaunchedEffect(layer.uri) {
+                    coroutineScope.launch {
+                        val request = ImageRequest.Builder(context)
+                            .data(layer.uri)
+                            .build()
+                        val result = (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                        layerBitmap = result
                     }
-                    // Layer 2: Unified Smart Gestures
-                    // We only restart if the imageBitmap reference changes.
-                    // UI state changes (offset, scale, axis) are handled via rememberUpdatedState.
-                    .pointerInput(imageBitmap) {
-                        val bmp = imageBitmap ?: return@pointerInput
+                }
 
-                        detectSmartOverlayGestures(
-                            getValidBounds = {
-                                // Calculate bounds dynamically using the LATEST state
-                                val state = currentUiState
-                                val currentLayer = state.layers.find { it.id == state.activeLayerId } ?: state.layers.firstOrNull()
-                                val currentScale = currentLayer?.scale ?: 1f
-                                val currentOffset = currentLayer?.offset ?: Offset.Zero
-
-                                val imgWidth = bmp.width * currentScale
-                                val imgHeight = bmp.height * currentScale
-                                val centerX = size.width / 2f + currentOffset.x
-                                val centerY = size.height / 2f + currentOffset.y
-                                val left = centerX - imgWidth / 2f
-                                val top = centerY - imgHeight / 2f
-                                Rect(left, top, left + imgWidth, top + imgHeight)
-                            },
-                            onGestureStart = onGestureStart,
-                            onGestureEnd = onGestureEnd
-                        ) { _, pan, zoom, rotation ->
-                            onScaleChanged(zoom)
-                            onOffsetChanged(pan)
-                            // Use currentUiState to get the active axis at the moment of rotation
-                            when (currentUiState.activeRotationAxis) {
-                                RotationAxis.X -> onRotationXChanged(rotation)
-                                RotationAxis.Y -> onRotationYChanged(rotation)
-                                RotationAxis.Z -> onRotationZChanged(rotation)
-                            }
-                        }
+                val layerColorMatrix = remember(layer.saturation, layer.contrast, layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB) {
+                    ColorMatrix().apply {
+                        setToSaturation(layer.saturation)
+                        val contrastMatrix = ColorMatrix(
+                            floatArrayOf(
+                                layer.contrast, 0f, 0f, 0f, (1 - layer.contrast) * 128,
+                                0f, layer.contrast, 0f, 0f, (1 - layer.contrast) * 128,
+                                0f, 0f, layer.contrast, 0f, (1 - layer.contrast) * 128,
+                                0f, 0f, 0f, 1f, 0f
+                            )
+                        )
+                        val colorBalanceMatrix = ColorMatrix(
+                            floatArrayOf(
+                                layer.colorBalanceR, 0f, 0f, 0f, 0f,
+                                0f, layer.colorBalanceG, 0f, 0f, 0f,
+                                0f, 0f, layer.colorBalanceB, 0f, 0f,
+                                0f, 0f, 0f, 1f, 0f
+                            )
+                        )
+                        timesAssign(contrastMatrix)
+                        timesAssign(colorBalanceMatrix)
                     }
-            ) {
-                imageBitmap?.let { bmp ->
+                }
+
+                layerBitmap?.let { bmp ->
                     Canvas(
                         modifier = Modifier
                             .fillMaxSize()
@@ -175,9 +159,9 @@ fun TraceScreen(
                         drawImage(
                             image = bmp.asImageBitmap(),
                             topLeft = Offset(xOffset, yOffset),
-                            alpha = opacity,
-                            colorFilter = ColorFilter.colorMatrix(colorMatrix),
-                            blendMode = blendMode
+                            alpha = layer.opacity,
+                            colorFilter = ColorFilter.colorMatrix(layerColorMatrix),
+                            blendMode = layer.blendMode
                         )
                     }
                 }
