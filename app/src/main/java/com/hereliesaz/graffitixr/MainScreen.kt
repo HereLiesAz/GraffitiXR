@@ -322,6 +322,7 @@ private fun MainContentLayer(uiState: UiState, viewModel: MainViewModel, gesture
         val onEnd: () -> Unit = { viewModel.onGestureEnd(); onGestureToggle(false) }
         val onOverlayGestureEnd: (Float, Offset, Float, Float, Float) -> Unit = { s, o, rx, ry, rz ->
             viewModel.setLayerTransform(s, o, rx, ry, rz)
+            viewModel.onGestureEnd()
             onGestureToggle(false)
         }
 

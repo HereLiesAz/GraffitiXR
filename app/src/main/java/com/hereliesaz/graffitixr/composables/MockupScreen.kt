@@ -55,23 +55,7 @@ fun MockupScreen(
 
     // Local State for smooth gestures (Active Layer)
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
-    var isGesturing by remember { mutableStateOf(false) }
-    var currentScale by remember { mutableFloatStateOf(activeLayer?.scale ?: 1f) }
-    var currentOffset by remember { mutableStateOf(activeLayer?.offset ?: Offset.Zero) }
-    var currentRotationX by remember { mutableFloatStateOf(activeLayer?.rotationX ?: 0f) }
-    var currentRotationY by remember { mutableFloatStateOf(activeLayer?.rotationY ?: 0f) }
-    var currentRotationZ by remember { mutableFloatStateOf(activeLayer?.rotationZ ?: 0f) }
-
-    // Sync state if not gesturing
-    LaunchedEffect(activeLayer) {
-        if (!isGesturing && activeLayer != null) {
-            currentScale = activeLayer.scale
-            currentOffset = activeLayer.offset
-            currentRotationX = activeLayer.rotationX
-            currentRotationY = activeLayer.rotationY
-            currentRotationZ = activeLayer.rotationZ
-        }
-    }
+    val transformState = rememberLayerTransformState(activeLayer)
 
     Box(modifier = Modifier.fillMaxSize()) {
         uiState.backgroundImageUri?.let {
@@ -99,20 +83,20 @@ fun MockupScreen(
                             Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
                         },
                         onGestureStart = {
-                            isGesturing = true
+                            transformState.isGesturing = true
                             onGestureStart()
                         },
                         onGestureEnd = {
-                            isGesturing = false
-                            onGestureEnd(currentScale, currentOffset, currentRotationX, currentRotationY, currentRotationZ)
+                            transformState.isGesturing = false
+                            onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
                         }
                     ) { _, pan, zoom, rotation ->
-                        currentScale *= zoom
-                        currentOffset += pan
+                        transformState.scale *= zoom
+                        transformState.offset += pan
                         when (currentUiState.activeRotationAxis) {
-                            RotationAxis.X -> currentRotationX += rotation
-                            RotationAxis.Y -> currentRotationY += rotation
-                            RotationAxis.Z -> currentRotationZ += rotation
+                            RotationAxis.X -> transformState.rotationX += rotation
+                            RotationAxis.Y -> transformState.rotationY += rotation
+                            RotationAxis.Z -> transformState.rotationZ += rotation
                         }
                     }
                 }
@@ -120,11 +104,11 @@ fun MockupScreen(
             uiState.layers.forEach { layer ->
                 if (layer.isVisible) {
                     val isLayerActive = layer.id == uiState.activeLayerId
-                    val scale = if (isLayerActive) currentScale else layer.scale
-                    val offset = if (isLayerActive) currentOffset else layer.offset
-                    val rotationX = if (isLayerActive) currentRotationX else layer.rotationX
-                    val rotationY = if (isLayerActive) currentRotationY else layer.rotationY
-                    val rotationZ = if (isLayerActive) currentRotationZ else layer.rotationZ
+                    val scale = if (isLayerActive) transformState.scale else layer.scale
+                    val offset = if (isLayerActive) transformState.offset else layer.offset
+                    val rotationX = if (isLayerActive) transformState.rotationX else layer.rotationX
+                    val rotationY = if (isLayerActive) transformState.rotationY else layer.rotationY
+                    val rotationZ = if (isLayerActive) transformState.rotationZ else layer.rotationZ
 
                     var layerBitmap by remember(layer.uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
 

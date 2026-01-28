@@ -61,30 +61,12 @@ fun OverlayScreen(
     // Resolve Active Layer
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
 
-    // Local State for smooth gestures
-    var isGesturing by remember { mutableStateOf(false) }
-    var currentScale by remember { mutableFloatStateOf(activeLayer?.scale ?: 1f) }
-    var currentOffset by remember { mutableStateOf(activeLayer?.offset ?: Offset.Zero) }
-    var currentRotationX by remember { mutableFloatStateOf(activeLayer?.rotationX ?: 0f) }
-    var currentRotationY by remember { mutableFloatStateOf(activeLayer?.rotationY ?: 0f) }
-    var currentRotationZ by remember { mutableFloatStateOf(activeLayer?.rotationZ ?: 0f) }
-
-    // Sync state if not gesturing
-    LaunchedEffect(activeLayer) {
-        if (!isGesturing && activeLayer != null) {
-            currentScale = activeLayer.scale
-            currentOffset = activeLayer.offset
-            currentRotationX = activeLayer.rotationX
-            currentRotationY = activeLayer.rotationY
-            currentRotationZ = activeLayer.rotationZ
-        }
-    }
-
-    val scale = currentScale
-    val offset = currentOffset
-    val rotationX = currentRotationX
-    val rotationY = currentRotationY
-    val rotationZ = currentRotationZ
+    val transformState = rememberLayerTransformState(activeLayer)
+    val scale = transformState.scale
+    val offset = transformState.offset
+    val rotationX = transformState.rotationX
+    val rotationY = transformState.rotationY
+    val rotationZ = transformState.rotationZ
 
     val opacity = activeLayer?.opacity ?: 1f
     val blendMode = activeLayer?.blendMode ?: BlendMode.SrcOver
@@ -212,29 +194,29 @@ fun OverlayScreen(
 
                         detectSmartOverlayGestures(
                             getValidBounds = {
-                                val imgWidth = bmp.width * currentScale
-                                val imgHeight = bmp.height * currentScale
-                                val centerX = size.width / 2f + currentOffset.x
-                                val centerY = size.height / 2f + currentOffset.y
+                                val imgWidth = bmp.width * transformState.scale
+                                val imgHeight = bmp.height * transformState.scale
+                                val centerX = size.width / 2f + transformState.offset.x
+                                val centerY = size.height / 2f + transformState.offset.y
                                 val left = centerX - imgWidth / 2f
                                 val top = centerY - imgHeight / 2f
                                 Rect(left, top, left + imgWidth, top + imgHeight)
                             },
                             onGestureStart = {
-                                isGesturing = true
+                                transformState.isGesturing = true
                                 onGestureStart()
                             },
                             onGestureEnd = {
-                                isGesturing = false
-                                onGestureEnd(currentScale, currentOffset, currentRotationX, currentRotationY, currentRotationZ)
+                                transformState.isGesturing = false
+                                onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
                             }
                         ) { _, pan, zoom, rotation ->
-                            currentScale *= zoom
-                            currentOffset += pan
+                            transformState.scale *= zoom
+                            transformState.offset += pan
                             when (currentUiState.activeRotationAxis) {
-                                RotationAxis.X -> currentRotationX += rotation
-                                RotationAxis.Y -> currentRotationY += rotation
-                                RotationAxis.Z -> currentRotationZ += rotation
+                                RotationAxis.X -> transformState.rotationX += rotation
+                                RotationAxis.Y -> transformState.rotationY += rotation
+                                RotationAxis.Z -> transformState.rotationZ += rotation
                             }
                         }
                     }
