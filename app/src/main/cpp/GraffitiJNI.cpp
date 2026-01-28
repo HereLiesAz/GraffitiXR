@@ -2,6 +2,9 @@
 #include <string>
 #include "MobileGS.h"
 
+// FIX: Global pointer definition was missing
+MobileGS *gMobileGS = nullptr;
+
 extern "C" {
 
 JNIEXPORT void JNICALL
@@ -48,7 +51,6 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_onSurfaceChanged(JNIEnv *env, jo
     // Pass to native if needed
 }
 
-// FIX: Return jboolean to indicate success/failure
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jstring path) {
     if (!gMobileGS) return false;
