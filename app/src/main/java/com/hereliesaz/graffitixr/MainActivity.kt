@@ -3,11 +3,14 @@ package com.hereliesaz.graffitixr
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -56,6 +59,8 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        forceCameraRelease()
+
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.captureEvent.collect { event ->
@@ -93,9 +98,36 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun forceCameraRelease() {
+        try {
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+            cameraProviderFuture.addListener({
+                try {
+                    val cameraProvider = cameraProviderFuture.get()
+                    cameraProvider.unbindAll()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }, ContextCompat.getMainExecutor(this))
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
     override fun onResume() {
         super.onResume()
-        arRenderer?.onResume(this)
+
+        if (viewModel.uiState.value.editorMode == EditorMode.AR) {
+            forceCameraRelease()
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (!isFinishing && !isDestroyed) {
+                    arRenderer?.onResume(this)
+                }
+            }, 500)
+        } else {
+            arRenderer?.onResume(this)
+        }
+
         viewModel.onResume()
         if (locationTracker.hasPermissions()) {
             locationTracker.startLocationUpdates { location ->
@@ -110,11 +142,13 @@ class MainActivity : ComponentActivity() {
         viewModel.onPause()
         locationTracker.stopLocationUpdates()
 
-        // Auto-save project state with a thumbnail
-        // FIX: Only capture if activity is valid to avoid PixelCopy errors
         if (!isFinishing && !isDestroyed) {
-            com.hereliesaz.graffitixr.utils.captureWindow(this) { bitmap ->
-                viewModel.autoSaveProject(this, bitmap)
+            try {
+                com.hereliesaz.graffitixr.utils.captureWindow(this) { bitmap ->
+                    viewModel.autoSaveProject(this, bitmap)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -122,7 +156,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         arRenderer?.cleanup()
-        arRenderer = null // Drop reference
+        arRenderer = null
         locationTracker.stopLocationUpdates()
     }
 

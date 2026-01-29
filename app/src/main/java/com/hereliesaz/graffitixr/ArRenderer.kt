@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
+import android.util.Log
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
@@ -40,12 +41,10 @@ class ArRenderer(
     var session: Session? = null
     private var displayRotationHelper: DisplayRotationHelper = DisplayRotationHelper(context)
 
-    // Renderers
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
     private val imageRenderer = ProjectedImageRenderer()
 
-    // Tools
     private val yuvConverter = YuvToRgbConverter(context)
     private var captureBitmap: Bitmap? = null
     private val captureLock = Any()
@@ -61,12 +60,13 @@ class ArRenderer(
     private var viewWidth = 0
     private var viewHeight = 0
     private var isFlashlightOn = false
-
-    @Volatile
-    private var captureNextFrame = false
-
-    // Prevents drawing before AR is ready
+    @Volatile private var captureNextFrame = false
     private var isSessionResumed = false
+    private var isSurfaceCreated = false
+
+    // THROTTLE: Limit depth processing to ~10 FPS to prevent CPU starvation
+    private var lastDepthTime = 0L
+    private val DEPTH_INTERVAL_MS = 100L
 
     private var layers: List<OverlayLayer> = emptyList()
     private val queuedTaps = Collections.synchronizedList(ArrayList<QueuedTap>())
@@ -79,9 +79,16 @@ class ArRenderer(
             backgroundRenderer.createOnGlThread()
             planeRenderer.createOnGlThread()
             imageRenderer.createOnGlThread()
+
+            // Re-enable Native
             slamManager.initNative()
+            isSurfaceCreated = true
+
+            if (session != null) {
+                session!!.setCameraTextureName(backgroundRenderer.textureId)
+            }
         } catch (e: IOException) {
-            e.printStackTrace()
+            Log.e("ArRenderer", "Failed to init GL", e)
         }
     }
 
@@ -96,16 +103,19 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
-        if (session == null || !isSessionResumed) return
+        if (session == null || !isSessionResumed || !isSurfaceCreated) return
 
         displayRotationHelper.updateSessionIfNeeded(session!!)
 
         try {
-            session!!.setCameraTextureName(backgroundRenderer.textureId)
+            if (backgroundRenderer.textureId != -1) {
+                session!!.setCameraTextureName(backgroundRenderer.textureId)
+            }
+
             val frame = session!!.update()
             val camera = frame.camera
 
-            // 1. Draw Background (Camera Feed) - Must happen first
+            // 1. Draw Background
             backgroundRenderer.draw(frame)
 
             onSessionUpdated?.invoke(session!!, frame)
@@ -117,29 +127,30 @@ class ArRenderer(
             val viewmtx = FloatArray(16)
             camera.getViewMatrix(viewmtx, 0)
 
-            val trackingState = camera.trackingState
-
-            if (trackingState == TrackingState.TRACKING) {
+            if (camera.trackingState == TrackingState.TRACKING) {
                 onTrackingFailure(null)
 
-                // 2. Feed Depth to Native Engine (Sync with Frame)
-                try {
-                    val depthImage = frame.acquireDepthImage16Bits()
-                    if (depthImage != null) {
-                        // Extract buffer and pass to C++
-                        val buffer = depthImage.planes[0].buffer
-                        slamManager.feedDepthData(buffer, depthImage.width, depthImage.height)
-                        depthImage.close()
+                // 2. Feed Depth to Native Engine (Throttled)
+                val now = System.currentTimeMillis()
+                if (now - lastDepthTime > DEPTH_INTERVAL_MS) {
+                    try {
+                        val depthImage = frame.acquireDepthImage16Bits()
+                        if (depthImage != null) {
+                            val buffer = depthImage.planes[0].buffer
+                            slamManager.feedDepthData(buffer, depthImage.width, depthImage.height)
+                            depthImage.close()
+                            lastDepthTime = now
+                        }
+                    } catch (e: Exception) {
+                        // Depth not available yet, ignore
                     }
-                } catch (e: Exception) {
-                    // Depth might not be available yet, harmless
                 }
 
                 // 3. Update & Draw SLAM Map
                 slamManager.updateCamera(viewmtx, projmtx)
                 slamManager.draw()
 
-                // 4. Draw Planes
+                // 4. Draw Planes (Visual verification of AR)
                 val planes = session!!.getAllTrackables(Plane::class.java)
                 val hasPlanes = planes.any { it.trackingState == TrackingState.TRACKING }
                 onPlanesDetected(hasPlanes)
@@ -147,7 +158,7 @@ class ArRenderer(
                     planeRenderer.drawPlanes(planes, viewmtx, projmtx)
                 }
 
-                // 5. Progress Update (Throttled)
+                // 5. Progress Update
                 val points = slamManager.getPointCount()
                 if (points > 0) {
                     val progress = (points / 10000f).coerceAtMost(1.0f) * 100
@@ -159,8 +170,7 @@ class ArRenderer(
             }
 
         } catch (t: Throwable) {
-            // Catching here prevents render thread crashes from taking down the app
-            t.printStackTrace()
+            // Log.e("ArRenderer", "Draw error", t)
         }
     }
 
@@ -185,13 +195,11 @@ class ArRenderer(
             captureNextFrame = false
             try {
                 val image = frame.acquireCameraImage()
-
                 synchronized(captureLock) {
                     if (captureBitmap == null || captureBitmap?.width != image.width || captureBitmap?.height != image.height) {
                         captureBitmap?.recycle()
                         captureBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                     }
-
                     captureBitmap?.let { bmp ->
                         yuvConverter.yuvToRgb(image, bmp)
                         val config = bmp.config ?: Bitmap.Config.ARGB_8888
@@ -216,9 +224,7 @@ class ArRenderer(
 
     fun createAnchor(pose: Pose): Anchor? {
         val anchor = session?.createAnchor(pose)
-        if (anchor != null) {
-            onAnchorCreated?.invoke(anchor)
-        }
+        if (anchor != null) onAnchorCreated?.invoke(anchor)
         return anchor
     }
 
@@ -231,11 +237,13 @@ class ArRenderer(
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                    config.depthMode = Config.DepthMode.AUTOMATIC // Ensure Depth is ON
+
+                    // RE-ENABLE DEPTH
+                    config.depthMode = Config.DepthMode.AUTOMATIC
+
                     session!!.configure(config)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
                 return
             }
         }
@@ -244,21 +252,28 @@ class ArRenderer(
             session!!.resume()
             isSessionResumed = true
             displayRotationHelper.onResume()
+            if (isSurfaceCreated && backgroundRenderer.textureId != -1) {
+                session!!.setCameraTextureName(backgroundRenderer.textureId)
+            }
+            // Ensure native is ready
+            slamManager.initNative()
         } catch (e: CameraNotAvailableException) {
             e.printStackTrace()
         }
     }
 
     fun onPause() {
+        isSessionResumed = false
         if (session != null) {
-            isSessionResumed = false
             displayRotationHelper.onPause()
             session!!.pause()
         }
+        slamManager.destroyNative()
     }
 
     fun cleanup() {
         isSessionResumed = false
+        isSurfaceCreated = false
         session?.close()
         session = null
         slamManager.destroyNative()
@@ -268,13 +283,6 @@ class ArRenderer(
 
     fun setFlashlight(on: Boolean) {
         isFlashlightOn = on
-        // Flashlight toggle requires config update in ARCore
-        val config = session?.config
-        if (config != null) {
-            // Currently ARCore doesn't expose simple torch API in basic Config easily
-            // without Camera2 interop or specific Lighting mode.
-            // Placeholder for now.
-        }
     }
 
     fun triggerCapture() {

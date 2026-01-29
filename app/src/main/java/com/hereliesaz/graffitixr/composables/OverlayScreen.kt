@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.composables
 
+import android.util.Log
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
@@ -10,6 +11,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -22,9 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -33,7 +35,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import android.util.Log
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -41,6 +42,7 @@ import com.hereliesaz.graffitixr.RotationAxis
 import com.hereliesaz.graffitixr.UiState
 import com.hereliesaz.graffitixr.utils.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
+import java.util.concurrent.ExecutionException
 
 @Composable
 fun OverlayScreen(
@@ -84,11 +86,24 @@ fun OverlayScreen(
                 camera?.cameraControl?.enableTorch(uiState.isFlashlightOn)
             }
         } catch (e: Exception) {
-            Log.e("OverlayScreen", "Failed to set torch state to ${uiState.isFlashlightOn}", e)
+            Log.e("OverlayScreen", "Failed to set torch state", e)
         }
     }
 
-    // Build the ColorMatrix based on slider values
+    // CRITICAL FIX: Ensure CameraX releases the camera when this screen is disposed
+    DisposableEffect(lifecycleOwner) {
+        onDispose {
+            try {
+                // Force unbind all use cases to free the camera for ARCore
+                if (cameraProviderFuture.isDone) {
+                    cameraProviderFuture.get().unbindAll()
+                }
+            } catch (e: Exception) {
+                Log.e("OverlayScreen", "Failed to unbind camera", e)
+            }
+        }
+    }
+
     val colorMatrix = remember(saturation, contrast, brightness, colorBalanceR, colorBalanceG, colorBalanceB) {
         ColorMatrix().apply {
             setToSaturation(saturation)
@@ -132,33 +147,25 @@ fun OverlayScreen(
                 val previewView = PreviewView(ctx)
                 val executor = ContextCompat.getMainExecutor(ctx)
                 cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                     try {
+                        val cameraProvider = cameraProviderFuture.get()
+                        // Ensure we start fresh
                         cameraProvider.unbindAll()
+
+                        val preview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
+                        }
+                        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                         camera = cameraProvider.bindToLifecycle(
                             lifecycleOwner,
                             cameraSelector,
                             preview
                         )
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Log.e("OverlayScreen", "CameraX init failed", e)
                     }
                 }, executor)
                 previewView
-            },
-            onRelease = {
-                // Ensure camera is released to avoid conflicts with AR mode
-                cameraProviderFuture.addListener({
-                    try {
-                        cameraProviderFuture.get().unbindAll()
-                    } catch (e: Exception) {
-                        Log.e("OverlayScreen", "Failed to unbind camera provider", e)
-                    }
-                }, ContextCompat.getMainExecutor(context))
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -168,7 +175,6 @@ fun OverlayScreen(
         imageUri?.let { uri ->
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
-            // Load the image asynchronously
             LaunchedEffect(uri) {
                 coroutineScope.launch {
                     val request = ImageRequest.Builder(context)
@@ -188,7 +194,6 @@ fun OverlayScreen(
                     .pointerInput(Unit) {
                         detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                     }
-                    // Handle gestures only when hitting the image bounds
                     .pointerInput(imageBitmap) {
                         val bmp = imageBitmap ?: return@pointerInput
 
