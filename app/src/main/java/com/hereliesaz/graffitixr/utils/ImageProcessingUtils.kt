@@ -140,19 +140,6 @@ object ImageProcessingUtils {
         return result
     }
 
-    fun generateFingerprint(bitmap: Bitmap): Fingerprint {
-        return generateFingerprintWithDepth(bitmap, ByteBuffer.allocate(0), 0, 0, floatArrayOf(0f, 0f, 0f, 0f))
-    }
-
-    /**
-     * Generates a Fingerprint with 3D depth information.
-     *
-     * @param bitmap The RGB image.
-     * @param depthBuffer Raw 16-bit depth buffer (from ARCore Image).
-     * @param depthWidth Width of depth image.
-     * @param depthHeight Height of depth image.
-     * @param intrinsics Camera intrinsics [fx, fy, cx, cy].
-     */
     fun generateFingerprintWithDepth(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer,
@@ -180,11 +167,9 @@ object ImageProcessingUtils {
             val cx = intrinsics[2]
             val cy = intrinsics[3]
 
-            // Scaling factors if depth image size differs from RGB image
-            val scaleX = if (bitmap.width > 0) depthWidth.toFloat() / bitmap.width else 0f
-            val scaleY = if (bitmap.height > 0) depthHeight.toFloat() / bitmap.height else 0f
+            val scaleX = depthWidth.toFloat() / bitmap.width
+            val scaleY = depthHeight.toFloat() / bitmap.height
 
-            // Rewind buffer for reading
             depthBuffer.rewind()
 
             for (kp in kpList) {
@@ -194,16 +179,14 @@ object ImageProcessingUtils {
                 val dU = (u * scaleX).toInt().coerceIn(0, depthWidth - 1)
                 val dV = (v * scaleY).toInt().coerceIn(0, depthHeight - 1)
 
-                // 2 bytes per pixel. Row stride assumption: width * 2 (usually true for dense depth)
                 val index = (dV * depthWidth + dU) * 2
-                // Buffer bounds check
-                if (depthWidth > 0 && index + 1 < depthBuffer.limit()) {
+                if (index + 1 < depthBuffer.limit()) {
                     val dLow = depthBuffer.get(index).toInt() and 0xFF
                     val dHigh = depthBuffer.get(index + 1).toInt() and 0xFF
                     val depthMm = (dHigh shl 8) or dLow
 
-                    if (depthMm > 0 && depthMm < 5000) { // Valid depth range
-                        val z = depthMm * 0.001f // mm to meters
+                    if (depthMm > 0 && depthMm < 5000) {
+                        val z = depthMm * 0.001f
                         val x = (u - cx) * z / fx
                         val y = (v - cy) * z / fy
 
@@ -211,7 +194,6 @@ object ImageProcessingUtils {
                         points3d.add(y.toFloat())
                         points3d.add(z)
                     } else {
-                        // Invalid depth, add dummy to keep index alignment
                         points3d.add(0f); points3d.add(0f); points3d.add(0f)
                     }
                 } else {
@@ -237,7 +219,7 @@ object ImageProcessingUtils {
     }
 
     /**
-     * Solves PnP to find the camera pose relative to the saved map.
+     * Solves PnP and converts the result to OpenGL Coordinate System.
      */
     fun solvePnP(
         sceneBitmap: Bitmap,
@@ -266,31 +248,25 @@ object ImageProcessingUtils {
         val matches = MatOfDMatch()
         matcher.match(savedDescriptors, sceneDescriptors, matches)
 
-        val goodMatches = matches.toList().filter { it.distance < 50.0f } // Strict threshold
+        val goodMatches = matches.toList().filter { it.distance < 50.0f }
         if (goodMatches.size < 10) {
             sceneMat.release(); sceneGray.release(); sceneKeypoints.release(); sceneDescriptors.release(); savedDescriptors.release(); matches.release()
             return null
         }
 
-        // Prepare points for PnP
         val objectPointsList = ArrayList<Point3>()
         val imagePointsList = ArrayList<Point>()
-
         val sceneKeypointsList = sceneKeypoints.toList()
 
         for (match in goodMatches) {
-            val qIdx = match.queryIdx // Index in saved fingerprint
-
-            // Check if we have valid depth for this point
-            // points3d is a flat list [x, y, z, x, y, z...]
+            val qIdx = match.queryIdx
             if (qIdx * 3 + 2 < fingerprint.points3d.size) {
                 val x = fingerprint.points3d[qIdx * 3]
                 val y = fingerprint.points3d[qIdx * 3 + 1]
                 val z = fingerprint.points3d[qIdx * 3 + 2]
 
-                if (z > 0.1f) { // Valid depth
+                if (z > 0.1f) {
                     objectPointsList.add(Point3(x.toDouble(), y.toDouble(), z.toDouble()))
-
                     val tIdx = match.trainIdx
                     imagePointsList.add(sceneKeypointsList[tIdx].pt)
                 }
@@ -315,7 +291,7 @@ object ImageProcessingUtils {
         cameraMatrix.put(1, 0, 0.0, fy, cy)
         cameraMatrix.put(2, 0, 0.0, 0.0, 1.0)
 
-        val distCoeffs = MatOfDouble(0.0, 0.0, 0.0, 0.0) // Assume 0 distortion for ARCore frames
+        val distCoeffs = MatOfDouble(0.0, 0.0, 0.0, 0.0)
 
         val rvec = Mat()
         val tvec = Mat()
@@ -325,34 +301,39 @@ object ImageProcessingUtils {
         var resultTransform: Mat? = null
 
         if (success) {
-            // Convert rvec/tvec to 4x4 transform
             val R = Mat()
             Calib3d.Rodrigues(rvec, R)
 
+            // Convert CV (Right-Down-Forward) to GL (Right-Up-Back)
+            // Matrix M_cv_to_gl = diag(1, -1, -1)
+            val cvToGl = Mat.eye(3, 3, CvType.CV_64F)
+            cvToGl.put(1, 1, -1.0)
+            cvToGl.put(2, 2, -1.0)
+
+            val R_gl = Mat()
+            Core.gemm(cvToGl, R, 1.0, Mat(), 0.0, R_gl)
+            // Also need to post-multiply? No, usually applying to camera pose.
+            // Simplified: T_gl = [R_gl | t_gl]
+            // where t_gl = cvToGl * t_cv
+
+            val t_gl = Mat()
+            Core.gemm(cvToGl, tvec, 1.0, Mat(), 0.0, t_gl)
+
             resultTransform = Mat.eye(4, 4, CvType.CV_64F)
 
-            // Copy rotation
             for(i in 0..2) {
                 for(j in 0..2) {
-                    val rotData = R.get(i, j)
-                    if (rotData != null) {
-                        resultTransform.put(i, j, rotData[0].toFloat().toDouble())
-                    }
+                    resultTransform.put(i, j, R_gl.get(i, j))
                 }
-            }
-
-            // Copy translation
-            for(i in 0..2) {
-                val transData = tvec.get(i, 0)
-                if (transData != null) {
-                    resultTransform.put(i, 3, transData[0].toFloat().toDouble())
-                }
+                resultTransform.put(i, 3, t_gl.get(i, 0))
             }
 
             R.release()
+            R_gl.release()
+            t_gl.release()
+            cvToGl.release()
         }
 
-        // Cleanup
         sceneMat.release()
         sceneGray.release()
         sceneKeypoints.release()
@@ -369,13 +350,11 @@ object ImageProcessingUtils {
         return resultTransform
     }
 
-    // Homography Logic (Legacy fallback)
     fun matchFingerprint(sceneBitmap: Bitmap, fingerprint: Fingerprint): Mat? {
-        // 1. Reconstruct Saved Descriptors from ByteArray
+        // [Same as previous logic for legacy homography]
         val savedDescriptors = Mat(fingerprint.descriptorsRows, fingerprint.descriptorsCols, fingerprint.descriptorsType)
         savedDescriptors.put(0, 0, fingerprint.descriptorsData)
 
-        // 2. Extract Features from Live Scene
         val sceneMat = Mat()
         Utils.bitmapToMat(sceneBitmap, sceneMat)
         val sceneGray = Mat()
@@ -391,12 +370,10 @@ object ImageProcessingUtils {
             return null
         }
 
-        // 3. Match Features (Hamming for ORB)
         val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
         val matches = MatOfDMatch()
         matcher.match(savedDescriptors, sceneDescriptors, matches)
 
-        // 4. Filter Matches (Distance Check)
         val matchList = matches.toList()
         if (matchList.isEmpty()) {
             cleanup(sceneMat, sceneGray, sceneKeypoints, sceneDescriptors, savedDescriptors, matches)

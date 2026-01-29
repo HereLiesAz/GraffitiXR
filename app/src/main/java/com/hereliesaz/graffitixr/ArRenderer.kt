@@ -33,24 +33,19 @@ class ArRenderer(
     private var displayRotationHelper: DisplayRotationHelper = DisplayRotationHelper(context)
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
-    val gridRenderer = GridRenderer() // Public for access if needed, or manage internally
+    val gridRenderer = GridRenderer()
 
     val slamManager = SlamManager()
     private val yuvConverter = YuvToRgbConverter(context)
-
-    var showMiniMap = false
-    var showGuide = false
 
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var onAnchorCreated: ((Anchor) -> Unit)? = null
 
     private var captureBitmap: Bitmap? = null
     @Volatile private var captureNextFrame = false
-    // New: Capture depth for PnP
     @Volatile private var captureFingerprint = false
     var onFingerprintReady: ((Fingerprint) -> Unit)? = null
 
-    // THROTTLE: Limit depth processing to ~10 FPS to prevent CPU starvation
     private var lastDepthTime = 0L
     private val DEPTH_INTERVAL_MS = 100L
 
@@ -59,6 +54,9 @@ class ArRenderer(
     private var viewWidth = 0
     private var viewHeight = 0
     private var isFlashlightOn = false
+
+    // NEW: Active Anchor state
+    private var currentAnchor: Anchor? = null
 
     private val queuedTaps = Collections.synchronizedList(ArrayList<QueuedTap>())
     data class QueuedTap(val x: Float, val y: Float)
@@ -106,7 +104,6 @@ class ArRenderer(
             onSessionUpdated?.invoke(session!!, frame)
             handleTaps(frame)
 
-            // Handle Captures
             if (captureNextFrame) {
                 captureNextFrame = false
                 try {
@@ -126,20 +123,17 @@ class ArRenderer(
                     if (depthImage != null) {
                         val bmp = convertImageToBitmap(image)
                         if (bmp != null) {
-                            // Extract intrinsics
                             val intrinsics = camera.imageIntrinsics
                             val fParams = floatArrayOf(
                                 intrinsics.focalLength[0], intrinsics.focalLength[1],
                                 intrinsics.principalPoint[0], intrinsics.principalPoint[1]
                             )
 
-                            // Copy depth buffer to avoid holding the image
                             val depthPlane = depthImage.planes[0]
                             val depthData = ByteBuffer.allocateDirect(depthPlane.buffer.limit())
                             depthPlane.buffer.rewind()
                             depthData.put(depthPlane.buffer)
 
-                            // Process off-thread to not stall render
                             val fp = ImageProcessingUtils.generateFingerprintWithDepth(
                                 bmp, depthData, depthImage.width, depthImage.height, fParams
                             )
@@ -161,7 +155,6 @@ class ArRenderer(
             if (camera.trackingState == TrackingState.TRACKING) {
                 onTrackingFailure(null)
 
-                // Feed Depth to SLAM (Throttled)
                 val now = System.currentTimeMillis()
                 if (now - lastDepthTime > DEPTH_INTERVAL_MS) {
                     try {
@@ -178,7 +171,6 @@ class ArRenderer(
                 slamManager.updateCamera(viewmtx, projmtx)
                 slamManager.draw()
 
-                // Draw Planes
                 val planes = session!!.getAllTrackables(Plane::class.java)
                 val hasPlanes = planes.any { it.trackingState == TrackingState.TRACKING }
                 onPlanesDetected(hasPlanes)
@@ -186,16 +178,18 @@ class ArRenderer(
                     planeRenderer.drawPlanes(planes, viewmtx, projmtx)
                 }
 
-                // Draw Anchors/Grid if present
-                // (Logic can be extended here to use gridRenderer for anchors)
+                // NEW: Draw Grid if Anchor is present and tracking
+                if (currentAnchor != null && currentAnchor!!.trackingState == TrackingState.TRACKING) {
+                    val anchorMtx = FloatArray(16)
+                    currentAnchor!!.pose.toMatrix(anchorMtx, 0)
+                    gridRenderer.draw(viewmtx, projmtx, anchorMtx)
+                }
 
             } else {
                 onTrackingFailure("Tracking lost")
             }
 
-        } catch (t: Throwable) {
-            // Log.e("ArRenderer", "Draw error", t)
-        }
+        } catch (t: Throwable) { }
     }
 
     private fun handleTaps(frame: Frame) {
@@ -208,6 +202,9 @@ class ArRenderer(
                 }
                 if (hitResult != null) {
                     val anchor = hitResult.createAnchor()
+                    // NEW: Update local anchor reference
+                    currentAnchor?.detach()
+                    currentAnchor = anchor
                     onAnchorCreated?.invoke(anchor)
                 }
             }
@@ -215,24 +212,19 @@ class ArRenderer(
     }
 
     private fun convertImageToBitmap(image: Image): Bitmap? {
-        // Helper to convert YUV to Bitmap
         synchronized(this) {
-            val width = image.width
-            val height = image.height
-            val config = Bitmap.Config.ARGB_8888
-            if (captureBitmap == null || captureBitmap?.width != width || captureBitmap?.height != height) {
-                captureBitmap = Bitmap.createBitmap(width, height, config)
+            if (captureBitmap == null || captureBitmap?.width != image.width || captureBitmap?.height != image.height) {
+                captureBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
             }
-            val targetBitmap = captureBitmap ?: return null
-            yuvConverter.yuvToRgb(image, targetBitmap)
-            return targetBitmap.copy(config, false)
+            yuvConverter.yuvToRgb(image, captureBitmap!!)
+            return captureBitmap?.copy(captureBitmap!!.config, false)
         }
     }
 
     fun triggerCapture() { captureNextFrame = true }
     fun triggerFingerprintCapture() { captureFingerprint = true }
 
-    fun updateLayers(newLayers: List<com.hereliesaz.graffitixr.data.OverlayLayer>) { /* Update layer logic */ }
+    fun updateLayers(newLayers: List<com.hereliesaz.graffitixr.data.OverlayLayer>) { }
     fun setFlashlight(on: Boolean) { isFlashlightOn = on }
     fun queueTap(x: Float, y: Float) { queuedTaps.add(QueuedTap(x, y)) }
 
@@ -281,10 +273,15 @@ class ArRenderer(
     }
 
     fun getLatestPose(): Pose? { return session?.update()?.camera?.pose }
-    fun generateFingerprint(bitmap: Bitmap): Fingerprint? { return ImageProcessingUtils.generateFingerprintWithDepth(bitmap, ByteBuffer.allocate(0), 0, 0, floatArrayOf(0f, 0f, 0f, 0f)) }
+    fun generateFingerprint(bitmap: Bitmap): Fingerprint? { return com.hereliesaz.graffitixr.utils.generateFingerprint(bitmap) }
+
     fun createAnchor(pose: Pose): Anchor? {
         val anchor = session?.createAnchor(pose)
-        if (anchor != null) onAnchorCreated?.invoke(anchor)
+        if (anchor != null) {
+            currentAnchor?.detach()
+            currentAnchor = anchor
+            onAnchorCreated?.invoke(anchor)
+        }
         return anchor
     }
 }
