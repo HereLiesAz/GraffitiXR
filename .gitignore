@@ -54,3 +54,4 @@ google-services.json
 
 build_log*.txt
 /gradle/gradle-daemon-jvm.properties
+project_backup_full_*

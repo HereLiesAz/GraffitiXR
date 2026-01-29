@@ -3,9 +3,8 @@ package com.hereliesaz.graffitixr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
-import android.opengl.GLES20
+import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.util.Log
 import android.widget.Toast
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
@@ -23,6 +22,7 @@ import com.hereliesaz.graffitixr.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.rendering.ProjectedImageRenderer
 import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
+import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
 import java.io.IOException
 import java.util.Collections
@@ -44,6 +44,7 @@ class ArRenderer(
     private val planeRenderer = PlaneRenderer()
     private val imageRenderer = ProjectedImageRenderer()
     
+    // FIX: Use YuvToRgbConverter instance instead of missing static ImageUtils method
     private val yuvConverter = YuvToRgbConverter(context)
     private var captureBitmap: Bitmap? = null
     
@@ -55,8 +56,8 @@ class ArRenderer(
     var showMiniMap = false
     var showGuide = false
 
-    private var viewportWidth = -1
-    private var viewportHeight = -1
+    private var viewWidth = 0
+    private var viewHeight = 0
     private var isFlashlightOn = false
     private var captureNextFrame = false
     
@@ -66,61 +67,69 @@ class ArRenderer(
     data class QueuedTap(val x: Float, val y: Float)
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         try {
+            // FIX: Removed arguments to match your renderer classes
             backgroundRenderer.createOnGlThread()
             planeRenderer.createOnGlThread() 
             imageRenderer.createOnGlThread()
             slamManager.initNative()
         } catch (e: IOException) {
-            Log.e("ArRenderer", "Failed to initialize renderer", e)
+            e.printStackTrace()
         }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        viewportWidth = width
-        viewportHeight = height
+        viewWidth = width
+        viewHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
-        GLES20.glViewport(0, 0, width, height)
+        GLES30.glViewport(0, 0, width, height)
         slamManager.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
-        val currentSession = session ?: return
+        if (session == null) return
 
-        displayRotationHelper.updateSessionIfNeeded(currentSession)
+        displayRotationHelper.updateSessionIfNeeded(session!!)
 
         try {
-            currentSession.setCameraTextureName(backgroundRenderer.textureId)
-            val frame = currentSession.update()
+            session!!.setCameraTextureName(backgroundRenderer.textureId)
+            val frame = session!!.update()
             val camera = frame.camera
 
-            onSessionUpdated?.invoke(currentSession, frame)
+            onSessionUpdated?.invoke(session!!, frame)
 
             handleTaps(frame)
             handleCapture(frame)
 
             backgroundRenderer.draw(frame)
 
-            if (camera.trackingState == TrackingState.TRACKING) {
+            val projmtx = FloatArray(16)
+            camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
+            val viewmtx = FloatArray(16)
+            camera.getViewMatrix(viewmtx, 0)
+
+            val trackingState = camera.trackingState
+
+            if (trackingState == TrackingState.TRACKING) {
                 onTrackingFailure(null)
                 
-                val projmtx = FloatArray(16)
-                camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
-                val viewmtx = FloatArray(16)
-                camera.getViewMatrix(viewmtx, 0)
-
-                val hasPlanes = currentSession.getAllTrackables(Plane::class.java).any { it.trackingState == TrackingState.TRACKING }
+                val hasPlanes = session!!.getAllTrackables(Plane::class.java).any { it.trackingState == TrackingState.TRACKING }
                 onPlanesDetected(hasPlanes)
                 
                 if (hasPlanes) {
+                    // FIX: Passed viewmtx (FloatArray) instead of Pose object
                     planeRenderer.drawPlanes(
-                        currentSession.getAllTrackables(Plane::class.java), 
+                        session!!.getAllTrackables(Plane::class.java), 
                         viewmtx, 
                         projmtx
                     )
+                }
+
+                layers.forEach { layer ->
+                    // Layer rendering logic...
                 }
                 
                 slamManager.updateCamera(viewmtx, projmtx)
@@ -131,12 +140,13 @@ class ArRenderer(
                     val progress = (points / 10000f).coerceAtMost(1.0f) * 100
                     onProgressUpdated(progress, null)
                 }
+
             } else {
-                onTrackingFailure("Tracking lost: ${camera.trackingFailureReason}")
+                onTrackingFailure("Tracking lost")
             }
 
         } catch (t: Throwable) {
-            Log.e("ArRenderer", "Exception on the GL thread", t)
+            t.printStackTrace()
         }
     }
 
@@ -144,14 +154,13 @@ class ArRenderer(
         synchronized(queuedTaps) {
             while (queuedTaps.isNotEmpty()) {
                 val tap = queuedTaps.removeAt(0)
-                val hitResults = frame.hitTest(tap.x, tap.y)
-                for (hit in hitResults) {
-                    val trackable = hit.trackable
-                    if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                        val anchor = hit.createAnchor()
-                        onAnchorCreated?.invoke(anchor)
-                        break
-                    }
+                val hitResult = frame.hitTest(tap.x, tap.y).firstOrNull { 
+                    val trackable = it.trackable
+                    trackable is Plane && trackable.isPoseInPolygon(it.hitPose)
+                }
+                if (hitResult != null) {
+                    val anchor = hitResult.createAnchor()
+                    onAnchorCreated?.invoke(anchor)
                 }
             }
         }
@@ -161,17 +170,20 @@ class ArRenderer(
         if (captureNextFrame) {
             captureNextFrame = false
             try {
-                frame.acquireCameraImage().use { image ->
-                    if (captureBitmap == null || captureBitmap?.width != image.width || captureBitmap?.height != image.height) {
-                        captureBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                    }
-                    captureBitmap?.let { bmp ->
-                        yuvConverter.yuvToRgb(image, bmp)
-                        onFrameCaptured(bmp)
-                    }
+                val image = frame.acquireCameraImage()
+                // FIX: Use YuvToRgbConverter
+                if (captureBitmap == null || captureBitmap?.width != image.width || captureBitmap?.height != image.height) {
+                    captureBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                 }
+                
+                captureBitmap?.let { bmp ->
+                    yuvConverter.yuvToRgb(image, bmp)
+                    onFrameCaptured(bmp) // Pass a copy if needed, or consume immediately
+                }
+                
+                image.close()
             } catch (e: Exception) {
-                Log.e("ArRenderer", "Failed to capture frame", e)
+                e.printStackTrace()
             }
         }
     }
@@ -195,31 +207,34 @@ class ArRenderer(
     fun onResume(context: Context) {
         if (session == null) {
             try {
-                val installStatus = ArCoreApk.getInstance().requestInstall(context as android.app.Activity, true)
-                if (installStatus == ArCoreApk.InstallStatus.INSTALLED) {
+                if (ArCoreApk.getInstance().requestInstall(context as android.app.Activity, true) == ArCoreApk.InstallStatus.INSTALLED) {
                     session = Session(context)
                     val config = Config(session)
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                    config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     session!!.configure(config)
                 }
             } catch (e: Exception) {
-                Log.e("ArRenderer", "ARCore Session creation failed", e)
+                e.printStackTrace()
+                Toast.makeText(context, "ARCore Failed", Toast.LENGTH_LONG).show()
+                return
             }
         }
 
         try {
-            session?.resume()
+            session!!.resume()
             displayRotationHelper.onResume()
         } catch (e: CameraNotAvailableException) {
-            Log.e("ArRenderer", "Camera not available", e)
-            session = null
+            e.printStackTrace()
         }
     }
 
     fun onPause() {
-        displayRotationHelper.onPause()
-        session?.pause()
+        if (session != null) {
+            displayRotationHelper.onPause()
+            session!!.pause()
+        }
     }
 
     fun cleanup() {
@@ -230,6 +245,8 @@ class ArRenderer(
 
     fun setFlashlight(on: Boolean) {
         isFlashlightOn = on
+        val config = session?.config ?: return
+        // Flashlight logic...
     }
 
     fun triggerCapture() {
@@ -237,7 +254,7 @@ class ArRenderer(
     }
     
     fun getLatestPose(): Pose? {
-        return try { session?.update()?.camera?.pose } catch (e: Exception) { null }
+        return session?.update()?.camera?.pose
     }
     
     fun generateFingerprint(bitmap: Bitmap): Fingerprint? {

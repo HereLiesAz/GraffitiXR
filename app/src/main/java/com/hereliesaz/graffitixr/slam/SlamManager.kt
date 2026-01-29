@@ -56,11 +56,14 @@ class SlamManager {
 
     // Placeholder for quality calculation
     fun updateFeatureMapQuality(session: Session, pose: Pose) {
+        // In a real implementation, you might query ARCore's estimate or native SLAM confidence
+        // For now, let's just simulate it based on point count or movement
         val count = getPointCount()
         val quality = (count / 5000f).coerceIn(0f, 1f)
         _mappingQuality.value = quality
     }
 
+    // FIX: Returns Boolean now
     external fun saveWorld(path: String): Boolean
     external fun loadWorld(path: String): Boolean
 

@@ -93,6 +93,7 @@ class BackgroundRenderer {
     }
 
     fun draw(frame: Frame) {
+        // Always transform coordinates if geometry changed OR if we haven't done it yet.
         if (frame.hasDisplayGeometryChanged() || !hasTransformedCoords) {
             quadCoords2D.position(0)
             quadTexCoordTransformed.position(0)
