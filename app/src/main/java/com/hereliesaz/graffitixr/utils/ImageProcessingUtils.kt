@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
-import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.data.Fingerprint
 import org.opencv.android.Utils
@@ -14,15 +13,17 @@ import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.DMatch
 import org.opencv.core.Mat
+import org.opencv.core.MatOfDouble
 import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.core.MatOfPoint2f
+import org.opencv.core.MatOfPoint3f
 import org.opencv.core.Point
-import org.opencv.core.Scalar
-import org.opencv.core.Size
+import org.opencv.core.Point3
 import org.opencv.features2d.DescriptorMatcher
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
+import java.nio.ByteBuffer
 
 object ImageProcessingUtils {
 
@@ -99,9 +100,6 @@ object ImageProcessingUtils {
         return result
     }
 
-    /**
-     * Rectifies a perspective-distorted image based on 4 normalized corner points.
-     */
     fun unwarpImage(bitmap: Bitmap, points: List<Offset>): Bitmap? {
         if (points.size != 4) return null
 
@@ -111,7 +109,6 @@ object ImageProcessingUtils {
         val w = srcMat.cols().toDouble()
         val h = srcMat.rows().toDouble()
 
-        // 1. Define Source Points (User's Quad)
         val srcPoints = MatOfPoint2f(
             Point(points[0].x * w, points[0].y * h), // TL
             Point(points[1].x * w, points[1].y * h), // TR
@@ -119,7 +116,6 @@ object ImageProcessingUtils {
             Point(points[3].x * w, points[3].y * h)  // BL
         )
 
-        // 2. Define Destination Points (Rectangular Image)
         val dstPoints = MatOfPoint2f(
             Point(0.0, 0.0),
             Point(w, 0.0),
@@ -127,11 +123,9 @@ object ImageProcessingUtils {
             Point(0.0, h)
         )
 
-        // 3. Compute Perspective Transform
         val transform = Imgproc.getPerspectiveTransform(srcPoints, dstPoints)
         val dstMat = Mat()
 
-        // 4. Apply Transform
         Imgproc.warpPerspective(srcMat, dstMat, transform, srcMat.size())
 
         val result = Bitmap.createBitmap(dstMat.cols(), dstMat.rows(), Bitmap.Config.ARGB_8888)
@@ -146,10 +140,236 @@ object ImageProcessingUtils {
         return result
     }
 
+    fun generateFingerprint(bitmap: Bitmap): Fingerprint {
+        return generateFingerprintWithDepth(bitmap, ByteBuffer.allocate(0), 0, 0, floatArrayOf(0f, 0f, 0f, 0f))
+    }
+
     /**
-     * Attempts to find the saved fingerprint in the current camera frame.
-     * Returns a Homography Matrix (3x3) if a match is found with sufficient inliers, null otherwise.
+     * Generates a Fingerprint with 3D depth information.
+     *
+     * @param bitmap The RGB image.
+     * @param depthBuffer Raw 16-bit depth buffer (from ARCore Image).
+     * @param depthWidth Width of depth image.
+     * @param depthHeight Height of depth image.
+     * @param intrinsics Camera intrinsics [fx, fy, cx, cy].
      */
+    fun generateFingerprintWithDepth(
+        bitmap: Bitmap,
+        depthBuffer: ByteBuffer,
+        depthWidth: Int,
+        depthHeight: Int,
+        intrinsics: FloatArray
+    ): Fingerprint {
+        val mat = Mat()
+        val gray = Mat()
+        val orb = ORB.create()
+        val keypoints = MatOfKeyPoint()
+        val descriptors = Mat()
+        val emptyMask = Mat()
+
+        try {
+            Utils.bitmapToMat(bitmap, mat)
+            Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
+            orb.detectAndCompute(gray, emptyMask, keypoints, descriptors)
+
+            val kpList = keypoints.toList()
+            val points3d = ArrayList<Float>()
+
+            val fx = intrinsics[0]
+            val fy = intrinsics[1]
+            val cx = intrinsics[2]
+            val cy = intrinsics[3]
+
+            // Scaling factors if depth image size differs from RGB image
+            val scaleX = if (bitmap.width > 0) depthWidth.toFloat() / bitmap.width else 0f
+            val scaleY = if (bitmap.height > 0) depthHeight.toFloat() / bitmap.height else 0f
+
+            // Rewind buffer for reading
+            depthBuffer.rewind()
+
+            for (kp in kpList) {
+                val u = kp.pt.x
+                val v = kp.pt.y
+
+                val dU = (u * scaleX).toInt().coerceIn(0, depthWidth - 1)
+                val dV = (v * scaleY).toInt().coerceIn(0, depthHeight - 1)
+
+                // 2 bytes per pixel. Row stride assumption: width * 2 (usually true for dense depth)
+                val index = (dV * depthWidth + dU) * 2
+                // Buffer bounds check
+                if (depthWidth > 0 && index + 1 < depthBuffer.limit()) {
+                    val dLow = depthBuffer.get(index).toInt() and 0xFF
+                    val dHigh = depthBuffer.get(index + 1).toInt() and 0xFF
+                    val depthMm = (dHigh shl 8) or dLow
+
+                    if (depthMm > 0 && depthMm < 5000) { // Valid depth range
+                        val z = depthMm * 0.001f // mm to meters
+                        val x = (u - cx) * z / fx
+                        val y = (v - cy) * z / fy
+
+                        points3d.add(x.toFloat())
+                        points3d.add(y.toFloat())
+                        points3d.add(z)
+                    } else {
+                        // Invalid depth, add dummy to keep index alignment
+                        points3d.add(0f); points3d.add(0f); points3d.add(0f)
+                    }
+                } else {
+                    points3d.add(0f); points3d.add(0f); points3d.add(0f)
+                }
+            }
+
+            val data = ByteArray(descriptors.rows() * descriptors.cols() * descriptors.elemSize().toInt())
+            if (data.isNotEmpty()) {
+                descriptors.get(0, 0, data)
+            }
+
+            return Fingerprint(kpList, points3d, data, descriptors.rows(), descriptors.cols(), descriptors.type())
+
+        } finally {
+            mat.release()
+            gray.release()
+            keypoints.release()
+            descriptors.release()
+            emptyMask.release()
+            orb.clear()
+        }
+    }
+
+    /**
+     * Solves PnP to find the camera pose relative to the saved map.
+     */
+    fun solvePnP(
+        sceneBitmap: Bitmap,
+        fingerprint: Fingerprint,
+        intrinsics: FloatArray
+    ): Mat? {
+        val savedDescriptors = Mat(fingerprint.descriptorsRows, fingerprint.descriptorsCols, fingerprint.descriptorsType)
+        savedDescriptors.put(0, 0, fingerprint.descriptorsData)
+
+        val sceneMat = Mat()
+        Utils.bitmapToMat(sceneBitmap, sceneMat)
+        val sceneGray = Mat()
+        Imgproc.cvtColor(sceneMat, sceneGray, Imgproc.COLOR_RGB2GRAY)
+
+        val orb = ORB.create()
+        val sceneKeypoints = MatOfKeyPoint()
+        val sceneDescriptors = Mat()
+        orb.detectAndCompute(sceneGray, Mat(), sceneKeypoints, sceneDescriptors)
+
+        if (sceneDescriptors.empty() || savedDescriptors.empty()) {
+            sceneMat.release(); sceneGray.release(); sceneKeypoints.release(); sceneDescriptors.release(); savedDescriptors.release()
+            return null
+        }
+
+        val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+        val matches = MatOfDMatch()
+        matcher.match(savedDescriptors, sceneDescriptors, matches)
+
+        val goodMatches = matches.toList().filter { it.distance < 50.0f } // Strict threshold
+        if (goodMatches.size < 10) {
+            sceneMat.release(); sceneGray.release(); sceneKeypoints.release(); sceneDescriptors.release(); savedDescriptors.release(); matches.release()
+            return null
+        }
+
+        // Prepare points for PnP
+        val objectPointsList = ArrayList<Point3>()
+        val imagePointsList = ArrayList<Point>()
+
+        val sceneKeypointsList = sceneKeypoints.toList()
+
+        for (match in goodMatches) {
+            val qIdx = match.queryIdx // Index in saved fingerprint
+
+            // Check if we have valid depth for this point
+            // points3d is a flat list [x, y, z, x, y, z...]
+            if (qIdx * 3 + 2 < fingerprint.points3d.size) {
+                val x = fingerprint.points3d[qIdx * 3]
+                val y = fingerprint.points3d[qIdx * 3 + 1]
+                val z = fingerprint.points3d[qIdx * 3 + 2]
+
+                if (z > 0.1f) { // Valid depth
+                    objectPointsList.add(Point3(x.toDouble(), y.toDouble(), z.toDouble()))
+
+                    val tIdx = match.trainIdx
+                    imagePointsList.add(sceneKeypointsList[tIdx].pt)
+                }
+            }
+        }
+
+        if (objectPointsList.size < 6) {
+            sceneMat.release(); sceneGray.release(); sceneKeypoints.release(); sceneDescriptors.release(); savedDescriptors.release(); matches.release()
+            return null
+        }
+
+        val objectPoints = MatOfPoint3f(*objectPointsList.toTypedArray())
+        val imagePoints = MatOfPoint2f(*imagePointsList.toTypedArray())
+
+        val fx = intrinsics[0].toDouble()
+        val fy = intrinsics[1].toDouble()
+        val cx = intrinsics[2].toDouble()
+        val cy = intrinsics[3].toDouble()
+
+        val cameraMatrix = Mat(3, 3, CvType.CV_64F)
+        cameraMatrix.put(0, 0, fx, 0.0, cx)
+        cameraMatrix.put(1, 0, 0.0, fy, cy)
+        cameraMatrix.put(2, 0, 0.0, 0.0, 1.0)
+
+        val distCoeffs = MatOfDouble(0.0, 0.0, 0.0, 0.0) // Assume 0 distortion for ARCore frames
+
+        val rvec = Mat()
+        val tvec = Mat()
+
+        val success = Calib3d.solvePnPRansac(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec)
+
+        var resultTransform: Mat? = null
+
+        if (success) {
+            // Convert rvec/tvec to 4x4 transform
+            val R = Mat()
+            Calib3d.Rodrigues(rvec, R)
+
+            resultTransform = Mat.eye(4, 4, CvType.CV_64F)
+
+            // Copy rotation
+            for(i in 0..2) {
+                for(j in 0..2) {
+                    val rotData = R.get(i, j)
+                    if (rotData != null) {
+                        resultTransform.put(i, j, rotData[0].toFloat().toDouble())
+                    }
+                }
+            }
+
+            // Copy translation
+            for(i in 0..2) {
+                val transData = tvec.get(i, 0)
+                if (transData != null) {
+                    resultTransform.put(i, 3, transData[0].toFloat().toDouble())
+                }
+            }
+
+            R.release()
+        }
+
+        // Cleanup
+        sceneMat.release()
+        sceneGray.release()
+        sceneKeypoints.release()
+        sceneDescriptors.release()
+        savedDescriptors.release()
+        matches.release()
+        objectPoints.release()
+        imagePoints.release()
+        cameraMatrix.release()
+        distCoeffs.release()
+        rvec.release()
+        tvec.release()
+
+        return resultTransform
+    }
+
+    // Homography Logic (Legacy fallback)
     fun matchFingerprint(sceneBitmap: Bitmap, fingerprint: Fingerprint): Mat? {
         // 1. Reconstruct Saved Descriptors from ByteArray
         val savedDescriptors = Mat(fingerprint.descriptorsRows, fingerprint.descriptorsCols, fingerprint.descriptorsType)
@@ -183,7 +403,6 @@ object ImageProcessingUtils {
             return null
         }
 
-        // Determine quality threshold (e.g., 2x min distance)
         var minDist = 100.0f
         var maxDist = 0.0f
         for (match in matchList) {
@@ -193,7 +412,6 @@ object ImageProcessingUtils {
         }
 
         val goodMatches = ArrayList<DMatch>()
-        // Threshold: strictly keep very good matches
         val threshold = (3.0f * minDist).coerceAtLeast(30.0f)
 
         for (match in matchList) {
@@ -202,13 +420,11 @@ object ImageProcessingUtils {
             }
         }
 
-        // Requirement: At least 20 good inliers to consider it a lock (per Architecture.md)
         if (goodMatches.size < 20) {
             cleanup(sceneMat, sceneGray, sceneKeypoints, sceneDescriptors, savedDescriptors, matches)
             return null
         }
 
-        // 5. Compute Homography
         val objPts = ArrayList<Point>()
         val scenePts = ArrayList<Point>()
 
@@ -223,7 +439,6 @@ object ImageProcessingUtils {
         val objMat = MatOfPoint2f(*objPts.toTypedArray())
         val sceneMat2f = MatOfPoint2f(*scenePts.toTypedArray())
 
-        // RANSAC to filter geometric outliers
         val homography = Calib3d.findHomography(objMat, sceneMat2f, Calib3d.RANSAC, 5.0)
 
         cleanup(sceneMat, sceneGray, sceneKeypoints, sceneDescriptors, savedDescriptors, matches, objMat, sceneMat2f)
@@ -235,77 +450,5 @@ object ImageProcessingUtils {
         for (mat in mats) {
             mat?.release()
         }
-    }
-}
-
-// Top-level functions
-fun detectFeaturesWithMask(bitmap: Bitmap): List<org.opencv.core.KeyPoint> {
-    val mat = Mat()
-    val gray = Mat()
-    val orb = ORB.create()
-    val keypoints = MatOfKeyPoint()
-    return try {
-        Utils.bitmapToMat(bitmap, mat)
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
-        orb.detect(gray, keypoints)
-        keypoints.toList()
-    } finally {
-        mat.release()
-        gray.release()
-        keypoints.release()
-        orb.clear()
-    }
-}
-
-fun generateFingerprint(bitmap: Bitmap): Fingerprint {
-    val mat = Mat()
-    val gray = Mat()
-    val orb = ORB.create()
-    val keypoints = MatOfKeyPoint()
-    val descriptors = Mat()
-    val emptyMask = Mat()
-    return try {
-        Utils.bitmapToMat(bitmap, mat)
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGB2GRAY)
-        orb.detectAndCompute(gray, emptyMask, keypoints, descriptors)
-
-        val data = ByteArray(descriptors.rows() * descriptors.cols() * descriptors.elemSize().toInt())
-        if (data.isNotEmpty()) {
-            descriptors.get(0, 0, data)
-        }
-
-        Fingerprint(keypoints.toList(), data, descriptors.rows(), descriptors.cols(), descriptors.type())
-    } finally {
-        mat.release()
-        gray.release()
-        keypoints.release()
-        descriptors.release()
-        emptyMask.release()
-        orb.clear()
-    }
-}
-
-fun enhanceImageForAr(bitmap: Bitmap): Bitmap {
-    val mat = Mat()
-    val lab = Mat()
-    val channels = ArrayList<Mat>()
-    return try {
-        Utils.bitmapToMat(bitmap, mat)
-        Imgproc.cvtColor(mat, lab, Imgproc.COLOR_RGB2Lab)
-        Core.split(lab, channels)
-        val clahe = Imgproc.createCLAHE()
-        clahe.clipLimit = 4.0
-        if (channels.isNotEmpty()) {
-            clahe.apply(channels[0], channels[0])
-        }
-        Core.merge(channels, lab)
-        Imgproc.cvtColor(lab, mat, Imgproc.COLOR_Lab2RGB)
-        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(mat, result)
-        result
-    } finally {
-        mat.release()
-        lab.release()
-        channels.forEach { it.release() }
     }
 }

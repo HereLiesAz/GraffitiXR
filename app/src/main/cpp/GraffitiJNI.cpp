@@ -2,96 +2,99 @@
 #include <string>
 #include "MobileGS.h"
 
-// RESTORED: Global pointer
-MobileGS *gMobileGS = nullptr;
-std::mutex gPointerMutex;
+// REMOVED: Global gMobileGS pointer to prevent single-instance collisions.
+// Instead, we cast the jlong handle back to MobileGS* in every call.
 
 extern "C" {
 
-JNIEXPORT void JNICALL
+JNIEXPORT jlong JNICALL
 Java_com_hereliesaz_graffitixr_slam_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
-    std::lock_guard<std::mutex> lock(gPointerMutex);
-    if (!gMobileGS) {
-        gMobileGS = new MobileGS();
-        gMobileGS->initialize();
+    auto *engine = new MobileGS();
+    engine->initialize();
+    return reinterpret_cast<jlong>(engine);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_destroyNativeJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS*>(handle);
+        delete engine;
     }
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_destroyNativeJni(JNIEnv *env, jobject thiz) {
-    std::lock_guard<std::mutex> lock(gPointerMutex);
-    if (gMobileGS) {
-        delete gMobileGS;
-        gMobileGS = nullptr;
-    }
-}
+Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCameraJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray viewMtx, jfloatArray projMtx) {
+    if (handle == 0) return;
+    auto *engine = reinterpret_cast<MobileGS*>(handle);
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCameraJni(JNIEnv *env, jobject thiz, jfloatArray viewMtx, jfloatArray projMtx) {
-    if (!gMobileGS) return;
     jfloat* view = env->GetFloatArrayElements(viewMtx, 0);
     jfloat* proj = env->GetFloatArrayElements(projMtx, 0);
-    gMobileGS->updateCamera(view, proj);
+    engine->updateCamera(view, proj);
     env->ReleaseFloatArrayElements(viewMtx, view, 0);
     env->ReleaseFloatArrayElements(projMtx, proj, 0);
 }
 
-// RESTORED: Depth Feed
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jobject buffer, jint width, jint height) {
-    if (!gMobileGS) return;
+Java_com_hereliesaz_graffitixr_slam_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject buffer, jint width, jint height) {
+    if (handle == 0) return;
+    auto *engine = reinterpret_cast<MobileGS*>(handle);
 
-    // Direct buffer access
     void* dataAddr = env->GetDirectBufferAddress(buffer);
     if (!dataAddr) return;
     uint16_t* data = static_cast<uint16_t*>(dataAddr);
 
-    // Pass to engine (Wrapper only, no deep copy here)
     cv::Mat depthWrapper(height, width, CV_16UC1, data);
-    gMobileGS->processDepthFrame(depthWrapper, width, height);
+    engine->processDepthFrame(depthWrapper, width, height);
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_drawJni(JNIEnv *env, jobject thiz) {
-    if (gMobileGS) {
-        gMobileGS->draw();
+Java_com_hereliesaz_graffitixr_slam_SlamManager_drawJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS*>(handle);
+        engine->draw();
     }
 }
 
 JNIEXPORT jint JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz) {
-    if (gMobileGS) return gMobileGS->getPointCount();
+Java_com_hereliesaz_graffitixr_slam_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS*>(handle);
+        return engine->getPointCount();
+    }
     return 0;
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jint width, jint height) {
+Java_com_hereliesaz_graffitixr_slam_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
     // Pass to native if needed
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jstring path) {
-    if (!gMobileGS) return false;
+Java_com_hereliesaz_graffitixr_slam_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
+    auto *engine = reinterpret_cast<MobileGS*>(handle);
     const char *nativePath = env->GetStringUTFChars(path, 0);
-    bool result = gMobileGS->saveModel(std::string(nativePath));
+    bool result = engine->saveModel(std::string(nativePath));
     env->ReleaseStringUTFChars(path, nativePath);
     return (jboolean)result;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jstring path) {
-    if (!gMobileGS) return false;
+Java_com_hereliesaz_graffitixr_slam_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
+    auto *engine = reinterpret_cast<MobileGS*>(handle);
     const char *nativePath = env->GetStringUTFChars(path, 0);
-    bool result = gMobileGS->loadModel(std::string(nativePath));
+    bool result = engine->loadModel(std::string(nativePath));
     env->ReleaseStringUTFChars(path, nativePath);
     return (jboolean)result;
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_slam_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jfloatArray transformMtx) {
-    if (!gMobileGS) return;
+Java_com_hereliesaz_graffitixr_slam_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transformMtx) {
+    if (handle == 0) return;
+    auto *engine = reinterpret_cast<MobileGS*>(handle);
     jfloat* transform = env->GetFloatArrayElements(transformMtx, 0);
-    gMobileGS->applyTransform(transform);
+    engine->applyTransform(transform);
     env->ReleaseFloatArrayElements(transformMtx, transform, 0);
 }
 

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -96,6 +97,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // Capture Volume Keys for Unlock Gesture
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            // Simple implementation: Unlock on either volume key
+            if (viewModel.uiState.value.isTouchLocked) {
+                viewModel.setTouchLocked(false)
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun forceCameraRelease() {

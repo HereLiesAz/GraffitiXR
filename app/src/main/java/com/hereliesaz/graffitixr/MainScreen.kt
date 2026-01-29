@@ -238,21 +238,20 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController, onRendere
             Box(modifier = Modifier.fillMaxSize()) {
                 AzNavHost(startDestination = "editor") {
                     composable("editor") {
-                        EditorContent(
-                            viewModel, uiState, gestureInProgress, showSliderDialog, showColorBalanceDialog,
-                            viewModel::onOpacityChanged, viewModel::onBrightnessChanged, viewModel::onContrastChanged,
-                            viewModel::onSaturationChanged, viewModel::onColorBalanceRChanged, viewModel::onColorBalanceGChanged,
-                            viewModel::onColorBalanceBChanged, viewModel::onUndoClicked, viewModel::onRedoClicked,
-                            viewModel::onMagicClicked, viewModel::onOnboardingComplete, viewModel::onDoubleTapHintDismissed,
-                            viewModel::onFeedbackShown, viewModel.tapFeedback.collectAsState().value
+                        EditorUi(
+                            viewModel,
+                            uiState,
+                            showSliderDialog,
+                            showColorBalanceDialog,
+                            gestureInProgress
                         )
                     }
-                    composable("surveyor") { 
+                    composable("surveyor") {
                         MappingScreen(
                             onMapSaved = { /* Optional surveyor save callback */ },
                             onExit = { localNavController.popBackStack() },
                             onRendererCreated = { /* Internal renderer handling */ }
-                        ) 
+                        )
                     }
                     composable("project_library") {
                         LaunchedEffect(Unit) { viewModel.loadAvailableProjects(context) }
@@ -273,42 +272,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController, onRendere
                 if (uiState.isCapturingTarget) Box(modifier = Modifier.fillMaxSize().zIndex(20f)) { TargetCreationFlow(uiState, viewModel, context) }
                 if (uiState.isCapturingTarget) CaptureAnimation()
             }
-        }
-    }
-}
-
-@Composable
-fun EditorContent(
-    viewModel: MainViewModel, uiState: UiState, gestureInProgress: Boolean, showSliderDialog: String?, showColorBalanceDialog: Boolean,
-    onOpacityChange: (Float) -> Unit, onBrightnessChange: (Float) -> Unit, onContrastChange: (Float) -> Unit,
-    onSaturationChange: (Float) -> Unit, onColorBalanceRChange: (Float) -> Unit, onColorBalanceGChange: (Float) -> Unit,
-    onColorBalanceBChange: (Float) -> Unit, onUndo: () -> Unit, onRedo: () -> Unit, onMagicAlign: () -> Unit,
-    onOnboardingComplete: (EditorMode) -> Unit, onDoubleTapHintDismissed: () -> Unit, onFeedbackShown: () -> Unit,
-    tapFeedback: com.hereliesaz.graffitixr.TapFeedback?
-) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val topSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
-    val bottomSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
-
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        if (uiState.editorMode == AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
-            StatusOverlay(uiState.qualityWarning, uiState.arState, uiState.isArPlanesDetected, uiState.isArTargetCreated, Modifier.align(Alignment.TopCenter).padding(top = topSafePadding).zIndex(10f))
-        }
-        if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
-            GestureFeedback(uiState, Modifier.align(Alignment.TopCenter).padding(top = topSafePadding + 20.dp).zIndex(3f), gestureInProgress)
-        }
-        if (uiState.isMarkingProgress) DrawingCanvas(uiState.drawingPaths, viewModel::onDrawingPathFinished)
-
-        Box(Modifier.fillMaxSize().padding(bottom = bottomSafePadding).zIndex(2f), contentAlignment = Alignment.BottomCenter) {
-            AdjustmentsPanel(uiState, showSliderDialog == "Adjust", showColorBalanceDialog, isLandscape, this@BoxWithConstraints.maxHeight, onOpacityChange, onBrightnessChange, onContrastChange, onSaturationChange, onColorBalanceRChange, onColorBalanceGChange, onColorBalanceBChange, onUndo, onRedo, onMagicAlign)
-        }
-        uiState.showOnboardingDialogForMode?.let { mode -> OnboardingDialog(mode) { onOnboardingComplete(mode) } }
-        if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
-            RotationAxisFeedback(uiState.activeRotationAxis, uiState.showRotationAxisFeedback, onFeedbackShown, Modifier.align(Alignment.BottomCenter).padding(bottom = bottomSafePadding + 32.dp).zIndex(4f))
-            TapFeedbackEffect(tapFeedback)
-            if (uiState.showDoubleTapHint) DoubleTapHintDialog(onDoubleTapHintDismissed)
-            if (uiState.isMarkingProgress) Text("Progress: %.2f%%".format(uiState.progressPercentage), Modifier.align(Alignment.TopCenter).padding(top = topSafePadding).zIndex(3f))
         }
     }
 }
@@ -458,7 +421,7 @@ private fun CaptureAnimation() {
     var s by remember { mutableFloatStateOf(0f) }
     val af by animateFloatAsState(f, tween(200))
     val `as` by animateFloatAsState(s, tween(300))
-    
+
     LaunchedEffect(Unit) {
         s = 0.5f
         delay(100)
@@ -468,7 +431,7 @@ private fun CaptureAnimation() {
         delay(150)
         s = 0f
     }
-    
+
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = `as`)).zIndex(10f))
     Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = af)).zIndex(11f))
 }

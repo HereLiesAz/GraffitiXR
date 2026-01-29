@@ -4,13 +4,14 @@ import kotlinx.serialization.Serializable
 
 /**
  * A unique identifier for an AR target image.
- * 
- * Bolt Optimization: Replaced OpenCV Mat with ByteArray to prevent finalizer n_delete crashes.
- * Descriptors are stored as raw bytes and metadata for safe serialization and thread-safe handling.
+ * Now includes 3D points for Perspective-n-Point (PnP) relocalization.
  */
 @Serializable
 data class Fingerprint(
     val keypoints: List<@Serializable(with = KeyPointSerializer::class) org.opencv.core.KeyPoint>,
+    // 3D coordinates relative to the anchor at capture time.
+    // Flattened list [x0, y0, z0, x1, y1, z1...] for serialization efficiency.
+    val points3d: List<Float> = emptyList(),
     val descriptorsData: ByteArray,
     val descriptorsRows: Int,
     val descriptorsCols: Int,

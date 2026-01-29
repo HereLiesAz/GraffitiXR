@@ -11,6 +11,10 @@ class SlamManager {
     private val _mappingQuality = MutableStateFlow(0.0f)
     val mappingQuality = _mappingQuality.asStateFlow()
 
+    // Instance Handle
+    private var nativeHandle: Long = 0
+    private val lock = Any()
+
     companion object {
         init {
             try {
@@ -19,56 +23,51 @@ class SlamManager {
                 e.printStackTrace()
             }
         }
-
-        private var refCount = 0
-        private val lock = Any()
     }
 
     fun initNative() {
         synchronized(lock) {
-            if (refCount == 0) {
-                initNativeJni()
+            if (nativeHandle == 0L) {
+                nativeHandle = initNativeJni()
             }
-            refCount++
         }
     }
 
     fun destroyNative() {
         synchronized(lock) {
-            if (refCount > 0) {
-                refCount--
-                if (refCount == 0) {
-                    destroyNativeJni()
-                }
+            if (nativeHandle != 0L) {
+                destroyNativeJni(nativeHandle)
+                nativeHandle = 0L
             }
         }
     }
 
     fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
-        updateCameraJni(viewMtx, projMtx)
+        if (nativeHandle != 0L) updateCameraJni(nativeHandle, viewMtx, projMtx)
     }
 
-    // New Method: Feed raw depth buffer
     fun feedDepthData(buffer: ByteBuffer, width: Int, height: Int) {
-        if (!buffer.isDirect) return
-        feedDepthDataJni(buffer, width, height)
+        if (nativeHandle != 0L && buffer.isDirect) {
+            feedDepthDataJni(nativeHandle, buffer, width, height)
+        }
     }
 
     fun draw() {
-        drawJni()
+        if (nativeHandle != 0L) drawJni(nativeHandle)
     }
 
     fun getPointCount(): Int {
-        return getPointCountJni()
+        return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
-        onSurfaceChangedJni(width, height)
+        if (nativeHandle != 0L) onSurfaceChangedJni(nativeHandle, width, height)
     }
 
     fun alignMap(transformMatrix: FloatArray) {
-        if (transformMatrix.size != 16) return
-        alignMapJni(transformMatrix)
+        if (nativeHandle != 0L && transformMatrix.size == 16) {
+            alignMapJni(nativeHandle, transformMatrix)
+        }
     }
 
     fun updateFeatureMapQuality(session: Session, pose: Pose) {
@@ -77,15 +76,23 @@ class SlamManager {
         _mappingQuality.value = quality
     }
 
-    external fun saveWorld(path: String): Boolean
-    external fun loadWorld(path: String): Boolean
+    fun saveWorld(path: String): Boolean {
+        return if (nativeHandle != 0L) saveWorld(nativeHandle, path) else false
+    }
 
-    private external fun initNativeJni()
-    private external fun destroyNativeJni()
-    private external fun updateCameraJni(viewMtx: FloatArray, projMtx: FloatArray)
-    private external fun feedDepthDataJni(buffer: ByteBuffer, width: Int, height: Int) // New JNI
-    private external fun drawJni()
-    private external fun getPointCountJni(): Int
-    private external fun onSurfaceChangedJni(width: Int, height: Int)
-    private external fun alignMapJni(transformMtx: FloatArray)
+    fun loadWorld(path: String): Boolean {
+        return if (nativeHandle != 0L) loadWorld(nativeHandle, path) else false
+    }
+
+    // Native Interface (Updated Signatures)
+    private external fun initNativeJni(): Long
+    private external fun destroyNativeJni(handle: Long)
+    private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
+    private external fun feedDepthDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int)
+    private external fun drawJni(handle: Long)
+    private external fun getPointCountJni(handle: Long): Int
+    private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
+    private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
+    private external fun saveWorld(handle: Long, path: String): Boolean
+    private external fun loadWorld(handle: Long, path: String): Boolean
 }
