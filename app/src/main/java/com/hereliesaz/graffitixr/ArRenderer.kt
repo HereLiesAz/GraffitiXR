@@ -38,6 +38,9 @@ class ArRenderer(
     val slamManager = SlamManager()
     private val yuvConverter = YuvToRgbConverter(context)
 
+    var showMiniMap = false
+    var showGuide = false
+
     var onSessionUpdated: ((Session, Frame) -> Unit)? = null
     var onAnchorCreated: ((Anchor) -> Unit)? = null
 
