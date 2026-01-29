@@ -160,7 +160,6 @@ class BackgroundRenderer {
             1.0f, 0.0f
         )
 
-        // Updated to GLES 3.0
         private const val VERTEX_SHADER = """#version 300 es
             layout(location = 0) in vec4 a_Position;
             layout(location = 1) in vec2 a_TexCoord;

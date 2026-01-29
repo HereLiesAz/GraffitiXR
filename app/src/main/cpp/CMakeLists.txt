@@ -6,7 +6,6 @@ project("graffitixr")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++17 -ffast-math -fopenmp")
 
 # --- DEPENDENCY PATHS ---
-# Use LIBS_DIR passed from Gradle, or fallback to relative path if testing manually
 if(NOT DEFINED LIBS_DIR)
     get_filename_component(LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../libs" ABSOLUTE)
 endif()
@@ -14,7 +13,6 @@ endif()
 message(STATUS "Native build looking for libs in: ${LIBS_DIR}")
 
 # --- OPENCV CONFIGURATION ---
-# FIX: Path aligned to branch structure (restored 'sdk' subfolder for relative paths)
 set(OpenCV_DIR "${LIBS_DIR}/opencv/sdk/native/jni")
 
 if(EXISTS "${OpenCV_DIR}/OpenCVConfig.cmake")
@@ -28,8 +26,9 @@ endif()
 find_package(OpenMP REQUIRED)
 
 # --- SOURCE FILES ---
+# CRITICAL: Target name MUST match System.loadLibrary("graffitixr")
 add_library(
-        graffiti-lib
+        graffitixr
         SHARED
         GraffitiJNI.cpp
         MobileGS.cpp
@@ -37,7 +36,7 @@ add_library(
 
 # --- INCLUDE DIRECTORIES ---
 target_include_directories(
-    graffiti-lib PRIVATE
+    graffitixr PRIVATE
     include
     ${OpenCV_INCLUDE_DIRS}
     ${LIBS_DIR}/glm
@@ -50,12 +49,12 @@ find_library(gles3-lib GLESv3)
 
 # --- LINKING ---
 target_link_libraries(
-        graffiti-lib
-        
+        graffitixr
+
         # External
         ${OpenCV_LIBS}
         OpenMP::OpenMP_CXX
-        
+
         # System
         ${log-lib}
         ${android-lib}

@@ -1,11 +1,4 @@
 # Add project specific ProGuard rules here.
-# By default, the flags in this file are appended to flags specified
-# in /home/jules/Android/sdk/tools/proguard/proguard-android.txt
-# You can edit the include path and order by changing the proguardFiles
-# directive in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
 
 # OpenCV keep rules to prevent UnsatisfiedLinkError
 -keep class org.opencv.** { *; }
@@ -18,9 +11,9 @@
 -keep class com.google.ar.** { *; }
 -dontwarn com.google.ar.**
 
-# Keep SphereSLAM
--keep class com.hereliesaz.sphereslam.** { *; }
--keepclassmembers class com.hereliesaz.sphereslam.** {
+# Keep SlamManager JNI methods (CRITICAL FIX)
+-keep class com.hereliesaz.graffitixr.slam.** { *; }
+-keepclassmembers class com.hereliesaz.graffitixr.slam.** {
     native <methods>;
 }
 

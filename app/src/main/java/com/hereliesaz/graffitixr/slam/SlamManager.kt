@@ -4,6 +4,7 @@ import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.nio.ByteBuffer
 
 class SlamManager {
 
@@ -12,11 +13,14 @@ class SlamManager {
 
     companion object {
         init {
-            System.loadLibrary("graffitixr")
+            try {
+                System.loadLibrary("graffitixr")
+            } catch (e: UnsatisfiedLinkError) {
+                e.printStackTrace()
+            }
         }
 
         private var refCount = 0
-        // Use a lock object for thread safety
         private val lock = Any()
     }
 
@@ -41,8 +45,13 @@ class SlamManager {
     }
 
     fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
-        // Native null check handles safety
         updateCameraJni(viewMtx, projMtx)
+    }
+
+    // New Method: Feed raw depth buffer
+    fun feedDepthData(buffer: ByteBuffer, width: Int, height: Int) {
+        if (!buffer.isDirect) return
+        feedDepthDataJni(buffer, width, height)
     }
 
     fun draw() {
@@ -57,15 +66,12 @@ class SlamManager {
         onSurfaceChangedJni(width, height)
     }
 
-    // Apply a 4x4 transform matrix to the entire voxel map
     fun alignMap(transformMatrix: FloatArray) {
         if (transformMatrix.size != 16) return
         alignMapJni(transformMatrix)
     }
 
-    // Placeholder for quality calculation
     fun updateFeatureMapQuality(session: Session, pose: Pose) {
-        // In a real implementation, you might query ARCore's estimate or native SLAM confidence
         val count = getPointCount()
         val quality = (count / 5000f).coerceIn(0f, 1f)
         _mappingQuality.value = quality
@@ -77,6 +83,7 @@ class SlamManager {
     private external fun initNativeJni()
     private external fun destroyNativeJni()
     private external fun updateCameraJni(viewMtx: FloatArray, projMtx: FloatArray)
+    private external fun feedDepthDataJni(buffer: ByteBuffer, width: Int, height: Int) // New JNI
     private external fun drawJni()
     private external fun getPointCountJni(): Int
     private external fun onSurfaceChangedJni(width: Int, height: Int)

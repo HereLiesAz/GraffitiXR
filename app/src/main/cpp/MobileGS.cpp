@@ -77,16 +77,18 @@ MobileGS::MobileGS() :
 }
 
 MobileGS::~MobileGS() {
+    // 1. Stop the sort thread safely
     mStopThread = true;
     mSortCV.notify_all();
     if(mSortThread.joinable()) mSortThread.join();
 
-    if (mIsInitialized) {
-        glDeleteProgram(mProgram);
-        glDeleteBuffers(1, &mVBO);
-        glDeleteVertexArrays(1, &mVAO);
-        glDeleteBuffers(1, &mQuadVBO);
-    }
+    // 2. CRITICAL FIX: Do NOT call glDelete* here.
+    // This destructor is called on the Main Thread (via SlamManager.destroyNative),
+    // but the GL context belongs to the Render Thread.
+    // The EGLContext destruction will automatically clean up these resources.
+    // Explicitly deleting them here causes "call to OpenGL ES API with no current context" error.
+
+    mIsInitialized = false;
 }
 
 void MobileGS::initialize() {
@@ -126,7 +128,6 @@ void MobileGS::applyTransform(const float* transformMtx) {
         key.y = static_cast<int>(std::floor(pos.y / VOXEL_SIZE));
         key.z = static_cast<int>(std::floor(pos.z / VOXEL_SIZE));
 
-        // Handle collisions simply by overwriting or ignoring (map alignment is usually a whole-world op)
         mVoxelGrid[key] = (int)(&splat - &mGaussians[0]);
     }
     mMapChanged = true;
@@ -142,7 +143,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
     if (mProjMatrix[0][0] == 0) return;
 
     mFrameCount++;
-    // Prune less frequently to save CPU
     if (mFrameCount % 100 == 0 || mGaussians.size() > MAX_POINTS * 0.95) {
         pruneMap();
     }
@@ -218,17 +218,14 @@ void MobileGS::pruneMap() {
     survived.reserve(mGaussians.size());
     mVoxelGrid.clear();
 
-    // Sort by age/confidence if hitting limit? For now, simple prune.
     bool hittingLimit = mGaussians.size() > (MAX_POINTS * 0.9);
 
     for (const auto& g : mGaussians) {
         long age = std::chrono::duration_cast<std::chrono::milliseconds>(now - g.creationTime).count();
 
-        // Safety: Keep points that are high confidence OR very young
         bool goodConfidence = g.renderData.opacity >= PRUNE_THRESHOLD;
         bool isYoung = age < MIN_AGE_MS;
 
-        // If hitting limit, be more aggressive: drop young points that haven't gained confidence quickly
         if (hittingLimit && isYoung && g.renderData.opacity < (PRUNE_THRESHOLD/2.0f)) {
             continue;
         }
@@ -265,7 +262,6 @@ void MobileGS::compileShaders() {
         glShaderSource(vs, 1, &vsSrc, 0);
         glCompileShader(vs);
 
-        // Check VS compile status
         GLint compiled;
         glGetShaderiv(vs, GL_COMPILE_STATUS, &compiled);
         if(!compiled) {
@@ -283,7 +279,6 @@ void MobileGS::compileShaders() {
         glShaderSource(fs, 1, &fsSrc, 0);
         glCompileShader(fs);
 
-        // Check FS compile status
         glGetShaderiv(fs, GL_COMPILE_STATUS, &compiled);
         if(!compiled) {
             GLint infoLen = 0;
@@ -321,7 +316,6 @@ void MobileGS::compileShaders() {
 
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
 
-    // Stride is strictly the render data size now
     int stride = sizeof(SplatRenderData);
 
     for(int i=0; i<4; ++i) {
@@ -396,7 +390,6 @@ void MobileGS::sortThreadLoop() {
 void MobileGS::draw() {
     if (!mIsInitialized) initialize();
 
-    // Sync render buffer
     size_t renderSize = 0;
     {
         std::lock_guard<std::mutex> lock(mDataMutex);
@@ -415,17 +408,13 @@ void MobileGS::draw() {
 
     glUseProgram(mProgram);
 
-    // Update Uniforms
     glm::vec3 camPos = glm::vec3(glm::inverse(mViewMatrix)[3]);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, &mViewMatrix[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uProj"), 1, GL_FALSE, &mProjMatrix[0][0]);
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, &camPos[0]);
 
-    // Update Instance Buffer with the packed RenderData
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
     {
-        // NOTE: mRenderBuffer is guarded by mDataMutex in logic,
-        // but here we are reading it. If draw() and update() run parallel, we need lock.
         std::lock_guard<std::mutex> lock(mDataMutex);
         glBufferData(GL_ARRAY_BUFFER, renderSize * sizeof(SplatRenderData), mRenderBuffer.data(), GL_DYNAMIC_DRAW);
     }
@@ -444,11 +433,9 @@ void MobileGS::clear() {
     mRenderBufferDirty = true;
 }
 
-// FIX: Copy-on-Write Strategy for Save
 bool MobileGS::saveModel(const std::string& path) {
     std::vector<SplatRenderData> dataToSave;
 
-    // 1. Quick Copy under lock
     {
         std::lock_guard<std::mutex> lock(mDataMutex);
         dataToSave.reserve(mGaussians.size());
@@ -457,8 +444,6 @@ bool MobileGS::saveModel(const std::string& path) {
         }
     }
 
-    // 2. Slow Write outside lock
-    // Only saving render data (position, color, etc), discarding timestamps/metadata for persistence
     std::ofstream out(path, std::ios::binary);
     if (!out) {
         LOGE("Failed to open file for saving: %s", path.c_str());

@@ -3,7 +3,6 @@
 #include "MobileGS.h"
 
 MobileGS *gMobileGS = nullptr;
-// Mutex for global pointer to prevent race conditions during init/destroy
 std::mutex gPointerMutex;
 
 extern "C" {
@@ -28,13 +27,30 @@ Java_com_hereliesaz_graffitixr_slam_SlamManager_destroyNativeJni(JNIEnv *env, jo
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_slam_SlamManager_updateCameraJni(JNIEnv *env, jobject thiz, jfloatArray viewMtx, jfloatArray projMtx) {
-    // No lock here for perf, assume lifecycle managed correctly by Kotlin
     if (!gMobileGS) return;
     jfloat* view = env->GetFloatArrayElements(viewMtx, 0);
     jfloat* proj = env->GetFloatArrayElements(projMtx, 0);
     gMobileGS->updateCamera(view, proj);
     env->ReleaseFloatArrayElements(viewMtx, view, 0);
     env->ReleaseFloatArrayElements(projMtx, proj, 0);
+}
+
+// CRITICAL FIX: Receive Depth Buffer directly
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_slam_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jobject buffer, jint width, jint height) {
+    if (!gMobileGS) return;
+
+    // Direct buffer access for performance (No copy)
+    uint16_t* data = (uint16_t*)env->GetDirectBufferAddress(buffer);
+    if (!data) return;
+
+    // Create OpenCV wrapper around the buffer (Does not copy data yet)
+    cv::Mat depthWrapper(height, width, CV_16UC1, data);
+
+    // Pass to engine (Engine handles internal thread safety and copying if needed)
+    gMobileGS->processDepthFrame(depthWrapper, width, height);
+
+    // No explicit release needed for wrapper, but data pointer invalid after Java call returns
 }
 
 JNIEXPORT void JNICALL

@@ -48,7 +48,7 @@ class ArRenderer(
     // Tools
     private val yuvConverter = YuvToRgbConverter(context)
     private var captureBitmap: Bitmap? = null
-    private val captureLock = Any() // Thread safety for capture bitmap
+    private val captureLock = Any()
 
     val slamManager = SlamManager()
 
@@ -64,6 +64,9 @@ class ArRenderer(
 
     @Volatile
     private var captureNextFrame = false
+
+    // Prevents drawing before AR is ready
+    private var isSessionResumed = false
 
     private var layers: List<OverlayLayer> = emptyList()
     private val queuedTaps = Collections.synchronizedList(ArrayList<QueuedTap>())
@@ -93,7 +96,7 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
-        if (session == null) return
+        if (session == null || !isSessionResumed) return
 
         displayRotationHelper.updateSessionIfNeeded(session!!)
 
@@ -102,15 +105,13 @@ class ArRenderer(
             val frame = session!!.update()
             val camera = frame.camera
 
-            onSessionUpdated?.invoke(session!!, frame)
+            // 1. Draw Background (Camera Feed) - Must happen first
+            backgroundRenderer.draw(frame)
 
+            onSessionUpdated?.invoke(session!!, frame)
             handleTaps(frame)
             handleCapture(frame)
 
-            // 1. Draw Camera Background
-            backgroundRenderer.draw(frame)
-
-            // Get Matrices
             val projmtx = FloatArray(16)
             camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
             val viewmtx = FloatArray(16)
@@ -121,43 +122,35 @@ class ArRenderer(
             if (trackingState == TrackingState.TRACKING) {
                 onTrackingFailure(null)
 
-                // 2. Draw Planes (Grid)
+                // 2. Feed Depth to Native Engine (Sync with Frame)
+                try {
+                    val depthImage = frame.acquireDepthImage16Bits()
+                    if (depthImage != null) {
+                        // Extract buffer and pass to C++
+                        val buffer = depthImage.planes[0].buffer
+                        slamManager.feedDepthData(buffer, depthImage.width, depthImage.height)
+                        depthImage.close()
+                    }
+                } catch (e: Exception) {
+                    // Depth might not be available yet, harmless
+                }
+
+                // 3. Update & Draw SLAM Map
+                slamManager.updateCamera(viewmtx, projmtx)
+                slamManager.draw()
+
+                // 4. Draw Planes
                 val planes = session!!.getAllTrackables(Plane::class.java)
                 val hasPlanes = planes.any { it.trackingState == TrackingState.TRACKING }
                 onPlanesDetected(hasPlanes)
-
                 if (hasPlanes) {
                     planeRenderer.drawPlanes(planes, viewmtx, projmtx)
                 }
 
-                // 3. Draw MobileGS Point Cloud (The Ghost)
-                // Update native camera first
-                slamManager.updateCamera(viewmtx, projmtx)
-
-                // Process depth if available
-                try {
-                    val depthImage = frame.acquireDepthImage16Bits()
-                    if (depthImage != null) {
-                        // Pass depth image to C++ (Implementation dependent, assuming JNI handles Image object or buffer)
-                        // Ideally we pass the buffer address. For now, assuming SlamManager handles image extraction internally
-                        // or we skip if not implemented.
-                        // NOTE: MobileGS.cpp expects raw data.
-                        // In a real app, we'd use GetPrimitiveArrayCritical here.
-                        // For stability in this fix, we rely on the `draw()` call to handle visualization
-                        // and assume `processDepthFrame` is wired via a separate efficient path (e.g. CPU image extraction).
-                        depthImage.close()
-                    }
-                } catch (e: Exception) {
-                    // Depth not available
-                }
-
-                slamManager.draw()
-
-                // 4. Update Progress
+                // 5. Progress Update (Throttled)
                 val points = slamManager.getPointCount()
                 if (points > 0) {
                     val progress = (points / 10000f).coerceAtMost(1.0f) * 100
-                    // Throttled UI update logic should be in ViewModel, simple callback here
                     onProgressUpdated(progress, null)
                 }
 
@@ -166,6 +159,7 @@ class ArRenderer(
             }
 
         } catch (t: Throwable) {
+            // Catching here prevents render thread crashes from taking down the app
             t.printStackTrace()
         }
     }
@@ -200,8 +194,6 @@ class ArRenderer(
 
                     captureBitmap?.let { bmp ->
                         yuvConverter.yuvToRgb(image, bmp)
-                        // Send a COPY of the bitmap to avoid recycling issues on the UI thread
-                        // FIX: Handle null config by defaulting to ARGB_8888
                         val config = bmp.config ?: Bitmap.Config.ARGB_8888
                         val copy = bmp.copy(config, false)
                         onFrameCaptured(copy)
@@ -239,7 +231,7 @@ class ArRenderer(
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                    config.depthMode = Config.DepthMode.AUTOMATIC
+                    config.depthMode = Config.DepthMode.AUTOMATIC // Ensure Depth is ON
                     session!!.configure(config)
                 }
             } catch (e: Exception) {
@@ -250,6 +242,7 @@ class ArRenderer(
 
         try {
             session!!.resume()
+            isSessionResumed = true
             displayRotationHelper.onResume()
         } catch (e: CameraNotAvailableException) {
             e.printStackTrace()
@@ -258,12 +251,14 @@ class ArRenderer(
 
     fun onPause() {
         if (session != null) {
+            isSessionResumed = false
             displayRotationHelper.onPause()
             session!!.pause()
         }
     }
 
     fun cleanup() {
+        isSessionResumed = false
         session?.close()
         session = null
         slamManager.destroyNative()
@@ -273,10 +268,13 @@ class ArRenderer(
 
     fun setFlashlight(on: Boolean) {
         isFlashlightOn = on
-        val config = session?.config ?: return
-        // ARCore doesn't support flashlight toggling easily while session is running without config update
-        // Usually handled by CameraManager in standard mode, or Config update in AR
-        // Simplified here for brevity
+        // Flashlight toggle requires config update in ARCore
+        val config = session?.config
+        if (config != null) {
+            // Currently ARCore doesn't expose simple torch API in basic Config easily
+            // without Camera2 interop or specific Lighting mode.
+            // Placeholder for now.
+        }
     }
 
     fun triggerCapture() {
@@ -287,8 +285,6 @@ class ArRenderer(
         return session?.update()?.camera?.pose
     }
 
-    // Helper to generate fingerprint from renderer thread if needed
-    // In practice, this is called by ViewModel via CaptureEvent using the captured bitmap
     fun generateFingerprint(bitmap: Bitmap): Fingerprint? {
         return com.hereliesaz.graffitixr.utils.generateFingerprint(bitmap)
     }
