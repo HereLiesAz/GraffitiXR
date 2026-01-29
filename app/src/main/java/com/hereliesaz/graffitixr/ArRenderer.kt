@@ -9,14 +9,20 @@ import android.media.Image
 import android.util.Log
 import com.google.ar.core.*
 import com.hereliesaz.graffitixr.data.Fingerprint
+import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.rendering.*
 import com.hereliesaz.graffitixr.slam.SlamManager
 import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
 import com.hereliesaz.graffitixr.utils.ImageProcessingUtils
+import com.hereliesaz.graffitixr.utils.ImageUtils
 import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -33,7 +39,19 @@ class ArRenderer(
     private var displayRotationHelper: DisplayRotationHelper = DisplayRotationHelper(context)
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
-    val gridRenderer = GridRenderer()
+    private val miniMapRenderer = MiniMapRenderer()
+
+    // Flags
+    var showMiniMap: Boolean = false
+    var showGuide: Boolean = true // Now controls Plane visualization only, not virtual grid.
+
+    // Reference Image for Tracking (The "Real World Grid")
+    private var referenceImageBitmap: Bitmap? = null
+    private var isDatabaseDirty = false
+
+    // Renderers for user art
+    private val layerRenderers = ConcurrentHashMap<String, ProjectedImageRenderer>()
+    private var currentLayers: List<OverlayLayer> = emptyList()
 
     val slamManager = SlamManager()
     private val yuvConverter = YuvToRgbConverter(context)
@@ -55,7 +73,6 @@ class ArRenderer(
     private var viewHeight = 0
     private var isFlashlightOn = false
 
-    // NEW: Active Anchor state
     private var currentAnchor: Anchor? = null
 
     private val queuedTaps = Collections.synchronizedList(ArrayList<QueuedTap>())
@@ -66,7 +83,11 @@ class ArRenderer(
         try {
             backgroundRenderer.createOnGlThread()
             planeRenderer.createOnGlThread()
-            gridRenderer.createOnGlThread()
+            miniMapRenderer.createOnGlThread(context)
+
+            // Initialize existing layer renderers if any
+            layerRenderers.values.forEach { it.createOnGlThread(context) }
+
             slamManager.initNative()
             isSurfaceCreated = true
 
@@ -89,6 +110,13 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         if (session == null || !isSessionResumed || !isSurfaceCreated) return
+
+        // Check if we need to update the Augmented Image Database
+        if (isDatabaseDirty) {
+            setupAugmentedImageDatabase()
+            isDatabaseDirty = false
+        }
+
         displayRotationHelper.updateSessionIfNeeded(session!!)
 
         try {
@@ -102,8 +130,29 @@ class ArRenderer(
             backgroundRenderer.draw(frame)
 
             onSessionUpdated?.invoke(session!!, frame)
+
+            // 1. Check for Augmented Images (The Physical Grid)
+            // If we find the reference image, we lock the anchor to it.
+            val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
+            for (img in updatedAugmentedImages) {
+                if (img.trackingState == TrackingState.TRACKING) {
+                    // We found the physical grid on the wall.
+                    // If we don't have an anchor, or if the user hasn't manually placed one, snap to this.
+                    // NOTE: This prioritizes the physical grid over manual taps.
+
+                    if (currentAnchor == null || img.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING) {
+                        currentAnchor?.detach()
+                        currentAnchor = img.createAnchor(img.centerPose)
+                        onAnchorCreated?.invoke(currentAnchor!!)
+                        onTrackingFailure(null) // Clear "Lost" message
+                    }
+                }
+            }
+
+            // 2. Handle Manual Taps (Fallback if no physical grid)
             handleTaps(frame)
 
+            // Capture Logic
             if (captureNextFrame) {
                 captureNextFrame = false
                 try {
@@ -137,9 +186,15 @@ class ArRenderer(
                             val fp = ImageProcessingUtils.generateFingerprintWithDepth(
                                 bmp, depthData, depthImage.width, depthImage.height, fParams
                             )
-                            onFingerprintReady?.invoke(fp)
+                            fp?.let { onFingerprintReady?.invoke(it) }
                         }
                         depthImage.close()
+                    } else {
+                        val bmp = convertImageToBitmap(image)
+                        if (bmp != null) {
+                            val fp = ImageProcessingUtils.generateFingerprint(bmp)
+                            fp?.let { onFingerprintReady?.invoke(it) }
+                        }
                     }
                     image.close()
                 } catch (e: Exception) {
@@ -153,8 +208,7 @@ class ArRenderer(
             camera.getViewMatrix(viewmtx, 0)
 
             if (camera.trackingState == TrackingState.TRACKING) {
-                onTrackingFailure(null)
-
+                // Slam Updates
                 val now = System.currentTimeMillis()
                 if (now - lastDepthTime > DEPTH_INTERVAL_MS) {
                     try {
@@ -171,18 +225,36 @@ class ArRenderer(
                 slamManager.updateCamera(viewmtx, projmtx)
                 slamManager.draw()
 
+                if (showMiniMap) {
+                    val pointCloud = frame.acquirePointCloud()
+                    miniMapRenderer.update(pointCloud)
+                    miniMapRenderer.draw(viewmtx, projmtx)
+                    pointCloud.close()
+                }
+
                 val planes = session!!.getAllTrackables(Plane::class.java)
                 val hasPlanes = planes.any { it.trackingState == TrackingState.TRACKING }
                 onPlanesDetected(hasPlanes)
-                if (hasPlanes) {
+
+                // Draw Planes (Helper)
+                if (hasPlanes && showGuide) {
                     planeRenderer.drawPlanes(planes, viewmtx, projmtx)
                 }
 
-                // NEW: Draw Grid if Anchor is present and tracking
+                // Render Content Attached to Anchor (The Physical Grid or Tap)
                 if (currentAnchor != null && currentAnchor!!.trackingState == TrackingState.TRACKING) {
                     val anchorMtx = FloatArray(16)
                     currentAnchor!!.pose.toMatrix(anchorMtx, 0)
-                    gridRenderer.draw(viewmtx, projmtx, anchorMtx)
+
+                    // NOTE: gridRenderer removed. We do not draw a virtual grid.
+                    // The anchor represents the physical grid on the wall.
+
+                    currentLayers.asReversed().forEach { layer ->
+                        if (layer.isVisible) {
+                            val renderer = layerRenderers[layer.id]
+                            renderer?.draw(viewmtx, projmtx, currentAnchor!!, layer)
+                        }
+                    }
                 }
 
             } else {
@@ -190,6 +262,33 @@ class ArRenderer(
             }
 
         } catch (t: Throwable) { }
+    }
+
+    // Set the reference image that corresponds to the physical markings on the wall
+    fun setReferenceImage(bitmap: Bitmap) {
+        referenceImageBitmap = bitmap
+        isDatabaseDirty = true
+    }
+
+    private fun setupAugmentedImageDatabase() {
+        if (session == null || referenceImageBitmap == null) return
+
+        val config = session!!.config
+        val database = AugmentedImageDatabase(session)
+
+        // We assume the physical grid is roughly 1 meter wide for initial scaling estimation
+        // Ideally, the user provides this, but we default to 1.0m to help ARCore's estimation.
+        database.addImage("wall_grid", referenceImageBitmap, 1.0f)
+
+        config.augmentedImageDatabase = database
+        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+        config.focusMode = Config.FocusMode.AUTO
+
+        try {
+            session!!.configure(config)
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Failed to configure Augmented Image Database", e)
+        }
     }
 
     private fun handleTaps(frame: Frame) {
@@ -202,7 +301,6 @@ class ArRenderer(
                 }
                 if (hitResult != null) {
                     val anchor = hitResult.createAnchor()
-                    // NEW: Update local anchor reference
                     currentAnchor?.detach()
                     currentAnchor = anchor
                     onAnchorCreated?.invoke(anchor)
@@ -217,14 +315,38 @@ class ArRenderer(
                 captureBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
             }
             yuvConverter.yuvToRgb(image, captureBitmap!!)
-            return captureBitmap?.copy(captureBitmap!!.config, false)
+            val config = captureBitmap!!.config ?: Bitmap.Config.ARGB_8888
+            return captureBitmap?.copy(config, false)
         }
     }
 
     fun triggerCapture() { captureNextFrame = true }
     fun triggerFingerprintCapture() { captureFingerprint = true }
 
-    fun updateLayers(newLayers: List<com.hereliesaz.graffitixr.data.OverlayLayer>) { }
+    fun updateLayers(newLayers: List<OverlayLayer>) {
+        currentLayers = newLayers
+        newLayers.forEach { layer ->
+            if (!layerRenderers.containsKey(layer.id)) {
+                val renderer = ProjectedImageRenderer()
+                CoroutineScope(Dispatchers.IO).launch {
+                    val bmp = ImageUtils.loadBitmapFromUri(context, layer.uri)
+                    if (bmp != null) {
+                        renderer.setBitmap(bmp)
+                    }
+                }
+                layerRenderers[layer.id] = renderer
+            }
+        }
+
+        val newIds = newLayers.map { it.id }.toSet()
+        val it = layerRenderers.keys.iterator()
+        while(it.hasNext()) {
+            if (!newIds.contains(it.next())) {
+                it.remove()
+            }
+        }
+    }
+
     fun setFlashlight(on: Boolean) { isFlashlightOn = on }
     fun queueTap(x: Float, y: Float) { queuedTaps.add(QueuedTap(x, y)) }
 
@@ -250,6 +372,11 @@ class ArRenderer(
                 session!!.setCameraTextureName(backgroundRenderer.textureId)
             }
             slamManager.initNative()
+
+            // Re-apply database if needed
+            if (referenceImageBitmap != null) {
+                isDatabaseDirty = true
+            }
         } catch (e: Exception) { e.printStackTrace() }
     }
 
@@ -270,10 +397,15 @@ class ArRenderer(
         slamManager.destroyNative()
         captureBitmap?.recycle()
         captureBitmap = null
+        layerRenderers.clear()
+        miniMapRenderer.clear()
     }
 
     fun getLatestPose(): Pose? { return session?.update()?.camera?.pose }
-    fun generateFingerprint(bitmap: Bitmap): Fingerprint? { return com.hereliesaz.graffitixr.utils.generateFingerprint(bitmap) }
+
+    fun generateFingerprint(bitmap: Bitmap): Fingerprint? {
+        return ImageProcessingUtils.generateFingerprint(bitmap)
+    }
 
     fun createAnchor(pose: Pose): Anchor? {
         val anchor = session?.createAnchor(pose)
