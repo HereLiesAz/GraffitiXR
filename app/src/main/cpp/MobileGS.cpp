@@ -5,6 +5,7 @@
 #include <fstream>
 #include <random>
 #include <future>
+#include <glm/gtc/type_ptr.hpp>
 
 #define TAG "MobileGS"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -12,8 +13,8 @@
 
 const float CONFIDENCE_THRESHOLD = 0.6f;
 const float CONFIDENCE_INCREMENT = 0.05f;
-const float PRUNE_THRESHOLD = 0.3f; 
-const int MIN_AGE_MS = 2000; // Time to live before pruning check
+const float PRUNE_THRESHOLD = 0.3f;
+const int MIN_AGE_MS = 2000;
 
 const char* VS_SRC = R"(#version 300 es
 layout(location = 0) in vec3 aInstancePos;
@@ -40,7 +41,6 @@ void main() {
     vec3 right = normalize(cross(up, forward));
     up = cross(forward, right);
 
-    // Scale calculation (using float scale)
     vec3 vertexOffset = (right * aQuadVert.x + up * aQuadVert.y) * aInstanceScale;
     vec3 finalPos = aInstancePos + vertexOffset;
 
@@ -64,12 +64,16 @@ MobileGS::MobileGS() :
         mProgram(0), mVAO(0), mVBO(0), mQuadVBO(0),
         mBgProgram(0), mBgVAO(0), mBgVBO(0), mBgTexture(0),
         mViewMatrix(1.0f), mProjMatrix(1.0f), mSortViewMatrix(1.0f),
+        mRenderBufferDirty(false),
         mSortRunning(false), mStopThread(false), mSortResultReady(false),
         mMapChanged(false), mNewBgAvailable(false), mHasBgData(false), mIsInitialized(false),
         mFrameCount(0)
 {
     mLastUpdateTime = std::chrono::steady_clock::now();
     mSortThread = std::thread(&MobileGS::sortThreadLoop, this);
+    // Reserve memory to prevent reallocations
+    mGaussians.reserve(MAX_POINTS);
+    mRenderBuffer.reserve(MAX_POINTS);
 }
 
 MobileGS::~MobileGS() {
@@ -94,13 +98,39 @@ void MobileGS::initialize() {
 
 int MobileGS::getPointCount() {
     std::lock_guard<std::mutex> lock(mDataMutex);
-    return (int)mRenderGaussians.size();
+    return (int)mGaussians.size();
 }
 
 void MobileGS::updateCamera(const float* viewMtx, const float* projMtx) {
     std::lock_guard<std::mutex> lock(mDataMutex);
     memcpy(&mViewMatrix[0][0], viewMtx, 16 * sizeof(float));
     memcpy(&mProjMatrix[0][0], projMtx, 16 * sizeof(float));
+}
+
+void MobileGS::applyTransform(const float* transformMtx) {
+    std::lock_guard<std::mutex> lock(mDataMutex);
+    glm::mat4 transform;
+    memcpy(glm::value_ptr(transform), transformMtx, 16 * sizeof(float));
+
+    // Rebuild voxel grid after transform
+    mVoxelGrid.clear();
+
+    for (auto& splat : mGaussians) {
+        glm::vec4 pos(splat.renderData.position, 1.0f);
+        pos = transform * pos;
+        splat.renderData.position = glm::vec3(pos);
+
+        // Re-hash
+        VoxelKey key;
+        key.x = static_cast<int>(std::floor(pos.x / VOXEL_SIZE));
+        key.y = static_cast<int>(std::floor(pos.y / VOXEL_SIZE));
+        key.z = static_cast<int>(std::floor(pos.z / VOXEL_SIZE));
+
+        // Handle collisions simply by overwriting or ignoring (map alignment is usually a whole-world op)
+        mVoxelGrid[key] = (int)(&splat - &mGaussians[0]);
+    }
+    mMapChanged = true;
+    mRenderBufferDirty = true;
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height) {
@@ -113,7 +143,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
 
     mFrameCount++;
     // Prune less frequently to save CPU
-    if (mFrameCount % 100 == 0 || mRenderGaussians.size() > MAX_POINTS * 0.95) {
+    if (mFrameCount % 100 == 0 || mGaussians.size() > MAX_POINTS * 0.95) {
         pruneMap();
     }
 
@@ -124,14 +154,16 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
     float p21 = mProjMatrix[2][1];
 
     int step = 2;
-    if (mRenderGaussians.size() > 20000) step = 3;
-    if (mRenderGaussians.size() > 40000) step = 4;
+    if (mGaussians.size() > 20000) step = 3;
+    if (mGaussians.size() > 40000) step = 4;
+
+    bool added = false;
 
     for (int y = 0; y < height; y += step) {
         const uint16_t* rowPtr = depthMap.ptr<uint16_t>(y);
         for (int x = 0; x < width; x += step) {
             uint16_t d_raw = rowPtr[x];
-            if (d_raw < 200 || d_raw > 4000) continue; 
+            if (d_raw < 200 || d_raw > 4000) continue;
 
             float z = d_raw * 0.001f;
             float ndc_x = ((float)x / width) * 2.0f - 1.0f;
@@ -152,50 +184,68 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
 
             auto it = mVoxelGrid.find(key);
             if (it != mVoxelGrid.end()) {
-                SplatGaussian& g = mRenderGaussians[it->second];
-                g.opacity = std::min(1.0f, g.opacity + CONFIDENCE_INCREMENT);
-                g.position = glm::mix(g.position, glm::vec3(worldPos), 0.1f);
-            } else if (mRenderGaussians.size() < MAX_POINTS) {
-                SplatGaussian g;
-                g.position = glm::vec3(worldPos);
-                g.scale = VOXEL_SIZE * 1.8f; // Changed to float
-                g.opacity = CONFIDENCE_INCREMENT; 
-                g.color = glm::vec3(0.0f, 0.8f, 1.0f);
-                g.creationTime = now; // Set creation time
-                mRenderGaussians.push_back(g);
-                mVoxelGrid[key] = (int)(mRenderGaussians.size() - 1);
+                int idx = it->second;
+                if(idx >= 0 && idx < mGaussians.size()){
+                    SplatMetadata& g = mGaussians[idx];
+                    g.renderData.opacity = std::min(1.0f, g.renderData.opacity + CONFIDENCE_INCREMENT);
+                    g.renderData.position = glm::mix(g.renderData.position, glm::vec3(worldPos), 0.1f);
+                    added = true;
+                }
+            } else if (mGaussians.size() < MAX_POINTS) {
+                SplatMetadata g;
+                g.renderData.position = glm::vec3(worldPos);
+                g.renderData.scale = VOXEL_SIZE * 1.8f;
+                g.renderData.opacity = CONFIDENCE_INCREMENT;
+                g.renderData.color = glm::vec3(0.0f, 0.8f, 1.0f);
+                g.creationTime = now;
+                mGaussians.push_back(g);
+                mVoxelGrid[key] = (int)(mGaussians.size() - 1);
+                added = true;
             }
         }
+    }
+    if(added) {
+        mRenderBufferDirty = true;
     }
 }
 
 void MobileGS::pruneMap() {
     mMapChanged = true;
+    mRenderBufferDirty = true;
     auto now = std::chrono::steady_clock::now();
-    
-    std::vector<SplatGaussian> survived;
-    survived.reserve(mRenderGaussians.size());
+
+    std::vector<SplatMetadata> survived;
+    survived.reserve(mGaussians.size());
     mVoxelGrid.clear();
 
-    for (const auto& g : mRenderGaussians) {
+    // Sort by age/confidence if hitting limit? For now, simple prune.
+    bool hittingLimit = mGaussians.size() > (MAX_POINTS * 0.9);
+
+    for (const auto& g : mGaussians) {
         long age = std::chrono::duration_cast<std::chrono::milliseconds>(now - g.creationTime).count();
-        
-        // FIX: Safe Pruning (Age Check)
-        // Keep if high confidence OR if point is brand new (too young to judge)
-        if (g.opacity >= PRUNE_THRESHOLD || age < MIN_AGE_MS) {
+
+        // Safety: Keep points that are high confidence OR very young
+        bool goodConfidence = g.renderData.opacity >= PRUNE_THRESHOLD;
+        bool isYoung = age < MIN_AGE_MS;
+
+        // If hitting limit, be more aggressive: drop young points that haven't gained confidence quickly
+        if (hittingLimit && isYoung && g.renderData.opacity < (PRUNE_THRESHOLD/2.0f)) {
+            continue;
+        }
+
+        if (goodConfidence || isYoung) {
             survived.push_back(g);
-            VoxelKey key = { 
-                (int)std::floor(g.position.x/VOXEL_SIZE), 
-                (int)std::floor(g.position.y/VOXEL_SIZE), 
-                (int)std::floor(g.position.z/VOXEL_SIZE) 
+            VoxelKey key = {
+                    (int)std::floor(g.renderData.position.x/VOXEL_SIZE),
+                    (int)std::floor(g.renderData.position.y/VOXEL_SIZE),
+                    (int)std::floor(g.renderData.position.z/VOXEL_SIZE)
             };
             mVoxelGrid[key] = (int)(survived.size() - 1);
         }
     }
-    size_t removed = mRenderGaussians.size() - survived.size();
-    mRenderGaussians = std::move(survived);
-    // Reduced logging spam
-    if (removed > 0) LOGI("GC: Pruned %zu noise points", removed);
+    size_t removed = mGaussians.size() - survived.size();
+    mGaussians = std::move(survived);
+    if (removed > 0) LOGI("GC: Pruned %zu noise points. Total: %zu", removed, mGaussians.size());
 }
 
 void MobileGS::setBackgroundFrame(const cv::Mat& frame) {
@@ -214,9 +264,38 @@ void MobileGS::compileShaders() {
         GLuint vs = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vs, 1, &vsSrc, 0);
         glCompileShader(vs);
+
+        // Check VS compile status
+        GLint compiled;
+        glGetShaderiv(vs, GL_COMPILE_STATUS, &compiled);
+        if(!compiled) {
+            GLint infoLen = 0;
+            glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &infoLen);
+            if(infoLen > 1) {
+                char* infoLog = new char[infoLen];
+                glGetShaderInfoLog(vs, infoLen, NULL, infoLog);
+                LOGE("VS Compile Error: %s", infoLog);
+                delete[] infoLog;
+            }
+        }
+
         GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fs, 1, &fsSrc, 0);
         glCompileShader(fs);
+
+        // Check FS compile status
+        glGetShaderiv(fs, GL_COMPILE_STATUS, &compiled);
+        if(!compiled) {
+            GLint infoLen = 0;
+            glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &infoLen);
+            if(infoLen > 1) {
+                char* infoLog = new char[infoLen];
+                glGetShaderInfoLog(fs, infoLen, NULL, infoLog);
+                LOGE("FS Compile Error: %s", infoLog);
+                delete[] infoLog;
+            }
+        }
+
         GLuint prog = glCreateProgram();
         glAttachShader(prog, vs);
         glAttachShader(prog, fs);
@@ -241,11 +320,10 @@ void MobileGS::compileShaders() {
     glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
-    // FIX: Stride is sizeof(SplatGaussian) to account for the timestamp field at the end
-    // Position (3) + Color (3) + Scale (1) + Opacity (1) = 8 floats (32 bytes)
-    // + creationTime (8 bytes) = 40 bytes stride
-    int stride = sizeof(SplatGaussian);
-    
+
+    // Stride is strictly the render data size now
+    int stride = sizeof(SplatRenderData);
+
     for(int i=0; i<4; ++i) {
         glEnableVertexAttribArray(i);
         int size = (i == 0 || i == 1) ? 3 : 1;
@@ -269,23 +347,23 @@ void MobileGS::sortThreadLoop() {
 
         glm::mat4 view;
         std::vector<glm::vec3> positions;
-        
+
         {
             std::lock_guard<std::mutex> dataLock(mDataMutex);
             view = mSortViewMatrix;
-            positions.reserve(mRenderGaussians.size());
-            for(const auto& g : mRenderGaussians) positions.push_back(g.position);
+            positions.reserve(mGaussians.size());
+            for(const auto& g : mGaussians) positions.push_back(g.renderData.position);
         }
 
         glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
-        glm::vec3 camDir = glm::vec3(view[0][2], view[1][2], view[2][2]); 
-        
+        glm::vec3 camDir = glm::vec3(view[0][2], view[1][2], view[2][2]);
+
         float distDelta = glm::distance(camPos, lastSortPos);
         float dirDelta = glm::dot(camDir, lastSortDir);
 
         if (distDelta < 0.05f && dirDelta > 0.99f && !mMapChanged) {
-             mSortRunning = false;
-             continue; 
+            mSortRunning = false;
+            continue;
         }
 
         lastSortPos = camPos;
@@ -318,51 +396,81 @@ void MobileGS::sortThreadLoop() {
 void MobileGS::draw() {
     if (!mIsInitialized) initialize();
 
-    // FIX: Enabled Rendering Logic
-    if (mRenderGaussians.empty()) return;
+    // Sync render buffer
+    size_t renderSize = 0;
+    {
+        std::lock_guard<std::mutex> lock(mDataMutex);
+        if (mGaussians.empty()) return;
+
+        if (mRenderBufferDirty || mGaussians.size() != mRenderBuffer.size()) {
+            mRenderBuffer.clear();
+            mRenderBuffer.reserve(mGaussians.size());
+            for(const auto& meta : mGaussians) {
+                mRenderBuffer.push_back(meta.renderData);
+            }
+            mRenderBufferDirty = false;
+        }
+        renderSize = mRenderBuffer.size();
+    }
 
     glUseProgram(mProgram);
-    
+
     // Update Uniforms
     glm::vec3 camPos = glm::vec3(glm::inverse(mViewMatrix)[3]);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, &mViewMatrix[0][0]);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uProj"), 1, GL_FALSE, &mProjMatrix[0][0]);
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, &camPos[0]);
 
-    // Update Instance Buffer
-    // Note: We upload the custom struct. GL ignores the 'creationTime' because of the stride.
+    // Update Instance Buffer with the packed RenderData
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
     {
+        // NOTE: mRenderBuffer is guarded by mDataMutex in logic,
+        // but here we are reading it. If draw() and update() run parallel, we need lock.
         std::lock_guard<std::mutex> lock(mDataMutex);
-        glBufferData(GL_ARRAY_BUFFER, mRenderGaussians.size() * sizeof(SplatGaussian), mRenderGaussians.data(), GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, renderSize * sizeof(SplatRenderData), mRenderBuffer.data(), GL_DYNAMIC_DRAW);
     }
 
     glBindVertexArray(mVAO);
-    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)mRenderGaussians.size());
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)renderSize);
     glBindVertexArray(0);
 }
 
 void MobileGS::clear() {
     std::lock_guard<std::mutex> lock(mDataMutex);
-    mRenderGaussians.clear();
+    mGaussians.clear();
+    mRenderBuffer.clear();
     mVoxelGrid.clear();
     mMapChanged = true;
+    mRenderBufferDirty = true;
 }
 
+// FIX: Copy-on-Write Strategy for Save
 bool MobileGS::saveModel(const std::string& path) {
-    // FIX: Removed unsafe detached thread.
-    // This is now synchronous. The caller (Kotlin) must invoke this from a background thread (Dispatchers.IO).
-    std::lock_guard<std::mutex> lock(mDataMutex);
+    std::vector<SplatRenderData> dataToSave;
+
+    // 1. Quick Copy under lock
+    {
+        std::lock_guard<std::mutex> lock(mDataMutex);
+        dataToSave.reserve(mGaussians.size());
+        for(const auto& g : mGaussians) {
+            dataToSave.push_back(g.renderData);
+        }
+    }
+
+    // 2. Slow Write outside lock
+    // Only saving render data (position, color, etc), discarding timestamps/metadata for persistence
     std::ofstream out(path, std::ios::binary);
     if (!out) {
         LOGE("Failed to open file for saving: %s", path.c_str());
         return false;
     }
-    size_t count = mRenderGaussians.size();
+    size_t count = dataToSave.size();
     out.write(reinterpret_cast<const char*>(&count), sizeof(count));
-    if (count > 0) out.write(reinterpret_cast<const char*>(mRenderGaussians.data()), (std::streamsize)(count * sizeof(SplatGaussian)));
+    if (count > 0) {
+        out.write(reinterpret_cast<const char*>(dataToSave.data()), (std::streamsize)(count * sizeof(SplatRenderData)));
+    }
     LOGI("Saved %zu points to %s", count, path.c_str());
-    
+
     return true;
 }
 
@@ -373,19 +481,31 @@ bool MobileGS::loadModel(const std::string& path) {
     size_t count = 0;
     in.read(reinterpret_cast<char*>(&count), sizeof(count));
     if (count > MAX_POINTS) count = MAX_POINTS;
-    mRenderGaussians.resize(count);
+
+    mGaussians.clear();
+    mGaussians.resize(count);
     mVoxelGrid.clear();
+
     if (count > 0) {
-        in.read(reinterpret_cast<char*>(mRenderGaussians.data()), (std::streamsize)(count * sizeof(SplatGaussian)));
+        std::vector<SplatRenderData> loadedData(count);
+        in.read(reinterpret_cast<char*>(loadedData.data()), (std::streamsize)(count * sizeof(SplatRenderData)));
+
+        auto now = std::chrono::steady_clock::now();
+
         for (int i=0; i<(int)count; ++i) {
-            auto& g = mRenderGaussians[i];
-            // Fix loaded data timestamps so they aren't pruned immediately
-            g.creationTime = std::chrono::steady_clock::now(); 
-            
-            VoxelKey key = { (int)std::floor(g.position.x/VOXEL_SIZE), (int)std::floor(g.position.y/VOXEL_SIZE), (int)std::floor(g.position.z/VOXEL_SIZE) };
+            auto& g = mGaussians[i];
+            g.renderData = loadedData[i];
+            g.creationTime = now;
+
+            VoxelKey key = {
+                    (int)std::floor(g.renderData.position.x/VOXEL_SIZE),
+                    (int)std::floor(g.renderData.position.y/VOXEL_SIZE),
+                    (int)std::floor(g.renderData.position.z/VOXEL_SIZE)
+            };
             mVoxelGrid[key] = i;
         }
     }
     mMapChanged = true;
+    mRenderBufferDirty = true;
     return true;
 }

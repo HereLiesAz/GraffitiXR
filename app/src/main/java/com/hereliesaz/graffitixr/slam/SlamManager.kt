@@ -14,12 +14,14 @@ class SlamManager {
         init {
             System.loadLibrary("graffitixr")
         }
-        
+
         private var refCount = 0
+        // Use a lock object for thread safety
+        private val lock = Any()
     }
 
     fun initNative() {
-        synchronized(Companion) {
+        synchronized(lock) {
             if (refCount == 0) {
                 initNativeJni()
             }
@@ -28,7 +30,7 @@ class SlamManager {
     }
 
     fun destroyNative() {
-        synchronized(Companion) {
+        synchronized(lock) {
             if (refCount > 0) {
                 refCount--
                 if (refCount == 0) {
@@ -39,6 +41,7 @@ class SlamManager {
     }
 
     fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
+        // Native null check handles safety
         updateCameraJni(viewMtx, projMtx)
     }
 
@@ -54,16 +57,20 @@ class SlamManager {
         onSurfaceChangedJni(width, height)
     }
 
+    // Apply a 4x4 transform matrix to the entire voxel map
+    fun alignMap(transformMatrix: FloatArray) {
+        if (transformMatrix.size != 16) return
+        alignMapJni(transformMatrix)
+    }
+
     // Placeholder for quality calculation
     fun updateFeatureMapQuality(session: Session, pose: Pose) {
         // In a real implementation, you might query ARCore's estimate or native SLAM confidence
-        // For now, let's just simulate it based on point count or movement
         val count = getPointCount()
         val quality = (count / 5000f).coerceIn(0f, 1f)
         _mappingQuality.value = quality
     }
 
-    // FIX: Returns Boolean now
     external fun saveWorld(path: String): Boolean
     external fun loadWorld(path: String): Boolean
 
@@ -73,4 +80,5 @@ class SlamManager {
     private external fun drawJni()
     private external fun getPointCountJni(): Int
     private external fun onSurfaceChangedJni(width: Int, height: Int)
+    private external fun alignMapJni(transformMtx: FloatArray)
 }

@@ -12,15 +12,18 @@
 #include <chrono>
 #include <unordered_map>
 
-struct SplatGaussian {
+// Render-ready struct (strictly packed for GPU instancing)
+struct SplatRenderData {
     glm::vec3 position; // 0, 1, 2
     glm::vec3 color;    // 3, 4, 5
-    float scale;        // 6 (Changed from vec3 to match shader/stride)
+    float scale;        // 6
     float opacity;      // 7
-    
-    // Non-rendered data (will be ignored by GL stride if packed at end, 
-    // but better to keep struct clean. We will handle stride in CPP)
-    std::chrono::steady_clock::time_point creationTime; 
+};
+
+// Full internal metadata
+struct SplatMetadata {
+    SplatRenderData renderData;
+    std::chrono::steady_clock::time_point creationTime;
 };
 
 struct Sortable {
@@ -53,10 +56,17 @@ public:
     void processImage(const cv::Mat& image, int width, int height, int64_t timestamp);
 
     void draw();
+
+    // Returns true on success.
+    // Performs a copy under lock, then writes to disk to prevent UI freezes.
     bool saveModel(const std::string& path);
     bool loadModel(const std::string& path);
+
+    // New API: Transform the entire map (rotation/translation)
+    // transformMtx: 16-float array (column-major 4x4 matrix)
+    void applyTransform(const float* transformMtx);
+
     void clear();
-    
     int getPointCount();
 
 private:
@@ -74,7 +84,12 @@ private:
     glm::mat4 mProjMatrix;
     glm::mat4 mSortViewMatrix;
 
-    std::vector<SplatGaussian> mRenderGaussians;
+    // Use the metadata struct internally
+    std::vector<SplatMetadata> mGaussians;
+    // Cache strictly for rendering (copied from mGaussians)
+    std::vector<SplatRenderData> mRenderBuffer;
+    bool mRenderBufferDirty;
+
     cv::Mat mPendingBgFrame;
 
     std::vector<Sortable> mSortListFront;
@@ -86,22 +101,21 @@ private:
     std::atomic<bool> mSortRunning;
     std::atomic<bool> mStopThread;
     std::atomic<bool> mSortResultReady;
-    
-    std::atomic<bool> mMapChanged; 
 
-    std::mutex mDataMutex;
+    std::atomic<bool> mMapChanged;
+
+    std::mutex mDataMutex; // Protects mGaussians and mRenderBuffer
     std::mutex mBgMutex;
     std::atomic<bool> mNewBgAvailable;
     std::atomic<bool> mHasBgData;
     std::atomic<bool> mIsInitialized;
     int64_t mPendingTimestamp;
-    
+
     int mFrameCount;
 
     std::chrono::steady_clock::time_point mLastUpdateTime;
     std::unordered_map<VoxelKey, int, VoxelHash> mVoxelGrid;
 
-    const size_t MAX_POINTS = 65536;
-    // FIX: Voxel Size changed to 5mm per Blueprint
-    const float VOXEL_SIZE = 0.005f; 
+    const size_t MAX_POINTS = 65536; // Hard cap
+    const float VOXEL_SIZE = 0.005f;
 };

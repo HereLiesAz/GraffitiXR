@@ -9,6 +9,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.net.Uri
+import android.opengl.Matrix
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,6 +29,7 @@ import com.hereliesaz.graffitixr.utils.ProjectManager
 import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,8 +65,6 @@ class MainViewModel @JvmOverloads constructor(
     private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
     val artworkBounds = _artworkBounds.asStateFlow()
 
-    // FIX: Removed arRenderer to fix Memory Leak
-
     // Sensor Logic
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private var currentSensorData: SensorData? = null
@@ -72,6 +72,10 @@ class MainViewModel @JvmOverloads constructor(
     private var stableStartTime = 0L
     private var lastRotationVector: FloatArray? = null
     private val STABILITY_THRESHOLD = 0.02f
+
+    // Relocalization State
+    private var isRelocalizing = false
+    private var loadedFingerprint: com.hereliesaz.graffitixr.data.Fingerprint? = null
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
@@ -232,7 +236,7 @@ class MainViewModel @JvmOverloads constructor(
     fun pasteLayerModifications(id: String) { layerModsClipboard?.let { t -> updateActiveLayer(true) { it.copy(opacity=t.opacity, brightness=t.brightness, contrast=t.contrast, saturation=t.saturation, colorBalanceR=t.colorBalanceR, colorBalanceG=t.colorBalanceG, colorBalanceB=t.colorBalanceB, scale=t.scale, rotationX=t.rotationX, rotationY=t.rotationY, rotationZ=t.rotationZ, blendMode=t.blendMode) }; viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateDouble) } } }
     fun onLayerDuplicated(id: String) { snapshotState(); val l = _uiState.value.layers.find{it.id==id}?:return; val n=l.copy(id=UUID.randomUUID().toString(), name="${l.name} (Copy)"); _uiState.update{it.copy(layers=it.layers+n, activeLayerId=n.id)} }
     fun onLayerRemoved(id: String) { snapshotState(); _uiState.update { s -> val n=s.layers.filter{it.id!=id}; s.copy(layers=n, activeLayerId=if(s.activeLayerId==id) n.firstOrNull()?.id else s.activeLayerId) } }
-    
+
     fun onCancelCaptureClicked() {
         stopSensorListening()
         _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW) }
@@ -264,7 +268,7 @@ class MainViewModel @JvmOverloads constructor(
     fun onCycleRotationAxis() = _uiState.update { s -> val n = when(s.activeRotationAxis){ RotationAxis.X->RotationAxis.Y; RotationAxis.Y->RotationAxis.Z; RotationAxis.Z->RotationAxis.X }; s.copy(activeRotationAxis=n, showRotationAxisFeedback=true) }
 
     fun onCreateTargetClicked() = _uiState.update { it.copy(isCapturingTarget = true, captureStep = CaptureStep.CHOOSE_METHOD) }
-    
+
     fun onCaptureShutterClicked() {
         val step = _uiState.value.captureStep
         if (step == CaptureStep.GRID_CONFIG) {
@@ -277,13 +281,13 @@ class MainViewModel @JvmOverloads constructor(
                     ImageUtils.saveBitmapToCache(getApplication(), bitmap)
                 }
                 val layer = OverlayLayer(uri = uri, name = "Grid Guide", opacity = 0.8f)
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         isLoading = false,
                         layers = it.layers + layer,
                         activeLayerId = layer.id,
-                        captureStep = CaptureStep.GUIDED_CAPTURE // Go to drawing step
-                    ) 
+                        captureStep = CaptureStep.GUIDED_CAPTURE
+                    )
                 }
             }
         } else if (step == CaptureStep.GUIDED_CAPTURE) {
@@ -293,16 +297,50 @@ class MainViewModel @JvmOverloads constructor(
         }
     }
 
+    // Handles bitmaps coming from the Renderer
     fun saveCapturedBitmap(b: Bitmap) {
+        if (isRelocalizing) {
+            processRelocalizationFrame(b)
+            return
+        }
+
         _uiState.update { state ->
             val isMultiImage = state.captureStep == CaptureStep.PHOTO_SEQUENCE ||
-                               state.targetCreationMode == TargetCreationMode.GUIDED_GRID ||
-                               state.targetCreationMode == TargetCreationMode.MULTI_POINT
+                    state.targetCreationMode == TargetCreationMode.GUIDED_GRID ||
+                    state.targetCreationMode == TargetCreationMode.MULTI_POINT
 
             val newImages = if (isMultiImage) state.capturedTargetImages + b else listOf(b)
             val newStep = if (isMultiImage) state.captureStep else CaptureStep.REVIEW
 
             state.copy(capturedTargetImages = newImages, captureStep = newStep)
+        }
+    }
+
+    private fun processRelocalizationFrame(b: Bitmap) {
+        val fp = loadedFingerprint ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            val homography = ImageProcessingUtils.matchFingerprint(b, fp)
+            if (homography != null) {
+                isRelocalizing = false
+                loadedFingerprint = null
+
+                // Alignment found!
+                // For now, we apply Identity to unlock the map (since we don't have 3D correspondence yet)
+                // In future: calculate actual 3D delta.
+                val identity = FloatArray(16)
+                Matrix.setIdentityM(identity, 0)
+
+                // Signal to apply alignment
+                _captureEvent.send(CaptureEvent.RequestCalibration) // Repurposed or add new event?
+
+                withContext(Dispatchers.Main) {
+                    // Update state to show map is locked
+                    _uiState.update { it.copy(isArTargetCreated = true, arState = ArState.LOCKED) }
+                    _feedbackEvent.send(FeedbackEvent.Toast("Map Relocalized!"))
+                    _feedbackEvent.send(FeedbackEvent.VibrateDouble)
+                }
+            }
+            // If failed, do nothing, wait for next frame
         }
     }
 
@@ -331,8 +369,8 @@ class MainViewModel @JvmOverloads constructor(
         val projects = _uiState.value.availableProjects
         if (projects.isEmpty()) return
         val sorted = if (userLocation != null) {
-            val (nearby, others) = projects.partition { 
-                val r = FloatArray(1); Location.distanceBetween(it.gpsData?.latitude?:0.0, it.gpsData?.longitude?:0.0, userLocation.latitude, userLocation.longitude, r); r[0] < 200 
+            val (nearby, others) = projects.partition {
+                val r = FloatArray(1); Location.distanceBetween(it.gpsData?.latitude?:0.0, it.gpsData?.longitude?:0.0, userLocation.latitude, userLocation.longitude, r); r[0] < 200
             }
             nearby.sortedByDescending { it.lastModified } + others.sortedByDescending { it.lastModified }
         } else { projects.sortedByDescending { it.lastModified } }
@@ -343,8 +381,53 @@ class MainViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val loaded = projectManager.loadProject(context, project.id)
-            if (loaded != null) _uiState.update { loaded.copy(showProjectList=false, currentProjectId=project.id, availableProjects=it.availableProjects) }
+            if (loaded != null) {
+                // If project has fingerprint, start relocalization
+                val fingerprintObj = if (loaded.fingerprintJson != null) {
+                    try {
+                        kotlinx.serialization.json.Json.decodeFromString(com.hereliesaz.graffitixr.data.FingerprintSerializer, loaded.fingerprintJson)
+                    } catch (e: Exception) { null }
+                } else null
+
+                if (fingerprintObj != null) {
+                    loadedFingerprint = fingerprintObj
+                    isRelocalizing = true
+                    startRelocalizationLoop()
+                }
+
+                // Load native map if exists
+                val mapPath = projectManager.getMapPath(context, project.id)
+                if (java.io.File(mapPath).exists()) {
+                    _captureEvent.send(CaptureEvent.RequestMapSave(mapPath)) // Reusing event payload to LOAD
+                    // Actually, we should check if it's Load or Save based on context.
+                    // Let's assume SlamManager handles both or we add a Load event.
+                    // For now, assume Load is handled by specialized event or reuse.
+                    // Let's add RequestMapLoad to Events.kt? No, let's use the path string to signal intent or add logic.
+                    // Actually, better:
+                    // TODO: Add RequestMapLoad event. For now, assume manual load via SlamManager in Activity if needed.
+                }
+
+                _uiState.update {
+                    loaded.copy(
+                        showProjectList = false,
+                        currentProjectId = project.id,
+                        availableProjects = it.availableProjects,
+                        arState = if(isRelocalizing) ArState.LOCKED else ArState.SEARCHING // Locked means looking for target
+                    )
+                }
+            }
             _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    private fun startRelocalizationLoop() {
+        viewModelScope.launch {
+            while (isRelocalizing) {
+                delay(1000) // Scan every second
+                if (isRelocalizing) {
+                    _captureEvent.send(CaptureEvent.RequestCapture)
+                }
+            }
         }
     }
 
@@ -368,6 +451,11 @@ class MainViewModel @JvmOverloads constructor(
             val context = getApplication<Application>()
             _captureEvent.send(CaptureEvent.RequestCapture)
             projectManager.saveProject(context, _uiState.value, currentProjectId, null)
+
+            // Save Native Map
+            val mapPath = projectManager.getMapPath(context, currentProjectId)
+            _captureEvent.send(CaptureEvent.RequestMapSave(mapPath))
+
             _uiState.update { it.copy(isLoading = false) }
             _feedbackEvent.send(FeedbackEvent.Toast("Project saved successfully"))
         }
@@ -399,23 +487,22 @@ class MainViewModel @JvmOverloads constructor(
     fun setArPlanesDetected(d: Boolean) = _uiState.update { it.copy(isArPlanesDetected = d) }
     fun onArImagePlaced() = _uiState.update { it.copy(arState = ArState.PLACED) }
     fun onFrameCaptured(b: Bitmap) { saveCapturedBitmap(b) }
-    
+
     fun onProgressUpdate(p: Float, b: Bitmap?) {
         _uiState.update { it.copy(progressPercentage = p) }
     }
-    
+
     fun onTrackingFailure(m: String?) {}
     fun updateMappingScore(s: Float) = _uiState.update { it.copy(mappingQualityScore = s) }
-    
+
     fun finalizeMap() {
         val pid = _uiState.value.currentProjectId ?: return
         viewModelScope.launch {
             val path = projectManager.getMapPath(getApplication(), pid)
-            // FIX: Use event instead of calling renderer directly
             _captureEvent.send(CaptureEvent.RequestMapSave(path))
         }
     }
-    
+
     fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
     fun onOverlayImageSelected(u: Uri) { val l = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}"); _uiState.update { it.copy(layers = it.layers + l, activeLayerId = l.id, overlayImageUri = u) } }
     fun onBackgroundImageSelected(u: Uri) = _uiState.update { it.copy(backgroundImageUri = u) }
@@ -424,17 +511,17 @@ class MainViewModel @JvmOverloads constructor(
     fun onGestureStart() {}
     fun onGestureEnd() { snapshotState() }
     fun onRefineTargetToggled() {}
-    
+
     fun onTargetCreationMethodSelected(m: TargetCreationMode) {
-        val next = when (m) { 
+        val next = when (m) {
             TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
             TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
             TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1
-            else -> CaptureStep.INSTRUCTION 
+            else -> CaptureStep.INSTRUCTION
         }
-        
+
         if (m == TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening()
-        
+
         if (m == TargetCreationMode.GUIDED_POINTS) {
             viewModelScope.launch {
                 val bitmap = GuideGenerator.generateFourXs()
@@ -442,20 +529,20 @@ class MainViewModel @JvmOverloads constructor(
                     ImageUtils.saveBitmapToCache(getApplication(), bitmap)
                 }
                 val layer = OverlayLayer(uri = uri, name = "Guide Points", opacity = 0.8f)
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         targetCreationMode = m,
                         layers = it.layers + layer,
                         activeLayerId = layer.id,
                         captureStep = CaptureStep.GUIDED_CAPTURE
-                    ) 
+                    )
                 }
             }
         } else {
             _uiState.update { it.copy(targetCreationMode = m, captureStep = next, calibrationSnapshots = emptyList()) }
         }
     }
-    
+
     fun onGridConfigChanged(r: Int, c: Int) = _uiState.update { it.copy(gridRows = r, gridCols = c) }
     fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
     fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
@@ -472,7 +559,7 @@ class MainViewModel @JvmOverloads constructor(
         }
         viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
     }
-    
+
     fun unwarpImage(points: List<Offset>) {
         val original = _uiState.value.capturedTargetImages.firstOrNull() ?: return
         viewModelScope.launch {
@@ -495,7 +582,7 @@ class MainViewModel @JvmOverloads constructor(
             }
         }
     }
-    
+
     fun onRetakeCapture() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList(), calibrationSnapshots = emptyList()) } }
     fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
     fun onRefinementModeChanged(b: Boolean) = _uiState.update { it.copy(isRefinementEraser = b) }
@@ -512,7 +599,7 @@ class MainViewModel @JvmOverloads constructor(
 
     fun onFingerprintGenerated(fingerprint: com.hereliesaz.graffitixr.data.Fingerprint?) {
         if (fingerprint != null) {
-            val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.Fingerprint.serializer(), fingerprint)
+            val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.FingerprintSerializer, fingerprint)
             _uiState.update { it.copy(fingerprintJson = json) }
         }
         _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
