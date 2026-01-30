@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.feature.editor
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize

@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.utils
+package com.hereliesaz.graffitixr.common
 
 import android.app.Activity
 import android.content.Context

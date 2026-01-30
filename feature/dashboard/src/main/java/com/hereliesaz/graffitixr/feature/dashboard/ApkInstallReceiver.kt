@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.feature.dashboard
 
 import android.app.DownloadManager
 import android.content.BroadcastReceiver

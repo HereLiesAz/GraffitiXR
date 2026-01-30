@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.design
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures

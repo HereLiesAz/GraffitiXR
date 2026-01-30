@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.feature.editor
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

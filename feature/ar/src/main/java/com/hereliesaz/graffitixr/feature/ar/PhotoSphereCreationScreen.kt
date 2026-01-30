@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.feature.ar
 
 import android.app.Activity
 import androidx.compose.animation.core.animateFloatAsState

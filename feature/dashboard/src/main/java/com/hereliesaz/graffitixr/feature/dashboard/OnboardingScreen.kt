@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.feature.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

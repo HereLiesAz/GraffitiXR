@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<full-backup-content>
-    <!-- For more information on backup rules, see https://developer.android.com/guide/topics/data/autobackup -->
-    <include domain="sharedpref" path="."/>
-    <exclude domain="sharedpref" path="device_id.xml"/>
-</full-backup-content>

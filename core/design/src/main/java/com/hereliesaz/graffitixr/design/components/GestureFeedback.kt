@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.design
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn

@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -12,10 +12,10 @@ import com.hereliesaz.graffitixr.data.Fingerprint
 import com.hereliesaz.graffitixr.data.OverlayLayer
 import com.hereliesaz.graffitixr.rendering.*
 import com.hereliesaz.graffitixr.slam.SlamManager
-import com.hereliesaz.graffitixr.utils.DisplayRotationHelper
-import com.hereliesaz.graffitixr.utils.ImageProcessingUtils
-import com.hereliesaz.graffitixr.utils.ImageUtils
-import com.hereliesaz.graffitixr.utils.YuvToRgbConverter
+import com.hereliesaz.graffitixr.common.DisplayRotationHelper
+import com.hereliesaz.graffitixr.common.ImageProcessingUtils
+import com.hereliesaz.graffitixr.common.ImageUtils
+import com.hereliesaz.graffitixr.common.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.feature.ar
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect

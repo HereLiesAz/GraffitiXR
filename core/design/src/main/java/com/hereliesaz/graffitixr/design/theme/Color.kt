@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.ui.theme
+package com.hereliesaz.graffitixr.design
 
 import androidx.compose.ui.graphics.Color
 

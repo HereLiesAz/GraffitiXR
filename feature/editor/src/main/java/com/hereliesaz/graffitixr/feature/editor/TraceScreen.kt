@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.feature.editor
 
 import android.net.Uri
 import androidx.compose.foundation.Canvas
@@ -29,9 +29,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import coil.imageLoader
 import coil.request.ImageRequest
-import com.hereliesaz.graffitixr.RotationAxis
+import com.hereliesaz.graffitixr.design.RotationAxis
 import com.hereliesaz.graffitixr.UiState
-import com.hereliesaz.graffitixr.utils.detectSmartOverlayGestures
+import com.hereliesaz.graffitixr.common.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 
 @Composable

@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.feature.editor
 
 import android.util.Log
 import androidx.camera.core.Camera
@@ -38,9 +38,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.imageLoader
 import coil.request.ImageRequest
-import com.hereliesaz.graffitixr.RotationAxis
+import com.hereliesaz.graffitixr.design.RotationAxis
 import com.hereliesaz.graffitixr.UiState
-import com.hereliesaz.graffitixr.utils.detectSmartOverlayGestures
+import com.hereliesaz.graffitixr.common.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutionException
 

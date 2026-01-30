@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas

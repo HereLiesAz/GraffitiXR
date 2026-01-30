@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.feature.dashboard
 
 import android.Manifest
 import android.content.Intent

@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.slam
+package com.hereliesaz.graffitixr.native
 
 import android.content.Context
 

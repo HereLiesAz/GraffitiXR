@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.composables
+package com.hereliesaz.graffitixr.design
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding

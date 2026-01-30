@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.rendering
+package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -8,7 +8,7 @@ import android.opengl.Matrix
 import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.data.OverlayLayer
-import com.hereliesaz.graffitixr.utils.ImageUtils
+import com.hereliesaz.graffitixr.common.ImageUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.ui.theme
+package com.hereliesaz.graffitixr.design
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
@@ -6,7 +6,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.hereliesaz.graffitixr.R
+import com.hereliesaz.graffitixr.design.R
 
 val BlackoutFontFamily = FontFamily(
     Font(R.font.blackout_midnight)

@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.dialogs
+package com.hereliesaz.graffitixr.feature.dashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box

@@ -1,12 +1,12 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.feature.ar
 
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
-import com.hereliesaz.graffitixr.utils.ensureOpenCVLoaded
+import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
+import com.hereliesaz.graffitixr.common.ensureOpenCVLoaded
 
 class MappingActivity : ComponentActivity() {
 
