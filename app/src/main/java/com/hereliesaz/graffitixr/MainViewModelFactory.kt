@@ -3,7 +3,7 @@ package com.hereliesaz.graffitixr
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.hereliesaz.graffitixr.utils.ProjectManager
+import com.hereliesaz.graffitixr.feature.ar.*
 
 class MainViewModelFactory(
     private val application: Application

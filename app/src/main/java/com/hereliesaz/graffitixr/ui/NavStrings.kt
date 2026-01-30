@@ -2,7 +2,7 @@ package com.hereliesaz.graffitixr.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import com.hereliesaz.graffitixr.R
+import com.hereliesaz.graffitixr.feature.ar.*
 
 data class NavStrings(
     val modes: String,
