@@ -1,30 +1,67 @@
+import java.util.Properties
+
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.jetbrains.kotlin.compose)
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+val arcoreApiKey = localProperties.getProperty("ARCORE_API_KEY") ?: ""
+
 android {
     namespace = "com.hereliesaz.graffitixr"
-    compileSdk = 34
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
         minSdk = 29
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        resValue("string", "arcore_api_key", arcoreApiKey)
     }
-    buildFeatures { compose = true }
-    composeOptions { kotlinCompilerExtensionVersion = "1.5.1" }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            pickFirsts += "**/libc++_shared.so"
+        }
+    }
+
+    buildFeatures {
+        compose = true
+        resValues = true
+    }
 }
+
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
     implementation(project(":core:design"))
-    implementation(project(":core:native"))
+    implementation(project(":core:cpp"))
     implementation(project(":feature:ar"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:dashboard"))
-    implementation(platform("androidx.compose:compose-bom:2024.01.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.material3)
+    implementation(libs.opencv)
+    implementation(libs.arcore.client)
+    implementation(libs.androidx.activity.ktx)
+    implementation(libs.navigation.compose)
+    implementation(libs.androidx.camera.lifecycle)
 }

@@ -1,74 +1,91 @@
 [versions]
+activityCompose = "1.12.3"
+activityKtx = "1.12.3"
 agp = "9.0.0"
-constraintlayout = "2.2.1"
-litert = "2.1.0"
-sphereSlam = "v0.5.48.280"
-kotlin = "2.2.20"
-coreKtx = "1.17.0"
-junit = "4.13.2"
-mockk = "1.14.7"
-junitVersion = "1.3.0"
-espressoCore = "3.7.0"
-activityCompose = "1.12.2"
-composeBom = "2026.01.00"
-lifecycle = "2.10.0"
-navigation = "2.9.6"
-coroutines = "1.10.2"
-coil = "2.7.0"
+androidxComposeBom = "2026.01.01"
 arcore = "1.52.0"
-camerax = "1.5.2"
-accompanistPermissions = "0.37.3"
-mlkitSubjectSegmentation = "16.0.0-beta1"
-opencv = "4.13.0"
-azNavRail = "6.25"
-kotlinxSerialization = "1.10.0"
-segmentationSelfie = "16.0.0-beta6"
+azNavRail = "6.99"
+camerax = "1.5.3"
+coil = "2.7.0"
+composeBom = "2026.01.01"
+constraintlayout = "2.2.1"
+coreKtx = "1.17.0"
+coreKtxVersion = "1.17.0"
+coroutines = "1.10.2"
+espressoCore = "3.7.0"
 firebaseBom = "34.8.0"
+gson = "2.13.2"
+junit = "4.13.2"
+mockk = "1.14.9"
+junitVersion = "1.3.0"
+kotlin = "2.3.0"
+kotlinxSerialization = "1.10.0"
+lifecycle = "2.10.0"
+litert = "2.1.1"
+mlkitSubjectSegmentation = "16.0.0-beta1"
+navigation = "2.9.7"
+opencv = "4.13.0"
 playServicesBase = "18.10.0"
 playServicesLocation = "21.3.0"
+segmentationSelfie = "16.0.0-beta6"
+sphereSlam = "v0.5.48.280"
+timber = "5.0.1"
+uiGeometry = "1.10.2"
+accompanistPermissions = "0.37.3"
+
 
 [libraries]
-androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
-litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
-sphere-slam = { module = "com.github.HereLiesAz:SphereSLAM", version.ref = "sphereSlam" }
-firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
-kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
-kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
-kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
-google-accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
-mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
-az-nav-rail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref = "azNavRail" }
-androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
-androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
-androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
-kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
-coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
-arcore-client = { group = "com.google.ar", name = "core", version.ref = "arcore" }
-opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
-androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
-androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-geometry = { group = "androidx.compose.ui", name = "ui-geometry", version.ref = "uiGeometry" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-ui-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
-androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
-androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
-androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
-segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
+arcore-client = { group = "com.google.ar", name = "core", version.ref = "arcore" }
+az-nav-rail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref = "azNavRail" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+google-accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
+material3 = { module = "androidx.compose.material3:material3" }
+mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
 play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
+sphere-slam = { module = "com.github.HereLiesAz:SphereSLAM", version.ref = "sphereSlam" }
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

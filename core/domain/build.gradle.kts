@@ -1,31 +1,30 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
     id("kotlin-parcelize")
 }
 
 android {
     namespace = "com.hereliesaz.graffitixr.domain"
-    compileSdk = 34
+    compileSdk = 36
     defaultConfig {
         minSdk = 29
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
     }
-
-    
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "1.8" }
+}
 
-    
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
+    }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
+    implementation(libs.androidx.core.ktx)
     implementation(project(":core:common"))
-    
+    implementation(libs.androidx.compose.ui.geometry)
 }

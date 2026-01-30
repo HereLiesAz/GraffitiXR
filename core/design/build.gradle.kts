@@ -1,31 +1,31 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    
+    alias(libs.plugins.jetbrains.kotlin.compose)
 }
 
 android {
     namespace = "com.hereliesaz.graffitixr.design"
-    compileSdk = 34
+    compileSdk = 36
     defaultConfig {
         minSdk = 29
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
     }
-
-    
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "1.8" }
 
-    buildFeatures { compose = true }; composeOptions { kotlinCompilerExtensionVersion = "1.5.1" }
+    buildFeatures {
+        compose = true
+    }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
+    implementation(libs.androidx.core.ktx)
     implementation(project(":core:common"))
-    implementation(platform("androidx.compose:compose-bom:2024.01.00")); implementation("androidx.compose.ui:ui"); implementation("androidx.compose.material3:material3"); implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.ui.tooling.preview)
 }
