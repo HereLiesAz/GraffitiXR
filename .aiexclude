@@ -23,12 +23,23 @@ local.properties
 *.keystore
 google-services.json
 
-# Transient Build Dependencies (Managed by setup_libs scripts)
-libs/opencv/
-libs/glm/
-libs/litert/
-libs/mlkit-subject-segmentation/
-libs/*.aar
+# Transient dependencies (stored in root libs/)
+*/libs/opencv/
+*/libs/glm/
+*/libs/litert/
+*/libs/mlkit-subject-segmentation/
+*/libs/*.aar
+*/libs/litert_npu_runtime_libraries/
+
+# Legacy/Other
+/app/src/main/cpp/include/glm/*
+
+build_log*.txt
+/gradle/gradle-daemon-jvm.properties
+project_backup_full_*
+refactor*.sh
+*/build/*
+*/.cxx/*
 
 # Large Binary Artifacts
 *.apk
