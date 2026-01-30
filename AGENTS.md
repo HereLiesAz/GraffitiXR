@@ -1,65 +1,32 @@
-# AGENT INSTRUCTIONS for GraffitiXR
+# AI Developer Guidelines & Mandatory Context
 
-**CRITICAL PROTOCOL: You MUST achieve a PERFECT code review and a passing build BEFORE committing. The Native C++ layer is fragile; treat it with extreme caution.**
+## 1. Context Requirement
+All AI agents working on this project must read and understand the project documentation before generating code. Operating without this context is prohibited.
 
-This document defines the technical reality of the GraffitiXR project. The documents in /docs/ are an extension of this document, and ALL MUST BE READ CAREFULLY BEFORE STARTING ANY TASK!!!
+**Mandatory Reading List (`/docs/`):**
+* `docs/architecture.md` - System rendering pipeline and component diagrams.
+* `docs/auth.md` - Authentication specifications.
+* `docs/AZNAVRAIL_COMPLETE_GUIDE.md` - Navigation rail component implementation details.
+* `docs/BLUEPRINT.md` - High-level project roadmap.
+* `docs/conduct.md` - Contributor code of conduct.
+* `docs/contributing.md` - Contribution guidelines.
+* `docs/data_layer.md` - Persistence, serialization, and state management strategies.
+* `docs/DSL.md` - UI Domain Specific Language configurations.
+* `docs/fauxpas.md` - Common development errors to avoid.
+* `docs/file_descriptions.md` - Directory structure and file purpose registry.
+* `docs/misc.md` - Miscellaneous implementation notes.
+* `docs/performance.md` - Optimization targets and constraints.
+* `docs/PRIVACY_POLICY.md` - Application privacy policy.
+* `docs/screens.md` - Screen hierarchy and layout definitions.
+* `docs/SLAM_SETUP.md` - SLAM engine mathematics and configuration.
+* `docs/task_flow.md` - Detailed user task flows.
+* `docs/testing.md` - Testing protocols (Unit, UI, Integration).
+* `docs/TODO.md` - Current backlog and known issues.
+* `docs/UI_UX.md` - Design system and UX specifications.
+* `docs/workflow.md` - CI/CD and version control workflows.
 
----
-
-## **1. Architecture Overview**
-
-GraffitiXR is a **Local-Only Hybrid Application**.
-It relies on a custom Shared Library (`graffiti-lib`) for high-performance mapping.
-
-**HARD RULE:** No Cloud APIs. No Firebase Database. No Google Cloud Anchors. All data is local.
-
-### **The Stack**
-1.  **UI Layer (Kotlin/Compose):**
-    * **`MainActivity.kt`**: Single Activity.
-    * **`MainScreen.kt`**: Uses **`AzNavRail`** for all navigation.
-    * **`MainViewModel.kt`**: Manages `UiState`.
-2.  **Logic Layer (Kotlin):**
-    * **`SlamManager.kt`**: Bridges ARCore frames to the Native Engine.
-    * **`ProjectManager.kt`**: Handles zipping/unzipping `.gxr` project containers.
-3.  **Native Core (C++17):**
-    * **`MobileGS.cpp`**: The **Confidence Engine**. Handles point cloud accumulation and rendering.
-
----
-
-## **2. Critical Systems**
-
-### **A. MobileGS (Confidence Mapping)**
-* **Location:** `app/src/main/cpp/MobileGS.cpp`
-* **The Logic:**
-    * **Input:** Depth Map + Pose.
-    * **Process:** Unproject points -> Hash to Voxel ID.
-    * **Duplication:** If Voxel ID exists, **INCREMENT CONFIDENCE**. Do not overwrite.
-    * **Render:** Only draw splats where `confidence > CONFIDENCE_THRESHOLD`.
-* **Purpose:** This mechanism naturally filters out moving objects (which don't accumulate confidence) and reinforces the static wall structure.
-
-### **B. Persistence (The `.gxr` File)**
-* **Format:** ZIP Archive.
-* **Contents:**
-    1.  `model.map`: Binary dump of High-Confidence Splats.
-    2.  `target.fingerprint`: Serialized OpenCV Keypoints/Descriptors (ORB).
-    3.  `meta.json`: Image edits, GPS, Compass heading.
-* **Re-Localization:**
-    * When loading a project, `FingerprintManager` scans the camera feed for the saved descriptors.
-    * Once a match is found (Homography found), the `model.map` is aligned to the world frame.
-
-### **C. AzNavRail Integration**
-* **Mandate:** The UI is strictly governed by `AzNavRail`.
-* **Prohibited:** No standard Android navigation bars.
-* **Pattern:** Use `RailItem` for primary modes (Scan, Trace, Mockup).
-
----
-
-## **3. Development Rules**
-
-1.  **Privacy First:** Do not add libraries that transmit user data.
-2.  **Native Safety:** Thread safety in `MobileGS` is manual (`std::mutex`). The Sorter thread runs asynchronous to the Render thread.
-3.  **No Snippets:** Provide **FULL FILES** only.
-
-## **4. Known Issues**
-* **Confidence Drift:** Rapid movement can cause "double walls" if the confidence threshold is too low.
-* **Memory Pressure:** The Voxel Map can grow large. `MobileGS` must implement a culling routine to prune low-confidence points when RAM is tight.
+## 2. Coding Standards
+1.  **Complete Files Only:** Do not provide snippets or partial diffs. When modifying a file, output the full, valid file content.
+2.  **No Assumptions:** If documentation is ambiguous, request clarification before proceeding.
+3.  **Module Isolation:** Adhere strictly to the defined module boundaries. Do not introduce cross-module dependencies that violate the architecture (see `REFACTORING_STRATEGY.md`).
+4.  **Atomic Functions:** Adhere to the Single Responsibility Principle. Refactor large functions into smaller, testable units.
