@@ -25,7 +25,7 @@ import com.hereliesaz.graffitixr.feature.ar.*
 import com.hereliesaz.graffitixr.feature.ar.*
 import com.hereliesaz.graffitixr.feature.ar.*
 import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.utils.LocationTracker
+import com.hereliesaz.graffitixr.common.LocationTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch

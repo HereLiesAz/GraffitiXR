@@ -6,26 +6,29 @@ plugins {
 android {
     namespace = "com.hereliesaz.graffitixr.design"
     compileSdk = 36
+
     defaultConfig {
         minSdk = 29
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
         compose = true
     }
+
+
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
     implementation(project(":core:common"))
+
+    // UI Frameworks
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.compose.ui.ui2)
+    implementation(libs.ui.graphics)
+    implementation(libs.androidx.compose.material3.material32)
+    implementation(libs.androidx.compose.material.icons.extended)
+
+    // MISSING DEPENDENCY RESTORED:
+    // Required for legacy vector drawables using ?attr/colorControlNormal
+    implementation(libs.androidx.appcompat)
 }

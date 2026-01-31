@@ -5,7 +5,7 @@ import android.graphics.Path
 import android.net.Uri
 import com.hereliesaz.graffitixr.domain.model.OverlayLayer
 import com.hereliesaz.graffitixr.domain.model.ProjectData
-import com.hereliesaz.graffitixr.data.RefinementPath
+import com.hereliesaz.graffitixr.domain.model.RefinementPath
 import com.hereliesaz.graffitixr.feature.ar.ArState
 import com.hereliesaz.graffitixr.feature.editor.RotationAxis
 
