@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.EditorMode
-import com.hereliesaz.graffitixr.UiState
+import com.hereliesaz.graffitixr.common.model.UiState
 
 /**
  * Integrated panel for image adjustments, color balance, and undo/redo controls.

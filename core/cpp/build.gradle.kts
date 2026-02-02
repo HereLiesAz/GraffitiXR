@@ -33,4 +33,5 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
+    implementation(libs.arcore.client)
 }

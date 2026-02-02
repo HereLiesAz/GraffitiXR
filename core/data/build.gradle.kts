@@ -1,5 +1,7 @@
 plugins {
     id("com.android.library")
+    id("kotlin-parcelize")
+    alias(libs.plugins.kotlinx.serialization)
 }
 
 android {
@@ -21,4 +23,6 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(libs.gson)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.compose.ui.geometry)
 }

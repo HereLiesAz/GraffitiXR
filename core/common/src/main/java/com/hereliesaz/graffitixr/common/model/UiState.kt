@@ -1,18 +1,8 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.common.model
 
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.net.Uri
-import com.hereliesaz.graffitixr.domain.model.OverlayLayer
-import com.hereliesaz.graffitixr.domain.model.ProjectData
-import com.hereliesaz.graffitixr.domain.model.RefinementPath
-import com.hereliesaz.graffitixr.feature.ar.ArState
-import com.hereliesaz.graffitixr.feature.editor.RotationAxis
-
-// NOTE: We assume EditorMode, ArState, etc. are defined in the root package
-// or their respective files as indicated by the "Redeclaration" errors.
-// If imports are missing, add them here based on where your original Enums live.
-// Based on logs: com.hereliesaz.graffitixr.EditorMode exists.
 
 data class UiState(
     // Global & Editor Modes
@@ -25,7 +15,7 @@ data class UiState(
     val availableProjects: List<ProjectData> = emptyList(),
     val showProjectList: Boolean = true,
     val currentProjectId: String? = null,
-    val gpsData: com.hereliesaz.graffitixr.data.GpsData? = null,
+    val gpsData: GpsData? = null,
 
     // Layers & Images
     val overlayImageUri: Uri? = null,
@@ -51,7 +41,7 @@ data class UiState(
     val targetCreationMode: TargetCreationMode = TargetCreationMode.SINGLE_IMAGE,
     val capturedTargetUris: List<Uri> = emptyList(),
     val capturedTargetImages: List<Bitmap> = emptyList(),
-    val calibrationSnapshots: List<com.hereliesaz.graffitixr.data.CalibrationSnapshot> = emptyList(),
+    val calibrationSnapshots: List<CalibrationSnapshot> = emptyList(),
     val targetMaskUri: Uri? = null,
     val gridRows: Int = 3,
     val gridCols: Int = 3,

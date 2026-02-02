@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.design
+package com.hereliesaz.graffitixr.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -12,7 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.UiState
+import com.hereliesaz.graffitixr.common.model.UiState
+import com.hereliesaz.graffitixr.common.model.RotationAxis
 
 @Composable
 fun GestureFeedback(
@@ -37,9 +38,9 @@ fun GestureFeedback(
             contentAlignment = Alignment.Center
         ) {
             val rotationValue = when (uiState.activeRotationAxis) {
-                com.hereliesaz.graffitixr.RotationAxis.X -> rotationX
-                com.hereliesaz.graffitixr.RotationAxis.Y -> rotationY
-                com.hereliesaz.graffitixr.RotationAxis.Z -> rotationZ
+                RotationAxis.X -> rotationX
+                RotationAxis.Y -> rotationY
+                RotationAxis.Z -> rotationZ
             }
             Text(
                 text = "Scale: %.2f, Rotation (%s): %.1f°".format(

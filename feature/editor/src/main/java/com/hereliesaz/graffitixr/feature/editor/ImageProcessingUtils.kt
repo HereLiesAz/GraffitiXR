@@ -6,7 +6,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.graffitixr.domain.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Fingerprint
 import org.opencv.android.Utils
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core

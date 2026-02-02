@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.common
+package com.hereliesaz.graffitixr.common;
 import java.io.IOException;
 import java.io.OutputStream;
 

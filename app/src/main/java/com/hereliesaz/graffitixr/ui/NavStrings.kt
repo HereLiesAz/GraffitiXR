@@ -1,8 +1,8 @@
-package com.hereliesaz.graffitixr.design
+package com.hereliesaz.graffitixr.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import com.hereliesaz.graffitixr.feature.ar.*
+import com.hereliesaz.graffitixr.R
 
 data class NavStrings(
     val modes: String,

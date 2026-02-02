@@ -1,11 +1,12 @@
-package com.hereliesaz.graffitixr.domain.model
+package com.hereliesaz.graffitixr.common.model
 
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.graffitixr.feature.ar.*
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
 import kotlinx.serialization.Serializable
+import com.hereliesaz.graffitixr.common.serialization.RefinementPathSerializer
+import com.hereliesaz.graffitixr.common.OffsetListParceler
 
 @Serializable(with = RefinementPathSerializer::class)
 @Parcelize

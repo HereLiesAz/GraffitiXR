@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.design
+package com.hereliesaz.graffitixr.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.design.RotationAxis
+import com.hereliesaz.graffitixr.common.model.RotationAxis
 
 @Composable
 fun RotationAxisFeedback(

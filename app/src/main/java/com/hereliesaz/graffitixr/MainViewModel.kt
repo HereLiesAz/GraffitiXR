@@ -14,19 +14,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
+import com.hereliesaz.graffitixr.common.model.*
+import com.hereliesaz.graffitixr.common.model.*
+import com.hereliesaz.graffitixr.common.model.RotationAxis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -380,14 +370,12 @@ class MainViewModel @JvmOverloads constructor(
     fun openProject(project: ProjectData, context: Context) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val loaded = projectManager.loadProject(context, project.id)
-            if (loaded != null) {
+            val loadedProject = projectManager.loadProject(context, project.id)
+            if (loadedProject != null) {
+                val data = loadedProject.projectData
+
                 // If project has fingerprint, start relocalization
-                val fingerprintObj = if (loaded.fingerprintJson != null) {
-                    try {
-                        kotlinx.serialization.json.Json.decodeFromString(com.hereliesaz.graffitixr.data.FingerprintSerializer, loaded.fingerprintJson)
-                    } catch (e: Exception) { null }
-                } else null
+                val fingerprintObj = data.fingerprint
 
                 if (fingerprintObj != null) {
                     loadedFingerprint = fingerprintObj
@@ -398,21 +386,62 @@ class MainViewModel @JvmOverloads constructor(
                 // Load native map if exists
                 val mapPath = projectManager.getMapPath(context, project.id)
                 if (java.io.File(mapPath).exists()) {
-                    _captureEvent.send(CaptureEvent.RequestMapSave(mapPath)) // Reusing event payload to LOAD
-                    // Actually, we should check if it's Load or Save based on context.
-                    // Let's assume SlamManager handles both or we add a Load event.
-                    // For now, assume Load is handled by specialized event or reuse.
-                    // Let's add RequestMapLoad to Events.kt? No, let's use the path string to signal intent or add logic.
-                    // Actually, better:
-                    // TODO: Add RequestMapLoad event. For now, assume manual load via SlamManager in Activity if needed.
+                    _captureEvent.send(CaptureEvent.RequestMapSave(mapPath))
+                }
+
+                // Reconstruct UiState from LoadedProject
+                val fingerprintJson = if (fingerprintObj != null) {
+                    kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.FingerprintSerializer, fingerprintObj)
+                } else null
+
+                val drawingPaths = data.drawingPaths.map { path ->
+                    path.map { pair -> Offset(pair.first, pair.second) }
+                }
+
+                val loadedUiState = UiState(
+                    backgroundImageUri = data.backgroundImageUri,
+                    overlayImageUri = data.overlayImageUri,
+                    capturedTargetImages = loadedProject.targetImages,
+                    capturedTargetUris = data.targetImageUris,
+                    refinementPaths = data.refinementPaths,
+                    drawingPaths = drawingPaths,
+                    progressPercentage = data.progressPercentage,
+                    fingerprintJson = fingerprintJson,
+                    layers = data.layers,
+                    calibrationSnapshots = data.calibrationSnapshots,
+                    activeLayerId = if (data.layers.isNotEmpty()) data.layers.first().id else null
+                ).let { state ->
+                     if (state.layers.isEmpty() && data.overlayImageUri != null) {
+                         // Migration logic
+                         val legacyLayer = OverlayLayer(
+                             uri = data.overlayImageUri!!,
+                             name = "Base Layer",
+                             opacity = data.opacity,
+                             brightness = data.brightness,
+                             contrast = data.contrast,
+                             saturation = data.saturation,
+                             colorBalanceR = data.colorBalanceR,
+                             colorBalanceG = data.colorBalanceG,
+                             colorBalanceB = data.colorBalanceB,
+                             scale = data.scale,
+                             rotationX = data.rotationX,
+                             rotationY = data.rotationY,
+                             rotationZ = data.rotationZ,
+                             offset = data.offset,
+                             blendMode = data.blendMode
+                         )
+                         state.copy(layers = listOf(legacyLayer), activeLayerId = legacyLayer.id)
+                     } else {
+                         state
+                     }
                 }
 
                 _uiState.update {
-                    loaded.copy(
+                    loadedUiState.copy(
                         showProjectList = false,
                         currentProjectId = project.id,
                         availableProjects = it.availableProjects,
-                        arState = if(isRelocalizing) ArState.LOCKED else ArState.SEARCHING // Locked means looking for target
+                        arState = if(isRelocalizing) ArState.LOCKED else ArState.SEARCHING
                     )
                 }
             }
@@ -437,7 +466,8 @@ class MainViewModel @JvmOverloads constructor(
             if (s.showProjectList) return@launch
             val pid = s.currentProjectId ?: UUID.randomUUID().toString()
             if (s.currentProjectId == null) _uiState.update { it.copy(currentProjectId = pid) }
-            projectManager.saveProject(context, s, pid, thumbnail)
+            val projectData = createProjectDataFromState(s, pid)
+            projectManager.saveProject(context, projectData, s.capturedTargetImages, thumbnail)
         }
     }
 
@@ -450,7 +480,8 @@ class MainViewModel @JvmOverloads constructor(
             _uiState.update { it.copy(isLoading = true, currentProjectId = currentProjectId) }
             val context = getApplication<Application>()
             _captureEvent.send(CaptureEvent.RequestCapture)
-            projectManager.saveProject(context, _uiState.value, currentProjectId, null)
+            val projectData = createProjectDataFromState(_uiState.value, currentProjectId)
+            projectManager.saveProject(context, projectData, _uiState.value.capturedTargetImages, null)
 
             // Save Native Map
             val mapPath = projectManager.getMapPath(context, currentProjectId)
@@ -459,6 +490,54 @@ class MainViewModel @JvmOverloads constructor(
             _uiState.update { it.copy(isLoading = false) }
             _feedbackEvent.send(FeedbackEvent.Toast("Project saved successfully"))
         }
+    }
+
+    private fun createProjectDataFromState(state: UiState, projectId: String): ProjectData {
+        val activeLayer = state.activeLayer
+
+        // Deserialize Fingerprint JSON string to Object (if exists)
+        val fingerprintObj: com.hereliesaz.graffitixr.data.Fingerprint? = state.fingerprintJson?.let {
+            try {
+                kotlinx.serialization.json.Json.decodeFromString(com.hereliesaz.graffitixr.data.FingerprintSerializer, it)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        // Map List<List<Offset>> to List<List<Pair<Float, Float>>>
+        val serializableDrawingPaths = state.drawingPaths.map { path ->
+            path.map { offset -> Pair(offset.x, offset.y) }
+        }
+
+        return ProjectData(
+            id = projectId,
+            name = projectId,
+            lastModified = System.currentTimeMillis(),
+            backgroundImageUri = state.backgroundImageUri,
+            overlayImageUri = state.overlayImageUri,
+            thumbnailUri = null, // Handled by ProjectManager
+            targetImageUris = state.capturedTargetUris, // Updated by ProjectManager
+            refinementPaths = state.refinementPaths,
+            gpsData = state.gpsData,
+            opacity = activeLayer?.opacity ?: 1f,
+            brightness = activeLayer?.brightness ?: 0f,
+            contrast = activeLayer?.contrast ?: 1f,
+            saturation = activeLayer?.saturation ?: 1f,
+            colorBalanceR = activeLayer?.colorBalanceR ?: 1f,
+            colorBalanceG = activeLayer?.colorBalanceG ?: 1f,
+            colorBalanceB = activeLayer?.colorBalanceB ?: 1f,
+            scale = activeLayer?.scale ?: 1f,
+            rotationX = activeLayer?.rotationX ?: 0f,
+            rotationY = activeLayer?.rotationY ?: 0f,
+            rotationZ = activeLayer?.rotationZ ?: 0f,
+            offset = activeLayer?.offset ?: Offset.Zero,
+            blendMode = activeLayer?.blendMode ?: androidx.compose.ui.graphics.BlendMode.SrcOver,
+            fingerprint = fingerprintObj,
+            drawingPaths = serializableDrawingPaths,
+            progressPercentage = state.progressPercentage,
+            layers = state.layers,
+            calibrationSnapshots = state.calibrationSnapshots
+        )
     }
 
     fun exportProjectToUri(u: Uri) {

@@ -1,5 +1,6 @@
-package com.hereliesaz.graffitixr.data
+package com.hereliesaz.graffitixr.common.serialization
 
+import com.hereliesaz.graffitixr.common.model.RefinementPath
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
