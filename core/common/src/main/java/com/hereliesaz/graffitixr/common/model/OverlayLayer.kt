@@ -1,15 +1,18 @@
-package com.hereliesaz.graffitixr.domain.model
+package com.hereliesaz.graffitixr.common.model
 
 import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import com.hereliesaz.graffitixr.common.serialization.BlendModeSerializer
+import com.hereliesaz.graffitixr.common.serialization.OffsetSerializer
+import com.hereliesaz.graffitixr.common.serialization.UriSerializer
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.TypeParceler
 import kotlinx.serialization.Serializable
 import java.util.UUID
-import com.hereliesaz.graffitixr.OffsetParceler
-import com.hereliesaz.graffitixr.BlendModeParceler
+import com.hereliesaz.graffitixr.common.OffsetParceler
+import com.hereliesaz.graffitixr.common.BlendModeParceler
 
 @Serializable
 @Parcelize

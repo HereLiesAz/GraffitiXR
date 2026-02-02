@@ -2,6 +2,7 @@ plugins {
     id("com.android.library")
     id("kotlin-parcelize")
     alias(libs.plugins.jetbrains.kotlin.compose) // Required for @Parcelize in Parcelers.kt
+    alias(libs.plugins.kotlinx.serialization)
 }
 
 android {
@@ -40,4 +41,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.ui.graphics)
     implementation(libs.androidx.compose.ui.ui.tooling.preview2)
     implementation(libs.androidx.compose.material3.material33)
+    implementation(libs.opencv)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.arcore.client)
 }

@@ -14,9 +14,12 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.EditorMode
 import com.hereliesaz.graffitixr.MainViewModel
 import com.hereliesaz.graffitixr.StatusOverlay
-import com.hereliesaz.graffitixr.UiState
+import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
+import com.hereliesaz.graffitixr.ui.GestureFeedback
+import com.hereliesaz.graffitixr.ui.RotationAxisFeedback
+import com.hereliesaz.graffitixr.design.components.TapFeedbackEffect
 
 @Composable
 fun EditorUi(

@@ -261,7 +261,6 @@ fun MainScreen(viewModel: MainViewModel, navController: NavController, onRendere
                 }
                 TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
                 UnlockInstructionsPopup(uiState.showUnlockInstructions)
-                if (showInfoScreen) CustomHelpOverlay(uiState, navStrings) { showInfoScreen = false }
                 if (uiState.isCapturingTarget) Box(modifier = Modifier.fillMaxSize().zIndex(20f)) { TargetCreationFlow(uiState, viewModel, context) }
                 if (uiState.isCapturingTarget) CaptureAnimation()
             }

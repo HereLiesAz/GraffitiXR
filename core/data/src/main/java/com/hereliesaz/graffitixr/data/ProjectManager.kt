@@ -5,8 +5,10 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.graffitixr.UiState
+import com.hereliesaz.graffitixr.common.model.*
+import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.data.*
+import com.hereliesaz.graffitixr.common.util.ImageUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -55,8 +57,8 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
         return File(root, "map.bin").absolutePath
     }
 
-    suspend fun saveProject(context: Context, state: UiState, projectId: String, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
-        val root = File(context.filesDir, "projects/$projectId")
+    suspend fun saveProject(context: Context, projectData: ProjectData, targetImages: List<Bitmap>, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
+        val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
         // 1. Save Thumbnail (if provided)
@@ -72,7 +74,7 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
         }
 
         // 2. Save Target Images (Bitmaps) -> URIs
-        val savedTargetUris = state.capturedTargetImages.mapIndexed { index, bitmap ->
+        val savedTargetUris = targetImages.mapIndexed { index, bitmap ->
             val file = File(root, "target_$index.png")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
@@ -80,60 +82,18 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
             uriProvider.getUriForFile(file)
         }
 
-        // 3. Deserialize Fingerprint JSON string to Object (if exists)
-        val fingerprintObj: Fingerprint? = state.fingerprintJson?.let {
-            try {
-                json.decodeFromString(FingerprintSerializer, it)
-            } catch (e: Exception) {
-                Log.e("ProjectManager", "Failed to decode fingerprintJson", e)
-                null
-            }
-        }
-
-        val activeLayer = state.layers.find { it.id == state.activeLayerId } ?: state.layers.firstOrNull()
-
-        // 3. Create ProjectData
-        // Map List<List<Offset>> to List<List<Pair<Float, Float>>>
-        val serializableDrawingPaths = state.drawingPaths.map { path ->
-            path.map { offset -> Pair(offset.x, offset.y) }
-        }
-
-        val projectData = ProjectData(
-            id = projectId,
-            name = projectId,
-            lastModified = System.currentTimeMillis(),
-            backgroundImageUri = state.backgroundImageUri,
-            overlayImageUri = state.overlayImageUri,
+        val updatedProjectData = projectData.copy(
             thumbnailUri = thumbnailUri,
             targetImageUris = savedTargetUris,
-            refinementPaths = state.refinementPaths,
-            gpsData = state.gpsData,
-            opacity = activeLayer?.opacity ?: 1f,
-            brightness = activeLayer?.brightness ?: 0f,
-            contrast = activeLayer?.contrast ?: 1f,
-            saturation = activeLayer?.saturation ?: 1f,
-            colorBalanceR = activeLayer?.colorBalanceR ?: 1f,
-            colorBalanceG = activeLayer?.colorBalanceG ?: 1f,
-            colorBalanceB = activeLayer?.colorBalanceB ?: 1f,
-            scale = activeLayer?.scale ?: 1f,
-            rotationX = activeLayer?.rotationX ?: 0f,
-            rotationY = activeLayer?.rotationY ?: 0f,
-            rotationZ = activeLayer?.rotationZ ?: 0f,
-            offset = activeLayer?.offset ?: Offset.Zero,
-            blendMode = activeLayer?.blendMode ?: androidx.compose.ui.graphics.BlendMode.SrcOver,
-            fingerprint = fingerprintObj,
-            drawingPaths = serializableDrawingPaths,
-            progressPercentage = state.progressPercentage,
-            layers = state.layers,
-            calibrationSnapshots = state.calibrationSnapshots
+            lastModified = System.currentTimeMillis()
         )
 
-        // 4. Save ProjectData to JSON
-        val jsonString = json.encodeToString(projectData)
+        // 3. Save ProjectData to JSON
+        val jsonString = json.encodeToString(updatedProjectData)
         File(root, "project.json").writeText(jsonString)
     }
 
-    suspend fun loadProject(context: Context, projectId: String): UiState? = withContext(Dispatchers.IO) {
+    suspend fun loadProject(context: Context, projectId: String): LoadedProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         val projectFile = File(root, "project.json")
         if (!projectFile.exists()) return@withContext null
@@ -147,56 +107,7 @@ class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()
                 ImageUtils.loadBitmapFromUri(context, uri)
             }
 
-            // Fingerprint Object -> JSON String
-            val fingerprintJson = projectData.fingerprint?.let {
-                json.encodeToString(FingerprintSerializer, it)
-            }
-
-            // Map drawing paths back to Offset
-            val drawingPaths = projectData.drawingPaths.map { path ->
-                path.map { pair -> Offset(pair.first, pair.second) }
-            }
-
-            // Map back to UiState
-            UiState(
-                backgroundImageUri = projectData.backgroundImageUri,
-                overlayImageUri = projectData.overlayImageUri,
-                capturedTargetImages = targetBitmaps,
-                capturedTargetUris = projectData.targetImageUris,
-                refinementPaths = projectData.refinementPaths,
-                drawingPaths = drawingPaths,
-                progressPercentage = projectData.progressPercentage,
-                fingerprintJson = fingerprintJson,
-                layers = projectData.layers,
-                calibrationSnapshots = projectData.calibrationSnapshots,
-
-                // Active layer logic
-                activeLayerId = if (projectData.layers.isNotEmpty()) projectData.layers.first().id else null
-            ).let { state ->
-                if (state.layers.isEmpty() && projectData.overlayImageUri != null) {
-                    // Create migration layer from legacy fields
-                    val legacyLayer = OverlayLayer(
-                        uri = projectData.overlayImageUri,
-                        name = "Base Layer",
-                        opacity = projectData.opacity,
-                        brightness = projectData.brightness,
-                        contrast = projectData.contrast,
-                        saturation = projectData.saturation,
-                        colorBalanceR = projectData.colorBalanceR,
-                        colorBalanceG = projectData.colorBalanceG,
-                        colorBalanceB = projectData.colorBalanceB,
-                        scale = projectData.scale,
-                        rotationX = projectData.rotationX,
-                        rotationY = projectData.rotationY,
-                        rotationZ = projectData.rotationZ,
-                        offset = projectData.offset,
-                        blendMode = projectData.blendMode
-                    )
-                    state.copy(layers = listOf(legacyLayer), activeLayerId = legacyLayer.id)
-                } else {
-                    state
-                }
-            }
+            LoadedProject(projectData, targetBitmaps)
         } catch (e: Exception) {
             Log.e("ProjectManager", "Failed to load project", e)
             null

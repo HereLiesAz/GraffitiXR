@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.data
+package com.hereliesaz.graffitixr.common.serialization
 
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset

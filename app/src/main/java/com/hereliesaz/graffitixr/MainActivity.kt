@@ -20,7 +20,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.graffitixr.common.ensureOpenCVLoaded
 import com.hereliesaz.graffitixr.design.GraffitiXRTheme
-import com.hereliesaz.graffitixr.domain.model.CaptureEvent
+import com.hereliesaz.graffitixr.common.model.CaptureEvent
 import com.hereliesaz.graffitixr.feature.ar.*
 import com.hereliesaz.graffitixr.feature.ar.*
 import com.hereliesaz.graffitixr.feature.ar.*

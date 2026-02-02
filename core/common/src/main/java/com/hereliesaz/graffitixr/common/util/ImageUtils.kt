@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.feature.editor
+package com.hereliesaz.graffitixr.common.util
 
 import android.content.Context
 import android.graphics.Bitmap

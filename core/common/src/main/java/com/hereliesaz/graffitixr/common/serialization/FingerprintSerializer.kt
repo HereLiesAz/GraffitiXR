@@ -1,5 +1,6 @@
-package com.hereliesaz.graffitixr.data
+package com.hereliesaz.graffitixr.common.serialization
 
+import com.hereliesaz.graffitixr.common.model.Fingerprint
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder

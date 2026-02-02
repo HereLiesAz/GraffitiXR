@@ -64,4 +64,5 @@ dependencies {
     implementation(libs.androidx.activity.ktx)
     implementation(libs.navigation.compose)
     implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.az.nav.rail)
 }

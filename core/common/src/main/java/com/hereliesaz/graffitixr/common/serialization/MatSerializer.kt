@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.data
+package com.hereliesaz.graffitixr.common.serialization
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor

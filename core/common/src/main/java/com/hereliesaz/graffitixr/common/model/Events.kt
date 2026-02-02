@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.domain.model
+package com.hereliesaz.graffitixr.common.model
 
 import android.graphics.Bitmap
 import android.net.Uri
