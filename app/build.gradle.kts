@@ -52,7 +52,7 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
     implementation(project(":core:design"))
-    implementation(project(":core:cpp"))
+    implementation(project(":core:native"))
     implementation(project(":feature:ar"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:dashboard"))

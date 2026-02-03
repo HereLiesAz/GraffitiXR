@@ -66,6 +66,7 @@ data class UiState(
     val showDoubleTapHint: Boolean = false,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
+    val tapFeedback: TapFeedback? = null,
     val isFlashlightOn: Boolean = false,
     val activeColorSeed: Int = 0,
 

@@ -4,13 +4,11 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
-import com.hereliesaz.graffitixr.common.ensureOpenCVLoaded
+import com.hereliesaz.graffitixr.natives.ensureOpenCVLoaded
 
 class MappingActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels { MainViewModelFactory(application) }
     private var arRenderer: ArRenderer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {

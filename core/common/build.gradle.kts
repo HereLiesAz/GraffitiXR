@@ -41,7 +41,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.ui.graphics)
     implementation(libs.androidx.compose.ui.ui.tooling.preview2)
     implementation(libs.androidx.compose.material3.material33)
-    implementation(libs.opencv)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.arcore.client)
+    implementation(libs.opencv)
 }

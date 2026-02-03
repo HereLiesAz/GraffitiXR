@@ -1,6 +1,20 @@
 
 # Architecture & Rendering Pipeline
 
+## Module Architecture (Clean Architecture)
+The application is structured into three layers:
+1.  **App Layer (`:app`)**: Entry point, Navigation Graph, Dependency Injection.
+2.  **Feature Layer**:
+    *   `:feature:ar` - AR Rendering, Mapping, Camera.
+    *   `:feature:editor` - Image manipulation, Trace/Mockup UI.
+    *   `:feature:dashboard` - Project management, Settings.
+3.  **Core Layer**:
+    *   `:core:domain` - Pure data models, Repository interfaces.
+    *   `:core:data` - Repository implementations, File I/O.
+    *   `:core:common` - Universal utilities.
+    *   `:core:design` - UI Components, Theme.
+    *   `:core:native` - Native C++ Engine (MobileGS).
+
 ## System Diagram
 
 ```mermaid
@@ -20,10 +34,20 @@ graph TD
     
     E -->|glDrawArraysInstanced| H[OpenGL ES 3.0 Surface]
     
-    I[MainViewModel] -- CaptureEvent (Channel) --> K[MainActivity]
-    K -- Calls --> B
-    B -- Callback --> I
-    I -->|UI State| J[Jetpack Compose / AzNavRail]
+    subgraph ViewModels
+        VM_AR[ArViewModel]
+        VM_ED[EditorViewModel]
+        VM_DB[DashboardViewModel]
+    end
+    
+    VM_AR -- Updates --> B
+    B -- Status --> VM_AR
+    
+    VM_ED -- Modifies --> Repo[ProjectRepository]
+    Repo -- Observes --> VM_AR
+    Repo -- Observes --> VM_ED
+    
+    VM_ED -->|UI State| J[Jetpack Compose / AzNavRail]
     J -->|Overlay| H
 ```
 Algorithm Details

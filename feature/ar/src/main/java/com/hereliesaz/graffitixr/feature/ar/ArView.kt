@@ -15,12 +15,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.hereliesaz.graffitixr.data.CaptureEvent
+import com.hereliesaz.graffitixr.common.model.CaptureEvent
 
 @Composable
 fun ArView(
-    viewModel: MainViewModel,
-    uiState: UiState,
+    viewModel: ArViewModel,
+    uiState: ArUiState,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val context = LocalContext.current
@@ -45,18 +45,12 @@ fun ArView(
                 }
                 viewModel.onArImagePlaced()
             }
-            // FIX: Removed viewModel.arRenderer assignment
         }
     }
     
     // FIX: Report renderer instance to parent
     LaunchedEffect(arRenderer) {
         onRendererCreated(arRenderer)
-    }
-
-    // Pass layer updates to renderer
-    LaunchedEffect(uiState.layers) {
-        arRenderer.updateLayers(uiState.layers)
     }
 
     // Pass flashlight state
@@ -97,12 +91,10 @@ fun ArView(
                 Lifecycle.Event.ON_RESUME -> {
                     arRenderer.onResume(activity)
                     glSurfaceView?.onResume()
-                    viewModel.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     arRenderer.onPause()
                     glSurfaceView?.onPause()
-                    viewModel.onPause()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
                     arRenderer.cleanup()

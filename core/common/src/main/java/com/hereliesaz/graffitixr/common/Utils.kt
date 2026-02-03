@@ -4,22 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
-import android.util.Log
-import org.opencv.android.OpenCVLoader
-
-// --- Single Source of Truth for OpenCV Loading ---
-fun ensureOpenCVLoaded(): Boolean {
-    try {
-        if (!OpenCVLoader.initLocal()) {
-            Log.e("OpenCV", "Unable to load OpenCV!")
-            return false
-        }
-        return true
-    } catch (e: Throwable) {
-        Log.e("OpenCV", "OpenCV load failed", e)
-        return false
-    }
-}
 
 fun resizeBitmapForArCore(bitmap: Bitmap): Bitmap {
     val MAX_DIMENSION = 1024

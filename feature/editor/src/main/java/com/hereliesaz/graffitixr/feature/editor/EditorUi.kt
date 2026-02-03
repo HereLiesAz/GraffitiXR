@@ -12,19 +12,18 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.EditorMode
-import com.hereliesaz.graffitixr.MainViewModel
-import com.hereliesaz.graffitixr.StatusOverlay
 import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.GestureFeedback
 import com.hereliesaz.graffitixr.ui.RotationAxisFeedback
 import com.hereliesaz.graffitixr.design.components.TapFeedbackEffect
+import com.hereliesaz.graffitixr.design.components.AdjustmentsPanel
 
 @Composable
 fun EditorUi(
-    viewModel: MainViewModel,
     uiState: UiState,
+    actions: EditorActions,
     showSliderDialog: String?,
     showColorBalanceDialog: Boolean,
     gestureInProgress: Boolean
@@ -57,7 +56,7 @@ fun EditorUi(
 
         // 3. Drawing Canvas
         if (uiState.isMarkingProgress) {
-            DrawingCanvas(uiState.drawingPaths, viewModel::onDrawingPathFinished)
+            DrawingCanvas(uiState.drawingPaths, actions::onDrawingPathFinished)
         }
 
         // 4. Adjustments Panel (Bottom)
@@ -71,35 +70,35 @@ fun EditorUi(
                 showColorBalance = showColorBalanceDialog,
                 isLandscape = isLandscape,
                 screenHeight = configuration.screenHeightDp.dp,
-                onOpacityChange = viewModel::onOpacityChanged,
-                onBrightnessChange = viewModel::onBrightnessChanged,
-                onContrastChange = viewModel::onContrastChanged,
-                onSaturationChange = viewModel::onSaturationChanged,
-                onColorBalanceRChange = viewModel::onColorBalanceRChanged,
-                onColorBalanceGChange = viewModel::onColorBalanceGChanged,
-                onColorBalanceBChange = viewModel::onColorBalanceBChanged,
-                onUndo = viewModel::onUndoClicked,
-                onRedo = viewModel::onRedoClicked,
-                onMagicAlign = viewModel::onMagicClicked
+                onOpacityChange = actions::onOpacityChanged,
+                onBrightnessChange = actions::onBrightnessChanged,
+                onContrastChange = actions::onContrastChanged,
+                onSaturationChange = actions::onSaturationChanged,
+                onColorBalanceRChange = actions::onColorBalanceRChanged,
+                onColorBalanceGChange = actions::onColorBalanceGChanged,
+                onColorBalanceBChange = actions::onColorBalanceBChanged,
+                onUndo = actions::onUndoClicked,
+                onRedo = actions::onRedoClicked,
+                onMagicAlign = actions::onMagicClicked
             )
         }
 
         // 5. Dialogs & Helpers
         uiState.showOnboardingDialogForMode?.let { mode ->
-            OnboardingDialog(mode) { viewModel.onOnboardingComplete(mode) }
+            OnboardingDialog(mode) { actions.onOnboardingComplete(mode) }
         }
 
         if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
             RotationAxisFeedback(
                 uiState.activeRotationAxis,
                 uiState.showRotationAxisFeedback,
-                viewModel::onFeedbackShown,
+                actions::onFeedbackShown,
                 Modifier.align(Alignment.BottomCenter).padding(bottom = bottomSafePadding + 32.dp).zIndex(4f)
             )
-            TapFeedbackEffect(viewModel.tapFeedback.collectAsState().value)
+            TapFeedbackEffect(uiState.tapFeedback)
 
             if (uiState.showDoubleTapHint) {
-                DoubleTapHintDialog(viewModel::onDoubleTapHintDismissed)
+                DoubleTapHintDialog(actions::onDoubleTapHintDismissed)
             }
 
             if (uiState.isMarkingProgress) {

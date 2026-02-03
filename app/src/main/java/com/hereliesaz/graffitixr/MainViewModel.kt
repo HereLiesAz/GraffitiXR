@@ -1,15 +1,10 @@
 package com.hereliesaz.graffitixr
 
+import com.hereliesaz.graffitixr.natives.ensureOpenCVLoaded
 import android.app.Application
-import android.content.Context
 import android.graphics.Bitmap
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import android.location.Location
 import android.net.Uri
-import android.opengl.Matrix
+import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -18,177 +13,172 @@ import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
-import kotlin.math.abs
-import kotlin.random.Random
 
-class MainViewModel @JvmOverloads constructor(
-    application: Application,
-    private val projectManager: ProjectManager = ProjectManager()
-) : AndroidViewModel(application) {
+class MainViewModel(application: Application) : AndroidViewModel(application), EditorActions {
 
-    private val prefs = application.getSharedPreferences("graffiti_settings", Context.MODE_PRIVATE)
-    private val _uiState = MutableStateFlow(UiState(
-        isRightHanded = prefs.getBoolean("is_right_handed", true),
-        activeColorSeed = Random.nextInt()
-    ))
+    private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    private val _feedbackEvent = Channel<FeedbackEvent>(Channel.BUFFERED)
-    val feedbackEvent = _feedbackEvent.receiveAsFlow()
+    private val _feedbackEvent = MutableSharedFlow<FeedbackEvent>()
+    val feedbackEvent: SharedFlow<FeedbackEvent> = _feedbackEvent.asSharedFlow()
 
-    private val _captureEvent = Channel<CaptureEvent>(Channel.BUFFERED)
-    val captureEvent = _captureEvent.receiveAsFlow()
+    // Reference to Renderer (set by Activity)
+    var arRenderer: ArRenderer? = null
 
-    private val _tapFeedback = MutableStateFlow<TapFeedback?>(null)
-    val tapFeedback = _tapFeedback.asStateFlow()
+    // Project Logic
+    private var currentFingerprint: Bitmap? = null
 
-    private val _artworkBounds = MutableStateFlow<android.graphics.RectF?>(null)
-    val artworkBounds = _artworkBounds.asStateFlow()
-
-    // Sensor Logic
-    private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private var currentSensorData: SensorData? = null
-    private var isSensorListening = false
-    private var stableStartTime = 0L
-    private var lastRotationVector: FloatArray? = null
-    private val STABILITY_THRESHOLD = 0.02f
-
-    // Relocalization State
-    private var isRelocalizing = false
-    private var loadedFingerprint: com.hereliesaz.graffitixr.data.Fingerprint? = null
-
-    private val sensorEventListener = object : SensorEventListener {
-        override fun onSensorChanged(event: SensorEvent?) {
-            event ?: return
-            if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
-                val rotationMatrix = FloatArray(9)
-                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                val orientation = FloatArray(3)
-                SensorManager.getOrientation(rotationMatrix, orientation)
-                currentSensorData = SensorData(orientation[0], orientation[1], orientation[2])
-
-                if (_uiState.value.isCapturingTarget && _uiState.value.captureStep.name.startsWith("CALIBRATION_POINT")) {
-                    val currentVector = event.values.clone()
-                    var isStable = false
-
-                    if (lastRotationVector != null) {
-                        var delta = 0f
-                        val size = minOf(currentVector.size, lastRotationVector!!.size, 4)
-                        for (i in 0 until size) {
-                            delta += abs(currentVector[i] - lastRotationVector!![i])
-                        }
-                        if (delta < STABILITY_THRESHOLD) isStable = true
-                    } else {
-                        isStable = true
-                    }
-                    lastRotationVector = currentVector
-
-                    val now = System.currentTimeMillis()
-                    if (isStable) {
-                        if (stableStartTime == 0L) stableStartTime = now
-                        else if (now - stableStartTime > 2000) {
-                            onCalibrationPointCaptured()
-                            stableStartTime = 0L
-                            lastRotationVector = null
-                        }
-                    } else {
-                        stableStartTime = 0L
-                    }
-                } else {
-                    stableStartTime = 0L
-                }
-            }
-        }
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-    }
-
-    // History Stacks
-    private val undoStack = ArrayDeque<List<OverlayLayer>>()
-    private val redoStack = ArrayDeque<List<OverlayLayer>>()
-    private val MAX_HISTORY = 50
-    private var layerModsClipboard: OverlayLayer? = null
-
-    private fun snapshotState() {
-        if (undoStack.size >= MAX_HISTORY) undoStack.removeFirst()
-        undoStack.addLast(_uiState.value.layers.toList())
-        redoStack.clear()
-        updateHistoryFlags()
-    }
-
-    private fun updateHistoryFlags() {
-        _uiState.update { it.copy(canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty()) }
-    }
-
-    private fun updateActiveLayer(saveHistory: Boolean = false, block: (OverlayLayer) -> OverlayLayer) {
-        val activeId = _uiState.value.activeLayerId ?: return
-        if (saveHistory) snapshotState()
-        _uiState.update { state ->
-            state.copy(layers = state.layers.map { if (it.id == activeId) block(it) else it })
-        }
-    }
-
-    fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
-    fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
-    fun onContrastChanged(v: Float) = updateActiveLayer { it.copy(contrast = v) }
-    fun onSaturationChanged(v: Float) = updateActiveLayer { it.copy(saturation = v) }
-    fun onColorBalanceRChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceR = v) }
-    fun onColorBalanceGChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceG = v) }
-    fun onColorBalanceBChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceB = v) }
-
-    fun onCycleBlendMode() = updateActiveLayer(saveHistory = true) { layer ->
-        layer.copy(blendMode = ImageUtils.getNextBlendMode(layer.blendMode))
-    }
-
-    fun onRemoveBackgroundClicked() {
-        val activeId = _uiState.value.activeLayerId ?: return
-        val context = getApplication<Application>()
+    fun showTapFeedback(position: Offset, isSuccess: Boolean) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            try {
-                val activeLayer = _uiState.value.layers.find { it.id == activeId }
-                if (activeLayer != null) {
-                    val original = withContext(Dispatchers.IO) {
-                        ImageUtils.loadBitmapFromUri(context, activeLayer.uri)
-                    }
-                    if (original != null) {
-                        snapshotState()
-                        val processed = withContext(Dispatchers.IO) {
-                            val safeBitmap = if (original.config != Bitmap.Config.ARGB_8888 || original.isMutable.not()) {
-                                original.copy(Bitmap.Config.ARGB_8888, true)
-                            } else {
-                                original
-                            }
-                            BackgroundRemover.removeBackground(context, safeBitmap)
-                        }
-                        if (processed != null) {
-                            val newUri = withContext(Dispatchers.IO) {
-                                ImageUtils.saveBitmapToCache(context, processed)
-                            }
-                            updateActiveLayer { it.copy(uri = newUri) }
-                        } else {
-                            _feedbackEvent.send(FeedbackEvent.Toast("Failed to remove background"))
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _feedbackEvent.send(FeedbackEvent.Toast("Error removing background"))
-            }
-            _uiState.update { it.copy(isLoading = false) }
+            val feedback = if (isSuccess) TapFeedback.Success(position) else TapFeedback.Failure(position)
+            _uiState.update { it.copy(tapFeedback = feedback) }
+            kotlinx.coroutines.delay(500)
+            _uiState.update { it.copy(tapFeedback = null) }
         }
     }
 
-    fun onLineDrawingClicked() {
+    fun togglePointCloud() {
+        _uiState.update { it.copy(showPointCloud = !it.showPointCloud) }
+        arRenderer?.showPointCloud = _uiState.value.showPointCloud
+    }
+
+    fun toggleFlashlight() {
+        _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
+        // Flashlight logic handled in Activity via session config usually
+    }
+
+    // --- EditorActions Implementation ---
+
+    override fun onOpacityChanged(v: Float) {
+        updateActiveLayer { it.copy(opacity = v) }
+    }
+
+    override fun onBrightnessChanged(v: Float) {
+        // Todo: Implement filters
+    }
+
+    override fun onContrastChanged(v: Float) {
+        // Todo: Implement filters
+    }
+
+    override fun onSaturationChanged(v: Float) {
+        // Todo: Implement filters
+    }
+
+    override fun onColorBalanceRChanged(v: Float) { }
+    override fun onColorBalanceGChanged(v: Float) { }
+    override fun onColorBalanceBChanged(v: Float) { }
+
+    override fun onUndoClicked() {
+        viewModelScope.launch { _feedbackEvent.emit(FeedbackEvent.Toast("Undo not implemented")) }
+    }
+
+    override fun onRedoClicked() {
+        viewModelScope.launch { _feedbackEvent.emit(FeedbackEvent.Toast("Redo not implemented")) }
+    }
+
+    override fun onMagicClicked() {
+        viewModelScope.launch {
+            _feedbackEvent.emit(FeedbackEvent.VibrateDouble)
+            // TODO: Trigger actual alignment logic here
+        }
+    }
+
+    override fun onRemoveBackgroundClicked() {
+        // Todo: Call python/OpenCV grabcut or similar
+    }
+
+    override fun onLineDrawingClicked() {
+        _uiState.update { it.copy(editorMode = EditorMode.DRAW) }
+    }
+
+    override fun onCycleBlendMode() {
+        // Todo: implementation
+    }
+
+    override fun toggleImageLock() {
+        // Check AR State, if locked, unlock, etc.
+        val newState = if (_uiState.value.arState == ArState.LOCKED) ArState.IDLE else ArState.LOCKED
+        _uiState.update { it.copy(arState = newState) }
+    }
+
+    override fun onLayerActivated(id: String) {
+        _uiState.update { it.copy(activeLayerId = id) }
+    }
+
+    override fun onLayerRenamed(id: String, name: String) {
+        val layers = _uiState.value.layers.map {
+            if (it.id == id) it.copy(name = name) else it
+        }
+        _uiState.update { it.copy(layers = layers) }
+    }
+
+    override fun onLayerReordered(newOrder: List<String>) {
+        // Reorder logic
+    }
+
+    override fun onLayerDuplicated(id: String) {
+        val layer = _uiState.value.layers.find { it.id == id } ?: return
+        val newLayer = layer.copy(id = UUID.randomUUID().toString(), name = layer.name + " Copy")
+        val layers = _uiState.value.layers + newLayer
+        _uiState.update { it.copy(layers = layers, activeLayerId = newLayer.id) }
+        updateRenderer()
+    }
+
+    override fun onLayerRemoved(id: String) {
+        val layers = _uiState.value.layers.filterNot { it.id == id }
+        _uiState.update { it.copy(layers = layers, activeLayerId = null) }
+        updateRenderer()
+    }
+
+    override fun copyLayerModifications(id: String) { }
+    override fun pasteLayerModifications(id: String) { }
+
+    override fun onScaleChanged(s: Float) {
+        updateActiveLayer { it.copy(scale = it.scale * s) }
+    }
+
+    override fun onOffsetChanged(o: Offset) {
+        updateActiveLayer { it.copy(x = it.x + o.x, y = it.y + o.y) }
+    }
+
+    override fun onRotationXChanged(d: Float) { }
+    override fun onRotationYChanged(d: Float) { }
+    override fun onRotationZChanged(d: Float) {
+        updateActiveLayer { it.copy(rotation = it.rotation + d) }
+    }
+
+    override fun onCycleRotationAxis() { }
+
+    override fun onGestureStart() {
+        _uiState.update { it.copy(gestureInProgress = true) }
+    }
+
+    override fun onGestureEnd() {
+        _uiState.update { it.copy(gestureInProgress = false) }
+    }
+
+    override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
+        updateActiveLayer { it.copy(scale = scale, x = offset.x, y = offset.y, rotation = rz) }
+    }
+
+    override fun onFeedbackShown() { }
+    override fun onDoubleTapHintDismissed() { }
+    override fun onOnboardingComplete(mode: Any) { }
+    override fun onDrawingPathFinished(path: List<Offset>) { }
+
+    // Helpers
+    private fun updateActiveLayer(transform: (OverlayLayer) -> OverlayLayer) {
         val activeId = _uiState.value.activeLayerId ?: return
         val context = getApplication<Application>()
         viewModelScope.launch {
@@ -580,116 +570,29 @@ class MainViewModel @JvmOverloads constructor(
             val path = projectManager.getMapPath(getApplication(), pid)
             _captureEvent.send(CaptureEvent.RequestMapSave(path))
         }
+        _uiState.update { it.copy(layers = layers) }
+        updateRenderer()
     }
 
-    fun showUnlockInstructions() = _uiState.update { it.copy(showUnlockInstructions = true) }
-    fun onOverlayImageSelected(u: Uri) { val l = OverlayLayer(uri = u, name = "Layer ${_uiState.value.layers.size + 1}"); _uiState.update { it.copy(layers = it.layers + l, activeLayerId = l.id, overlayImageUri = u) } }
-    fun onBackgroundImageSelected(u: Uri) = _uiState.update { it.copy(backgroundImageUri = u) }
-    fun onImagePickerShown() {}
-    fun onDoubleTapHintDismissed() {}
-    fun onGestureStart() {}
-    fun onGestureEnd() { snapshotState() }
-    fun onRefineTargetToggled() {}
-
-    fun onTargetCreationMethodSelected(m: TargetCreationMode) {
-        val next = when (m) {
-            TargetCreationMode.GUIDED_GRID -> CaptureStep.GRID_CONFIG
-            TargetCreationMode.GUIDED_POINTS -> CaptureStep.GUIDED_CAPTURE
-            TargetCreationMode.MULTI_POINT_CALIBRATION -> CaptureStep.CALIBRATION_POINT_1
-            else -> CaptureStep.INSTRUCTION
-        }
-
-        if (m == TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening()
-
-        if (m == TargetCreationMode.GUIDED_POINTS) {
-            viewModelScope.launch {
-                val bitmap = GuideGenerator.generateFourXs()
-                val uri = withContext(Dispatchers.IO) {
-                    ImageUtils.saveBitmapToCache(getApplication(), bitmap)
-                }
-                val layer = OverlayLayer(uri = uri, name = "Guide Points", opacity = 0.8f)
-                _uiState.update {
-                    it.copy(
-                        targetCreationMode = m,
-                        layers = it.layers + layer,
-                        activeLayerId = layer.id,
-                        captureStep = CaptureStep.GUIDED_CAPTURE
-                    )
-                }
-            }
-        } else {
-            _uiState.update { it.copy(targetCreationMode = m, captureStep = next, calibrationSnapshots = emptyList()) }
-        }
+    private fun updateRenderer() {
+        arRenderer?.updateLayers(_uiState.value.layers)
     }
 
-    fun onGridConfigChanged(r: Int, c: Int) = _uiState.update { it.copy(gridRows = r, gridCols = c) }
-    fun onGpsDecision(e: Boolean) = _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION) }
-    fun onPhotoSequenceFinished() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.REVIEW) } }
-    fun onCalibrationPointCaptured(poseMatrix: FloatArray? = null) {
-        if (poseMatrix == null) {
-            viewModelScope.launch { _captureEvent.send(CaptureEvent.RequestCalibration) }
-            return
-        }
-        val snapshot = CalibrationSnapshot(_uiState.value.gpsData, currentSensorData, poseMatrix.toList(), System.currentTimeMillis())
-        _uiState.update {
-            val next = when(it.captureStep) { CaptureStep.CALIBRATION_POINT_1 -> CaptureStep.CALIBRATION_POINT_2; CaptureStep.CALIBRATION_POINT_2 -> CaptureStep.CALIBRATION_POINT_3; CaptureStep.CALIBRATION_POINT_3 -> CaptureStep.CALIBRATION_POINT_4; CaptureStep.CALIBRATION_POINT_4 -> CaptureStep.REVIEW; else -> it.captureStep }
-            if (next == CaptureStep.REVIEW) stopSensorListening()
-            it.copy(captureStep = next, calibrationSnapshots = it.calibrationSnapshots + snapshot)
-        }
-        viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateSingle) }
+    // Add new layer logic
+    fun addLayer(uri: Uri) {
+        val layer = OverlayLayer(
+            id = UUID.randomUUID().toString(),
+            uri = uri,
+            name = "New Layer"
+        )
+        val layers = _uiState.value.layers + layer
+        _uiState.update { it.copy(layers = layers, activeLayerId = layer.id) }
+        updateRenderer()
     }
+}
 
-    fun unwarpImage(points: List<Offset>) {
-        val original = _uiState.value.capturedTargetImages.firstOrNull() ?: return
-        viewModelScope.launch {
-            if (!ensureOpenCVLoaded()) return@launch
-            _uiState.update { it.copy(isLoading = true) }
-            val unwarped = withContext(Dispatchers.IO) {
-                ImageProcessingUtils.unwarpImage(original, points)
-            }
-            if (unwarped != null) {
-                _uiState.update {
-                    it.copy(
-                        capturedTargetImages = listOf(unwarped),
-                        captureStep = CaptureStep.REVIEW,
-                        isLoading = false
-                    )
-                }
-            } else {
-                _uiState.update { it.copy(isLoading = false) }
-                _feedbackEvent.send(FeedbackEvent.Toast("Failed to rectify image"))
-            }
-        }
-    }
-
-    fun onRetakeCapture() { stopSensorListening(); _uiState.update { it.copy(captureStep = CaptureStep.INSTRUCTION, capturedTargetImages = emptyList(), calibrationSnapshots = emptyList()) } }
-    fun onRefinementPathAdded(p: RefinementPath) = _uiState.update { it.copy(refinementPaths = it.refinementPaths + p) }
-    fun onRefinementModeChanged(b: Boolean) = _uiState.update { it.copy(isRefinementEraser = b) }
-    fun onConfirmTargetCreation() {
-        val captured = _uiState.value.capturedTargetImages.firstOrNull()
-        if (captured != null) {
-            viewModelScope.launch {
-                _captureEvent.send(CaptureEvent.RequestFingerprint(captured))
-            }
-        } else {
-            _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
-        }
-    }
-
-    fun onFingerprintGenerated(fingerprint: com.hereliesaz.graffitixr.data.Fingerprint?) {
-        if (fingerprint != null) {
-            val json = kotlinx.serialization.json.Json.encodeToString(com.hereliesaz.graffitixr.data.FingerprintSerializer, fingerprint)
-            _uiState.update { it.copy(fingerprintJson = json) }
-        }
-        _uiState.update { it.copy(isCapturingTarget = false, captureStep = CaptureStep.PREVIEW, isArTargetCreated = true) }
-    }
-
-    private fun startSensorListening() { if (!isSensorListening) { val s = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR); if (s != null) { sensorManager.registerListener(sensorEventListener, s, SensorManager.SENSOR_DELAY_GAME); isSensorListening = true; stableStartTime = 0L } } }
-    private fun stopSensorListening() { if (isSensorListening) { sensorManager.unregisterListener(sensorEventListener); isSensorListening = false } }
-    fun onResume() { if (_uiState.value.isCapturingTarget && _uiState.value.targetCreationMode == TargetCreationMode.MULTI_POINT_CALIBRATION) startSensorListening() }
-    fun onPause() = stopSensorListening()
-    override fun onCleared() { super.onCleared(); stopSensorListening() }
-    fun onMagicClicked() { viewModelScope.launch { _feedbackEvent.send(FeedbackEvent.VibrateDouble) } }
-    fun checkForUpdates() {}
-    fun installLatestUpdate() {}
+sealed class FeedbackEvent {
+    data class Toast(val message: String) : FeedbackEvent()
+    object VibrateDouble : FeedbackEvent()
+    object VibrateSingle : FeedbackEvent()
 }
