@@ -11,6 +11,7 @@ event_loop:
   max_iterations: 100
   # max_runtime_seconds: 14400    # 4 hours max
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Additional Configuration (uncomment to customize)
 # ─────────────────────────────────────────────────────────────────────────────

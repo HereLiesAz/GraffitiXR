@@ -28,12 +28,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import coil.imageLoader
-import com.hereliesaz.graffitixr.common.model.UiState
-import androidx.compose.ui.zIndex
-import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
-import com.hereliesaz.graffitixr.common.model.RotationAxis
-import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.model.UiState
+import com.hereliesaz.graffitixr.common.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 
 @Composable

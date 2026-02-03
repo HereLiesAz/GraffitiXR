@@ -8,13 +8,13 @@ import android.opengl.GLSurfaceView
 import android.media.Image
 import android.util.Log
 import com.google.ar.core.*
-import com.hereliesaz.graffitixr.common.model.Fingerprint
-import com.hereliesaz.graffitixr.common.model.OverlayLayer
-import com.hereliesaz.graffitixr.feature.ar.rendering.*
-import com.hereliesaz.graffitixr.natives.SlamManager
-import com.hereliesaz.graffitixr.common.util.DisplayRotationHelper
+import com.hereliesaz.graffitixr.data.Fingerprint
+import com.hereliesaz.graffitixr.data.OverlayLayer
+import com.hereliesaz.graffitixr.rendering.*
+import com.hereliesaz.graffitixr.native.SlamManager
+import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
-import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.common.ImageUtils
 import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +44,6 @@ class ArRenderer(
     // Flags
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true // Now controls Plane visualization only, not virtual grid.
-    var showPointCloud: Boolean = false
 
     // Reference Image for Tracking (The "Real World Grid")
     private var referenceImageBitmap: Bitmap? = null
@@ -95,7 +94,7 @@ class ArRenderer(
             if (session != null) {
                 session!!.setCameraTextureName(backgroundRenderer.textureId)
             }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             Log.e("ArRenderer", "Failed to init GL", e)
         }
     }
@@ -137,6 +136,10 @@ class ArRenderer(
             val updatedAugmentedImages = frame.getUpdatedTrackables(AugmentedImage::class.java)
             for (img in updatedAugmentedImages) {
                 if (img.trackingState == TrackingState.TRACKING) {
+                    // We found the physical grid on the wall.
+                    // If we don't have an anchor, or if the user hasn't manually placed one, snap to this.
+                    // NOTE: This prioritizes the physical grid over manual taps.
+
                     if (currentAnchor == null || img.trackingMethod == AugmentedImage.TrackingMethod.FULL_TRACKING) {
                         currentAnchor?.detach()
                         currentAnchor = img.createAnchor(img.centerPose)
@@ -243,12 +246,13 @@ class ArRenderer(
                     val anchorMtx = FloatArray(16)
                     currentAnchor!!.pose.toMatrix(anchorMtx, 0)
 
+                    // NOTE: gridRenderer removed. We do not draw a virtual grid.
+                    // The anchor represents the physical grid on the wall.
+
                     currentLayers.asReversed().forEach { layer ->
                         if (layer.isVisible) {
                             val renderer = layerRenderers[layer.id]
-                            renderer?.updateTransforms(layer.scale, layer.offset.x, layer.offset.y, layer.rotationZ)
-                            renderer?.setOpacity(layer.opacity)
-                            renderer?.draw(viewmtx, projmtx, currentAnchor!!)
+                            renderer?.draw(viewmtx, projmtx, currentAnchor!!, layer)
                         }
                     }
                 }
@@ -272,6 +276,8 @@ class ArRenderer(
         val config = session!!.config
         val database = AugmentedImageDatabase(session)
 
+        // We assume the physical grid is roughly 1 meter wide for initial scaling estimation
+        // Ideally, the user provides this, but we default to 1.0m to help ARCore's estimation.
         database.addImage("wall_grid", referenceImageBitmap, 1.0f)
 
         config.augmentedImageDatabase = database
@@ -344,11 +350,11 @@ class ArRenderer(
     fun setFlashlight(on: Boolean) { isFlashlightOn = on }
     fun queueTap(x: Float, y: Float) { queuedTaps.add(QueuedTap(x, y)) }
 
-    fun onResume(activity: android.app.Activity) {
+    fun onResume(context: Context) {
         if (session == null) {
             try {
-                if (ArCoreApk.getInstance().requestInstall(activity, true) == ArCoreApk.InstallStatus.INSTALLED) {
-                    session = Session(activity)
+                if (ArCoreApk.getInstance().requestInstall(context as android.app.Activity, true) == ArCoreApk.InstallStatus.INSTALLED) {
+                    session = Session(context)
                     val config = Config(session)
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
