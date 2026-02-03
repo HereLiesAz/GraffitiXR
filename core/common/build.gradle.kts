@@ -43,4 +43,5 @@ dependencies {
     implementation(libs.androidx.compose.material3.material33)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.opencv)
+    implementation(libs.arcore.client)
 }

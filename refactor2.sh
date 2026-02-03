@@ -97,8 +97,8 @@ rewrite_code() {
             sed -i "s|^package com.hereliesaz.graffitixr.*|package $new_package|" "$file"
 
             # 2. Update Imports (Global Mapping)
-            sed -i "s|import com.hereliesaz.graffitixr.utils|import com.hereliesaz.graffitixr.common|g" "$file"
-            sed -i "s|import com.hereliesaz.graffitixr.data.model|import com.hereliesaz.graffitixr.domain.model|g" "$file"
+            sed -i "s|import com.hereliesaz.graffitixr.common.util|import com.hereliesaz.graffitixr.common|g" "$file"
+            sed -i "s|import com.hereliesaz.graffitixr.data.model|import com.hereliesaz.graffitixr.common.model|g" "$file"
             sed -i "s|import com.hereliesaz.graffitixr.ui.theme|import com.hereliesaz.graffitixr.design.theme|g" "$file"
 
             # 3. Remap Resource R references
@@ -114,7 +114,7 @@ rewrite_code() {
 
 # Execute Rewrites
 rewrite_code "core/common" "com.hereliesaz.graffitixr.common"
-rewrite_code "core/domain" "com.hereliesaz.graffitixr.domain.model"
+rewrite_code "core/domain" "com.hereliesaz.graffitixr.common.model"
 rewrite_code "core/data" "com.hereliesaz.graffitixr.data"
 rewrite_code "core/design" "com.hereliesaz.graffitixr.design"
 rewrite_code "feature/ar" "com.hereliesaz.graffitixr.feature.ar"

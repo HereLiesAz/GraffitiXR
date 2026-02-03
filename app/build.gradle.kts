@@ -65,4 +65,7 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.az.nav.rail)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 }

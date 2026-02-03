@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.design
+package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text

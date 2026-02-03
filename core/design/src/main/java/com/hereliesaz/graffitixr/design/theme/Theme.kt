@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.design
+package com.hereliesaz.graffitixr.design.theme
 
 import android.app.Activity
 import android.os.Build

@@ -31,9 +31,11 @@ import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 
 import androidx.navigation.NavController
-import com.hereliesaz.graffitixr.feature.ar.ArViewModel
-import com.hereliesaz.graffitixr.feature.ar.ArRenderer
-import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.feature.ar.*
+import com.hereliesaz.graffitixr.feature.editor.*
+import com.hereliesaz.graffitixr.common.model.*
+import com.hereliesaz.graffitixr.design.components.*
+import com.hereliesaz.graffitixr.design.theme.rememberNavStrings
 
 @Composable
 fun MainScreen(

@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.hardware.SensorManager
 import android.net.Uri
-import com.hereliesaz.graffitixr.utils.ProjectManager
+import com.hereliesaz.graffitixr.common.util.ProjectManager
 import io.mockk.Runs
 import io.mockk.coVerify
 import io.mockk.every

@@ -28,8 +28,11 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:design"))
     implementation(project(":core:data"))
+    implementation(libs.az.nav.rail)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.coil.compose)
 }

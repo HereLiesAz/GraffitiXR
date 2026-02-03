@@ -9,7 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.graffitixr.data.OverlayLayer
+import com.hereliesaz.graffitixr.common.model.OverlayLayer
 
 @Stable
 class LayerTransformState(

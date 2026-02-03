@@ -31,12 +31,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalContext
+import com.hereliesaz.graffitixr.common.model.RefinementPath
+import com.hereliesaz.graffitixr.common.model.TapFeedback
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.data.RefinementPath
 
 @Composable
 fun TargetRefinementScreen(

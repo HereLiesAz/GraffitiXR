@@ -19,8 +19,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.graffitixr.natives.ensureOpenCVLoaded
-import com.hereliesaz.graffitixr.design.GraffitiXRTheme
+import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.common.model.CaptureEvent
+import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.feature.ar.*
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.data.ProjectManager
@@ -50,7 +51,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        projectManager = ProjectManager(application)
+        projectManager = ProjectManager()
         projectRepository = ProjectRepositoryImpl(this, projectManager)
         viewModelFactory = GraffitiViewModelFactory(application, projectManager, projectRepository)
 
@@ -174,7 +175,7 @@ class MainActivity : ComponentActivity() {
 
         if (!isFinishing && !isDestroyed) {
             try {
-                com.hereliesaz.graffitixr.utils.captureWindow(this) { bitmap ->
+                com.hereliesaz.graffitixr.common.util.captureWindow(this) { bitmap ->
                     viewModel.autoSaveProject(this, bitmap)
                 }
             } catch (e: Exception) {

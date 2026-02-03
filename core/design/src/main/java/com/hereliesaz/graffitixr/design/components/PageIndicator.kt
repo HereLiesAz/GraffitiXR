@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.design
+package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

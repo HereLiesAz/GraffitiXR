@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.feature.ar
+package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.graphics.Bitmap
 import android.opengl.GLES30

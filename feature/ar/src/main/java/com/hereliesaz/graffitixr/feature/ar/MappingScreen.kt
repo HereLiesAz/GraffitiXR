@@ -19,7 +19,7 @@ import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzDockingSide
-import com.hereliesaz.graffitixr.slam.SlamManager
+import com.hereliesaz.graffitixr.natives.SlamManager
 import kotlinx.coroutines.launch
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
@@ -110,7 +110,7 @@ fun MappingScreen(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    arRenderer.onResume(context)
+                    arRenderer.onResume(context as Activity)
                     glSurfaceView?.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {

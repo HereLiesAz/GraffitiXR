@@ -8,7 +8,7 @@ import android.opengl.Matrix
 import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
-import com.hereliesaz.graffitixr.common.ImageUtils
+import com.hereliesaz.graffitixr.common.util.ImageUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

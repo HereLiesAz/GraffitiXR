@@ -29,7 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.data.ProjectData
+import com.hereliesaz.graffitixr.common.model.ProjectData
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

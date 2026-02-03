@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.utils
+package com.hereliesaz.graffitixr.common.util
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

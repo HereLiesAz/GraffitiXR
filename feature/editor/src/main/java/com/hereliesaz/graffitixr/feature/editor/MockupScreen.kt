@@ -30,6 +30,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.model.UiState
+import kotlinx.coroutines.launch
+import coil.imageLoader
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 

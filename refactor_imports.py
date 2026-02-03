@@ -1,7 +1,7 @@
 import os
 
 replacements = {
-    "com.hereliesaz.graffitixr.domain.model": "com.hereliesaz.graffitixr.common.model",
+    "com.hereliesaz.graffitixr.common.model": "com.hereliesaz.graffitixr.common.model",
     "com.hereliesaz.graffitixr.feature.ar.ArState": "com.hereliesaz.graffitixr.common.model.ArState",
     "com.hereliesaz.graffitixr.feature.editor.RotationAxis": "com.hereliesaz.graffitixr.common.model.RotationAxis",
     "com.hereliesaz.graffitixr.UiState": "com.hereliesaz.graffitixr.common.model.UiState",

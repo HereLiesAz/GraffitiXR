@@ -14,7 +14,7 @@ This document describes how GraffitiXR handles data persistence, state managemen
 -   **Usage:** Managed by `MainViewModel` via a `StateFlow`. UI components observe this stream.
 
 ### **`OverlayLayer` (Serializable)**
--   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/data/OverlayLayer.kt`
+-   **Location:** `app/src/main/java/com.hereliesaz.graffitixr.common.model.OverlayLayer.kt`
 -   **Purpose:** Represents a single visual layer (image + properties).
 -   **Fields:**
     -   `uri`: Image source.
@@ -33,7 +33,7 @@ This document describes how GraffitiXR handles data persistence, state managemen
     -   `gpsData`, `sensorData`: Contextual metadata.
 
 ### **`Fingerprint`**
--   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/data/Fingerprint.kt`
+-   **Location:** `app/src/main/java/com.hereliesaz.graffitixr.common.model.Fingerprint.kt`
 -   **Purpose:** Stores the OpenCV ORB features required to identify an AR target.
 -   **Structure:**
     -   `keypoints`: List of `org.opencv.core.KeyPoint` (serialized via `KeyPointSerializer`).
@@ -53,7 +53,7 @@ The app uses `kotlinx.serialization` with custom serializers for complex/native 
 ## **3. Project Management**
 
 ### **`ProjectManager`**
--   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/utils/ProjectManager.kt`
+-   **Location:** `app/src/main/java/com.hereliesaz.graffitixr.common.util/ProjectManager.kt`
 -   **Function:** Handles the I/O operations for project files (`.json` or `.zip`).
 -   **Logic:**
     -   Converts `UiState` -> `ProjectData` (handling type mapping like `List<Offset>` -> `List<Pair>`).
