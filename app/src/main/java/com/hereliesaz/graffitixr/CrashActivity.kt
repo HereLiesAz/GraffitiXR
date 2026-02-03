@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.graffitixr.BuildConfig
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 

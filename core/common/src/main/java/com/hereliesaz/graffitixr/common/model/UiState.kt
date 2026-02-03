@@ -29,6 +29,7 @@ data class UiState(
     val arState: ArState = ArState.SEARCHING,
     val isArPlanesDetected: Boolean = false,
     val isArTargetCreated: Boolean = false,
+    val showPointCloud: Boolean = false,
     val qualityWarning: String? = null,
     val mappingQualityScore: Float = 0f,
     val isMappingMode: Boolean = false,
