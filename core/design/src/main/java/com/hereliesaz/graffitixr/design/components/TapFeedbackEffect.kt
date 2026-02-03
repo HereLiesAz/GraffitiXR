@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.design
+package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.design.TapFeedback
+import com.hereliesaz.graffitixr.common.model.TapFeedback
 
 @Composable
 fun TapFeedbackEffect(feedback: TapFeedback?) {
