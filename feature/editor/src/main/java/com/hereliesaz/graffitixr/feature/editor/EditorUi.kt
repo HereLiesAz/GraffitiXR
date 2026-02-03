@@ -5,24 +5,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.hereliesaz.graffitixr.EditorMode
-import com.hereliesaz.graffitixr.common.model.UiState
+import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.dialogs.DoubleTapHintDialog
-import com.hereliesaz.graffitixr.dialogs.OnboardingDialog
+import com.hereliesaz.graffitixr.design.components.OnboardingDialog
 import com.hereliesaz.graffitixr.ui.GestureFeedback
 import com.hereliesaz.graffitixr.ui.RotationAxisFeedback
 import com.hereliesaz.graffitixr.design.components.TapFeedbackEffect
 import com.hereliesaz.graffitixr.design.components.AdjustmentsPanel
+import com.hereliesaz.graffitixr.design.components.AdjustmentsState
 
 @Composable
 fun EditorUi(
-    uiState: UiState,
+    uiState: EditorUiState,
     actions: EditorActions,
     showSliderDialog: String?,
     showColorBalanceDialog: Boolean,
@@ -34,25 +33,17 @@ fun EditorUi(
     val bottomSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Status Overlays
-        if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
-            StatusOverlay(
-                uiState.qualityWarning,
-                uiState.arState,
-                uiState.isArPlanesDetected,
-                uiState.isArTargetCreated,
-                Modifier.align(Alignment.TopCenter).padding(top = topSafePadding).zIndex(10f)
-            )
-        }
+        // StatusOverlay removed (handled by MainScreen)
 
         // 2. Gesture Feedback
-        if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
-            GestureFeedback(
-                uiState,
-                Modifier.align(Alignment.TopCenter).padding(top = topSafePadding + 20.dp).zIndex(3f),
-                gestureInProgress
-            )
-        }
+        // TODO: Update GestureFeedback to take EditorUiState or extract params
+        // if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
+        //    GestureFeedback(
+        //        uiState,
+        //        Modifier.align(Alignment.TopCenter).padding(top = topSafePadding + 20.dp).zIndex(3f),
+        //        gestureInProgress
+        //    )
+        // }
 
         // 3. Drawing Canvas
         if (uiState.isMarkingProgress) {
@@ -64,8 +55,18 @@ fun EditorUi(
             Modifier.fillMaxSize().padding(bottom = bottomSafePadding).zIndex(2f),
             contentAlignment = Alignment.BottomCenter
         ) {
+            val adjustmentsState = AdjustmentsState(
+                hideUiForCapture = uiState.hideUiForCapture,
+                isTouchLocked = uiState.isTouchLocked,
+                hasImage = uiState.layers.isNotEmpty(),
+                isArMode = uiState.editorMode == EditorMode.AR,
+                hasHistory = true, // TODO: Add canUndo/canRedo to EditorUiState
+                isRightHanded = uiState.isRightHanded,
+                activeLayer = uiState.activeLayer
+            )
+
             AdjustmentsPanel(
-                uiState = uiState,
+                state = adjustmentsState,
                 showKnobs = showSliderDialog == "Adjust",
                 showColorBalance = showColorBalanceDialog,
                 isLandscape = isLandscape,
@@ -85,7 +86,9 @@ fun EditorUi(
 
         // 5. Dialogs & Helpers
         uiState.showOnboardingDialogForMode?.let { mode ->
-            OnboardingDialog(mode) { actions.onOnboardingComplete(mode) }
+            if (mode is EditorMode) {
+                OnboardingDialog(mode) { actions.onOnboardingComplete(mode) }
+            }
         }
 
         if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {

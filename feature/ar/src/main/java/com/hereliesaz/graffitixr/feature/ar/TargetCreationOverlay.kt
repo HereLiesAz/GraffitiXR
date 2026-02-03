@@ -55,8 +55,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.CaptureStep
-import com.hereliesaz.graffitixr.TargetCreationMode
+import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.model.TargetCreationMode
 
 @Composable
 fun TargetCreationOverlay(

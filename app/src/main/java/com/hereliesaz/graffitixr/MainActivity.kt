@@ -22,9 +22,10 @@ import com.hereliesaz.graffitixr.natives.ensureOpenCVLoaded
 import com.hereliesaz.graffitixr.design.GraffitiXRTheme
 import com.hereliesaz.graffitixr.common.model.CaptureEvent
 import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
-import com.hereliesaz.graffitixr.feature.ar.*
+import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.data.ProjectManager
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
 import com.hereliesaz.graffitixr.common.LocationTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
@@ -33,9 +34,14 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(application)
-    }
+    private lateinit var projectManager: ProjectManager
+    private lateinit var projectRepository: ProjectRepository
+    private lateinit var viewModelFactory: GraffitiViewModelFactory
+
+    // Lazy initialization using the factory
+    private val viewModel: MainViewModel by viewModels { viewModelFactory }
+    private val editorViewModel: EditorViewModel by viewModels { viewModelFactory }
+    private val arViewModel: ArViewModel by viewModels { viewModelFactory }
 
     private val PERMISSION_REQUEST_CODE = 1001
     private lateinit var locationTracker: LocationTracker
@@ -43,6 +49,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        projectManager = ProjectManager(application)
+        projectRepository = ProjectRepositoryImpl(this, projectManager)
+        viewModelFactory = GraffitiViewModelFactory(application, projectManager, projectRepository)
 
         ensureOpenCVLoaded()
         enableEdgeToEdge()
@@ -57,6 +67,8 @@ class MainActivity : ComponentActivity() {
             GraffitiXRTheme {
                 MainScreen(
                     viewModel = viewModel,
+                    editorViewModel = editorViewModel,
+                    arViewModel = arViewModel,
                     navController = navController,
                     onRendererCreated = { renderer ->
                         arRenderer = renderer

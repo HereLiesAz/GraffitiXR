@@ -1,8 +1,7 @@
 package com.hereliesaz.graffitixr.feature.dashboard
 
 import android.content.Context
-import android.content.SharedPreferences
-import com.hereliesaz.graffitixr.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorMode
 
 class OnboardingManager(context: Context) {
 

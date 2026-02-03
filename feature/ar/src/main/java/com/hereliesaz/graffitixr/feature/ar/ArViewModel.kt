@@ -1,14 +1,18 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import com.hereliesaz.graffitixr.common.model.ArState
 import com.hereliesaz.graffitixr.common.model.CaptureEvent
+import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -26,13 +30,11 @@ class ArViewModel(
     var arRenderer: ArRenderer? = null
         set(value) {
             field = value
-            // Initial update if project is already loaded
             value?.showPointCloud = _uiState.value.showPointCloud
-            projectRepository.currentProject.value?.layers?.let { value?.updateLayers(it) }
+            // Observe project layers if not already doing so
         }
 
     init {
-        // Observe Project Layers and update Renderer
         viewModelScope.launch {
             projectRepository.currentProject.collectLatest { project ->
                 if (project != null) {
@@ -49,7 +51,6 @@ class ArViewModel(
 
     fun toggleFlashlight() {
         _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
-        // Flashlight logic is usually in Activity via ArSession, but state is here
     }
 
     fun setArPlanesDetected(detected: Boolean) {
@@ -61,7 +62,7 @@ class ArViewModel(
     }
 
     fun onArImagePlaced() {
-        _uiState.update { it.copy(arState = com.hereliesaz.graffitixr.common.model.ArState.PLACED) }
+        _uiState.update { it.copy(arState = ArState.PLACED) }
     }
 
     fun toggleMappingMode() {
@@ -80,37 +81,27 @@ class ArViewModel(
         _uiState.update { it.copy(isArTargetCreated = true) }
     }
 
-import android.graphics.Bitmap
-import com.hereliesaz.graffitixr.common.model.Fingerprint
-
-class ArViewModel(
-    private val projectRepository: ProjectRepository
-) : ViewModel() {
-// ... existing code ...
-    fun onFrameCaptured(bitmap: Any) {
-        // Placeholder
+    fun onFrameCaptured(bitmap: Bitmap) {
+        // Handle captured frame
     }
 
     fun onProgressUpdate(percentage: Float, bitmap: Bitmap?) {
-        // Update project progress?
-        // This likely belongs in Editor or Dashboard via Repository update
-        // But ArRenderer triggers it.
+        // Update progress
     }
 
     fun onCreateTargetClicked() {
-        _uiState.update { it.copy(isArTargetCreated = false) } // logic?
+        _uiState.update { it.copy(isArTargetCreated = false) }
     }
 
     fun onCalibrationPointCaptured(matrix: FloatArray) {
         // Calibration logic
     }
 
-    fun onFingerprintGenerated(fingerprint: Fingerprint) {
-        // Save fingerprint to project via Repository
+    fun onFingerprintGenerated(fingerprint: Fingerprint?) {
+        // Save fingerprint
     }
 
     fun saveMap() {
-// ... existing code ...
         val pid = projectRepository.currentProject.value?.id ?: return
         viewModelScope.launch {
              val path = projectRepository.getMapPath(pid)

@@ -24,7 +24,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-class MainViewModel(application: Application) : AndroidViewModel(application), EditorActions {
+import com.hereliesaz.graffitixr.data.ProjectManager
+
+class MainViewModel(
+    application: Application,
+    private val projectManager: ProjectManager
+) : AndroidViewModel(application), EditorActions {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()

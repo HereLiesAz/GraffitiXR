@@ -5,6 +5,8 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 
+import com.hereliesaz.graffitixr.common.model.TapFeedback
+
 data class EditorUiState(
     val editorMode: EditorMode = EditorMode.AR,
     val layers: List<OverlayLayer> = emptyList(),
@@ -18,6 +20,7 @@ data class EditorUiState(
     val showDoubleTapHint: Boolean = false,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
+    val tapFeedback: TapFeedback? = null,
     val showOnboardingDialogForMode: Any? = null,
     val gestureInProgress: Boolean = false,
     

@@ -31,8 +31,11 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.design.RotationAxis
 import com.hereliesaz.graffitixr.common.model.UiState
-import com.hereliesaz.graffitixr.common.detectSmartOverlayGestures
-import kotlinx.coroutines.launch
+import androidx.compose.ui.zIndex
+import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
+import com.hereliesaz.graffitixr.common.model.RotationAxis
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 
 @Composable
 fun TraceScreen(

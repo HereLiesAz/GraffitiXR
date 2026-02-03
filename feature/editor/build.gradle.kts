@@ -30,5 +30,9 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.coil.compose)
+    implementation(libs.mlkit.subject.segmentation)
+    implementation(libs.segmentation.selfie)
     implementation(libs.opencv)
 }

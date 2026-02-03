@@ -30,9 +30,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 
+import androidx.navigation.NavController
+import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.ar.ArRenderer
+import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(
+    viewModel: MainViewModel,
+    editorViewModel: EditorViewModel,
+    arViewModel: ArViewModel,
+    navController: NavController,
+    onRendererCreated: (ArRenderer) -> Unit
+) {
     val uiState by viewModel.uiState.collectAsState()
+    val arUiState by arViewModel.uiState.collectAsState()
+    val editorUiState by editorViewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showInfoScreen by remember { mutableStateOf(false) }
 
@@ -49,21 +62,21 @@ fun MainScreen(viewModel: MainViewModel) {
             Column(horizontalAlignment = Alignment.End) {
                 // Point Cloud Toggle
                 SmallFloatingActionButton(
-                    onClick = { viewModel.togglePointCloud() },
+                    onClick = { arViewModel.togglePointCloud() },
                     modifier = Modifier.padding(bottom = 16.dp),
-                    containerColor = if (uiState.showPointCloud) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+                    containerColor = if (arUiState.showPointCloud) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 ) {
                     Icon(Icons.Filled.Grain, contentDescription = "Toggle Point Cloud")
                 }
 
                 // Flashlight Toggle
                 SmallFloatingActionButton(
-                    onClick = { viewModel.toggleFlashlight() },
+                    onClick = { arViewModel.toggleFlashlight() },
                     modifier = Modifier.padding(bottom = 16.dp),
-                    containerColor = if (uiState.isFlashlightOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+                    containerColor = if (arUiState.isFlashlightOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 ) {
                     Icon(
-                        if (uiState.isFlashlightOn) Icons.Filled.FlashlightOn else Icons.Filled.FlashlightOff,
+                        if (arUiState.isFlashlightOn) Icons.Filled.FlashlightOn else Icons.Filled.FlashlightOff,
                         contentDescription = "Toggle Flashlight"
                     )
                 }
@@ -82,29 +95,24 @@ fun MainScreen(viewModel: MainViewModel) {
         ) {
             // AR View (Background)
             ArView(
-                arState = uiState.arState,
-                showPointCloud = uiState.showPointCloud,
-                onRendererCreated = { renderer ->
-                    viewModel.arRenderer = renderer
-                }
+                viewModel = arViewModel,
+                uiState = arUiState,
+                onRendererCreated = onRendererCreated
             )
 
             // Editor Overlay
             EditorUi(
-                uiState = uiState,
-                actions = viewModel,
-                showSliderDialog = uiState.sliderDialogType,
-                showColorBalanceDialog = uiState.showColorBalanceDialog,
-                gestureInProgress = uiState.gestureInProgress
+                uiState = editorUiState,
+                actions = editorViewModel,
+                showSliderDialog = editorUiState.sliderDialogType,
+                showColorBalanceDialog = editorUiState.showColorBalanceDialog,
+                gestureInProgress = editorUiState.gestureInProgress
             )
 
             // Overlays
             TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
             UnlockInstructionsPopup(uiState.showUnlockInstructions)
             
-            // Helper Overlays
-            // if (showInfoScreen) CustomHelpOverlay(uiState, navStrings) { showInfoScreen = false } // navStrings undefined
-
             if (uiState.isCapturingTarget) {
                 Box(modifier = Modifier.fillMaxSize().zIndex(20f)) { 
                     TargetCreationFlow(uiState, viewModel, context) 
