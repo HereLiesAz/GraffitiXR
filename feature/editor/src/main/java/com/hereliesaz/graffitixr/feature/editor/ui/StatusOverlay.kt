@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.domain.model.ArState
+import com.hereliesaz.graffitixr.common.model.ArState
 
 @Composable
 fun StatusOverlay(

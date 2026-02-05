@@ -54,6 +54,7 @@ class ArRenderer(
     // Flags
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true // Now controls Plane visualization only, not virtual grid.
+    var showPointCloud: Boolean = false
 
     // Reference Image for Tracking (The "Real World Grid")
     private var referenceImageBitmap: Bitmap? = null
@@ -260,7 +261,9 @@ class ArRenderer(
 
                 slamManager.updateCamera(viewmtx, projmtx)
                 // Render point cloud.
-                slamManager.draw()
+                if (showPointCloud) {
+                    slamManager.draw()
+                }
 
                 if (showMiniMap) {
                     val pointCloud = frame.acquirePointCloud()

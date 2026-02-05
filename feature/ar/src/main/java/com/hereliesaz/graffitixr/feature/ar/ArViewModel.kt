@@ -30,7 +30,7 @@ class ArViewModel(
     var arRenderer: ArRenderer? = null
         set(value) {
             field = value
-//             value?.showPointCloud = _uiState.value.showPointCloud
+            value?.showPointCloud = _uiState.value.showPointCloud
             // Observe project layers if not already doing so
         }
 
@@ -45,8 +45,8 @@ class ArViewModel(
     }
 
     fun togglePointCloud() {
-//         _uiState.update { it.copy(showPointCloud = !it.showPointCloud) }
-//         arRenderer?.showPointCloud = _uiState.value.showPointCloud
+        _uiState.update { it.copy(showPointCloud = !it.showPointCloud) }
+        arRenderer?.showPointCloud = _uiState.value.showPointCloud
     }
 
     fun toggleFlashlight() {
