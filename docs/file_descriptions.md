@@ -1,34 +1,264 @@
-### 4. `docs/file_descriptions.md`
-**Updates:**
-* Added `app/src/main/java/com/hereliesaz/graffitixr/data/Events.kt`.
-* Added `app/src/main/java/com/hereliesaz/graffitixr/MappingActivity.kt`.
-* Added `app/src/main/java/com/hereliesaz/graffitixr/MappingScreen.kt`.
-
-```markdown
 # File Descriptions
 
-## Root
-* `build.gradle.kts`: Project-level build config.
-* `local.properties`: SDK paths (not in git).
+This document lists all files in the repository and their purposes.
 
-## app/src/main/java/com/hereliesaz/graffitixr/
-* `MainActivity.kt`: Entry point. Permission handling and Event observation.
-* `GraffitiApplication.kt`: App context, loads OpenCV/Native libs.
-* `MainViewModel.kt`: Global state holder (Decoupled from Renderer).
-* `ArRenderer.kt`: GLSurfaceView renderer, ARCore lifecycle.
-* `SlamManager.kt`: JNI Bridge to C++.
-* `MappingActivity.kt`: Specialized activity for surveyor/mapping mode.
-* `MappingScreen.kt`: UI composable for the mapping workflow.
-* `MainScreen.kt`: Main UI composable using AzNavRail.
-
-## app/src/main/java/com/hereliesaz/graffitixr/data/
-* `Events.kt`: Sealed classes for App-wide events (CaptureEvent, FeedbackEvent).
-
-## app/src/main/cpp/
-* `GraffitiJNI.cpp`: JNI interface methods.
-* `MobileGS.cpp`: The Gaussian Splatting engine implementation.
-* `MobileGS.h`: Header for the engine.
-* `glm/`: Math library (headers).
-
-## app/src/main/res/
-* `raw/`: Shaders (vertex.glsl, fragment.glsl).
+.
+./gradlew.bat
+./refactor_imports.py
+./docs
+./docs/API_REFERENCE.md
+./docs/data_layer.md
+./docs/TODO.md
+./docs/workflow.md
+./docs/DSL.md
+./docs/performance.md
+./docs/task_flow.md
+./docs/USER_FLOW.md
+./docs/architecture.md
+./docs/conduct.md
+./docs/file_descriptions.md
+./docs/UI_UX.md
+./docs/testing.md
+./docs/PRIVACY_POLICY.md
+./docs/auth.md
+./docs/misc.md
+./docs/AZNAVRAIL_COMPLETE_GUIDE.md
+./docs/SLAM_SETUP.md
+./docs/BLUEPRINT.md
+./docs/NATIVE_ENGINE.md
+./docs/fauxpas.md
+./docs/contributing.md
+./docs/screens.md
+./setup_libs.ps1
+./setup_libs.sh
+./README.md
+./GEMINI.md
+./AGENTS.md
+./build
+./build/reports
+./build/reports/problems
+./build/reports/problems/problems-report.html
+./build/reports/configuration-cache
+./build/reports/configuration-cache/31zviqsw2edvx1bxq0uics5m6
+./build/reports/configuration-cache/31zviqsw2edvx1bxq0uics5m6/dlg6wy6yc3morlcy0ko81787s
+./build/reports/configuration-cache/31zviqsw2edvx1bxq0uics5m6/er71p55rrnhemzip56x1nknk2
+./build/reports/configuration-cache/31zviqsw2edvx1bxq0uics5m6/dhr64916690i7zbold9g1m3t6
+./build/reports/configuration-cache/31zviqsw2edvx1bxq0uics5m6/4kg1mmgxy0kjlcelhonkf2gz7
+./build/reports/configuration-cache/31zviqsw2edvx1bxq0uics5m6/54gykeo4quj7lz2qbq7ax164q
+./build/reports/configuration-cache/31zviqsw2edvx1bxq0uics5m6/d4l3x2xrfm5bbcv8jm57sq1gs
+./feature
+./feature/ar
+./feature/ar/build
+./feature/ar/build/intermediates
+./feature/ar/build/intermediates/packaged_res
+./feature/ar/build/intermediates/public_res
+./feature/ar/build/intermediates/data_binding_layout_info_type_package
+./feature/ar/build/intermediates/compile_r_class_jar
+./feature/ar/build/intermediates/built_in_kotlinc
+./feature/ar/build/intermediates/compile_symbol_list
+./feature/ar/build/intermediates/local_only_symbol_list
+./feature/ar/build/intermediates/nested_resources_validation_report
+./feature/ar/build/intermediates/symbol_list_with_package_name
+./feature/ar/build/intermediates/incremental
+./feature/ar/build/kotlin
+./feature/ar/build/kotlin/compileDebugKotlin
+./feature/ar/build/generated
+./feature/ar/build/generated/res
+./feature/ar/build/generated/updated_navigation_xml
+./feature/ar/src
+./feature/ar/src/test
+./feature/ar/src/test/java
+./feature/ar/src/main
+./feature/ar/src/main/java
+./feature/ar/src/main/AndroidManifest.xml
+./feature/ar/build.gradle.kts
+./feature/dashboard
+./feature/dashboard/src
+./feature/dashboard/src/main
+./feature/dashboard/src/main/java
+./feature/dashboard/src/main/AndroidManifest.xml
+./feature/dashboard/build.gradle.kts
+./feature/editor
+./feature/editor/src
+./feature/editor/src/main
+./feature/editor/src/main/java
+./feature/editor/src/main/AndroidManifest.xml
+./feature/editor/build.gradle.kts
+./version.properties
+./gradle
+./gradle/libs.versions.toml
+./gradle/wrapper
+./gradle/wrapper/gradle-wrapper.jar
+./gradle/wrapper/gradle-wrapper.properties
+./ANALYSIS.md
+./all_files.txt
+./gradle.properties
+./REFACTORING_STRATEGY.md
+./gradlew
+./core
+./core/data
+./core/data/src
+./core/data/src/main
+./core/data/src/main/java
+./core/data/src/main/AndroidManifest.xml
+./core/data/build.gradle.kts
+./core/common
+./core/common/build
+./core/common/build/intermediates
+./core/common/build/intermediates/packaged_res
+./core/common/build/intermediates/public_res
+./core/common/build/intermediates/data_binding_layout_info_type_package
+./core/common/build/intermediates/compile_r_class_jar
+./core/common/build/intermediates/built_in_kotlinc
+./core/common/build/intermediates/compile_symbol_list
+./core/common/build/intermediates/local_only_symbol_list
+./core/common/build/intermediates/compile_library_classes_jar
+./core/common/build/intermediates/javac
+./core/common/build/intermediates/nested_resources_validation_report
+./core/common/build/intermediates/symbol_list_with_package_name
+./core/common/build/intermediates/annotation_processor_list
+./core/common/build/intermediates/incremental
+./core/common/build/kotlin
+./core/common/build/kotlin/compileDebugKotlin
+./core/common/build/tmp
+./core/common/build/tmp/compileDebugJavaWithJavac
+./core/common/build/generated
+./core/common/build/generated/ap_generated_sources
+./core/common/build/generated/res
+./core/common/build/generated/updated_navigation_xml
+./core/common/src
+./core/common/src/main
+./core/common/src/main/java
+./core/common/src/main/AndroidManifest.xml
+./core/common/build.gradle.kts
+./core/native
+./core/native/libs
+./core/native/libs/mlkit-subject-segmentation.aar
+./core/native/libs/litert_npu_runtime_libraries
+./core/native/libs/litert_npu_runtime_libraries/qualcomm_runtime_v73
+./core/native/libs/litert_npu_runtime_libraries/qualcomm_runtime_v75
+./core/native/libs/litert_npu_runtime_libraries/mediatek_runtime
+./core/native/libs/litert_npu_runtime_libraries/qualcomm_runtime_v69
+./core/native/libs/litert_npu_runtime_libraries/google_tensor_runtime
+./core/native/libs/litert_npu_runtime_libraries/qualcomm_runtime_v81
+./core/native/libs/litert_npu_runtime_libraries/fetch_qualcomm_library.sh
+./core/native/libs/litert_npu_runtime_libraries/runtime_strings
+./core/native/libs/litert_npu_runtime_libraries/qualcomm_runtime_v79
+./core/native/libs/litert-2.1.0.aar
+./core/native/libs/glm
+./core/native/libs/glm/glm
+./core/native/libs/mlkit-subject-segmentation
+./core/native/libs/mlkit-subject-segmentation/classes.jar
+./core/native/libs/mlkit-subject-segmentation/third_party_licenses.txt
+./core/native/libs/mlkit-subject-segmentation/AndroidManifest.xml
+./core/native/libs/mlkit-subject-segmentation/R.txt
+./core/native/libs/mlkit-subject-segmentation/third_party_licenses.json
+./core/native/libs/opencv
+./core/native/libs/opencv/sdk
+./core/native/build
+./core/native/build/intermediates
+./core/native/build/intermediates/packaged_res
+./core/native/build/intermediates/public_res
+./core/native/build/intermediates/data_binding_layout_info_type_package
+./core/native/build/intermediates/compile_r_class_jar
+./core/native/build/intermediates/built_in_kotlinc
+./core/native/build/intermediates/compile_symbol_list
+./core/native/build/intermediates/local_only_symbol_list
+./core/native/build/intermediates/compile_library_classes_jar
+./core/native/build/intermediates/nested_resources_validation_report
+./core/native/build/intermediates/symbol_list_with_package_name
+./core/native/build/intermediates/annotation_processor_list
+./core/native/build/intermediates/incremental
+./core/native/build/kotlin
+./core/native/build/kotlin/compileDebugKotlin
+./core/native/build/generated
+./core/native/build/generated/res
+./core/native/build/generated/updated_navigation_xml
+./core/native/src
+./core/native/src/main
+./core/native/src/main/cpp
+./core/native/src/main/java
+./core/native/src/main/AndroidManifest.xml
+./core/native/build.gradle.kts
+./core/domain
+./core/domain/build
+./core/domain/build/intermediates
+./core/domain/build/intermediates/packaged_res
+./core/domain/build/intermediates/public_res
+./core/domain/build/intermediates/data_binding_layout_info_type_package
+./core/domain/build/intermediates/compile_r_class_jar
+./core/domain/build/intermediates/built_in_kotlinc
+./core/domain/build/intermediates/compile_symbol_list
+./core/domain/build/intermediates/local_only_symbol_list
+./core/domain/build/intermediates/compile_library_classes_jar
+./core/domain/build/intermediates/nested_resources_validation_report
+./core/domain/build/intermediates/symbol_list_with_package_name
+./core/domain/build/intermediates/annotation_processor_list
+./core/domain/build/intermediates/incremental
+./core/domain/build/kotlin
+./core/domain/build/kotlin/compileDebugKotlin
+./core/domain/build/generated
+./core/domain/build/generated/res
+./core/domain/build/generated/updated_navigation_xml
+./core/domain/src
+./core/domain/src/main
+./core/domain/src/main/java
+./core/domain/src/main/AndroidManifest.xml
+./core/domain/build.gradle.kts
+./core/design
+./core/design/build
+./core/design/build/intermediates
+./core/design/build/intermediates/packaged_res
+./core/design/build/intermediates/public_res
+./core/design/build/intermediates/data_binding_layout_info_type_package
+./core/design/build/intermediates/compile_r_class_jar
+./core/design/build/intermediates/built_in_kotlinc
+./core/design/build/intermediates/compile_symbol_list
+./core/design/build/intermediates/local_only_symbol_list
+./core/design/build/intermediates/compile_library_classes_jar
+./core/design/build/intermediates/nested_resources_validation_report
+./core/design/build/intermediates/symbol_list_with_package_name
+./core/design/build/intermediates/annotation_processor_list
+./core/design/build/intermediates/incremental
+./core/design/build/kotlin
+./core/design/build/kotlin/compileDebugKotlin
+./core/design/build/generated
+./core/design/build/generated/res
+./core/design/build/generated/updated_navigation_xml
+./core/design/src
+./core/design/src/main
+./core/design/src/main/java
+./core/design/src/main/AndroidManifest.xml
+./core/design/src/main/res
+./core/design/build.gradle.kts
+./refactor2.sh
+./ralph.yml
+./setup_ndk.sh
+./app
+./app/google-services.json.template
+./app/proguard-rules.pro
+./app/src
+./app/src/test
+./app/src/test/java
+./app/src/test/java/com
+./app/src/main
+./app/src/main/java
+./app/src/main/java/com
+./app/src/main/assets
+./app/src/main/assets/Astronaut.jpg
+./app/src/main/assets/shaders
+./app/src/main/assets/Lander.jpg
+./app/src/main/ic_launcher-playstore.png
+./app/src/main/AndroidManifest.xml
+./app/src/main/res
+./app/src/main/res/mipmap-xxhdpi
+./app/src/main/res/mipmap-xxxhdpi
+./app/src/main/res/mipmap-mdpi
+./app/src/main/res/values
+./app/src/main/res/mipmap-hdpi
+./app/src/main/res/mipmap-xhdpi
+./app/src/main/res/mipmap-anydpi-v26
+./app/build.gradle.kts
+./app/CMakeLists.txt
+./settings.gradle.kts
+./build.gradle.kts

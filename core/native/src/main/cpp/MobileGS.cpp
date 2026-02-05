@@ -62,6 +62,10 @@ void main() {
     FragColor = vec4(vColor, 1.0);
 })";
 
+
+/**
+ * Constructor: Initializes the voxel grid and default state.
+ */
 MobileGS::MobileGS() :
         mProgram(0), mVAO(0), mVBO(0), mQuadVBO(0),
         mBgProgram(0), mBgVAO(0), mBgVBO(0), mBgTexture(0),
@@ -72,6 +76,11 @@ MobileGS::MobileGS() :
         mFrameCount(0)
 {
     mLastUpdateTime = std::chrono::steady_clock::now();
+
+/**
+ * Background Thread: Sorts the splats back-to-front for correct alpha blending.
+ * Runs continuously to decouple sorting from the render loop.
+ */
     mSortThread = std::thread(&MobileGS::sortThreadLoop, this);
     mGaussians.reserve(MAX_POINTS);
     mRenderBuffer.reserve(MAX_POINTS);
@@ -89,6 +98,11 @@ MobileGS::~MobileGS() {
     mIsInitialized = false;
 }
 
+
+/**
+ * Initializes OpenGL resources (Shaders, VBOs) and starts the sorting thread.
+ * Must be called on the GL thread.
+ */
 void MobileGS::initialize() {
     if (mIsInitialized) return;
     compileShaders();
@@ -179,6 +193,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
                 key.y = static_cast<int>(std::floor(worldPos.y / VOXEL_SIZE));
                 key.z = static_cast<int>(std::floor(worldPos.z / VOXEL_SIZE));
 
+                // Check voxel occupancy.
                 auto it = mVoxelGrid.find(key);
                 if (it != mVoxelGrid.end()) {
                     int idx = it->second;
@@ -208,6 +223,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
     }
 }
 
+
+/**
+ * Garbage Collection: Removes points that have low confidence (opacity)
+ * or are too old, keeping the map sparse and efficient.
+ */
 void MobileGS::pruneMap() {
     mMapChanged = true;
     mRenderBufferDirty = true;
@@ -301,6 +321,11 @@ void MobileGS::compileShaders() {
     glBindVertexArray(0);
 }
 
+
+/**
+ * Background Thread: Sorts the splats back-to-front for correct alpha blending.
+ * Runs continuously to decouple sorting from the render loop.
+ */
 void MobileGS::sortThreadLoop() {
     glm::vec3 lastSortPos(0.0f);
     glm::vec3 lastSortDir(0.0f);
@@ -360,6 +385,11 @@ void MobileGS::sortThreadLoop() {
     }
 }
 
+
+/**
+ * Renders the point cloud using Instanced Rendering.
+ * Uploads the sorted/culled buffer to the GPU and issues the draw call.
+ */
 void MobileGS::draw() {
     if (!mIsInitialized) initialize();
 
@@ -399,6 +429,7 @@ void MobileGS::draw() {
     }
 
     glBindVertexArray(mVAO);
+    // Instanced draw call.
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)renderSize);
     glBindVertexArray(0);
 
