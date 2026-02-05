@@ -12,12 +12,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.UiState
-import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.feature.ar.TargetRefinementScreen
 import com.hereliesaz.graffitixr.feature.ar.UnwarpScreen
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationOverlay
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Context) {
@@ -31,28 +28,14 @@ fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Cont
                     else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri) 
                 } 
             }
-            val maskBitmap by produceState<Bitmap?>(null, uiState.targetMaskUri) { 
-                val targetMaskUri = uiState.targetMaskUri
-                value = if (targetMaskUri != null) withContext(Dispatchers.IO) { 
-                    ImageUtils.loadBitmapFromUri(context, targetMaskUri) 
-                } else null 
-            }
+
             TargetRefinementScreen(
-                targetImage = imageBitmap, 
-                mask = maskBitmap, 
-                keypoints = uiState.detectedKeypoints, 
-                paths = uiState.refinementPaths, 
-                isEraser = uiState.isRefinementEraser, 
-                canUndo = uiState.canUndo, 
-                canRedo = uiState.canRedo, 
-                onPathAdded = viewModel::onRefinementPathAdded, 
-                onModeChanged = { viewModel.onRefinementModeChanged(!it) }, 
-                onUndo = viewModel::onUndoClicked, 
-                onRedo = viewModel::onRedoClicked,
-                onConfirm = { viewModel.onConfirmTargetCreation() }
+                bitmap = imageBitmap,
+                onConfirm = { viewModel.onConfirmTargetCreation() },
+                onRetake = { viewModel.onRetakeCapture() }
             )
         } else if (uiState.captureStep == CaptureStep.RECTIFY) {
-            val uri = uiState.capturedTargetUris.firstOrNull()
+             val uri = uiState.capturedTargetUris.firstOrNull()
             val imageBitmap by produceState<Bitmap?>(null, uri, uiState.capturedTargetImages) { 
                 value = if (uiState.capturedTargetImages.isNotEmpty()) 
                     uiState.capturedTargetImages.first() 
@@ -65,19 +48,17 @@ fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Cont
             UnwarpScreen(uiState.isRightHanded, imageBitmap, viewModel::unwarpImage, viewModel::onRetakeCapture)
         } else {
             TargetCreationOverlay(
-                isRightHanded = uiState.isRightHanded, 
-                step = uiState.captureStep, 
-                targetCreationMode = uiState.targetCreationMode, 
-                gridRows = uiState.gridRows, 
-                gridCols = uiState.gridCols, 
-                qualityWarning = uiState.qualityWarning, 
-                captureFailureTimestamp = uiState.captureFailureTimestamp,
-                onCaptureClick = { if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) viewModel.onCalibrationPointCaptured(FloatArray(16)) else viewModel.onCaptureShutterClicked() },
-                onCancelClick = viewModel::onCancelCaptureClicked, 
-                onMethodSelected = viewModel::onTargetCreationMethodSelected, 
-                onGridConfigChanged = viewModel::onGridConfigChanged, 
-                onGpsDecision = viewModel::onGpsDecision, 
-                onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
+                uiState = uiState,
+                onCapture = {
+                    if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
+                        viewModel.onCalibrationPointCaptured(FloatArray(16))
+                    } else {
+                        viewModel.onCaptureShutterClicked()
+                    }
+                },
+                onConfirm = { viewModel.onConfirmTargetCreation() }, // Overlay might use this for intermediate steps?
+                onRetake = { viewModel.onRetakeCapture() },
+                onCancel = { viewModel.onCancelCaptureClicked() }
             )
         }
     }
