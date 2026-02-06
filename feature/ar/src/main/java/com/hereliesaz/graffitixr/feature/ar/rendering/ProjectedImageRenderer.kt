@@ -8,7 +8,6 @@ import android.opengl.Matrix
 import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Anchor
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
-import com.hereliesaz.graffitixr.feature.ar.ShaderUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 

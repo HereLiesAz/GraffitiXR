@@ -104,8 +104,9 @@ fun MainScreen(
 
             // Editor Overlay
             EditorUi(
-                uiState = editorUiState,
+                uiState = uiState,
                 actions = editorViewModel,
+                tapFeedback = uiState.tapFeedback,
                 showSliderDialog = editorUiState.sliderDialogType,
                 showColorBalanceDialog = editorUiState.showColorBalanceDialog,
                 gestureInProgress = editorUiState.gestureInProgress

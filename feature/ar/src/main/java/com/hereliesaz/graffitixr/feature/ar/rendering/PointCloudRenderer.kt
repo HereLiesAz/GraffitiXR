@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.opengl.GLES20
 import android.opengl.Matrix
 import com.google.ar.core.PointCloud
-import com.hereliesaz.graffitixr.feature.ar.ShaderUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.HashMap

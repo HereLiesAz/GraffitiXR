@@ -1,5 +1,9 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import com.hereliesaz.graffitixr.common.util.DisplayRotationHelper
+import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.common.model.OverlayLayer
+import com.hereliesaz.graffitixr.common.model.Fingerprint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
@@ -8,13 +12,9 @@ import android.opengl.GLSurfaceView
 import android.media.Image
 import android.util.Log
 import com.google.ar.core.*
-import com.hereliesaz.graffitixr.data.Fingerprint
-import com.hereliesaz.graffitixr.data.OverlayLayer
-import com.hereliesaz.graffitixr.rendering.*
-import com.hereliesaz.graffitixr.native.SlamManager
-import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
+import com.hereliesaz.graffitixr.feature.ar.rendering.*
+import com.hereliesaz.graffitixr.natives.SlamManager
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
-import com.hereliesaz.graffitixr.common.ImageUtils
 import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +26,16 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
+/**
+ * ArRenderer: The heart of the AR experience.
+ * This class implements the GLSurfaceView.Renderer interface to handle OpenGL rendering.
+ * It manages the ARCore Session, processes camera frames, feeds data to the native SLAM engine,
+ * and renders both the camera background and the augmented content (overlays, point clouds).
+ */
+/**
+ * ArRenderer: The core AR rendering engine.
+ * Handles ARCore session updates, camera background rendering, and native SLAM integration.
+ */
 class ArRenderer(
     private val context: Context,
     private val onPlanesDetected: (Boolean) -> Unit,
@@ -38,12 +48,13 @@ class ArRenderer(
     var session: Session? = null
     private var displayRotationHelper: DisplayRotationHelper = DisplayRotationHelper(context)
     private val backgroundRenderer = BackgroundRenderer()
-    private val planeRenderer = PlaneRenderer()
+    private val planeRenderer = PlaneRenderer(context, context)
     private val miniMapRenderer = MiniMapRenderer()
 
     // Flags
     var showMiniMap: Boolean = false
     var showGuide: Boolean = true // Now controls Plane visualization only, not virtual grid.
+    var showPointCloud: Boolean = false
 
     // Reference Image for Tracking (The "Real World Grid")
     private var referenceImageBitmap: Bitmap? = null
@@ -78,11 +89,17 @@ class ArRenderer(
     private val queuedTaps = Collections.synchronizedList(ArrayList<QueuedTap>())
     data class QueuedTap(val x: Float, val y: Float)
 
+
+    /**
+     * Called when the GLSurfaceView creates the OpenGL context.
+     * Initializes the background renderer, plane renderer, and native engine.
+     */
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        // Clear buffers.
         GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         try {
             backgroundRenderer.createOnGlThread()
-            planeRenderer.createOnGlThread()
+            planeRenderer.createOnGlThread(context)
             miniMapRenderer.createOnGlThread(context)
 
             // Initialize existing layer renderers if any
@@ -99,6 +116,11 @@ class ArRenderer(
         }
     }
 
+
+    /**
+     * Called when the surface dimensions change (e.g., device rotation).
+     * Updates the OpenGL viewport and notifies the display rotation helper.
+     */
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         viewWidth = width
         viewHeight = height
@@ -107,7 +129,17 @@ class ArRenderer(
         slamManager.onSurfaceChanged(width, height)
     }
 
+
+    /**
+     * The main rendering loop, called for every frame (approx 60fps).
+     * 1. Updates ARCore session to get the latest frame.
+     * 2. Renders the camera background.
+     * 3. Feeds depth/pose data to the native SLAM engine.
+     * 4. Renders virtual content (planes, overlays) on top.
+     */
+    /** Main render loop. */
     override fun onDrawFrame(gl: GL10?) {
+        // Clear buffers.
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         if (session == null || !isSessionResumed || !isSurfaceCreated) return
 
@@ -124,9 +156,11 @@ class ArRenderer(
                 session!!.setCameraTextureName(backgroundRenderer.textureId)
             }
 
+            // Update AR frame.
             val frame = session!!.update()
             val camera = frame.camera
 
+            // Draw camera feed.
             backgroundRenderer.draw(frame)
 
             onSessionUpdated?.invoke(session!!, frame)
@@ -156,6 +190,7 @@ class ArRenderer(
             if (captureNextFrame) {
                 captureNextFrame = false
                 try {
+                    // Get CPU image.
                     val image = frame.acquireCameraImage()
                     val bmp = convertImageToBitmap(image)
                     image.close()
@@ -166,6 +201,7 @@ class ArRenderer(
             if (captureFingerprint) {
                 captureFingerprint = false
                 try {
+                    // Get CPU image.
                     val image = frame.acquireCameraImage()
                     val depthImage = frame.acquireDepthImage16Bits()
 
@@ -215,6 +251,7 @@ class ArRenderer(
                         val depthImage = frame.acquireDepthImage16Bits()
                         if (depthImage != null) {
                             val buffer = depthImage.planes[0].buffer
+                            // Feed depth to SLAM.
                             slamManager.feedDepthData(buffer, depthImage.width, depthImage.height)
                             depthImage.close()
                             lastDepthTime = now
@@ -223,7 +260,10 @@ class ArRenderer(
                 }
 
                 slamManager.updateCamera(viewmtx, projmtx)
-                slamManager.draw()
+                // Render point cloud.
+                if (showPointCloud) {
+                    slamManager.draw()
+                }
 
                 if (showMiniMap) {
                     val pointCloud = frame.acquirePointCloud()
@@ -249,6 +289,7 @@ class ArRenderer(
                     // NOTE: gridRenderer removed. We do not draw a virtual grid.
                     // The anchor represents the physical grid on the wall.
 
+                    // Draw layers.
                     currentLayers.asReversed().forEach { layer ->
                         if (layer.isVisible) {
                             val renderer = layerRenderers[layer.id]
@@ -350,6 +391,11 @@ class ArRenderer(
     fun setFlashlight(on: Boolean) { isFlashlightOn = on }
     fun queueTap(x: Float, y: Float) { queuedTaps.add(QueuedTap(x, y)) }
 
+
+    /**
+     * Lifecycle method: Resumes the AR session and OpenGL context.
+     * Checks for ARCore installation, configures the session, and initializes native resources.
+     */
     fun onResume(context: Context) {
         if (session == null) {
             try {
@@ -380,6 +426,10 @@ class ArRenderer(
         } catch (e: Exception) { e.printStackTrace() }
     }
 
+
+    /**
+     * Lifecycle method: Pauses the AR session to save battery and release the camera.
+     */
     fun onPause() {
         isSessionResumed = false
         if (session != null) {
@@ -401,6 +451,7 @@ class ArRenderer(
         miniMapRenderer.clear()
     }
 
+    // Update AR frame.
     fun getLatestPose(): Pose? { return session?.update()?.camera?.pose }
 
     fun generateFingerprint(bitmap: Bitmap): Fingerprint? {

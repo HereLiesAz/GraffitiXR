@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.domain.state.UiState
+import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 
 @Composable
