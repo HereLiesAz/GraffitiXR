@@ -15,6 +15,9 @@ import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.feature.ar.TargetRefinementScreen
 import com.hereliesaz.graffitixr.feature.ar.UnwarpScreen
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationOverlay
+import com.hereliesaz.graffitixr.common.util.ImageUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Context) {
@@ -37,18 +40,9 @@ fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Cont
             }
 
             TargetRefinementScreen(
-                targetImage = imageBitmap,
-                mask = maskBitmap,
-                keypoints = uiState.detectedKeypoints,
-                paths = uiState.refinementPaths,
-                isEraser = uiState.isRefinementEraser,
-                canUndo = uiState.canUndo,
-                canRedo = uiState.canRedo,
-                onPathAdded = viewModel::onRefinementPathAdded,
-                onModeChanged = { viewModel.onRefinementModeChanged(it) }, // it is Boolean (isEraser)
-                onUndo = viewModel::onUndoClicked,
-                onRedo = viewModel::onRedoClicked,
-                onConfirm = { viewModel.onConfirmTargetCreation() }
+                bitmap = imageBitmap,
+                onConfirm = { viewModel.onConfirmTargetCreation() },
+                onRetake = { viewModel.onRetakeCapture() }
             )
         } else if (uiState.captureStep == CaptureStep.RECTIFY) {
              val uri = uiState.capturedTargetUris.firstOrNull()
@@ -64,25 +58,17 @@ fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Cont
             UnwarpScreen(uiState.isRightHanded, imageBitmap, viewModel::unwarpImage, viewModel::onRetakeCapture)
         } else {
             TargetCreationOverlay(
-                isRightHanded = uiState.isRightHanded,
-                step = uiState.captureStep,
-                targetCreationMode = uiState.targetCreationMode,
-                gridRows = uiState.gridRows,
-                gridCols = uiState.gridCols,
-                qualityWarning = uiState.qualityWarning,
-                captureFailureTimestamp = uiState.captureFailureTimestamp,
-                onCaptureClick = {
+                uiState = uiState,
+                onCapture = {
                     if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
                         viewModel.onCalibrationPointCaptured(FloatArray(16))
                     } else {
                         viewModel.onCaptureShutterClicked()
                     }
                 },
-                onCancelClick = viewModel::onCancelCaptureClicked,
-                onMethodSelected = viewModel::onTargetCreationMethodSelected,
-                onGridConfigChanged = viewModel::onGridConfigChanged,
-                onGpsDecision = viewModel::onGpsDecision,
-                onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
+                onConfirm = { viewModel.onConfirmTargetCreation() },
+                onRetake = { viewModel.onRetakeCapture() },
+                onCancel = viewModel::onCancelCaptureClicked
             )
         }
     }
