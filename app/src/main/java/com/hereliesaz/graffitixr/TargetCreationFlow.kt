@@ -29,10 +29,26 @@ fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Cont
                 } 
             }
 
+            val maskBitmap by produceState<Bitmap?>(null, uiState.targetMaskUri) { 
+                val targetMaskUri = uiState.targetMaskUri
+                value = if (targetMaskUri != null) withContext(Dispatchers.IO) { 
+                    ImageUtils.loadBitmapFromUri(context, targetMaskUri) 
+                } else null 
+            }
+
             TargetRefinementScreen(
-                bitmap = imageBitmap,
-                onConfirm = { viewModel.onConfirmTargetCreation() },
-                onRetake = { viewModel.onRetakeCapture() }
+                targetImage = imageBitmap,
+                mask = maskBitmap,
+                keypoints = uiState.detectedKeypoints,
+                paths = uiState.refinementPaths,
+                isEraser = uiState.isRefinementEraser,
+                canUndo = uiState.canUndo,
+                canRedo = uiState.canRedo,
+                onPathAdded = viewModel::onRefinementPathAdded,
+                onModeChanged = { viewModel.onRefinementModeChanged(it) }, // it is Boolean (isEraser)
+                onUndo = viewModel::onUndoClicked,
+                onRedo = viewModel::onRedoClicked,
+                onConfirm = { viewModel.onConfirmTargetCreation() }
             )
         } else if (uiState.captureStep == CaptureStep.RECTIFY) {
              val uri = uiState.capturedTargetUris.firstOrNull()
@@ -48,17 +64,25 @@ fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Cont
             UnwarpScreen(uiState.isRightHanded, imageBitmap, viewModel::unwarpImage, viewModel::onRetakeCapture)
         } else {
             TargetCreationOverlay(
-                uiState = uiState,
-                onCapture = {
+                isRightHanded = uiState.isRightHanded,
+                step = uiState.captureStep,
+                targetCreationMode = uiState.targetCreationMode,
+                gridRows = uiState.gridRows,
+                gridCols = uiState.gridCols,
+                qualityWarning = uiState.qualityWarning,
+                captureFailureTimestamp = uiState.captureFailureTimestamp,
+                onCaptureClick = {
                     if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
                         viewModel.onCalibrationPointCaptured(FloatArray(16))
                     } else {
                         viewModel.onCaptureShutterClicked()
                     }
                 },
-                onConfirm = { viewModel.onConfirmTargetCreation() }, // Overlay might use this for intermediate steps?
-                onRetake = { viewModel.onRetakeCapture() },
-                onCancel = { viewModel.onCancelCaptureClicked() }
+                onCancelClick = viewModel::onCancelCaptureClicked,
+                onMethodSelected = viewModel::onTargetCreationMethodSelected,
+                onGridConfigChanged = viewModel::onGridConfigChanged,
+                onGpsDecision = viewModel::onGpsDecision,
+                onFinishPhotoSequence = viewModel::onPhotoSequenceFinished
             )
         }
     }
