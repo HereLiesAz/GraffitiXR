@@ -12,12 +12,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.UiState
-import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.feature.ar.TargetRefinementScreen
 import com.hereliesaz.graffitixr.feature.ar.UnwarpScreen
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationOverlay
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 fun TargetCreationFlow(uiState: UiState, viewModel: MainViewModel, context: Context) {
