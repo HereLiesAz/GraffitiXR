@@ -451,7 +451,7 @@ class ArRenderer(
         miniMapRenderer.clear()
     }
 
-    // Update AR frame.
+    // Updates the AR session and returns the latest camera pose.
     fun getLatestPose(): Pose? { return session?.update()?.camera?.pose }
 
     fun generateFingerprint(bitmap: Bitmap): Fingerprint? {
