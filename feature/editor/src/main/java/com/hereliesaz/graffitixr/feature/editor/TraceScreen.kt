@@ -31,7 +31,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.UiState
-import com.hereliesaz.graffitixr.common.detectSmartOverlayGestures
+import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 
 @Composable

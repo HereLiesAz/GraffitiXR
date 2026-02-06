@@ -13,3 +13,6 @@ rootProject.name = "GraffitiXR"
 include(":app")
 include(":core:common", ":core:domain", ":core:data", ":core:native", ":core:design")
 include(":feature:ar", ":feature:editor", ":feature:dashboard")
+
+include(":opencv")
+project(":opencv").projectDir = file("core/native/libs/opencv/sdk")

@@ -31,4 +31,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.arcore.client)
     implementation(project(":opencv"))
+    implementation(libs.az.nav.rail)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation("androidx.compose.material:material-icons-core")
+    implementation(libs.androidx.compose.material.icons.extended)
 }

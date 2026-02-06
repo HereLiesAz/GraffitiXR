@@ -1,8 +1,8 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.common.model.ArState
 import com.hereliesaz.graffitixr.common.model.CaptureEvent
 import com.hereliesaz.graffitixr.common.model.Fingerprint
