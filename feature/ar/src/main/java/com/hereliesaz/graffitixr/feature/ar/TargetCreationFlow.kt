@@ -12,14 +12,12 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.CaptureStep
-import com.hereliesaz.graffitixr.common.model.UiState
-import com.hereliesaz.graffitixr.common.util.ImageUtils
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 fun TargetCreationFlow(
-    uiState: UiState,
+    uiState: ArUiState,
+    isRightHanded: Boolean,
+    captureStep: CaptureStep,
     context: Context,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
@@ -29,13 +27,13 @@ fun TargetCreationFlow(
     onUnwarpImage: (List<Offset>) -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
-        if (uiState.captureStep == CaptureStep.REVIEW) {
+        if (captureStep == CaptureStep.REVIEW) {
             val uri = uiState.capturedTargetUris.firstOrNull()
             val imageBitmap by produceState<Bitmap?>(null, uri) { 
                 uri?.let { 
                     value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) 
                         ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, it)) 
-                    else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri) 
+                    else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it) 
                 } 
             }
 
@@ -46,7 +44,7 @@ fun TargetCreationFlow(
                 onConfirm = onConfirm,
                 onRetake = onRetake
             )
-        } else if (uiState.captureStep == CaptureStep.RECTIFY) {
+        } else if (captureStep == CaptureStep.RECTIFY) {
              val uri = uiState.capturedTargetUris.firstOrNull()
             val imageBitmap by produceState<Bitmap?>(null, uri, uiState.capturedTargetImages) { 
                 value = if (uiState.capturedTargetImages.isNotEmpty()) 
@@ -58,8 +56,8 @@ fun TargetCreationFlow(
                 } else null 
             }
             UnwarpScreen(
-                isRightHanded = uiState.isRightHanded, 
-                image = imageBitmap, 
+                isRightHanded = isRightHanded, 
+                targetImage = imageBitmap, 
                 onConfirm = onUnwarpImage, 
                 onRetake = onRetake
             )
@@ -67,7 +65,7 @@ fun TargetCreationFlow(
             TargetCreationOverlay(
                 uiState = uiState,
                 onCapture = {
-                    if (uiState.captureStep.name.startsWith("CALIBRATION_POINT")) {
+                    if (captureStep.name.startsWith("CALIBRATION_POINT")) {
                         onCalibrationPointCaptured(FloatArray(16)) // Placeholder as per original
                     } else {
                         onCaptureShutter()
