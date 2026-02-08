@@ -74,6 +74,7 @@ fun MockupScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .zIndex(1f)
                 .onSizeChanged { containerSize = it }
                 .clipToBounds()
                 // Layer 1: Double Tap (Global)
