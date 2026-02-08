@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.graphics.Bitmap
+import android.net.Uri
 import com.hereliesaz.graffitixr.common.model.ArState
 
 data class ArUiState(
@@ -10,5 +12,7 @@ data class ArUiState(
     val isFlashlightOn: Boolean = false,
     val mappingQualityScore: Float = 0f,
     val isMappingMode: Boolean = false,
-    val qualityWarning: String? = null
+    val qualityWarning: String? = null,
+    val capturedTargetUris: List<Uri> = emptyList(),
+    val capturedTargetImages: List<Bitmap> = emptyList()
 )

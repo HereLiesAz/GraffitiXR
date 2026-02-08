@@ -2,12 +2,12 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.opengl.GLSurfaceView
-import android.view.View
 import android.widget.Toast
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.Config
 import com.google.ar.core.Session
+import com.google.ar.core.Frame
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableApkTooOldException
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
@@ -27,8 +27,10 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
     }
 
-    private var session: Session? = null
-    private val slamManager = SlamManager()
+    var session: Session? = null
+        private set
+
+    val slamManager = SlamManager()
 
     // State flags
     private var showPointCloud = false
@@ -77,7 +79,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         session?.pause()
     }
 
-    fun onDestroy() {
+    fun cleanup() {
         session?.close()
         session = null
     }
@@ -131,15 +133,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
 
         // Note: ARCore doesn't have a direct "Flashlight" API in Config.
         // Usually, this requires Camera2 API interop or a shared Camera session.
-        // If strict ARCore is used, we might be limited.
-        // For now, we assume the Config allows flashlight control or we access the camera directly via
-        // shared session (advanced).
-        //
-        // FALLBACK Implementation for standard ARCore:
-        if (enable) {
-            config.focusMode = Config.FocusMode.AUTO // Trigger auto-focus might flash? No.
-            // Real implementation requires Camera2Manager or paused session reconfiguration.
-        }
+        // If shared Camera session is used, we can access the flashlight.
         session.configure(config)
     }
 

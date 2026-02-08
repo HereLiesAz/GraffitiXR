@@ -46,34 +46,7 @@ fun MappingScreen(
     var isMapping by isMappingState
 
     val arRenderer = remember {
-        var lastUpdateTime = 0L
-        ArRenderer(
-            context = context,
-            onPlanesDetected = {},
-            onFrameCaptured = {},
-            onProgressUpdated = { _, _ -> },
-            onTrackingFailure = {},
-            onBoundsUpdated = {}
-        ).apply {
-            showMiniMap = true
-            showGuide = false
-            onSessionUpdated = { session, frame ->
-                if (frame.camera.trackingState == TrackingState.TRACKING) {
-                    latestCameraPose.value = frame.camera.pose
-                }
-
-                if (isMappingState.value) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastUpdateTime > 500) {
-                        if (frame.camera.trackingState == TrackingState.TRACKING) {
-                            val cameraPose = frame.camera.pose
-                            this.slamManager.updateFeatureMapQuality(session, cameraPose)
-                            lastUpdateTime = now
-                        }
-                    }
-                }
-            }
-        }
+        ArRenderer(context = context)
     }
     
     // Pass renderer out if requested
@@ -84,33 +57,11 @@ fun MappingScreen(
     val slamManager = arRenderer.slamManager
     val mappingQuality by slamManager.mappingQuality.collectAsState()
 
-    // Setup Local Map Saving Callback
-    LaunchedEffect(arRenderer) {
-        arRenderer.onAnchorCreated = { anchor: Anchor ->
-            val session = arRenderer.session
-            if (session != null) {
-                val mapId = UUID.randomUUID().toString()
-                val mapPath = java.io.File(context.filesDir, "$mapId.map").absolutePath
-                
-                scope.launch {
-                    val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        slamManager.saveWorld(mapPath)
-                    }
-                    if (success) {
-                        onMapSaved(mapId)
-                    } else {
-                        Toast.makeText(context, "Failed to save local map.", Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-        }
-    }
-
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    arRenderer.onResume(context as Activity)
+                    arRenderer.onResume()
                     glSurfaceView?.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
@@ -180,12 +131,21 @@ fun MappingScreen(
                                     currentQuality = qualityEnum,
                                     isHosting = false, 
                                     onCaptureComplete = {
-                                        val cameraPose = latestCameraPose.value
-                                        if (cameraPose != null) {
-                                            val forwardOffset = Pose.makeTranslation(0f, 0f, -0.5f)
-                                            val pose = cameraPose.compose(forwardOffset)
-                                            // FIX: Direct call instead of state side-effect
-                                            arRenderer.createAnchor(pose)
+                                        val session = arRenderer.session
+                                        if (session != null) {
+                                            val mapId = UUID.randomUUID().toString()
+                                            val mapPath = java.io.File(context.filesDir, "$mapId.map").absolutePath
+                                            
+                                            scope.launch {
+                                                val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                    slamManager.saveWorld(mapPath)
+                                                }
+                                                if (success) {
+                                                    onMapSaved(mapId)
+                                                } else {
+                                                    Toast.makeText(context, "Failed to save local map.", Toast.LENGTH_LONG).show()
+                                                }
+                                            }
                                         } else {
                                             Toast.makeText(context, "Tracking not ready", Toast.LENGTH_SHORT).show()
                                         }
