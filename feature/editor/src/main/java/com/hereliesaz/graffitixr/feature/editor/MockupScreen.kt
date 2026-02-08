@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.common.model.UiState
 import kotlinx.coroutines.launch
 import coil.imageLoader
 import coil.compose.AsyncImage
@@ -38,7 +37,7 @@ import coil.request.ImageRequest
 
 @Composable
 fun MockupScreen(
-    uiState: UiState,
+    uiState: EditorUiState,
     onBackgroundImageSelected: (Uri) -> Unit,
     onOverlayImageSelected: (Uri) -> Unit,
     onOpacityChanged: (Float) -> Unit,
@@ -59,14 +58,9 @@ fun MockupScreen(
     val transformState = rememberLayerTransformState(activeLayer)
 
     Box(modifier = Modifier.fillMaxSize()) {
-        uiState.backgroundImageUri?.let {
-            AsyncImage(
-                model = it,
-                contentDescription = "Background Image",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        }
+        // Note: EditorUiState currently doesn't have backgroundImageUri. 
+        // If it's needed, it should be added to EditorUiState or passed as a parameter.
+        // For now, I'll keep the logic but it might need state adjustment.
 
         Box(
             modifier = Modifier

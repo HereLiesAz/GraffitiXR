@@ -30,13 +30,12 @@ import androidx.compose.ui.unit.IntSize
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 
 @Composable
 fun TraceScreen(
-    uiState: UiState,
+    uiState: EditorUiState,
     onOverlayImageSelected: (Uri) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,

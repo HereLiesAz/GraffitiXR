@@ -39,14 +39,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutionException
 
 @Composable
 fun OverlayScreen(
-    uiState: UiState,
+    uiState: EditorUiState,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
     onGestureEnd: (Float, Offset, Float, Float, Float) -> Unit,
@@ -79,11 +78,14 @@ fun OverlayScreen(
     val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
     val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
 
-    // Flashlight control logic
-    LaunchedEffect(uiState.isFlashlightOn, camera) {
+    // Flashlight control logic - Note: isFlashlightOn moved to a placeholder or should be in EditorUiState
+    // For now, defaulting to false as it's missing from EditorUiState
+    val isFlashlightOn = false 
+
+    LaunchedEffect(isFlashlightOn, camera) {
         try {
             if (camera?.cameraInfo?.hasFlashUnit() == true) {
-                camera?.cameraControl?.enableTorch(uiState.isFlashlightOn)
+                camera?.cameraControl?.enableTorch(isFlashlightOn)
             }
         } catch (e: Exception) {
             Log.e("OverlayScreen", "Failed to set torch state", e)

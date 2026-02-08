@@ -34,7 +34,7 @@ fun EditorUi(
     val topSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
     val bottomSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
 
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+    val activeLayer = uiState.activeLayer
 
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. Status Overlays
@@ -44,9 +44,9 @@ fun EditorUi(
         // 2. Gesture Feedback
         if (!isTouchLocked) {
             GestureFeedback(
-                uiState,
-                Modifier.align(Alignment.TopCenter).padding(top = topSafePadding + 20.dp).zIndex(3f),
-                uiState.gestureInProgress
+                uiState = uiState,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = topSafePadding + 20.dp).zIndex(3f),
+                isVisible = uiState.gestureInProgress
             )
         }
 
@@ -91,7 +91,9 @@ fun EditorUi(
 
         // 5. Dialogs & Helpers
         uiState.showOnboardingDialogForMode?.let { mode ->
-            OnboardingDialog(mode) { actions.onOnboardingComplete(mode) }
+            if (mode is EditorMode) {
+                OnboardingDialog(mode) { actions.onOnboardingComplete(mode) }
+            }
         }
 
         if (!isTouchLocked) {
