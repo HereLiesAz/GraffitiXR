@@ -21,7 +21,6 @@ dependencies {
     implementation(project(":core:common"))
 
     // UI Frameworks
-    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.material3)

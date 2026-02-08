@@ -23,7 +23,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     // Compose BOM only if needed for UI code in common
-    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)
     
     implementation(libs.kotlinx.coroutines.android)
