@@ -18,19 +18,19 @@ object DataModule {
     @Provides
     @Singleton
     fun provideProjectRepository(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        projectManager: ProjectManager
     ): ProjectRepository {
-        return ProjectRepositoryImpl(context)
+        return ProjectRepositoryImpl(context, projectManager)
     }
 
     @Provides
     @Singleton
     fun provideProjectManager(
-        @ApplicationContext context: Context,
-        repository: ProjectRepository
+        @ApplicationContext context: Context
     ): ProjectManager {
         // Bridging legacy ProjectManager to use the new Repository
         // This keeps MainViewModel happy without rewriting it entirely yet
-        return ProjectManager(context, repository)
+        return ProjectManager(context)
     }
 }

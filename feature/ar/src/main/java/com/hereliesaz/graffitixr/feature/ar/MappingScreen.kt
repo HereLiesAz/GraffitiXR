@@ -93,6 +93,11 @@ fun MappingScreen(
                 onExit()
             })
 
+            azRailItem(id = "rescan", text = "Rescan", info = "Clear Map", onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                slamManager.clearMap()
+            })
+
             background(weight = 0) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),

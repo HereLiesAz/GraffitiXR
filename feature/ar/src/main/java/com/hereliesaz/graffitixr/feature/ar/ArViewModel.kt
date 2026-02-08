@@ -17,24 +17,14 @@ class ArViewModel(application: Application, private val projectRepository: Proje
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
 
-    // Held reference to renderer to trigger specific AR actions
-    private var arRenderer: ArRenderer? = null
-
-    fun setArRenderer(renderer: ArRenderer) {
-        this.arRenderer = renderer
-    }
-
     fun togglePointCloud() {
         val newState = !_uiState.value.showPointCloud
         _uiState.update { it.copy(showPointCloud = newState) }
-        arRenderer?.setShowPointCloud(newState)
     }
 
     fun toggleFlashlight() {
         val newState = !_uiState.value.isFlashlightOn
         _uiState.update { it.copy(isFlashlightOn = newState) }
-        // Note: Actual flashlight toggle usually happens in Activity/Camera Manager,
-        // but we update state here for UI reflection.
     }
 
     // NEW: Frame Capture
