@@ -24,6 +24,7 @@ struct SplatRenderData {
 struct SplatMetadata {
     SplatRenderData renderData;
     std::chrono::steady_clock::time_point creationTime;
+    std::chrono::steady_clock::time_point lastSeenTime;
 };
 
 struct Sortable {

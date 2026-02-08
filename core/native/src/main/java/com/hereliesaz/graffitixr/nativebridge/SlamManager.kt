@@ -90,6 +90,13 @@ class SlamManager {
         if (nativeHandle != 0L) alignMapJni(nativeHandle, transformMtx)
     }
 
+    fun clearMap() {
+        if (nativeHandle != 0L) {
+            clearMapJni(nativeHandle)
+            _mappingQuality.value = 0f
+        }
+    }
+
     // --- Native JNI declarations (Private) ---
 
     private external fun initNativeJni(): Long
@@ -102,6 +109,7 @@ class SlamManager {
     private external fun saveWorld(handle: Long, path: String): Boolean
     private external fun loadWorld(handle: Long, path: String): Boolean
     private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
+    private external fun clearMapJni(handle: Long)
 
     // --- Legacy Compatibility Layer (TO BE DEPRECATED) ---
 

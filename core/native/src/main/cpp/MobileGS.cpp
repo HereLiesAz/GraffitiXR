@@ -16,6 +16,7 @@ const float CONFIDENCE_THRESHOLD = 0.6f;
 const float CONFIDENCE_INCREMENT = 0.15f; // Very sticky
 const float PRUNE_THRESHOLD = 0.1f;       // Keep almost everything
 const int MIN_AGE_MS = 2000;
+const int MAX_UNSEEN_AGE_MS = 10000;      // Expire points not seen for 10s
 
 const char* VS_SRC = R"(#version 300 es
 layout(location = 0) in vec3 aInstancePos;
@@ -201,6 +202,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
                         SplatMetadata& g = mGaussians[idx];
                         g.renderData.opacity = std::min(1.0f, g.renderData.opacity + CONFIDENCE_INCREMENT);
                         g.renderData.position = glm::mix(g.renderData.position, glm::vec3(worldPos), 0.1f);
+                        g.lastSeenTime = now;
                         added = true;
                     }
                 } else if (mGaussians.size() < MAX_POINTS) {
@@ -210,6 +212,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, int width, int height)
                     g.renderData.opacity = CONFIDENCE_INCREMENT;
                     g.renderData.color = glm::vec3(0.0f, 0.8f, 1.0f);
                     g.creationTime = now;
+                    g.lastSeenTime = now;
                     mGaussians.push_back(g);
                     mVoxelGrid[key] = (int)(mGaussians.size() - 1);
                     added = true;
@@ -241,15 +244,17 @@ void MobileGS::pruneMap() {
 
     for (const auto& g : mGaussians) {
         long age = std::chrono::duration_cast<std::chrono::milliseconds>(now - g.creationTime).count();
+        long unseenAge = std::chrono::duration_cast<std::chrono::milliseconds>(now - g.lastSeenTime).count();
         bool goodConfidence = g.renderData.opacity >= PRUNE_THRESHOLD;
         bool isYoung = age < MIN_AGE_MS;
+        bool isRecentlySeen = unseenAge < MAX_UNSEEN_AGE_MS;
 
         // Only prune young points if we are literally out of memory
         if (hittingLimit && isYoung && g.renderData.opacity < 0.05f) {
             continue;
         }
 
-        if (goodConfidence || isYoung) {
+        if ((goodConfidence || isYoung) && isRecentlySeen) {
             survived.push_back(g);
             VoxelKey key = {
                     (int)std::floor(g.renderData.position.x/VOXEL_SIZE),
@@ -482,6 +487,7 @@ bool MobileGS::loadModel(const std::string& path) {
             auto& g = mGaussians[i];
             g.renderData = loadedData[i];
             g.creationTime = now;
+            g.lastSeenTime = now;
             VoxelKey key = {
                     (int)std::floor(g.renderData.position.x/VOXEL_SIZE),
                     (int)std::floor(g.renderData.position.y/VOXEL_SIZE),

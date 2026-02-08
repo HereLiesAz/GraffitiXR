@@ -98,4 +98,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env,
     env->ReleaseFloatArrayElements(transformMtx, transform, 0);
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMapJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    auto *engine = reinterpret_cast<MobileGS*>(handle);
+    engine->clear();
+}
+
 }
