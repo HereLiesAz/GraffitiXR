@@ -19,6 +19,14 @@ class EditorViewModel : ViewModel(), EditorActions {
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
+    fun setEditorMode(mode: EditorMode) {
+        _uiState.update { it.copy(editorMode = mode) }
+    }
+
+    fun setBackgroundImage(uri: Uri) {
+        _uiState.update { it.copy(backgroundImageUri = uri) }
+    }
+
     private fun updateActiveLayer(update: (OverlayLayer) -> OverlayLayer) {
         _uiState.update { state ->
             val layers = state.layers.map { layer ->

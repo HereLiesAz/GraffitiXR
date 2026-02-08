@@ -73,6 +73,18 @@ fun MainScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "Camera permission is required for AR", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        permissionLauncher.launch(android.Manifest.permission.CAMERA)
+    }
+
     val navStrings = remember { 
         NavStrings(
             modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
@@ -112,8 +124,7 @@ fun MainScreen(
         uri?.let { editorViewModel.onAddLayer(it) } 
     }
     val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> 
-        // Background image selection logic moved to MainViewModel or EditorViewModel?
-        // MockupScreen handled it. We'll use a placeholder for now.
+        uri?.let { editorViewModel.setBackgroundImage(it) }
     }
 
     // Determine Rail Visibility
@@ -136,10 +147,32 @@ fun MainScreen(
             azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                editorViewModel.onLineDrawingClicked()
-            }) // Temporary mapping
-            
+                editorViewModel.setEditorMode(EditorMode.AR)
+            })
+            azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                editorViewModel.setEditorMode(EditorMode.OVERLAY)
+            })
+            azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                editorViewModel.setEditorMode(EditorMode.STATIC)
+            })
+            azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                editorViewModel.setEditorMode(EditorMode.TRACE)
+            })
+
             azDivider()
+
+            if (editorUiState.editorMode == EditorMode.STATIC) {
+                azRailHostItem(id = "mockup_host", text = navStrings.grid, onClick = {})
+                azRailSubItem(id = "wall", hostId = "mockup_host", text = navStrings.wall, info = navStrings.wallInfo, onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    resetDialogs()
+                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                })
+                azDivider()
+            }
 
             if (editorUiState.editorMode == EditorMode.AR) {
                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
@@ -361,7 +394,8 @@ fun MainContentLayer(
         when (editorUiState.editorMode) {
             EditorMode.STATIC -> MockupScreen(
                 uiState = editorUiState,
-                onBackgroundImageSelected = { },
+                backgroundImageUri = editorUiState.backgroundImageUri,
+                onBackgroundImageSelected = { editorViewModel.setBackgroundImage(it) },
                 onOverlayImageSelected = editorViewModel::onAddLayer,
                 onOpacityChanged = editorViewModel::onOpacityChanged,
                 onBrightnessChanged = editorViewModel::onBrightnessChanged,
@@ -380,6 +414,7 @@ fun MainContentLayer(
             )
             EditorMode.OVERLAY -> OverlayScreen(
                 uiState = editorUiState, 
+                isFlashlightOn = arUiState.isFlashlightOn,
                 onCycleRotationAxis = onCycle, 
                 onGestureStart = onStart, 
                 onGestureEnd = onOverlayGestureEnd
@@ -401,6 +436,7 @@ fun MainContentLayer(
             }
             else -> OverlayScreen(
                 uiState = editorUiState, 
+                isFlashlightOn = arUiState.isFlashlightOn,
                 onCycleRotationAxis = onCycle, 
                 onGestureStart = onStart, 
                 onGestureEnd = onOverlayGestureEnd

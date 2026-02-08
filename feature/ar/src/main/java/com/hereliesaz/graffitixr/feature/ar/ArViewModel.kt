@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.feature.ar.ArRenderer
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,12 @@ class ArViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
+
+    private var arRenderer: ArRenderer? = null
+
+    fun setArRenderer(renderer: ArRenderer) {
+        this.arRenderer = renderer
+    }
 
     fun togglePointCloud() {
         _uiState.update { it.copy(showPointCloud = !it.showPointCloud) }

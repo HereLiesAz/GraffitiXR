@@ -7,6 +7,7 @@ import com.hereliesaz.graffitixr.common.model.RotationAxis
 
 data class EditorUiState(
     val editorMode: EditorMode = EditorMode.AR,
+    val backgroundImageUri: android.net.Uri? = null,
     val layers: List<OverlayLayer> = emptyList(),
     val activeLayerId: String? = null,
     val isImageLocked: Boolean = false,
