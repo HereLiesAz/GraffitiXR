@@ -5,7 +5,7 @@
     - [x] Run `./gradlew :app:dependencies` and visualize the graph.
     - [x] Identify any `feature` -> `feature` dependencies.
     - [x] Identify any circular dependencies involving `core:native`.
-- [ ] Task: Document the violations found and update `spec.md` if new constraints are discovered.
+- [x] Task: Document the violations found and update `spec.md` if new constraints are discovered. [de7fc5c]
 - [ ] Task: Conductor - User Manual Verification 'Analysis & Dependency Graph Verification' (Protocol in workflow.md)
 
 ## Phase 2: Core Native Isolation
