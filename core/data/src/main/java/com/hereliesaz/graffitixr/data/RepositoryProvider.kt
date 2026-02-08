@@ -14,7 +14,8 @@ object RepositoryProvider {
 
     fun initialize(context: Context) {
         if (_projectRepository == null) {
-            _projectRepository = ProjectRepositoryImpl(context.applicationContext, Dispatchers.IO)
+            val projectManager = ProjectManager(context.applicationContext)
+            _projectRepository = ProjectRepositoryImpl(context.applicationContext, projectManager, Dispatchers.IO)
         }
     }
 }

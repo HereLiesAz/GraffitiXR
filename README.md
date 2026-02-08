@@ -16,7 +16,7 @@ This repository is exhaustively documented. Please refer to the `docs/` director
 2.  **Build**: Open in Android Studio or run `./gradlew assembleDebug`.
 
 ## Features
-*   **AR Mode**: Project images onto walls with persistent locking via Gaussian Splats.
+*   **AR Mode**: Project images onto walls with persistent locking via Gaussian Splats. Includes auto-aging for map stability and manual rescan.
 *   **Trace Mode**: Lightbox functionality for tracing on paper.
 *   **Mockup Mode**: Visualize art on a static photo of a wall.
 *   **Editor**: Adjust transparency, color balance, and layers.

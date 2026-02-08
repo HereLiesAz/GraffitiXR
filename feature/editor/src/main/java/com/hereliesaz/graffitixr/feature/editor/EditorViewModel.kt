@@ -76,6 +76,10 @@ class EditorViewModel : ViewModel(), EditorActions {
         _uiState.update { it.copy(editorMode = EditorMode.DRAW) }
     }
 
+    fun setEditorMode(mode: EditorMode) {
+        _uiState.update { it.copy(editorMode = mode) }
+    }
+
     // IMPL: Cycle Blend Mode
     override fun onCycleBlendMode() {
         updateActiveLayer { layer ->

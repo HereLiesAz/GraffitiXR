@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.GpsData
 import com.hereliesaz.graffitixr.common.model.ProjectData
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,7 +15,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-class DashboardViewModel(
+@HiltViewModel
+class DashboardViewModel @Inject constructor(
     private val projectRepository: ProjectRepository
 ) : ViewModel() {
 
