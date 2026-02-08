@@ -92,13 +92,6 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(editorMode = EditorMode.DRAW) }
     }
 
-    fun setEditorMode(mode: EditorMode) {
-        _uiState.update { it.copy(editorMode = mode) }
-    }
-
-    fun setBackgroundImage(uri: Uri) {
-        _uiState.update { it.copy(backgroundImageUri = uri) }
-    }
 
     fun toggleHandedness() {
         viewModelScope.launch {

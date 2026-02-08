@@ -2,40 +2,31 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import android.net.Uri
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
-import coil.imageLoader
-import coil.request.ImageRequest
-import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
+import coil.compose.AsyncImage
+import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import kotlinx.coroutines.launch
 
 @Composable
 fun TraceScreen(
     uiState: EditorUiState,
+    isFlashlightOn: Boolean, // Added to keep signature parity with OverlayScreen
     onOverlayImageSelected: (Uri) -> Unit,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
@@ -63,109 +54,46 @@ fun TraceScreen(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { containerSize = it }
-            .clipToBounds()
-            .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
-            }
-            .pointerInput(activeLayer?.id) { // Re-bind gestures if active layer changes
-                val activeId = activeLayer?.id ?: return@pointerInput
-
-                detectSmartOverlayGestures(
-                    getValidBounds = {
-                        // For bounding box, we assume the layer fills/centers reasonably or use 0-size as fallback
-                        Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
-                    },
-                    onGestureStart = {
-                        transformState.isGesturing = true
+            .background(Color.Black)
+            .pointerInput(uiState.isImageLocked) {
+                if (!uiState.isImageLocked) {
+                    detectTransformGestures {
                         onGestureStart()
-                    },
-                    onGestureEnd = {
-                        transformState.isGesturing = false
-                        onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
-                    }
-                ) { _, pan, zoom, rotation ->
-                    transformState.scale *= zoom
-                    transformState.offset += pan
-                    when (currentUiState.activeRotationAxis) {
-                        RotationAxis.X -> transformState.rotationX += rotation
-                        RotationAxis.Y -> transformState.rotationY += rotation
-                        RotationAxis.Z -> transformState.rotationZ += rotation
+                        onGestureEnd(scale, offset, rotationX, rotationY, rotationZ)
                     }
                 }
             }
     ) {
-        uiState.layers.forEach { layer ->
-            if (layer.isVisible) {
-                val isLayerActive = layer.id == activeLayer?.id
-                val scale = if (isLayerActive) transformState.scale else layer.scale
-                val offset = if (isLayerActive) transformState.offset else layer.offset
-                val rotationX = if (isLayerActive) transformState.rotationX else layer.rotationX
-                val rotationY = if (isLayerActive) transformState.rotationY else layer.rotationY
-                val rotationZ = if (isLayerActive) transformState.rotationZ else layer.rotationZ
+        // Background Image (The surface being traced upon)
+        uiState.backgroundImageUri?.let {
+            AsyncImage(
+                model = it,
+                contentDescription = "Background Image",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        }
 
-                var layerBitmap by remember(layer.uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
-
-                LaunchedEffect(layer.uri) {
-                    coroutineScope.launch {
-                        val request = ImageRequest.Builder(context)
-                            .data(layer.uri)
-                            .build()
-                        val result = (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                        layerBitmap = result
-                    }
-                }
-
-                val layerColorMatrix = remember(layer.saturation, layer.contrast, layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB) {
-                    ColorMatrix().apply {
-                        setToSaturation(layer.saturation)
-                        val contrastMatrix = ColorMatrix(
-                            floatArrayOf(
-                                layer.contrast, 0f, 0f, 0f, (1 - layer.contrast) * 128,
-                                0f, layer.contrast, 0f, 0f, (1 - layer.contrast) * 128,
-                                0f, 0f, layer.contrast, 0f, (1 - layer.contrast) * 128,
-                                0f, 0f, 0f, 1f, 0f
-                            )
-                        )
-                        val colorBalanceMatrix = ColorMatrix(
-                            floatArrayOf(
-                                layer.colorBalanceR, 0f, 0f, 0f, 0f,
-                                0f, layer.colorBalanceG, 0f, 0f, 0f,
-                                0f, 0f, layer.colorBalanceB, 0f, 0f,
-                                0f, 0f, 0f, 1f, 0f
-                            )
-                        )
-                        timesAssign(contrastMatrix)
-                        timesAssign(colorBalanceMatrix)
-                    }
-                }
-
-                layerBitmap?.let { bmp ->
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                this.rotationX = rotationX
-                                this.rotationY = rotationY
-                                this.rotationZ = rotationZ
-                                translationX = offset.x
-                                translationY = offset.y
-                            }
-                    ) {
-                        val xOffset = (size.width - bmp.width) / 2f
-                        val yOffset = (size.height - bmp.height) / 2f
-
-                        drawImage(
-                            image = bmp.asImageBitmap(),
-                            topLeft = Offset(xOffset, yOffset),
-                            alpha = layer.opacity,
-                            colorFilter = ColorFilter.colorMatrix(layerColorMatrix),
-                            blendMode = layer.blendMode
-                        )
-                    }
-                }
-            }
+        // Overlay Layer (The image being traced)
+        activeLayer?.let { layer ->
+            AsyncImage(
+                model = layer.uri,
+                contentDescription = "Overlay Image",
+                colorFilter = ColorFilter.colorMatrix(layer.colorMatrix),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offset.x,
+                        translationY = offset.y,
+                        rotationX = rotationX,
+                        rotationY = rotationY,
+                        rotationZ = rotationZ,
+                        alpha = layer.opacity
+                    ),
+                blendMode = layer.blendMode
+            )
         }
     }
 }
