@@ -1,7 +1,5 @@
 plugins {
     id("com.android.library")
-    id("kotlin-parcelize")
-    alias(libs.plugins.jetbrains.kotlin.compose)
 }
 
 android {
@@ -13,9 +11,8 @@ android {
     }
 
     buildFeatures {
-        compose = true
+        compose = false
     }
-
 
 }
 
@@ -24,9 +21,9 @@ dependencies {
 
     // UI Frameworks
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui.ui2)
-    implementation(libs.ui.graphics)
-    implementation(libs.androidx.compose.material3.material32)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
     // MISSING DEPENDENCY RESTORED:

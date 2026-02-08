@@ -1,9 +1,9 @@
-import java.util.Properties
-
 plugins {
-    alias(libs.plugins.android.application)
+    id("com.android.application")
     alias(libs.plugins.jetbrains.kotlin.compose)
 }
+
+import java.util.Properties
 
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
@@ -58,8 +58,8 @@ dependencies {
     implementation(project(":feature:editor"))
     implementation(project(":feature:dashboard"))
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
     implementation(libs.opencv)
     implementation(libs.arcore.client)
     implementation(libs.androidx.activity.ktx)

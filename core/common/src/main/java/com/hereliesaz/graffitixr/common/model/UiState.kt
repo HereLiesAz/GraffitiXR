@@ -11,7 +11,7 @@ data class UiState(
     // Editor State Bridge
     val layers: List<OverlayLayer> = emptyList(),
     val activeLayerId: String? = null,
-    val editorMode: EditorMode = EditorMode.TRANSFORM,
+    val editorMode: EditorMode = EditorMode.STATIC,
     val isRightHanded: Boolean = true,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
@@ -31,7 +31,7 @@ data class EditorUiState(
     val layers: List<OverlayLayer> = emptyList(),
     val activeLayerId: String? = null,
     val drawingPaths: List<List<Offset>> = emptyList(),
-    val editorMode: EditorMode = EditorMode.TRANSFORM,
+    val editorMode: EditorMode = EditorMode.STATIC,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
     val isImageLocked: Boolean = false,
@@ -54,8 +54,5 @@ data class ArUiState(
 )
 
 // Enums required for the state
-enum class EditorMode { TRANSFORM, DRAW, ERASE }
-enum class RotationAxis { X, Y, Z }
-enum class CaptureStep { PREVIEW, CAPTURE, CONFIRM }
-enum class TargetCreationMode { SINGLE_IMAGE, GUIDED_GRID, SLAM_SCAN }
+// EditorMode, RotationAxis, CaptureStep, TargetCreationMode are defined in their own files.
 enum class SliderType { OPACITY, SCALE, ROTATION }

@@ -1,6 +1,5 @@
 plugins {
     id("com.android.library")
-    alias(libs.plugins.jetbrains.kotlin.compose)
 }
 
 android {
@@ -15,7 +14,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
-        compose = true
+        compose = false
     }
 }
 

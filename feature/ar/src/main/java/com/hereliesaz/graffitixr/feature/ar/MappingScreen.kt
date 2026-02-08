@@ -136,11 +136,15 @@ fun MappingScreen(
         modifier = Modifier.fillMaxSize(),
         navController = navController
     ) {
+            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
             azConfig(
                 displayAppName = true,
                 dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
             )
-            azRailItem(id = "back", text = "Abort", onClick = onExit)
+            azRailItem(id = "back", text = "Abort", onClick = {
+                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                onExit()
+            })
 
             background(weight = 0) {
                 AndroidView(
