@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.hereliesaz.graffitixr.native"
+    namespace = "com.hereliesaz.graffitixr.nativebridge"
     compileSdk = 36
     defaultConfig {
         minSdk = 29

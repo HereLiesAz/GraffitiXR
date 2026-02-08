@@ -71,7 +71,7 @@ We reject deep nesting. We map modules to flattened packages to minimize path le
 | :--- | :--- | :--- |
 | **`:core:common`** | `com.hereliesaz.graffitixr.common` | `core/common/src/main/java/com/hereliesaz/graffitixr/common/` |
 | **`:core:domain`** | `com.hereliesaz.graffitixr.domain` | `core/domain/src/main/java/com/hereliesaz/graffitixr/domain/` |
-| **`:core:native`** | `com.hereliesaz.graffitixr.native` | `core/native/src/main/java/com/hereliesaz/graffitixr/native/` |
+| **`:core:native`** | `com.hereliesaz.graffitixr.nativebridge` | `core/native/src/main/java/com/hereliesaz/graffitixr/nativebridge/` |
 | **`:core:design`** | `com.hereliesaz.graffitixr.design` | `core/design/src/main/java/com/hereliesaz/graffitixr/design/` |
 | **`:core:data`** | `com.hereliesaz.graffitixr.data` | `core/data/src/main/java/com/hereliesaz/graffitixr/data/` |
 | **`:feature:ar`** | `com.hereliesaz.graffitixr.feature.ar` | `feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/` |

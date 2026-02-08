@@ -1,32 +1,15 @@
-# Ralph Scratchpad - Fixing the Broken Build
+## Analysis of Core Native Isolation
 
-## Status
-The build is now SUCCESSFUL!
+I found significant mismatches between the Kotlin JNI wrappers and the C++ implementation in `core:native`.
 
-## Changes Made
-1.  **Repository Fixes**:
-    - Repaired corrupted Git index using `rm .git/index && git reset`.
-    - Repaired corrupted Gradle cache by removing `.gradle/`.
-2.  **AR Module Restoration**:
-    - Restored complex logic in `ArRenderer.kt` from git history.
-    - Restored missing `MiniMapRenderer.kt` from shelved patches.
-    - Fixed package names in `feature:ar:rendering` subpackage.
-3.  **Core Resources**:
-    - Restored deleted string resources in `core:design`.
-    - Fixed package names for UI components in `core:design:components`.
-    - Fixed package names for Theme and Typography in `core:design:theme`.
-4.  **ViewModel and Actions**:
-    - Cleaned up `MainViewModel.kt` in the `app` module, removing redundant/conflicting code blocks.
-    - Implemented missing `EditorActions` placeholders in `MainViewModel`.
-    - Unified model imports to `com.hereliesaz.graffitixr.common.model`.
-5.  **Dependencies**:
-    - Added missing dependencies (CameraX, Coil, Icons, Coroutines-Play-Services) to `build.gradle.kts` files for feature modules.
-    - Enabled `buildConfig` feature in `app/build.gradle.kts`.
-6.  **Refactoring Cleanup**:
-    - Moved `YuvToRgbConverter.kt`, `ImageProcessingUtils.kt`, `DisplayRotationHelper.kt`, and `CaptureUtils.kt` to `core:common:util` to break circular dependencies and share logic correctly.
-    - Extracted `TargetCreationFlow.kt` to the `app` module to manage coordination between AR and Editor logic.
+### Findings
+1. **Library Name Mismatch:** `SlamManager.kt` attempts to load `mobile_gs_jni`, but `CMakeLists.txt` builds `graffitixr`.
+2. **Function Signature Mismatch:** `GraffitiJNI.cpp` expects a `jlong handle` for stateful operations, but `SlamManager.kt` does not maintain a native handle and uses different method names (`init` vs `initNativeJni`, etc.).
+3. **Namespace Inconsistency:** The strategy dictates `com.hereliesaz.graffitixr.native`, but the code uses `com.hereliesaz.graffitixr.natives`.
+4. **Unused Files:** `app/CMakeLists.txt` exists but appears unused as there is no `src/main/cpp` in `app`.
 
-## Next Steps
-- Continue with `ANALYSIS.md` Phase 1: Fully decomposing `MainViewModel` into feature-specific ViewModels.
-- Implement the placeholder methods in ViewModels.
-- Add unit tests for the new modular structure.
+### Plan
+1. **Standardize Naming:** Rename `com.hereliesaz.graffitixr.natives` to `com.hereliesaz.graffitixr.native`.
+2. **Sync JNI Interface:** Align `SlamManager.kt` and `GraffitiJNI.cpp`. I will adopt the handle-based approach in `GraffitiJNI.cpp` as it's better for avoiding global state in native code.
+3. **Fix Library Loading:** Change `System.loadLibrary` to use the name defined in `CMakeLists.txt`.
+4. **Cleanup:** Remove ghost `app/CMakeLists.txt`.

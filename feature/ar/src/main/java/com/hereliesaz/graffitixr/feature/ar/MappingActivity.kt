@@ -5,7 +5,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
-import com.hereliesaz.graffitixr.native.ensureOpenCVLoaded
+import com.hereliesaz.graffitixr.nativebridge.ensureOpenCVLoaded
 
 class MappingActivity : ComponentActivity() {
 
