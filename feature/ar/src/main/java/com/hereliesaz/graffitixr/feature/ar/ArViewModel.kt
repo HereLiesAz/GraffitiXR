@@ -27,6 +27,12 @@ class ArViewModel @Inject constructor(
         this.arRenderer = renderer
     }
 
+    private var renderer: ArRenderer? = null
+
+    fun setArRenderer(renderer: ArRenderer) {
+        this.renderer = renderer
+    }
+
     fun togglePointCloud() {
         _uiState.update { it.copy(showPointCloud = !it.showPointCloud) }
     }
