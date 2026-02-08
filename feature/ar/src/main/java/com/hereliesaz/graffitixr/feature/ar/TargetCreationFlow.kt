@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 
 @Composable
@@ -37,40 +38,15 @@ fun TargetCreationFlow(
                 } 
             }
 
-            // Note: Mask loading logic was simplified in the original file I read, adhering to that.
-            
             TargetRefinementScreen(
                 bitmap = imageBitmap,
                 onConfirm = onConfirm,
                 onRetake = onRetake
             )
-        } else if (captureStep == CaptureStep.RECTIFY) {
-             val uri = uiState.capturedTargetUris.firstOrNull()
-            val imageBitmap by produceState<Bitmap?>(null, uri, uiState.capturedTargetImages) { 
-                value = if (uiState.capturedTargetImages.isNotEmpty()) 
-                    uiState.capturedTargetImages.first() 
-                else if (uri != null) { 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) 
-                        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) 
-                    else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri) 
-                } else null 
-            }
-            UnwarpScreen(
-                isRightHanded = isRightHanded, 
-                targetImage = imageBitmap, 
-                onConfirm = onUnwarpImage, 
-                onRetake = onRetake
-            )
         } else {
             TargetCreationOverlay(
                 uiState = uiState,
-                onCapture = {
-                    if (captureStep.name.startsWith("CALIBRATION_POINT")) {
-                        onCalibrationPointCaptured(FloatArray(16)) // Placeholder as per original
-                    } else {
-                        onCaptureShutter()
-                    }
-                },
+                onCapture = onCaptureShutter,
                 onConfirm = onConfirm,
                 onRetake = onRetake,
                 onCancel = onCancel

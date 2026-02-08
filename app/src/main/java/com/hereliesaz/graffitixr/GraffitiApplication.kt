@@ -2,8 +2,12 @@ package com.hereliesaz.graffitixr
 
 import android.app.Application
 import android.util.Log
+import dagger.hilt.android.HiltAndroidApp
 import org.opencv.android.OpenCVLoader
 
+private const val TAG = "GraffitiApp"
+
+@HiltAndroidApp
 class GraffitiApplication : Application() {
 
     override fun onCreate() {
@@ -34,7 +38,7 @@ class GraffitiApplication : Application() {
         }
 
         if (!isLoaded) {
-            Log.e(TAG, "CRITICAL: OpenCV failed to load. Computer Vision features will be unavailable.")
+             Log.e(TAG, "OpenCV initialization failed entirely")
         }
     }
 
@@ -44,19 +48,8 @@ class GraffitiApplication : Application() {
             Log.i(TAG, "System.loadLibrary(opencv_java4) successful")
             true
         } catch (e: UnsatisfiedLinkError) {
-            Log.w(TAG, "opencv_java4 not found, trying legacy opencv_java...")
-            try {
-                System.loadLibrary("opencv_java")
-                Log.i(TAG, "System.loadLibrary(opencv_java) successful")
-                true
-            } catch (e2: UnsatisfiedLinkError) {
-                Log.e(TAG, "FATAL: Could not load any OpenCV library.", e2)
-                false
-            }
+            Log.e(TAG, "Failed to load opencv_java4", e)
+            false
         }
-    }
-
-    companion object {
-        private const val TAG = "GraffitiApplication"
     }
 }
