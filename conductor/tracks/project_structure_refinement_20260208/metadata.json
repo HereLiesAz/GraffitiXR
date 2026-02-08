@@ -1,0 +1,8 @@
+{
+  "track_id": "project_structure_refinement_20260208",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-08T00:00:00Z",
+  "updated_at": "2026-02-08T00:00:00Z",
+  "description": "Standardize module boundaries and resolve any circular dependencies in the native-to-Kotlin bridge to ensure a stable foundation for new AR features."
+}
