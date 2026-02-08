@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.natives
+package com.hereliesaz.graffitixr.native
 
 import android.util.Log
 import org.opencv.android.OpenCVLoader

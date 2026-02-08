@@ -15,8 +15,8 @@
 
 # --- Native Engine (MobileGS & SlamManager) ---
 # Keep the JNI wrapper class and its native methods
--keep class com.hereliesaz.graffitixr.natives.SlamManager { *; }
--keepclassmembers class com.hereliesaz.graffitixr.natives.SlamManager {
+-keep class com.hereliesaz.graffitixr.native.SlamManager { *; }
+-keepclassmembers class com.hereliesaz.graffitixr.native.SlamManager {
     native <methods>;
 }
 

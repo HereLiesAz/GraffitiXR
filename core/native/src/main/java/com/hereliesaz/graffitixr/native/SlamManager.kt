@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.natives
+package com.hereliesaz.graffitixr.native
 
 import android.content.res.AssetManager
 import kotlinx.coroutines.flow.MutableStateFlow
