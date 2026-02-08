@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.common.model
 
-import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 
 data class UiState(
@@ -42,14 +41,6 @@ data class EditorUiState(
     val isRightHanded: Boolean = true,
     val isLoading: Boolean = false,
     val progressPercentage: Float = 0f
-)
-
-data class ArUiState(
-    val showPointCloud: Boolean = false,
-    val isFlashlightOn: Boolean = false,
-    val isArTargetCreated: Boolean = false,
-    val mappingQualityScore: Float = 0f,
-    val capturedTargetUris: List<Uri> = emptyList()
 )
 
 // Enums required for the state
