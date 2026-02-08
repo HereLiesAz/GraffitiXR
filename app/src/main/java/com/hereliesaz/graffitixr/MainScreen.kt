@@ -74,6 +74,7 @@ fun MainScreen(
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
     
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
