@@ -1,0 +1,68 @@
+Calculating task graph as no cached configuration is available for tasks: :core:native:externalNativeBuildDebug
+
+> Configure project :opencv
+Configure OpenCV with Kotlin
+OpenCV: 4.13.0 /app/core/native/libs/opencv/sdk/build.gradle
+Checking the license for package NDK (Side by side) 28.2.13676358 in /opt/android-sdk/licenses
+License for package NDK (Side by side) 28.2.13676358 accepted.
+Preparing "Install NDK (Side by side) 28.2.13676358 v.28.2.13676358".
+"Install NDK (Side by side) 28.2.13676358 v.28.2.13676358" ready.
+Installing NDK (Side by side) 28.2.13676358 in /opt/android-sdk/ndk/28.2.13676358
+"Install NDK (Side by side) 28.2.13676358 v.28.2.13676358" complete.
+"Install NDK (Side by side) 28.2.13676358 v.28.2.13676358" finished.
+
+> Task :core:native:preBuild UP-TO-DATE
+> Task :opencv:preBuild UP-TO-DATE
+> Task :opencv:preDebugBuild UP-TO-DATE
+> Task :core:domain:preBuild UP-TO-DATE
+> Task :core:common:preBuild UP-TO-DATE
+
+> Task :opencv:configureCMakeDebug[arm64-v8a]
+Checking the license for package CMake 3.22.1 in /opt/android-sdk/licenses
+License for package CMake 3.22.1 accepted.
+Preparing "Install CMake 3.22.1 v.3.22.1".
+"Install CMake 3.22.1 v.3.22.1" ready.
+Installing CMake 3.22.1 in /opt/android-sdk/cmake/3.22.1
+"Install CMake 3.22.1 v.3.22.1" complete.
+"Install CMake 3.22.1 v.3.22.1" finished.
+
+> Task :opencv:configureCMakeDebug[armeabi-v7a]
+> Task :opencv:configureCMakeDebug[x86_64]
+> Task :opencv:configureCMakeDebug[x86]
+> Task :opencv:buildCMakeDebug[armeabi-v7a][opencv_jni_shared]
+> Task :opencv:buildCMakeDebug[x86_64][opencv_jni_shared]
+> Task :core:common:preDebugBuild UP-TO-DATE
+> Task :opencv:buildCMakeDebug[x86][opencv_jni_shared]
+> Task :core:domain:preDebugBuild UP-TO-DATE
+> Task :opencv:buildCMakeDebug[arm64-v8a][opencv_jni_shared]
+> Task :core:native:preDebugBuild UP-TO-DATE
+> Task :core:common:mergeDebugJniLibFolders
+> Task :core:domain:mergeDebugJniLibFolders
+> Task :core:domain:mergeDebugNativeLibs NO-SOURCE
+> Task :core:common:mergeDebugNativeLibs NO-SOURCE
+> Task :core:common:copyDebugJniLibsProjectOnly
+> Task :core:domain:copyDebugJniLibsProjectOnly
+> Task :core:native:configureCMakeDebug[armeabi-v7a]
+> Task :core:native:configureCMakeDebug[x86]
+> Task :opencv:mergeDebugJniLibFolders
+> Task :core:native:configureCMakeDebug[arm64-v8a]
+> Task :opencv:mergeDebugNativeLibs
+> Task :opencv:copyDebugJniLibsProjectOnly
+> Task :core:native:configureCMakeDebug[x86_64]
+> Task :core:native:buildCMakeDebug[armeabi-v7a]
+> Task :core:native:buildCMakeDebug[arm64-v8a]
+> Task :core:native:buildCMakeDebug[x86]
+> Task :core:native:buildCMakeDebug[x86_64]
+> Task :core:native:externalNativeBuildDebug
+
+[Incubating] Problems report is available at: file:///app/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 45s
+24 actionable tasks: 24 executed
+Configuration cache entry stored.
