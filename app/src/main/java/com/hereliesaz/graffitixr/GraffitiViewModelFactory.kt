@@ -17,7 +17,7 @@ class GraffitiViewModelFactory(
         return when {
             modelClass.isAssignableFrom(MainViewModel::class.java) -> {
                 @Suppress("UNCHECKED_CAST")
-                MainViewModel(application, projectManager) as T
+                MainViewModel(application) as T
             }
             modelClass.isAssignableFrom(EditorViewModel::class.java) -> {
                 @Suppress("UNCHECKED_CAST")

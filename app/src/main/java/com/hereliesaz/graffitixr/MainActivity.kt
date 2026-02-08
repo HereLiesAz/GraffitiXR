@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -21,6 +22,7 @@ class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
     private val arViewModel: ArViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
+    private val dashboardViewModel: DashboardViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,6 +42,7 @@ class MainActivity : ComponentActivity() {
                         viewModel = mainViewModel,
                         arViewModel = arViewModel,
                         editorViewModel = editorViewModel,
+                        dashboardViewModel = dashboardViewModel,
                         navController = navController,
                         onRendererCreated = { renderer ->
                             // CRITICAL FIX: Only ArViewModel gets the renderer.

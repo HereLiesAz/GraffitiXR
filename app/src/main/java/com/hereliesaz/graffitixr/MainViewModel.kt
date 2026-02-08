@@ -4,7 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.*
-import com.hereliesaz.graffitixr.data.ProjectManager
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,9 +20,9 @@ import kotlinx.coroutines.launch
  * - Touch Locking (Global Overlay)
  * - Target Creation Orchestration (App-level flow)
  */
-class MainViewModel(
-    application: Application,
-    private val projectManager: ProjectManager
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    application: Application
 ) : AndroidViewModel(application) {
 
     // Simplified UI State
@@ -63,15 +64,5 @@ class MainViewModel(
 
     fun onRetakeCapture() {
         // Reset capture state logic here
-    }
-
-    // --- Project Management ---
-
-    fun loadAvailableProjects(context: android.content.Context) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            val projectIds = projectManager.getProjectList(context)
-            _uiState.update { it.copy(isLoading = false) }
-        }
     }
 }
