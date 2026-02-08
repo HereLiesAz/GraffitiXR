@@ -27,3 +27,11 @@ The project uses a mix of Kotlin and C++ (via `core:native`). Strict separation 
 ## Non-Goals
 -   Refactoring the entire C++ engine logic (only the interface boundary).
 -   Adding new AR features.
+
+## Analysis Findings
+-   **Dependency Graph:** Valid layering observed.
+    -   `feature` modules do NOT depend on other `feature` modules.
+    -   `core:native` depends on `core:domain` and `core:common`.
+    -   `core:domain` and `core:common` do NOT depend on `core:native`.
+    -   No Gradle-level dependency cycles found.
+-   **Build Status:** `dependencies` task reported failures for some modules (e.g., `core:native` FAILED). This warrants further investigation into the `externalNativeBuild` configuration.
