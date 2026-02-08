@@ -13,6 +13,13 @@ plugins {
 subprojects {
     plugins.withType<com.android.build.gradle.BasePlugin> {
         apply(plugin = "org.jetbrains.kotlin.android")
+        
+        configure<com.android.build.gradle.BaseExtension> {
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+        }
     }
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
