@@ -7,7 +7,6 @@ import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -30,7 +29,6 @@ class DefaultUriProvider : UriProvider {
 
 class ProjectManager(
     private val context: Context,
-    private val repository: ProjectRepository,
     private val uriProvider: UriProvider = DefaultUriProvider()
 ) {
 
@@ -60,7 +58,7 @@ class ProjectManager(
         return File(root, "map.bin").absolutePath
     }
 
-    suspend fun saveProject(context: Context, projectData: ProjectData, targetImages: List<Bitmap>, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
+    suspend fun saveProject(context: Context, projectData: ProjectData, targetImages: List<Bitmap>? = null, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
@@ -72,17 +70,24 @@ class ProjectManager(
             }
             uriProvider.getUriForFile(file)
         } else {
-            val file = File(root, "thumbnail.png")
-            if (file.exists()) uriProvider.getUriForFile(file) else null
+            // Keep existing or check file
+             projectData.thumbnailUri ?: run {
+                val file = File(root, "thumbnail.png")
+                if (file.exists()) uriProvider.getUriForFile(file) else null
+            }
         }
 
         // 2. Save Target Images (Bitmaps) -> URIs
-        val savedTargetUris = targetImages.mapIndexed { index, bitmap ->
-            val file = File(root, "target_$index.png")
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        val savedTargetUris = if (targetImages != null) {
+            targetImages.mapIndexed { index, bitmap ->
+                val file = File(root, "target_$index.png")
+                FileOutputStream(file).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                uriProvider.getUriForFile(file)
             }
-            uriProvider.getUriForFile(file)
+        } else {
+            projectData.targetImageUris
         }
 
         val updatedProjectData = projectData.copy(
