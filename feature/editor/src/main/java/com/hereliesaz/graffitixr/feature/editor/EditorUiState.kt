@@ -9,7 +9,7 @@ import android.net.Uri
 
 data class EditorUiState(
     val editorMode: EditorMode = EditorMode.AR,
-    val backgroundImageUri: Uri? = null,
+    val backgroundImageUri: android.net.Uri? = null,
     val layers: List<OverlayLayer> = emptyList(),
     val activeLayerId: String? = null,
     val isImageLocked: Boolean = false,

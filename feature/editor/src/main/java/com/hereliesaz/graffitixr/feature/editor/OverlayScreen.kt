@@ -46,6 +46,7 @@ import java.util.concurrent.ExecutionException
 @Composable
 fun OverlayScreen(
     uiState: EditorUiState,
+    isFlashlightOn: Boolean,
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
     onGestureEnd: (Float, Offset, Float, Float, Float) -> Unit,
@@ -77,10 +78,6 @@ fun OverlayScreen(
     val colorBalanceR = activeLayer?.colorBalanceR ?: 1f
     val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
     val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
-
-    // Flashlight control logic - Note: isFlashlightOn moved to a placeholder or should be in EditorUiState
-    // For now, defaulting to false as it's missing from EditorUiState
-    val isFlashlightOn = false 
 
     LaunchedEffect(isFlashlightOn, camera) {
         try {
