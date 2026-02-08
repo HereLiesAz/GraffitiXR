@@ -44,7 +44,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-core:1.7.8")
     implementation(libs.androidx.compose.material.icons.extended)
 
     // Testing
