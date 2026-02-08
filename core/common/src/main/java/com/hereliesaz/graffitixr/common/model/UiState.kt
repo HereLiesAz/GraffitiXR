@@ -15,7 +15,6 @@ data class UiState(
     val isRightHanded: Boolean = true,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val showRotationAxisFeedback: Boolean = false,
-    val tapFeedback: Offset? = null,
 
     // AR State Bridge
     val showPointCloud: Boolean = false,

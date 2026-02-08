@@ -238,7 +238,6 @@ fun MainScreen(
                         EditorUi(
                              uiState = mapToCommonUiState(uiState, editorUiState, arUiState),
                              actions = editorViewModel,
-                             tapFeedback = uiState.tapFeedback,
                              showSliderDialog = showSliderDialog,
                              showColorBalanceDialog = showColorBalanceDialog,
                              gestureInProgress = editorUiState.gestureInProgress

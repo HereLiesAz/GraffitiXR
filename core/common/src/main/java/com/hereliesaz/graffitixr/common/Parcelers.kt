@@ -126,36 +126,3 @@ object OffsetListParceler : Parceler<List<Offset>> {
         forEach { with(OffsetParceler) { it.write(parcel, flags) } }
     }
 }
-
-object TapFeedbackParceler : Parceler<com.hereliesaz.graffitixr.common.model.TapFeedback?> {
-    override fun create(parcel: Parcel): com.hereliesaz.graffitixr.common.model.TapFeedback? {
-        val isNull = parcel.readInt() == 1
-        if (isNull) return null
-
-        val type = parcel.readInt()
-        val position = OffsetParceler.create(parcel)
-        return when (type) {
-            0 -> com.hereliesaz.graffitixr.common.model.TapFeedback.Success(position)
-            1 -> com.hereliesaz.graffitixr.common.model.TapFeedback.Failure(position)
-            else -> throw IllegalArgumentException("Invalid type for TapFeedback")
-        }
-    }
-
-    override fun com.hereliesaz.graffitixr.common.model.TapFeedback?.write(parcel: Parcel, flags: Int) {
-        if (this == null) {
-            parcel.writeInt(1) // Mark as null
-            return
-        }
-        parcel.writeInt(0) // Mark as not null
-        when (this) {
-            is com.hereliesaz.graffitixr.common.model.TapFeedback.Success -> {
-                parcel.writeInt(0)
-                with(OffsetParceler) { position.write(parcel, flags) }
-            }
-            is com.hereliesaz.graffitixr.common.model.TapFeedback.Failure -> {
-                parcel.writeInt(1)
-                with(OffsetParceler) { position.write(parcel, flags) }
-            }
-        }
-    }
-}
