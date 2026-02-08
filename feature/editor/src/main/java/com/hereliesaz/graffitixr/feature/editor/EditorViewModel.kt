@@ -92,6 +92,14 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(editorMode = EditorMode.DRAW) }
     }
 
+    fun setEditorMode(mode: EditorMode) {
+        _uiState.update { it.copy(editorMode = mode) }
+    }
+
+    fun setBackgroundImage(uri: Uri) {
+        _uiState.update { it.copy(backgroundImageUri = uri, isEditingBackground = true) }
+    }
+
 
     fun toggleHandedness() {
         viewModelScope.launch {
@@ -130,7 +138,7 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onLayerActivated(id: String) {
-        _uiState.update { it.copy(activeLayerId = id) }
+        _uiState.update { it.copy(activeLayerId = id, isEditingBackground = false) }
     }
 
     override fun onLayerRenamed(id: String, name: String) {
@@ -166,7 +174,8 @@ class EditorViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 layers = state.layers + newLayer,
-                activeLayerId = newLayer.id
+                activeLayerId = newLayer.id,
+                isEditingBackground = false
             )
         }
     }
@@ -180,11 +189,19 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onScaleChanged(s: Float) {
-        updateActiveLayer { it.copy(scale = it.scale * s) }
+        if (_uiState.value.isEditingBackground) {
+            _uiState.update { it.copy(backgroundScale = it.backgroundScale * s) }
+        } else {
+            updateActiveLayer { it.copy(scale = it.scale * s) }
+        }
     }
 
     override fun onOffsetChanged(o: Offset) {
-        updateActiveLayer { it.copy(offset = it.offset + o) }
+        if (_uiState.value.isEditingBackground) {
+            _uiState.update { it.copy(backgroundOffset = it.backgroundOffset + o) }
+        } else {
+            updateActiveLayer { it.copy(offset = it.offset + o) }
+        }
     }
 
     override fun onRotationXChanged(d: Float) {

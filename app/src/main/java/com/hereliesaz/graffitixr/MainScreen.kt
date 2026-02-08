@@ -404,13 +404,15 @@ fun MainContentLayer(
             )
             EditorMode.TRACE -> TraceScreen(
                 uiState = editorUiState,
+                isFlashlightOn = arUiState.isFlashlightOn,
                 onOverlayImageSelected = editorViewModel::onAddLayer,
                 onCycleRotationAxis = onCycle,
                 onGestureStart = onStart,
                 onGestureEnd = onOverlayGestureEnd
             )
             EditorMode.OVERLAY -> OverlayScreen(
-                uiState = editorUiState, 
+                uiState = editorUiState,
+                isFlashlightOn = arUiState.isFlashlightOn,
                 onCycleRotationAxis = onCycle, 
                 onGestureStart = onStart, 
                 onGestureEnd = onOverlayGestureEnd
@@ -433,7 +435,8 @@ fun MainContentLayer(
                 }
             }
             else -> OverlayScreen(
-                uiState = editorUiState, 
+                uiState = editorUiState,
+                isFlashlightOn = arUiState.isFlashlightOn,
                 onCycleRotationAxis = onCycle, 
                 onGestureStart = onStart, 
                 onGestureEnd = onOverlayGestureEnd

@@ -34,7 +34,12 @@ data class EditorUiState(
     val showColorBalanceDialog: Boolean = false,
     
     // Capture state needed for UI hiding
-    val hideUiForCapture: Boolean = false
+    val hideUiForCapture: Boolean = false,
+
+    // Background Editing
+    val isEditingBackground: Boolean = false,
+    val backgroundScale: Float = 1f,
+    val backgroundOffset: Offset = Offset.Zero
 ) {
     val activeLayer: OverlayLayer?
         get() = layers.find { it.id == activeLayerId } ?: layers.firstOrNull()
