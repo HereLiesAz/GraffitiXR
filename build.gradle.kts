@@ -9,3 +9,9 @@ plugins {
     alias(libs.plugins.kotlinx.serialization) apply false
     alias(libs.plugins.kotlin.parcelize) apply false
 }
+
+subprojects {
+    plugins.withType<com.android.build.gradle.BasePlugin> {
+        apply(plugin = "org.jetbrains.kotlin.android")
+    }
+}

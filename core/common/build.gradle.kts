@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.kotlin.parcelize)
 }
@@ -32,7 +32,4 @@ dependencies {
     
     implementation(project(":opencv"))
     implementation(libs.play.services.location)
-    
-    // Explicitly add parcelize runtime to resolve unresolved reference
-    implementation("org.jetbrains.kotlin:kotlin-parcelize-runtime:2.1.0")
 }
