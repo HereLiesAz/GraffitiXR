@@ -28,6 +28,9 @@ import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
 
 @Composable
 fun TraceScreen(
@@ -66,39 +69,7 @@ fun TraceScreen(
     val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
 
     val colorMatrix = remember(saturation, contrast, brightness, colorBalanceR, colorBalanceG, colorBalanceB) {
-        ColorMatrix().apply {
-            setToSaturation(saturation)
-            val contrastMatrix = ColorMatrix(
-                floatArrayOf(
-                    contrast, 0f, 0f, 0f, (1 - contrast) * 128,
-                    0f, contrast, 0f, 0f, (1 - contrast) * 128,
-                    0f, 0f, contrast, 0f, (1 - contrast) * 128,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-
-            val b = brightness * 255f
-            val brightnessMatrix = ColorMatrix(
-                floatArrayOf(
-                    1f, 0f, 0f, 0f, b,
-                    0f, 1f, 0f, 0f, b,
-                    0f, 0f, 1f, 0f, b,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-
-            val colorBalanceMatrix = ColorMatrix(
-                floatArrayOf(
-                    colorBalanceR, 0f, 0f, 0f, 0f,
-                    0f, colorBalanceG, 0f, 0f, 0f,
-                    0f, 0f, colorBalanceB, 0f, 0f,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-            timesAssign(contrastMatrix)
-            timesAssign(brightnessMatrix)
-            timesAssign(colorBalanceMatrix)
-        }
+        createColorMatrix(saturation, contrast, brightness, colorBalanceR, colorBalanceG, colorBalanceB)
     }
 
     Box(
@@ -123,13 +94,16 @@ fun TraceScreen(
             var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
             LaunchedEffect(uri) {
-                coroutineScope.launch {
+                // Use IO dispatcher to avoid blocking main thread
+                launch(Dispatchers.IO) {
                     val request = ImageRequest.Builder(context)
                         .data(uri)
                         .build()
                     val result =
                         (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                    imageBitmap = result
+                    withContext(Dispatchers.Main) {
+                        imageBitmap = result
+                    }
                 }
             }
 
@@ -137,38 +111,49 @@ fun TraceScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.isImageLocked) {
-                         detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
-                    }
                     .pointerInput(uiState.isImageLocked, imageBitmap) {
-                        if (!uiState.isImageLocked) {
+                         if (!uiState.isImageLocked) {
                             val bmp = imageBitmap ?: return@pointerInput
 
-                            detectSmartOverlayGestures(
-                                getValidBounds = {
-                                    val imgWidth = bmp.width * transformState.scale
-                                    val imgHeight = bmp.height * transformState.scale
-                                    val centerX = size.width / 2f + transformState.offset.x
-                                    val centerY = size.height / 2f + transformState.offset.y
-                                    val left = centerX - imgWidth / 2f
-                                    val top = centerY - imgHeight / 2f
-                                    Rect(left, top, left + imgWidth, top + imgHeight)
-                                },
-                                onGestureStart = {
-                                    transformState.isGesturing = true
-                                    onGestureStart()
-                                },
-                                onGestureEnd = {
-                                    transformState.isGesturing = false
-                                    onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
+                            coroutineScope {
+                                launch {
+                                    detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                                 }
-                            ) { _, pan, zoom, rotation ->
-                                transformState.scale *= zoom
-                                transformState.offset += pan
-                                when (currentUiState.activeRotationAxis) {
-                                    RotationAxis.X -> transformState.rotationX += rotation
-                                    RotationAxis.Y -> transformState.rotationY += rotation
-                                    RotationAxis.Z -> transformState.rotationZ += rotation
+
+                                launch {
+                                    detectSmartOverlayGestures(
+                                        getValidBounds = {
+                                            val imgWidth = bmp.width * transformState.scale
+                                            val imgHeight = bmp.height * transformState.scale
+                                            val centerX = size.width / 2f + transformState.offset.x
+                                            val centerY = size.height / 2f + transformState.offset.y
+                                            val left = centerX - imgWidth / 2f
+                                            val top = centerY - imgHeight / 2f
+                                            Rect(left, top, left + imgWidth, top + imgHeight)
+                                        },
+                                        onGestureStart = {
+                                            transformState.isGesturing = true
+                                            onGestureStart()
+                                        },
+                                        onGestureEnd = {
+                                            transformState.isGesturing = false
+                                            onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
+                                        }
+                                    ) { _, pan, zoom, rotation ->
+                                        transformState.scale *= zoom
+                                        transformState.offset += pan
+                                        when (currentUiState.activeRotationAxis) {
+                                            RotationAxis.X -> transformState.rotationX += rotation
+                                            RotationAxis.Y -> transformState.rotationY += rotation
+                                            RotationAxis.Z -> transformState.rotationZ += rotation
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            coroutineScope {
+                                launch {
+                                    detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                                 }
                             }
                         }
