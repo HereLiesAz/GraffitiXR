@@ -1,11 +1,13 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.app.Application
 import androidx.compose.ui.geometry.Offset
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,8 +18,9 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class EditorViewModel(
+    application: Application,
     private val projectRepository: ProjectRepository
-) : ViewModel(), EditorActions {
+) : AndroidViewModel(application), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -25,7 +28,7 @@ class EditorViewModel(
     // Undo/Redo Stacks
     private val undoStack = ArrayDeque<List<OverlayLayer>>()
     private val redoStack = ArrayDeque<List<OverlayLayer>>()
-    
+
     // Clipboard
     private var layerModsClipboard: OverlayLayer? = null
 
@@ -34,13 +37,14 @@ class EditorViewModel(
         viewModelScope.launch {
             projectRepository.currentProject.collectLatest { project ->
                 if (project != null) {
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             layers = project.layers,
                             drawingPaths = project.drawingPaths.map { path -> path.map { p -> Offset(p.first, p.second) } },
                             progressPercentage = project.progressPercentage
-                        ) 
+                        )
                     }
+                    // Ensure an active layer is selected if we have layers but no selection
                     if (_uiState.value.activeLayerId == null && project.layers.isNotEmpty()) {
                         _uiState.update { it.copy(activeLayerId = project.layers.first().id) }
                     }
@@ -54,23 +58,25 @@ class EditorViewModel(
         val activeId = _uiState.value.activeLayerId ?: return
         val currentLayers = _uiState.value.layers
         val activeLayer = currentLayers.find { it.id == activeId } ?: return
-        
+
         if (saveHistory) snapshotState()
 
         val newLayer = transform(activeLayer)
         val newLayers = currentLayers.map { if (it.id == activeId) newLayer else it }
 
         _uiState.update { it.copy(layers = newLayers) }
-        
+
         // Sync to Repo
         viewModelScope.launch {
             projectRepository.updateProject { it.copy(layers = newLayers) }
         }
     }
-    
+
     private fun snapshotState() {
         undoStack.addLast(_uiState.value.layers.toList())
         redoStack.clear()
+        // Optional: Limit stack size to prevent memory issues
+        if (undoStack.size > 20) undoStack.removeFirst()
     }
 
     // --- EditorActions Implementation ---
@@ -101,22 +107,57 @@ class EditorViewModel(
         }
     }
 
+    // IMPL: Magic Align (Reset Transforms)
     override fun onMagicClicked() {
-        // TODO: Alignment logic
+        updateActiveLayer(saveHistory = true) {
+            it.copy(
+                scale = 1.0f,
+                offset = Offset.Zero,
+                rotationX = 0f,
+                rotationY = 0f,
+                rotationZ = 0f
+            )
+        }
     }
 
+    // IMPL: Background Removal
     override fun onRemoveBackgroundClicked() {
-        // TODO: Background removal
+        val activeLayer = _uiState.value.activeLayer ?: return
+        val context = getApplication<Application>().applicationContext
+
+        viewModelScope.launch {
+            // Signal UI loading if needed (e.g., via a transient state or toast)
+            try {
+                // 1. Load Bitmap
+                val originalBitmap = BitmapUtils.getBitmapFromUri(context, activeLayer.uri)
+                if (originalBitmap != null) {
+                    // 2. Remove Background (MLKit)
+                    val processedBitmap = BackgroundRemover.removeBackground(context, originalBitmap)
+
+                    if (processedBitmap != null) {
+                        // 3. Save to Cache
+                        val newUri = ImageUtils.saveBitmapToCache(context, processedBitmap)
+
+                        // 4. Update Layer
+                        updateActiveLayer(saveHistory = true) {
+                            it.copy(uri = newUri)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override fun onLineDrawingClicked() {
         _uiState.update { it.copy(editorMode = EditorMode.DRAW) }
     }
 
+    // IMPL: Cycle Blend Mode
     override fun onCycleBlendMode() {
-        updateActiveLayer { 
-             // Simple cycle for prototype
-             it 
+        updateActiveLayer {
+            it.copy(blendMode = ImageUtils.getNextBlendMode(it.blendMode))
         }
     }
 
@@ -177,7 +218,7 @@ class EditorViewModel(
     }
 
     override fun onScaleChanged(s: Float) = updateActiveLayer { it.copy(scale = it.scale * s) }
-    override fun onOffsetChanged(o: Offset) = updateActiveLayer { it.copy(offset = it.offset + o) } // Assuming OverlayLayer has offset
+    override fun onOffsetChanged(o: Offset) = updateActiveLayer { it.copy(offset = it.offset + o) }
     override fun onRotationXChanged(d: Float) = updateActiveLayer { it.copy(rotationX = it.rotationX + d) }
     override fun onRotationYChanged(d: Float) = updateActiveLayer { it.copy(rotationY = it.rotationY + d) }
     override fun onRotationZChanged(d: Float) = updateActiveLayer { it.copy(rotationZ = it.rotationZ + d) }
@@ -222,10 +263,10 @@ class EditorViewModel(
     override fun onDrawingPathFinished(path: List<Offset>) {
         val newPaths = _uiState.value.drawingPaths + listOf(path)
         _uiState.update { it.copy(drawingPaths = newPaths) }
-        viewModelScope.launch { 
-            projectRepository.updateProject { 
-                it.copy(drawingPaths = newPaths.map { p -> p.map { o -> Pair(o.x, o.y) } }) 
-            } 
+        viewModelScope.launch {
+            projectRepository.updateProject {
+                it.copy(drawingPaths = newPaths.map { p -> p.map { o -> Pair(o.x, o.y) } })
+            }
         }
     }
 }

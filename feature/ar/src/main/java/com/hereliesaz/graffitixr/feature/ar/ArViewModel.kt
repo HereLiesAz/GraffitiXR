@@ -1,111 +1,62 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import android.app.Application
 import android.graphics.Bitmap
-import com.hereliesaz.graffitixr.common.model.ArState
-import com.hereliesaz.graffitixr.common.model.CaptureEvent
-import com.hereliesaz.graffitixr.common.model.Fingerprint
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
-import kotlinx.coroutines.flow.MutableSharedFlow
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ArViewModel(
-    private val projectRepository: ProjectRepository
-) : ViewModel() {
+class ArViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
 
-    private val _captureEvent = MutableSharedFlow<CaptureEvent>()
-    val captureEvent: SharedFlow<CaptureEvent> = _captureEvent.asSharedFlow()
+    // Held reference to renderer to trigger specific AR actions
+    private var arRenderer: ArRenderer? = null
 
-    var arRenderer: ArRenderer? = null
-        set(value) {
-            field = value
-            value?.showPointCloud = _uiState.value.showPointCloud
-            // Observe project layers if not already doing so
-        }
+    fun setArRenderer(renderer: ArRenderer) {
+        this.arRenderer = renderer
+    }
 
-    init {
+    fun togglePointCloud() {
+        val newState = !_uiState.value.showPointCloud
+        _uiState.update { it.copy(showPointCloud = newState) }
+        arRenderer?.setShowPointCloud(newState)
+    }
+
+    fun toggleFlashlight() {
+        val newState = !_uiState.value.isFlashlightOn
+        _uiState.update { it.copy(isFlashlightOn = newState) }
+        // Note: Actual flashlight toggle usually happens in Activity/Camera Manager,
+        // but we update state here for UI reflection.
+    }
+
+    // NEW: Frame Capture
+    fun onFrameCaptured(bitmap: Bitmap) {
+        // Logic to handle the captured bitmap
+        // e.g., save to disk, add to list of calibration images
         viewModelScope.launch {
-            projectRepository.currentProject.collectLatest { project ->
-                if (project != null) {
-                    arRenderer?.updateLayers(project.layers)
-                }
+            // For now, we update state to indicate a capture happened
+            _uiState.update {
+                // In a real scenario, we'd append the new image URI to capturedTargetUris
+                it.copy(isArTargetCreated = true)
             }
         }
     }
 
-    fun togglePointCloud() {
-        _uiState.update { it.copy(showPointCloud = !it.showPointCloud) }
-        arRenderer?.showPointCloud = _uiState.value.showPointCloud
-    }
-
-    fun toggleFlashlight() {
-        _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
-    }
-
-    fun setArPlanesDetected(detected: Boolean) {
-        _uiState.update { it.copy(isArPlanesDetected = detected) }
-    }
-
-    fun updateMappingScore(score: Float) {
-        _uiState.update { it.copy(mappingQualityScore = score) }
-    }
-
-    fun onArImagePlaced() {
-        _uiState.update { it.copy(arState = ArState.PLACED) }
-    }
-
-    fun toggleMappingMode() {
-        _uiState.update { it.copy(isMappingMode = !it.isMappingMode) }
-    }
-
-    fun onTrackingFailure(message: String?) {
-        _uiState.update { it.copy(qualityWarning = message) }
-    }
-
-    fun updateArtworkBounds(bounds: Any) {
-        // Placeholder
-    }
-
-    fun onAnchorCreated(anchor: Any) {
-        _uiState.update { it.copy(isArTargetCreated = true) }
-    }
-
-    fun onFrameCaptured(bitmap: Bitmap) {
-        // Handle captured frame
-    }
-
+    // NEW: Progress Update
     fun onProgressUpdate(percentage: Float, bitmap: Bitmap?) {
-        // Update progress
+        _uiState.update { it.copy(mappingQualityScore = percentage) }
     }
 
-    fun onCreateTargetClicked() {
-        _uiState.update { it.copy(isArTargetCreated = false) }
-    }
-
+    // NEW: Calibration Points
     fun onCalibrationPointCaptured(matrix: FloatArray) {
-        // Calibration logic
-    }
-
-    fun onFingerprintGenerated(fingerprint: Fingerprint?) {
-        // Save fingerprint
-    }
-
-    fun saveMap() {
-        val pid = projectRepository.currentProject.value?.id ?: return
-        viewModelScope.launch {
-             val path = projectRepository.getMapPath(pid)
-             _captureEvent.emit(CaptureEvent.RequestMapSave(path))
-        }
+        // Store matrix data for SLAM/Gaussian Splatting
+        // _uiState.update { ... }
     }
 }

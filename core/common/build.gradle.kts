@@ -1,8 +1,7 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.jetbrains.kotlin.android)
     id("kotlin-parcelize")
-    alias(libs.plugins.jetbrains.kotlin.compose) // Required for @Parcelize in Parcelers.kt
-    alias(libs.plugins.kotlinx.serialization)
 }
 
 android {
@@ -11,37 +10,43 @@ android {
 
     defaultConfig {
         minSdk = 29
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildFeatures {
-        compose = true // Required for Offset/Color in Parcelers.kt
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material3) // Kept for generic UI utils if needed, otherwise could be removed
+
+    // Coroutines
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.timber)
 
-    // MISSING DEPENDENCIES RESTORED:
-    implementation(libs.play.services.location.v2101) // For LocationTracker
-
-    // Compose Dependencies (for Parcelers.kt, ProgressCalculator.kt)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui.ui3)
-    implementation(libs.androidx.compose.ui.ui.graphics)
-    implementation(libs.androidx.compose.ui.ui.tooling.preview2)
-    implementation(libs.androidx.compose.material3.material33)
+    // Serialization
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.opencv)
-    implementation(libs.arcore.client)
+
+    // Geometry (Offset, Rect, etc)
+    implementation(libs.androidx.compose.ui.geometry)
+
+    // Testing
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+
+    // CRITICAL: ARCore and OpenCV removed from here.
+    // They are now strictly in :feature:ar and :core:native
 }
