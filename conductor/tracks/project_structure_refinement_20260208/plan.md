@@ -1,7 +1,7 @@
 # Implementation Plan - Project Structure Refinement
 
 ## Phase 1: Analysis & Dependency Graph Verification
-- [ ] Task: Analyze current Gradle dependency graph to identify violations of the Clean Architecture layering.
+- [~] Task: Analyze current Gradle dependency graph to identify violations of the Clean Architecture layering.
     - [ ] Run `./gradlew :app:dependencies` and visualize the graph.
     - [ ] Identify any `feature` -> `feature` dependencies.
     - [ ] Identify any circular dependencies involving `core:native`.
