@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.compose)
 }
 
-import java.util.Properties
 
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
