@@ -5,8 +5,11 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 
+import android.net.Uri
+
 data class EditorUiState(
     val editorMode: EditorMode = EditorMode.AR,
+    val backgroundImageUri: Uri? = null,
     val layers: List<OverlayLayer> = emptyList(),
     val activeLayerId: String? = null,
     val isImageLocked: Boolean = false,

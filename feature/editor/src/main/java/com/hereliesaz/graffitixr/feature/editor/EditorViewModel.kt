@@ -80,6 +80,10 @@ class EditorViewModel : ViewModel(), EditorActions {
         _uiState.update { it.copy(editorMode = mode) }
     }
 
+    fun setBackgroundImage(uri: Uri) {
+        _uiState.update { it.copy(backgroundImageUri = uri) }
+    }
+
     // IMPL: Cycle Blend Mode
     override fun onCycleBlendMode() {
         updateActiveLayer { layer ->

@@ -74,7 +74,6 @@ fun MainScreen(
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
     
     val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
 
     val navStrings = remember { 
         NavStrings(
@@ -115,8 +114,39 @@ fun MainScreen(
         uri?.let { editorViewModel.onAddLayer(it) } 
     }
     val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> 
-        // Background image selection logic moved to MainViewModel or EditorViewModel?
-        // MockupScreen handled it. We'll use a placeholder for now.
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    // Permissions
+    var hasCameraPermission by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasCameraPermission = permissions[android.Manifest.permission.CAMERA] ?: false
+    }
+
+    LaunchedEffect(Unit) {
+        permissionLauncher.launch(
+            arrayOf(
+                android.Manifest.permission.CAMERA,
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    if (!hasCameraPermission) {
+        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Camera permission is required for AR features.", color = Color.White, modifier = Modifier.padding(16.dp))
+                Button(onClick = {
+                    permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+                }) {
+                    Text("Grant Permission")
+                }
+            }
+        }
+        return
     }
 
     // Permissions
@@ -170,19 +200,15 @@ fun MainScreen(
             
             azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 editorViewModel.setEditorMode(EditorMode.AR)
             })
             azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 editorViewModel.setEditorMode(EditorMode.OVERLAY)
             })
             azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 editorViewModel.setEditorMode(EditorMode.STATIC)
             })
             azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 editorViewModel.setEditorMode(EditorMode.TRACE)
             })
             
@@ -191,7 +217,6 @@ fun MainScreen(
             if (editorUiState.editorMode == EditorMode.AR) {
                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
                 azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     localNavController.navigate("surveyor")
                     resetDialogs()
                 })
@@ -199,10 +224,17 @@ fun MainScreen(
             }
 
             azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
+
+            if (editorUiState.editorMode == EditorMode.STATIC) {
+                azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
+                    resetDialogs()
+                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+            }
+
             val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else navStrings.open
             val openButtonId = if (editorUiState.layers.isNotEmpty()) "add_layer" else "image"
             azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 resetDialogs()
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
@@ -212,7 +244,6 @@ fun MainScreen(
                 azRailRelocItem(
                     id = "layer_${layer.id}", hostId = "design_host", text = layer.name,
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
                     },
                     onRelocate = { _, _, newOrder -> editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed()) }
@@ -224,62 +255,51 @@ fun MainScreen(
 
             if (editorUiState.layers.isNotEmpty()) {
                 azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     editorViewModel.onRemoveBackgroundClicked()
                     resetDialogs()
                 })
                 azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     editorViewModel.onLineDrawingClicked()
                     resetDialogs()
                 })
                 azDivider()
                 azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
                     showColorBalanceDialog = false
                 }
                 azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     editorViewModel.onCycleBlendMode()
                     resetDialogs()
                 })
                 azRailSubToggle(id = "lock_image", hostId = "design_host", isChecked = editorUiState.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Prevent accidental moves", onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     editorViewModel.toggleImageLock()
                 })
             }
             azDivider()
             azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
             azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 localNavController.navigate("settings")
                 resetDialogs()
             }
             azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 localNavController.navigate("project_library")
                 resetDialogs()
             }
             azDivider()
             
             azRailItem(id = "help", text = "Help", info = "Show Help") {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 showInfoScreen = true
                 resetDialogs()
             }
             if (editorUiState.editorMode == EditorMode.AR) azRailItem(id = "ghost", text = "Ghost", info = "Toggle Point Cloud", onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 arViewModel.togglePointCloud()
                 resetDialogs()
             })
             if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 arViewModel.toggleFlashlight()
                 resetDialogs()
             })
             if (editorUiState.editorMode == EditorMode.TRACE) azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 viewModel.setTouchLocked(true)
                 resetDialogs()
             })
@@ -330,14 +350,13 @@ fun MainScreen(
                                     dashboardViewModel.openProject(it)
                                     localNavController.popBackStack()
                                 },
-                                onDeleteProject = { /* Implement delete */ },
+                                onDeleteProject = { /* TODO: Implement project deletion */ },
                                 onNewProject = {
                                     dashboardViewModel.onNewProject(editorUiState.isRightHanded)
                                     localNavController.popBackStack()
                                 }
                             )
                             AzButton(text = "Back", onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 localNavController.popBackStack()
                             }, modifier = Modifier.align(Alignment.TopStart).padding(16.dp))
                         }
@@ -408,7 +427,9 @@ fun MainContentLayer(
         when (editorUiState.editorMode) {
             EditorMode.STATIC -> MockupScreen(
                 uiState = editorUiState,
-                onBackgroundImageSelected = { },
+                onBackgroundImageSelected = {
+                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
                 onOverlayImageSelected = editorViewModel::onAddLayer,
                 onOpacityChanged = editorViewModel::onOpacityChanged,
                 onBrightnessChanged = editorViewModel::onBrightnessChanged,

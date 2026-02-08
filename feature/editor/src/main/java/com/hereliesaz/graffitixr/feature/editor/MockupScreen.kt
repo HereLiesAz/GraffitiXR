@@ -58,13 +58,19 @@ fun MockupScreen(
     val transformState = rememberLayerTransformState(activeLayer)
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Note: EditorUiState currently doesn't have backgroundImageUri. 
-        // If it's needed, it should be added to EditorUiState or passed as a parameter.
-        // For now, I'll keep the logic but it might need state adjustment.
+        uiState.backgroundImageUri?.let { uri ->
+            AsyncImage(
+                model = uri,
+                contentDescription = "Background",
+                modifier = Modifier.fillMaxSize().zIndex(0f),
+                contentScale = ContentScale.Fit
+            )
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .zIndex(1f)
                 .onSizeChanged { containerSize = it }
                 .clipToBounds()
                 // Layer 1: Double Tap (Global)
