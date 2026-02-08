@@ -63,8 +63,7 @@ fun MainScreen(
     val editorUiState by editorViewModel.uiState.collectAsState()
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
     
-    val context = LocalContext.current
-
+    // Removed duplicate context declaration
     val navStrings = remember { 
         NavStrings(
             modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
@@ -108,7 +107,16 @@ fun MainScreen(
     }
 
     // Permissions
-    var hasCameraPermission by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -264,13 +272,17 @@ fun MainScreen(
         // Background / Content Area
         background(weight = 0) {
              if (currentNavRoute == "editor" || currentNavRoute == null) {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.White else Color.Black
+                Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
                      MainContentLayer(
                          editorUiState = editorUiState,
                          arUiState = arUiState,
                          editorViewModel = editorViewModel,
                          arViewModel = arViewModel,
-                         onRendererCreated = onRendererCreated
+                         onRendererCreated = onRendererCreated,
+                         onPickBackground = {
+                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                         }
                     )
                 }
             } else {
@@ -324,7 +336,7 @@ fun MainScreen(
                                 updateStatus = "Up to date",
                                 isCheckingForUpdate = false,
                                 isRightHanded = editorUiState.isRightHanded,
-                                onHandednessChanged = { /* Implement hand preference change in DashboardViewModel or EditorViewModel */ },
+                                onHandednessChanged = { editorViewModel.toggleHandedness() },
                                 onCheckForUpdates = { },
                                 onInstallUpdate = { },
                                 onClose = { localNavController.popBackStack() }
@@ -363,12 +375,9 @@ fun MainContentLayer(
     arUiState: com.hereliesaz.graffitixr.feature.ar.ArUiState,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
-    onRendererCreated: (ArRenderer) -> Unit
+    onRendererCreated: (ArRenderer) -> Unit,
+    onPickBackground: () -> Unit
 ) {
-    val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let { editorViewModel.setBackgroundImage(it) }
-    }
-
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
         
         val onScale: (Float) -> Unit = editorViewModel::onScaleChanged
@@ -387,9 +396,7 @@ fun MainContentLayer(
         when (editorUiState.editorMode) {
             EditorMode.STATIC -> MockupScreen(
                 uiState = editorUiState,
-                onBackgroundImageSelected = {
-                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                },
+                onBackgroundImageSelected = { onPickBackground() },
                 onOverlayImageSelected = editorViewModel::onAddLayer,
                 onOpacityChanged = editorViewModel::onOpacityChanged,
                 onBrightnessChanged = editorViewModel::onBrightnessChanged,

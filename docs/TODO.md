@@ -163,9 +163,9 @@ All items completed. Ready for the next phase of development.
 
 ## 🟡 Medium Priority (Features)
 
-- [ ] **"Ghost" Toggle:** A button to toggle the rendered splats on/off. Sometimes the green dots get in the way of seeing the actual wall art.
-- [ ] **Fingerprint Aging:** The ORB descriptors should age out. If a wall changes significantly (painted over), the old fingerprint prevents re-localization. We need a "Force Rescan" button.
-- [ ] **Left-Handed Mode:** Invert the AzNavRail alignment in `MainScreen.kt`.
+- [x] **"Ghost" Toggle:** A button to toggle the rendered splats on/off. Sometimes the green dots get in the way of seeing the actual wall art.
+- [x] **Fingerprint Aging:** The ORB descriptors should age out. If a wall changes significantly (painted over), the old fingerprint prevents re-localization. We need a "Force Rescan" button.
+- [x] **Left-Handed Mode:** Invert the AzNavRail alignment in `MainScreen.kt`.
 
 ## 🟢 Low Priority (Polish)
 
