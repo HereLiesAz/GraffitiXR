@@ -38,7 +38,6 @@ import coil.request.ImageRequest
 @Composable
 fun MockupScreen(
     uiState: EditorUiState,
-    backgroundImageUri: Uri?,
     onBackgroundImageSelected: (Uri) -> Unit,
     onOverlayImageSelected: (Uri) -> Unit,
     onOpacityChanged: (Float) -> Unit,
@@ -59,15 +58,12 @@ fun MockupScreen(
     val transformState = rememberLayerTransformState(activeLayer)
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (backgroundImageUri != null) {
+        uiState.backgroundImageUri?.let { uri ->
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(backgroundImageUri)
-                    .crossfade(true)
-                    .build(),
+                model = uri,
                 contentDescription = "Background",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize().zIndex(0f),
+                contentScale = ContentScale.Fit
             )
         }
 

@@ -44,11 +44,7 @@ class MainActivity : ComponentActivity() {
                         editorViewModel = editorViewModel,
                         dashboardViewModel = dashboardViewModel,
                         navController = navController,
-                        onRendererCreated = { renderer ->
-                            // CRITICAL FIX: Only ArViewModel gets the renderer.
-                            // MainViewModel is no longer aware of AR implementation details.
-                            arViewModel.setArRenderer(renderer)
-                        }
+                        onRendererCreated = { /* Renderer lifecycle managed by ArView */ }
                     )
                 }
             }

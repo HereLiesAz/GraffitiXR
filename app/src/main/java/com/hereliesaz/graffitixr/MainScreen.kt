@@ -1,12 +1,5 @@
 package com.hereliesaz.graffitixr
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,9 +32,6 @@ import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.common.model.CaptureStep
-import com.hereliesaz.graffitixr.common.model.UiState as CommonUiState
-import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import com.hereliesaz.graffitixr.design.theme.NavStrings
@@ -74,19 +64,6 @@ fun MainScreen(
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
     
     val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            Toast.makeText(context, "Camera permission is required for AR", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        permissionLauncher.launch(android.Manifest.permission.CAMERA)
-    }
 
     val navStrings = remember { 
         NavStrings(
@@ -110,7 +87,7 @@ fun MainScreen(
             save = "Save", saveInfo = "Save to File",
             load = "Load", loadInfo = "Open Project",
             export = "Export", exportInfo = "Export Image",
-            help = "Help", helpInfo = "Manual",
+            help = "Help", helpInfo = "Guide",
             light = "Light", lightInfo = "Flashlight",
             lock = "Lock", lockInfo = "Touch Lock"
         )
@@ -128,6 +105,24 @@ fun MainScreen(
     }
     val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> 
         uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    // Permissions
+    var hasCameraPermission by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasCameraPermission = permissions[android.Manifest.permission.CAMERA] ?: false
+    }
+
+    val requestPermissions = {
+        permissionLauncher.launch(
+            arrayOf(
+                android.Manifest.permission.CAMERA,
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
 
     // Determine Rail Visibility
@@ -149,39 +144,37 @@ fun MainScreen(
             
             azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                editorViewModel.setEditorMode(EditorMode.AR)
+                if (hasCameraPermission) {
+                    editorViewModel.setEditorMode(EditorMode.AR)
+                } else {
+                    requestPermissions()
+                }
             })
             azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                editorViewModel.setEditorMode(EditorMode.OVERLAY)
+                if (hasCameraPermission) {
+                    editorViewModel.setEditorMode(EditorMode.OVERLAY)
+                } else {
+                    requestPermissions()
+                }
             })
             azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 editorViewModel.setEditorMode(EditorMode.STATIC)
             })
             azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 editorViewModel.setEditorMode(EditorMode.TRACE)
             })
-
+            
             azDivider()
-
-            if (editorUiState.editorMode == EditorMode.STATIC) {
-                azRailHostItem(id = "mockup_host", text = navStrings.grid, onClick = {})
-                azRailSubItem(id = "wall", hostId = "mockup_host", text = navStrings.wall, info = navStrings.wallInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    resetDialogs()
-                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                })
-                azDivider()
-            }
 
             if (editorUiState.editorMode == EditorMode.AR) {
                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
                 azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
-                    localNavController.navigate("surveyor")
-                    resetDialogs()
+                    if (hasCameraPermission) {
+                        localNavController.navigate("surveyor")
+                        resetDialogs()
+                    } else {
+                        requestPermissions()
+                    }
                 })
                 azDivider()
             }
@@ -367,11 +360,15 @@ fun MainScreen(
 @Composable
 fun MainContentLayer(
     editorUiState: EditorUiState,
-    arUiState: ArUiState,
+    arUiState: com.hereliesaz.graffitixr.feature.ar.ArUiState,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
+    val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
         
         val onScale: (Float) -> Unit = editorViewModel::onScaleChanged
@@ -390,8 +387,9 @@ fun MainContentLayer(
         when (editorUiState.editorMode) {
             EditorMode.STATIC -> MockupScreen(
                 uiState = editorUiState,
-                backgroundImageUri = editorUiState.backgroundImageUri,
-                onBackgroundImageSelected = { editorViewModel.setBackgroundImage(it) },
+                onBackgroundImageSelected = {
+                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
                 onOverlayImageSelected = editorViewModel::onAddLayer,
                 onOpacityChanged = editorViewModel::onOpacityChanged,
                 onBrightnessChanged = editorViewModel::onBrightnessChanged,
@@ -410,7 +408,6 @@ fun MainContentLayer(
             )
             EditorMode.OVERLAY -> OverlayScreen(
                 uiState = editorUiState, 
-                isFlashlightOn = arUiState.isFlashlightOn,
                 onCycleRotationAxis = onCycle, 
                 onGestureStart = onStart, 
                 onGestureEnd = onOverlayGestureEnd
@@ -427,12 +424,13 @@ fun MainContentLayer(
                             }
                         }
                 ) {
+                    // Check for permissions locally for the view, but the main check is at the button
+                    // Keep the view rendering if permitted, else blank (or handled by button)
                     ArView(viewModel = arViewModel, uiState = arUiState, onRendererCreated = onRendererCreated)
                 }
             }
             else -> OverlayScreen(
                 uiState = editorUiState, 
-                isFlashlightOn = arUiState.isFlashlightOn,
                 onCycleRotationAxis = onCycle, 
                 onGestureStart = onStart, 
                 onGestureEnd = onOverlayGestureEnd
