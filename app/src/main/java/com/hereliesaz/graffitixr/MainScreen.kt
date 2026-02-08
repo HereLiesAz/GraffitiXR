@@ -1,12 +1,5 @@
 package com.hereliesaz.graffitixr
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,15 +27,12 @@ import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.common.model.CaptureStep
-import com.hereliesaz.graffitixr.common.model.UiState as CommonUiState
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
-import com.hereliesaz.graffitixr.feature.ar.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.MappingScreen
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationFlow
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
@@ -265,7 +255,7 @@ fun MainScreen(
 @Composable
 fun MainContentLayer(
     editorUiState: EditorUiState,
-    arUiState: ArUiState,
+    arUiState: com.hereliesaz.graffitixr.feature.ar.ArUiState,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit

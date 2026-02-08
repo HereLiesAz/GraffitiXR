@@ -9,12 +9,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.hereliesaz.graffitixr.common.model.ArUiState
 
 @Composable
 fun ArView(
     viewModel: ArViewModel,
-    uiState: ArUiState,
+    uiState: com.hereliesaz.graffitixr.feature.ar.ArUiState,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val context = LocalContext.current
