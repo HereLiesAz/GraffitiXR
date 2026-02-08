@@ -31,6 +31,7 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
 import coil.imageLoader
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -73,31 +74,35 @@ fun MockupScreen(
                 .zIndex(1f)
                 .onSizeChanged { containerSize = it }
                 .clipToBounds()
-                // Layer 1: Double Tap (Global)
-                .pointerInput(Unit) {
-                    detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
-                }
                 // Layer 2: Smart Gestures (Targeting Active Layer)
                 .pointerInput(currentUiState.activeLayerId, currentUiState.layers.size) {
-                    detectSmartOverlayGestures(
-                        getValidBounds = {
-                            Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
-                        },
-                        onGestureStart = {
-                            transformState.isGesturing = true
-                            onGestureStart()
-                        },
-                        onGestureEnd = {
-                            transformState.isGesturing = false
-                            onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
+                    coroutineScope {
+                        launch {
+                            detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                         }
-                    ) { _, pan, zoom, rotation ->
-                        transformState.scale *= zoom
-                        transformState.offset += pan
-                        when (currentUiState.activeRotationAxis) {
-                            RotationAxis.X -> transformState.rotationX += rotation
-                            RotationAxis.Y -> transformState.rotationY += rotation
-                            RotationAxis.Z -> transformState.rotationZ += rotation
+
+                        launch {
+                            detectSmartOverlayGestures(
+                                getValidBounds = {
+                                    Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
+                                },
+                                onGestureStart = {
+                                    transformState.isGesturing = true
+                                    onGestureStart()
+                                },
+                                onGestureEnd = {
+                                    transformState.isGesturing = false
+                                    onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
+                                }
+                            ) { _, pan, zoom, rotation ->
+                                transformState.scale *= zoom
+                                transformState.offset += pan
+                                when (currentUiState.activeRotationAxis) {
+                                    RotationAxis.X -> transformState.rotationX += rotation
+                                    RotationAxis.Y -> transformState.rotationY += rotation
+                                    RotationAxis.Z -> transformState.rotationZ += rotation
+                                }
+                            }
                         }
                     }
                 }
@@ -125,38 +130,7 @@ fun MockupScreen(
 
                     // Calculate color matrix for THIS layer
                     val layerColorMatrix = remember(layer.saturation, layer.contrast, layer.brightness, layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB) {
-                        ColorMatrix().apply {
-                            setToSaturation(layer.saturation)
-                            val c = layer.contrast
-                            val contrastMatrix = ColorMatrix(
-                                floatArrayOf(
-                                    c, 0f, 0f, 0f, (1 - c) * 128,
-                                    0f, c, 0f, 0f, (1 - c) * 128,
-                                    0f, 0f, c, 0f, (1 - c) * 128,
-                                    0f, 0f, 0f, 1f, 0f
-                                )
-                            )
-                            val b = layer.brightness * 255f
-                            val brightnessMatrix = ColorMatrix(
-                                floatArrayOf(
-                                    1f, 0f, 0f, 0f, b,
-                                    0f, 1f, 0f, 0f, b,
-                                    0f, 0f, 1f, 0f, b,
-                                    0f, 0f, 0f, 1f, 0f
-                                )
-                            )
-                            val colorBalanceMatrix = ColorMatrix(
-                                floatArrayOf(
-                                    layer.colorBalanceR, 0f, 0f, 0f, 0f,
-                                    0f, layer.colorBalanceG, 0f, 0f, 0f,
-                                    0f, 0f, layer.colorBalanceB, 0f, 0f,
-                                    0f, 0f, 0f, 1f, 0f
-                                )
-                            )
-                            timesAssign(contrastMatrix)
-                            timesAssign(brightnessMatrix)
-                            timesAssign(colorBalanceMatrix)
-                        }
+                        createColorMatrix(layer.saturation, layer.contrast, layer.brightness, layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB)
                     }
 
                     layerBitmap?.let { bmp ->

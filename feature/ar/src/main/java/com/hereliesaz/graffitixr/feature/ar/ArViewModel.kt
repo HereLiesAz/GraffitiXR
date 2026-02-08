@@ -7,13 +7,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ArViewModel(application: Application, private val projectRepository: ProjectRepository) : AndroidViewModel(application) {
+@HiltViewModel
+class ArViewModel @Inject constructor(
+    application: Application,
+    private val projectRepository: ProjectRepository
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
