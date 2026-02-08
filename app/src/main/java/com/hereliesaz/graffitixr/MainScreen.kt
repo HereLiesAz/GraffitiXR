@@ -15,6 +15,9 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
+import androidx.compose.material3.Button
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -116,6 +119,38 @@ fun MainScreen(
         // MockupScreen handled it. We'll use a placeholder for now.
     }
 
+    // Permissions
+    var hasCameraPermission by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasCameraPermission = permissions[android.Manifest.permission.CAMERA] ?: false
+    }
+
+    LaunchedEffect(Unit) {
+        permissionLauncher.launch(
+            arrayOf(
+                android.Manifest.permission.CAMERA,
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    if (!hasCameraPermission) {
+        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Camera permission is required for AR features.", color = Color.White, modifier = Modifier.padding(16.dp))
+                Button(onClick = {
+                    permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+                }) {
+                    Text("Grant Permission")
+                }
+            }
+        }
+        return
+    }
+
     // Determine Rail Visibility
     val isRailVisible = !editorUiState.hideUiForCapture && !uiState.isTouchLocked
 
@@ -136,8 +171,20 @@ fun MainScreen(
             azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                editorViewModel.onLineDrawingClicked()
-            }) // Temporary mapping
+                editorViewModel.setEditorMode(EditorMode.AR)
+            })
+            azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                editorViewModel.setEditorMode(EditorMode.OVERLAY)
+            })
+            azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                editorViewModel.setEditorMode(EditorMode.STATIC)
+            })
+            azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                editorViewModel.setEditorMode(EditorMode.TRACE)
+            })
             
             azDivider()
 
