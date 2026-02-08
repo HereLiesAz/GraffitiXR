@@ -1,5 +1,6 @@
 plugins {
     id("com.android.library")
+    alias(libs.plugins.jetbrains.kotlin.compose)
 }
 
 android {
@@ -11,7 +12,7 @@ android {
     }
 
     buildFeatures {
-        compose = false
+        compose = true
     }
 
 }

@@ -107,7 +107,7 @@ class ProjectManager(
 
             // Load Target Bitmaps
             val targetBitmaps = projectData.targetImageUris.mapNotNull { uri ->
-                ImageUtils.loadBitmapFromUri(context, uri)
+                ImageUtils.getBitmapFromUri(context, uri)
             }
 
             LoadedProject(projectData, targetBitmaps)
