@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.UUID
 
 class EditorViewModel : ViewModel(), EditorActions {
 
@@ -131,6 +133,20 @@ class EditorViewModel : ViewModel(), EditorActions {
         }
     }
 
+    override fun onAddLayer(uri: Uri) {
+        val newLayer = OverlayLayer(
+            id = UUID.randomUUID().toString(),
+            name = "Layer ${_uiState.value.layers.size + 1}",
+            uri = uri
+        )
+        _uiState.update { state ->
+            state.copy(
+                layers = state.layers + newLayer,
+                activeLayerId = newLayer.id
+            )
+        }
+    }
+
     override fun copyLayerModifications(id: String) {
         // TODO
     }
@@ -140,23 +156,23 @@ class EditorViewModel : ViewModel(), EditorActions {
     }
 
     override fun onScaleChanged(s: Float) {
-        updateActiveLayer { it.copy(scale = s) }
+        updateActiveLayer { it.copy(scale = it.scale * s) }
     }
 
     override fun onOffsetChanged(o: Offset) {
-        updateActiveLayer { it.copy(offset = o) }
+        updateActiveLayer { it.copy(offset = it.offset + o) }
     }
 
     override fun onRotationXChanged(d: Float) {
-        updateActiveLayer { it.copy(rotationX = d) }
+        updateActiveLayer { it.copy(rotationX = it.rotationX + d) }
     }
 
     override fun onRotationYChanged(d: Float) {
-        updateActiveLayer { it.copy(rotationY = d) }
+        updateActiveLayer { it.copy(rotationY = it.rotationY + d) }
     }
 
     override fun onRotationZChanged(d: Float) {
-        updateActiveLayer { it.copy(rotationZ = d) }
+        updateActiveLayer { it.copy(rotationZ = it.rotationZ + d) }
     }
 
     override fun onCycleRotationAxis() {

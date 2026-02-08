@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 
 interface EditorActions {
@@ -25,6 +26,8 @@ interface EditorActions {
     fun onLayerReordered(newOrder: List<String>)
     fun onLayerDuplicated(id: String)
     fun onLayerRemoved(id: String)
+    
+    fun onAddLayer(uri: Uri)
     
     fun copyLayerModifications(id: String)
     fun pasteLayerModifications(id: String)

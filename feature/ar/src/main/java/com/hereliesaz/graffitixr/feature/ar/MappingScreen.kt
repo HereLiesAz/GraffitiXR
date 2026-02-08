@@ -12,6 +12,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
@@ -29,6 +31,7 @@ fun MappingScreen(
     onRendererCreated: (ArRenderer) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
@@ -81,13 +84,12 @@ fun MappingScreen(
         modifier = Modifier.fillMaxSize(),
         navController = navController
     ) {
-            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
             azConfig(
                 displayAppName = true,
                 dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
             )
             azRailItem(id = "back", text = "Abort", onClick = {
-                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onExit()
             })
 

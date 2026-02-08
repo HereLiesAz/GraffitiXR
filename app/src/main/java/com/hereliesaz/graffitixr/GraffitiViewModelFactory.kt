@@ -21,11 +21,11 @@ class GraffitiViewModelFactory(
             }
             modelClass.isAssignableFrom(EditorViewModel::class.java) -> {
                 @Suppress("UNCHECKED_CAST")
-                EditorViewModel(projectRepository) as T
+                EditorViewModel() as T
             }
             modelClass.isAssignableFrom(ArViewModel::class.java) -> {
                 @Suppress("UNCHECKED_CAST")
-                ArViewModel(projectRepository) as T
+                ArViewModel(application, projectRepository) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
