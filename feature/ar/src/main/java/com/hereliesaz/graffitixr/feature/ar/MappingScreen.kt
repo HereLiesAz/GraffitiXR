@@ -89,8 +89,11 @@ fun MappingScreen(
                 dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
             )
             azRailItem(id = "back", text = "Abort", onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onExit()
+            })
+
+            azRailItem(id = "rescan", text = "Rescan", info = "Clear Map", onClick = {
+                slamManager.clearMap()
             })
 
             background(weight = 0) {

@@ -3,7 +3,9 @@ package com.hereliesaz.graffitixr.data.di
 import android.content.Context
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
+import com.hereliesaz.graffitixr.data.repository.SettingsRepositoryImpl
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,19 +20,27 @@ object DataModule {
     @Provides
     @Singleton
     fun provideProjectRepository(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        projectManager: ProjectManager
     ): ProjectRepository {
-        return ProjectRepositoryImpl(context)
+        return ProjectRepositoryImpl(context, projectManager)
     }
 
     @Provides
     @Singleton
     fun provideProjectManager(
-        @ApplicationContext context: Context,
-        repository: ProjectRepository
+        @ApplicationContext context: Context
     ): ProjectManager {
         // Bridging legacy ProjectManager to use the new Repository
         // This keeps MainViewModel happy without rewriting it entirely yet
-        return ProjectManager(context, repository)
+        return ProjectManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSettingsRepository(
+        @ApplicationContext context: Context
+    ): SettingsRepository {
+        return SettingsRepositoryImpl(context)
     }
 }

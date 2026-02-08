@@ -8,16 +8,32 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.UUID
+import javax.inject.Inject
 
-class EditorViewModel : ViewModel(), EditorActions {
+@HiltViewModel
+class EditorViewModel @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            settingsRepository.isRightHanded.collectLatest { isRight ->
+                _uiState.update { it.copy(isRightHanded = isRight) }
+            }
+        }
+    }
 
     private fun updateActiveLayer(update: (OverlayLayer) -> OverlayLayer) {
         _uiState.update { state ->
@@ -74,6 +90,21 @@ class EditorViewModel : ViewModel(), EditorActions {
 
     override fun onLineDrawingClicked() {
         _uiState.update { it.copy(editorMode = EditorMode.DRAW) }
+    }
+
+    fun setEditorMode(mode: EditorMode) {
+        _uiState.update { it.copy(editorMode = mode) }
+    }
+
+    fun setBackgroundImage(uri: Uri) {
+        _uiState.update { it.copy(backgroundImageUri = uri) }
+    }
+
+    fun toggleHandedness() {
+        viewModelScope.launch {
+            val current = _uiState.value.isRightHanded
+            settingsRepository.setRightHanded(!current)
+        }
     }
 
     // IMPL: Cycle Blend Mode

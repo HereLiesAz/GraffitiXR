@@ -1,6 +1,8 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -42,4 +44,7 @@ dependencies {
     // MLKit
     implementation(libs.mlkit.subject.segmentation)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 }
