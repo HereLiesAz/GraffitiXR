@@ -15,11 +15,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.TargetCreationMode
-import com.hereliesaz.graffitixr.common.model.UiState
 
 @Composable
 fun TargetCreationOverlay(
-    uiState: UiState,
+    uiState: ArUiState,
     onCapture: () -> Unit,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
@@ -45,11 +44,7 @@ fun TargetCreationOverlay(
                     .padding(8.dp)
             ) {
                 Text(
-                    text = when (uiState.targetCreationMode) {
-                        TargetCreationMode.SINGLE_IMAGE -> "Capture flat target"
-                        TargetCreationMode.GUIDED_GRID -> "Align grid with wall"
-                        else -> "Calibrate target"
-                    },
+                    text = "Capture target",
                     color = Color.White
                 )
             }
@@ -58,18 +53,7 @@ fun TargetCreationOverlay(
         }
 
         // Guide Overlay (viewfinder box)
-        if (uiState.captureStep == CaptureStep.CAPTURE) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(48.dp)
-                    .align(Alignment.Center)
-                    .background(Color.Transparent)
-            ) {
-                // In a future update, draw a viewfinder outline here.
-                // Currently relies on the AR camera feed behind this overlay.
-            }
-        }
+        // Note: CaptureStep is handled in the parent for visibility
 
         // Bottom Bar: Controls
         Row(
@@ -80,30 +64,19 @@ fun TargetCreationOverlay(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (uiState.captureStep == CaptureStep.PREVIEW || uiState.captureStep == CaptureStep.CAPTURE) {
-                // Shutter Button
-                Button(
-                    onClick = onCapture,
-                    shape = CircleShape,
-                    modifier = Modifier.size(80.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Camera,
-                        contentDescription = "Capture",
-                        tint = Color.Black,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-            } else if (uiState.captureStep == CaptureStep.CONFIRM) {
-                // Confirm/Retake
-                IconButton(onClick = onRetake, modifier = Modifier.size(64.dp)) {
-                    Icon(Icons.Default.Refresh, "Retake", tint = Color.White, modifier = Modifier.size(32.dp))
-                }
-
-                Button(onClick = onConfirm) {
-                    Text("Confirm Target")
-                }
+            // Shutter Button
+            Button(
+                onClick = onCapture,
+                shape = CircleShape,
+                modifier = Modifier.size(80.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Camera,
+                    contentDescription = "Capture",
+                    tint = Color.Black,
+                    modifier = Modifier.size(40.dp)
+                )
             }
         }
     }

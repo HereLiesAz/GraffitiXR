@@ -1,6 +1,9 @@
 package com.hereliesaz.graffitixr.natives
 
 import android.content.res.AssetManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * JNI Bridge to the MobileGS C++ Engine.
@@ -14,6 +17,9 @@ class SlamManager {
             System.loadLibrary("mobile_gs_jni")
         }
     }
+
+    private val _mappingQuality = MutableStateFlow(0f)
+    val mappingQuality: StateFlow<Float> = _mappingQuality.asStateFlow()
 
     /**
      * Initialize the native engine.
@@ -54,4 +60,9 @@ class SlamManager {
      * Clean up native resources.
      */
     external fun destroy()
+
+    /**
+     * Save the current world map to a file.
+     */
+    external fun saveWorld(path: String): Boolean
 }

@@ -122,14 +122,15 @@ class EditorViewModel(
 
     // IMPL: Background Removal
     override fun onRemoveBackgroundClicked() {
-        val activeLayer = _uiState.value.activeLayer ?: return
+        val activeId = _uiState.value.activeLayerId ?: return
+        val activeLayer = _uiState.value.layers.find { it.id == activeId } ?: return
         val context = getApplication<Application>().applicationContext
 
         viewModelScope.launch {
             // Signal UI loading if needed (e.g., via a transient state or toast)
             try {
                 // 1. Load Bitmap
-                val originalBitmap = BitmapUtils.getBitmapFromUri(context, activeLayer.uri)
+                val originalBitmap = com.hereliesaz.graffitixr.common.util.ImageUtils.getBitmapFromUri(context, activeLayer.uri)
                 if (originalBitmap != null) {
                     // 2. Remove Background (MLKit)
                     val processedBitmap = BackgroundRemover.removeBackground(context, originalBitmap)
@@ -157,7 +158,8 @@ class EditorViewModel(
     // IMPL: Cycle Blend Mode
     override fun onCycleBlendMode() {
         updateActiveLayer {
-            it.copy(blendMode = ImageUtils.getNextBlendMode(it.blendMode))
+            val nextModeName = ImageUtils.getNextBlendMode(it.blendMode.toString())
+            it.copy(blendMode = androidx.compose.ui.graphics.BlendMode.valueOf(nextModeName))
         }
     }
 

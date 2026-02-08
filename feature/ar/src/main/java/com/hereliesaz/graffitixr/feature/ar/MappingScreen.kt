@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import android.app.Activity
 import android.opengl.GLSurfaceView
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
@@ -19,12 +18,8 @@ import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzDockingSide
-import com.hereliesaz.graffitixr.natives.SlamManager
 import kotlinx.coroutines.launch
-import com.google.ar.core.Anchor
-import com.google.ar.core.Pose
 import com.google.ar.core.Session
-import com.google.ar.core.TrackingState
 import java.util.UUID
 
 @Composable
@@ -41,7 +36,6 @@ fun MappingScreen(
     val isRightHanded = remember { prefs.getBoolean("is_right_handed", true) }
 
     var glSurfaceView by remember { mutableStateOf<GLSurfaceView?>(null) }
-    val latestCameraPose = remember { mutableStateOf<Pose?>(null) }
     val isMappingState = remember { mutableStateOf(true) }
     var isMapping by isMappingState
 
@@ -61,11 +55,11 @@ fun MappingScreen(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    arRenderer.onResume()
+                    arRenderer.onResume(lifecycleOwner)
                     glSurfaceView?.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    arRenderer.onPause()
+                    arRenderer.onPause(lifecycleOwner)
                     glSurfaceView?.onPause()
                 }
                 Lifecycle.Event.ON_DESTROY -> arRenderer.cleanup()
@@ -75,7 +69,7 @@ fun MappingScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            arRenderer.onPause()
+            arRenderer.onPause(lifecycleOwner)
             glSurfaceView?.onPause()
             arRenderer.cleanup()
         }

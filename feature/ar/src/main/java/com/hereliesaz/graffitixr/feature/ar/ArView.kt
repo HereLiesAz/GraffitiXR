@@ -32,16 +32,16 @@ fun ArView(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> arRenderer.onResume()
-                Lifecycle.Event.ON_PAUSE -> arRenderer.onPause()
-                Lifecycle.Event.ON_DESTROY -> arRenderer.onDestroy()
+                Lifecycle.Event.ON_RESUME -> arRenderer.onResume(lifecycleOwner)
+                Lifecycle.Event.ON_PAUSE -> arRenderer.onPause(lifecycleOwner)
+                Lifecycle.Event.ON_DESTROY -> arRenderer.cleanup()
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            arRenderer.onDestroy()
+            arRenderer.cleanup()
         }
     }
 

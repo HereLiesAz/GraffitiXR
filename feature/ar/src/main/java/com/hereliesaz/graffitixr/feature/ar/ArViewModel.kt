@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,7 +44,6 @@ class ArViewModel(application: Application, private val projectRepository: Proje
         viewModelScope.launch {
             // For now, we update state to indicate a capture happened
             _uiState.update {
-                // In a real scenario, we'd append the new image URI to capturedTargetUris
                 it.copy(
                     isArTargetCreated = true,
                     capturedTargetUris = it.capturedTargetUris + uri,

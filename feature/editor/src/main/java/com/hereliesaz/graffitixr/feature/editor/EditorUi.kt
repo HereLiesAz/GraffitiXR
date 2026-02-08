@@ -5,14 +5,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.common.model.TapFeedback
 import com.hereliesaz.graffitixr.feature.editor.ui.GestureFeedback
 import com.hereliesaz.graffitixr.feature.editor.ui.RotationAxisFeedback
@@ -26,40 +24,34 @@ import com.hereliesaz.graffitixr.design.components.TapFeedbackEffect
 @Composable
 fun EditorUi(
     actions: EditorActions,
-    uiState: UiState,
+    uiState: EditorUiState,
     tapFeedback: TapFeedback?,
-    showSliderDialog: String?,
-    showColorBalanceDialog: Boolean,
-    gestureInProgress: Boolean
+    isTouchLocked: Boolean,
+    showUnlockInstructions: Boolean
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val topSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
     val bottomSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
 
+    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. Status Overlays
-        if (uiState.editorMode == EditorMode.AR && !uiState.isCapturingTarget && !uiState.hideUiForCapture) {
-            StatusOverlay(
-                uiState.qualityWarning,
-                uiState.arState,
-                uiState.isArPlanesDetected,
-                uiState.isArTargetCreated,
-                Modifier.align(Alignment.TopCenter).padding(top = topSafePadding).zIndex(10f)
-            )
-        }
+        // Note: statusOverlay removed for now, as it requires AR state which is no longer in EditorUiState
+        // If needed, it should be passed in as a separate parameter or provided via a different state.
 
         // 2. Gesture Feedback
-        if (!uiState.isTouchLocked && !uiState.hideUiForCapture) {
+        if (!isTouchLocked) {
             GestureFeedback(
                 uiState,
                 Modifier.align(Alignment.TopCenter).padding(top = topSafePadding + 20.dp).zIndex(3f),
-                gestureInProgress
+                uiState.gestureInProgress
             )
         }
 
         // 3. Drawing Canvas
-        if (uiState.isMarkingProgress) {
+        if (uiState.editorMode == EditorMode.DRAW) {
             DrawingCanvas(uiState.drawingPaths, actions::onDrawingPathFinished)
         }
 
@@ -69,19 +61,19 @@ fun EditorUi(
             contentAlignment = Alignment.BottomCenter
         ) {
             val adjustmentsState = AdjustmentsState(
-                hideUiForCapture = uiState.hideUiForCapture,
-                isTouchLocked = uiState.isTouchLocked,
-                hasImage = uiState.activeLayer != null,
+                hideUiForCapture = false, // Placeholder
+                isTouchLocked = isTouchLocked,
+                hasImage = activeLayer != null,
                 isArMode = uiState.editorMode == EditorMode.AR,
-                hasHistory = uiState.canUndo || uiState.canRedo,
+                hasHistory = true, // Placeholder
                 isRightHanded = uiState.isRightHanded,
-                activeLayer = uiState.activeLayer
+                activeLayer = activeLayer
             )
 
             AdjustmentsPanel(
                 state = adjustmentsState,
-                showKnobs = showSliderDialog == "Adjust",
-                showColorBalance = showColorBalanceDialog,
+                showKnobs = uiState.sliderDialogType != null,
+                showColorBalance = uiState.showColorBalanceDialog,
                 isLandscape = isLandscape,
                 screenHeight = configuration.screenHeightDp.dp,
                 onOpacityChange = actions::onOpacityChanged,
@@ -102,7 +94,7 @@ fun EditorUi(
             OnboardingDialog(mode) { actions.onOnboardingComplete(mode) }
         }
 
-        if (!uiState.hideUiForCapture && !uiState.isTouchLocked) {
+        if (!isTouchLocked) {
             RotationAxisFeedback(
                 uiState.activeRotationAxis,
                 uiState.showRotationAxisFeedback,
@@ -115,7 +107,7 @@ fun EditorUi(
                 DoubleTapHintDialog(actions::onDoubleTapHintDismissed)
             }
 
-            if (uiState.isMarkingProgress) {
+            if (uiState.editorMode == EditorMode.DRAW) {
                 Text(
                     "Progress: %.2f%%".format(uiState.progressPercentage),
                     Modifier.align(Alignment.TopCenter).padding(top = topSafePadding).zIndex(3f)
