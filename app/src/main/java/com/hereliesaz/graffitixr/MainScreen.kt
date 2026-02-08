@@ -1,5 +1,12 @@
 package com.hereliesaz.graffitixr
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,6 +39,9 @@ import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.model.UiState as CommonUiState
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import com.hereliesaz.graffitixr.design.theme.NavStrings
@@ -87,7 +97,7 @@ fun MainScreen(
             save = "Save", saveInfo = "Save to File",
             load = "Load", loadInfo = "Open Project",
             export = "Export", exportInfo = "Export Image",
-            help = "Help", helpInfo = "Guide",
+            help = "Help", helpInfo = "Manual",
             light = "Light", lightInfo = "Flashlight",
             lock = "Lock", lockInfo = "Touch Lock"
         )
@@ -105,6 +115,38 @@ fun MainScreen(
     }
     val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> 
         uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    // Permissions
+    var hasCameraPermission by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasCameraPermission = permissions[android.Manifest.permission.CAMERA] ?: false
+    }
+
+    LaunchedEffect(Unit) {
+        permissionLauncher.launch(
+            arrayOf(
+                android.Manifest.permission.CAMERA,
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    if (!hasCameraPermission) {
+        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Camera permission is required for AR features.", color = Color.White, modifier = Modifier.padding(16.dp))
+                Button(onClick = {
+                    permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+                }) {
+                    Text("Grant Permission")
+                }
+            }
+        }
+        return
     }
 
     // Permissions
@@ -362,7 +404,7 @@ fun MainScreen(
 @Composable
 fun MainContentLayer(
     editorUiState: EditorUiState,
-    arUiState: com.hereliesaz.graffitixr.feature.ar.ArUiState,
+    arUiState: ArUiState,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit

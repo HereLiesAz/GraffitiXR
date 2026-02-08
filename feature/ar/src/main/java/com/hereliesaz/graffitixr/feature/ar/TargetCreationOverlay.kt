@@ -6,15 +6,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.common.model.CaptureStep
-import com.hereliesaz.graffitixr.common.model.TargetCreationMode
+import com.hereliesaz.graffitixr.common.model.ArUiState
 
 @Composable
 fun TargetCreationOverlay(
@@ -51,9 +49,6 @@ fun TargetCreationOverlay(
             // Spacer to balance the row
             Spacer(modifier = Modifier.size(48.dp))
         }
-
-        // Guide Overlay (viewfinder box)
-        // Note: CaptureStep is handled in the parent for visibility
 
         // Bottom Bar: Controls
         Row(
