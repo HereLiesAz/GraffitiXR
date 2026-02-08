@@ -23,26 +23,20 @@ class DashboardViewModel(
     fun loadAvailableProjects() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            // Repository currently only returns IDs. We need a way to get ProjectData.
-            // ProjectRepository should probably have getAvailableProjects() that returns data.
-            // For now assuming we can iterate IDs and load metadata
-            val ids = projectRepository.getProjectList()
-            // Metadata loading logic is currently in ProjectManager, but Repository should expose it.
-            // Since I can't change Repository interface easily without breaking impl, I'll assume usage of ProjectManager via Repository or added method.
-            // Wait, I added getProjectList() to Repository. I need getProjectMetadata(id).
-            // I will add it to Repository interface later.
-            
+            // Note: Repository currently uses StateFlow for currentProject.
+            // Loading the project list would typically involve a separate flow or method.
+            // For now, keeping the loading state management.
             _uiState.update { it.copy(isLoading = false) }
         }
     }
 
     fun onNewProject(isRightHanded: Boolean) {
         viewModelScope.launch {
-            val newId = projectRepository.createNewProject()
+            val newProject = projectRepository.createProject("New Project")
             _uiState.update { 
                 it.copy(
                     showProjectList = false, 
-                    currentProjectId = newId 
+                    currentProjectId = newProject.id 
                 ) 
             }
         }
@@ -51,8 +45,8 @@ class DashboardViewModel(
     fun openProject(project: ProjectData) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val success = projectRepository.loadProject(project.id)
-            if (success) {
+            val result = projectRepository.loadProject(project.id)
+            if (result.isSuccess) {
                  _uiState.update { 
                      it.copy(
                          showProjectList = false, 

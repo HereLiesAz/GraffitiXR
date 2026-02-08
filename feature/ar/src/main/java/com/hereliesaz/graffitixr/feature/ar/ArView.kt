@@ -6,10 +6,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.common.model.ArUiState
 
 @Composable
@@ -56,9 +55,8 @@ fun ArView(
         arRenderer.setFlashlight(uiState.isFlashlightOn)
     }
 
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { ctx ->
+    val factory = remember(arRenderer) {
+        { ctx: android.content.Context ->
             FrameLayout(ctx).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -67,5 +65,10 @@ fun ArView(
                 addView(arRenderer.view)
             }
         }
+    }
+
+    androidx.compose.ui.viewinterop.AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = factory
     )
 }
