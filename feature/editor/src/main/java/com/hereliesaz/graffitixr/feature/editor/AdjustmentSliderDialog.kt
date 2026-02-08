@@ -38,6 +38,9 @@ fun AdjustmentSliderDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        // Using manual layout containers to avoid potential compiler issues with inline functions in this context
+        // although the issue might be related to the build environment or compose compiler version.
+        // I will try to simplify the structure slightly.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -46,11 +49,14 @@ fun AdjustmentSliderDialog(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(text = title, style = MaterialTheme.typography.titleMedium)
+            
             Slider(
                 value = value,
                 onValueChange = onValueChange,
-                valueRange = valueRange
+                valueRange = valueRange,
+                modifier = Modifier.fillMaxWidth()
             )
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween

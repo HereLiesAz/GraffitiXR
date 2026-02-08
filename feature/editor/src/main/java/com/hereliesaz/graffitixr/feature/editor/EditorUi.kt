@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.TapFeedback
+import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.feature.editor.ui.GestureFeedback
 import com.hereliesaz.graffitixr.feature.editor.ui.RotationAxisFeedback
 import com.hereliesaz.graffitixr.feature.editor.ui.StatusOverlay
@@ -43,8 +44,14 @@ fun EditorUi(
 
         // 2. Gesture Feedback
         if (!isTouchLocked) {
+            // Mapping EditorUiState to common UiState for GestureFeedback
+            val bridgeState = UiState(
+                layers = uiState.layers,
+                activeLayerId = uiState.activeLayerId,
+                activeRotationAxis = uiState.activeRotationAxis
+            )
             GestureFeedback(
-                uiState = uiState,
+                uiState = bridgeState,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = topSafePadding + 20.dp).zIndex(3f),
                 isVisible = uiState.gestureInProgress
             )

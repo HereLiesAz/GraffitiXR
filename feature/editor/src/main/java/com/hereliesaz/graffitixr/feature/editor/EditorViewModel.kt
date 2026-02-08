@@ -26,32 +26,32 @@ class EditorViewModel : ViewModel(), EditorActions {
         }
     }
 
-    override fun onOpacityChanged(opacity: Float) {
-        updateActiveLayer { it.copy(opacity = opacity) }
+    override fun onOpacityChanged(v: Float) {
+        updateActiveLayer { it.copy(opacity = v) }
     }
 
-    override fun onBrightnessChanged(brightness: Float) {
-        updateActiveLayer { it.copy(brightness = brightness) }
+    override fun onBrightnessChanged(v: Float) {
+        updateActiveLayer { it.copy(brightness = v) }
     }
 
-    override fun onContrastChanged(contrast: Float) {
-        updateActiveLayer { it.copy(contrast = contrast) }
+    override fun onContrastChanged(v: Float) {
+        updateActiveLayer { it.copy(contrast = v) }
     }
 
-    override fun onSaturationChanged(saturation: Float) {
-        updateActiveLayer { it.copy(saturation = saturation) }
+    override fun onSaturationChanged(v: Float) {
+        updateActiveLayer { it.copy(saturation = v) }
     }
 
-    override fun onColorBalanceRChanged(value: Float) {
-        updateActiveLayer { it.copy(colorBalanceR = value) }
+    override fun onColorBalanceRChanged(v: Float) {
+        updateActiveLayer { it.copy(colorBalanceR = v) }
     }
 
-    override fun onColorBalanceGChanged(value: Float) {
-        updateActiveLayer { it.copy(colorBalanceG = value) }
+    override fun onColorBalanceGChanged(v: Float) {
+        updateActiveLayer { it.copy(colorBalanceG = v) }
     }
 
-    override fun onColorBalanceBChanged(value: Float) {
-        updateActiveLayer { it.copy(colorBalanceB = value) }
+    override fun onColorBalanceBChanged(v: Float) {
+        updateActiveLayer { it.copy(colorBalanceB = v) }
     }
 
     override fun onUndoClicked() {
@@ -66,20 +66,8 @@ class EditorViewModel : ViewModel(), EditorActions {
         // TODO: Implement magic alignment logic
     }
 
-    override fun onFeedbackShown() {
-        _uiState.update { it.copy(showRotationAxisFeedback = false) }
-    }
-
-    override fun onOnboardingComplete(mode: EditorMode) {
-        _uiState.update { it.copy(showOnboardingDialogForMode = null) }
-    }
-
-    override fun onDoubleTapHintDismissed() {
-        _uiState.update { it.copy(showDoubleTapHint = false) }
-    }
-
-    override fun onDrawingPathFinished(path: List<Offset>) {
-        _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(path)) }
+    override fun onRemoveBackgroundClicked() {
+        // TODO: Implement background removal
     }
 
     override fun onLineDrawingClicked() {
@@ -90,31 +78,22 @@ class EditorViewModel : ViewModel(), EditorActions {
     override fun onCycleBlendMode() {
         updateActiveLayer { layer ->
             val nextModeName = ImageUtils.getNextBlendMode(layer.blendMode.toString())
-            val nextMode = try {
-                // Compose BlendMode is an internal-like class, valueOf doesn't exist.
-                // We should ideally map from string or use a custom enum.
-                // For now, let's use a simple mapping or fallback.
-                when (nextModeName) {
-                    "SrcOver" -> androidx.compose.ui.graphics.BlendMode.SrcOver
-                    "Multiply" -> androidx.compose.ui.graphics.BlendMode.Multiply
-                    "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
-                    "Overlay" -> androidx.compose.ui.graphics.BlendMode.Overlay
-                    "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
-                    "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
-                    "ColorDodge" -> androidx.compose.ui.graphics.BlendMode.ColorDodge
-                    "ColorBurn" -> androidx.compose.ui.graphics.BlendMode.ColorBurn
-                    "HardLight" -> androidx.compose.ui.graphics.BlendMode.HardLight
-                    "SoftLight" -> androidx.compose.ui.graphics.BlendMode.SoftLight
-                    "Difference" -> androidx.compose.ui.graphics.BlendMode.Difference
-                    "Exclusion" -> androidx.compose.ui.graphics.BlendMode.Exclusion
-                    "Hue" -> androidx.compose.ui.graphics.BlendMode.Hue
-                    "Saturation" -> androidx.compose.ui.graphics.BlendMode.Saturation
-                    "Color" -> androidx.compose.ui.graphics.BlendMode.Color
-                    "Luminosity" -> androidx.compose.ui.graphics.BlendMode.Luminosity
-                    else -> androidx.compose.ui.graphics.BlendMode.SrcOver
-                }
-            } catch (e: Exception) {
-                androidx.compose.ui.graphics.BlendMode.SrcOver
+            val nextMode = when (nextModeName) {
+                "SrcOver" -> androidx.compose.ui.graphics.BlendMode.SrcOver
+                "Multiply" -> androidx.compose.ui.graphics.BlendMode.Multiply
+                "Screen" -> androidx.compose.ui.graphics.BlendMode.Screen
+                "Overlay" -> androidx.compose.ui.graphics.BlendMode.Overlay
+                "Darken" -> androidx.compose.ui.graphics.BlendMode.Darken
+                "Lighten" -> androidx.compose.ui.graphics.BlendMode.Lighten
+                "ColorDodge" -> androidx.compose.ui.graphics.BlendMode.ColorDodge
+                "ColorBurn" -> androidx.compose.ui.graphics.BlendMode.ColorBurn
+                "Difference" -> androidx.compose.ui.graphics.BlendMode.Difference
+                "Exclusion" -> androidx.compose.ui.graphics.BlendMode.Exclusion
+                "Hue" -> androidx.compose.ui.graphics.BlendMode.Hue
+                "Saturation" -> androidx.compose.ui.graphics.BlendMode.Saturation
+                "Color" -> androidx.compose.ui.graphics.BlendMode.Color
+                "Luminosity" -> androidx.compose.ui.graphics.BlendMode.Luminosity
+                else -> androidx.compose.ui.graphics.BlendMode.SrcOver
             }
             layer.copy(blendMode = nextMode)
         }
@@ -133,5 +112,89 @@ class EditorViewModel : ViewModel(), EditorActions {
             val layers = state.layers.map { if (it.id == id) it.copy(name = name) else it }
             state.copy(layers = layers)
         }
+    }
+
+    override fun onLayerReordered(newOrder: List<String>) {
+        _uiState.update { state ->
+            val reordered = newOrder.mapNotNull { id -> state.layers.find { it.id == id } }
+            state.copy(layers = reordered)
+        }
+    }
+
+    override fun onLayerDuplicated(id: String) {
+        // TODO: Implement duplication
+    }
+
+    override fun onLayerRemoved(id: String) {
+        _uiState.update { state ->
+            state.copy(layers = state.layers.filterNot { it.id == id })
+        }
+    }
+
+    override fun copyLayerModifications(id: String) {
+        // TODO
+    }
+
+    override fun pasteLayerModifications(id: String) {
+        // TODO
+    }
+
+    override fun onScaleChanged(s: Float) {
+        updateActiveLayer { it.copy(scale = s) }
+    }
+
+    override fun onOffsetChanged(o: Offset) {
+        updateActiveLayer { it.copy(offset = o) }
+    }
+
+    override fun onRotationXChanged(d: Float) {
+        updateActiveLayer { it.copy(rotationX = d) }
+    }
+
+    override fun onRotationYChanged(d: Float) {
+        updateActiveLayer { it.copy(rotationY = d) }
+    }
+
+    override fun onRotationZChanged(d: Float) {
+        updateActiveLayer { it.copy(rotationZ = d) }
+    }
+
+    override fun onCycleRotationAxis() {
+        _uiState.update { state ->
+            val next = when (state.activeRotationAxis) {
+                RotationAxis.X -> RotationAxis.Y
+                RotationAxis.Y -> RotationAxis.Z
+                RotationAxis.Z -> RotationAxis.X
+            }
+            state.copy(activeRotationAxis = next, showRotationAxisFeedback = true)
+        }
+    }
+
+    override fun onGestureStart() {
+        _uiState.update { it.copy(gestureInProgress = true) }
+    }
+
+    override fun onGestureEnd() {
+        _uiState.update { it.copy(gestureInProgress = false) }
+    }
+
+    override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
+        updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
+    }
+
+    override fun onFeedbackShown() {
+        _uiState.update { it.copy(showRotationAxisFeedback = false) }
+    }
+
+    override fun onDoubleTapHintDismissed() {
+        _uiState.update { it.copy(showDoubleTapHint = false) }
+    }
+
+    override fun onOnboardingComplete(mode: Any) {
+        _uiState.update { it.copy(showOnboardingDialogForMode = null) }
+    }
+
+    override fun onDrawingPathFinished(path: List<Offset>) {
+        _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(path)) }
     }
 }
