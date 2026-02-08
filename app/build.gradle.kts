@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     alias(libs.plugins.jetbrains.kotlin.compose)

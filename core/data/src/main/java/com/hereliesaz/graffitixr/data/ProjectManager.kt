@@ -6,9 +6,8 @@ import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.*
-import com.hereliesaz.graffitixr.common.model.*
-import com.hereliesaz.graffitixr.data.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -29,7 +28,11 @@ class DefaultUriProvider : UriProvider {
     }
 }
 
-class ProjectManager(private val uriProvider: UriProvider = DefaultUriProvider()) {
+class ProjectManager(
+    private val context: Context,
+    private val repository: ProjectRepository,
+    private val uriProvider: UriProvider = DefaultUriProvider()
+) {
 
     private val json = Json {
         prettyPrint = true
