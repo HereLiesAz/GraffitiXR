@@ -146,13 +146,14 @@ fun OverlayScreen(
                 .onSizeChanged { containerSize = it }
                 .clipToBounds()
                 .pointerInput(currentUiState.activeLayerId, currentUiState.layers.size) {
+                    val pointerInputScope = this
                     coroutineScope {
                         launch {
-                            detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                            pointerInputScope.detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                         }
 
                         launch {
-                            detectSmartOverlayGestures(
+                            pointerInputScope.detectSmartOverlayGestures(
                                 getValidBounds = {
                                     Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
                                 },

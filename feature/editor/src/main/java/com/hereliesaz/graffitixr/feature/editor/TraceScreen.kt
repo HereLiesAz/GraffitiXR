@@ -94,13 +94,14 @@ fun TraceScreen(
                 .fillMaxSize()
                 .pointerInput(uiState.isImageLocked, currentUiState.layers.size) {
                         if (!uiState.isImageLocked) {
+                        val pointerInputScope = this
                         coroutineScope {
                             launch {
-                                detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                                pointerInputScope.detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                             }
 
                             launch {
-                                detectSmartOverlayGestures(
+                                pointerInputScope.detectSmartOverlayGestures(
                                     getValidBounds = {
                                         Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
                                     },
@@ -124,9 +125,10 @@ fun TraceScreen(
                             }
                         }
                     } else {
+                        val pointerInputScope = this
                         coroutineScope {
                             launch {
-                                detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                                pointerInputScope.detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
                             }
                         }
                     }
