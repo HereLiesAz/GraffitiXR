@@ -1,5 +1,9 @@
 package com.hereliesaz.graffitixr
 
+import android.graphics.Bitmap
+import android.content.ContentValues
+import android.provider.MediaStore
+import android.view.PixelCopy
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
@@ -40,6 +45,13 @@ import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun MainScreen(
@@ -58,8 +70,24 @@ fun MainScreen(
     val arUiState by arViewModel.uiState.collectAsState()
     val editorUiState by editorViewModel.uiState.collectAsState()
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
+    val exportTrigger by editorViewModel.exportTrigger.collectAsState()
     
-    // Removed duplicate context declaration
+    val view = LocalView.current
+    val context = LocalContext.current
+    val window = (view.context as? android.app.Activity)?.window
+
+    // Export Logic
+    LaunchedEffect(exportTrigger) {
+        if (exportTrigger && window != null) {
+            // Wait for UI to hide (recomposition)
+            delay(300)
+            captureScreenshot(window) { bitmap ->
+                saveExportedImage(context, bitmap)
+                editorViewModel.onExportComplete()
+            }
+        }
+    }
+
     val navStrings = remember { 
         NavStrings(
             modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
@@ -77,7 +105,7 @@ fun MainScreen(
             adjust = "Adjust", adjustInfo = "Colors",
             balance = "Balance", balanceInfo = "Color Tint",
             build = "Blend", blendingInfo = "Blend Mode",
-            settings = "Settings", project = "Library",
+            settings = "Settings", project = "Project", // Renamed Library -> Project
             new = "New", newInfo = "Clear Canvas",
             save = "Save", saveInfo = "Save to File",
             load = "Load", loadInfo = "Open Project",
@@ -91,7 +119,6 @@ fun MainScreen(
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
     var showInfoScreen by remember { mutableStateOf(false) }
-    var hasSelectedModeOnce by remember { mutableStateOf(false) }
 
     val resetDialogs = remember { { showSliderDialog = null; showColorBalanceDialog = false } }
 
@@ -103,7 +130,6 @@ fun MainScreen(
     }
 
     // Permissions
-    val context = LocalContext.current
     var hasCameraPermission by remember {
         mutableStateOf(
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -240,13 +266,21 @@ fun MainScreen(
                 })
             }
             azDivider()
-            azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
-            azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
-                localNavController.navigate("settings")
+            azRailHostItem(id = "project_host", text = navStrings.project, onClick = {}) // "Project"
+            azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
+                editorViewModel.saveProject()
                 resetDialogs()
             }
             azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
                 localNavController.navigate("project_library")
+                resetDialogs()
+            }
+            azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo) {
+                editorViewModel.exportProject()
+                resetDialogs()
+            }
+            azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
+                localNavController.navigate("settings")
                 resetDialogs()
             }
             azDivider()
@@ -293,7 +327,7 @@ fun MainScreen(
         // Onscreen Overlays & Navigation Host
         onscreen(alignment = Alignment.Center) {
             Box(modifier = Modifier.fillMaxSize()) {
-                AzNavHost(startDestination = "editor") {
+                AzNavHost(startDestination = "project_library") { // Changed Start Destination
                     composable("editor") {
                         EditorUi(
                              actions = editorViewModel,
@@ -316,17 +350,25 @@ fun MainScreen(
                                 projects = dashboardUiState.availableProjects,
                                 onLoadProject = {
                                     dashboardViewModel.openProject(it)
-                                    localNavController.popBackStack()
+                                    // Navigate to editor after loading
+                                    localNavController.navigate("editor") {
+                                        popUpTo("project_library") { inclusive = false }
+                                    }
                                 },
                                 onDeleteProject = { /* TODO: Implement project deletion */ },
                                 onNewProject = {
                                     dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-                                    localNavController.popBackStack()
+                                    // Navigate to editor after creating new
+                                    localNavController.navigate("editor") {
+                                        popUpTo("project_library") { inclusive = false }
+                                    }
                                 }
                             )
-                            AzButton(text = "Back", onClick = {
-                                localNavController.popBackStack()
-                            }, modifier = Modifier.align(Alignment.TopStart).padding(16.dp))
+                            // "Back" button removed as this is now the start screen.
+                            // However, if navigating from "Load", we might want a back button.
+                            // But usually Library replaces Editor.
+                            // The user says "initial screen ... is a list of projects".
+                            // So this is the root.
                         }
                     }
                     composable("settings") {
@@ -445,5 +487,70 @@ fun MainContentLayer(
                 onGestureEnd = onOverlayGestureEnd
             )
         }
+    }
+}
+
+fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
+    val bitmap = Bitmap.createBitmap(
+        window.decorView.width,
+        window.decorView.height,
+        Bitmap.Config.ARGB_8888
+    )
+    val location = IntArray(2)
+    window.decorView.getLocationInWindow(location)
+
+    val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    try {
+        PixelCopy.request(
+            window,
+            android.graphics.Rect(location[0], location[1], location[0] + window.decorView.width, location[1] + window.decorView.height),
+            bitmap,
+            { result ->
+                if (result == PixelCopy.SUCCESS) {
+                    onCaptured(bitmap)
+                }
+            },
+            handler
+        )
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+fun saveExportedImage(context: android.content.Context, bitmap: Bitmap) {
+    try {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val fileName = "Export_$timestamp.webp"
+
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/webp")
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/GraffitiXR")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+        }
+
+        val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+        uri?.let {
+            context.contentResolver.openOutputStream(it).use { out ->
+                if (out != null) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
+                    } else {
+                        bitmap.compress(Bitmap.CompressFormat.WEBP, 100, out)
+                    }
+                }
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                contentValues.clear()
+                contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                context.contentResolver.update(it, contentValues, null, null)
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }

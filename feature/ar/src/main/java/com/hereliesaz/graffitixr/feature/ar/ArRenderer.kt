@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
+import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.widget.Toast
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -89,10 +90,14 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         displayRotationHelper.onSurfaceChanged(width, height)
+        GLES20.glViewport(0, 0, width, height)
         slamManager.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        // Clear screen to avoid artifacts if native draw fails or is partial
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+
         val session = session ?: return
 
         displayRotationHelper.updateSessionIfNeeded(session)

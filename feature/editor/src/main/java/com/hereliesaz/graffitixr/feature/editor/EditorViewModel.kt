@@ -65,6 +65,27 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    // Explicit Save (User action)
+    fun saveProject() {
+        viewModelScope.launch {
+            projectRepository.saveProject()
+        }
+    }
+
+    // Export Logic
+    private val _exportTrigger = MutableStateFlow<Boolean>(false)
+    val exportTrigger: StateFlow<Boolean> = _exportTrigger.asStateFlow()
+
+    fun exportProject() {
+        _uiState.update { it.copy(hideUiForCapture = true) }
+        _exportTrigger.value = true
+    }
+
+    fun onExportComplete() {
+        _exportTrigger.value = false
+        _uiState.update { it.copy(hideUiForCapture = false) }
+    }
+
     private fun persistState() {
         saveJob?.cancel()
         saveJob = viewModelScope.launch {
