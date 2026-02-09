@@ -38,6 +38,7 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/gradle/incremental.annotation.processors"
         }
         jniLibs {
             pickFirsts += "**/libc++_shared.so"
@@ -74,6 +75,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     
     // Hilt
     implementation(libs.hilt.android)
