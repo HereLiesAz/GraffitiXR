@@ -2,7 +2,7 @@ package com.hereliesaz.graffitixr.data
 
 import android.content.Context
 import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
-import com.hereliesaz.graffitixr.data.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import kotlinx.coroutines.Dispatchers
 
 object RepositoryProvider {
