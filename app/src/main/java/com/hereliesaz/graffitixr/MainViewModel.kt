@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,9 +20,7 @@ import kotlinx.coroutines.launch
  * - Target Creation Orchestration (App-level flow)
  */
 @HiltViewModel
-class MainViewModel @Inject constructor(
-    application: Application
-) : AndroidViewModel(application) {
+class MainViewModel @Inject constructor() : ViewModel() {
 
     // Simplified UI State
     private val _uiState = MutableStateFlow(UiState())
