@@ -30,8 +30,7 @@ data class EditorUiState(
     val progressPercentage: Float = 0f,
     
     // Dialogs
-    val sliderDialogType: String? = null,
-    val showColorBalanceDialog: Boolean = false,
+    val activePanel: EditorPanel = EditorPanel.NONE,
     
     // Capture state needed for UI hiding
     val hideUiForCapture: Boolean = false,

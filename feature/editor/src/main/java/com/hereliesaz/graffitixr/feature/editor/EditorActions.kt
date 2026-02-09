@@ -48,4 +48,8 @@ interface EditorActions {
     fun onDoubleTapHintDismissed()
     fun onOnboardingComplete(mode: Any)
     fun onDrawingPathFinished(path: List<Offset>)
+
+    fun onAdjustClicked()
+    fun onColorClicked()
+    fun onDismissPanel()
 }
