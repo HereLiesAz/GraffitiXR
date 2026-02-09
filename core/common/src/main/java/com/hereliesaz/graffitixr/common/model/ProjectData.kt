@@ -38,6 +38,7 @@ data class CalibrationSnapshot(
 
 @Serializable
 data class ProjectData(
+    // Force Recompile
     val id: String = UUID.randomUUID().toString(),
     val name: String = "Untitled",
     val created: Long = System.currentTimeMillis(),
