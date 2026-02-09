@@ -15,6 +15,7 @@ import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.feature.ar.rendering.BackgroundRenderer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -32,6 +33,8 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         private set
 
     val slamManager = SlamManager()
+
+    private val backgroundRenderer = BackgroundRenderer()
 
     // State flags
     private var showPointCloud = false
@@ -86,6 +89,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         // Initialize Native Engine (MobileGS)
         slamManager.init(context.assets)
+        backgroundRenderer.createOnGlThread()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -103,9 +107,12 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         displayRotationHelper.updateSessionIfNeeded(session)
 
         try {
-            session.setCameraTextureName(slamManager.getExternalTextureId())
+            session.setCameraTextureName(backgroundRenderer.textureId)
             val frame = session.update()
             val camera = frame.camera
+
+            // Draw the camera background
+            backgroundRenderer.draw(frame)
 
             // Pass ARCore frame data to Native Engine
             slamManager.update(
