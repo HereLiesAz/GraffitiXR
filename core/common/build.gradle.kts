@@ -33,7 +33,8 @@ dependencies {
     
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.androidx.compose.ui.geometry)
+    api(libs.androidx.compose.ui.geometry)
+    api(libs.androidx.compose.ui.graphics)
     testImplementation(libs.junit)
     
     implementation(project(":opencv"))

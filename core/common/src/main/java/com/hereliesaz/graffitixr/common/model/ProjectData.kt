@@ -99,4 +99,10 @@ data class ProjectData(
 
     // Neural Scan ID
     val cloudAnchorId: String? = null
-)
+) {
+    companion object {
+        fun create(name: String): ProjectData {
+            return ProjectData(name = name)
+        }
+    }
+}
