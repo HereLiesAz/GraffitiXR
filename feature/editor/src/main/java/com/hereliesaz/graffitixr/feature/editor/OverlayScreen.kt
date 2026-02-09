@@ -53,12 +53,11 @@ fun OverlayScreen(
     onCycleRotationAxis: () -> Unit,
     onGestureStart: () -> Unit,
     onGestureEnd: (Float, Offset, Float, Float, Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showCamera: Boolean = true
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
-    var camera by remember { mutableStateOf<Camera?>(null) }
     val coroutineScope = rememberCoroutineScope()
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val currentUiState by rememberUpdatedState(uiState)
@@ -73,72 +72,65 @@ fun OverlayScreen(
     val rotationY = transformState.rotationY
     val rotationZ = transformState.rotationZ
 
-    val opacity = activeLayer?.opacity ?: 1f
-    val blendMode = activeLayer?.blendMode ?: BlendMode.SrcOver
-    val contrast = activeLayer?.contrast ?: 1f
-    val brightness = activeLayer?.brightness ?: 0f
-    val saturation = activeLayer?.saturation ?: 1f
-    val colorBalanceR = activeLayer?.colorBalanceR ?: 1f
-    val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
-    val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
-
-    LaunchedEffect(isFlashlightOn, camera) {
-        try {
-            if (camera?.cameraInfo?.hasFlashUnit() == true) {
-                camera?.cameraControl?.enableTorch(isFlashlightOn)
-            }
-        } catch (e: Exception) {
-            Log.e("OverlayScreen", "Failed to set torch state", e)
-        }
+    // CameraX State (Only used if showCamera is true)
+    val cameraProviderFuture = remember(showCamera) {
+        if (showCamera) ProcessCameraProvider.getInstance(context) else null
     }
+    var camera by remember { mutableStateOf<Camera?>(null) }
 
-    // CRITICAL FIX: Ensure CameraX releases the camera when this screen is disposed
-    DisposableEffect(lifecycleOwner) {
-        onDispose {
+    if (showCamera) {
+        LaunchedEffect(isFlashlightOn, camera) {
             try {
-                // Force unbind all use cases to free the camera for ARCore
-                if (cameraProviderFuture.isDone) {
-                    cameraProviderFuture.get().unbindAll()
+                if (camera?.cameraInfo?.hasFlashUnit() == true) {
+                    camera?.cameraControl?.enableTorch(isFlashlightOn)
                 }
             } catch (e: Exception) {
-                Log.e("OverlayScreen", "Failed to unbind camera", e)
+                Log.e("OverlayScreen", "Failed to set torch state", e)
             }
         }
-    }
 
-    val colorMatrix = remember(saturation, contrast, brightness, colorBalanceR, colorBalanceG, colorBalanceB) {
-        createColorMatrix(saturation, contrast, brightness, colorBalanceR, colorBalanceG, colorBalanceB)
+        DisposableEffect(lifecycleOwner) {
+            onDispose {
+                try {
+                    if (cameraProviderFuture?.isDone == true) {
+                        cameraProviderFuture.get().unbindAll()
+                    }
+                } catch (e: Exception) {
+                    Log.e("OverlayScreen", "Failed to unbind camera", e)
+                }
+            }
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // CameraX Preview View
-        AndroidView(
-            factory = { ctx ->
-                val previewView = PreviewView(ctx)
-                val executor = ContextCompat.getMainExecutor(ctx)
-                cameraProviderFuture.addListener({
-                    try {
-                        val cameraProvider = cameraProviderFuture.get()
-                        // Ensure we start fresh
-                        cameraProvider.unbindAll()
+        if (showCamera) {
+            AndroidView(
+                factory = { ctx ->
+                    val previewView = PreviewView(ctx)
+                    val executor = ContextCompat.getMainExecutor(ctx)
+                    cameraProviderFuture?.addListener({
+                        try {
+                            val cameraProvider = cameraProviderFuture.get()
+                            cameraProvider.unbindAll()
 
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
+                            val preview = Preview.Builder().build().also {
+                                it.setSurfaceProvider(previewView.surfaceProvider)
+                            }
+                            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                            camera = cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                cameraSelector,
+                                preview
+                            )
+                        } catch (e: Exception) {
+                            Log.e("OverlayScreen", "CameraX init failed", e)
                         }
-                        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                        camera = cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            cameraSelector,
-                            preview
-                        )
-                    } catch (e: Exception) {
-                        Log.e("OverlayScreen", "CameraX init failed", e)
-                    }
-                }, executor)
-                previewView
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+                    }, executor)
+                    previewView
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         Box(
             modifier = Modifier

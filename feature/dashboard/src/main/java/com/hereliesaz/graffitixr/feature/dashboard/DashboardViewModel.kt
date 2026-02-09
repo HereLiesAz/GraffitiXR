@@ -26,16 +26,21 @@ class DashboardViewModel @Inject constructor(
     fun loadAvailableProjects() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            // Note: Repository currently uses StateFlow for currentProject.
-            // Loading the project list would typically involve a separate flow or method.
-            // For now, keeping the loading state management.
-            _uiState.update { it.copy(isLoading = false) }
+            val projects = projectRepository.getProjects()
+            _uiState.update {
+                it.copy(
+                    availableProjects = projects,
+                    isLoading = false
+                )
+            }
         }
     }
 
     fun onNewProject(isRightHanded: Boolean) {
         viewModelScope.launch {
-            val newProject = projectRepository.createProject("New Project")
+            // Auto-assigned filename (UUID based or Timestamp)
+            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+            val newProject = projectRepository.createProject("Project $timestamp")
             _uiState.update { 
                 it.copy(
                     showProjectList = false, 

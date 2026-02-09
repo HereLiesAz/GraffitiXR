@@ -79,13 +79,16 @@ fun TraceScreen(
             .background(Color.Black)
     ) {
         // Background Image (The surface being traced upon)
-        uiState.backgroundImageUri?.let {
-            AsyncImage(
-                model = it,
-                contentDescription = "Background Image",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+        // Hidden during capture (export)
+        if (!uiState.hideUiForCapture) {
+            uiState.backgroundImageUri?.let {
+                AsyncImage(
+                    model = it,
+                    contentDescription = "Background Image",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
 
         // Gesture handling box covering the screen
