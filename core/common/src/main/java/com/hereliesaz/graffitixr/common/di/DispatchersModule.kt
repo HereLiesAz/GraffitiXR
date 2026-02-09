@@ -35,10 +35,15 @@ object DispatchersModule {
 
     @Provides
     @Singleton
-    fun provideDispatcherProvider(): DispatcherProvider = object : DispatcherProvider {
-        override val main: CoroutineDispatcher get() = Dispatchers.Main
-        override val mainImmediate: CoroutineDispatcher get() = Dispatchers.Main.immediate
-        override val io: CoroutineDispatcher get() = Dispatchers.IO
-        override val default: CoroutineDispatcher get() = Dispatchers.Default
+    fun provideDispatcherProvider(
+        @MainDispatcher mainDispatcher: CoroutineDispatcher,
+        @MainImmediateDispatcher mainImmediateDispatcher: CoroutineDispatcher,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+        @DefaultDispatcher defaultDispatcher: CoroutineDispatcher,
+    ): DispatcherProvider = object : DispatcherProvider {
+        override val main: CoroutineDispatcher get() = mainDispatcher
+        override val mainImmediate: CoroutineDispatcher get() = mainImmediateDispatcher
+        override val io: CoroutineDispatcher get() = ioDispatcher
+        override val default: CoroutineDispatcher get() = defaultDispatcher
     }
 }

@@ -9,7 +9,13 @@ import java.io.InputStreamReader
 
 object ShaderUtil {
     fun loadGLShader(tag: String, context: Context, type: Int, filename: String): Int {
-        val code = readShaderFileFromAssets(context, filename)
+        val code = try {
+            readShaderFileFromAssets(context, filename)
+        } catch (e: IOException) {
+            Log.e(tag, "Error reading shader file: $filename", e)
+            return 0
+        }
+
         var shader = GLES20.glCreateShader(type)
         GLES20.glShaderSource(shader, code)
         GLES20.glCompileShader(shader)
@@ -25,7 +31,8 @@ object ShaderUtil {
             shader = 0
         }
         if (shader == 0) {
-            throw RuntimeException("Error creating shader.")
+            Log.e(tag, "Error creating shader: $filename")
+            // throw RuntimeException("Error creating shader.") // Changed behavior: Log instead of throw to avoid crash loop
         }
         return shader
     }
