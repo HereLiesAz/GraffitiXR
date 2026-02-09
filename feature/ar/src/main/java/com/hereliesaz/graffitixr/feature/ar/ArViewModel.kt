@@ -8,6 +8,9 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +24,9 @@ class ArViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
+
+    private val _newTargetImage = MutableSharedFlow<Pair<Bitmap, String>>()
+    val newTargetImage: SharedFlow<Pair<Bitmap, String>> = _newTargetImage.asSharedFlow()
 
     fun togglePointCloud() {
         val newState = !_uiState.value.showPointCloud
@@ -43,6 +49,9 @@ class ArViewModel @Inject constructor(
                     capturedTargetImages = it.capturedTargetImages + bitmap
                 )
             }
+
+            // Signal AR View to update database
+            _newTargetImage.emit(bitmap to uri.toString())
 
             // Sync to Project Repository
             projectRepository.updateProject { project ->

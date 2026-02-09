@@ -22,6 +22,7 @@ class BackgroundRenderer {
     private var quadPositionParam: Int = 0
     private var quadTexCoordParam: Int = 0
     private var uTextureParam: Int = 0
+    private var hasTransformed = false
 
     fun createOnGlThread() {
         // Generate Texture
@@ -79,13 +80,14 @@ class BackgroundRenderer {
     }
 
     fun draw(frame: Frame) {
-        if (frame.hasDisplayGeometryChanged()) {
+        if (frame.hasDisplayGeometryChanged() || !hasTransformed) {
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
                 quadVertices,
                 Coordinates2d.TEXTURE_NORMALIZED,
                 quadTexCoordTransformed
             )
+            hasTransformed = true
         }
 
         // Reset VAO to 0 to ensure we use the default VAO for this draw call

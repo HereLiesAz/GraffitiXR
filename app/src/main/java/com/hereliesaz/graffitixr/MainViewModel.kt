@@ -56,6 +56,19 @@ class MainViewModel @Inject constructor() : ViewModel() {
     // --- Target Creation Flow (Orchestration) ---
     // This remains here as it interrupts the main screen flow
 
+    fun startTargetCapture() {
+        _uiState.update {
+            it.copy(
+                isCapturingTarget = true,
+                captureStep = CaptureStep.CAPTURE
+            )
+        }
+    }
+
+    fun setCaptureStep(step: CaptureStep) {
+        _uiState.update { it.copy(captureStep = step) }
+    }
+
     fun onCancelCaptureClicked() {
         _uiState.update { it.copy(isCapturingTarget = false) }
     }
@@ -65,6 +78,6 @@ class MainViewModel @Inject constructor() : ViewModel() {
     }
 
     fun onRetakeCapture() {
-        // Reset capture state logic here
+        _uiState.update { it.copy(captureStep = CaptureStep.CAPTURE) }
     }
 }
