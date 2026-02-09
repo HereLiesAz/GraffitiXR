@@ -32,10 +32,11 @@ fun UndoRedoRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(end = 48.dp), // Reduced start padding (handled by parent or default)
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Aligned with the first knob (Red/Opacity)
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
@@ -46,6 +47,7 @@ fun UndoRedoRow(
             }
         }
 
+        // Aligned with the second knob (Green/Brightness) - Magic Wand
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
@@ -56,6 +58,7 @@ fun UndoRedoRow(
             }
         }
 
+        // Aligned with the third knob (Blue/Contrast)
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
