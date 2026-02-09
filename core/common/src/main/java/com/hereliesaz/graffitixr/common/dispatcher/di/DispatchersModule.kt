@@ -1,6 +1,6 @@
-package com.hereliesaz.graffitixr.core.common.dispatcher.di
+package com.hereliesaz.graffitixr.common.dispatcher.di
 
-import com.hereliesaz.graffitixr.core.common.dispatcher.DispatcherProvider
+import com.hereliesaz.graffitixr.common.dispatcher.DispatcherProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
