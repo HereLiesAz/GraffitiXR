@@ -1,54 +1,57 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.opengl.GLSurfaceView
-import android.util.AttributeSet
 import android.util.Log
+import android.view.MotionEvent
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import com.google.ar.core.Session
-// FIXED IMPORT:
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 
-class GraffitiArView @JvmOverloads constructor(
-    context: Context,
-    attrs: AttributeSet? = null
-) : GLSurfaceView(context, attrs) {
+class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycleObserver {
 
     private var session: Session? = null
-    private val renderer: ArRenderer
+    private val renderer = ArRenderer(context)
 
     init {
         preserveEGLContextOnPause = true
         setEGLContextClientVersion(2)
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-
-        renderer = ArRenderer(context)
         setRenderer(renderer)
-        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        renderMode = RENDERMODE_CONTINUOUSLY
+        setWillNotDraw(false)
     }
 
-    fun setSession(arSession: Session) {
-        this.session = arSession
-        val config = arSession.config
-        config.focusMode = Config.FocusMode.AUTO
-        config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
-        arSession.configure(config)
+    fun onResume() {
+        if (session == null) {
+            try {
+                session = Session(context)
+                val config = Config(session)
+                config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                config.focusMode = Config.FocusMode.AUTO
+                session?.configure(config)
+                renderer.setSession(session!!)
+            } catch (e: Exception) {
+                Log.e("GraffitiArView", "Failed to create AR Session", e)
+            }
+        }
 
-        // Pass session to renderer for frame updates
-        renderer.setSession(arSession)
-    }
-
-    override fun onResume() {
-        super.onResume()
         try {
             session?.resume()
+            super.onResume()
         } catch (e: Exception) {
-            Log.e("GraffitiArView", "Error resuming AR Session", e)
+            Log.e("GraffitiArView", "Failed to resume AR Session", e)
         }
     }
 
-    override fun onPause() {
+    override fun onPause(owner: LifecycleOwner) {
+        onPause()
+    }
+
+    fun onPause() {
         super.onPause()
         session?.pause()
     }
@@ -58,15 +61,23 @@ class GraffitiArView @JvmOverloads constructor(
         session = null
     }
 
-    fun setShowPointCloud(enable: Boolean) {
-        renderer.showPointCloud = enable
+    fun setShowPointCloud(show: Boolean) {
+        renderer.showPointCloud = show
     }
 
-    fun setFlashlight(enable: Boolean) {
-        // Not implemented in renderer yet
+    fun setFlashlight(on: Boolean) {
+        session?.let { s ->
+            val config = s.config
+            config.flashMode = if (on) Config.FlashMode.TORCH else Config.FlashMode.OFF
+            s.configure(config)
+        }
     }
 
-    fun setupAugmentedImageDatabase(bitmap: Bitmap?) {
-        // Not implemented
+    fun setupAugmentedImageDatabase(db: AugmentedImageDatabase?) {
+        session?.let { s ->
+            val config = s.config
+            config.augmentedImageDatabase = db
+            s.configure(config)
+        }
     }
 }
