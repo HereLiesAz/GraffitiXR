@@ -1,15 +1,11 @@
-uniform mat4 u_MVPMatrix;
-uniform mat3 u_HomographyMatrix;
+uniform mat4 u_ModelViewProjection;
 attribute vec4 a_Position;
-attribute vec2 a_TexCoordinate;
-
-varying vec2 v_TexCoordinate;
+attribute float a_Confidence; // Assuming you might use this later, keeping it.
 
 void main() {
-    // Transform texture coordinates by the homography matrix
-    vec3 warpedTexCoord = u_HomographyMatrix * vec3(a_TexCoordinate, 1.0);
-    // Perform perspective divide
-    v_TexCoordinate = warpedTexCoord.xy / warpedTexCoord.z;
+    gl_Position = u_ModelViewProjection * a_Position;
 
-    gl_Position = u_MVPMatrix * a_Position;
+    // MODIFICATION: Shrink the radius to pinpoints.
+    // Was likely 10.0 or 20.0. Now it is 2.0.
+    gl_PointSize = 2.0;
 }

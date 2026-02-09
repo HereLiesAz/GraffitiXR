@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
+import android.content.Context
 import android.opengl.GLES20
 import android.util.Log
 
@@ -7,7 +8,7 @@ import android.util.Log
  * Shader helper functions.
  */
 object ShaderUtil {
-    fun loadGLShader(tag: String, shaderCode: String, type: Int): Int {
+    fun loadGLShader(tag: String, shaderCode: Int, type: Context): Int {
         var shader = GLES20.glCreateShader(type)
         GLES20.glShaderSource(shader, shaderCode)
         GLES20.glCompileShader(shader)

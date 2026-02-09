@@ -5,7 +5,6 @@ import android.opengl.GLES30
 import android.opengl.Matrix
 import com.google.ar.core.Plane
 import com.google.ar.core.TrackingState
-import com.google.ar.core.Pose
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer

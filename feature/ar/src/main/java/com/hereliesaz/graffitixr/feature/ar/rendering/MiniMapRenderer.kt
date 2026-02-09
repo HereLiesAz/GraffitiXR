@@ -4,9 +4,6 @@ import android.content.Context
 import android.opengl.GLES20
 import android.opengl.Matrix
 import com.google.ar.core.PointCloud
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.FloatBuffer
 
 class MiniMapRenderer {
     private var program = 0

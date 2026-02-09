@@ -4,7 +4,6 @@ import android.opengl.GLES30
 import android.opengl.Matrix
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.FloatBuffer
 
 /**
  * Renders a 3D metric grid centered at a specific pose (Anchor).
