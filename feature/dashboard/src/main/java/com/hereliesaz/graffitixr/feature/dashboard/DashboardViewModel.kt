@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.GpsData
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.data.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

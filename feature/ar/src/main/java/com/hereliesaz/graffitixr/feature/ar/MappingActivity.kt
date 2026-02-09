@@ -1,52 +1,42 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
-import com.hereliesaz.graffitixr.nativebridge.ensureOpenCVLoaded
+import com.hereliesaz.graffitixr.feature.ar.GraffitiArView
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 
 class MappingActivity : ComponentActivity() {
 
-    private var arRenderer: ArRenderer? = null
+    private lateinit var arView: GraffitiArView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ensureOpenCVLoaded()
 
-        setContent {
-            GraffitiXRTheme {
-                MappingScreen(
-                    // FIX: Provide missing callbacks
-                    onMapSaved = { mapId -> 
-                        runOnUiThread {
-                            Toast.makeText(this, "Map Saved: $mapId", Toast.LENGTH_SHORT).show()
-                            finish()
-                        }
-                    },
-                    onExit = { finish() },
-                    onRendererCreated = { renderer ->
-                        arRenderer = renderer
-                    }
-                )
-            }
-        }
+        // This activity seems to be a wrapper for the mapping screen
+        // Initialize View directly or via Compose
+        arView = GraffitiArView(this)
+        setContentView(arView)
     }
 
     override fun onResume() {
         super.onResume()
-        arRenderer?.onResume(this)
+        if (::arView.isInitialized) {
+            arView.onResume()
+        }
     }
 
     override fun onPause() {
         super.onPause()
-        arRenderer?.onPause()
+        if (::arView.isInitialized) {
+            arView.onPause()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        arRenderer?.cleanup()
-        arRenderer = null
+        if (::arView.isInitialized) {
+            arView.cleanup()
+        }
     }
 }

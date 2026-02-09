@@ -1,30 +1,20 @@
 package com.hereliesaz.graffitixr.data.repository
 
-import android.content.Context
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.preferencesDataStore
-import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
 
-private val Context.dataStore by preferencesDataStore(name = "settings")
+class SettingsRepositoryImpl @Inject constructor(override val isRightHanded: Flow<Boolean>) : SettingsRepository {
 
-class SettingsRepositoryImpl @Inject constructor(
-    private val context: Context
-) : SettingsRepository {
+    private val _themeMode = MutableStateFlow(0) // 0 = System, 1 = Light, 2 = Dark
 
-    private val IS_RIGHT_HANDED = booleanPreferencesKey("is_right_handed")
+    val themeMode: Flow<Int> = _themeMode
 
-    override val isRightHanded: Flow<Boolean> = context.dataStore.data
-        .map { preferences ->
-            preferences[IS_RIGHT_HANDED] ?: true
-        }
+    suspend fun setThemeMode(mode: Int) {
+        _themeMode.value = mode
+    }
 
     override suspend fun setRightHanded(isRight: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[IS_RIGHT_HANDED] = isRight
-        }
+        TODO("Not yet implemented")
     }
 }

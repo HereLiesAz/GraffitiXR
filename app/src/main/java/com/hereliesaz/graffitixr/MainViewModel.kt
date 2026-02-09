@@ -1,83 +1,60 @@
 package com.hereliesaz.graffitixr
 
+import android.app.Application
+import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.hereliesaz.graffitixr.common.model.*
+import com.google.ar.core.Session
+import com.hereliesaz.graffitixr.common.dispatcher.DispatcherProvider
+import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-/**
- * REFACTORED: No longer implements EditorActions.
- * Responsibilities:
- * - Application Lifecycle (Resume/Pause)
- * - Global App State (Navigation, Permissions)
- * - Touch Locking (Global Overlay)
- * - Target Creation Orchestration (App-level flow)
- */
 @HiltViewModel
-class MainViewModel @Inject constructor() : ViewModel() {
+class MainViewModel @Inject constructor(
+    private val application: Application,
+    private val projectManager: ProjectManager,
+    private val dispatchers: DispatcherProvider
+) : ViewModel() {
 
-    // Simplified UI State
-    private val _uiState = MutableStateFlow(UiState())
-    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    // UI State: Controls top-level navigation and system status only.
+    // Content state (Layers, Tools) is now owned by EditorViewModel.
+    private val _uiState = MutableStateFlow(MainUiState())
+    val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    fun onResume() {
-        // Global resume logic if needed
+    // AR Session State
+    private var arSession: Session? = null
+
+    init {
+        Log.d("MainViewModel", "Initialized with Hilt")
+        checkPermissions()
     }
 
-    fun onPause() {
-        // Global pause logic
+    private fun checkPermissions() {
+        // Handled by ActivityResultLauncher in UI
     }
 
-    // --- Global Overlays ---
-
-    fun setTouchLocked(locked: Boolean) {
-        _uiState.update { it.copy(isTouchLocked = locked) }
+    fun onPermissionsResult(permissions: Map<String, Boolean>) {
+        val allGranted = permissions.entries.all { it.value }
+        _uiState.update { it.copy(permissionsGranted = allGranted) }
     }
 
-    fun setTraceLocked(locked: Boolean) {
-        // Trace lock implies touch lock
-        _uiState.update { it.copy(isTouchLocked = locked) }
+    fun onArSessionCreated(session: Session) {
+        this.arSession = session
+        _uiState.update { it.copy(isArSessionReady = true) }
+        Log.d("MainViewModel", "AR Session Captured")
     }
 
-    fun showUnlockInstructions() {
-        _uiState.update { it.copy(showUnlockInstructions = true) }
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(3000)
-            _uiState.update { it.copy(showUnlockInstructions = false) }
-        }
-    }
-
-    // --- Target Creation Flow (Orchestration) ---
-    // This remains here as it interrupts the main screen flow
-
-    fun startTargetCapture() {
-        _uiState.update {
-            it.copy(
-                isCapturingTarget = true,
-                captureStep = CaptureStep.CAPTURE
-            )
-        }
-    }
-
-    fun setCaptureStep(step: CaptureStep) {
-        _uiState.update { it.copy(captureStep = step) }
-    }
-
-    fun onCancelCaptureClicked() {
-        _uiState.update { it.copy(isCapturingTarget = false) }
-    }
-
-    fun onConfirmTargetCreation() {
-        _uiState.update { it.copy(isArTargetCreated = true, isCapturingTarget = false) }
-    }
-
-    fun onRetakeCapture() {
-        _uiState.update { it.copy(captureStep = CaptureStep.CAPTURE) }
-    }
+    // REMOVED: onOverlayImageSelected()
+    // REMOVED: layerList management
+    // REASON: Moved to feature:editor / EditorViewModel to fix "Split Brain" architecture.
 }
+
+data class MainUiState(
+    val permissionsGranted: Boolean = false,
+    val isArSessionReady: Boolean = false,
+    val isLoading: Boolean = false
+)

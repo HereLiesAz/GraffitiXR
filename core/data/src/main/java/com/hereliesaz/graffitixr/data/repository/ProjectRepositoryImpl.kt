@@ -1,82 +1,34 @@
-package com.hereliesaz.graffitixr.data.repository
+package com.hereliesaz.graffitixr.core.data.repository
 
-import android.content.Context
-import com.hereliesaz.graffitixr.common.model.GraffitiProject
-import com.hereliesaz.graffitixr.data.ProjectManager
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.hereliesaz.graffitixr.core.model.Project
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import javax.inject.Inject
 
-class ProjectRepositoryImpl @Inject constructor(
-    private val context: Context,
-    private val projectManager: ProjectManager,
-    // Using IO dispatcher for file operations
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
-) : ProjectRepository {
+// Placeholder implementation to get you compiling.
+// Replace with Room/DataStore logic later.
+class ProjectRepositoryImpl @Inject constructor() : ProjectRepository {
 
-    private val _currentProject = MutableStateFlow<GraffitiProject?>(null)
-    override val currentProject: StateFlow<GraffitiProject?> = _currentProject.asStateFlow()
+    private val projects = mutableListOf<Project>()
 
-    override suspend fun loadProject(projectId: String): Result<GraffitiProject> = withContext(ioDispatcher) {
-        try {
-            val loadedProject = projectManager.loadProject(context, projectId)
-            if (loadedProject != null) {
-                _currentProject.value = loadedProject.projectData
-                Result.success(loadedProject.projectData)
-            } else {
-                Result.failure(Exception("Project not found"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+    override fun getProjects(): Flow<List<Project>> = flowOf(projects)
+
+    override suspend fun getProjectById(id: String): Project? {
+        return projects.find { it.id == id }
+    }
+
+    override suspend fun createProject(project: Project) {
+        projects.add(project)
+    }
+
+    override suspend fun deleteProject(id: String) {
+        projects.removeAll { it.id == id }
+    }
+
+    override suspend fun updateProject(project: Project) {
+        val index = projects.indexOfFirst { it.id == project.id }
+        if (index != -1) {
+            projects[index] = project
         }
-    }
-
-    override suspend fun createProject(name: String): GraffitiProject = withContext(ioDispatcher) {
-        // Force Recompile
-        val newProject = GraffitiProject(name = name)
-        _currentProject.value = newProject
-        projectManager.saveProject(context, newProject, emptyList())
-        newProject
-    }
-
-    override suspend fun updateProject(transform: (GraffitiProject) -> GraffitiProject) {
-        _currentProject.update { current ->
-            if (current == null) return@update null
-            val updated = transform(current).copy(lastModified = System.currentTimeMillis())
-            // Fire and forget save to avoid blocking UI
-            // In a real prod app, use a queue or worker
-            CoroutineScope(ioDispatcher).launch {
-                projectManager.saveProject(context, updated, null)
-            }
-            updated
-        }
-    }
-
-    override suspend fun getProjects(): List<GraffitiProject> = withContext(ioDispatcher) {
-        projectManager.getProjectList(context).mapNotNull { id ->
-            projectManager.loadProjectMetadata(context, id)
-        }
-    }
-
-    override suspend fun saveProject(): Result<Unit> = withContext(ioDispatcher) {
-        val current = _currentProject.value ?: return@withContext Result.failure(Exception("No active project"))
-        try {
-            projectManager.saveProject(context, current, null)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun closeProject() {
-        _currentProject.value = null
     }
 }
