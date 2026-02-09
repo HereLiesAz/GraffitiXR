@@ -76,8 +76,8 @@ fun EditorUi(
 
             AdjustmentsPanel(
                 state = adjustmentsState,
-                showKnobs = uiState.sliderDialogType != null,
-                showColorBalance = uiState.showColorBalanceDialog,
+                showKnobs = uiState.activePanel == EditorPanel.ADJUST,
+                showColorBalance = uiState.activePanel == EditorPanel.COLOR,
                 isLandscape = isLandscape,
                 screenHeight = configuration.screenHeightDp.dp,
                 onOpacityChange = actions::onOpacityChanged,

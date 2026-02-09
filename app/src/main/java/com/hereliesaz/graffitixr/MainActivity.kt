@@ -1,14 +1,20 @@
 package com.hereliesaz.graffitixr
 
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
+import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
@@ -24,6 +30,9 @@ class MainActivity : ComponentActivity() {
     private val editorViewModel: EditorViewModel by viewModels()
     private val dashboardViewModel: DashboardViewModel by viewModels()
 
+    private var isVolumeDownPressed = false
+    private var isVolumeUpPressed = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -37,6 +46,23 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
+                    val uiState by mainViewModel.uiState.collectAsState()
+                    val editorState by editorViewModel.uiState.collectAsState()
+
+                    // Handle Trace Lock Window Attributes (Screen On, Brightness)
+                    LaunchedEffect(uiState.isTouchLocked, editorState.editorMode) {
+                        if (uiState.isTouchLocked && editorState.editorMode == EditorMode.TRACE) {
+                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            val layoutParams = window.attributes
+                            layoutParams.screenBrightness = 1.0f
+                            window.attributes = layoutParams
+                        } else {
+                            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            val layoutParams = window.attributes
+                            layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                            window.attributes = layoutParams
+                        }
+                    }
 
                     MainScreen(
                         viewModel = mainViewModel,
@@ -60,5 +86,22 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         mainViewModel.onPause()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) isVolumeDownPressed = true
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolumeUpPressed = true
+
+        if (isVolumeDownPressed && isVolumeUpPressed) {
+            mainViewModel.setTraceLocked(false)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) isVolumeDownPressed = false
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolumeUpPressed = false
+        return super.onKeyUp(keyCode, event)
     }
 }

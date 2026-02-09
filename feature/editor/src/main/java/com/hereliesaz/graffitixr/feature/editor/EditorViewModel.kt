@@ -145,7 +145,26 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onLineDrawingClicked() {
-        _uiState.update { it.copy(editorMode = EditorMode.DRAW) }
+        val activeLayer = _uiState.value.activeLayer ?: return
+        viewModelScope.launch {
+            saveState()
+            val bitmap = BitmapUtils.getBitmapFromUri(application, activeLayer.uri) ?: return@launch
+            val processedBitmap = ImageProcessor.detectEdges(bitmap)
+
+            if (processedBitmap != null) {
+                val newUri = saveBitmapToCache(processedBitmap)
+                updateActiveLayer { it.copy(uri = newUri) }
+            }
+        }
+    }
+
+    fun setEditorMode(mode: EditorMode) {
+        _uiState.update { it.copy(editorMode = mode) }
+    }
+
+    fun setBackgroundImage(uri: Uri) {
+        saveState()
+        _uiState.update { it.copy(backgroundImageUri = uri, isEditingBackground = true) }
     }
 
     fun setEditorMode(mode: EditorMode) {
@@ -354,5 +373,23 @@ class EditorViewModel @Inject constructor(
 
     override fun onDrawingPathFinished(path: List<Offset>) {
         _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(path)) }
+    }
+
+    override fun onAdjustClicked() {
+        _uiState.update {
+            if (it.activePanel == EditorPanel.ADJUST) it.copy(activePanel = EditorPanel.NONE)
+            else it.copy(activePanel = EditorPanel.ADJUST)
+        }
+    }
+
+    override fun onColorClicked() {
+        _uiState.update {
+            if (it.activePanel == EditorPanel.COLOR) it.copy(activePanel = EditorPanel.NONE)
+            else it.copy(activePanel = EditorPanel.COLOR)
+        }
+    }
+
+    override fun onDismissPanel() {
+        _uiState.update { it.copy(activePanel = EditorPanel.NONE) }
     }
 }
