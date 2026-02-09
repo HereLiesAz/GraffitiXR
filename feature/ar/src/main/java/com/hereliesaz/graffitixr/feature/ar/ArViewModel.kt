@@ -34,15 +34,20 @@ class ArViewModel @Inject constructor(
 
     // NEW: Frame Capture
     fun onFrameCaptured(bitmap: Bitmap, uri: Uri) {
-        // Logic to handle the captured bitmap
-        // e.g., save to disk, add to list of calibration images
         viewModelScope.launch {
-            // For now, we update state to indicate a capture happened
+            // Update local state
             _uiState.update {
                 it.copy(
                     isArTargetCreated = true,
                     capturedTargetUris = it.capturedTargetUris + uri,
                     capturedTargetImages = it.capturedTargetImages + bitmap
+                )
+            }
+
+            // Sync to Project Repository
+            projectRepository.updateProject { project ->
+                project.copy(
+                    targetImageUris = project.targetImageUris + uri
                 )
             }
         }
@@ -51,11 +56,16 @@ class ArViewModel @Inject constructor(
     // NEW: Progress Update
     fun onProgressUpdate(percentage: Float, bitmap: Bitmap?) {
         _uiState.update { it.copy(mappingQualityScore = percentage) }
+        viewModelScope.launch {
+            projectRepository.updateProject { project ->
+                project.copy(progressPercentage = percentage)
+            }
+        }
     }
 
     // NEW: Calibration Points
     fun onCalibrationPointCaptured(matrix: FloatArray) {
-        // Store matrix data for SLAM/Gaussian Splatting
-        // _uiState.update { ... }
+        // Assuming we store calibration in GraffitiProject somehow
+        // For now, no-op or specific logic needed
     }
 }

@@ -4,7 +4,7 @@ import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.GpsData
-import com.hereliesaz.graffitixr.common.model.ProjectData
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -26,16 +26,21 @@ class DashboardViewModel @Inject constructor(
     fun loadAvailableProjects() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            // Note: Repository currently uses StateFlow for currentProject.
-            // Loading the project list would typically involve a separate flow or method.
-            // For now, keeping the loading state management.
-            _uiState.update { it.copy(isLoading = false) }
+            val projects = projectRepository.getProjects()
+            _uiState.update {
+                it.copy(
+                    availableProjects = projects,
+                    isLoading = false
+                )
+            }
         }
     }
 
     fun onNewProject(isRightHanded: Boolean) {
         viewModelScope.launch {
-            val newProject = projectRepository.createProject("New Project")
+            // Auto-assigned filename (UUID based or Timestamp)
+            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+            val newProject = projectRepository.createProject("Project $timestamp")
             _uiState.update { 
                 it.copy(
                     showProjectList = false, 
@@ -45,7 +50,7 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun openProject(project: ProjectData) {
+    fun openProject(project: GraffitiProject) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val result = projectRepository.loadProject(project.id)

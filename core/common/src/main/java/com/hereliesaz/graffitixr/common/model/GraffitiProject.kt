@@ -37,7 +37,7 @@ data class CalibrationSnapshot(
 ) : Parcelable
 
 @Serializable
-data class ProjectData(
+data class GraffitiProject(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "Untitled",
     val created: Long = System.currentTimeMillis(),

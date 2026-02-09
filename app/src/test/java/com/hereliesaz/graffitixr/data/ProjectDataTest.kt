@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 import org.junit.Test
 import org.junit.Before
 
-class ProjectDataTest {
+class GraffitiProjectTest {
 
     @Before
     fun setup() {
@@ -16,7 +16,7 @@ class ProjectDataTest {
 
     @Test
     fun testSerializationWithEmptyRefinementPaths() {
-        val projectData = ProjectData(
+        val projectData = GraffitiProject(
             refinementPaths = emptyList()
         )
 

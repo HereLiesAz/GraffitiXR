@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
-import com.hereliesaz.graffitixr.common.model.ProjectData
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -26,7 +26,7 @@ class ArViewModelTest {
     private val renderer: ArRenderer = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
     
-    private val projectFlow = MutableStateFlow<ProjectData?>(null)
+    private val projectFlow = MutableStateFlow<GraffitiProject?>(null)
 
     @Before
     fun setup() {

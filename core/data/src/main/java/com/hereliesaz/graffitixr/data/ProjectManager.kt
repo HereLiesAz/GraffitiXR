@@ -58,7 +58,7 @@ class ProjectManager(
         return File(root, "map.bin").absolutePath
     }
 
-    suspend fun saveProject(context: Context, projectData: ProjectData, targetImages: List<Bitmap>? = null, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
+    suspend fun saveProject(context: Context, projectData: GraffitiProject, targetImages: List<Bitmap>? = null, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
@@ -90,14 +90,14 @@ class ProjectManager(
             projectData.targetImageUris
         }
 
-        val updatedProjectData = projectData.copy(
+        val updatedGraffitiProject = projectData.copy(
             thumbnailUri = thumbnailUri,
             targetImageUris = savedTargetUris,
             lastModified = System.currentTimeMillis()
         )
 
-        // 3. Save ProjectData to JSON
-        val jsonString = json.encodeToString(updatedProjectData)
+        // 3. Save GraffitiProject to JSON
+        val jsonString = json.encodeToString(updatedGraffitiProject)
         File(root, "project.json").writeText(jsonString)
     }
 
@@ -108,7 +108,7 @@ class ProjectManager(
 
         return@withContext try {
             val jsonString = projectFile.readText()
-            val projectData = json.decodeFromString<ProjectData>(jsonString)
+            val projectData = json.decodeFromString<GraffitiProject>(jsonString)
 
             // Load Target Bitmaps
             val targetBitmaps = projectData.targetImageUris.mapNotNull { uri ->
@@ -122,14 +122,14 @@ class ProjectManager(
         }
     }
 
-    suspend fun loadProjectMetadata(context: Context, projectId: String): ProjectData? = withContext(Dispatchers.IO) {
+    suspend fun loadProjectMetadata(context: Context, projectId: String): GraffitiProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         val projectFile = File(root, "project.json")
         if (!projectFile.exists()) return@withContext null
 
         return@withContext try {
             val jsonString = projectFile.readText()
-            json.decodeFromString<ProjectData>(jsonString)
+            json.decodeFromString<GraffitiProject>(jsonString)
         } catch (e: Exception) {
             Log.e("ProjectManager", "Failed to load project metadata", e)
             null

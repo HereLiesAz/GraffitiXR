@@ -15,11 +15,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,37 +28,37 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.common.model.ProjectData
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun ProjectLibraryScreen(
-    projects: List<ProjectData>,
-    onLoadProject: (ProjectData) -> Unit,
+    projects: List<GraffitiProject>,
+    onLoadProject: (GraffitiProject) -> Unit,
     onDeleteProject: (String) -> Unit,
     onNewProject: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Black)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header with Title
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Projects",
-                    style = MaterialTheme.typography.headlineMedium
+            // New Project Button at the Top
+            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), contentAlignment = Alignment.Center) {
+                 AzButton(
+                    text = "New",
+                    onClick = onNewProject,
+                    modifier = Modifier.width(200.dp), // Constrain width, don't fill max
+                    shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
                 )
             }
 
@@ -77,7 +76,8 @@ fun ProjectLibraryScreen(
                 ) {
                     items(projects) { project ->
                         Card(
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.DarkGray)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -92,7 +92,7 @@ fun ProjectLibraryScreen(
                                         contentDescription = "Project Thumbnail",
                                         modifier = Modifier
                                             .size(60.dp)
-                                            .background(Color.DarkGray)
+                                            .background(Color.Black)
                                             .padding(1.dp),
                                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                                     )
@@ -100,7 +100,7 @@ fun ProjectLibraryScreen(
                                     Icon(
                                         Icons.Default.Folder,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = Color.White,
                                         modifier = Modifier.size(60.dp).padding(12.dp)
                                     )
                                 }
@@ -110,13 +110,14 @@ fun ProjectLibraryScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = project.name,
-                                        style = MaterialTheme.typography.titleMedium
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = Color.White
                                     )
                                     Text(
                                         text = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
                                             .format(Date(project.lastModified)),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color.Gray
+                                        color = Color.LightGray
                                     )
                                 }
 
@@ -133,18 +134,6 @@ fun ProjectLibraryScreen(
                     }
                 }
             }
-        }
-
-        // New Project Button - Centered in the screen
-        Button(
-            onClick = onNewProject,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(16.dp) // Add padding so it doesn't touch edges if screen is small
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("New")
         }
     }
 }
