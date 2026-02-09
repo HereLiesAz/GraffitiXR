@@ -25,7 +25,12 @@ class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycl
         setWillNotDraw(false)
     }
 
-    fun onResume() {
+    override fun onResume(owner: LifecycleOwner) {
+        onResume()
+    }
+
+    // Explicitly override onResume from GLSurfaceView
+    public override fun onResume() {
         if (session == null) {
             try {
                 session = Session(context)
@@ -41,7 +46,7 @@ class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycl
 
         try {
             session?.resume()
-            super.onResume()
+            super<GLSurfaceView>.onResume()
         } catch (e: Exception) {
             Log.e("GraffitiArView", "Failed to resume AR Session", e)
         }
@@ -51,8 +56,9 @@ class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycl
         onPause()
     }
 
-    fun onPause() {
-        super.onPause()
+    // Explicitly override onPause from GLSurfaceView
+    public override fun onPause() {
+        super<GLSurfaceView>.onPause()
         session?.pause()
     }
 
@@ -76,7 +82,9 @@ class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycl
     fun setupAugmentedImageDatabase(db: AugmentedImageDatabase?) {
         session?.let { s ->
             val config = s.config
-            config.augmentedImageDatabase = db
+            if (db != null) {
+                config.augmentedImageDatabase = db
+            }
             s.configure(config)
         }
     }

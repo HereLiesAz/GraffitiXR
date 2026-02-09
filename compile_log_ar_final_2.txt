@@ -1,0 +1,73 @@
+Reusing configuration cache.
+> Task :opencv:preBuild UP-TO-DATE
+> Task :opencv:preDebugBuild UP-TO-DATE
+> Task :core:domain:preBuild UP-TO-DATE
+> Task :core:design:preBuild UP-TO-DATE
+> Task :core:common:preBuild UP-TO-DATE
+> Task :opencv:generateDebugBuildConfig UP-TO-DATE
+> Task :core:common:preDebugBuild UP-TO-DATE
+> Task :opencv:javaPreCompileDebug UP-TO-DATE
+> Task :opencv:generateDebugResources UP-TO-DATE
+> Task :core:common:generateDebugResources UP-TO-DATE
+> Task :core:common:processDebugNavigationResources UP-TO-DATE
+> Task :core:common:javaPreCompileDebug UP-TO-DATE
+> Task :opencv:packageDebugResources UP-TO-DATE
+> Task :core:common:packageDebugResources UP-TO-DATE
+> Task :core:design:preDebugBuild UP-TO-DATE
+> Task :opencv:processDebugNavigationResources UP-TO-DATE
+> Task :core:common:parseDebugLocalResources UP-TO-DATE
+> Task :core:design:generateDebugResources UP-TO-DATE
+> Task :opencv:parseDebugLocalResources UP-TO-DATE
+> Task :core:common:generateDebugRFile UP-TO-DATE
+> Task :core:design:processDebugNavigationResources UP-TO-DATE
+> Task :core:domain:preDebugBuild UP-TO-DATE
+> Task :core:design:javaPreCompileDebug UP-TO-DATE
+> Task :opencv:generateDebugRFile UP-TO-DATE
+> Task :core:design:packageDebugResources UP-TO-DATE
+> Task :core:domain:processDebugNavigationResources UP-TO-DATE
+> Task :core:domain:javaPreCompileDebug UP-TO-DATE
+> Task :core:domain:generateDebugResources UP-TO-DATE
+> Task :core:design:parseDebugLocalResources UP-TO-DATE
+> Task :core:native:preBuild UP-TO-DATE
+> Task :core:native:preDebugBuild UP-TO-DATE
+> Task :core:design:generateDebugRFile UP-TO-DATE
+> Task :core:native:processDebugNavigationResources UP-TO-DATE
+> Task :core:native:generateDebugResources UP-TO-DATE
+> Task :core:native:javaPreCompileDebug UP-TO-DATE
+> Task :core:domain:packageDebugResources UP-TO-DATE
+> Task :core:domain:parseDebugLocalResources UP-TO-DATE
+> Task :core:native:packageDebugResources UP-TO-DATE
+> Task :core:domain:generateDebugRFile UP-TO-DATE
+> Task :feature:ar:preBuild UP-TO-DATE
+> Task :core:native:parseDebugLocalResources UP-TO-DATE
+> Task :feature:ar:preDebugBuild UP-TO-DATE
+> Task :feature:ar:generateDebugResources UP-TO-DATE
+> Task :core:native:generateDebugRFile UP-TO-DATE
+> Task :feature:ar:processDebugNavigationResources UP-TO-DATE
+> Task :feature:ar:packageDebugResources UP-TO-DATE
+> Task :feature:ar:parseDebugLocalResources UP-TO-DATE
+> Task :feature:ar:generateDebugRFile UP-TO-DATE
+> Task :opencv:compileDebugKotlin NO-SOURCE
+> Task :opencv:compileDebugJavaWithJavac UP-TO-DATE
+> Task :opencv:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:common:compileDebugKotlin UP-TO-DATE
+> Task :core:common:compileDebugJavaWithJavac UP-TO-DATE
+> Task :core:common:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:domain:compileDebugKotlin UP-TO-DATE
+> Task :core:domain:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:domain:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:design:compileDebugKotlin UP-TO-DATE
+> Task :core:design:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:design:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:native:compileDebugKotlin UP-TO-DATE
+> Task :core:native:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:native:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:ar:kspDebugKotlin
+
+> Task :feature:ar:compileDebugKotlin
+w: file:///app/feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/MappingScreen.kt:27:26 'val LocalLifecycleOwner: ProvidableCompositionLocal<LifecycleOwner>' is deprecated. Moved to lifecycle-runtime-compose library in androidx.lifecycle.compose package.
+w: file:///app/feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/BackgroundRenderer.kt:61:19 'fun transformDisplayUvCoords(p0: FloatBuffer!, p1: FloatBuffer!): Unit' is deprecated. Deprecated in Java.
+
+BUILD SUCCESSFUL in 6s
+49 actionable tasks: 2 executed, 47 up-to-date
+Configuration cache entry reused.

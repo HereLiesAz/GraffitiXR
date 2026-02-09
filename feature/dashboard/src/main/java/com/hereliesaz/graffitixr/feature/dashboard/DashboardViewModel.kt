@@ -52,7 +52,15 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    fun openProject(project: GraffitiProject) {
+        openProject(project.id)
+    }
+
     fun openProject(project: Project) {
+        openProject(project.id)
+    }
+
+    fun openProject(projectId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val result = projectRepository.loadProject(projectId)
