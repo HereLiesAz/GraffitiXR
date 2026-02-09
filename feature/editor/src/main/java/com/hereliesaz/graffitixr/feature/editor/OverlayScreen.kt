@@ -93,10 +93,17 @@ fun OverlayScreen(
             onDispose {
                 try {
                     if (cameraProviderFuture?.isDone == true) {
-                        cameraProviderFuture.get().unbindAll()
+                        // Ensure unbind happens on the main thread
+                        ContextCompat.getMainExecutor(context).execute {
+                            try {
+                                cameraProviderFuture.get().unbindAll()
+                            } catch (e: Exception) {
+                                Log.e("OverlayScreen", "Failed to unbind camera on main thread", e)
+                            }
+                        }
                     }
                 } catch (e: Exception) {
-                    Log.e("OverlayScreen", "Failed to unbind camera", e)
+                    Log.e("OverlayScreen", "Failed to schedule camera unbind", e)
                 }
             }
         }
