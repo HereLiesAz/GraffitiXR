@@ -9,7 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.hereliesaz.graffitixr.ui.MainScreen
-import com.hereliesaz.graffitixr.ui.theme.GraffitiXRTheme
+import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
