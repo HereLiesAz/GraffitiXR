@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     
     // Hilt
     implementation(libs.hilt.android)
