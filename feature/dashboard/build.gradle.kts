@@ -42,6 +42,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.coil.compose)
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
