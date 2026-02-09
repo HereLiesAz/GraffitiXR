@@ -9,6 +9,9 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.Frame
+import com.google.ar.core.Plane
+import com.google.ar.core.PointCloud
+import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableApkTooOldException
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
@@ -16,6 +19,8 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.feature.ar.rendering.BackgroundRenderer
+import com.hereliesaz.graffitixr.feature.ar.rendering.PlaneRenderer
+import com.hereliesaz.graffitixr.feature.ar.rendering.PointCloudRenderer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -35,10 +40,16 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
     val slamManager = SlamManager()
 
     private val backgroundRenderer = BackgroundRenderer()
+    private val planeRenderer = PlaneRenderer(context, context)
+    private val pointCloudRenderer = PointCloudRenderer()
 
     // State flags
     private var showPointCloud = false
     private var isFlashlightOn = false
+
+    // Matrix caches to avoid allocation in draw loop
+    private val projectionMatrix = FloatArray(16)
+    private val viewMatrix = FloatArray(16)
 
     // Display rotation helper
     private val displayRotationHelper = DisplayRotationHelper(context)
@@ -90,6 +101,8 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         // Initialize Native Engine (MobileGS)
         slamManager.init(context.assets)
         backgroundRenderer.createOnGlThread()
+        planeRenderer.createOnGlThread(context)
+        pointCloudRenderer.createOnGlThread()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -114,14 +127,30 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
             // Draw the camera background
             backgroundRenderer.draw(frame)
 
-            // Pass ARCore frame data to Native Engine
-            slamManager.update(
-                frame.timestamp,
-                camera.displayOrientedPose.translation,
-                camera.displayOrientedPose.rotationQuaternion
+            // Get projection matrix.
+            camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+
+            // Get camera matrix and draw.
+            camera.getViewMatrix(viewMatrix, 0)
+
+            // Visualize tracked points.
+            val pointCloud = frame.acquirePointCloud()
+            pointCloudRenderer.update(pointCloud)
+            pointCloudRenderer.draw(viewMatrix, projectionMatrix)
+            pointCloud.release()
+
+            // Visualize planes.
+            planeRenderer.drawPlanes(
+                session.getAllTrackables(Plane::class.java),
+                viewMatrix,
+                projectionMatrix
             )
 
-            // Render
+            // Pass ARCore frame data to Native Engine (MobileGS)
+            // Use the real matrix update method, not the placeholder
+            slamManager.updateCamera(viewMatrix, projectionMatrix)
+
+            // Render Native SLAM content (if enabled)
             slamManager.draw(showPointCloud)
 
         } catch (t: Throwable) {
