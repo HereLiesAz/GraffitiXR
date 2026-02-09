@@ -10,8 +10,8 @@ There is effectively only **one** screen.
 The "Screens" are actually just logic states within the AR Viewport:
 
 ### A. Scan Mode
-* **Visuals:** Shows the Confidence Cloud (Green/Yellow/Red dots).
-* **Controls:** Reset Map, Save Map.
+* **Visuals:** Shows the Confidence Cloud (Sparse, opaque dots) and AR Planes.
+* **Controls:** Reset Map, Save Map, Create Target.
 
 ### B. Project Mode
 * **Visuals:** Shows the selected User Image overlaid on the map.
@@ -24,3 +24,8 @@ The "Screens" are actually just logic states within the AR Viewport:
 ## 3. Settings (Flyout)
 * **Permissions:** Camera, Storage status.
 * **About:** Version info.
+
+## 4. Target Creation (Overlay)
+*   **Trigger:** "Create" button on Rail.
+*   **Visuals:** Camera viewfinder with "Capture" shutter.
+*   **Flow:** Capture -> Review -> AR Anchor Injection.

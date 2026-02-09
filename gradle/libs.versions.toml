@@ -15,6 +15,7 @@ espressoCore = "3.7.0"
 firebaseBom = "34.9.0"
 gson = "2.13.2"
 hilt = "2.59.1"
+hiltNavigationCompose = "1.2.0"
 junit = "4.13.2"
 materialIconsCore = "1.7.8"
 mockk = "1.14.9"
@@ -70,6 +71,7 @@ google-accompanist-permissions = { group = "com.google.accompanist", name = "acc
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
+androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
