@@ -1,9 +1,8 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -17,9 +16,8 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
-    application: Application,
     private val projectRepository: ProjectRepository
-) : AndroidViewModel(application) {
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()

@@ -34,7 +34,6 @@ class ArViewModelTest {
         every { projectRepository.currentProject } returns projectFlow
         
         viewModel = ArViewModel(projectRepository)
-        viewModel.arRenderer = renderer
     }
 
     @After
@@ -43,26 +42,42 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `togglePointCloud updates state and renderer`() = runTest {
+    fun `togglePointCloud updates state`() = runTest {
         // Initial state
         assertEquals(false, viewModel.uiState.value.showPointCloud)
         
         viewModel.togglePointCloud()
         
         assertEquals(true, viewModel.uiState.value.showPointCloud)
-        verify { renderer.showPointCloud = true }
     }
 
     @Test
-    fun `updateLayers from repository updates renderer`() = runTest {
-        val layer = mockk<OverlayLayer>(relaxed = true)
-        val project = mockk<ProjectData>(relaxed = true)
-        every { project.layers } returns listOf(layer)
+    fun `toggleFlashlight updates state`() = runTest {
+        // Initial state
+        assertEquals(false, viewModel.uiState.value.isFlashlightOn)
+
+        viewModel.toggleFlashlight()
+
+        assertEquals(true, viewModel.uiState.value.isFlashlightOn)
+    }
+
+    @Test
+    fun `onProgressUpdate updates mappingQualityScore`() = runTest {
+        viewModel.onProgressUpdate(0.75f, null)
+        assertEquals(0.75f, viewModel.uiState.value.mappingQualityScore)
+    }
+
+    @Test
+    fun `onFrameCaptured updates state with bitmap and uri`() = runTest {
+        val bitmap = mockk<android.graphics.Bitmap>()
+        val uri = mockk<android.net.Uri>()
         
-        projectFlow.value = project
+        viewModel.onFrameCaptured(bitmap, uri)
         
         testDispatcher.scheduler.advanceUntilIdle()
         
-        verify { renderer.updateLayers(listOf(layer)) }
+        assertEquals(true, viewModel.uiState.value.isArTargetCreated)
+        assert(viewModel.uiState.value.capturedTargetUris.contains(uri))
+        assert(viewModel.uiState.value.capturedTargetImages.contains(bitmap))
     }
 }
