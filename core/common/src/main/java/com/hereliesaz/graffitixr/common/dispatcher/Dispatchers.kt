@@ -1,19 +1,4 @@
 package com.hereliesaz.graffitixr.common.dispatcher
 
-import javax.inject.Qualifier
-
-@Retention(AnnotationRetention.BINARY)
-@Qualifier
-annotation class IoDispatcher
-
-@Retention(AnnotationRetention.BINARY)
-@Qualifier
-annotation class DefaultDispatcher
-
-@Retention(AnnotationRetention.BINARY)
-@Qualifier
-annotation class MainDispatcher
-
-@Retention(AnnotationRetention.BINARY)
-@Qualifier
-annotation class MainImmediateDispatcher
+// This file is being emptied to resolve redeclaration errors. 
+// Use DispatcherQualifiers.kt for Hilt qualifier annotations.

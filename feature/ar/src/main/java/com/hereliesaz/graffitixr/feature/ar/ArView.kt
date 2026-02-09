@@ -1,8 +1,9 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,30 +57,18 @@ fun ArView(
 
     AndroidView(
         modifier = modifier,
-        factory = {
-            arView
-        },
-        update = { view ->
-            // Explicitly named parameter 'view' avoids "Unresolved reference: it" issues
-            view.setShowPointCloud(showPointCloud)
-            view.setFlashlight(flashLightOn)
-
-    // React to new target images being captured
-    LaunchedEffect(Unit) {
-        viewModel.newTargetImage.collect { (bitmap, name) ->
-            arRenderer.setupAugmentedImageDatabase(bitmap, name)
-        }
-    }
-
-    val factory = remember(arRenderer) {
-        { ctx: android.content.Context ->
+        factory = { ctx ->
             FrameLayout(ctx).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
-                addView(arRenderer.view)
+                addView(arView)
             }
+        },
+        update = { _ ->
+            arView.setShowPointCloud(showPointCloud)
+            arView.setFlashlight(flashLightOn)
         }
     )
 }
