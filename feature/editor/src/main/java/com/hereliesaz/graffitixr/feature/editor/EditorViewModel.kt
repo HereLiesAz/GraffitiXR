@@ -14,7 +14,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class EditorViewModel @Inject constructor(
-    private val projectManager: ProjectManager
+    private val projectRepository: ProjectRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditorUiState())
@@ -42,7 +42,7 @@ class EditorViewModel @Inject constructor(
         }
 
         // In a real scenario, we would trigger a save to the ProjectManager here
-        // projectManager.saveLayer(newLayer)
+        // projectRepository.saveLayer(newLayer)
     }
 
     /**

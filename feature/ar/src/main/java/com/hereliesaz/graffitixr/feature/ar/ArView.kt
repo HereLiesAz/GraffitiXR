@@ -2,16 +2,17 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ar.core.Session
 
 @Composable
@@ -63,8 +64,22 @@ fun ArView(
             view.setShowPointCloud(showPointCloud)
             view.setFlashlight(flashLightOn)
 
-            // Assuming image db setup happens here
-            view.setupAugmentedImageDatabase(null)
+    // React to new target images being captured
+    LaunchedEffect(Unit) {
+        viewModel.newTargetImage.collect { (bitmap, name) ->
+            arRenderer.setupAugmentedImageDatabase(bitmap, name)
+        }
+    }
+
+    val factory = remember(arRenderer) {
+        { ctx: android.content.Context ->
+            FrameLayout(ctx).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                addView(arRenderer.view)
+            }
         }
     )
 }

@@ -55,12 +55,12 @@ class DashboardViewModel @Inject constructor(
     fun openProject(project: Project) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val result = projectRepository.loadProject(project.id)
+            val result = projectRepository.loadProject(projectId)
             if (result.isSuccess) {
                  _uiState.update { 
                      it.copy(
                          showProjectList = false, 
-                         currentProjectId = project.id 
+                         currentProjectId = projectId
                      ) 
                  }
             }

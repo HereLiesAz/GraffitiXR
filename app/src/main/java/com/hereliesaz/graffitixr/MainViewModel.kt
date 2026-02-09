@@ -53,8 +53,28 @@ class MainViewModel @Inject constructor(
     // REASON: Moved to feature:editor / EditorViewModel to fix "Split Brain" architecture.
 }
 
-data class MainUiState(
-    val permissionsGranted: Boolean = false,
-    val isArSessionReady: Boolean = false,
-    val isLoading: Boolean = false
-)
+    fun startTargetCapture() {
+        _uiState.update {
+            it.copy(
+                isCapturingTarget = true,
+                captureStep = CaptureStep.CAPTURE
+            )
+        }
+    }
+
+    fun setCaptureStep(step: CaptureStep) {
+        _uiState.update { it.copy(captureStep = step) }
+    }
+
+    fun onCancelCaptureClicked() {
+        _uiState.update { it.copy(isCapturingTarget = false) }
+    }
+
+    fun onConfirmTargetCreation() {
+        _uiState.update { it.copy(isArTargetCreated = true, isCapturingTarget = false) }
+    }
+
+    fun onRetakeCapture() {
+        _uiState.update { it.copy(captureStep = CaptureStep.CAPTURE) }
+    }
+}
