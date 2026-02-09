@@ -38,3 +38,7 @@ Gaussian Splatting requires back-to-front sorting for correct alpha blending.
 
 ## JNI Interface
 The engine is exposed to Kotlin via `GraffitiJNI.cpp`, which maps native pointers to Java `long` handles.
+
+**Key Methods:**
+*   `updateCamera(viewMtx, projMtx)`: Updates the camera pose using raw OpenGL matrices.
+*   `feedDepthData(buffer, width, height)`: Ingests the 16-bit depth buffer for voxel unprojection.
