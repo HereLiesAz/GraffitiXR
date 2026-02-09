@@ -43,6 +43,11 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(isTouchLocked = locked) }
     }
 
+    fun setTraceLocked(locked: Boolean) {
+        // Trace lock implies touch lock
+        _uiState.update { it.copy(isTouchLocked = locked) }
+    }
+
     fun showUnlockInstructions() {
         _uiState.update { it.copy(showUnlockInstructions = true) }
         viewModelScope.launch {

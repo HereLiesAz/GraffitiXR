@@ -30,11 +30,15 @@ data class EditorUiState(
     val progressPercentage: Float = 0f,
     
     // Dialogs
-    val sliderDialogType: String? = null,
-    val showColorBalanceDialog: Boolean = false,
+    val activePanel: EditorPanel = EditorPanel.NONE,
     
     // Capture state needed for UI hiding
-    val hideUiForCapture: Boolean = false
+    val hideUiForCapture: Boolean = false,
+
+    // Background Editing
+    val isEditingBackground: Boolean = false,
+    val backgroundScale: Float = 1f,
+    val backgroundOffset: Offset = Offset.Zero
 ) {
     val activeLayer: OverlayLayer?
         get() = layers.find { it.id == activeLayerId } ?: layers.firstOrNull()
