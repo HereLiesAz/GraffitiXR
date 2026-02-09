@@ -8,6 +8,9 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +25,9 @@ class ArViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
 
+    private val _newTargetImage = MutableSharedFlow<Pair<Bitmap, String>>()
+    val newTargetImage: SharedFlow<Pair<Bitmap, String>> = _newTargetImage.asSharedFlow()
+
     fun togglePointCloud() {
         val newState = !_uiState.value.showPointCloud
         _uiState.update { it.copy(showPointCloud = newState) }
@@ -32,7 +38,14 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isFlashlightOn = newState) }
     }
 
-    // NEW: Frame Capture
+    /**
+     * Called when the user captures a new target image in the Target Creation Flow.
+     * Updates the UI state with the capture URI, signals the View to update the AR session database,
+     * and persists the target URI to the current project.
+     *
+     * @param bitmap The captured bitmap.
+     * @param uri The URI where the bitmap is stored (usually in cache).
+     */
     fun onFrameCaptured(bitmap: Bitmap, uri: Uri) {
         viewModelScope.launch {
             // Update local state
@@ -43,6 +56,9 @@ class ArViewModel @Inject constructor(
                     capturedTargetImages = it.capturedTargetImages + bitmap
                 )
             }
+
+            // Signal AR View to update database
+            _newTargetImage.emit(bitmap to uri.toString())
 
             // Sync to Project Repository
             projectRepository.updateProject { project ->

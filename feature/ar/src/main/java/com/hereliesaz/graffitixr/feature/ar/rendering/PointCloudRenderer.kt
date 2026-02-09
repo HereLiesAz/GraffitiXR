@@ -74,6 +74,8 @@ class PointCloudRenderer {
         val numPoints = points.remaining() / 4
         var hasUpdates = false
         for (i in 0 until numPoints) {
+            if (i % 20 != 0) continue
+
             val id = ids.get(i)
             val x = points.get(i * 4)
             val y = points.get(i * 4 + 1)
@@ -113,7 +115,7 @@ class PointCloudRenderer {
         val mvpMatrix = FloatArray(16)
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
-        GLES20.glUniform1f(pointSizeHandle, 15.0f) 
+        GLES20.glUniform1f(pointSizeHandle, 2.5f)
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         GLES20.glVertexAttribPointer(positionHandle, 4, GLES20.GL_FLOAT, false, 16, 0)
         GLES20.glEnableVertexAttribArray(positionHandle)
