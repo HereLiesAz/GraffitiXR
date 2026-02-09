@@ -58,3 +58,5 @@ project_backup_full_*
 refactor*.sh
 */build/*
 */.cxx/*
+
+build_output*.txt
