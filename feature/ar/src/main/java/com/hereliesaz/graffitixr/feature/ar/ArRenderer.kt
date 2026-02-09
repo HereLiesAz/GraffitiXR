@@ -6,6 +6,9 @@ import android.opengl.GLSurfaceView
 import android.widget.Toast
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import android.graphics.Bitmap
+import com.google.ar.core.AugmentedImage
+import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.Frame
@@ -18,6 +21,7 @@ import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.feature.ar.rendering.AugmentedImageRenderer
 import com.hereliesaz.graffitixr.feature.ar.rendering.BackgroundRenderer
 import com.hereliesaz.graffitixr.feature.ar.rendering.PlaneRenderer
 import com.hereliesaz.graffitixr.feature.ar.rendering.PointCloudRenderer
@@ -42,6 +46,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer(context, context)
     private val pointCloudRenderer = PointCloudRenderer()
+    private val augmentedImageRenderer = AugmentedImageRenderer()
 
     // State flags
     private var showPointCloud = false
@@ -103,6 +108,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         backgroundRenderer.createOnGlThread()
         planeRenderer.createOnGlThread(context)
         pointCloudRenderer.createOnGlThread()
+        augmentedImageRenderer.createOnGlThread()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -146,6 +152,20 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
                 projectionMatrix
             )
 
+            // Visualize Augmented Images (Anchors)
+            val augmentedImages = session.getAllTrackables(AugmentedImage::class.java)
+            for (augmentedImage in augmentedImages) {
+                if (augmentedImage.trackingState == TrackingState.TRACKING) {
+                    augmentedImageRenderer.draw(
+                        viewMatrix,
+                        projectionMatrix,
+                        augmentedImage.centerPose,
+                        augmentedImage.extentX,
+                        augmentedImage.extentZ
+                    )
+                }
+            }
+
             // Pass ARCore frame data to Native Engine (MobileGS)
             // Use the real matrix update method, not the placeholder
             slamManager.updateCamera(viewMatrix, projectionMatrix)
@@ -173,6 +193,28 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         try {
             config.flashMode = if (enable) Config.FlashMode.TORCH else Config.FlashMode.OFF
             session.configure(config)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun setupAugmentedImageDatabase(bitmap: Bitmap, name: String) {
+        val session = session ?: return
+        try {
+            // Pause session to configure
+            session.pause()
+
+            val config = Config(session)
+            config.focusMode = Config.FocusMode.AUTO
+            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+
+            // Create database
+            val database = AugmentedImageDatabase(session)
+            database.addImage(name, bitmap)
+            config.augmentedImageDatabase = database
+
+            session.configure(config)
+            session.resume()
         } catch (e: Exception) {
             e.printStackTrace()
         }
