@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.domain.repository
+package com.hereliesaz.graffitixr.data.repository
 
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.Project

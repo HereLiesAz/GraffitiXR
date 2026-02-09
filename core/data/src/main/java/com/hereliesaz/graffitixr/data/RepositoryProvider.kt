@@ -2,7 +2,7 @@ package com.hereliesaz.graffitixr.data
 
 import android.content.Context
 import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.data.repository.ProjectRepository
 import kotlinx.coroutines.Dispatchers
 
 object RepositoryProvider {
@@ -15,7 +15,8 @@ object RepositoryProvider {
     fun initialize(context: Context) {
         if (_projectRepository == null) {
             val projectManager = ProjectManager(context.applicationContext)
-            _projectRepository = ProjectRepositoryImpl(context.applicationContext, projectManager, Dispatchers.IO)
+            _projectRepository =
+                ProjectRepositoryImpl(context.applicationContext, projectManager, Dispatchers.IO)
         }
     }
 }

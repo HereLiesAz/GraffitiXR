@@ -39,4 +39,7 @@ dependencies {
     
     implementation(project(":opencv"))
     implementation(libs.play.services.location)
+    // Hilt / Dagger
+    implementation(libs.hilt.android)
+    implementation(libs.hilt.compiler)
 }

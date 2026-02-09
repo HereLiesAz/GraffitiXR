@@ -1,66 +1,47 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.ui
 
-import android.graphics.Bitmap
-import android.content.ContentValues
-import android.provider.MediaStore
-import android.view.PixelCopy
+import android.Manifest
+import android.view.HapticFeedbackConstants
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.geometry.Offset
-import androidx.navigation.NavController
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import com.hereliesaz.aznavrail.*
-import com.hereliesaz.aznavrail.model.AzButtonShape
-import com.hereliesaz.aznavrail.model.AzDockingSide
-import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.graffitixr.common.model.ArUiState
-import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
-import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
-import com.hereliesaz.graffitixr.design.theme.NavStrings
-import com.hereliesaz.graffitixr.feature.ar.ArRenderer
-import com.hereliesaz.graffitixr.feature.ar.ArView
-import com.hereliesaz.graffitixr.feature.ar.ArViewModel
-import com.hereliesaz.graffitixr.feature.ar.MappingScreen
-import com.hereliesaz.graffitixr.feature.ar.TargetCreationFlow
-import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
-import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
-import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
-import com.hereliesaz.graffitixr.feature.editor.*
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.io.File
-import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hereliesaz.graffitixr.MainViewModel
+import com.hereliesaz.graffitixr.feature.ar.presentation.ArScreen
+import com.hereliesaz.graffitixr.feature.dashboard.DashboardScreen
+import com.hereliesaz.graffitixr.feature.editor.presentation.EditorViewModel
+import com.hereliesaz.graffitixr.feature.map.MappingScreen
+import com.hereliesaz.graffitixr.ui.components.AzHostActivityLayout
+import com.hereliesaz.graffitixr.ui.components.azRailHostItem
+import com.hereliesaz.graffitixr.ui.components.azRailSubItem
 
 @Composable
 fun MainScreen(
-    viewModel: MainViewModel,
-    editorViewModel: EditorViewModel,
-    arViewModel: ArViewModel,
-    dashboardViewModel: DashboardViewModel,
-    navController: NavController,
-    onRendererCreated: (ArRenderer) -> Unit
+    viewModel: MainViewModel = hiltViewModel(),
+    editorViewModel: EditorViewModel = hiltViewModel() // Injected for correct scope
 ) {
     val localNavController = rememberNavController()
     val navBackStackEntry by localNavController.currentBackStackEntryAsState()
@@ -149,15 +130,15 @@ fun MainScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        hasCameraPermission = permissions[android.Manifest.permission.CAMERA] ?: false
+        viewModel.onPermissionsResult(permissions)
     }
 
-    val requestPermissions = {
+    LaunchedEffect(Unit) {
         permissionLauncher.launch(
             arrayOf(
-                android.Manifest.permission.CAMERA,
-                android.Manifest.permission.ACCESS_FINE_LOCATION,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION
+                Manifest.permission.CAMERA,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
             )
         )
     }
@@ -240,12 +221,21 @@ fun MainScreen(
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
 
-            // Layer Management
-            editorUiState.layers.reversed().forEach { layer ->
-                azRailRelocItem(
-                    id = "layer_${layer.id}", hostId = "design_host", text = layer.name,
+            // HOST: AR/Editor
+            azRailHostItem(
+                selected = currentRoute == "ar",
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+                    currentRoute = "ar"
+                },
+                icon = { Icon(Icons.Default.Build, contentDescription = "AR") },
+                label = { Text("Create") }
+            ) {
+                // SUB: Add Layer (routed to EditorViewModel now)
+                azRailSubItem(
                     onClick = {
-                        if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
+                        haptic.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        editorViewModel.onAddLayer() // Fixed: Using EditorViewModel
                     },
                     onRelocate = { _, _, newOrder -> editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed()) }
                 ) {
@@ -482,28 +472,16 @@ fun MainContentLayer(
                 onGestureStart = onStart, 
                 onGestureEnd = onOverlayGestureEnd
             )
-            EditorMode.AR -> {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    // AR View (Background - Handles Camera & Flashlight via ARCore)
-                    ArView(viewModel = arViewModel, uiState = arUiState, onRendererCreated = onRendererCreated)
 
-                    // Overlay Screen (Foreground - Handles Layers & Gestures, Camera disabled)
-                    OverlayScreen(
-                        uiState = editorUiState,
-                        isFlashlightOn = false, // Handled by ArView/ArRenderer
-                        onCycleRotationAxis = onCycle,
-                        onGestureStart = onStart,
-                        onGestureEnd = onOverlayGestureEnd,
-                        showCamera = false
-                    )
-                }
-            }
-            else -> OverlayScreen(
-                uiState = editorUiState,
-                isFlashlightOn = arUiState.isFlashlightOn,
-                onCycleRotationAxis = onCycle, 
-                onGestureStart = onStart, 
-                onGestureEnd = onOverlayGestureEnd
+            // HOST: Settings
+            azRailHostItem(
+                selected = currentRoute == "settings",
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+                    currentRoute = "settings"
+                },
+                icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                label = { Text("Settings") }
             )
         }
     }
@@ -588,7 +566,5 @@ fun saveExportedImage(context: android.content.Context, bitmap: Bitmap) {
                 context.contentResolver.update(it, contentValues, null, null)
             }
         }
-    } catch (e: Exception) {
-        e.printStackTrace()
     }
 }

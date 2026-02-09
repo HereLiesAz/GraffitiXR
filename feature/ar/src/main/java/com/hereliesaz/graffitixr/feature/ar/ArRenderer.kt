@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.feature.ar
+package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
 import android.opengl.GLES20
@@ -29,20 +29,13 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.PointCloudRenderer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, DefaultLifecycleObserver {
+class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
-    val view: GLSurfaceView = GLSurfaceView(context).apply {
-        preserveEGLContextOnPause = true
-        setEGLContextClientVersion(3)
-        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-        setRenderer(this@ArRenderer)
-        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-    }
+    private var session: Session? = null
 
-    var session: Session? = null
-        private set
-
-    val slamManager = SlamManager()
+    // Renderers
+    private val backgroundRenderer = BackgroundRenderer()
+    private val pointCloudRenderer = PointCloudRenderer()
 
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer(context, context)
@@ -64,8 +57,8 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         onResume()
     }
 
-    override fun onPause(owner: LifecycleOwner) {
-        onPause()
+    fun setSession(session: Session) {
+        this.session = session
     }
 
     fun onResume() {
@@ -85,11 +78,10 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         }
 
         try {
-            session?.resume()
-            view.onResume()
-            displayRotationHelper.onResume()
-        } catch (e: CameraNotAvailableException) {
-            Toast.makeText(context, "Camera unavailable", Toast.LENGTH_LONG).show()
+            backgroundRenderer.createOnGlThread(context)
+            pointCloudRenderer.createOnGlThread(context)
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Failed to init GL", e)
         }
     }
 
@@ -114,18 +106,14 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        displayRotationHelper.onSurfaceChanged(width, height)
         GLES20.glViewport(0, 0, width, height)
-        slamManager.onSurfaceChanged(width, height)
+        session?.setDisplayGeometry(0, width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        // Clear screen to avoid artifacts if native draw fails or is partial
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        val session = session ?: return
-
-        displayRotationHelper.updateSessionIfNeeded(session)
+        val currentSession = session ?: return
 
         try {
             session.setCameraTextureName(backgroundRenderer.textureId)
@@ -196,22 +184,17 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
 
     // --- Interaction Hooks ---
 
-    fun setShowPointCloud(enable: Boolean) {
-        this.showPointCloud = enable
-    }
+            // Projection Matrix
+            camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+            camera.getViewMatrix(viewMatrix, 0)
 
-    fun setFlashlight(enable: Boolean) {
-        this.isFlashlightOn = enable
-        val session = session ?: return
-        val config = session.config
-
-        try {
-            config.flashMode = if (enable) Config.FlashMode.TORCH else Config.FlashMode.OFF
-            session.configure(config)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
+            // Draw Point Cloud (The "Blue Dots")
+            if (showPointCloud) {
+                val pointCloud = frame.acquirePointCloud()
+                pointCloudRenderer.update(pointCloud)
+                pointCloudRenderer.draw(viewMatrix, projectionMatrix)
+                pointCloud.release()
+            }
 
     /**
      * Pauses the AR session to re-configure it with a new AugmentedImageDatabase containing
@@ -281,6 +264,5 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
             is UnavailableDeviceNotCompatibleException -> "This device does not support AR"
             else -> "Failed to create AR session"
         }
-        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
     }
 }
