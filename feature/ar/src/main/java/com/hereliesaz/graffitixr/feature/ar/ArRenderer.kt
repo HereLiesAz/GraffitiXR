@@ -4,6 +4,7 @@ import android.content.Context
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.widget.Toast
+import android.view.PixelCopy
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import android.graphics.Bitmap
@@ -74,6 +75,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
                     val config = Config(this)
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                    config.depthMode = Config.DepthMode.AUTOMATIC
                     configure(config)
                 }
             } catch (e: Exception) {
@@ -170,6 +172,19 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
             // Use the real matrix update method, not the placeholder
             slamManager.updateCamera(viewMatrix, projectionMatrix)
 
+            try {
+                val depthImage = frame.acquireDepthImage16Bits()
+                if (depthImage != null) {
+                    val buffer = depthImage.planes[0].buffer
+                    val width = depthImage.width
+                    val height = depthImage.height
+                    slamManager.feedDepthData(buffer, width, height)
+                    depthImage.close()
+                }
+            } catch (e: Exception) {
+                // Depth not available or error acquiring
+            }
+
             // Render Native SLAM content (if enabled)
             slamManager.draw(showPointCloud)
 
@@ -207,6 +222,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
             val config = Config(session)
             config.focusMode = Config.FocusMode.AUTO
             config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+            config.depthMode = Config.DepthMode.AUTOMATIC
 
             // Create database
             val database = AugmentedImageDatabase(session)
@@ -215,6 +231,30 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
 
             session.configure(config)
             session.resume()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun captureFrame(onCaptured: (Bitmap) -> Unit) {
+        val bitmap = Bitmap.createBitmap(
+            view.width,
+            view.height,
+            Bitmap.Config.ARGB_8888
+        )
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        try {
+            PixelCopy.request(
+                view,
+                bitmap,
+                { result ->
+                    if (result == PixelCopy.SUCCESS) {
+                        onCaptured(bitmap)
+                    }
+                },
+                handler
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }

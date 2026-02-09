@@ -76,6 +76,13 @@ fun MainScreen(
     val context = LocalContext.current
     val window = (view.context as? android.app.Activity)?.window
 
+    // Keep track of renderer for captures
+    var renderRef by remember { mutableStateOf<ArRenderer?>(null) }
+    val onRendererCreatedWrapper: (ArRenderer) -> Unit = { renderer ->
+        renderRef = renderer
+        onRendererCreated(renderer)
+    }
+
     // Export Logic
     LaunchedEffect(exportTrigger) {
         if (exportTrigger && window != null) {
@@ -198,6 +205,14 @@ fun MainScreen(
 
             if (editorUiState.editorMode == EditorMode.AR) {
                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
+                azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
+                    if (hasCameraPermission) {
+                        viewModel.startTargetCapture()
+                        resetDialogs()
+                    } else {
+                        requestPermissions()
+                    }
+                })
                 azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
                     if (hasCameraPermission) {
                         localNavController.navigate("surveyor")
@@ -309,7 +324,7 @@ fun MainScreen(
                          arUiState = arUiState,
                          editorViewModel = editorViewModel,
                          arViewModel = arViewModel,
-                         onRendererCreated = onRendererCreated,
+                         onRendererCreated = onRendererCreatedWrapper,
                          onPickBackground = {
                              backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                          }
@@ -396,7 +411,15 @@ fun MainScreen(
                             onConfirm = viewModel::onConfirmTargetCreation,
                             onRetake = viewModel::onRetakeCapture,
                             onCancel = viewModel::onCancelCaptureClicked,
-                            onCaptureShutter = { },
+                            onCaptureShutter = {
+                                renderRef?.captureFrame { bitmap ->
+                                    val uri = saveBitmapToCache(context, bitmap)
+                                    if (uri != null) {
+                                        arViewModel.onFrameCaptured(bitmap, uri)
+                                        viewModel.setCaptureStep(com.hereliesaz.graffitixr.common.model.CaptureStep.REVIEW)
+                                    }
+                                }
+                            },
                             onCalibrationPointCaptured = { },
                             onUnwarpImage = { _ -> }
                         )
@@ -511,6 +534,25 @@ fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit)
         )
     } catch (e: Exception) {
         e.printStackTrace()
+    }
+}
+
+fun saveBitmapToCache(context: android.content.Context, bitmap: Bitmap): android.net.Uri? {
+    try {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val fileName = "Target_$timestamp.jpg"
+        val file = File(context.cacheDir, fileName)
+        FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        }
+        return androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
     }
 }
 
