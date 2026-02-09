@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.dashboard
 
 import com.hereliesaz.graffitixr.common.model.GpsData
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.Project
 
 data class DashboardUiState(

@@ -2,7 +2,7 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

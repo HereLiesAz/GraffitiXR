@@ -25,6 +25,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
+    implementation(project(":core:data"))
     implementation(project(":core:design"))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)

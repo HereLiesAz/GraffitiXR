@@ -23,7 +23,6 @@ class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
-    private val renderer: ArRenderer = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
     
     private val projectFlow = MutableStateFlow<GraffitiProject?>(null)
