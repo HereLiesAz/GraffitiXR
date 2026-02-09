@@ -1,6 +1,9 @@
 package com.hereliesaz.graffitixr.common.dispatcher.di
 
+import com.hereliesaz.graffitixr.common.dispatcher.DefaultDispatcher
 import com.hereliesaz.graffitixr.common.dispatcher.DispatcherProvider
+import com.hereliesaz.graffitixr.common.dispatcher.IoDispatcher
+import com.hereliesaz.graffitixr.common.dispatcher.MainDispatcher
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,4 +25,16 @@ object DispatchersModule {
             override val default: CoroutineDispatcher get() = Dispatchers.Default
         }
     }
+
+    @Provides
+    @IoDispatcher
+    fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
+
+    @Provides
+    @MainDispatcher
+    fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
+
+    @Provides
+    @DefaultDispatcher
+    fun provideDefaultDispatcher(): CoroutineDispatcher = Dispatchers.Default
 }
