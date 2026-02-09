@@ -289,10 +289,6 @@ fun MainScreen(
                 showInfoScreen = true
                 resetDialogs()
             }
-            if (editorUiState.editorMode == EditorMode.AR) azRailItem(id = "ghost", text = "Ghost", info = "Toggle Point Cloud", onClick = {
-                arViewModel.togglePointCloud()
-                resetDialogs()
-            })
             if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
                 arViewModel.toggleFlashlight()
                 resetDialogs()

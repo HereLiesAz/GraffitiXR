@@ -40,6 +40,7 @@ class ProjectRepositoryImpl @Inject constructor(
     }
 
     override suspend fun createProject(name: String): ProjectData = withContext(ioDispatcher) {
+        // Force Recompile
         val newProject = ProjectData(name = name)
         _currentProject.value = newProject
         projectManager.saveProject(context, newProject, emptyList())
