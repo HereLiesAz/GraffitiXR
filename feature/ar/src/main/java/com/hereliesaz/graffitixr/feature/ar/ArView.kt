@@ -63,8 +63,22 @@ fun ArView(
             view.setShowPointCloud(showPointCloud)
             view.setFlashlight(flashLightOn)
 
-            // Assuming image db setup happens here
-            view.setupAugmentedImageDatabase(null)
+    // React to new target images being captured
+    LaunchedEffect(Unit) {
+        viewModel.newTargetImage.collect { (bitmap, name) ->
+            arRenderer.setupAugmentedImageDatabase(bitmap, name)
+        }
+    }
+
+    val factory = remember(arRenderer) {
+        { ctx: android.content.Context ->
+            FrameLayout(ctx).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                addView(arRenderer.view)
+            }
         }
     )
 }

@@ -18,7 +18,13 @@ class BackgroundRenderer {
     var textureId: Int = -1
         private set
 
-    fun createOnGlThread(context: Context) {
+    private var quadPositionParam: Int = 0
+    private var quadTexCoordParam: Int = 0
+    private var uTextureParam: Int = 0
+    private var hasTransformed = false
+
+    fun createOnGlThread() {
+        // Generate Texture
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
         textureId = textures[0]
@@ -57,8 +63,14 @@ class BackgroundRenderer {
     }
 
     fun draw(frame: Frame) {
-        if (frame.hasDisplayGeometryChanged()) {
-            frame.transformDisplayUvCoords(quadTexCoord, quadTexCoord)
+        if (frame.hasDisplayGeometryChanged() || !hasTransformed) {
+            frame.transformCoordinates2d(
+                Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+                quadVertices,
+                Coordinates2d.TEXTURE_NORMALIZED,
+                quadTexCoordTransformed
+            )
+            hasTransformed = true
         }
 
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)

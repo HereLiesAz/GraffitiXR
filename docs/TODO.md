@@ -152,25 +152,36 @@ This document tracks the development status, future enhancements, and identified
 
 ## **Project Backlog**
 
-All items completed. Ready for the next phase of development.
 # Project Roadmap & Backlog
 
 ## 🔴 High Priority (The Core)
 
-- [x] **Voxel Map Culling:** The `MobileGS` engine now performs a "Garbage Collector" pass that deletes points with `opacity < 0.3` and `age > 2000ms` when the map buffer reaches 95% capacity.
-- [x] **Serialization Speed:** The `.map` save functionality has been moved to `Dispatchers.IO` in Kotlin, calling a synchronous C++ `saveModel` function to prevent UI freezes (ANRs).
-- [ ] **AzNavRail Haptics:** Add haptic feedback when scrolling through rail items so the user can "feel" the menu without looking.
+- [x] **Move `TargetCreationFlow` to `:feature:ar`**
+    - Moved logic to feature module.
+- [x] **Fix AR Camera Black Screen**
+    - Implemented `BackgroundRenderer` in `ArRenderer` to correctly draw the camera feed.
+- [x] **Restore AR Visualizations**
+    - Wired up `PlaneRenderer` and `PointCloudRenderer` to show standard ARCore trackables.
+- [x] **Target Creation Frontend**
+    - Connected "Create" rail button to `TargetCreationFlow`.
+    - Implemented `ArRenderer.captureFrame` (PixelCopy) and `setupAugmentedImageDatabase` to create dynamic anchors.
+- [x] **Enable Neural Scan Depth**
+    - Enabled `Config.DepthMode.AUTOMATIC` and wired 16-bit depth buffer to `MobileGS` native engine.
+- [x] **Reduce Point Cloud Clutter**
+    - Reduced point size (2.5f) and implemented sparse sampling (1/20) to keep the view clear.
+- [x] **Voxel Map Culling:** The `MobileGS` engine now performs a "Garbage Collector" pass.
+- [x] **Serialization Speed:** The `.map` save functionality has been moved to `Dispatchers.IO`.
 
 ## 🟡 Medium Priority (Features)
 
-- [x] **"Ghost" Toggle:** A button to toggle the rendered splats on/off. Sometimes the green dots get in the way of seeing the actual wall art.
-- [x] **Fingerprint Aging:** The ORB descriptors should age out. If a wall changes significantly (painted over), the old fingerprint prevents re-localization. We need a "Force Rescan" button.
-- [x] **Left-Handed Mode:** Invert the AzNavRail alignment in `MainScreen.kt`.
+- [ ] **AzNavRail Haptics:** Add haptic feedback when scrolling through rail items.
+- [ ] **Fingerprint Aging:** Implement logic to expire old ORB descriptors in `MobileGS`.
+- [ ] **Left-Handed Mode:** Invert the AzNavRail alignment in `MainScreen.kt`.
 
 ## 🟢 Low Priority (Polish)
 
-- [ ] **Mockup Mode - Perspective Warp:** The current 2D perspective warp is linear. Add a "Mesh Warp" for curved surfaces (pillars).
-- [ ] **App Icon:** The current icon is a placeholder. Needs something that screams "Cyberpunk Spray Can."
+- [ ] **Mockup Mode - Perspective Warp:** The current 2D perspective warp is linear. Add a "Mesh Warp".
+- [ ] **App Icon:** The current icon is a placeholder.
 
 ## ❌ Deprecated / Won't Do
 
