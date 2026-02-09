@@ -55,6 +55,13 @@ fun ArView(
         arRenderer.setFlashlight(uiState.isFlashlightOn)
     }
 
+    // React to new target images being captured
+    LaunchedEffect(Unit) {
+        viewModel.newTargetImage.collect { (bitmap, name) ->
+            arRenderer.setupAugmentedImageDatabase(bitmap, name)
+        }
+    }
+
     val factory = remember(arRenderer) {
         { ctx: android.content.Context ->
             FrameLayout(ctx).apply {
