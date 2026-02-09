@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.common.dispatcher.DispatcherProvider
+import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,37 +23,26 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     // UI State: Controls top-level navigation and system status only.
-    // Content state (Layers, Tools) is now owned by EditorViewModel.
-    private val _uiState = MutableStateFlow(MainUiState())
-    val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     // AR Session State
     private var arSession: Session? = null
 
     init {
         Log.d("MainViewModel", "Initialized with Hilt")
-        checkPermissions()
-    }
-
-    private fun checkPermissions() {
-        // Handled by ActivityResultLauncher in UI
     }
 
     fun onPermissionsResult(permissions: Map<String, Boolean>) {
         val allGranted = permissions.entries.all { it.value }
-        _uiState.update { it.copy(permissionsGranted = allGranted) }
+        _uiState.update { it.copy(isLoading = !allGranted) } // Placeholder for actual permission handling
     }
 
     fun onArSessionCreated(session: Session) {
         this.arSession = session
-        _uiState.update { it.copy(isArSessionReady = true) }
+        _uiState.update { it.copy(isLoading = false) } // Placeholder
         Log.d("MainViewModel", "AR Session Captured")
     }
-
-    // REMOVED: onOverlayImageSelected()
-    // REMOVED: layerList management
-    // REASON: Moved to feature:editor / EditorViewModel to fix "Split Brain" architecture.
-}
 
     fun startTargetCapture() {
         _uiState.update {
