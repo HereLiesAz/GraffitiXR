@@ -159,7 +159,7 @@ All items completed. Ready for the next phase of development.
 
 - [x] **Voxel Map Culling:** The `MobileGS` engine now performs a "Garbage Collector" pass that deletes points with `opacity < 0.3` and `age > 2000ms` when the map buffer reaches 95% capacity.
 - [x] **Serialization Speed:** The `.map` save functionality has been moved to `Dispatchers.IO` in Kotlin, calling a synchronous C++ `saveModel` function to prevent UI freezes (ANRs).
-- [ ] **AzNavRail Haptics:** Add haptic feedback when scrolling through rail items so the user can "feel" the menu without looking.
+- [x] **AzNavRail Haptics:** Add haptic feedback when scrolling through rail items so the user can "feel" the menu without looking.
 
 ## 🟡 Medium Priority (Features)
 

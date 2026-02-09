@@ -2,9 +2,10 @@ package com.hereliesaz.graffitixr.feature.dashboard
 
 import com.hereliesaz.graffitixr.common.model.GpsData
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
+import com.hereliesaz.graffitixr.common.model.Project
 
 data class DashboardUiState(
-    val availableProjects: List<GraffitiProject> = emptyList(),
+    val availableProjects: List<Project> = emptyList(),
     val showProjectList: Boolean = true,
     val currentProjectId: String? = null,
     val gpsData: GpsData? = null,

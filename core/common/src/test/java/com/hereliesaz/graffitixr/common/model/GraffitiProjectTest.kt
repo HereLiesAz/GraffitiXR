@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.data
+package com.hereliesaz.graffitixr.common.model
 
 import android.net.Uri
 import io.mockk.mockkStatic
