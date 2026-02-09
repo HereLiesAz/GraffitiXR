@@ -12,6 +12,8 @@ import java.nio.FloatBuffer
 class BackgroundRenderer {
     private lateinit var quadVertices: FloatBuffer
     private lateinit var quadTexCoord: FloatBuffer
+    private lateinit var quadTexCoordTransformed: FloatBuffer
+
     private var programId: Int = 0
     private var textureTarget: Int = GLES11Ext.GL_TEXTURE_EXTERNAL_OES
 
@@ -23,7 +25,7 @@ class BackgroundRenderer {
     private var uTextureParam: Int = 0
     private var hasTransformed = false
 
-    fun createOnGlThread() {
+    fun createOnGlThread(context: Context) {
         // Generate Texture
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
@@ -51,6 +53,10 @@ class BackgroundRenderer {
         quadTexCoord = bbTexCoords.asFloatBuffer()
         quadTexCoord.put(QUAD_TEXCOORDS)
         quadTexCoord.position(0)
+
+        val bbTexCoordsTransformed = ByteBuffer.allocateDirect(QUAD_COORDS.size * 4)
+        bbTexCoordsTransformed.order(ByteOrder.nativeOrder())
+        quadTexCoordTransformed = bbTexCoordsTransformed.asFloatBuffer()
 
         // Load shaders
         val vertexShader = ShaderUtil.loadGLShader("shaders/background_vertex.glsl", GLES20.GL_VERTEX_SHADER, context)

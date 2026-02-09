@@ -14,13 +14,13 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycleObserver {
 
     private var session: Session? = null
-    private val renderer = ArRenderer(context)
+    val arRenderer = ArRenderer(context)
 
     init {
         preserveEGLContextOnPause = true
         setEGLContextClientVersion(2)
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-        setRenderer(renderer)
+        setRenderer(arRenderer)
         renderMode = RENDERMODE_CONTINUOUSLY
         setWillNotDraw(false)
     }
@@ -38,7 +38,7 @@ class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycl
                 config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 config.focusMode = Config.FocusMode.AUTO
                 session?.configure(config)
-                renderer.setSession(session!!)
+                arRenderer.setSession(session!!)
             } catch (e: Exception) {
                 Log.e("GraffitiArView", "Failed to create AR Session", e)
             }
@@ -68,7 +68,7 @@ class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycl
     }
 
     fun setShowPointCloud(show: Boolean) {
-        renderer.showPointCloud = show
+        arRenderer.showPointCloud = show
     }
 
     fun setFlashlight(on: Boolean) {

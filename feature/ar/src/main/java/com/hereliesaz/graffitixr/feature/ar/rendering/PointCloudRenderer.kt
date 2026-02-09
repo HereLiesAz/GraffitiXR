@@ -11,8 +11,16 @@ class PointCloudRenderer {
     private var positionAttribute = 0
     private var colorUniform = 0
     private var modelViewProjectionUniform = 0
+    private var pointSizeUniform = 0
+
     private var numPoints = 0
     private var lastTimestamp: Long = 0
+
+    // Missing properties
+    private val pointIdMap = HashMap<Int, Int>()
+    private val maxPoints = 1000 // Or appropriate default
+    private val localBuffer = FloatArray(maxPoints * 4)
+    private var accumulatedPointCount = 0
 
     fun createOnGlThread(context: Context) {
         val buffers = IntArray(1)
@@ -30,15 +38,16 @@ class PointCloudRenderer {
         positionAttribute = GLES20.glGetAttribLocation(programId, "a_Position")
         colorUniform = GLES20.glGetUniformLocation(programId, "u_Color")
         modelViewProjectionUniform = GLES20.glGetUniformLocation(programId, "u_ModelViewProjection")
+        pointSizeUniform = GLES20.glGetUniformLocation(programId, "u_PointSize")
     }
 
     fun update(pointCloud: PointCloud) {
         val points = pointCloud.points
         val ids = pointCloud.ids
         if (points == null || ids == null) return
-        val numPoints = points.remaining() / 4
+        val pointsInFrame = points.remaining() / 4
         var hasUpdates = false
-        for (i in 0 until numPoints) {
+        for (i in 0 until pointsInFrame) {
             if (i % 20 != 0) continue
 
             val id = ids.get(i)
@@ -83,13 +92,13 @@ class PointCloudRenderer {
 
         val mvpMatrix = FloatArray(16)
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
-        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
-        GLES20.glUniform1f(pointSizeHandle, 2.5f)
+        GLES20.glUniformMatrix4fv(modelViewProjectionUniform, 1, false, mvpMatrix, 0)
+        GLES20.glUniform1f(pointSizeUniform, 2.5f)
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
-        GLES20.glVertexAttribPointer(positionHandle, 4, GLES20.GL_FLOAT, false, 16, 0)
-        GLES20.glEnableVertexAttribArray(positionHandle)
+        GLES20.glVertexAttribPointer(positionAttribute, 4, GLES20.GL_FLOAT, false, 16, 0)
+        GLES20.glEnableVertexAttribArray(positionAttribute)
         GLES20.glDrawArrays(GLES20.GL_POINTS, 0, accumulatedPointCount)
-        GLES20.glDisableVertexAttribArray(positionHandle)
+        GLES20.glDisableVertexAttribArray(positionAttribute)
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
     }
 }
