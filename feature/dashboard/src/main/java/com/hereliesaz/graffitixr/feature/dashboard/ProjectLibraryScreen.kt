@@ -29,15 +29,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.graffitixr.common.model.ProjectData
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun ProjectLibraryScreen(
-    projects: List<ProjectData>,
-    onLoadProject: (ProjectData) -> Unit,
+    projects: List<GraffitiProject>,
+    onLoadProject: (GraffitiProject) -> Unit,
     onDeleteProject: (String) -> Unit,
     onNewProject: () -> Unit
 ) {
@@ -55,9 +55,10 @@ fun ProjectLibraryScreen(
             // New Project Button at the Top
             Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), contentAlignment = Alignment.Center) {
                  AzButton(
-                    text = "New Project",
+                    text = "New",
                     onClick = onNewProject,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.width(200.dp), // Constrain width, don't fill max
+                    shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
                 )
             }
 

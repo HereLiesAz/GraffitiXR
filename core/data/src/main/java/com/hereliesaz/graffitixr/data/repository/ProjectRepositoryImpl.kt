@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.data.repository
 
 import android.content.Context
-import com.hereliesaz.graffitixr.common.model.ProjectData
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -22,10 +22,10 @@ class ProjectRepositoryImpl @Inject constructor(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ProjectRepository {
 
-    private val _currentProject = MutableStateFlow<ProjectData?>(null)
-    override val currentProject: StateFlow<ProjectData?> = _currentProject.asStateFlow()
+    private val _currentProject = MutableStateFlow<GraffitiProject?>(null)
+    override val currentProject: StateFlow<GraffitiProject?> = _currentProject.asStateFlow()
 
-    override suspend fun loadProject(projectId: String): Result<ProjectData> = withContext(ioDispatcher) {
+    override suspend fun loadProject(projectId: String): Result<GraffitiProject> = withContext(ioDispatcher) {
         try {
             val loadedProject = projectManager.loadProject(context, projectId)
             if (loadedProject != null) {
@@ -39,14 +39,15 @@ class ProjectRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun createProject(name: String): ProjectData = withContext(ioDispatcher) {
-        val newProject = ProjectData.create(name)
+    override suspend fun createProject(name: String): GraffitiProject = withContext(ioDispatcher) {
+        // Force Recompile
+        val newProject = GraffitiProject(name = name)
         _currentProject.value = newProject
         projectManager.saveProject(context, newProject, emptyList())
         newProject
     }
 
-    override suspend fun updateProject(transform: (ProjectData) -> ProjectData) {
+    override suspend fun updateProject(transform: (GraffitiProject) -> GraffitiProject) {
         _currentProject.update { current ->
             if (current == null) return@update null
             val updated = transform(current).copy(lastModified = System.currentTimeMillis())
@@ -59,7 +60,7 @@ class ProjectRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getProjects(): List<ProjectData> = withContext(ioDispatcher) {
+    override suspend fun getProjects(): List<GraffitiProject> = withContext(ioDispatcher) {
         projectManager.getProjectList(context).mapNotNull { id ->
             projectManager.loadProjectMetadata(context, id)
         }

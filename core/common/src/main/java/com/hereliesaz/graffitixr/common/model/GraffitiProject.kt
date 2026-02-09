@@ -37,8 +37,7 @@ data class CalibrationSnapshot(
 ) : Parcelable
 
 @Serializable
-data class ProjectData(
-    // Force Recompile
+data class GraffitiProject(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "Untitled",
     val created: Long = System.currentTimeMillis(),
@@ -100,10 +99,4 @@ data class ProjectData(
 
     // Neural Scan ID
     val cloudAnchorId: String? = null
-) {
-    companion object {
-        fun create(name: String): ProjectData {
-            return ProjectData(name = name)
-        }
-    }
-}
+)

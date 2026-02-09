@@ -4,7 +4,7 @@ import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.GpsData
-import com.hereliesaz.graffitixr.common.model.ProjectData
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -50,7 +50,7 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun openProject(project: ProjectData) {
+    fun openProject(project: GraffitiProject) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val result = projectRepository.loadProject(project.id)

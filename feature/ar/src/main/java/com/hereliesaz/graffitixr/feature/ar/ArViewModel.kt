@@ -65,7 +65,7 @@ class ArViewModel @Inject constructor(
 
     // NEW: Calibration Points
     fun onCalibrationPointCaptured(matrix: FloatArray) {
-        // Assuming we store calibration in ProjectData somehow
+        // Assuming we store calibration in GraffitiProject somehow
         // For now, no-op or specific logic needed
     }
 }
