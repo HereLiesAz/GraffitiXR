@@ -42,6 +42,8 @@ import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutionException
 
 @Composable
@@ -138,91 +140,96 @@ fun OverlayScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        val imageUri = activeLayer?.uri
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { containerSize = it }
+                .clipToBounds()
+                .pointerInput(currentUiState.activeLayerId, currentUiState.layers.size) {
+                    val pointerInputScope = this
+                    coroutineScope {
+                        launch {
+                            pointerInputScope.detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
+                        }
 
-        imageUri?.let { uri ->
-            var imageBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-
-            LaunchedEffect(uri) {
-                coroutineScope.launch {
-                    val request = ImageRequest.Builder(context)
-                        .data(uri)
-                        .build()
-                    val result =
-                        (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                    imageBitmap = result
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .onSizeChanged { containerSize = it }
-                    .clipToBounds()
-                    .pointerInput(imageBitmap) {
-                        val bmp = imageBitmap ?: return@pointerInput
-
-                        coroutineScope {
-                            launch {
-                                detectTapGestures(onDoubleTap = { onCycleRotationAxis() })
-                            }
-
-                            launch {
-                                detectSmartOverlayGestures(
-                                    getValidBounds = {
-                                        val imgWidth = bmp.width * transformState.scale
-                                        val imgHeight = bmp.height * transformState.scale
-                                        val centerX = size.width / 2f + transformState.offset.x
-                                        val centerY = size.height / 2f + transformState.offset.y
-                                        val left = centerX - imgWidth / 2f
-                                        val top = centerY - imgHeight / 2f
-                                        Rect(left, top, left + imgWidth, top + imgHeight)
-                                    },
-                                    onGestureStart = {
-                                        transformState.isGesturing = true
-                                        onGestureStart()
-                                    },
-                                    onGestureEnd = {
-                                        transformState.isGesturing = false
-                                        onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
-                                    }
-                                ) { _, pan, zoom, rotation ->
-                                    transformState.scale *= zoom
-                                    transformState.offset += pan
-                                    when (currentUiState.activeRotationAxis) {
-                                        RotationAxis.X -> transformState.rotationX += rotation
-                                        RotationAxis.Y -> transformState.rotationY += rotation
-                                        RotationAxis.Z -> transformState.rotationZ += rotation
-                                    }
+                        launch {
+                            pointerInputScope.detectSmartOverlayGestures(
+                                getValidBounds = {
+                                    Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
+                                },
+                                onGestureStart = {
+                                    transformState.isGesturing = true
+                                    onGestureStart()
+                                },
+                                onGestureEnd = {
+                                    transformState.isGesturing = false
+                                    onGestureEnd(transformState.scale, transformState.offset, transformState.rotationX, transformState.rotationY, transformState.rotationZ)
+                                }
+                            ) { _, pan, zoom, rotation ->
+                                transformState.scale *= zoom
+                                transformState.offset += pan
+                                when (currentUiState.activeRotationAxis) {
+                                    RotationAxis.X -> transformState.rotationX += rotation
+                                    RotationAxis.Y -> transformState.rotationY += rotation
+                                    RotationAxis.Z -> transformState.rotationZ += rotation
                                 }
                             }
                         }
                     }
-            ) {
-                imageBitmap?.let { bmp ->
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                this.rotationX = rotationX
-                                this.rotationY = rotationY
-                                this.rotationZ = rotationZ
-                                translationX = offset.x
-                                translationY = offset.y
-                            }
-                    ) {
-                        val xOffset = (size.width - bmp.width) / 2f
-                        val yOffset = (size.height - bmp.height) / 2f
+                }
+        ) {
+            uiState.layers.forEach { layer ->
+                if (layer.isVisible) {
+                    val isLayerActive = layer.id == activeLayer?.id
+                    val layerScale = if (isLayerActive) transformState.scale else layer.scale
+                    val layerOffset = if (isLayerActive) transformState.offset else layer.offset
+                    val layerRotationX = if (isLayerActive) transformState.rotationX else layer.rotationX
+                    val layerRotationY = if (isLayerActive) transformState.rotationY else layer.rotationY
+                    val layerRotationZ = if (isLayerActive) transformState.rotationZ else layer.rotationZ
 
-                        drawImage(
-                            image = bmp.asImageBitmap(),
-                            topLeft = Offset(xOffset, yOffset),
-                            alpha = opacity,
-                            colorFilter = ColorFilter.colorMatrix(colorMatrix),
-                            blendMode = blendMode
-                        )
+                    var layerBitmap by remember(layer.uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+                    LaunchedEffect(layer.uri) {
+                        launch(Dispatchers.IO) {
+                            val request = ImageRequest.Builder(context)
+                                .data(layer.uri)
+                                .build()
+                            val result = (context.imageLoader.execute(request).drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                            withContext(Dispatchers.Main) {
+                                layerBitmap = result
+                            }
+                        }
+                    }
+
+                    val layerColorMatrix = remember(layer.saturation, layer.contrast, layer.brightness, layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB) {
+                        createColorMatrix(layer.saturation, layer.contrast, layer.brightness, layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB)
+                    }
+
+                    layerBitmap?.let { bmp ->
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = layerScale
+                                    scaleY = layerScale
+                                    this.rotationX = layerRotationX
+                                    this.rotationY = layerRotationY
+                                    this.rotationZ = layerRotationZ
+                                    translationX = layerOffset.x
+                                    translationY = layerOffset.y
+                                }
+                        ) {
+                            val xOffset = (size.width - bmp.width) / 2f
+                            val yOffset = (size.height - bmp.height) / 2f
+
+                            drawImage(
+                                image = bmp.asImageBitmap(),
+                                topLeft = Offset(xOffset, yOffset),
+                                alpha = layer.opacity,
+                                colorFilter = ColorFilter.colorMatrix(layerColorMatrix),
+                                blendMode = layer.blendMode
+                            )
+                        }
                     }
                 }
             }
