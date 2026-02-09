@@ -51,11 +51,9 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         if (session == null) {
             try {
                 session = Session(context).apply {
-                    val config = config
+                    val config = Config(this)
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                    // Depth mode for occlusion if needed
-                    // config.depthMode = Config.DepthMode.AUTOMATIC
                     configure(config)
                 }
             } catch (e: Exception) {
@@ -131,10 +129,12 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         val session = session ?: return
         val config = session.config
 
-        // Note: ARCore doesn't have a direct "Flashlight" API in Config.
-        // Usually, this requires Camera2 API interop or a shared Camera session.
-        // If shared Camera session is used, we can access the flashlight.
-        session.configure(config)
+        try {
+            config.flashMode = if (enable) Config.FlashMode.TORCH else Config.FlashMode.OFF
+            session.configure(config)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun handleSessionException(e: Exception) {

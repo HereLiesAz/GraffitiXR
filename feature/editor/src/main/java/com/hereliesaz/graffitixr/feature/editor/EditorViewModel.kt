@@ -12,7 +12,10 @@ import android.graphics.Bitmap
 import androidx.core.content.FileProvider
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +30,8 @@ import javax.inject.Inject
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val application: Application,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val projectRepository: ProjectRepository
 ) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
@@ -36,11 +40,40 @@ class EditorViewModel @Inject constructor(
     private val undoStack = ArrayDeque<EditorUiState>()
     private val redoStack = ArrayDeque<EditorUiState>()
     private val maxStackSize = 20
+    private var saveJob: Job? = null
 
     init {
         viewModelScope.launch {
-            settingsRepository.isRightHanded.collectLatest { isRight ->
-                _uiState.update { it.copy(isRightHanded = isRight) }
+            launch {
+                settingsRepository.isRightHanded.collectLatest { isRight ->
+                    _uiState.update { it.copy(isRightHanded = isRight) }
+                }
+            }
+            launch {
+                projectRepository.currentProject.collectLatest { project ->
+                    if (project != null) {
+                        _uiState.update { state ->
+                            state.copy(
+                                layers = project.layers,
+                                backgroundImageUri = project.backgroundImageUri,
+                                // Assuming we only sync layers and BG for now to avoid overwriting transient UI state like activePanel
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun persistState() {
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            delay(1000) // Debounce 1s to avoid excessive disk writes
+            projectRepository.updateProject { project ->
+                project.copy(
+                    layers = _uiState.value.layers,
+                    backgroundImageUri = _uiState.value.backgroundImageUri
+                )
             }
         }
     }
@@ -61,6 +94,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(layers = layers)
         }
+        persistState()
     }
 
     override fun onOpacityChanged(v: Float) {
@@ -96,6 +130,7 @@ class EditorViewModel @Inject constructor(
             val previousState = undoStack.removeLast()
             redoStack.addLast(_uiState.value)
             _uiState.value = previousState
+            persistState()
         }
     }
 
@@ -104,6 +139,7 @@ class EditorViewModel @Inject constructor(
             val nextState = redoStack.removeLast()
             undoStack.addLast(_uiState.value)
             _uiState.value = nextState
+            persistState()
         }
     }
 
@@ -138,9 +174,6 @@ class EditorViewModel @Inject constructor(
         FileOutputStream(file).use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         }
-        // Using FileProvider or just direct file URI depending on internal usage.
-        // Since we are internal, Uri.fromFile is okay, but using FileProvider is safer for sharing.
-        // Assuming simplistic approach for internal cache for now.
         return Uri.fromFile(file)
     }
 
@@ -165,6 +198,7 @@ class EditorViewModel @Inject constructor(
     fun setBackgroundImage(uri: Uri) {
         saveState()
         _uiState.update { it.copy(backgroundImageUri = uri, isEditingBackground = true) }
+        persistState()
     }
 
 
@@ -177,7 +211,6 @@ class EditorViewModel @Inject constructor(
 
     // IMPL: Cycle Blend Mode
     override fun onCycleBlendMode() {
-        // updateActiveLayer calls saveState
         updateActiveLayer { layer ->
             val nextModeName = ImageUtils.getNextBlendMode(layer.blendMode.toString())
             val nextMode = when (nextModeName) {
@@ -206,8 +239,6 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onLayerActivated(id: String) {
-        // Activation changes selection, usually we don't undo selection changes, but we can.
-        // Let's NOT save state for simple selection changes to avoid spamming stack.
         _uiState.update { it.copy(activeLayerId = id, isEditingBackground = false) }
     }
 
@@ -217,6 +248,7 @@ class EditorViewModel @Inject constructor(
             val layers = state.layers.map { if (it.id == id) it.copy(name = name) else it }
             state.copy(layers = layers)
         }
+        persistState()
     }
 
     override fun onLayerReordered(newOrder: List<String>) {
@@ -225,6 +257,7 @@ class EditorViewModel @Inject constructor(
             val reordered = newOrder.mapNotNull { id -> state.layers.find { it.id == id } }
             state.copy(layers = reordered)
         }
+        persistState()
     }
 
     override fun onLayerDuplicated(id: String) {
@@ -236,6 +269,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(layers = state.layers.filterNot { it.id == id })
         }
+        persistState()
     }
 
     override fun onAddLayer(uri: Uri) {
@@ -252,6 +286,7 @@ class EditorViewModel @Inject constructor(
                 isEditingBackground = false
             )
         }
+        persistState()
     }
 
     override fun copyLayerModifications(id: String) {
@@ -263,13 +298,9 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onScaleChanged(s: Float) {
-        // Gestures usually continuous, we might want to save state on Gesture Start?
-        // For now, let's assume fine granular undo isn't needed for every frame of gesture.
-        // A "Gesture End" saveState would be better.
         if (_uiState.value.isEditingBackground) {
             _uiState.update { it.copy(backgroundScale = it.backgroundScale * s) }
         } else {
-            // Manually update without saveState to avoid stack overflow during gesture
             _uiState.update { state ->
                 val layers = state.layers.map { layer ->
                     if (layer.id == state.activeLayerId) layer.copy(scale = layer.scale * s) else layer
@@ -277,6 +308,10 @@ class EditorViewModel @Inject constructor(
                 state.copy(layers = layers)
             }
         }
+        // Debounced persist handled by persistState if called, but updateActiveLayer is NOT called here.
+        // We should call persistState here too if we want to save geometry changes.
+        // But onScaleChanged is continuous. persistState handles debounce.
+        persistState()
     }
 
     override fun onOffsetChanged(o: Offset) {
@@ -290,6 +325,7 @@ class EditorViewModel @Inject constructor(
                 state.copy(layers = layers)
             }
         }
+        persistState()
     }
 
     override fun onRotationXChanged(d: Float) {
@@ -299,6 +335,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(layers = layers)
         }
+        persistState()
     }
 
     override fun onRotationYChanged(d: Float) {
@@ -308,6 +345,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(layers = layers)
         }
+        persistState()
     }
 
     override fun onRotationZChanged(d: Float) {
@@ -317,6 +355,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(layers = layers)
         }
+        persistState()
     }
 
     override fun onCycleRotationAxis() {
@@ -331,22 +370,16 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onGestureStart() {
-        saveState() // Save before gesture starts
+        saveState()
         _uiState.update { it.copy(gestureInProgress = true) }
     }
 
     override fun onGestureEnd() {
         _uiState.update { it.copy(gestureInProgress = false) }
+        persistState()
     }
 
     override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
-        // This is called at end of gesture, but we already updated continuously.
-        // Actually, TraceScreen calls this at onGestureEnd.
-        // We shouldn't double-save. if onGestureStart saved, we are good.
-        // But updateActiveLayer calls saveState()...
-
-        // Refactor: We need a direct update without saveState for this one if we rely on onGestureStart
-        // Or just let it save again? Saving twice is safer than missing it.
         updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
     }
 
@@ -364,6 +397,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onDrawingPathFinished(path: List<Offset>) {
         _uiState.update { it.copy(drawingPaths = it.drawingPaths + listOf(path)) }
+        persistState()
     }
 
     override fun onAdjustClicked() {

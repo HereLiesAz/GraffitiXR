@@ -224,8 +224,12 @@ fun MainScreen(
                 })
                 azDivider()
                 azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                    showSliderDialog = if (showSliderDialog == "Adjust") null else "Adjust"
-                    showColorBalanceDialog = false
+                    editorViewModel.onAdjustClicked()
+                    resetDialogs()
+                }
+                azRailSubItem(id = "balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
+                    editorViewModel.onColorClicked()
+                    resetDialogs()
                 }
                 azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
                     editorViewModel.onCycleBlendMode()
@@ -418,20 +422,19 @@ fun MainContentLayer(
                 onGestureEnd = onOverlayGestureEnd
             )
             EditorMode.AR -> {
-                Box(
-                    modifier = Modifier.fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTransformGestures { _, pan, zoom, rotation ->
-                                if (!gestureInProgress) onStart()
-                                if (zoom != 1f) onScale(zoom)
-                                if (rotation != 0f) onRotZ(rotation)
-                                if (pan != Offset.Zero) onOffset(pan)
-                            }
-                        }
-                ) {
-                    // Check for permissions locally for the view, but the main check is at the button
-                    // Keep the view rendering if permitted, else blank (or handled by button)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // AR View (Background - Handles Camera & Flashlight via ARCore)
                     ArView(viewModel = arViewModel, uiState = arUiState, onRendererCreated = onRendererCreated)
+
+                    // Overlay Screen (Foreground - Handles Layers & Gestures, Camera disabled)
+                    OverlayScreen(
+                        uiState = editorUiState,
+                        isFlashlightOn = false, // Handled by ArView/ArRenderer
+                        onCycleRotationAxis = onCycle,
+                        onGestureStart = onStart,
+                        onGestureEnd = onOverlayGestureEnd,
+                        showCamera = false
+                    )
                 }
             }
             else -> OverlayScreen(
