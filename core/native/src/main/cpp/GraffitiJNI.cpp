@@ -43,8 +43,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv 
     if (!dataAddr) return;
     uint16_t* data = static_cast<uint16_t*>(dataAddr);
 
-    cv::Mat depthWrapper(height, width, CV_16UC1, data);
-    engine->processDepthFrame(depthWrapper, width, height);
+    // Call the correct method signature from MobileGS.h
+    engine->feedDepthData(data, width, height);
 }
 
 JNIEXPORT void JNICALL
@@ -59,14 +59,17 @@ JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz, jlong handle) {
     if (handle != 0) {
         auto *engine = reinterpret_cast<MobileGS*>(handle);
-        return engine->getPointCount();
+        return engine->getSplatCount(); // Renamed from getPointCount to getSplatCount
     }
     return 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
-    // Pass to native if needed
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS*>(handle);
+        engine->onSurfaceChanged(width, height);
+    }
 }
 
 JNIEXPORT jboolean JNICALL
@@ -94,7 +97,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env,
     if (handle == 0) return;
     auto *engine = reinterpret_cast<MobileGS*>(handle);
     jfloat* transform = env->GetFloatArrayElements(transformMtx, 0);
-    engine->applyTransform(transform);
+    // Renamed from applyTransform to alignMap to match MobileGS.h
+    engine->alignMap(transform);
     env->ReleaseFloatArrayElements(transformMtx, transform, 0);
 }
 
