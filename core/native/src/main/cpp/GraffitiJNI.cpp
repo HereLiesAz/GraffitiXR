@@ -2,123 +2,121 @@
 #include <string>
 #include "include/MobileGS.h"
 
-// Singleton instance
-static MobileGS* engine = nullptr;
+// Helper to cast jlong handle to pointer
+inline MobileGS* getEngine(jlong handle) {
+    return reinterpret_cast<MobileGS*>(handle);
+}
 
 extern "C" {
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_initialize(JNIEnv *env, jobject thiz) {
-    if (engine == nullptr) {
-        engine = new MobileGS();
-    }
+JNIEXPORT jlong JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
+    auto *engine = new MobileGS();
     engine->initialize();
+    return reinterpret_cast<jlong>(engine);
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_destroy(JNIEnv *env, jobject thiz) {
-    if (engine != nullptr) {
-        delete engine;
-        engine = nullptr;
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyNativeJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle != 0) {
+        delete getEngine(handle);
     }
 }
 
-// --- UPDATED SIGNATURE FOR SPLATAM ---
-// Requires: Depth (float[]), Color (float[] or byte[]), Width, Height, Pose (float[16]), FOV (float)
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_feedDepthData(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
+        JNIEnv *env, jobject thiz, jlong handle, jfloatArray viewMtx, jfloatArray projMtx) {
+    if (handle == 0) return;
+
+    jfloat* view = env->GetFloatArrayElements(viewMtx, nullptr);
+    jfloat* proj = env->GetFloatArrayElements(projMtx, nullptr);
+
+    getEngine(handle)->updateCamera(view, proj);
+
+    env->ReleaseFloatArrayElements(viewMtx, view, 0);
+    env->ReleaseFloatArrayElements(projMtx, proj, 0);
+}
+
+// --- UPDATED METHOD FOR SPLATAM ---
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
         JNIEnv *env, jobject thiz,
-        jfloatArray depthData,
-        jfloatArray colorData, // NEW: Required for SplaTAM
+        jlong handle,
+        jobject depthBuffer,
+        jobject colorBuffer,
         jint width, jint height,
-        jfloatArray poseMatrix, // NEW: Required for Global Mapping
-        jfloat fov // NEW: Required for Projection
-) {
+        jfloatArray poseMatrix,
+        jfloat fov) {
 
-    if (engine == nullptr) return;
+    if (handle == 0) return;
 
-    jfloat* dPixels = env->GetFloatArrayElements(depthData, nullptr);
-    jfloat* cPixels = colorData ? env->GetFloatArrayElements(colorData, nullptr) : nullptr;
-    jfloat* pose = poseMatrix ? env->GetFloatArrayElements(poseMatrix, nullptr) : nullptr;
+    // Get Direct Buffer Addresses
+    // NOTE: This assumes the ByteBuffers were allocated with allocateDirect in Kotlin/Java
+    auto* depthData = (float*)env->GetDirectBufferAddress(depthBuffer);
+    float* colorData = nullptr;
 
-    // Pass to engine
-    // If color/pose are null (older Kotlin call?), the engine handles it but mapping will be poor.
-    // The engine's feedDepthData handles the nullptr checks I added in MobileGS.cpp
-    if (pose) {
-        engine->feedDepthData(dPixels, cPixels, width, height, pose, fov);
+    if (colorBuffer != nullptr) {
+        colorData = (float*)env->GetDirectBufferAddress(colorBuffer);
     }
 
-    env->ReleaseFloatArrayElements(depthData, dPixels, 0);
-    if (cPixels) env->ReleaseFloatArrayElements(colorData, cPixels, 0);
-    if (pose) env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
+    jfloat* pose = env->GetFloatArrayElements(poseMatrix, nullptr);
+
+    // Call Engine
+    if (depthData && pose) {
+        getEngine(handle)->feedDepthData(depthData, colorData, width, height, pose, fov);
+    }
+
+    env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_updateCamera(
-        JNIEnv *env, jobject thiz,
-        jfloatArray viewMatrix, jfloatArray projMatrix) {
-
-    if (engine == nullptr) return;
-
-    jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
-    jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
-
-    engine->updateCamera(view, proj);
-
-    env->ReleaseFloatArrayElements(viewMatrix, view, 0);
-    env->ReleaseFloatArrayElements(projMatrix, proj, 0);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_draw(JNIEnv *env, jobject thiz) {
-    if (engine == nullptr) return;
-    engine->draw();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_onSurfaceChanged(JNIEnv *env, jobject thiz, jint width, jint height) {
-    if (engine == nullptr) return;
-    engine->onSurfaceChanged(width, height);
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_drawJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    getEngine(handle)->draw();
 }
 
 JNIEXPORT jint JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_getSplatCount(JNIEnv *env, jobject thiz) {
-    if (engine == nullptr) return 0;
-    return engine->getSplatCount();
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return 0;
+    return getEngine(handle)->getSplatCount();
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_clear(JNIEnv *env, jobject thiz) {
-    if (engine == nullptr) return;
-    engine->clear();
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
+    if (handle == 0) return;
+    getEngine(handle)->onSurfaceChanged(width, height);
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_saveModel(JNIEnv *env, jobject thiz, jstring path) {
-    if (engine == nullptr) return false;
-
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
     const char *nativePath = env->GetStringUTFChars(path, 0);
-    bool result = engine->saveModel(std::string(nativePath));
+    bool result = getEngine(handle)->saveModel(std::string(nativePath));
     env->ReleaseStringUTFChars(path, nativePath);
     return result;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_loadModel(JNIEnv *env, jobject thiz, jstring path) {
-    if (engine == nullptr) return false;
-
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
     const char *nativePath = env->GetStringUTFChars(path, 0);
-    bool result = engine->loadModel(std::string(nativePath));
+    bool result = getEngine(handle)->loadModel(std::string(nativePath));
     env->ReleaseStringUTFChars(path, nativePath);
     return result;
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_GraffitiJNI_alignMap(JNIEnv *env, jobject thiz, jfloatArray transformMatrix) {
-    if (engine == nullptr) return;
-    jfloat* transform = env->GetFloatArrayElements(transformMatrix, nullptr);
-    engine->alignMap(transform);
-    env->ReleaseFloatArrayElements(transformMatrix, transform, 0);
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transformMtx) {
+    if (handle == 0) return;
+    jfloat* transform = env->GetFloatArrayElements(transformMtx, nullptr);
+    getEngine(handle)->alignMap(transform);
+    env->ReleaseFloatArrayElements(transformMtx, transform, 0);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMapJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    getEngine(handle)->clear();
 }
 
 } // extern "C"

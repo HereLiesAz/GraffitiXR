@@ -19,7 +19,6 @@ class SlamManager {
     }
 
     private var nativeHandle: Long = 0
-
     private val _mappingQuality = MutableStateFlow(0f)
     val mappingQuality: StateFlow<Float> = _mappingQuality.asStateFlow()
 
@@ -48,6 +47,7 @@ class SlamManager {
     fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
         if (nativeHandle != 0L) {
             updateCameraJni(nativeHandle, viewMtx, projMtx)
+
             // Update mapping quality metric based on point density
             val points = getPointCountJni(nativeHandle)
             _mappingQuality.value = (points / 2000f).coerceAtMost(1.0f)
@@ -55,11 +55,24 @@ class SlamManager {
     }
 
     /**
-     * Pass depth buffer to the engine.
+     * Pass depth and color data to the SplaTAM engine.
+     * * @param depthBuffer Direct ByteBuffer containing depth data (Float, Meters)
+     * @param colorBuffer Direct ByteBuffer containing RGB data (Float 0..1 or Byte 0..255)
+     * @param width Width of the buffers
+     * @param height Height of the buffers
+     * @param pose 4x4 Model Matrix of the Camera (Column-Major)
+     * @param fov Vertical Field of View in Radians
      */
-    fun feedDepthData(buffer: ByteBuffer, width: Int, height: Int) {
+    fun feedDepthData(
+        depthBuffer: ByteBuffer,
+        colorBuffer: ByteBuffer?,
+        width: Int,
+        height: Int,
+        pose: FloatArray,
+        fov: Float
+    ) {
         if (nativeHandle != 0L) {
-            feedDepthDataJni(nativeHandle, buffer, width, height)
+            feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, pose, fov)
         }
     }
 
@@ -98,11 +111,21 @@ class SlamManager {
     }
 
     // --- Native JNI declarations (Private) ---
-
     private external fun initNativeJni(): Long
     private external fun destroyNativeJni(handle: Long)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
-    private external fun feedDepthDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int)
+
+    // UPDATED SIGNATURE
+    private external fun feedDepthDataJni(
+        handle: Long,
+        depthBuffer: ByteBuffer,
+        colorBuffer: ByteBuffer?,
+        width: Int,
+        height: Int,
+        pose: FloatArray,
+        fov: Float
+    )
+
     private external fun drawJni(handle: Long)
     private external fun getPointCountJni(handle: Long): Int
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
@@ -111,20 +134,10 @@ class SlamManager {
     private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
     private external fun clearMapJni(handle: Long)
 
-    // --- Legacy Compatibility Layer (TO BE DEPRECATED) ---
-
+    // --- Legacy Compatibility Layer (Deprecated) ---
     fun init(assetManager: AssetManager) = initialize()
-    
-    fun getExternalTextureId(): Int = 0 // Handled by ARCore directly now
-
-    fun update(timestampNs: Long, position: FloatArray, rotation: FloatArray) {
-        // Placeholder: Real integration uses updateCamera with matrices
-    }
-
+    fun getExternalTextureId(): Int = 0
+    fun update(timestampNs: Long, position: FloatArray, rotation: FloatArray) { }
     fun draw(renderPointCloud: Boolean) = draw()
-
-    fun reset() {
-        destroy()
-        initialize()
-    }
+    fun reset() { destroy(); initialize() }
 }
