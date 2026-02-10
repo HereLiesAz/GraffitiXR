@@ -16,6 +16,7 @@ static GLuint gProgram = 0;
 
 MobileGS::MobileGS() {
     m_Splats.reserve(MAX_SPLATS);
+    m_DrawBuffer.reserve(MAX_SPLATS * 7);
     LOGI("MobileGS Created");
 }
 

@@ -39,6 +39,21 @@ struct Splat {
     int updateCount;
 };
 
+// Voxel Key for Sparse Hashing
+struct VoxelKey {
+    int x, y, z;
+    bool operator==(const VoxelKey& other) const {
+        return x == other.x && y == other.y && z == other.z;
+    }
+};
+
+// Hash function for VoxelKey
+struct VoxelKeyHash {
+    std::size_t operator()(const VoxelKey& k) const {
+        return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1) ^ (std::hash<int>()(k.z) << 2);
+    }
+};
+
 class MobileGS {
 public:
     MobileGS();

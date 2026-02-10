@@ -25,6 +25,7 @@ class PointCloudRenderer {
     private val maxPoints = 1000 // Or appropriate default
     private val localBuffer = FloatArray(maxPoints * 4)
     private var accumulatedPointCount = 0
+    private var lastTimestamp: Long = 0
 
     fun createOnGlThread(context: Context) {
         val buffers = IntArray(1)
