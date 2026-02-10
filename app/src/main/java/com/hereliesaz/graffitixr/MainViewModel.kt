@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.common.dispatcher.DispatcherProvider
+import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,7 +52,6 @@ class MainViewModel @Inject constructor(
     // REMOVED: onOverlayImageSelected()
     // REMOVED: layerList management
     // REASON: Moved to feature:editor / EditorViewModel to fix "Split Brain" architecture.
-}
 
     fun startTargetCapture() {
         _uiState.update {
