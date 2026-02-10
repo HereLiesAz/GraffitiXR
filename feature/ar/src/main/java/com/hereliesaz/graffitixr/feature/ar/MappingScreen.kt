@@ -24,6 +24,7 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import kotlinx.coroutines.launch
 import com.google.ar.core.Session
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import java.util.UUID
 
 @Composable
@@ -102,14 +103,11 @@ fun MappingScreen(
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
-                        GLSurfaceView(ctx).apply {
-                            preserveEGLContextOnPause = true
-                            setEGLContextClientVersion(3)
-                            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                            setRenderer(arRenderer)
-                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                            glSurfaceView = this
+                        val view = arRenderer.view
+                        if (view is GLSurfaceView) {
+                            glSurfaceView = view
                         }
+                        view
                     }
                 )
             }

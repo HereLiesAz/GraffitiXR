@@ -48,6 +48,8 @@ fun AdjustmentsPanel(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onMagicAlign: () -> Unit,
+    onAdjustmentStart: () -> Unit,
+    onAdjustmentEnd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Hide entirely during capture or if touch is locked
@@ -108,6 +110,8 @@ fun AdjustmentsPanel(
                     onColorBalanceRChange = onColorBalanceRChange,
                     onColorBalanceGChange = onColorBalanceGChange,
                     onColorBalanceBChange = onColorBalanceBChange,
+                    onAdjustmentStart = onAdjustmentStart,
+                    onAdjustmentEnd = onAdjustmentEnd,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -126,6 +130,8 @@ fun AdjustmentsPanel(
                     onBrightnessChange = onBrightnessChange,
                     onContrastChange = onContrastChange,
                     onSaturationChange = onSaturationChange,
+                    onAdjustmentStart = onAdjustmentStart,
+                    onAdjustmentEnd = onAdjustmentEnd,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

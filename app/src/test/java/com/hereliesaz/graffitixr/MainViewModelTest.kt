@@ -1,19 +1,6 @@
 package com.hereliesaz.graffitixr
 
-import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
-import android.hardware.SensorManager
-import android.net.Uri
-import com.hereliesaz.graffitixr.common.util.ProjectManager
-import io.mockk.Runs
-import io.mockk.coVerify
-import io.mockk.every
-import io.mockk.just
-import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
-import io.mockk.verify
+import com.hereliesaz.graffitixr.common.model.CaptureStep
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -29,91 +16,47 @@ import org.junit.Test
 class MainViewModelTest {
 
     private lateinit var viewModel: MainViewModel
-    private val projectManager: ProjectManager = mockk(relaxed = true)
-    private val application: Application = mockk(relaxed = true)
-    private val prefs: SharedPreferences = mockk(relaxed = true)
-    private val editor: SharedPreferences.Editor = mockk(relaxed = true)
-    private val sensorManager: SensorManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        mockkStatic(Uri::class)
-        every { Uri.parse(any()) } returns mockk()
-
-        every { application.getSharedPreferences(any(), any()) } returns prefs
-        every { prefs.edit() } returns editor
-        every { editor.putBoolean(any(), any()) } returns editor
-        every { editor.apply() } just Runs
-        every { prefs.getBoolean("is_right_handed", true) } returns true
-
-        every { application.getSystemService(Context.SENSOR_SERVICE) } returns sensorManager
-
-        viewModel = MainViewModel(application, projectManager)
+        viewModel = MainViewModel()
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
-        unmockkStatic(Uri::class)
     }
 
     @Test
-    fun `initial state is empty`() = runTest {
+    fun `initial state is correct`() = runTest {
         val state = viewModel.uiState.value
-        assertEquals(0, state.layers.size)
+        assertEquals(false, state.isTouchLocked)
+        assertEquals(false, state.isCapturingTarget)
     }
 
     @Test
-    fun `onOpacityChanged updates active layer`() = runTest {
-        val mockUri = mockk<Uri>()
-        viewModel.onOverlayImageSelected(mockUri)
+    fun `startTargetCapture updates state`() = runTest {
+        viewModel.startTargetCapture()
 
-        // Default opacity is 1.0f
-        assertEquals(1f, viewModel.uiState.value.layers.first().opacity, 0.0f)
-
-        viewModel.onOpacityChanged(0.5f)
-        assertEquals(0.5f, viewModel.uiState.value.layers.first().opacity, 0.0f)
+        val state = viewModel.uiState.value
+        assertEquals(true, state.isCapturingTarget)
+        assertEquals(CaptureStep.CAPTURE, state.captureStep)
     }
 
     @Test
-    fun `undo works correctly`() = runTest {
-        val mockUri = mockk<Uri>()
-        viewModel.onOverlayImageSelected(mockUri)
+    fun `setTouchLocked updates state`() = runTest {
+        viewModel.setTouchLocked(true)
+        assertEquals(true, viewModel.uiState.value.isTouchLocked)
 
-        // Create a history point
-        viewModel.onGestureEnd()
-
-        viewModel.onOpacityChanged(0.5f)
-        assertEquals(0.5f, viewModel.uiState.value.layers.first().opacity, 0.0f)
-
-        viewModel.onUndoClicked()
-        assertEquals(1f, viewModel.uiState.value.layers.first().opacity, 0.0f)
+        viewModel.setTouchLocked(false)
+        assertEquals(false, viewModel.uiState.value.isTouchLocked)
     }
 
     @Test
-    fun `autoSaveProject calls projectManager`() = runTest {
-        val context = mockk<Context>(relaxed = true)
-        viewModel.onNewProject() // Ensure we have a project ID
-
-        // Wait for coroutine to process onNewProject if needed, but it's using state update which is sync or quick
-        // Actually MainViewModel uses viewModelScope.launch.
-        // We need to advance time or wait. runTest handles this usually.
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.autoSaveProject(context)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        coVerify { projectManager.saveProject(context, any(), any(), any()) }
-    }
-
-    @Test
-    fun `setHandedness updates state`() = runTest {
-        // Default is true (Right handed)
-        assertEquals(true, viewModel.uiState.value.isRightHanded)
-
-        viewModel.setHandedness(false)
-        assertEquals(false, viewModel.uiState.value.isRightHanded)
+    fun `setCaptureStep updates state`() = runTest {
+        viewModel.setCaptureStep(CaptureStep.REVIEW)
+        assertEquals(CaptureStep.REVIEW, viewModel.uiState.value.captureStep)
     }
 }

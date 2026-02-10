@@ -82,6 +82,8 @@ fun AdjustmentsKnobsRow(
     onBrightnessChange: (Float) -> Unit,
     onContrastChange: (Float) -> Unit,
     onSaturationChange: (Float) -> Unit,
+    onAdjustmentStart: () -> Unit,
+    onAdjustmentEnd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -93,6 +95,8 @@ fun AdjustmentsKnobsRow(
         Knob(
             value = opacity,
             onValueChange = onOpacityChange,
+            onValueChangeStart = onAdjustmentStart,
+            onValueChangeFinished = onAdjustmentEnd,
             text = "Opacity",
             color = MaterialTheme.colorScheme.secondary,
             valueRange = 0f..1f,
@@ -102,6 +106,8 @@ fun AdjustmentsKnobsRow(
         Knob(
             value = brightness,
             onValueChange = onBrightnessChange,
+            onValueChangeStart = onAdjustmentStart,
+            onValueChangeFinished = onAdjustmentEnd,
             text = "Brightness",
             color = MaterialTheme.colorScheme.onSurface,
             valueRange = -1f..1f,
@@ -111,6 +117,8 @@ fun AdjustmentsKnobsRow(
         Knob(
             value = contrast,
             onValueChange = onContrastChange,
+            onValueChangeStart = onAdjustmentStart,
+            onValueChangeFinished = onAdjustmentEnd,
             text = "Contrast",
             color = MaterialTheme.colorScheme.tertiary,
             valueRange = 0f..2f,
@@ -120,6 +128,8 @@ fun AdjustmentsKnobsRow(
         Knob(
             value = saturation,
             onValueChange = onSaturationChange,
+            onValueChangeStart = onAdjustmentStart,
+            onValueChangeFinished = onAdjustmentEnd,
             text = "Saturation",
             color = MaterialTheme.colorScheme.primary,
             valueRange = 0f..2f,
@@ -137,6 +147,8 @@ fun ColorBalanceKnobsRow(
     onColorBalanceRChange: (Float) -> Unit,
     onColorBalanceGChange: (Float) -> Unit,
     onColorBalanceBChange: (Float) -> Unit,
+    onAdjustmentStart: () -> Unit,
+    onAdjustmentEnd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -149,6 +161,8 @@ fun ColorBalanceKnobsRow(
         Knob(
             value = colorBalanceR,
             onValueChange = onColorBalanceRChange,
+            onValueChangeStart = onAdjustmentStart,
+            onValueChangeFinished = onAdjustmentEnd,
             text = "Red",
             color = Color.Red,
             valueRange = 0f..2f,
@@ -159,6 +173,8 @@ fun ColorBalanceKnobsRow(
         Knob(
             value = colorBalanceG,
             onValueChange = onColorBalanceGChange,
+            onValueChangeStart = onAdjustmentStart,
+            onValueChangeFinished = onAdjustmentEnd,
             text = "Green",
             color = Color.Green,
             valueRange = 0f..2f,
@@ -169,6 +185,8 @@ fun ColorBalanceKnobsRow(
         Knob(
             value = colorBalanceB,
             onValueChange = onColorBalanceBChange,
+            onValueChangeStart = onAdjustmentStart,
+            onValueChangeFinished = onAdjustmentEnd,
             text = "Blue",
             color = Color.Blue,
             valueRange = 0f..2f,

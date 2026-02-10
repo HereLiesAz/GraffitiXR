@@ -39,6 +39,8 @@ fun Knob(
     text: String,
     value: Float,
     onValueChange: (Float) -> Unit,
+    onValueChangeStart: (() -> Unit)? = null,
+    onValueChangeFinished: (() -> Unit)? = null,
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     modifier: Modifier = Modifier,
     color: Color = Color.White,
@@ -89,7 +91,11 @@ fun Knob(
                 )
             }
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
+                detectDragGestures(
+                    onDragStart = { onValueChangeStart?.invoke() },
+                    onDragEnd = { onValueChangeFinished?.invoke() },
+                    onDragCancel = { onValueChangeFinished?.invoke() }
+                ) { change, dragAmount ->
                     change.consume()
                     // Sensitivity: full range in 300dp drag
                     val sensitivityPx = with(density) { 300.dp.toPx() }

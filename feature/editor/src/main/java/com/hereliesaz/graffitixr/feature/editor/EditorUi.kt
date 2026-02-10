@@ -89,7 +89,9 @@ fun EditorUi(
                 onColorBalanceBChange = actions::onColorBalanceBChanged,
                 onUndo = actions::onUndoClicked,
                 onRedo = actions::onRedoClicked,
-                onMagicAlign = actions::onMagicClicked
+                onMagicAlign = actions::onMagicClicked,
+                onAdjustmentStart = actions::onAdjustmentStart,
+                onAdjustmentEnd = actions::onAdjustmentEnd
             )
         }
 

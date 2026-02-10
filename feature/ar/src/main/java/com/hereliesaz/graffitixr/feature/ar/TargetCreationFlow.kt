@@ -28,29 +28,40 @@ fun TargetCreationFlow(
     onUnwarpImage: (List<Offset>) -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
-        if (captureStep == CaptureStep.REVIEW) {
-            val uri = uiState.capturedTargetUris.firstOrNull()
-            val imageBitmap by produceState<Bitmap?>(null, uri) { 
-                uri?.let { 
-                    value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) 
-                        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, it)) 
-                    else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it) 
-                } 
+        when (captureStep) {
+            CaptureStep.RECTIFY -> {
+                UnwarpScreen(
+                    isRightHanded = isRightHanded,
+                    targetImage = uiState.tempCaptureBitmap,
+                    onConfirm = onUnwarpImage,
+                    onRetake = onRetake
+                )
             }
+            CaptureStep.REVIEW -> {
+                val uri = uiState.capturedTargetUris.firstOrNull()
+                val imageBitmap by produceState<Bitmap?>(null, uri) {
+                    uri?.let {
+                        value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, it))
+                        else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it)
+                    }
+                }
 
-            TargetRefinementScreen(
-                bitmap = imageBitmap,
-                onConfirm = onConfirm,
-                onRetake = onRetake
-            )
-        } else {
-            TargetCreationOverlay(
-                uiState = uiState,
-                onCapture = onCaptureShutter,
-                onConfirm = onConfirm,
-                onRetake = onRetake,
-                onCancel = onCancel
-            )
+                TargetRefinementScreen(
+                    bitmap = imageBitmap,
+                    onConfirm = onConfirm,
+                    onRetake = onRetake
+                )
+            }
+            else -> {
+                TargetCreationOverlay(
+                    uiState = uiState,
+                    onCapture = onCaptureShutter,
+                    onConfirm = onConfirm,
+                    onRetake = onRetake,
+                    onCancel = onCancel
+                )
+            }
         }
     }
 }

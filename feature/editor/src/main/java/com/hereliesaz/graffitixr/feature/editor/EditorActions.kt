@@ -41,6 +41,9 @@ interface EditorActions {
     
     fun onGestureStart()
     fun onGestureEnd()
+
+    fun onAdjustmentStart()
+    fun onAdjustmentEnd()
     
     fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float)
     

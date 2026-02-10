@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
@@ -33,10 +35,11 @@ import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import com.hereliesaz.graffitixr.design.theme.NavStrings
-import com.hereliesaz.graffitixr.feature.ar.ArRenderer
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingScreen
@@ -75,6 +78,9 @@ fun MainScreen(
     val view = LocalView.current
     val context = LocalContext.current
     val window = (view.context as? android.app.Activity)?.window
+
+    val haptic = LocalHapticFeedback.current
+    val performHaptic = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
 
     // Keep track of renderer for captures
     var renderRef by remember { mutableStateOf<ArRenderer?>(null) }
@@ -179,8 +185,14 @@ fun MainScreen(
             azTheme(activeColor = activeHighlightColor, defaultShape = AzButtonShape.RECTANGLE, headerIconShape = AzHeaderIconShape.ROUNDED)
             azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
             
+            azAdvanced(
+                infoScreen = showInfoScreen,
+                onDismissInfoScreen = { showInfoScreen = false }
+            )
+
             azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
+                performHaptic()
                 if (hasCameraPermission) {
                     editorViewModel.setEditorMode(EditorMode.AR)
                 } else {
@@ -188,6 +200,7 @@ fun MainScreen(
                 }
             })
             azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
+                performHaptic()
                 if (hasCameraPermission) {
                     editorViewModel.setEditorMode(EditorMode.OVERLAY)
                 } else {
@@ -195,9 +208,11 @@ fun MainScreen(
                 }
             })
             azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
+                performHaptic()
                 editorViewModel.setEditorMode(EditorMode.STATIC)
             })
             azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
+                performHaptic()
                 editorViewModel.setEditorMode(EditorMode.TRACE)
             })
             
@@ -206,6 +221,7 @@ fun MainScreen(
             if (editorUiState.editorMode == EditorMode.AR) {
                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
                 azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
+                    performHaptic()
                     if (hasCameraPermission) {
                         viewModel.startTargetCapture()
                         resetDialogs()
@@ -214,6 +230,7 @@ fun MainScreen(
                     }
                 })
                 azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
+                    performHaptic()
                     if (hasCameraPermission) {
                         localNavController.navigate("surveyor")
                         resetDialogs()
@@ -228,6 +245,7 @@ fun MainScreen(
 
             if (editorUiState.editorMode == EditorMode.STATIC) {
                 azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
+                    performHaptic()
                     resetDialogs()
                     backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
@@ -236,6 +254,7 @@ fun MainScreen(
             val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else navStrings.open
             val openButtonId = if (editorUiState.layers.isNotEmpty()) "add_layer" else "image"
             azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
+                performHaptic()
                 resetDialogs()
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
@@ -245,6 +264,7 @@ fun MainScreen(
                 azRailRelocItem(
                     id = "layer_${layer.id}", hostId = "design_host", text = layer.name,
                     onClick = {
+                        performHaptic()
                         if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
                     },
                     onRelocate = { _, _, newOrder -> editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed()) }
@@ -256,59 +276,72 @@ fun MainScreen(
 
             if (editorUiState.layers.isNotEmpty()) {
                 azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
+                    performHaptic()
                     editorViewModel.onRemoveBackgroundClicked()
                     resetDialogs()
                 })
                 azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
+                    performHaptic()
                     editorViewModel.onLineDrawingClicked()
                     resetDialogs()
                 })
                 azDivider()
                 azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
+                    performHaptic()
                     editorViewModel.onAdjustClicked()
                     resetDialogs()
                 }
                 azRailSubItem(id = "balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
+                    performHaptic()
                     editorViewModel.onColorClicked()
                     resetDialogs()
                 }
                 azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
+                    performHaptic()
                     editorViewModel.onCycleBlendMode()
                     resetDialogs()
                 })
                 azRailSubToggle(id = "lock_image", hostId = "design_host", isChecked = editorUiState.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Prevent accidental moves", onClick = {
+                    performHaptic()
                     editorViewModel.toggleImageLock()
                 })
             }
             azDivider()
             azRailHostItem(id = "project_host", text = navStrings.project, onClick = {}) // "Project"
             azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
+                performHaptic()
                 editorViewModel.saveProject()
                 resetDialogs()
             }
             azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
+                performHaptic()
                 localNavController.navigate("project_library")
                 resetDialogs()
             }
             azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo) {
+                performHaptic()
                 editorViewModel.exportProject()
                 resetDialogs()
             }
             azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
+                performHaptic()
                 localNavController.navigate("settings")
                 resetDialogs()
             }
             azDivider()
             
             azRailItem(id = "help", text = "Help", info = "Show Help") {
-                showInfoScreen = true
+                performHaptic()
+                showInfoScreen = !showInfoScreen
                 resetDialogs()
             }
             if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
+                performHaptic()
                 arViewModel.toggleFlashlight()
                 resetDialogs()
             })
             if (editorUiState.editorMode == EditorMode.TRACE) azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
+                performHaptic()
                 viewModel.setTouchLocked(true)
                 resetDialogs()
             })
@@ -401,6 +434,17 @@ fun MainScreen(
                 TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
                 UnlockInstructionsPopup(uiState.showUnlockInstructions)
                 
+                // InfoDialog removed in favor of AzNavRail info mode
+                /*
+                if (showInfoScreen) {
+                    com.hereliesaz.graffitixr.design.components.InfoDialog(
+                        title = "GraffitiXR Help",
+                        content = """...""",
+                        onDismiss = { showInfoScreen = false }
+                    )
+                }
+                */
+
                  if (uiState.isCapturingTarget) {
                     Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
                          TargetCreationFlow(
@@ -413,15 +457,21 @@ fun MainScreen(
                             onCancel = viewModel::onCancelCaptureClicked,
                             onCaptureShutter = {
                                 renderRef?.captureFrame { bitmap ->
-                                    val uri = saveBitmapToCache(context, bitmap)
-                                    if (uri != null) {
-                                        arViewModel.onFrameCaptured(bitmap, uri)
-                                        viewModel.setCaptureStep(com.hereliesaz.graffitixr.common.model.CaptureStep.REVIEW)
-                                    }
+                                    arViewModel.setTempCapture(bitmap)
+                                    viewModel.setCaptureStep(com.hereliesaz.graffitixr.common.model.CaptureStep.RECTIFY)
                                 }
                             },
                             onCalibrationPointCaptured = { },
-                            onUnwarpImage = { _ -> }
+                            onUnwarpImage = { points ->
+                                arUiState.tempCaptureBitmap?.let { src ->
+                                    ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                                        saveBitmapToCache(context, unwarped)?.let { uri ->
+                                            arViewModel.onFrameCaptured(unwarped, uri)
+                                            viewModel.setCaptureStep(com.hereliesaz.graffitixr.common.model.CaptureStep.REVIEW)
+                                        }
+                                    }
+                                }
+                            }
                         )
                     }
                 }

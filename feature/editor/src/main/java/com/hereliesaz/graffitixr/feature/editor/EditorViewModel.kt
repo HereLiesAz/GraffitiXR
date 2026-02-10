@@ -42,6 +42,9 @@ class EditorViewModel @Inject constructor(
     private val maxStackSize = 20
     private var saveJob: Job? = null
 
+    // Track continuous adjustments
+    private var isAdjusting = false
+
     init {
         viewModelScope.launch {
             launch {
@@ -108,13 +111,27 @@ class EditorViewModel @Inject constructor(
     }
 
     private fun updateActiveLayer(update: (OverlayLayer) -> OverlayLayer) {
-        saveState()
+        if (!isAdjusting) {
+            saveState()
+        }
         _uiState.update { state ->
             val layers = state.layers.map { layer ->
                 if (layer.id == state.activeLayerId) update(layer) else layer
             }
             state.copy(layers = layers)
         }
+        persistState()
+    }
+
+    override fun onAdjustmentStart() {
+        if (!isAdjusting) {
+            saveState()
+            isAdjusting = true
+        }
+    }
+
+    override fun onAdjustmentEnd() {
+        isAdjusting = false
         persistState()
     }
 
@@ -165,7 +182,7 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onMagicClicked() {
-        saveState()
+        // saveState() is handled by updateActiveLayer
         updateActiveLayer {
             it.copy(
                 contrast = 1.2f,
@@ -178,7 +195,7 @@ class EditorViewModel @Inject constructor(
     override fun onRemoveBackgroundClicked() {
         val activeLayer = _uiState.value.activeLayer ?: return
         viewModelScope.launch {
-            saveState()
+            // saveState() is handled by updateActiveLayer
             val bitmap = BitmapUtils.getBitmapFromUri(application, activeLayer.uri) ?: return@launch
             val processedBitmap = BackgroundRemover.removeBackground(application, bitmap)
 
@@ -201,7 +218,7 @@ class EditorViewModel @Inject constructor(
     override fun onLineDrawingClicked() {
         val activeLayer = _uiState.value.activeLayer ?: return
         viewModelScope.launch {
-            saveState()
+            // saveState() is handled by updateActiveLayer
             val bitmap = BitmapUtils.getBitmapFromUri(application, activeLayer.uri) ?: return@launch
             val processedBitmap = ImageProcessor.detectEdges(bitmap)
 

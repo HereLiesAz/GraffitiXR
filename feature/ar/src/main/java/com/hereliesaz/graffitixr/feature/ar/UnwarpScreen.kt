@@ -128,19 +128,18 @@ fun UnwarpScreen(
                                 magnifierPosition = touchPos
                             }
                         },
-                        onDrag = { change, _ ->
-                            if (activePointIndex != -1) {
-                                val touchPos = change.position
-                                magnifierPosition = touchPos
-                                val newX = ((touchPos.x - renderOffsetX) / renderWidth).coerceIn(0f, 1f)
-                                val newY = ((touchPos.y - renderOffsetY) / renderHeight).coerceIn(0f, 1f)
-                                points[activePointIndex] = Offset(newX, newY)
-                            }
-                        },
                         onDragEnd = {
                             activePointIndex = -1
                         }
-                    )
+                    ) { change, _ ->
+                        if (activePointIndex != -1) {
+                            val touchPos = change.position
+                            magnifierPosition = touchPos
+                            val newX = ((touchPos.x - renderOffsetX) / renderWidth).coerceIn(0f, 1f)
+                            val newY = ((touchPos.y - renderOffsetY) / renderHeight).coerceIn(0f, 1f)
+                            points[activePointIndex] = Offset(newX, newY)
+                        }
+                    }
                 }
         ) {
             // Draw Image
