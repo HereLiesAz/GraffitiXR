@@ -44,6 +44,10 @@ class MainViewModel @Inject constructor(
         Log.d("MainViewModel", "AR Session Captured")
     }
 
+    // REMOVED: onOverlayImageSelected()
+    // REMOVED: layerList management
+    // REASON: Moved to feature:editor / EditorViewModel to fix "Split Brain" architecture.
+
     fun startTargetCapture() {
         _uiState.update {
             it.copy(

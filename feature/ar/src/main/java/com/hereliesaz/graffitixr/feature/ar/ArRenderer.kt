@@ -3,8 +3,10 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.graphics.Bitmap
 import android.opengl.Matrix
 import android.util.Log
+import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Session
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -28,6 +30,15 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     fun setSession(session: Session) {
         this.session = session
+    }
+
+    fun setupAugmentedImageDatabase(bitmap: Bitmap, name: String) {
+        val currentSession = session ?: return
+        val database = AugmentedImageDatabase(currentSession)
+        database.addImage(name, bitmap)
+        val config = currentSession.config
+        config.augmentedImageDatabase = database
+        currentSession.configure(config)
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
