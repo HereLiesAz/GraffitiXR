@@ -129,7 +129,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
             } catch (e: NotYetAvailableException) {
                 // Ignore
             } catch (e: Exception) {
-                // Log.e("ArRenderer", "Error processing depth", e)
+                Log.e("ArRenderer", "Error processing depth", e)
             }
 
             // Draw Custom Engine (SLAM)
