@@ -41,4 +41,4 @@ The engine is exposed to Kotlin via `GraffitiJNI.cpp`, which maps native pointer
 
 **Key Methods:**
 *   `updateCamera(viewMtx, projMtx)`: Updates the camera pose using raw OpenGL matrices.
-*   `feedDepthData(buffer, width, height)`: Ingests the 16-bit depth buffer for voxel unprojection.
+*   `feedDepthData(buffer, width, height, stride)`: Ingests the 16-bit depth buffer for voxel unprojection, respecting the row stride (padding).

@@ -65,6 +65,7 @@ class GraffitiArView(context: Context) : GLSurfaceView(context), DefaultLifecycl
     fun cleanup() {
         session?.close()
         session = null
+        arRenderer.destroy()
     }
 
     fun setShowPointCloud(show: Boolean) {

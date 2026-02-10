@@ -35,7 +35,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(JNIEnv *
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject buffer, jint width, jint height) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject buffer, jint width, jint height, jint stride) {
     if (handle == 0) return;
     auto *engine = reinterpret_cast<MobileGS*>(handle);
 
@@ -43,7 +43,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv 
     if (!dataAddr) return;
     uint16_t* data = static_cast<uint16_t*>(dataAddr);
 
-    cv::Mat depthWrapper(height, width, CV_16UC1, data);
+    // Stride is usually bytes. OpenCV step is bytes.
+    // If stride is pixels, convert to bytes. But Image.getPlane().getRowStride() is bytes.
+    // CV_16UC1 is 2 bytes per pixel.
+    cv::Mat depthWrapper(height, width, CV_16UC1, data, stride);
     engine->processDepthFrame(depthWrapper, width, height);
 }
 

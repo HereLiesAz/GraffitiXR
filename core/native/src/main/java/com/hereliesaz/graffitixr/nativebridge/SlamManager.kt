@@ -63,9 +63,9 @@ class SlamManager {
      * @param width Width of the depth image.
      * @param height Height of the depth image.
      */
-    fun feedDepthData(buffer: ByteBuffer, width: Int, height: Int) {
+    fun feedDepthData(buffer: ByteBuffer, width: Int, height: Int, stride: Int) {
         if (nativeHandle != 0L) {
-            feedDepthDataJni(nativeHandle, buffer, width, height)
+            feedDepthDataJni(nativeHandle, buffer, width, height, stride)
         }
     }
 
@@ -108,7 +108,7 @@ class SlamManager {
     private external fun initNativeJni(): Long
     private external fun destroyNativeJni(handle: Long)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
-    private external fun feedDepthDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int)
+    private external fun feedDepthDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int, stride: Int)
     private external fun drawJni(handle: Long)
     private external fun getPointCountJni(handle: Long): Int
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)

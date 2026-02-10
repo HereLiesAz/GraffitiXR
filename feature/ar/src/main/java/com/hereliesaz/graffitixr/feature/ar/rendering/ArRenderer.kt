@@ -12,6 +12,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 
 class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
@@ -20,6 +21,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     // Renderers
     private val backgroundRenderer = BackgroundRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
+    private val slamManager = SlamManager()
 
     // Matrices
     private val viewMatrix = FloatArray(16)
@@ -41,12 +43,17 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
         currentSession.configure(config)
     }
 
+    fun destroy() {
+        slamManager.destroy()
+    }
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
 
         try {
             backgroundRenderer.createOnGlThread(context)
             pointCloudRenderer.createOnGlThread(context)
+            slamManager.initialize()
         } catch (e: Exception) {
             Log.e("ArRenderer", "Failed to init GL", e)
         }
@@ -73,6 +80,25 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
             // Projection Matrix
             camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
             camera.getViewMatrix(viewMatrix, 0)
+
+            // Update SlamManager Camera
+            slamManager.updateCamera(viewMatrix, projectionMatrix)
+
+            // Feed Depth Data
+            try {
+                val depthImage = frame.acquireDepthImage16Bits()
+                if (depthImage != null) {
+                    val buffer = depthImage.planes[0].buffer
+                    val stride = depthImage.planes[0].rowStride
+                    slamManager.feedDepthData(buffer, depthImage.width, depthImage.height, stride)
+                    depthImage.close()
+                }
+            } catch (e: Exception) {
+                // Ignore NotYetAvailableException or others
+            }
+
+            // Draw Native Map
+            slamManager.draw()
 
             // Draw Point Cloud (The "Blue Dots")
             if (showPointCloud) {

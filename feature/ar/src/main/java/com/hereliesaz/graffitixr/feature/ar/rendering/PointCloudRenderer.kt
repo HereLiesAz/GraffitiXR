@@ -18,6 +18,7 @@ class PointCloudRenderer {
     private var mvpMatrixHandle = 0
     private var pointSizeHandle = 0
     private var numPoints = 0
+    private var lastTimestamp: Long = 0
 
     // Missing properties
     private val pointIdMap = HashMap<Int, Int>()
