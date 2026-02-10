@@ -80,6 +80,7 @@ fun MainScreen(
     val window = (view.context as? android.app.Activity)?.window
 
     val haptic = LocalHapticFeedback.current
+    val performHaptic = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
 
     // Keep track of renderer for captures
     var renderRef by remember { mutableStateOf<ArRenderer?>(null) }
@@ -186,7 +187,7 @@ fun MainScreen(
             
             azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 if (hasCameraPermission) {
                     editorViewModel.setEditorMode(EditorMode.AR)
                 } else {
@@ -194,7 +195,7 @@ fun MainScreen(
                 }
             })
             azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 if (hasCameraPermission) {
                     editorViewModel.setEditorMode(EditorMode.OVERLAY)
                 } else {
@@ -202,11 +203,11 @@ fun MainScreen(
                 }
             })
             azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 editorViewModel.setEditorMode(EditorMode.STATIC)
             })
             azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 editorViewModel.setEditorMode(EditorMode.TRACE)
             })
             
@@ -215,7 +216,7 @@ fun MainScreen(
             if (editorUiState.editorMode == EditorMode.AR) {
                 azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
                 azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     if (hasCameraPermission) {
                         viewModel.startTargetCapture()
                         resetDialogs()
@@ -224,7 +225,7 @@ fun MainScreen(
                     }
                 })
                 azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     if (hasCameraPermission) {
                         localNavController.navigate("surveyor")
                         resetDialogs()
@@ -239,7 +240,7 @@ fun MainScreen(
 
             if (editorUiState.editorMode == EditorMode.STATIC) {
                 azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     resetDialogs()
                     backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
@@ -248,7 +249,7 @@ fun MainScreen(
             val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else navStrings.open
             val openButtonId = if (editorUiState.layers.isNotEmpty()) "add_layer" else "image"
             azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 resetDialogs()
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
@@ -258,7 +259,7 @@ fun MainScreen(
                 azRailRelocItem(
                     id = "layer_${layer.id}", hostId = "design_host", text = layer.name,
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        performHaptic()
                         if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
                     },
                     onRelocate = { _, _, newOrder -> editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed()) }
@@ -270,72 +271,72 @@ fun MainScreen(
 
             if (editorUiState.layers.isNotEmpty()) {
                 azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     editorViewModel.onRemoveBackgroundClicked()
                     resetDialogs()
                 })
                 azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     editorViewModel.onLineDrawingClicked()
                     resetDialogs()
                 })
                 azDivider()
                 azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     editorViewModel.onAdjustClicked()
                     resetDialogs()
                 }
                 azRailSubItem(id = "balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     editorViewModel.onColorClicked()
                     resetDialogs()
                 }
                 azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     editorViewModel.onCycleBlendMode()
                     resetDialogs()
                 })
                 azRailSubToggle(id = "lock_image", hostId = "design_host", isChecked = editorUiState.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Prevent accidental moves", onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    performHaptic()
                     editorViewModel.toggleImageLock()
                 })
             }
             azDivider()
             azRailHostItem(id = "project_host", text = navStrings.project, onClick = {}) // "Project"
             azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 editorViewModel.saveProject()
                 resetDialogs()
             }
             azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 localNavController.navigate("project_library")
                 resetDialogs()
             }
             azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 editorViewModel.exportProject()
                 resetDialogs()
             }
             azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 localNavController.navigate("settings")
                 resetDialogs()
             }
             azDivider()
             
             azRailItem(id = "help", text = "Help", info = "Show Help") {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 showInfoScreen = true
                 resetDialogs()
             }
             if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 arViewModel.toggleFlashlight()
                 resetDialogs()
             })
             if (editorUiState.editorMode == EditorMode.TRACE) azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                performHaptic()
                 viewModel.setTouchLocked(true)
                 resetDialogs()
             })
@@ -470,12 +471,9 @@ fun MainScreen(
                             },
                             onCalibrationPointCaptured = { },
                             onUnwarpImage = { points ->
-                                val src = arUiState.tempCaptureBitmap
-                                if (src != null) {
-                                    val unwarped = ImageProcessor.unwarpImage(src, points)
-                                    if (unwarped != null) {
-                                        val uri = saveBitmapToCache(context, unwarped)
-                                        if (uri != null) {
+                                arUiState.tempCaptureBitmap?.let { src ->
+                                    ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                                        saveBitmapToCache(context, unwarped)?.let { uri ->
                                             arViewModel.onFrameCaptured(unwarped, uri)
                                             viewModel.setCaptureStep(com.hereliesaz.graffitixr.common.model.CaptureStep.REVIEW)
                                         }

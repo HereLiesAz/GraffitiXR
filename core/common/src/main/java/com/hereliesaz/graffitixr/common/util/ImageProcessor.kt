@@ -75,7 +75,7 @@ object ImageProcessor {
 
             resultBitmap
         } catch (e: Exception) {
-            android.util.Log.e("ImageProcessor", "Failed to detect edges", e)
+            e.printStackTrace()
             null
         }
     }
@@ -131,7 +131,7 @@ object ImageProcessor {
 
             resultBitmap
         } catch (e: Exception) {
-            android.util.Log.e("ImageProcessor", "Failed to unwarp image", e)
+            e.printStackTrace()
             null
         }
     }
