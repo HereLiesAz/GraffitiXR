@@ -55,13 +55,7 @@ class SlamManager {
     }
 
     /**
-     * Pass the raw 16-bit depth buffer from ARCore to the native engine.
-     * This is critical for the "Neural Scan" feature, which uses depth data for
-     * sparse voxel hashing and unprojection.
-     *
-     * @param buffer Direct ByteBuffer containing 16-bit depth values (mm).
-     * @param width Width of the depth image.
-     * @param height Height of the depth image.
+     * Pass depth buffer to the engine.
      */
     fun feedDepthData(buffer: ByteBuffer, width: Int, height: Int) {
         if (nativeHandle != 0L) {

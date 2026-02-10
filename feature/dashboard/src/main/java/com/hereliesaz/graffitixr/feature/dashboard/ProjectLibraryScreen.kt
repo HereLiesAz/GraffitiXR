@@ -29,15 +29,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.graffitixr.common.model.Project
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun ProjectLibraryScreen(
-    projects: List<Project>,
-    onLoadProject: (Project) -> Unit,
+    projects: List<GraffitiProject>,
+    onLoadProject: (GraffitiProject) -> Unit,
     onDeleteProject: (String) -> Unit,
     onNewProject: () -> Unit
 ) {

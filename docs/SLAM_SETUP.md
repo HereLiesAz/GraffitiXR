@@ -20,9 +20,9 @@ These constants are defined in `MobileGS.h` and can be tweaked for performance v
 
 ## Sensor Input
 
-The engine requires two synchronized streams from ARCore, fed via `SlamManager` in the `ArRenderer` draw loop:
-1.  **Depth Map (16-bit):** Extracted from `frame.acquireDepthImage16Bits()`. Used for unprojection. Values > 6500mm are discarded.
-2.  **Camera Pose (View/Projection Matrices):** The exact View and Projection matrices are passed to `updateCamera()` to align the voxel grid with the ARCore world coordinate system.
+The engine requires two synchronized streams from ARCore:
+1.  **Depth Map (16-bit):** Used for unprojection. Values > 6500mm are discarded.
+2.  **Camera Pose (Matrix4x4):** The precise location of the device in world space.
 
 ## Tuning Guide
 

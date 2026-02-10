@@ -1,52 +1,60 @@
 package com.hereliesaz.graffitixr
 
-import android.app.Application
-import android.util.Log
 import androidx.lifecycle.ViewModel
-import com.google.ar.core.Session
-import com.hereliesaz.graffitixr.common.dispatcher.DispatcherProvider
-import com.hereliesaz.graffitixr.common.model.CaptureStep
-import com.hereliesaz.graffitixr.common.model.UiState
-import com.hereliesaz.graffitixr.data.ProjectManager
+import androidx.lifecycle.viewModelScope
+import com.hereliesaz.graffitixr.common.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import javax.inject.Inject
+import kotlinx.coroutines.launch
 
+/**
+ * REFACTORED: No longer implements EditorActions.
+ * Responsibilities:
+ * - Application Lifecycle (Resume/Pause)
+ * - Global App State (Navigation, Permissions)
+ * - Touch Locking (Global Overlay)
+ * - Target Creation Orchestration (App-level flow)
+ */
 @HiltViewModel
-class MainViewModel @Inject constructor(
-    private val application: Application,
-    private val projectManager: ProjectManager,
-    private val dispatchers: DispatcherProvider
-) : ViewModel() {
+class MainViewModel @Inject constructor() : ViewModel() {
 
-    // UI State: Controls top-level navigation and system status only.
+    // Simplified UI State
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    // AR Session State
-    private var arSession: Session? = null
-
-    init {
-        Log.d("MainViewModel", "Initialized with Hilt")
+    fun onResume() {
+        // Global resume logic if needed
     }
 
-    fun onPermissionsResult(permissions: Map<String, Boolean>) {
-        val allGranted = permissions.entries.all { it.value }
-        _uiState.update { it.copy(isLoading = !allGranted) } // Placeholder for actual permission handling
+    fun onPause() {
+        // Global pause logic
     }
 
-    fun onArSessionCreated(session: Session) {
-        this.arSession = session
-        _uiState.update { it.copy(isLoading = false) } // Placeholder
-        Log.d("MainViewModel", "AR Session Captured")
+    // --- Global Overlays ---
+
+    fun setTouchLocked(locked: Boolean) {
+        _uiState.update { it.copy(isTouchLocked = locked) }
     }
 
-    // REMOVED: onOverlayImageSelected()
-    // REMOVED: layerList management
-    // REASON: Moved to feature:editor / EditorViewModel to fix "Split Brain" architecture.
+    fun setTraceLocked(locked: Boolean) {
+        // Trace lock implies touch lock
+        _uiState.update { it.copy(isTouchLocked = locked) }
+    }
+
+    fun showUnlockInstructions() {
+        _uiState.update { it.copy(showUnlockInstructions = true) }
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(3000)
+            _uiState.update { it.copy(showUnlockInstructions = false) }
+        }
+    }
+
+    // --- Target Creation Flow (Orchestration) ---
+    // This remains here as it interrupts the main screen flow
 
     fun startTargetCapture() {
         _uiState.update {

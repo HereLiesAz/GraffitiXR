@@ -5,7 +5,7 @@ This document describes how GraffitiXR handles data persistence, state managemen
 ## **1. Core Data Models**
 
 ### **`UiState` (Immutable)**
--   **Location:** `core/common/src/main/java/com/hereliesaz/graffitixr/common/model/UiState.kt`
+-   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/UiState.kt`
 -   **Purpose:** The single source of truth for the application's UI. It holds:
     -   Global state (`editorMode`, `isCapturingTarget`).
     -   **Layers:** A list of `OverlayLayer` objects managed by the user.
@@ -14,7 +14,7 @@ This document describes how GraffitiXR handles data persistence, state managemen
 -   **Usage:** Managed by `MainViewModel` via a `StateFlow`. UI components observe this stream.
 
 ### **`OverlayLayer` (Serializable)**
--   **Location:** `core/common/src/main/java/com/hereliesaz/graffitixr/common/model/OverlayLayer.kt`
+-   **Location:** `app/src/main/java/com.hereliesaz.graffitixr.common.model.OverlayLayer.kt`
 -   **Purpose:** Represents a single visual layer (image + properties).
 -   **Fields:**
     -   `uri`: Image source.
@@ -22,8 +22,8 @@ This document describes how GraffitiXR handles data persistence, state managemen
     -   `adjustments`: Opacity, Brightness, Contrast, Saturation, Color Balance.
     -   `blendMode`: Composition mode (Multiply, Overlay, etc.).
 
-### **`GraffitiProject` (Serializable)**
--   **Location:** `core/common/src/main/java/com/hereliesaz/graffitixr/common/model/GraffitiProject.kt`
+### **`ProjectData` (Serializable)**
+-   **Location:** `app/src/main/java/com/hereliesaz/graffitixr/data/ProjectData.kt`
 -   **Purpose:** The DTO (Data Transfer Object) used for saving and loading projects. It mirrors the persistent parts of `UiState`.
 -   **Fields:**
     -   `layers`: List of `OverlayLayer`.
@@ -33,7 +33,7 @@ This document describes how GraffitiXR handles data persistence, state managemen
     -   `gpsData`, `sensorData`: Contextual metadata.
 
 ### **`Fingerprint`**
--   **Location:** `core/common/src/main/java/com/hereliesaz/graffitixr/common/model/Fingerprint.kt`
+-   **Location:** `app/src/main/java/com.hereliesaz.graffitixr.common.model.Fingerprint.kt`
 -   **Purpose:** Stores the OpenCV ORB features required to identify an AR target.
 -   **Structure:**
     -   `keypoints`: List of `org.opencv.core.KeyPoint` (serialized via `KeyPointSerializer`).
@@ -53,7 +53,7 @@ The app uses `kotlinx.serialization` with custom serializers for complex/native 
 ## **3. Project Management**
 
 ### **`ProjectManager`**
--   **Location:** `core/data/src/main/java/com/hereliesaz/graffitixr/data/ProjectManager.kt`
+-   **Location:** `app/src/main/java/com.hereliesaz.graffitixr.common.util/ProjectManager.kt`
 -   **Function:** Handles the I/O operations for project files (`.json` or `.zip`).
 -   **Logic:**
     -   Converts `UiState` -> `ProjectData` (handling type mapping like `List<Offset>` -> `List<Pair>`).

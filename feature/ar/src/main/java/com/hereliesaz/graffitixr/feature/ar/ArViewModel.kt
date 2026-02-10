@@ -38,14 +38,7 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isFlashlightOn = newState) }
     }
 
-    /**
-     * Called when the user captures a new target image in the Target Creation Flow.
-     * Updates the UI state with the capture URI, signals the View to update the AR session database,
-     * and persists the target URI to the current project.
-     *
-     * @param bitmap The captured bitmap.
-     * @param uri The URI where the bitmap is stored (usually in cache).
-     */
+    // NEW: Frame Capture
     fun onFrameCaptured(bitmap: Bitmap, uri: Uri) {
         viewModelScope.launch {
             // Update local state

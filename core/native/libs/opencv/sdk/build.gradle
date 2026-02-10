@@ -121,8 +121,10 @@ android {
         }
     }
     
-    buildFeatures {
-        buildConfig true
+    android {
+        buildFeatures {
+            buildConfig true
+        }
     }
 
     compileOptions {
@@ -130,10 +132,8 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    if (project.plugins.hasPlugin('kotlin-android')) {
-        kotlinOptions {
-            jvmTarget = '17'
-        }
+    kotlinOptions {
+        jvmTarget = '17'
     }
 
     buildTypes {

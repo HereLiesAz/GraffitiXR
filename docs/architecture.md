@@ -40,13 +40,12 @@ The rendering loop in `ArRenderer.kt` is the heartbeat of the application.
 
 1.  **Input**: ARCore provides a `Frame` (Camera Image + Depth Map + Pose).
 2.  **Processing**:
-    *   **Background**: `ArRenderer` uses `BackgroundRenderer` to draw the camera feed to the GL surface.
-    *   **Native Sync**: `ArRenderer` extracts the 16-bit Depth Image and Camera Matrices (View/Projection) and passes them to `MobileGS.cpp` via `SlamManager`.
-    *   **Logic**: `MobileGS` updates the voxel grid (Sparse Voxel Hashing) using the depth data and camera pose.
+    *   **Background**: The camera image is rendered to a texture.
+    *   **Native Sync**: The Depth Map and Pose are passed to `MobileGS.cpp` via `SlamManager`.
+    *   **Logic**: `MobileGS` updates the voxel grid (Sparse Voxel Hashing).
 3.  **Output**:
-    *   **AR Visualization**: `ArRenderer` draws standard ARCore Point Clouds (`PointCloudRenderer`) and Planes (`PlaneRenderer`).
-    *   **Native Draw**: `MobileGS` draws the persistent Neural Map (splats) directly to the OpenGL surface.
-    *   **Overlay Draw**: `ArRenderer` draws Augmented Images (Anchors) and user content (layers).
+    *   **Native Draw**: `MobileGS` draws the point cloud/splats directly to the OpenGL surface.
+    *   **Overlay Draw**: `ArRenderer` draws user content (layers) on top.
 
 ## Data Persistence (.gxr)
 Projects are saved as ZIP containers.

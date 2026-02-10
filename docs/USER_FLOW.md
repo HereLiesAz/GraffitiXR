@@ -52,22 +52,26 @@
 
 ## 3. TARGET CREATION (The Grid Ritual)
 **Definition:** The workflow to establish the initial `Anchor` (Coordinate 0,0,0).
-**Context:** `TargetCreationOverlay.kt`, `ArRenderer.kt`.
+**Context:** `TargetCreationOverlay.kt`.
 
 ### A. The Workflow Logic
 1.  **Capture Phase:**
-    *   **Input:** Live AR Camera Feed (`GLSurfaceView`).
-    *   **User Action:** Tap "Create" on Rail, then "Shutter".
-    *   **Process:** `ArRenderer.captureFrame` uses `PixelCopy` to grab the current view.
-    *   **Data:** Captures `Bitmap tempTarget`.
-2.  **Review Phase:**
-    *   **Context:** `TargetRefinementScreen`.
-    *   **User Action:** Confirm or Retake.
-3.  **Injection Phase:**
-    *   **Action:** `ArRenderer.setupAugmentedImageDatabase(bitmap)`.
-    *   **Process:** Pauses AR Session, adds image to `AugmentedImageDatabase`, Resumes Session.
-    *   **Result:** ARCore starts tracking the image as an `AugmentedImage` anchor.
-    *   **Visualization:** `ArRenderer` draws a green quad (`AugmentedImageRenderer`) over the tracked image.
+    * **Input:** Camera X stream.
+    * **User Action:** Tap "Shutter".
+    * **Data:** Captures `Bitmap tempTarget`.
+    * **Relation:** `ArView` is PAUSED (Camera logic handed to `TargetCreationOverlay`).
+2.  **Rectification Phase (Unwarp):**
+    * **Context:** `UnwarpScreen`.
+    * **User Action:** Drag 4 corners to define the plane.
+    * **Logic:** `OpenCV.getPerspectiveTransform(srcPoints, dstPoints)`.
+    * **Output:** `Bitmap flatTarget` (The rectified, flat texture of the wall).
+3.  **Feature Extraction Phase:**
+    * **Process:** Pass `flatTarget` to `OrbFeatureDetector`.
+    * **Validation:** `IF (FeatureCount < 50) -> Reject "Too low texture"`.
+    * **Result:** `Fingerprint` created.
+4.  **Injection Phase:**
+    * **Action:** `MobileGS.setAnchor(Fingerprint)`.
+    * **Result:** The engine now treats this image's position as (0,0,0) in World Space.
 
 ---
 

@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.data.repository
+package com.hereliesaz.graffitixr.domain.repository
 
 import kotlinx.coroutines.flow.Flow
 

@@ -60,4 +60,3 @@ refactor*.sh
 */.cxx/*
 
 build_output*.txt
-build*.txt

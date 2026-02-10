@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.GpsData
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
-import com.hereliesaz.graffitixr.common.model.Project
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -27,13 +26,12 @@ class DashboardViewModel @Inject constructor(
     fun loadAvailableProjects() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            projectRepository.getProjects().collect { projects ->
-                _uiState.update {
-                    it.copy(
-                        availableProjects = projects,
-                        isLoading = false
-                    )
-                }
+            val projects = projectRepository.getProjects()
+            _uiState.update {
+                it.copy(
+                    availableProjects = projects,
+                    isLoading = false
+                )
             }
         }
     }
@@ -53,22 +51,14 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun openProject(project: GraffitiProject) {
-        openProject(project.id)
-    }
-
-    fun openProject(project: Project) {
-        openProject(project.id)
-    }
-
-    fun openProject(projectId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val result = projectRepository.loadProject(projectId)
+            val result = projectRepository.loadProject(project.id)
             if (result.isSuccess) {
                  _uiState.update { 
                      it.copy(
                          showProjectList = false, 
-                         currentProjectId = projectId
+                         currentProjectId = project.id 
                      ) 
                  }
             }
