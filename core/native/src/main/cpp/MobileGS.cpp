@@ -1,4 +1,4 @@
-#include "include/MobileGS.h"
+#include "MobileGS.h"
 #include <cmath>
 #include <algorithm>
 #include <glm/glm.hpp>

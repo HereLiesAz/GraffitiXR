@@ -1,294 +1,113 @@
-#include "include/MobileGS.h"
+#ifndef MOBILE_GS_H
+#define MOBILE_GS_H
+
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <mutex>
 #include <cmath>
-#include <algorithm>
+#include <GLES3/gl3.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <fstream>
-#include <iostream>
 
-// Helper to unpack Pose
-glm::mat4 makeMat4(const float* d) {
-    return glm::make_mat4(d);
-}
+// --- SPLATAM: Augmented Data Structure ---
+struct Splat {
+    // Spatial (Geometry)
+    float x, y, z;
 
-MobileGS::MobileGS() {
-    mChunkSize = 2.0f;
-    mVoxelSize = 0.05f;
-    mScreenWidth = 1080;
-    mScreenHeight = 1920;
-    // Identity matrices default
-    mStoredView = glm::mat4(1.0f);
-    mStoredProj = glm::mat4(1.0f);
-}
+    // Orientation & Scale (Covariance approximation for Mobile)
+    float nx, ny, nz; // Surface Normal
+    float radius;     // Splat influence radius
 
-MobileGS::~MobileGS() {
-    clear();
-}
+    // Visual (Appearance)
+    uint8_t r, g, b;  // Base Albedo
 
-void MobileGS::initialize() {
-    clear();
-}
+    // Metadata
+    float confidence;       // 0.0 to 1.0
+    uint32_t lastSeenFrame; // For culling/maintenance
+    float luminance;        // Cached for lighting invariance
+};
 
-void MobileGS::clear() {
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-    for (auto& pair : mChunks) {
-        if (pair.second.vbo != 0) {
-            glDeleteBuffers(1, &pair.second.vbo);
-        }
+// --- DISKCHUNGS: Spatial Hashing ---
+struct ChunkKey {
+    int x, y, z;
+
+    bool operator==(const ChunkKey& other) const {
+        return x == other.x && y == other.y && z == other.z;
     }
-    mChunks.clear();
-    mFrameCount = 0;
-}
+};
 
-// --- JNI Adapter Impl ---
-void MobileGS::updateCamera(const float* view, const float* proj) {
-    if (view) mStoredView = makeMat4(view);
-    if (proj) mStoredProj = makeMat4(proj);
-}
-
-void MobileGS::draw() {
-    // Bridge old draw() call to new render()
-    render(glm::value_ptr(mStoredView), glm::value_ptr(mStoredProj));
-}
-
-void MobileGS::onSurfaceChanged(int width, int height) {
-    mScreenWidth = width;
-    mScreenHeight = height;
-}
-
-int MobileGS::getSplatCount() {
-    int total = 0;
-    // This is approximate/slow, but safe
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-    for (const auto& pair : mChunks) {
-        total += pair.second.splats.size();
+struct ChunkKeyHash {
+    std::size_t operator()(const ChunkKey& k) const {
+        // Cantor pairing or simple XOR hash for 3D coords
+        size_t h1 = std::hash<int>{}(k.x);
+        size_t h2 = std::hash<int>{}(k.y);
+        size_t h3 = std::hash<int>{}(k.z);
+        return h1 ^ (h2 << 1) ^ (h3 << 2);
     }
-    return total;
-}
+};
 
-void MobileGS::alignMap(const float* transform) {
-    // TODO: Apply transformation to all splats (Complex due to chunks)
-    // For now, no-op or clear
-}
+struct Chunk {
+    bool isDirty;       // Needs GL buffer update
+    bool isActive;      // Is currently in memory/renderable
+    std::vector<Splat> splats;
 
-bool MobileGS::saveModel(std::string path) {
-    std::ofstream out(path, std::ios::binary);
-    if (!out) return false;
+    // GL Buffers for this chunk
+    GLuint vbo;
+    int splatCount;
 
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-    size_t chunkCount = mChunks.size();
-    out.write((char*)&chunkCount, sizeof(size_t));
+    Chunk() : isDirty(true), isActive(true), vbo(0), splatCount(0) {}
+};
 
-    for (const auto& pair : mChunks) {
-        const Chunk& c = pair.second;
-        size_t splatCount = c.splats.size();
-        out.write((char*)&splatCount, sizeof(size_t));
-        if (splatCount > 0) {
-            out.write((char*)c.splats.data(), splatCount * sizeof(Splat));
-        }
-    }
-    out.close();
-    return true;
-}
+class MobileGS {
+public:
+    MobileGS();
+    ~MobileGS();
 
-bool MobileGS::loadModel(std::string path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) return false;
+    // --- Core Pipeline (SplaTAM) ---
+    void feedDepthData(const float* depthPixels, const float* colorPixels,
+            int width, int height, const float* cameraPose, float fov);
 
-    clear();
+    void update(const float* cameraPose); // Manages chunks (load/unload)
 
-    size_t chunkCount;
-    in.read((char*)&chunkCount, sizeof(size_t));
+    // Renders using stored matrices or passed ones
+    void render(const float* viewMatrix, const float* projMatrix);
 
-    for (size_t i = 0; i < chunkCount; i++) {
-        size_t splatCount;
-        in.read((char*)&splatCount, sizeof(size_t));
-        if (splatCount > 0) {
-            std::vector<Splat> tempSplats(splatCount);
-            in.read((char*)tempSplats.data(), splatCount * sizeof(Splat));
+    // --- JNI Adapter Methods ---
+    void initialize(); // Reset/Init
+    void updateCamera(const float* view, const float* proj); // Stores matrices for draw()
+    void draw(); // Calls render() with stored matrices
 
-            // Re-hash into chunks based on position (in case logic changed)
-            // Or just trust the serialization. Let's just restore.
-            if (!tempSplats.empty()) {
-                ChunkKey key = getChunkKey(tempSplats[0].x, tempSplats[0].y, tempSplats[0].z);
-                mChunks[key].splats = tempSplats;
-                mChunks[key].isDirty = true;
-            }
-        }
-    }
-    in.close();
-    return true;
-}
+    void onSurfaceChanged(int width, int height);
+    int getSplatCount();
+    void clear();
 
-// --- CORE LOGIC ---
+    // Serialization
+    bool saveModel(std::string path);
+    bool loadModel(std::string path);
+    void alignMap(const float* transform);
 
-ChunkKey MobileGS::getChunkKey(float x, float y, float z) {
-    return ChunkKey{
-            (int)floor(x / mChunkSize),
-            (int)floor(y / mChunkSize),
-            (int)floor(z / mChunkSize)
-    };
-}
+    // Settings
+    void setChunkSize(float meters) { mChunkSize = meters; }
 
-float MobileGS::getLuminance(uint8_t r, uint8_t g, uint8_t b) {
-    return 0.299f * r + 0.587f * g + 0.114f * b;
-}
+private:
+    // Parameters
+    float mChunkSize = 2.0f;
+    float mVoxelSize = 0.05f;
+    int mFrameCount = 0;
 
-void MobileGS::fuseSplat(Splat& target, const Splat& source) {
-    // 1. ILLUMINATION INVARIANCE
-    float lumDiff = std::abs(target.luminance - source.luminance);
-    float lumThreshold = 50.0f;
+    // State
+    glm::mat4 mStoredView;
+    glm::mat4 mStoredProj;
+    int mScreenWidth, mScreenHeight;
 
-    if (lumDiff > lumThreshold) {
-        target.confidence = std::min(target.confidence + 0.05f, 1.0f);
-        target.lastSeenFrame = source.lastSeenFrame;
-        return;
-    }
+    // Storage
+    std::unordered_map<ChunkKey, Chunk, ChunkKeyHash> mChunks;
+    std::mutex mChunkMutex;
 
-    // 2. STANDARD FUSION
-    float alpha = 0.1f;
+    // Helpers
+    ChunkKey getChunkKey(float x, float y, float z);
+    float getLuminance(uint8_t r, uint8_t g, uint8_t b);
+    void fuseSplat(Splat& target, const Splat& source);
+};
 
-    target.x = target.x * (1.0f - alpha) + source.x * alpha;
-    target.y = target.y * (1.0f - alpha) + source.y * alpha;
-    target.z = target.z * (1.0f - alpha) + source.z * alpha;
-
-    target.nx = target.nx * (1.0f - alpha) + source.nx * alpha;
-    target.ny = target.ny * (1.0f - alpha) + source.ny * alpha;
-    target.nz = target.nz * (1.0f - alpha) + source.nz * alpha;
-
-    float invLen = 1.0f / sqrt(target.nx*target.nx + target.ny*target.ny + target.nz*target.nz + 0.0001f);
-    target.nx *= invLen; target.ny *= invLen; target.nz *= invLen;
-
-    target.radius = target.radius * (1.0f - alpha) + source.radius * alpha;
-
-    target.r = (uint8_t)(target.r * (1.0f - alpha) + source.r * alpha);
-    target.g = (uint8_t)(target.g * (1.0f - alpha) + source.g * alpha);
-    target.b = (uint8_t)(target.b * (1.0f - alpha) + source.b * alpha);
-
-    target.luminance = getLuminance(target.r, target.g, target.b);
-    target.confidence = std::min(target.confidence + 0.2f, 1.0f);
-    target.lastSeenFrame = source.lastSeenFrame;
-}
-
-void MobileGS::feedDepthData(const float* depthPixels, const float* colorPixels,
-        int width, int height, const float* cameraPose, float fov) {
-    mFrameCount++;
-    glm::mat4 pose = makeMat4(cameraPose);
-    glm::vec3 camPos = glm::vec3(pose[3]);
-
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-
-    int stride = 4;
-    float fx = (width / 2.0f) / tan(fov / 2.0f);
-    float fy = fx;
-    float cx = width / 2.0f;
-    float cy = height / 2.0f;
-
-    for (int v = 0; v < height; v += stride) {
-        for (int u = 0; u < width; u += stride) {
-            int idx = v * width + u;
-            float d = depthPixels[idx];
-
-            if (d <= 0.1f || d > 4.0f) continue;
-
-            float z_cam = -d;
-            float x_cam = (u - cx) * d / fx;
-            float y_cam = (v - cy) * d / fy;
-
-            glm::vec4 worldPos = pose * glm::vec4(x_cam, y_cam, z_cam, 1.0f);
-
-            Splat s;
-            s.x = worldPos.x;
-            s.y = worldPos.y;
-            s.z = worldPos.z;
-
-            glm::vec3 dirToCam = glm::normalize(camPos - glm::vec3(s.x, s.y, s.z));
-            s.nx = dirToCam.x; s.ny = dirToCam.y; s.nz = dirToCam.z;
-            s.radius = d * (stride / fx) * 1.5f;
-
-            // Handle color (check for null to prevent crash during init)
-            if (colorPixels) {
-                // Assuming RGB 0..1 floats
-                s.r = (uint8_t)(colorPixels[idx * 3 + 0] * 255.0f);
-                s.g = (uint8_t)(colorPixels[idx * 3 + 1] * 255.0f);
-                s.b = (uint8_t)(colorPixels[idx * 3 + 2] * 255.0f);
-            } else {
-                s.r = 255; s.g = 255; s.b = 255;
-            }
-            s.luminance = getLuminance(s.r, s.g, s.b);
-            s.confidence = 0.5f;
-            s.lastSeenFrame = mFrameCount;
-
-            ChunkKey key = getChunkKey(s.x, s.y, s.z);
-            Chunk& chunk = mChunks[key];
-
-            bool found = false;
-            float mergeDistSq = mVoxelSize * mVoxelSize;
-
-            for (auto& existing : chunk.splats) {
-                float dx = existing.x - s.x;
-                float dy = existing.y - s.y;
-                float dz = existing.z - s.z;
-                if (dx*dx + dy*dy + dz*dz < mergeDistSq) {
-                    fuseSplat(existing, s);
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
-                chunk.splats.push_back(s);
-            }
-            chunk.isDirty = true;
-        }
-    }
-}
-
-void MobileGS::update(const float* cameraPose) {
-    // DiskChunGS Logic placeholder
-}
-
-void MobileGS::render(const float* viewMatrix, const float* projMatrix) {
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-
-    for (auto& pair : mChunks) {
-        Chunk& c = pair.second;
-        if (c.splats.empty()) continue;
-
-        if (c.isDirty) {
-            if (c.vbo == 0) glGenBuffers(1, &c.vbo);
-
-            std::vector<float> buffer;
-            buffer.reserve(c.splats.size() * 7);
-
-            for (const auto& s : c.splats) {
-                if (s.confidence < 0.3f) continue;
-                buffer.push_back(s.x);
-                buffer.push_back(s.y);
-                buffer.push_back(s.z);
-                buffer.push_back(s.r / 255.0f);
-                buffer.push_back(s.g / 255.0f);
-                buffer.push_back(s.b / 255.0f);
-                buffer.push_back(s.radius);
-            }
-
-            glBindBuffer(GL_ARRAY_BUFFER, c.vbo);
-            glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(), GL_STATIC_DRAW);
-            c.splatCount = buffer.size() / 7;
-            c.isDirty = false;
-        }
-
-        if (c.splatCount > 0) {
-            glBindBuffer(GL_ARRAY_BUFFER, c.vbo);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(6 * sizeof(float)));
-            glDrawArrays(GL_POINTS, 0, c.splatCount);
-        }
-    }
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
+#endif // MOBILE_GS_H

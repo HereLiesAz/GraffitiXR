@@ -1,6 +1,6 @@
 #include <jni.h>
 #include <string>
-#include "include/MobileGS.h"
+#include "MobileGS.h"
 
 // Helper to cast jlong handle to pointer
 inline MobileGS* getEngine(jlong handle) {
