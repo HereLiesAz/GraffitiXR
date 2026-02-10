@@ -1,32 +1,61 @@
-#ifndef MOBILEGS_H
-#define MOBILEGS_H
+#ifndef MOBILE_GS_H
+#define MOBILE_GS_H
 
 #include <vector>
 #include <string>
-#include <mutex>
-#include <atomic>
-#include <thread>
-#include <condition_variable>
 #include <unordered_map>
+#include <mutex>
+#include <cmath>
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
-#include <opencv2/core.hpp>
 
-constexpr float VOXEL_SIZE = 0.02f; // 2cm voxels
-constexpr int MAX_SPLATS = 500000;
-constexpr float CONFIDENCE_INCREMENT = 0.05f;
+// --- SPLATAM: Augmented Data Structure ---
+struct Splat {
+    // Spatial (Geometry)
+    float x, y, z;
 
-struct VoxelKey {
+    // Orientation & Scale (Covariance approximation for Mobile)
+    float nx, ny, nz; // Surface Normal
+    float radius;     // Splat influence radius
+
+    // Visual (Appearance)
+    uint8_t r, g, b;  // Base Albedo
+
+    // Metadata
+    float confidence;       // 0.0 to 1.0
+    uint32_t lastSeenFrame; // For culling/maintenance
+    float luminance;        // Cached for lighting invariance
+};
+
+// --- DISKCHUNGS: Spatial Hashing ---
+struct ChunkKey {
     int x, y, z;
-    bool operator==(const VoxelKey& other) const {
+
+    bool operator==(const ChunkKey& other) const {
         return x == other.x && y == other.y && z == other.z;
     }
 };
 
-struct VoxelKeyHash {
-    std::size_t operator()(const VoxelKey& k) const {
-        return ((std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1)) >> 1) ^ (std::hash<int>()(k.z) << 1);
+struct ChunkKeyHash {
+    std::size_t operator()(const ChunkKey& k) const {
+        // Cantor pairing or simple XOR hash for 3D coords
+        size_t h1 = std::hash<int>{}(k.x);
+        size_t h2 = std::hash<int>{}(k.y);
+        size_t h3 = std::hash<int>{}(k.z);
+        return h1 ^ (h2 << 1) ^ (h3 << 2);
     }
+};
+
+struct Chunk {
+    bool isDirty;       // Needs GL buffer update
+    bool isActive;      // Is currently in memory/renderable
+    std::vector<Splat> splats;
+
+    // GL Buffers for this chunk
+    GLuint vbo;
+    int splatCount;
+
+    Chunk() : isDirty(true), isActive(true), vbo(0), splatCount(0) {}
 };
 
 struct Splat {
@@ -42,50 +71,51 @@ public:
     MobileGS();
     ~MobileGS();
 
-    void initialize();
-    void updateCamera(const float* viewMtx, const float* projMtx);
-    void feedDepthData(const uint16_t* depthData, int width, int height);
-    void draw();
+    // --- Core Pipeline (SplaTAM) ---
+    void feedDepthData(const float* depthPixels, const float* colorPixels,
+            int width, int height, const float* cameraPose, float fov);
+
+    void update(const float* cameraPose); // Manages chunks (load/unload)
+
+    // Renders using stored matrices or passed ones
+    void render(const float* viewMatrix, const float* projMatrix);
+
+    // --- JNI Adapter Methods (Fixes Build Errors) ---
+    void initialize(); // Reset/Init
+    void updateCamera(const float* view, const float* proj); // Stores matrices for draw()
+    void draw(); // Calls render() with stored matrices
+
     void onSurfaceChanged(int width, int height);
-
-    // I/O
-    bool saveModel(const std::string& path);
-    bool loadModel(const std::string& path);
-    void clear();
     int getSplatCount();
+    void clear();
 
-    // Map Alignment (Touch-based adjustment)
-    void alignMap(const float* transformMtx);
+    // Serialization
+    bool saveModel(std::string path);
+    bool loadModel(std::string path);
+    void alignMap(const float* transform);
+
+    // Settings
+    void setChunkSize(float meters) { mChunkSize = meters; }
 
 private:
-    void compileShaders();
-    void processVoxelGrid();
+    // Parameters
+    float mChunkSize = 2.0f;
+    float mVoxelSize = 0.05f;
+    int mFrameCount = 0;
 
-    // OpenGL State
-    GLuint m_Program;
-    GLint m_LocMVP;
-    GLint m_LocPointSize;
-    GLint m_LocColor; // If used
-    GLuint m_VAO;
-    GLuint m_VBO;
+    // State
+    glm::mat4 mStoredView;
+    glm::mat4 mStoredProj;
+    int mScreenWidth, mScreenHeight;
 
-    // Data
-    std::vector<Splat> m_Splats;
-    std::vector<float> m_DrawBuffer; // For uploading to GPU
-    std::unordered_map<VoxelKey, int, VoxelKeyHash> m_VoxelGrid;
+    // Storage
+    std::unordered_map<ChunkKey, Chunk, ChunkKeyHash> mChunks;
+    std::mutex mChunkMutex;
 
-    // Camera State
-    glm::mat4 m_ViewMatrix;
-    glm::mat4 m_ProjMatrix;
-    glm::mat4 m_WorldTransform; // User alignment
-
-    // Synchronization
-    std::mutex m_SplatsMutex;
-    std::atomic<bool> m_IsInitialized;
-
-    // Viewport
-    int m_Width;
-    int m_Height;
+    // Helpers
+    ChunkKey getChunkKey(float x, float y, float z);
+    float getLuminance(uint8_t r, uint8_t g, uint8_t b);
+    void fuseSplat(Splat& target, const Splat& source);
 };
 
-#endif // MOBILEGS_H
+#endif // MOBILE_GS_H
