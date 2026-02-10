@@ -38,6 +38,10 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isFlashlightOn = newState) }
     }
 
+    fun setTempCapture(bitmap: Bitmap?) {
+        _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
+    }
+
     // NEW: Frame Capture
     fun onFrameCaptured(bitmap: Bitmap, uri: Uri) {
         viewModelScope.launch {
