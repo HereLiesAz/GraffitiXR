@@ -77,8 +77,6 @@ class PointCloudRenderer {
                 hasUpdates = true
             }
         }
-        lastTimestamp = pointCloud.timestamp
-
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         numPoints = pointCloud.points.remaining() / 4
         if (numPoints > 0) {

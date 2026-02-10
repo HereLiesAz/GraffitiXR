@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
+import android.media.Image
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.graphics.Bitmap
@@ -8,6 +9,8 @@ import android.opengl.Matrix
 import android.util.Log
 import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Session
+import com.google.ar.core.exceptions.NotYetAvailableException
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
@@ -20,6 +23,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     // Renderers
     private val backgroundRenderer = BackgroundRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
+    private val slamManager = SlamManager()
 
     // Matrices
     private val viewMatrix = FloatArray(16)
@@ -47,6 +51,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
         try {
             backgroundRenderer.createOnGlThread(context)
             pointCloudRenderer.createOnGlThread(context)
+            slamManager.initialize()
         } catch (e: Exception) {
             Log.e("ArRenderer", "Failed to init GL", e)
         }
@@ -55,6 +60,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
         session?.setDisplayGeometry(0, width, height)
+        slamManager.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -73,6 +79,28 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
             // Projection Matrix
             camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
             camera.getViewMatrix(viewMatrix, 0)
+
+            // Update SLAM
+            slamManager.updateCamera(viewMatrix, projectionMatrix)
+
+            // Acquire Depth Image
+            try {
+                val depthImage = frame.acquireDepthImage16Bits()
+                if (depthImage != null) {
+                    val buffer = depthImage.planes[0].buffer
+                    val width = depthImage.width
+                    val height = depthImage.height
+                    slamManager.feedDepthData(buffer, width, height)
+                    depthImage.close()
+                }
+            } catch (e: NotYetAvailableException) {
+                // Depth data not available yet, ignore
+            } catch (e: Exception) {
+                Log.e("ArRenderer", "Error processing depth image", e)
+            }
+
+            // Draw Custom Engine
+            slamManager.draw()
 
             // Draw Point Cloud (The "Blue Dots")
             if (showPointCloud) {
