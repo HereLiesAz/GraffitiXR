@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.media.Image
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
@@ -11,6 +12,8 @@ import com.google.ar.core.PointCloud
 import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.feature.ar.rendering.ShaderUtil
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.google.ar.core.exceptions.NotYetAvailableException
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.IntBuffer
@@ -32,13 +35,17 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private var vboId: Int = 0
     private var numPoints: Int = 0
-    
+
     private var viewportWidth = 0
     private var viewportHeight = 0
 
     // Stride for filtered rendering (Show 1 in every 20 points)
     private val POINT_STRIDE = 20
 
+    // Renderers
+    private val backgroundRenderer = BackgroundRenderer()
+    private val pointCloudRenderer = PointCloudRenderer()
+    private val slamManager = SlamManager()
     var showPointCloud = true
         private set
 
@@ -67,12 +74,22 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         createOnGlThread()
+
+        try {
+            backgroundRenderer.createOnGlThread(context)
+            pointCloudRenderer.createOnGlThread(context)
+            slamManager.initialize()
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Failed to init GL", e)
+        }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         viewportWidth = width
         viewportHeight = height
         GLES20.glViewport(0, 0, width, height)
+        session?.setDisplayGeometry(0, width, height)
+        slamManager.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -113,7 +130,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     fun updatePointCloud(pointCloud: PointCloud) {
         val buffer = pointCloud.points
-        val pointsRemaining = buffer.remaining() / 4 
+        val pointsRemaining = buffer.remaining() / 4
 
         val filteredPointCount = pointsRemaining / POINT_STRIDE
         if (filteredPointCount == 0) {
@@ -136,10 +153,39 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
         filteredBuffer.position(0)
         numPoints = filteredPointCount
 
+            // Update SLAM
+            slamManager.updateCamera(viewMatrix, projectionMatrix)
+
+            // Acquire Depth Image
+            try {
+                val depthImage = frame.acquireDepthImage16Bits()
+                if (depthImage != null) {
+                    val buffer = depthImage.planes[0].buffer
+                    val width = depthImage.width
+                    val height = depthImage.height
+                    slamManager.feedDepthData(buffer, width, height)
+                    depthImage.close()
+                }
+            } catch (e: NotYetAvailableException) {
+                // Depth data not available yet, ignore
+            } catch (e: Exception) {
+                Log.e("ArRenderer", "Error processing depth image", e)
+            }
+
+            // Draw Custom Engine
+            slamManager.draw()
+
+            // Draw Point Cloud (The "Blue Dots")
+            if (showPointCloud) {
+                val pointCloud = frame.acquirePointCloud()
+                pointCloudRenderer.update(pointCloud)
+                pointCloudRenderer.draw(viewMatrix, projectionMatrix)
+                pointCloud.release()
+            }
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         GLES20.glBufferData(
             GLES20.GL_ARRAY_BUFFER,
-            numPoints * 16, 
+            numPoints * 16,
             filteredBuffer,
             GLES20.GL_DYNAMIC_DRAW
         )
@@ -192,12 +238,12 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         bitmap.copyPixelsFromBuffer(IntBuffer.wrap(pixelBuffer))
-        
+
         // OpenGL uses bottom-left origin, Bitmap uses top-left. Flip it.
         val matrix = android.graphics.Matrix()
         matrix.postScale(1f, -1f)
         val flippedBitmap = Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true)
-        
+
         onBitmapCaptured(flippedBitmap)
     }
 

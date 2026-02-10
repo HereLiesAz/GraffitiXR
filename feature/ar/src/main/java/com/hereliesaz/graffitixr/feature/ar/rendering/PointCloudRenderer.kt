@@ -43,11 +43,28 @@ class PointCloudRenderer {
     private var positionHandle: Int = 0
     private var mvpMatrixHandle: Int = 0
     private var pointSizeHandle: Int = 0
-    private val maxPoints = 50000 
+    private val maxPoints = 50000
     private var accumulatedPointCount = 0
     private var vboId = 0
+    private var programId = 0
+    private var positionAttribute = 0
+    private var colorUniform = 0
+    private var modelViewProjectionUniform = 0
+    private var pointSizeUniform = 0
+
+    private var positionHandle = 0
+    private var mvpMatrixHandle = 0
+    private var pointSizeHandle = 0
+    private var numPoints = 0
+
+    // Missing properties
+    private val pointIdMap = HashMap<Int, Int>()
+    private val maxPoints = 1000 // Or appropriate default
+    private val localBuffer = FloatArray(maxPoints * 4)
+    private var accumulatedPointCount = 0
+    private var lastTimestamp: Long = 0
     private val localBuffer: FloatArray = FloatArray(maxPoints * 4)
-    private val pointIdMap = HashMap<Int, Int>() 
+    private val pointIdMap = HashMap<Int, Int>()
 
     fun createOnGlThread(context: Context) {
         val vertexShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_VERTEX_SHADER, vertexShaderCode)
