@@ -116,6 +116,15 @@ class PointCloudRenderer {
                 hasUpdates = true
             }
         }
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
+        numPoints = pointCloud.points.remaining() / 4
+        if (numPoints > 0) {
+            GLES20.glBufferData(
+                GLES20.GL_ARRAY_BUFFER,
+                numPoints * 16,
+                pointCloud.points,
+                GLES20.GL_DYNAMIC_DRAW
+            )
         if (hasUpdates) {
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
             val byteBuffer = ByteBuffer.allocateDirect(accumulatedPointCount * 4 * 4).order(ByteOrder.nativeOrder())

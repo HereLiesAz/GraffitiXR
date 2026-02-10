@@ -1,3 +1,14 @@
+package com.hereliesaz.graffitixr.feature.ar.rendering
+
+import android.content.Context
+import android.media.Image
+import android.opengl.GLES20
+import android.opengl.GLSurfaceView
+import android.graphics.Bitmap
+import android.opengl.Matrix
+import android.util.Log
+import com.google.ar.core.AugmentedImageDatabase
+import com.google.ar.core.Session
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
@@ -16,6 +27,12 @@ import com.google.ar.core.exceptions.NotYetAvailableException
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
+
+class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
+
+    private var session: Session? = null
 import java.nio.IntBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -46,6 +63,13 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private val backgroundRenderer = BackgroundRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
     private val slamManager = SlamManager()
+
+    // Matrices
+    private val viewMatrix = FloatArray(16)
+    private val projectionMatrix = FloatArray(16)
+
+    // Configuration
+    var showPointCloud: Boolean = true
     var showPointCloud = true
         private set
 
@@ -63,6 +87,13 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
         this.session = session
     }
 
+    fun setupAugmentedImageDatabase(bitmap: Bitmap, name: String) {
+        val currentSession = session ?: return
+        val database = AugmentedImageDatabase(currentSession)
+        database.addImage(name, bitmap)
+        val config = currentSession.config
+        config.augmentedImageDatabase = database
+        currentSession.configure(config)
     fun setShowPointCloud(show: Boolean) {
         this.showPointCloud = show
     }
@@ -94,6 +125,20 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+
+        val currentSession = session ?: return
+
+        try {
+            currentSession.setCameraTextureName(backgroundRenderer.textureId)
+            val frame = currentSession.update()
+            val camera = frame.camera
+
+            // Draw Background
+            backgroundRenderer.draw(frame)
+
+            // Projection Matrix
+            camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+            camera.getViewMatrix(viewMatrix, 0)
         // Rendering logic would go here
     }
 
@@ -182,6 +227,10 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 pointCloudRenderer.draw(viewMatrix, projectionMatrix)
                 pointCloud.release()
             }
+
+        } catch (t: Throwable) {
+            Log.e("ArRenderer", "Exception on draw frame", t)
+        }
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         GLES20.glBufferData(
             GLES20.GL_ARRAY_BUFFER,

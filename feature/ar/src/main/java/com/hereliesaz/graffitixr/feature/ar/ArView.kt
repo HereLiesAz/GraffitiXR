@@ -16,6 +16,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.ar.core.Session
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+
+@Composable
+fun ArScreen(
+    onArSessionCreated: (Session) -> Unit
+) {
+    val viewModel: ArViewModel = hiltViewModel()
+    ArView(
+        viewModel = viewModel,
+        onSessionCreated = onArSessionCreated
+    )
+}
 import com.hereliesaz.graffitixr.common.model.ArUiState
 
 @Composable
