@@ -7,6 +7,7 @@
 #include <mutex>
 #include <cmath>
 #include <GLES3/gl3.h>
+#include <glm/glm.hpp>
 
 // --- SPLATAM: Augmented Data Structure ---
 struct Splat {
@@ -62,21 +63,42 @@ public:
     MobileGS();
     ~MobileGS();
 
-    // Core Pipeline
+    // --- Core Pipeline (SplaTAM) ---
     void feedDepthData(const float* depthPixels, const float* colorPixels,
             int width, int height, const float* cameraPose, float fov);
 
     void update(const float* cameraPose); // Manages chunks (load/unload)
+
+    // Renders using stored matrices or passed ones
     void render(const float* viewMatrix, const float* projMatrix);
+
+    // --- JNI Adapter Methods (Fixes Build Errors) ---
+    void initialize(); // Reset/Init
+    void updateCamera(const float* view, const float* proj); // Stores matrices for draw()
+    void draw(); // Calls render() with stored matrices
+
+    void onSurfaceChanged(int width, int height);
+    int getSplatCount();
+    void clear();
+
+    // Serialization
+    bool saveModel(std::string path);
+    bool loadModel(std::string path);
+    void alignMap(const float* transform);
 
     // Settings
     void setChunkSize(float meters) { mChunkSize = meters; }
 
 private:
     // Parameters
-    float mChunkSize = 2.0f; // 2 meter cubic chunks
-    float mVoxelSize = 0.05f; // 5cm resolution
+    float mChunkSize = 2.0f;
+    float mVoxelSize = 0.05f;
     int mFrameCount = 0;
+
+    // State
+    glm::mat4 mStoredView;
+    glm::mat4 mStoredProj;
+    int mScreenWidth, mScreenHeight;
 
     // Storage
     std::unordered_map<ChunkKey, Chunk, ChunkKeyHash> mChunks;
