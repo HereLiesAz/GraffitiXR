@@ -46,7 +46,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     val view: View get() = GLSurfaceView(context).apply {
         setPreserveEGLContextOnPause(true)
-        setEGLContextClientVersion(2)
+        setEGLContextClientVersion(3)
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
         setRenderer(this@ArRenderer)
         renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
