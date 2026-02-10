@@ -2,8 +2,11 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.LifecycleOwner
@@ -14,6 +17,8 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.atan
@@ -34,6 +39,9 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var viewportWidth = 0
     private var viewportHeight = 0
     private var isDepthSupported = false
+
+    // Capture State
+    private var pendingCaptureCallback: ((Bitmap) -> Unit)? = null
 
     // Matrices
     private val viewMatrix = FloatArray(16)
@@ -84,7 +92,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
 
         // Initialize Sub-renderers
-        backgroundRenderer.createOnGlThread(context) // Fixed: Now matches method signature
+        backgroundRenderer.createOnGlThread(context)
 
         // Initialize Native Engine
         slamManager.initialize()
@@ -134,6 +142,12 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 slamManager.draw()
             }
 
+            // 6. Handle Screen Capture
+            pendingCaptureCallback?.let { callback ->
+                captureScreen(callback)
+                pendingCaptureCallback = null
+            }
+
         } catch (t: Throwable) {
             Log.e(TAG, "Exception on OpenGL Thread", t)
         }
@@ -144,7 +158,6 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
             val depthImage = frame.acquireDepthImage16Bits()
             if (depthImage != null) {
                 // SplaTAM Integration
-                // For now, passing null color (white/grey mode)
                 slamManager.feedDepthData(
                     depthBuffer = depthImage.planes[0].buffer,
                     colorBuffer = null,
@@ -160,21 +173,14 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
-    // --- AR Features ---
+    // --- Public API ---
+
+    fun captureFrame(callback: (Bitmap) -> Unit) {
+        pendingCaptureCallback = callback
+    }
 
     fun setFlashlight(on: Boolean) {
-        val currentSession = session ?: return
-        try {
-            val config = currentSession.config
-            if (on) {
-                // Not standard ARCore API, usually requires Camera2 interop
-                // Leaving placeholder as actual implementation requires pausing session
-                // to grab CameraDevice, which is heavy.
-                // Assuming standard LightEstimate for now.
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Flashlight toggle failed", e)
-        }
+        // Placeholder for Camera2 interop or light estimation
     }
 
     fun setupAugmentedImageDatabase(bitmap: Bitmap?, name: String) {
@@ -189,6 +195,32 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
             Log.i(TAG, "Augmented Image '$name' added to database")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to add augmented image", e)
+        }
+    }
+
+    // --- Internal Helpers ---
+
+    private fun captureScreen(callback: (Bitmap) -> Unit) {
+        val w = viewportWidth
+        val h = viewportHeight
+        val screenshotSize = w * h
+        val buf = ByteBuffer.allocateDirect(screenshotSize * 4)
+        buf.order(ByteOrder.nativeOrder())
+
+        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+
+        // Process on Main Thread to avoid stalling GL or crashing with UI callbacks
+        Handler(Looper.getMainLooper()).post {
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            buf.rewind()
+            bitmap.copyPixelsFromBuffer(buf)
+
+            // Flip vertically (GL origin is bottom-left, Bitmap is top-left)
+            val matrix = Matrix()
+            matrix.preScale(1.0f, -1.0f)
+            val flippedBitmap = Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true)
+
+            callback(flippedBitmap)
         }
     }
 }
