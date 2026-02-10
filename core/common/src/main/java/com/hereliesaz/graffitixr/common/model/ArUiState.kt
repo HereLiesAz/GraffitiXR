@@ -13,5 +13,6 @@ data class ArUiState(
     val isMappingMode: Boolean = false,
     val qualityWarning: String? = null,
     val capturedTargetUris: List<Uri> = emptyList(),
-    val capturedTargetImages: List<Bitmap> = emptyList()
+    val capturedTargetImages: List<Bitmap> = emptyList(),
+    val tempCaptureBitmap: Bitmap? = null
 )
