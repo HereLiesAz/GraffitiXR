@@ -2,8 +2,6 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.kotlin.parcelize)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.ksp)
 }
 
 android {
@@ -38,11 +36,7 @@ dependencies {
     api(libs.androidx.compose.ui.geometry)
     api(libs.androidx.compose.ui.graphics)
     testImplementation(libs.junit)
-    testImplementation(libs.mockk)
     
     implementation(project(":opencv"))
     implementation(libs.play.services.location)
-    // Hilt / Dagger
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
 }

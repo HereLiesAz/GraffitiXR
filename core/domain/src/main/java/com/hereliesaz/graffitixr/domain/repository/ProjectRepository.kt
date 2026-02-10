@@ -1,8 +1,6 @@
 package com.hereliesaz.graffitixr.domain.repository
 
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
-import com.hereliesaz.graffitixr.common.model.Project
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 interface ProjectRepository {
@@ -31,7 +29,7 @@ interface ProjectRepository {
     /**
      * Returns a list of all available projects.
      */
-    suspend fun getProjects(): Flow<List<Project>>
+    suspend fun getProjects(): List<GraffitiProject>
 
     /**
      * Saves the current state to disk immediately.

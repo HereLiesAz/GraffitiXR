@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.common.model
+package com.hereliesaz.graffitixr.data
 
 import android.net.Uri
 import io.mockk.mockkStatic
@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 import org.junit.Test
 import org.junit.Before
 
-class GraffitiProjectTest {
+class ProjectDataTest {
 
     @Before
     fun setup() {
@@ -16,7 +16,7 @@ class GraffitiProjectTest {
 
     @Test
     fun testSerializationWithEmptyRefinementPaths() {
-        val projectData = GraffitiProject(
+        val projectData = ProjectData(
             refinementPaths = emptyList()
         )
 

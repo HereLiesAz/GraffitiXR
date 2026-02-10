@@ -3,10 +3,9 @@ package com.hereliesaz.graffitixr.data.di
 import android.content.Context
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
-import com.hereliesaz.graffitixr.data.repository.SettingsRepository
 import com.hereliesaz.graffitixr.data.repository.SettingsRepositoryImpl
-import dagger.Binds
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -16,27 +15,32 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class DataModule {
+object DataModule {
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindProjectRepository(impl: ProjectRepositoryImpl): ProjectRepository
+    fun provideProjectRepository(
+        @ApplicationContext context: Context,
+        projectManager: ProjectManager
+    ): ProjectRepository {
+        return ProjectRepositoryImpl(context, projectManager)
+    }
 
-    companion object {
-        @Provides
-        @Singleton
-        fun provideProjectManager(
-            @ApplicationContext context: Context
-        ): ProjectManager {
-            return ProjectManager(context)
-        }
+    @Provides
+    @Singleton
+    fun provideProjectManager(
+        @ApplicationContext context: Context
+    ): ProjectManager {
+        // Bridging legacy ProjectManager to use the new Repository
+        // This keeps MainViewModel happy without rewriting it entirely yet
+        return ProjectManager(context)
+    }
 
-        @Provides
-        @Singleton
-        fun provideSettingsRepository(
-            @ApplicationContext context: Context
-        ): SettingsRepository {
-            return SettingsRepositoryImpl(context)
-        }
+    @Provides
+    @Singleton
+    fun provideSettingsRepository(
+        @ApplicationContext context: Context
+    ): SettingsRepository {
+        return SettingsRepositoryImpl(context)
     }
 }

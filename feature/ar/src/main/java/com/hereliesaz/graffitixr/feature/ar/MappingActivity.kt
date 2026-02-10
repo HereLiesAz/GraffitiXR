@@ -1,42 +1,51 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.hereliesaz.graffitixr.feature.ar.GraffitiArView
-import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
+import com.hereliesaz.graffitixr.nativebridge.ensureOpenCVLoaded
 
 class MappingActivity : ComponentActivity() {
 
-    private lateinit var arView: GraffitiArView
+    private var arRenderer: ArRenderer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ensureOpenCVLoaded()
 
-        // This activity seems to be a wrapper for the mapping screen
-        // Initialize View directly or via Compose
-        arView = GraffitiArView(this)
-        setContentView(arView)
+        setContent {
+            GraffitiXRTheme {
+                MappingScreen(
+                    onMapSaved = { mapId -> 
+                        runOnUiThread {
+                            Toast.makeText(this, "Map Saved: $mapId", Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
+                    },
+                    onExit = { finish() },
+                    onRendererCreated = { renderer ->
+                        arRenderer = renderer
+                    }
+                )
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        if (::arView.isInitialized) {
-            arView.onResume()
-        }
+        arRenderer?.onResume(this)
     }
 
     override fun onPause() {
         super.onPause()
-        if (::arView.isInitialized) {
-            arView.onPause()
-        }
+        arRenderer?.onPause(this)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (::arView.isInitialized) {
-            arView.cleanup()
-        }
+        arRenderer?.cleanup()
+        arRenderer = null
     }
 }
