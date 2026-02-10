@@ -13,7 +13,7 @@
 #include <opencv2/core.hpp>
 
 constexpr float VOXEL_SIZE = 0.02f; // 2cm voxels
-constexpr int MAX_SPLATS = 50000;
+constexpr int MAX_SPLATS = 500000;
 constexpr float CONFIDENCE_INCREMENT = 0.05f;
 
 struct VoxelKey {

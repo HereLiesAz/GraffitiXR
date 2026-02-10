@@ -428,6 +428,30 @@ fun MainScreen(
                 TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
                 UnlockInstructionsPopup(uiState.showUnlockInstructions)
                 
+                if (showInfoScreen) {
+                    com.hereliesaz.graffitixr.design.components.InfoDialog(
+                        title = "GraffitiXR Help",
+                        content = """
+                            **Modes:**
+                            - AR: Project on walls using camera + SLAM.
+                            - Overlay: Camera feed without SLAM.
+                            - Mockup: Static background image.
+                            - Trace: White lightbox screen.
+
+                            **Target Creation:**
+                            1. Capture a photo of the wall.
+                            2. Drag corners to rectify perspective.
+                            3. Confirm to lock AR world origin.
+
+                            **Editor:**
+                            - Add layers, remove background, outline edges.
+                            - Adjust opacity, blend modes, and color balance.
+                            - Use 'Magic' for auto-enhancement.
+                        """.trimIndent(),
+                        onDismiss = { showInfoScreen = false }
+                    )
+                }
+
                  if (uiState.isCapturingTarget) {
                     Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
                          TargetCreationFlow(
