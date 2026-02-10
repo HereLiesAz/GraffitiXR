@@ -17,6 +17,7 @@ import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import dagger.hilt.android.AndroidEntryPoint

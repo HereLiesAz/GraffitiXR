@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
