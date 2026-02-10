@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
+import android.content.Context
 import android.opengl.GLES11Ext
 import android.opengl.GLES30
 import android.util.Log
@@ -24,7 +25,7 @@ class BackgroundRenderer {
     private var uTextureParam: Int = 0
     private var hasTransformed = false
 
-    fun createOnGlThread() {
+    fun createOnGlThread(context: Context) {
         // Generate Texture
         val textures = IntArray(1)
         GLES30.glGenTextures(1, textures, 0)
@@ -90,7 +91,7 @@ class BackgroundRenderer {
             hasTransformed = true
         }
 
-        // Reset VAO to 0 to ensure we use the default VAO for this draw call
+        // Reset VAO to 0 to ensure we use the default VAO
         GLES30.glBindVertexArray(0)
 
         GLES30.glDisable(GLES30.GL_DEPTH_TEST)
@@ -153,7 +154,6 @@ class BackgroundRenderer {
             1.0f, 0.0f
         )
 
-        // GLES 3.0 Strict
         private val VERTEX_SHADER = """#version 300 es
             layout(location = 0) in vec4 a_Position;
             layout(location = 1) in vec2 a_TexCoord;
@@ -164,7 +164,6 @@ class BackgroundRenderer {
             }
         """.trimIndent()
 
-        // GLES 3.0 Strict with OES extension
         private val FRAGMENT_SHADER = """#version 300 es
             #extension GL_OES_EGL_image_external_essl3 : require
             precision mediump float;

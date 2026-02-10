@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.opengl.GLSurfaceView
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +23,7 @@ fun ArView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Memoize the renderer so it survives recompositions but dies with the View
+    // Initialize Renderer
     val arRenderer = remember {
         ArRenderer(context).also {
             onRendererCreated(it)
@@ -55,27 +56,24 @@ fun ArView(
         arRenderer.setFlashlight(uiState.isFlashlightOn)
     }
 
-    // React to new target images being captured
+    // React to new target images
     LaunchedEffect(Unit) {
         viewModel.newTargetImage.collect { (bitmap, name) ->
             arRenderer.setupAugmentedImageDatabase(bitmap, name)
         }
     }
 
-    val factory = remember(arRenderer) {
-        { ctx: android.content.Context ->
-            FrameLayout(ctx).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                addView(arRenderer.view)
-            }
-        }
-    }
-
+    // View Factory
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = factory
+        factory = { ctx ->
+            GLSurfaceView(ctx).apply {
+                preserveEGLContextOnPause = true
+                setEGLContextClientVersion(3)
+                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                setRenderer(arRenderer)
+                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            }
+        }
     )
 }

@@ -2,216 +2,70 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.media.Image
-import android.opengl.GLES20
+import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.opengl.Matrix
 import android.util.Log
-import android.view.View
+import android.widget.Toast
 import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.AugmentedImageDatabase
-import com.google.ar.core.PointCloud
+import com.google.ar.core.Config
+import com.google.ar.core.Frame
 import com.google.ar.core.Session
-import com.google.ar.core.exceptions.NotYetAvailableException
+import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.IntBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.atan
 
 class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
-    // Renderers
+    private val TAG = "ArRenderer"
+
+    // Components
+    val slamManager = SlamManager()
+    var session: Session? = null
+        private set
+
     private val backgroundRenderer = BackgroundRenderer()
-    private val pointCloudRenderer = PointCloudRenderer()
-    val slamManager = SlamManager() // Use val and exposed
+
+    // State
+    var showPointCloud = true
+    private var viewportWidth = 0
+    private var viewportHeight = 0
+    private var isDepthSupported = false
 
     // Matrices
     private val viewMatrix = FloatArray(16)
     private val projectionMatrix = FloatArray(16)
+    private val modelMatrix = FloatArray(16)
 
-    // Configuration
-    var showPointCloud: Boolean = true
-
-    var session: Session? = null
-        private set
-
-    // Viewport
-    private var viewportWidth = 0
-    private var viewportHeight = 0
-
-    // Capture callback
-    private var pendingCaptureCallback: ((Bitmap) -> Unit)? = null
-
-    // GLSurfaceView reference
-    private var _glSurfaceView: GLSurfaceView? = null
-
-    val view: View get() {
-        if (_glSurfaceView == null) {
-            _glSurfaceView = GLSurfaceView(context).apply {
-                preserveEGLContextOnPause = true
-                setEGLContextClientVersion(3)
-                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                setRenderer(this@ArRenderer)
-                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-            }
-        }
-        return _glSurfaceView!!
-    }
-
-    fun setSession(session: Session) {
-        this.session = session
-    }
-
-    fun setupAugmentedImageDatabase(bitmap: Bitmap, name: String) {
-        val currentSession = session ?: return
-        val database = AugmentedImageDatabase(currentSession)
-        database.addImage(name, bitmap)
-        val config = currentSession.config
-        config.augmentedImageDatabase = database
-        currentSession.configure(config)
-    }
-
-    fun setFlashlight(enabled: Boolean) {
-        val currentSession = session ?: return
-        val config = currentSession.config
-        // Assuming ARCore supports it or ignored for now.
-    }
-
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
-
-        try {
-            backgroundRenderer.createOnGlThread()
-            pointCloudRenderer.createOnGlThread(context)
-            slamManager.initialize()
-        } catch (e: Exception) {
-            Log.e("ArRenderer", "Failed to init GL", e)
-        }
-    }
-
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        viewportWidth = width
-        viewportHeight = height
-        GLES20.glViewport(0, 0, width, height)
-        session?.setDisplayGeometry(0, width, height)
-        slamManager.onSurfaceChanged(width, height)
-    }
-
-    override fun onDrawFrame(gl: GL10?) {
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-
-        val currentSession = session ?: return
-
-        try {
-            // Notify ARCore that camera texture is ready
-            currentSession.setCameraTextureName(backgroundRenderer.textureId)
-
-            val frame = currentSession.update()
-            val camera = frame.camera
-
-            // Draw Background
-            backgroundRenderer.draw(frame)
-
-            // Projection Matrix
-            camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
-            camera.getViewMatrix(viewMatrix, 0)
-
-            // Update SLAM
-            slamManager.updateCamera(viewMatrix, projectionMatrix)
-
-            // Acquire Depth Image
-            try {
-                 val depthImage = frame.acquireDepthImage16Bits() // ARCore 1.12+
-                 if (depthImage != null) {
-                     val planes = depthImage.planes
-                     if (planes.isNotEmpty()) {
-                         val buffer = planes[0].buffer
-                         val width = depthImage.width
-                         val height = depthImage.height
-                         slamManager.feedDepthData(buffer, width, height)
-                     }
-                     depthImage.close()
-                 }
-            } catch (e: NotYetAvailableException) {
-                // Ignore
-            } catch (e: Exception) {
-                Log.e("ArRenderer", "Error processing depth", e)
-            }
-
-            // Draw Custom Engine (SLAM)
-            slamManager.draw()
-
-            // Draw Point Cloud (ARCore Debug)
-            if (showPointCloud) {
-                val pointCloud = frame.acquirePointCloud()
-                pointCloudRenderer.update(pointCloud)
-                pointCloudRenderer.draw(viewMatrix, projectionMatrix)
-                pointCloud.release()
-            }
-
-            // Handle Capture
-            pendingCaptureCallback?.let { callback ->
-                doCapture(callback)
-                pendingCaptureCallback = null
-            }
-
-        } catch (t: Throwable) {
-            Log.e("ArRenderer", "Exception on draw frame", t)
-        }
-    }
-
-    fun captureFrame(onBitmapCaptured: (Bitmap) -> Unit) {
-        pendingCaptureCallback = onBitmapCaptured
-    }
-
-    private fun doCapture(callback: (Bitmap) -> Unit) {
-        val w = viewportWidth
-        val h = viewportHeight
-        if (w <= 0 || h <= 0) return
-
-        val pixelBuffer = IntArray(w * h)
-        val bitmapBuffer = IntBuffer.wrap(pixelBuffer)
-        bitmapBuffer.position(0)
-
-        // Read pixels from framebuffer
-        GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, bitmapBuffer)
-
-        try {
-            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            bitmap.copyPixelsFromBuffer(IntBuffer.wrap(pixelBuffer))
-
-            // OpenGL uses bottom-left origin, Bitmap uses top-left. Flip it vertically.
-            val matrix = android.graphics.Matrix()
-            matrix.postScale(1f, -1f) // Flip Y
-
-            val flippedBitmap = Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true)
-            callback(flippedBitmap)
-
-        } catch (e: Exception) {
-            Log.e("ArRenderer", "Capture failed", e)
-        }
-    }
-
+    // Lifecycle
     fun onResume(owner: LifecycleOwner) {
         if (session == null) {
             try {
-                session = Session(context)
-                val config = com.google.ar.core.Config(session)
-                config.depthMode = com.google.ar.core.Config.DepthMode.AUTOMATIC
-                config.focusMode = com.google.ar.core.Config.FocusMode.AUTO
-                session?.configure(config)
+                session = Session(context).apply {
+                    val config = config
+                    config.focusMode = Config.FocusMode.AUTO
+                    config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                    // Check for Depth API
+                    if (isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                        config.depthMode = Config.DepthMode.AUTOMATIC
+                        isDepthSupported = true
+                    }
+                    configure(config)
+                }
             } catch (e: Exception) {
-                Log.e("ArRenderer", "Failed to create session", e)
+                Log.e(TAG, "Failed to create AR Session", e)
+                Toast.makeText(context, "AR Init Failed: ${e.message}", Toast.LENGTH_LONG).show()
                 return
             }
         }
 
         try {
             session?.resume()
-        } catch (e: Exception) {
-            Log.e("ArRenderer", "Failed to resume session", e)
+        } catch (e: CameraNotAvailableException) {
+            Log.e(TAG, "Camera not available", e)
         }
     }
 
@@ -222,8 +76,119 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     fun cleanup() {
         session?.close()
         session = null
-        _glSurfaceView?.queueEvent {
-            slamManager.destroy()
+        slamManager.destroy()
+    }
+
+    // GL Surface Callbacks
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+
+        // Initialize Sub-renderers
+        backgroundRenderer.createOnGlThread(context) // Fixed: Now matches method signature
+
+        // Initialize Native Engine
+        slamManager.initialize()
+    }
+
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        viewportWidth = width
+        viewportHeight = height
+        GLES30.glViewport(0, 0, width, height)
+        session?.setDisplayGeometry(0, width, height)
+        slamManager.onSurfaceChanged(width, height)
+    }
+
+    override fun onDrawFrame(gl: GL10?) {
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+
+        val currentSession = session ?: return
+
+        try {
+            currentSession.setCameraTextureName(backgroundRenderer.textureId)
+            val frame = currentSession.update() ?: return
+            val camera = frame.camera
+
+            // 1. Render Background
+            backgroundRenderer.draw(frame)
+
+            // 2. Update Camera Matrices
+            camera.getViewMatrix(viewMatrix, 0)
+            camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+
+            // 3. Update Native Engine Camera
+            slamManager.updateCamera(viewMatrix, projectionMatrix)
+
+            // 4. SplaTAM Data Feed (if tracking)
+            if (camera.trackingState == TrackingState.TRACKING) {
+                camera.pose.toMatrix(modelMatrix, 0)
+
+                // Calculate vertical FOV from projection matrix (1/tan(fov/2))
+                val valY = projectionMatrix[5]
+                val fov = if (valY != 0f) (2.0 * atan(1.0 / valY)).toFloat() else 1.0f
+
+                processDepth(frame, modelMatrix, fov)
+            }
+
+            // 5. Render Splats
+            if (showPointCloud) {
+                slamManager.draw()
+            }
+
+        } catch (t: Throwable) {
+            Log.e(TAG, "Exception on OpenGL Thread", t)
+        }
+    }
+
+    private fun processDepth(frame: Frame, pose: FloatArray, fov: Float) {
+        try {
+            val depthImage = frame.acquireDepthImage16Bits()
+            if (depthImage != null) {
+                // SplaTAM Integration
+                // For now, passing null color (white/grey mode)
+                slamManager.feedDepthData(
+                    depthBuffer = depthImage.planes[0].buffer,
+                    colorBuffer = null,
+                    width = depthImage.width,
+                    height = depthImage.height,
+                    pose = pose,
+                    fov = fov
+                )
+                depthImage.close()
+            }
+        } catch (e: Exception) {
+            // Depth ignored
+        }
+    }
+
+    // --- AR Features ---
+
+    fun setFlashlight(on: Boolean) {
+        val currentSession = session ?: return
+        try {
+            val config = currentSession.config
+            if (on) {
+                // Not standard ARCore API, usually requires Camera2 interop
+                // Leaving placeholder as actual implementation requires pausing session
+                // to grab CameraDevice, which is heavy.
+                // Assuming standard LightEstimate for now.
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Flashlight toggle failed", e)
+        }
+    }
+
+    fun setupAugmentedImageDatabase(bitmap: Bitmap?, name: String) {
+        if (bitmap == null || session == null) return
+
+        try {
+            val config = session!!.config
+            val database = AugmentedImageDatabase(session)
+            database.addImage(name, bitmap)
+            config.augmentedImageDatabase = database
+            session!!.configure(config)
+            Log.i(TAG, "Augmented Image '$name' added to database")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to add augmented image", e)
         }
     }
 }
