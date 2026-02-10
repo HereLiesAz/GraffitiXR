@@ -1,303 +1,233 @@
 #include "MobileGS.h"
-#include <android/log.h>
-#include <fstream>
 #include <cmath>
-#include <glm/gtc/type_ptr.hpp>
+#include <algorithm>
+#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
-#define LOG_TAG "MobileGS"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-
-static const char* VERTEX_SHADER = R"(#version 300 es
-uniform mat4 u_MVP;
-uniform float u_PointSize;
-layout(location = 0) in vec3 a_Position;
-layout(location = 1) in vec3 a_Color;
-layout(location = 2) in float a_Opacity;
-out vec4 v_Color;
-void main() {
-    gl_Position = u_MVP * vec4(a_Position, 1.0);
-    gl_PointSize = u_PointSize;
-    v_Color = vec4(a_Color, a_Opacity);
+// Helper to unpack Pose
+glm::mat4 makeMat4(const float* d) {
+    return glm::make_mat4(d);
 }
-)";
 
-static const char* FRAGMENT_SHADER = R"(#version 300 es
-precision mediump float;
-in vec4 v_Color;
-out vec4 FragColor;
-void main() {
-    vec2 coord = gl_PointCoord - vec2(0.5);
-    if(length(coord) > 0.5) discard;
-    FragColor = v_Color;
-}
-)";
-
-MobileGS::MobileGS()
-    : m_Program(0), m_LocMVP(-1), m_LocPointSize(-1), m_VAO(0), m_VBO(0),
-      m_IsInitialized(false), m_Width(0), m_Height(0), m_WorldTransform(1.0f) {
-    m_Splats.reserve(MAX_SPLATS);
+MobileGS::MobileGS() {
+    mChunkSize = 2.0f;
+    mVoxelSize = 0.05f; // 5cm voxels
 }
 
 MobileGS::~MobileGS() {
-    if (m_Program != 0) {
-        glDeleteProgram(m_Program);
-    }
-    if (m_VAO != 0) {
-        glDeleteVertexArrays(1, &m_VAO);
-    }
-    if (m_VBO != 0) {
-        glDeleteBuffers(1, &m_VBO);
-    }
-}
-
-void MobileGS::initialize() {
-    if (m_IsInitialized) return;
-    compileShaders();
-    m_IsInitialized = true;
-    LOGI("MobileGS initialized");
-}
-
-void MobileGS::compileShaders() {
-    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vs, 1, &VERTEX_SHADER, nullptr);
-    glCompileShader(vs);
-
-    GLint compiled;
-    glGetShaderiv(vs, GL_COMPILE_STATUS, &compiled);
-    if (!compiled) {
-        glDeleteShader(vs);
-        return;
-    }
-
-    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fs, 1, &FRAGMENT_SHADER, nullptr);
-    glCompileShader(fs);
-
-    glGetShaderiv(fs, GL_COMPILE_STATUS, &compiled);
-    if (!compiled) {
-        glDeleteShader(fs);
-        return;
-    }
-
-    m_Program = glCreateProgram();
-    glAttachShader(m_Program, vs);
-    glAttachShader(m_Program, fs);
-    glLinkProgram(m_Program);
-
-    GLint linked;
-    glGetProgramiv(m_Program, GL_LINK_STATUS, &linked);
-    if (!linked) {
-        glDeleteProgram(m_Program);
-        return;
-    }
-
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-
-    m_LocMVP = glGetUniformLocation(m_Program, "u_MVP");
-    m_LocPointSize = glGetUniformLocation(m_Program, "u_PointSize");
-
-    glGenVertexArrays(1, &m_VAO);
-    glGenBuffers(1, &m_VBO);
-}
-
-void MobileGS::updateCamera(const float* viewMtx, const float* projMtx) {
-    std::lock_guard<std::mutex> lock(m_SplatsMutex);
-    m_ViewMatrix = glm::make_mat4(viewMtx);
-    m_ProjMatrix = glm::make_mat4(projMtx);
-}
-
-void MobileGS::feedDepthData(const uint16_t* depthData, int width, int height) {
-    if (!depthData || width <= 0 || height <= 0 || !m_IsInitialized) return;
-
-    std::lock_guard<std::mutex> lock(m_SplatsMutex);
-
-    // Extract intrinsics from Projection Matrix (approximate for ARCore)
-    // P[0][0] = 2 * fx / w
-    // P[1][1] = 2 * fy / h
-    float fx = m_ProjMatrix[0][0] * width / 2.0f;
-    float fy = m_ProjMatrix[1][1] * height / 2.0f;
-    float cx = width / 2.0f; // Approx
-    float cy = height / 2.0f; // Approx
-
-    glm::mat4 invView = glm::inverse(m_ViewMatrix);
-    glm::vec3 camPos = glm::vec3(invView[3]);
-
-    // Stride to reduce processing
-    int stride = 8;
-
-    for (int y = 0; y < height; y += stride) {
-        for (int x = 0; x < width; x += stride) {
-            uint16_t d = depthData[y * width + x];
-            if (d == 0 || d > 5000) continue; // Skip invalid or too far (5m)
-
-            float depthM = d * 0.001f; // mm to meters
-
-            // Unproject to Camera Space
-            // Z is negative in OpenGL camera space
-            float z_cam = -depthM;
-            float x_cam = (x - cx) * depthM / fx;
-            float y_cam = -(y - cy) * depthM / fy; // Flip Y for image coords
-
-            glm::vec4 P_cam(x_cam, y_cam, z_cam, 1.0f);
-            glm::vec4 P_world = invView * P_cam;
-
-            // Voxel Grid Integration
-            VoxelKey key;
-            key.x = (int)std::floor(P_world.x / VOXEL_SIZE);
-            key.y = (int)std::floor(P_world.y / VOXEL_SIZE);
-            key.z = (int)std::floor(P_world.z / VOXEL_SIZE);
-
-            if (m_VoxelGrid.find(key) != m_VoxelGrid.end()) {
-                // Update existing
-                int idx = m_VoxelGrid[key];
-                Splat& s = m_Splats[idx];
-                s.confidence = std::min(1.0f, s.confidence + CONFIDENCE_INCREMENT);
-                // In a real system, we'd fuse color here too (weighted avg)
-            } else {
-                // Create new
-                if (m_Splats.size() < MAX_SPLATS) {
-                    Splat s;
-                    s.x = P_world.x;
-                    s.y = P_world.y;
-                    s.z = P_world.z;
-                    // Default color (Cyan-ish for now, since we don't have RGB here yet)
-                    s.r = 0.0f; s.g = 1.0f; s.b = 1.0f;
-                    s.opacity = 1.0f;
-                    s.scale = VOXEL_SIZE;
-                    s.confidence = 0.1f;
-
-                    m_VoxelGrid[key] = m_Splats.size();
-                    m_Splats.push_back(s);
-                }
-            }
+    for (auto& pair : mChunks) {
+        if (pair.second.vbo != 0) {
+            glDeleteBuffers(1, &pair.second.vbo);
         }
     }
 }
 
-void MobileGS::draw() {
-    if (!m_IsInitialized || m_Program == 0) return;
+ChunkKey MobileGS::getChunkKey(float x, float y, float z) {
+    return ChunkKey{
+            (int)floor(x / mChunkSize),
+            (int)floor(y / mChunkSize),
+            (int)floor(z / mChunkSize)
+    };
+}
 
-    std::lock_guard<std::mutex> lock(m_SplatsMutex);
-    if (m_Splats.empty()) return;
+float MobileGS::getLuminance(uint8_t r, uint8_t g, uint8_t b) {
+    // Standard Rec. 601 Luma
+    return 0.299f * r + 0.587f * g + 0.114f * b;
+}
 
-    glUseProgram(m_Program);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+// --- CORE FUSION LOGIC (SplaTAM + Illumination Invariance) ---
+void MobileGS::fuseSplat(Splat& target, const Splat& source) {
+    // 1. ILLUMINATION INVARIANCE ("Taming the Light")
+    // If the geometry matches but luminance is wildly different, it's likely a shadow/highlight.
+    float lumDiff = std::abs(target.luminance - source.luminance);
+    float lumThreshold = 50.0f; // out of 255
 
-    glm::mat4 mvp = m_ProjMatrix * m_ViewMatrix * m_WorldTransform;
-    glUniformMatrix4fv(m_LocMVP, 1, GL_FALSE, glm::value_ptr(mvp));
-    glUniform1f(m_LocPointSize, 15.0f);
-
-    // Populate Draw Buffer
-    // Format: x, y, z, r, g, b, a (7 floats per splat)
-    m_DrawBuffer.clear();
-    m_DrawBuffer.reserve(m_Splats.size() * 7);
-    for (const auto& s : m_Splats) {
-        // Simple confidence visualization: Alpha fades in
-        m_DrawBuffer.push_back(s.x);
-        m_DrawBuffer.push_back(s.y);
-        m_DrawBuffer.push_back(s.z);
-
-        // Color based on confidence (Red -> Green)
-        float conf = s.confidence;
-        m_DrawBuffer.push_back(1.0f - conf); // R
-        m_DrawBuffer.push_back(conf);        // G
-        m_DrawBuffer.push_back(0.0f);        // B
-
-        m_DrawBuffer.push_back(s.opacity * conf);
+    if (lumDiff > lumThreshold) {
+        // Reject Color Update: Maintain old albedo (assume it's the true surface color)
+        // But Update Geometry: The surface is still there.
+        // We only slightly boost confidence to show we saw *something*.
+        target.confidence = std::min(target.confidence + 0.05f, 1.0f);
+        target.lastSeenFrame = source.lastSeenFrame;
+        return;
     }
 
-    glBindVertexArray(m_VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferData(GL_ARRAY_BUFFER, m_DrawBuffer.size() * sizeof(float), m_DrawBuffer.data(), GL_DYNAMIC_DRAW);
+    // 2. STANDARD FUSION (Moving Average)
+    float alpha = 0.1f; // Learning rate
 
-    // Attribs
-    // 0: Position (3 floats)
-    // 1: Color (3 floats)
-    // 2: Opacity (1 float)
-    GLsizei stride = 7 * sizeof(float);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+    // Geometry
+    target.x = target.x * (1.0f - alpha) + source.x * alpha;
+    target.y = target.y * (1.0f - alpha) + source.y * alpha;
+    target.z = target.z * (1.0f - alpha) + source.z * alpha;
 
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+    // SplaTAM: Update Normal and Radius
+    target.nx = target.nx * (1.0f - alpha) + source.nx * alpha;
+    target.ny = target.ny * (1.0f - alpha) + source.ny * alpha;
+    target.nz = target.nz * (1.0f - alpha) + source.nz * alpha;
 
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+    // Normalize normal
+    float invLen = 1.0f / sqrt(target.nx*target.nx + target.ny*target.ny + target.nz*target.nz);
+    target.nx *= invLen; target.ny *= invLen; target.nz *= invLen;
 
-    glDrawArrays(GL_POINTS, 0, m_Splats.size());
+    target.radius = target.radius * (1.0f - alpha) + source.radius * alpha;
 
-    glDisableVertexAttribArray(0);
-    glDisableVertexAttribArray(1);
-    glDisableVertexAttribArray(2);
+    // Color
+    target.r = (uint8_t)(target.r * (1.0f - alpha) + source.r * alpha);
+    target.g = (uint8_t)(target.g * (1.0f - alpha) + source.g * alpha);
+    target.b = (uint8_t)(target.b * (1.0f - alpha) + source.b * alpha);
+
+    // Update cached luminance for next check
+    target.luminance = getLuminance(target.r, target.g, target.b);
+
+    target.confidence = std::min(target.confidence + 0.2f, 1.0f);
+    target.lastSeenFrame = source.lastSeenFrame;
+}
+
+void MobileGS::feedDepthData(const float* depthPixels, const float* colorPixels,
+        int width, int height, const float* cameraPose, float fov) {
+    mFrameCount++;
+    glm::mat4 pose = makeMat4(cameraPose);
+    glm::vec3 camPos = glm::vec3(pose[3]);
+    glm::vec3 camFwd = glm::vec3(pose[2]) * -1.0f; // -Z is forward in GL
+
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+
+    // Stride to save perf (process every 4th pixel)
+    int stride = 4;
+    float fx = (width / 2.0f) / tan(fov / 2.0f);
+    float fy = fx;
+    float cx = width / 2.0f;
+    float cy = height / 2.0f;
+
+    for (int v = 0; v < height; v += stride) {
+        for (int u = 0; u < width; u += stride) {
+            int idx = v * width + u;
+            float d = depthPixels[idx];
+
+            if (d <= 0.1f || d > 4.0f) continue; // Ignore sky/noise
+
+            // Back-project
+            float z_cam = -d;
+            float x_cam = (u - cx) * d / fx;
+            float y_cam = (v - cy) * d / fy;
+
+            glm::vec4 worldPos = pose * glm::vec4(x_cam, y_cam, z_cam, 1.0f);
+
+            // Create Candidate Splat
+            Splat s;
+            s.x = worldPos.x;
+            s.y = worldPos.y;
+            s.z = worldPos.z;
+
+            // SplaTAM Heuristic: Normal faces camera initially
+            // (Real SplaTAM uses depth gradients, this is the fast mobile approx)
+            glm::vec3 dirToCam = glm::normalize(camPos - glm::vec3(s.x, s.y, s.z));
+            s.nx = dirToCam.x;
+            s.ny = dirToCam.y;
+            s.nz = dirToCam.z;
+
+            // Radius grows with distance (perspective projected size)
+            s.radius = d * (stride / fx) * 1.5f; // 1.5x overlap factor
+
+            // Color
+            // Assume colorPixels is RGB float 0..1 or 0..255. Assuming 0..1 from Bitmap
+            // Adjust index if color buffer has different stride/layout
+            s.r = (uint8_t)(colorPixels[idx * 3 + 0] * 255.0f);
+            s.g = (uint8_t)(colorPixels[idx * 3 + 1] * 255.0f);
+            s.b = (uint8_t)(colorPixels[idx * 3 + 2] * 255.0f);
+            s.luminance = getLuminance(s.r, s.g, s.b);
+            s.confidence = 0.5f;
+            s.lastSeenFrame = mFrameCount;
+
+            // Find Chunk
+            ChunkKey key = getChunkKey(s.x, s.y, s.z);
+            Chunk& chunk = mChunks[key]; // Auto-creates if missing
+
+            // Find existing voxel in chunk (Linear search is slow, but fine for small chunks + stride)
+            // OPTIMIZATION: Spatial Hash inside chunk could go here.
+            bool found = false;
+            float mergeDistSq = mVoxelSize * mVoxelSize;
+
+            for (auto& existing : chunk.splats) {
+                float dx = existing.x - s.x;
+                float dy = existing.y - s.y;
+                float dz = existing.z - s.z;
+                if (dx*dx + dy*dy + dz*dz < mergeDistSq) {
+                    fuseSplat(existing, s);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                chunk.splats.push_back(s);
+            }
+            chunk.isDirty = true;
+        }
+    }
+}
+
+void MobileGS::update(const float* cameraPose) {
+    // DiskChunGS Logic: Unload far chunks
+    // For now, we just mark dirty buffers.
+    // Real implementation would serialize mChunks to disk here.
+}
+
+void MobileGS::render(const float* viewMatrix, const float* projMatrix) {
+    // Render all active chunks
+    // Note: Use a shader that supports Splat size (gl_PointSize or Instancing)
+
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+
+    for (auto& pair : mChunks) {
+        Chunk& c = pair.second;
+        if (c.splats.empty()) continue;
+
+        if (c.isDirty) {
+            if (c.vbo == 0) glGenBuffers(1, &c.vbo);
+
+            // Pack data: X, Y, Z, R, G, B, Radius (7 floats/bytes mix)
+            // Simplifying to struct dump for now.
+            // Warning: Padding in struct Splat might mess this up.
+            // Better to pack manually into a temp buffer.
+            std::vector<float> buffer;
+            buffer.reserve(c.splats.size() * 7);
+
+            for (const auto& s : c.splats) {
+                if (s.confidence < 0.3f) continue; // Noise filter
+                buffer.push_back(s.x);
+                buffer.push_back(s.y);
+                buffer.push_back(s.z);
+                buffer.push_back(s.r / 255.0f);
+                buffer.push_back(s.g / 255.0f);
+                buffer.push_back(s.b / 255.0f);
+                buffer.push_back(s.radius); // Pass radius to shader
+            }
+
+            glBindBuffer(GL_ARRAY_BUFFER, c.vbo);
+            glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(), GL_STATIC_DRAW);
+            c.splatCount = buffer.size() / 7;
+            c.isDirty = false;
+        }
+
+        if (c.splatCount > 0) {
+            glBindBuffer(GL_ARRAY_BUFFER, c.vbo);
+
+            // Pos
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
+
+            // Color
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
+
+            // Radius (Size)
+            glEnableVertexAttribArray(2);
+            glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(6 * sizeof(float)));
+
+            glDrawArrays(GL_POINTS, 0, c.splatCount);
+        }
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    glDisable(GL_BLEND);
-}
-
-void MobileGS::onSurfaceChanged(int width, int height) {
-    m_Width = width;
-    m_Height = height;
-    glViewport(0, 0, width, height);
-}
-
-bool MobileGS::saveModel(const std::string& path) {
-    std::lock_guard<std::mutex> lock(m_SplatsMutex);
-    std::ofstream out(path, std::ios::binary);
-    if (!out) return false;
-
-    uint32_t count = m_Splats.size();
-    out.write((char*)&count, sizeof(count));
-    if (count > 0) {
-        out.write((char*)m_Splats.data(), count * sizeof(Splat));
-    }
-    return true;
-}
-
-bool MobileGS::loadModel(const std::string& path) {
-    std::lock_guard<std::mutex> lock(m_SplatsMutex);
-    std::ifstream in(path, std::ios::binary);
-    if (!in) return false;
-
-    uint32_t count = 0;
-    in.read((char*)&count, sizeof(count));
-    if (count > MAX_SPLATS) count = MAX_SPLATS; // Safety cap
-
-    m_Splats.resize(count);
-    if (count > 0) {
-        in.read((char*)m_Splats.data(), count * sizeof(Splat));
-    }
-
-    // Rebuild Voxel Grid
-    m_VoxelGrid.clear();
-    for(int i=0; i<m_Splats.size(); ++i) {
-        const auto& s = m_Splats[i];
-        VoxelKey key;
-        key.x = (int)std::floor(s.x / VOXEL_SIZE);
-        key.y = (int)std::floor(s.y / VOXEL_SIZE);
-        key.z = (int)std::floor(s.z / VOXEL_SIZE);
-        m_VoxelGrid[key] = i;
-    }
-
-    return true;
-}
-
-void MobileGS::clear() {
-    std::lock_guard<std::mutex> lock(m_SplatsMutex);
-    m_Splats.clear();
-    m_VoxelGrid.clear();
-}
-
-int MobileGS::getSplatCount() {
-    std::lock_guard<std::mutex> lock(m_SplatsMutex);
-    return (int)m_Splats.size();
-}
-
-void MobileGS::alignMap(const float* transformMtx) {
-    std::lock_guard<std::mutex> lock(m_SplatsMutex);
-    m_WorldTransform = glm::make_mat4(transformMtx);
 }
