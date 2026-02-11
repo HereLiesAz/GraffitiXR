@@ -7,7 +7,6 @@
 #include <fstream>
 #include <iostream>
 
-// Helper to unpack Pose
 glm::mat4 makeMat4(const float* d) {
     return glm::make_mat4(d);
 }
@@ -17,7 +16,6 @@ MobileGS::MobileGS() {
     mVoxelSize = 0.05f;
     mScreenWidth = 1080;
     mScreenHeight = 1920;
-    // Identity matrices default
     mStoredView = glm::mat4(1.0f);
     mStoredProj = glm::mat4(1.0f);
 }
@@ -41,14 +39,12 @@ void MobileGS::clear() {
     mFrameCount = 0;
 }
 
-// --- JNI Adapter Impl ---
 void MobileGS::updateCamera(const float* view, const float* proj) {
     if (view) mStoredView = makeMat4(view);
     if (proj) mStoredProj = makeMat4(proj);
 }
 
 void MobileGS::draw() {
-    // Bridge old draw() call to new render()
     render(glm::value_ptr(mStoredView), glm::value_ptr(mStoredProj));
 }
 
@@ -59,7 +55,6 @@ void MobileGS::onSurfaceChanged(int width, int height) {
 
 int MobileGS::getSplatCount() {
     int total = 0;
-    // This is approximate/slow, but safe
     std::lock_guard<std::mutex> lock(mChunkMutex);
     for (const auto& pair : mChunks) {
         total += pair.second.splats.size();
@@ -68,8 +63,6 @@ int MobileGS::getSplatCount() {
 }
 
 void MobileGS::alignMap(const float* transform) {
-    // TODO: Apply transformation to all splats (Complex due to chunks)
-    // For now, no-op or clear
 }
 
 bool MobileGS::saveModel(std::string path) {
@@ -108,8 +101,6 @@ bool MobileGS::loadModel(std::string path) {
             std::vector<Splat> tempSplats(splatCount);
             in.read((char*)tempSplats.data(), splatCount * sizeof(Splat));
 
-            // Re-hash into chunks based on position (in case logic changed)
-            // Or just trust the serialization. Let's just restore.
             if (!tempSplats.empty()) {
                 ChunkKey key = getChunkKey(tempSplats[0].x, tempSplats[0].y, tempSplats[0].z);
                 mChunks[key].splats = tempSplats;
@@ -120,8 +111,6 @@ bool MobileGS::loadModel(std::string path) {
     in.close();
     return true;
 }
-
-// --- CORE LOGIC ---
 
 ChunkKey MobileGS::getChunkKey(float x, float y, float z) {
     return ChunkKey{
@@ -136,7 +125,6 @@ float MobileGS::getLuminance(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void MobileGS::fuseSplat(Splat& target, const Splat& source) {
-    // 1. ILLUMINATION INVARIANCE
     float lumDiff = std::abs(target.luminance - source.luminance);
     float lumThreshold = 50.0f;
 
@@ -146,7 +134,6 @@ void MobileGS::fuseSplat(Splat& target, const Splat& source) {
         return;
     }
 
-    // 2. STANDARD FUSION
     float alpha = 0.1f;
 
     target.x = target.x * (1.0f - alpha) + source.x * alpha;
@@ -171,7 +158,8 @@ void MobileGS::fuseSplat(Splat& target, const Splat& source) {
     target.lastSeenFrame = source.lastSeenFrame;
 }
 
-void MobileGS::feedDepthData(const float* depthPixels, const float* colorPixels,
+// CHANGED: depthPixels type from float* to uint16_t*
+void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
         int width, int height, const float* cameraPose, float fov) {
     mFrameCount++;
     glm::mat4 pose = makeMat4(cameraPose);
@@ -188,7 +176,15 @@ void MobileGS::feedDepthData(const float* depthPixels, const float* colorPixels,
     for (int v = 0; v < height; v += stride) {
         for (int u = 0; u < width; u += stride) {
             int idx = v * width + u;
-            float d = depthPixels[idx];
+
+            // CHANGED: Read uint16 raw depth (millimeters)
+            uint16_t rawDepth = depthPixels[idx];
+
+            // 0 means no data in ARCore Depth16
+            if (rawDepth == 0) continue;
+
+            // CHANGED: Convert mm to meters
+            float d = (float)rawDepth * 0.001f;
 
             if (d <= 0.1f || d > 4.0f) continue;
 
@@ -207,9 +203,7 @@ void MobileGS::feedDepthData(const float* depthPixels, const float* colorPixels,
             s.nx = dirToCam.x; s.ny = dirToCam.y; s.nz = dirToCam.z;
             s.radius = d * (stride / fx) * 1.5f;
 
-            // Handle color (check for null to prevent crash during init)
             if (colorPixels) {
-                // Assuming RGB 0..1 floats
                 s.r = (uint8_t)(colorPixels[idx * 3 + 0] * 255.0f);
                 s.g = (uint8_t)(colorPixels[idx * 3 + 1] * 255.0f);
                 s.b = (uint8_t)(colorPixels[idx * 3 + 2] * 255.0f);
@@ -245,9 +239,7 @@ void MobileGS::feedDepthData(const float* depthPixels, const float* colorPixels,
     }
 }
 
-void MobileGS::update(const float* cameraPose) {
-    // DiskChunGS Logic placeholder
-}
+void MobileGS::update(const float* cameraPose) {}
 
 void MobileGS::render(const float* viewMatrix, const float* projMatrix) {
     std::lock_guard<std::mutex> lock(mChunkMutex);

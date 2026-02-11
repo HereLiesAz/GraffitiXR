@@ -2,7 +2,6 @@
 #include <string>
 #include "MobileGS.h"
 
-// Helper to cast jlong handle to pointer
 inline MobileGS* getEngine(jlong handle) {
     return reinterpret_cast<MobileGS*>(handle);
 }
@@ -37,7 +36,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
     env->ReleaseFloatArrayElements(projMtx, proj, 0);
 }
 
-// --- UPDATED METHOD FOR SPLATAM ---
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
         JNIEnv *env, jobject thiz,
@@ -50,18 +48,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
 
     if (handle == 0) return;
 
-    // Get Direct Buffer Addresses
-    // NOTE: This assumes the ByteBuffers were allocated with allocateDirect in Kotlin/Java
-    auto* depthData = (float*)env->GetDirectBufferAddress(depthBuffer);
-    float* colorData = nullptr;
+    // CHANGED: Cast to uint16_t* (unsigned short) instead of float*
+    // ARCore DEPTH16 is 16-bit integers
+    auto* depthData = (uint16_t*)env->GetDirectBufferAddress(depthBuffer);
 
+    float* colorData = nullptr;
     if (colorBuffer != nullptr) {
         colorData = (float*)env->GetDirectBufferAddress(colorBuffer);
     }
 
     jfloat* pose = env->GetFloatArrayElements(poseMatrix, nullptr);
 
-    // Call Engine
     if (depthData && pose) {
         getEngine(handle)->feedDepthData(depthData, colorData, width, height, pose, fov);
     }
