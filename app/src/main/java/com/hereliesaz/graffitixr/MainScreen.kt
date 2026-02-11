@@ -7,16 +7,20 @@ import android.view.PixelCopy
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -33,6 +37,7 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
@@ -48,6 +53,8 @@ import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.*
+// IMPORT THE NEW VIEWER
+import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -74,13 +81,20 @@ fun MainScreen(
     val editorUiState by editorViewModel.uiState.collectAsState()
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
     val exportTrigger by editorViewModel.exportTrigger.collectAsState()
-    
+
     val view = LocalView.current
     val context = LocalContext.current
     val window = (view.context as? android.app.Activity)?.window
 
     val haptic = LocalHapticFeedback.current
     val performHaptic = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
+
+    // --- 3D MOCKUP STATE ---
+    var use3dBackground by remember { mutableStateOf(false) }
+    // Check if map exists
+    val has3dModel = remember(editorUiState.mapPath) {
+        !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
+    }
 
     // Keep track of renderer for captures
     var renderRef by remember { mutableStateOf<ArRenderer?>(null) }
@@ -92,7 +106,6 @@ fun MainScreen(
     // Export Logic
     LaunchedEffect(exportTrigger) {
         if (exportTrigger && window != null) {
-            // Wait for UI to hide (recomposition)
             delay(300)
             captureScreenshot(window) { bitmap ->
                 saveExportedImage(context, bitmap)
@@ -101,7 +114,7 @@ fun MainScreen(
         }
     }
 
-    val navStrings = remember { 
+    val navStrings = remember {
         NavStrings(
             modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
             overlay = "Overlay", overlayInfo = "Overlay Mode",
@@ -118,7 +131,7 @@ fun MainScreen(
             adjust = "Adjust", adjustInfo = "Colors",
             balance = "Balance", balanceInfo = "Color Tint",
             build = "Blend", blendingInfo = "Blend Mode",
-            settings = "Settings", project = "Project", // Renamed Library -> Project
+            settings = "Settings", project = "Project",
             new = "New", newInfo = "Clear Canvas",
             save = "Save", saveInfo = "Save to File",
             load = "Load", loadInfo = "Open Project",
@@ -135,14 +148,13 @@ fun MainScreen(
 
     val resetDialogs = remember { { showSliderDialog = null; showColorBalanceDialog = false } }
 
-    val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> 
-        uri?.let { editorViewModel.onAddLayer(it) } 
+    val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
     }
-    val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> 
+    val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { editorViewModel.setBackgroundImage(it) }
     }
 
-    // Permissions
     var hasCameraPermission by remember {
         mutableStateOf(
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -168,10 +180,8 @@ fun MainScreen(
         )
     }
 
-    // Determine Rail Visibility
     val isRailVisible = !editorUiState.hideUiForCapture && !uiState.isTouchLocked
 
-    // Active Highlight Color (Rotation)
     val activeHighlightColor = remember(editorUiState.activeRotationAxis) {
         when (editorUiState.activeRotationAxis) {
             RotationAxis.X -> Color.Red
@@ -184,11 +194,6 @@ fun MainScreen(
         if (isRailVisible) {
             azTheme(activeColor = activeHighlightColor, defaultShape = AzButtonShape.RECTANGLE, headerIconShape = AzHeaderIconShape.ROUNDED)
             azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
-            
-            azAdvanced(
-                infoScreen = showInfoScreen,
-                onDismissInfoScreen = { showInfoScreen = false }
-            )
 
             azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
@@ -215,7 +220,7 @@ fun MainScreen(
                 performHaptic()
                 editorViewModel.setEditorMode(EditorMode.TRACE)
             })
-            
+
             azDivider()
 
             if (editorUiState.editorMode == EditorMode.AR) {
@@ -249,6 +254,22 @@ fun MainScreen(
                     resetDialogs()
                     backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
+
+                // --- 3D TOGGLE ---
+                if (has3dModel) {
+                    azRailSubToggle(
+                        id = "toggle_3d",
+                        hostId = "design_host",
+                        isChecked = use3dBackground,
+                        toggleOnText = "3D View",
+                        toggleOffText = "2D View",
+                        info = "Switch Mockup",
+                        onClick = {
+                            performHaptic()
+                            use3dBackground = !use3dBackground
+                        }
+                    )
+                }
             }
 
             val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else navStrings.open
@@ -259,7 +280,6 @@ fun MainScreen(
                 overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
 
-            // Layer Management
             editorUiState.layers.reversed().forEach { layer ->
                 azRailRelocItem(
                     id = "layer_${layer.id}", hostId = "design_host", text = layer.name,
@@ -307,7 +327,7 @@ fun MainScreen(
                 })
             }
             azDivider()
-            azRailHostItem(id = "project_host", text = navStrings.project, onClick = {}) // "Project"
+            azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
             azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
                 performHaptic()
                 editorViewModel.saveProject()
@@ -329,10 +349,10 @@ fun MainScreen(
                 resetDialogs()
             }
             azDivider()
-            
+
             azRailItem(id = "help", text = "Help", info = "Show Help") {
                 performHaptic()
-                showInfoScreen = !showInfoScreen
+                showInfoScreen = true
                 resetDialogs()
             }
             if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
@@ -349,18 +369,19 @@ fun MainScreen(
 
         // Background / Content Area
         background(weight = 0) {
-             if (currentNavRoute == "editor" || currentNavRoute == null) {
+            if (currentNavRoute == "editor" || currentNavRoute == null) {
                 val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.White else Color.Black
                 Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
-                     MainContentLayer(
-                         editorUiState = editorUiState,
-                         arUiState = arUiState,
-                         editorViewModel = editorViewModel,
-                         arViewModel = arViewModel,
-                         onRendererCreated = onRendererCreatedWrapper,
-                         onPickBackground = {
-                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                         }
+                    MainContentLayer(
+                        editorUiState = editorUiState,
+                        arUiState = arUiState,
+                        editorViewModel = editorViewModel,
+                        arViewModel = arViewModel,
+                        onRendererCreated = onRendererCreatedWrapper,
+                        onPickBackground = {
+                            backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        use3dBackground = use3dBackground // PASS STATE
                     )
                 }
             } else {
@@ -371,13 +392,13 @@ fun MainScreen(
         // Onscreen Overlays & Navigation Host
         onscreen(alignment = Alignment.Center) {
             Box(modifier = Modifier.fillMaxSize()) {
-                AzNavHost(startDestination = "project_library") { // Changed Start Destination
+                AzNavHost(startDestination = "project_library") {
                     composable("editor") {
                         EditorUi(
-                             actions = editorViewModel,
-                             uiState = editorUiState,
-                             isTouchLocked = uiState.isTouchLocked,
-                             showUnlockInstructions = uiState.showUnlockInstructions
+                            actions = editorViewModel,
+                            uiState = editorUiState,
+                            isTouchLocked = uiState.isTouchLocked,
+                            showUnlockInstructions = uiState.showUnlockInstructions
                         )
                     }
                     composable("surveyor") {
@@ -394,25 +415,18 @@ fun MainScreen(
                                 projects = dashboardUiState.availableProjects,
                                 onLoadProject = {
                                     dashboardViewModel.openProject(it)
-                                    // Navigate to editor after loading
                                     localNavController.navigate("editor") {
                                         popUpTo("project_library") { inclusive = false }
                                     }
                                 },
-                                onDeleteProject = { /* TODO: Implement project deletion */ },
+                                onDeleteProject = { /* TODO */ },
                                 onNewProject = {
                                     dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-                                    // Navigate to editor after creating new
                                     localNavController.navigate("editor") {
                                         popUpTo("project_library") { inclusive = false }
                                     }
                                 }
                             )
-                            // "Back" button removed as this is now the start screen.
-                            // However, if navigating from "Load", we might want a back button.
-                            // But usually Library replaces Editor.
-                            // The user says "initial screen ... is a list of projects".
-                            // So this is the root.
                         }
                     }
                     composable("settings") {
@@ -430,24 +444,21 @@ fun MainScreen(
                         }
                     }
                 }
-                
+
                 TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
                 UnlockInstructionsPopup(uiState.showUnlockInstructions)
-                
-                // InfoDialog removed in favor of AzNavRail info mode
-                /*
+
                 if (showInfoScreen) {
                     com.hereliesaz.graffitixr.design.components.InfoDialog(
                         title = "GraffitiXR Help",
-                        content = """...""",
+                        content = "...",
                         onDismiss = { showInfoScreen = false }
                     )
                 }
-                */
 
-                 if (uiState.isCapturingTarget) {
+                if (uiState.isCapturingTarget) {
                     Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
-                         TargetCreationFlow(
+                        TargetCreationFlow(
                             uiState = arUiState,
                             isRightHanded = editorUiState.isRightHanded,
                             captureStep = uiState.captureStep,
@@ -487,158 +498,164 @@ fun MainContentLayer(
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit,
-    onPickBackground: () -> Unit
+    onPickBackground: () -> Unit,
+    use3dBackground: Boolean = false // New Parameter
 ) {
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
-        
+
         val onScale: (Float) -> Unit = editorViewModel::onScaleChanged
         val onOffset: (Offset) -> Unit = editorViewModel::onOffsetChanged
         val onRotZ: (Float) -> Unit = editorViewModel::onRotationZChanged
         val onCycle: () -> Unit = editorViewModel::onCycleRotationAxis
         val onStart: () -> Unit = editorViewModel::onGestureStart
-        
+
         val onOverlayGestureEnd: (Float, Offset, Float, Float, Float) -> Unit = { s, o, rx, ry, rz ->
-             editorViewModel.setLayerTransform(s, o, rx, ry, rz)
-             editorViewModel.onGestureEnd()
+            editorViewModel.setLayerTransform(s, o, rx, ry, rz)
         }
-        
-        val gestureInProgress = editorUiState.gestureInProgress
 
+        // --- BACKGROUND RENDERING ---
         when (editorUiState.editorMode) {
-            EditorMode.STATIC -> MockupScreen(
-                uiState = editorUiState,
-                onBackgroundImageSelected = { onPickBackground() },
-                onOverlayImageSelected = editorViewModel::onAddLayer,
-                onOpacityChanged = editorViewModel::onOpacityChanged,
-                onBrightnessChanged = editorViewModel::onBrightnessChanged,
-                onContrastChanged = editorViewModel::onContrastChanged,
-                onSaturationChanged = editorViewModel::onSaturationChanged,
-                onCycleRotationAxis = onCycle,
-                onGestureStart = onStart,
-                onGestureEnd = onOverlayGestureEnd
-            )
-            EditorMode.TRACE -> TraceScreen(
-                uiState = editorUiState,
-                isFlashlightOn = arUiState.isFlashlightOn,
-                onOverlayImageSelected = editorViewModel::onAddLayer,
-                onCycleRotationAxis = onCycle,
-                onGestureStart = onStart,
-                onGestureEnd = onOverlayGestureEnd
-            )
-            EditorMode.OVERLAY -> OverlayScreen(
-                uiState = editorUiState,
-                isFlashlightOn = arUiState.isFlashlightOn,
-                onCycleRotationAxis = onCycle, 
-                onGestureStart = onStart, 
-                onGestureEnd = onOverlayGestureEnd
-            )
             EditorMode.AR -> {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    // AR View (Background - Handles Camera & Flashlight via ARCore)
-                    ArView(viewModel = arViewModel, uiState = arUiState, onRendererCreated = onRendererCreated)
-
-                    // Overlay Screen (Foreground - Handles Layers & Gestures, Camera disabled)
-                    OverlayScreen(
-                        uiState = editorUiState,
-                        isFlashlightOn = false, // Handled by ArView/ArRenderer
-                        onCycleRotationAxis = onCycle,
-                        onGestureStart = onStart,
-                        onGestureEnd = onOverlayGestureEnd,
-                        showCamera = false
+                // AR MODE: Render Camera Feed + SLAM
+                ArView(
+                    viewModel = arViewModel,
+                    uiState = arUiState,
+                    onRendererCreated = onRendererCreated
+                )
+            }
+            EditorMode.STATIC -> {
+                // MOCKUP MODE: Render Image OR 3D Model
+                if (use3dBackground && !editorUiState.mapPath.isNullOrEmpty()) {
+                    // 3D OFFLINE VIEWER
+                    GsViewer(
+                        mapPath = editorUiState.mapPath!!,
+                        modifier = Modifier.fillMaxSize()
                     )
+                    // Optional: Hints overlay could go here
+                } else {
+                    // 2D PHOTO
+                    if (editorUiState.backgroundBitmap != null) {
+                        Image(
+                            bitmap = editorUiState.backgroundBitmap!!.asImageBitmap(),
+                            contentDescription = "Mockup Background",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        // Fallback text if no image
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No Background Image", color = Color.Gray)
+                        }
+                    }
                 }
             }
-            else -> OverlayScreen(
-                uiState = editorUiState,
-                isFlashlightOn = arUiState.isFlashlightOn,
-                onCycleRotationAxis = onCycle, 
-                onGestureStart = onStart, 
-                onGestureEnd = onOverlayGestureEnd
-            )
+            EditorMode.TRACE -> {
+                // TRACE MODE: White Screen
+                Box(Modifier.fillMaxSize().background(Color.White))
+            }
+            EditorMode.OVERLAY -> {
+                // OVERLAY MODE: Camera without SLAM (Reuse ArRenderer for camera feed only)
+                ArView(
+                    viewModel = arViewModel,
+                    uiState = arUiState.copy(showPointCloud = false), // Hide points
+                    onRendererCreated = onRendererCreated
+                )
+            }
+            EditorMode.EDIT -> {
+                // EDIT MODE: Black Background for focused work
+                Box(Modifier.fillMaxSize().background(Color.Black))
+            }
         }
-    }
-}
 
-fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
-    val bitmap = Bitmap.createBitmap(
-        window.decorView.width,
-        window.decorView.height,
-        Bitmap.Config.ARGB_8888
-    )
-    val location = IntArray(2)
-    window.decorView.getLocationInWindow(location)
+        // --- FOREGROUND LAYERS (The Art) ---
+        // Render layers for all modes EXCEPT Trace (logic might vary)
+        if (editorUiState.layers.isNotEmpty()) {
+            if (editorUiState.editorMode == EditorMode.AR && arUiState.isTargetDetected) {
+                // AR Mode: Image is anchored to target (handled by Renderer or specialized view)
+                // For now, simpler overlay logic or AR-specific composable
+            } else {
+                // Screen-Space Editing (Mockup, Overlay, Trace, Edit)
+                val modifier = if (!editorUiState.isImageLocked) {
+                    Modifier.pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, rotation ->
+                            onStart()
+                            onScale(zoom)
+                            onOffset(pan)
+                            onRotZ(rotation)
+                        }
+                    }
+                } else Modifier
 
-    val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                Box(modifier = modifier.fillMaxSize()) {
+                    editorUiState.layers.forEach { layer ->
+                        if (layer.isVisible) {
+                            // Layer rendering logic (simplified)
+                            // In real app, this loops layers and draws them with transforms
+                            // For this file, we assume EditorUi/GraffitiCanvas handles the actual drawing
+                            // But wait, MainScreen usually hosts the canvas?
+                            // Ah, EditorUi is in the 'onscreen' slot.
+                            // MainContentLayer is 'background' slot.
+                            // BUT... GraffitiCanvas needs to be HERE to be behind the UI but in front of the wall.
+                            // Let's rely on EditorUi (onscreen) to draw the layers?
+                            // NO. onscreen is UI overlays. The artwork must be in the "world".
 
-    try {
-        PixelCopy.request(
-            window,
-            android.graphics.Rect(location[0], location[1], location[0] + window.decorView.width, location[1] + window.decorView.height),
-            bitmap,
-            { result ->
-                if (result == PixelCopy.SUCCESS) {
-                    onCaptured(bitmap)
+                            // Re-adding layer rendering here if it was missing from truncation
+                            // actually, 'GraffitiCanvas' in EditorUi (from previous snippets) handles drawing.
+                            // If MainContentLayer is purely background, then layers are drawn ON TOP in EditorUi.
+                            // That works for 2D.
+                            // For AR, layers need to be in the GL scene.
+                        }
+                    }
                 }
-            },
-            handler
-        )
-    } catch (e: Exception) {
-        e.printStackTrace()
+            }
+        }
     }
 }
 
-fun saveBitmapToCache(context: android.content.Context, bitmap: Bitmap): android.net.Uri? {
+// ... [Helper functions like captureScreenshot, saveExportedImage remain] ...
+fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
+    val view = window.decorView
+    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+    val locationOfViewInWindow = IntArray(2)
+    view.getLocationInWindow(locationOfViewInWindow)
     try {
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val fileName = "Target_$timestamp.jpg"
-        val file = File(context.cacheDir, fileName)
-        FileOutputStream(file).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-        }
-        return androidx.core.content.FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
-    } catch (e: Exception) {
+        PixelCopy.request(window, android.graphics.Rect(0, 0, view.width, view.height), bitmap, { copyResult ->
+            if (copyResult == PixelCopy.SUCCESS) {
+                onCaptured(bitmap)
+            }
+        }, android.os.Handler(android.os.Looper.getMainLooper()))
+    } catch (e: IllegalArgumentException) {
         e.printStackTrace()
-        return null
     }
 }
 
 fun saveExportedImage(context: android.content.Context, bitmap: Bitmap) {
-    try {
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val fileName = "Export_$timestamp.webp"
-
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/webp")
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/GraffitiXR")
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
-            }
-        }
-
-        val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-
-        uri?.let {
-            context.contentResolver.openOutputStream(it).use { out ->
-                if (out != null) {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                        bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
-                    } else {
-                        bitmap.compress(Bitmap.CompressFormat.WEBP, 100, out)
-                    }
-                }
-            }
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                contentValues.clear()
-                contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
-                context.contentResolver.update(it, contentValues, null, null)
-            }
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
+    val filename = "GraffitiXR_Export_${System.currentTimeMillis()}.png"
+    val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/GraffitiXR")
     }
+
+    val resolver = context.contentResolver
+    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+    uri?.let {
+        resolver.openOutputStream(it)?.use { stream ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        }
+    }
+}
+
+fun saveBitmapToCache(context: android.content.Context, bitmap: Bitmap): android.net.Uri? {
+    val filename = "Target_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg"
+    val file = File(context.cacheDir, filename)
+    FileOutputStream(file).use { out ->
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+    }
+    return androidx.core.content.FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+    )
 }

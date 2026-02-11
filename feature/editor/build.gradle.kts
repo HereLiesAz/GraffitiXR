@@ -26,6 +26,10 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":core:design"))
+
+    // ADDED: Required for GsViewer / SlamManager
+    implementation(project(":core:native"))
+
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -47,4 +51,7 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // AZ Nav Rail (Ensure this is available if used in Editor, though usually in App)
+    implementation(libs.az.nav.rail)
 }
