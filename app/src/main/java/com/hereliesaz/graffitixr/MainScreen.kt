@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr
 
-import android.graphics.Bitmap
 import android.content.ContentValues
+import android.graphics.Bitmap
 import android.provider.MediaStore
 import android.view.PixelCopy
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,10 +36,7 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.graffitixr.common.model.ArUiState
-import com.hereliesaz.graffitixr.common.model.EditorUiState
-import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
@@ -53,8 +50,6 @@ import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.*
-// IMPORT THE NEW VIEWER
-import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -89,21 +84,18 @@ fun MainScreen(
     val haptic = LocalHapticFeedback.current
     val performHaptic = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
 
-    // --- 3D MOCKUP STATE ---
     var use3dBackground by remember { mutableStateOf(false) }
-    // Check if map exists
+
     val has3dModel = remember(editorUiState.mapPath) {
         !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
     }
 
-    // Keep track of renderer for captures
     var renderRef by remember { mutableStateOf<ArRenderer?>(null) }
     val onRendererCreatedWrapper: (ArRenderer) -> Unit = { renderer ->
         renderRef = renderer
         onRendererCreated(renderer)
     }
 
-    // Export Logic
     LaunchedEffect(exportTrigger) {
         if (exportTrigger && window != null) {
             delay(300)
@@ -255,7 +247,6 @@ fun MainScreen(
                     backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
 
-                // --- 3D TOGGLE ---
                 if (has3dModel) {
                     azRailSubToggle(
                         id = "toggle_3d",
@@ -381,7 +372,7 @@ fun MainScreen(
                         onPickBackground = {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
-                        use3dBackground = use3dBackground // PASS STATE
+                        use3dBackground = use3dBackground
                     )
                 }
             } else {
@@ -451,7 +442,7 @@ fun MainScreen(
                 if (showInfoScreen) {
                     com.hereliesaz.graffitixr.design.components.InfoDialog(
                         title = "GraffitiXR Help",
-                        content = "...",
+                        content = "Design and project graffiti onto physical walls using AR.",
                         onDismiss = { showInfoScreen = false }
                     )
                 }
@@ -499,7 +490,7 @@ fun MainContentLayer(
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit,
     onPickBackground: () -> Unit,
-    use3dBackground: Boolean = false // New Parameter
+    use3dBackground: Boolean = false
 ) {
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
 
@@ -509,14 +500,8 @@ fun MainContentLayer(
         val onCycle: () -> Unit = editorViewModel::onCycleRotationAxis
         val onStart: () -> Unit = editorViewModel::onGestureStart
 
-        val onOverlayGestureEnd: (Float, Offset, Float, Float, Float) -> Unit = { s, o, rx, ry, rz ->
-            editorViewModel.setLayerTransform(s, o, rx, ry, rz)
-        }
-
-        // --- BACKGROUND RENDERING ---
         when (editorUiState.editorMode) {
             EditorMode.AR -> {
-                // AR MODE: Render Camera Feed + SLAM
                 ArView(
                     viewModel = arViewModel,
                     uiState = arUiState,
@@ -524,16 +509,12 @@ fun MainContentLayer(
                 )
             }
             EditorMode.STATIC -> {
-                // MOCKUP MODE: Render Image OR 3D Model
                 if (use3dBackground && !editorUiState.mapPath.isNullOrEmpty()) {
-                    // 3D OFFLINE VIEWER
                     GsViewer(
                         mapPath = editorUiState.mapPath!!,
                         modifier = Modifier.fillMaxSize()
                     )
-                    // Optional: Hints overlay could go here
                 } else {
-                    // 2D PHOTO
                     if (editorUiState.backgroundBitmap != null) {
                         Image(
                             bitmap = editorUiState.backgroundBitmap!!.asImageBitmap(),
@@ -542,7 +523,6 @@ fun MainContentLayer(
                             contentScale = ContentScale.Fit
                         )
                     } else {
-                        // Fallback text if no image
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("No Background Image", color = Color.Gray)
                         }
@@ -550,31 +530,24 @@ fun MainContentLayer(
                 }
             }
             EditorMode.TRACE -> {
-                // TRACE MODE: White Screen
                 Box(Modifier.fillMaxSize().background(Color.White))
             }
             EditorMode.OVERLAY -> {
-                // OVERLAY MODE: Camera without SLAM (Reuse ArRenderer for camera feed only)
                 ArView(
                     viewModel = arViewModel,
-                    uiState = arUiState.copy(showPointCloud = false), // Hide points
+                    uiState = arUiState.copy(showPointCloud = false),
                     onRendererCreated = onRendererCreated
                 )
             }
-            EditorMode.EDIT -> {
-                // EDIT MODE: Black Background for focused work
+            else -> {
                 Box(Modifier.fillMaxSize().background(Color.Black))
             }
         }
 
-        // --- FOREGROUND LAYERS (The Art) ---
-        // Render layers for all modes EXCEPT Trace (logic might vary)
         if (editorUiState.layers.isNotEmpty()) {
             if (editorUiState.editorMode == EditorMode.AR && arUiState.isTargetDetected) {
-                // AR Mode: Image is anchored to target (handled by Renderer or specialized view)
-                // For now, simpler overlay logic or AR-specific composable
+                // AR Scene rendering
             } else {
-                // Screen-Space Editing (Mockup, Overlay, Trace, Edit)
                 val modifier = if (!editorUiState.isImageLocked) {
                     Modifier.pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, rotation ->
@@ -586,38 +559,15 @@ fun MainContentLayer(
                     }
                 } else Modifier
 
-                Box(modifier = modifier.fillMaxSize()) {
-                    editorUiState.layers.forEach { layer ->
-                        if (layer.isVisible) {
-                            // Layer rendering logic (simplified)
-                            // In real app, this loops layers and draws them with transforms
-                            // For this file, we assume EditorUi/GraffitiCanvas handles the actual drawing
-                            // But wait, MainScreen usually hosts the canvas?
-                            // Ah, EditorUi is in the 'onscreen' slot.
-                            // MainContentLayer is 'background' slot.
-                            // BUT... GraffitiCanvas needs to be HERE to be behind the UI but in front of the wall.
-                            // Let's rely on EditorUi (onscreen) to draw the layers?
-                            // NO. onscreen is UI overlays. The artwork must be in the "world".
-
-                            // Re-adding layer rendering here if it was missing from truncation
-                            // actually, 'GraffitiCanvas' in EditorUi (from previous snippets) handles drawing.
-                            // If MainContentLayer is purely background, then layers are drawn ON TOP in EditorUi.
-                            // That works for 2D.
-                            // For AR, layers need to be in the GL scene.
-                        }
-                    }
-                }
+                Box(modifier = modifier.fillMaxSize())
             }
         }
     }
 }
 
-// ... [Helper functions like captureScreenshot, saveExportedImage remain] ...
 fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
     val view = window.decorView
     val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-    val locationOfViewInWindow = IntArray(2)
-    view.getLocationInWindow(locationOfViewInWindow)
     try {
         PixelCopy.request(window, android.graphics.Rect(0, 0, view.width, view.height), bitmap, { copyResult ->
             if (copyResult == PixelCopy.SUCCESS) {

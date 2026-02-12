@@ -1,48 +1,65 @@
 package com.hereliesaz.graffitixr.common.model
 
+import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 
-data class UiState(
-    val isLoading: Boolean = false,
-    val isTouchLocked: Boolean = false,
-    val showUnlockInstructions: Boolean = false,
-
-    // Editor State Bridge
-    val layers: List<OverlayLayer> = emptyList(),
-    val activeLayerId: String? = null,
-    val editorMode: EditorMode = EditorMode.STATIC,
-    val isRightHanded: Boolean = true,
-    val activeRotationAxis: RotationAxis = RotationAxis.Z,
-    val showRotationAxisFeedback: Boolean = false,
-
-    // AR State Bridge
-    val showPointCloud: Boolean = false,
+// Main AR State
+data class ArUiState(
+    val isScanning: Boolean = false,
+    val pointCloudCount: Int = 0,
+    val planeCount: Int = 0,
+    val isTargetDetected: Boolean = false,
+    val trackingState: String = "Initializing",
+    val showPointCloud: Boolean = true,
     val isFlashlightOn: Boolean = false,
-    val isCapturingTarget: Boolean = false,
-    val isArTargetCreated: Boolean = false,
-    val captureStep: CaptureStep = CaptureStep.PREVIEW,
-    val targetCreationMode: TargetCreationMode = TargetCreationMode.SINGLE_IMAGE,
-    val mappingQualityScore: Float = 0f
+    val tempCaptureBitmap: Bitmap? = null
 )
 
+// Editor State
 data class EditorUiState(
-    val layers: List<OverlayLayer> = emptyList(),
     val activeLayerId: String? = null,
-    val drawingPaths: List<List<Offset>> = emptyList(),
-    val editorMode: EditorMode = EditorMode.STATIC,
+    val layers: List<Layer> = emptyList(),
+    val editorMode: EditorMode = EditorMode.EDIT,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
-    val showRotationAxisFeedback: Boolean = false,
-    val isImageLocked: Boolean = false,
-    val sliderDialogType: SliderType? = null, // Custom enum for brightness/contrast sliders
-    val showColorBalanceDialog: Boolean = false,
-    val gestureInProgress: Boolean = false,
-    val showDoubleTapHint: Boolean = false,
-    val showOnboardingDialogForMode: Any? = null,
     val isRightHanded: Boolean = true,
+    val isImageLocked: Boolean = false,
+    val hideUiForCapture: Boolean = false,
     val isLoading: Boolean = false,
+
+    // Background Fields (Required for 3D Mockup)
+    val mapPath: String? = null,
+    val backgroundBitmap: Bitmap? = null,
+
+    // Tool State
+    val activePanel: EditorPanel = EditorPanel.NONE,
+    val gestureInProgress: Boolean = false,
+    val showRotationAxisFeedback: Boolean = false,
+    val showDoubleTapHint: Boolean = false,
     val progressPercentage: Float = 0f
 )
 
-// Enums required for the state
-// EditorMode, RotationAxis, CaptureStep, TargetCreationMode are defined in their own files.
-enum class SliderType { OPACITY, SCALE, ROTATION }
+// Helper Classes
+enum class EditorPanel {
+    NONE, LAYERS, ADJUST, COLOR, BLEND
+}
+
+data class Layer(
+    val id: String,
+    val name: String,
+    val bitmap: Bitmap,
+    val offset: Offset = Offset.Zero,
+    val scale: Float = 1f,
+    val rotationX: Float = 0f,
+    val rotationY: Float = 0f,
+    val rotationZ: Float = 0f,
+    val isVisible: Boolean = true,
+    val opacity: Float = 1f,
+    val blendMode: BlendMode = BlendMode.SrcOver
+)
+
+enum class BlendMode {
+    SrcOver, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn,
+    HardLight, SoftLight, Difference, Exclusion, Hue, Saturation, Color, Luminosity,
+    Clear, Src, Dst, DstOver, SrcIn, DstIn, SrcOut, DstOut, SrcAtop, DstAtop,
+    Xor, Plus, Modulate
+}

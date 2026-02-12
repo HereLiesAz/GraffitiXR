@@ -11,10 +11,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorPanel
+import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.UiState
 import com.hereliesaz.graffitixr.feature.editor.ui.GestureFeedback
 import com.hereliesaz.graffitixr.feature.editor.ui.RotationAxisFeedback
-import com.hereliesaz.graffitixr.feature.editor.ui.StatusOverlay
 import com.hereliesaz.graffitixr.design.components.DoubleTapHintDialog
 import com.hereliesaz.graffitixr.design.components.OnboardingDialog
 import com.hereliesaz.graffitixr.design.components.AdjustmentsPanel

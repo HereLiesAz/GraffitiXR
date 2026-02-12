@@ -11,7 +11,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 
 @Composable
