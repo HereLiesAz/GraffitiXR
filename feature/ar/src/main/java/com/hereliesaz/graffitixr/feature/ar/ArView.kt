@@ -1,8 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.Context
 import android.opengl.GLSurfaceView
-import android.view.ViewGroup
-import android.widget.FrameLayout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -11,6 +10,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 
 @Composable
@@ -22,14 +22,12 @@ fun ArView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Initialize Renderer
     val arRenderer = remember {
         ArRenderer(context).also {
             onRendererCreated(it)
         }
     }
 
-    // Lifecycle Management
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -46,7 +44,6 @@ fun ArView(
         }
     }
 
-    // React to UI State changes
     LaunchedEffect(uiState.showPointCloud) {
         arRenderer.showPointCloud = uiState.showPointCloud
     }
@@ -55,17 +52,15 @@ fun ArView(
         arRenderer.setFlashlight(uiState.isFlashlightOn)
     }
 
-    // React to new target images
     LaunchedEffect(Unit) {
         viewModel.newTargetImage.collect { (bitmap, name) ->
             arRenderer.setupAugmentedImageDatabase(bitmap, name)
         }
     }
 
-    // View Factory
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = { ctx ->
+        factory = { ctx: Context ->
             GLSurfaceView(ctx).apply {
                 preserveEGLContextOnPause = true
                 setEGLContextClientVersion(3)

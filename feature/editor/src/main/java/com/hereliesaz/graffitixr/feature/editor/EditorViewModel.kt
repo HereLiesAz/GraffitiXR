@@ -1,11 +1,12 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.*
-import com.hereliesaz.graffitixr.common.model.EditorPanel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,17 +30,13 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(editorMode = mode) }
     }
 
-    fun setBackgroundImage(uri: Uri?) {
-        // Implementation for loading background
-    }
+    fun setBackgroundImage(uri: Uri?) { }
 
     fun setMapPath(path: String) {
         _uiState.update { it.copy(mapPath = path) }
     }
 
-    fun onAddLayer(uri: Uri) {
-        // Implementation for adding layers
-    }
+    fun onAddLayer(uri: Uri) { }
 
     fun onLayerActivated(layerId: String) {
         _uiState.update { it.copy(activeLayerId = layerId) }
@@ -110,8 +107,14 @@ class EditorViewModel @Inject constructor(
 
     fun onRemoveBackgroundClicked() { }
     fun onLineDrawingClicked() { }
-    fun onAdjustClicked() { _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) } }
-    fun onColorClicked() { _uiState.update { it.copy(activePanel = EditorPanel.COLOR) } }
+
+    fun onAdjustClicked() {
+        _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) }
+    }
+
+    fun onColorClicked() {
+        _uiState.update { it.copy(activePanel = EditorPanel.COLOR) }
+    }
 
     fun onCycleBlendMode() {
         updateActiveLayer {

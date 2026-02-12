@@ -1,126 +1,118 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
-import com.hereliesaz.graffitixr.common.model.UiState
+import com.hereliesaz.graffitixr.common.model.EditorPanel
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.feature.editor.ui.GestureFeedback
-import com.hereliesaz.graffitixr.feature.editor.ui.RotationAxisFeedback
-import com.hereliesaz.graffitixr.design.components.DoubleTapHintDialog
-import com.hereliesaz.graffitixr.design.components.OnboardingDialog
-import com.hereliesaz.graffitixr.design.components.AdjustmentsPanel
-import com.hereliesaz.graffitixr.design.components.AdjustmentsState
 
 @Composable
 fun EditorUi(
-    actions: EditorActions,
+    actions: EditorViewModel,
     uiState: EditorUiState,
     isTouchLocked: Boolean,
     showUnlockInstructions: Boolean
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val topSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
-    val bottomSafePadding = (configuration.screenHeightDp.dp * 0.05f).coerceAtLeast(16.dp)
-
-    val activeLayer = uiState.activeLayer
-
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Status Overlays
-        // Note: statusOverlay removed for now, as it requires AR state which is no longer in EditorUiState
-        // If needed, it should be passed in as a separate parameter or provided via a different state.
 
-        // 2. Gesture Feedback
-        if (!isTouchLocked) {
-            // Mapping EditorUiState to common UiState for GestureFeedback
-            val bridgeState = UiState(
-                layers = uiState.layers,
-                activeLayerId = uiState.activeLayerId,
-                activeRotationAxis = uiState.activeRotationAxis
-            )
+        if (uiState.gestureInProgress || uiState.showRotationAxisFeedback) {
             GestureFeedback(
-                uiState = bridgeState,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = topSafePadding + 20.dp).zIndex(3f),
-                isVisible = uiState.gestureInProgress
+                uiState = uiState,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 32.dp)
             )
         }
 
-        // 3. Drawing Canvas
-        if (uiState.editorMode == EditorMode.DRAW) {
-            DrawingCanvas(uiState.drawingPaths, actions::onDrawingPathFinished)
-        }
-
-        // 4. Adjustments Panel (Bottom)
-        Box(
-            Modifier.fillMaxSize().padding(bottom = bottomSafePadding).zIndex(2f),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            val adjustmentsState = AdjustmentsState(
-                hideUiForCapture = false, // Placeholder
-                isTouchLocked = isTouchLocked,
-                hasImage = activeLayer != null,
-                isArMode = uiState.editorMode == EditorMode.AR,
-                hasHistory = true, // Placeholder
-                isRightHanded = uiState.isRightHanded,
-                activeLayer = activeLayer
-            )
-
-            AdjustmentsPanel(
-                state = adjustmentsState,
-                showKnobs = uiState.activePanel == EditorPanel.ADJUST,
-                showColorBalance = uiState.activePanel == EditorPanel.COLOR,
-                isLandscape = isLandscape,
-                screenHeight = configuration.screenHeightDp.dp,
-                onOpacityChange = actions::onOpacityChanged,
-                onBrightnessChange = actions::onBrightnessChanged,
-                onContrastChange = actions::onContrastChanged,
-                onSaturationChange = actions::onSaturationChanged,
-                onColorBalanceRChange = actions::onColorBalanceRChanged,
-                onColorBalanceGChange = actions::onColorBalanceGChanged,
-                onColorBalanceBChange = actions::onColorBalanceBChanged,
-                onUndo = actions::onUndoClicked,
-                onRedo = actions::onRedoClicked,
-                onMagicAlign = actions::onMagicClicked,
-                onAdjustmentStart = actions::onAdjustmentStart,
-                onAdjustmentEnd = actions::onAdjustmentEnd
-            )
-        }
-
-        // 5. Dialogs & Helpers
-        uiState.showOnboardingDialogForMode?.let { mode ->
-            if (mode is EditorMode) {
-                OnboardingDialog(mode) { actions.onOnboardingComplete(mode) }
+        if (uiState.activePanel != EditorPanel.NONE) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+                    .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                when (uiState.activePanel) {
+                    EditorPanel.LAYERS -> LayersPanel(
+                        layers = uiState.layers,
+                        activeLayerId = uiState.activeLayerId,
+                        onSelectLayer = actions::onLayerActivated,
+                        onToggleVisibility = { },
+                        onClose = { actions.onAdjustClicked() } // Close action
+                    )
+                    EditorPanel.ADJUST -> AdjustPanel(onDismiss = { })
+                    EditorPanel.COLOR -> ColorPanel(onDismiss = { })
+                    EditorPanel.BLEND -> BlendPanel(onDismiss = { })
+                    else -> {}
+                }
             }
         }
+    }
+}
 
-        if (!isTouchLocked) {
-            RotationAxisFeedback(
-                uiState.activeRotationAxis,
-                uiState.showRotationAxisFeedback,
-                actions::onFeedbackShown,
-                Modifier.align(Alignment.BottomCenter).padding(bottom = bottomSafePadding + 32.dp).zIndex(4f)
-            )
+// --- Internal Panels ---
 
-            if (uiState.showDoubleTapHint) {
-                DoubleTapHintDialog(actions::onDoubleTapHintDismissed)
-            }
-
-            if (uiState.editorMode == EditorMode.DRAW) {
-                Text(
-                    "Progress: %.2f%%".format(uiState.progressPercentage),
-                    Modifier.align(Alignment.TopCenter).padding(top = topSafePadding).zIndex(3f)
-                )
+@Composable
+fun LayersPanel(
+    layers: List<Layer>,
+    activeLayerId: String?,
+    onSelectLayer: (String) -> Unit,
+    onToggleVisibility: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Text("Layers", style = MaterialTheme.typography.titleMedium, color = Color.White)
+        LazyColumn(Modifier.fillMaxWidth()) {
+            items(layers.reversed()) { layer ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelectLayer(layer.id) }
+                        .background(if (layer.id == activeLayerId) Color.Gray else Color.Transparent)
+                        .padding(8.dp)
+                ) {
+                    Text(layer.name, color = Color.White)
+                }
             }
         }
+    }
+}
+
+@Composable
+fun AdjustPanel(onDismiss: () -> Unit) {
+    Column {
+        Text("Adjustments", color = Color.White)
+        Slider(value = 0.5f, onValueChange = {})
+    }
+}
+
+@Composable
+fun ColorPanel(onDismiss: () -> Unit) {
+    Column {
+        Text("Color Balance", color = Color.White)
+        Slider(value = 0.5f, onValueChange = {})
+    }
+}
+
+@Composable
+fun BlendPanel(onDismiss: () -> Unit) {
+    Column {
+        Text("Blend Mode", color = Color.White)
     }
 }

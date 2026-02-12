@@ -1,16 +1,9 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.os.Build
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 
 @Composable
@@ -23,44 +16,44 @@ fun TargetCreationFlow(
     onRetake: () -> Unit,
     onCancel: () -> Unit,
     onCaptureShutter: () -> Unit,
-    onCalibrationPointCaptured: (FloatArray) -> Unit,
+    onCalibrationPointCaptured: (Offset) -> Unit,
     onUnwarpImage: (List<Offset>) -> Unit
 ) {
-    Box(Modifier.fillMaxSize()) {
-        when (captureStep) {
-            CaptureStep.RECTIFY -> {
-                UnwarpScreen(
-                    isRightHanded = isRightHanded,
-                    targetImage = uiState.tempCaptureBitmap,
-                    onConfirm = onUnwarpImage,
-                    onRetake = onRetake
-                )
-            }
-            CaptureStep.REVIEW -> {
-                val uri = uiState.capturedTargetUris.firstOrNull()
-                val imageBitmap by produceState<Bitmap?>(null, uri) {
-                    uri?.let {
-                        value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-                            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, it))
-                        else @Suppress("DEPRECATION") android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it)
-                    }
-                }
+    // This composable manages the UI overlays for the target creation process
+    // (Capture -> Rectify -> Review)
 
-                TargetRefinementScreen(
-                    bitmap = imageBitmap,
-                    onConfirm = onConfirm,
-                    onRetake = onRetake
-                )
-            }
-            else -> {
-                TargetCreationOverlay(
-                    uiState = uiState,
-                    onCapture = onCaptureShutter,
-                    onConfirm = onConfirm,
-                    onRetake = onRetake,
-                    onCancel = onCancel
-                )
-            }
+    when (captureStep) {
+        CaptureStep.CAPTURE -> {
+            // Camera Overlay is handled by ArView, we just need the shutter button
+            TargetCreationOverlay(
+                uiState = uiState,
+                step = CaptureStep.CAPTURE,
+                onPrimaryAction = onCaptureShutter,
+                onCancel = onCancel
+            )
         }
+        CaptureStep.RECTIFY -> {
+            // Show the captured bitmap and allow corner dragging
+            // For now, assuming rectification logic is handled by a dedicated view or dialog
+            // invoking onUnwarpImage when done.
+            TargetCreationOverlay(
+                uiState = uiState,
+                step = CaptureStep.RECTIFY,
+                onPrimaryAction = {
+                    // Mock: just pass 4 corners of the screen/image
+                    onUnwarpImage(listOf(Offset(0f,0f), Offset(100f,0f), Offset(100f,100f), Offset(0f,100f)))
+                },
+                onCancel = onRetake
+            )
+        }
+        CaptureStep.REVIEW -> {
+            TargetCreationOverlay(
+                uiState = uiState,
+                step = CaptureStep.REVIEW,
+                onPrimaryAction = onConfirm,
+                onCancel = onRetake
+            )
+        }
+        else -> {}
     }
 }

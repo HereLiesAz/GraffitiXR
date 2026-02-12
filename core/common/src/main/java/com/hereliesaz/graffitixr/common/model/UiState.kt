@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.common.model
 
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 
 // Main AR State
@@ -12,7 +13,9 @@ data class ArUiState(
     val trackingState: String = "Initializing",
     val showPointCloud: Boolean = true,
     val isFlashlightOn: Boolean = false,
-    val tempCaptureBitmap: Bitmap? = null
+    val tempCaptureBitmap: Bitmap? = null,
+    val capturedTargetUris: List<Uri> = emptyList(),
+    val capturedTargetImages: List<Bitmap> = emptyList()
 )
 
 // Editor State
@@ -26,9 +29,15 @@ data class EditorUiState(
     val hideUiForCapture: Boolean = false,
     val isLoading: Boolean = false,
 
-    // Background Fields (Required for 3D Mockup)
+    // Background Fields
     val mapPath: String? = null,
     val backgroundBitmap: Bitmap? = null,
+    val backgroundImageUri: String? = null,
+
+    // Background Editing
+    val isEditingBackground: Boolean = false,
+    val backgroundScale: Float = 1f,
+    val backgroundOffset: Offset = Offset.Zero,
 
     // Tool State
     val activePanel: EditorPanel = EditorPanel.NONE,
@@ -37,6 +46,11 @@ data class EditorUiState(
     val showDoubleTapHint: Boolean = false,
     val progressPercentage: Float = 0f
 )
+
+// Main App Flow State
+enum class CaptureStep {
+    NONE, CAPTURE, RECTIFY, REVIEW
+}
 
 // Helper Classes
 enum class EditorPanel {
@@ -54,7 +68,15 @@ data class Layer(
     val rotationZ: Float = 0f,
     val isVisible: Boolean = true,
     val opacity: Float = 1f,
-    val blendMode: BlendMode = BlendMode.SrcOver
+    val blendMode: BlendMode = BlendMode.SrcOver,
+
+    // Image Adjustment
+    val saturation: Float = 1f,
+    val contrast: Float = 1f,
+    val brightness: Float = 0f,
+    val colorBalanceR: Float = 0f,
+    val colorBalanceG: Float = 0f,
+    val colorBalanceB: Float = 0f
 )
 
 enum class BlendMode {

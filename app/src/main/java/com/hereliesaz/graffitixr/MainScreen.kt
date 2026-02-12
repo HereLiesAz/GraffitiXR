@@ -36,7 +36,11 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.graffitixr.common.model.*
+import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
@@ -50,6 +54,7 @@ import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.*
+import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -436,7 +441,10 @@ fun MainScreen(
                     }
                 }
 
-                TouchLockOverlay(uiState.isTouchLocked, viewModel::showUnlockInstructions)
+                // Fixed: Explicitly passing 'true' to showUnlockInstructions
+                TouchLockOverlay(uiState.isTouchLocked) {
+                    viewModel.showUnlockInstructions(true)
+                }
                 UnlockInstructionsPopup(uiState.showUnlockInstructions)
 
                 if (showInfoScreen) {
@@ -460,7 +468,7 @@ fun MainScreen(
                             onCaptureShutter = {
                                 renderRef?.captureFrame { bitmap ->
                                     arViewModel.setTempCapture(bitmap)
-                                    viewModel.setCaptureStep(com.hereliesaz.graffitixr.common.model.CaptureStep.RECTIFY)
+                                    viewModel.setCaptureStep(CaptureStep.RECTIFY)
                                 }
                             },
                             onCalibrationPointCaptured = { },
@@ -469,7 +477,7 @@ fun MainScreen(
                                     ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
                                         saveBitmapToCache(context, unwarped)?.let { uri ->
                                             arViewModel.onFrameCaptured(unwarped, uri)
-                                            viewModel.setCaptureStep(com.hereliesaz.graffitixr.common.model.CaptureStep.REVIEW)
+                                            viewModel.setCaptureStep(CaptureStep.REVIEW)
                                         }
                                     }
                                 }
@@ -565,6 +573,7 @@ fun MainContentLayer(
     }
 }
 
+// ... [Helper functions remain same as before] ...
 fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
     val view = window.decorView
     val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)

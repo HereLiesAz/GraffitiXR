@@ -1,56 +1,55 @@
 package com.hereliesaz.graffitixr.feature.editor.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.common.model.UiState
+import androidx.compose.ui.unit.sp
+import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 
 @Composable
 fun GestureFeedback(
-    uiState: UiState,
-    modifier: Modifier = Modifier,
-    isVisible: Boolean
+    uiState: EditorUiState,
+    modifier: Modifier = Modifier
 ) {
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId } ?: uiState.layers.firstOrNull()
-    val scale = activeLayer?.scale ?: 1f
-    val rotationX = activeLayer?.rotationX ?: 0f
-    val rotationY = activeLayer?.rotationY ?: 0f
-    val rotationZ = activeLayer?.rotationZ ?: 0f
-
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = modifier
-    ) {
+    if (uiState.gestureInProgress || uiState.showRotationAxisFeedback) {
         Box(
-            modifier = Modifier.padding(16.dp),
+            modifier = modifier
+                .padding(16.dp)
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
-            val rotationValue = when (uiState.activeRotationAxis) {
-                RotationAxis.X -> rotationX
-                RotationAxis.Y -> rotationY
-                RotationAxis.Z -> rotationZ
+            val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+
+            if (activeLayer != null) {
+                val text = when {
+                    uiState.showRotationAxisFeedback -> {
+                        val axisName = when(uiState.activeRotationAxis) {
+                            RotationAxis.X -> "X-Axis"
+                            RotationAxis.Y -> "Y-Axis"
+                            RotationAxis.Z -> "Z-Axis"
+                        }
+                        "Rotation Axis: $axisName"
+                    }
+                    else -> {
+                        val scalePct = (activeLayer.scale * 100).toInt()
+                        val rotX = activeLayer.rotationX.toInt() % 360
+                        val rotY = activeLayer.rotationY.toInt() % 360
+                        val rotZ = activeLayer.rotationZ.toInt() % 360
+
+                        "Scale: ${scalePct}%  |  Rot: ${rotX}°, ${rotY}°, ${rotZ}°"
+                    }
+                }
+                Text(text = text, color = Color.White, fontSize = 14.sp)
             }
-            Text(
-                text = "Scale: %.2f, Rotation (%s): %.1f°".format(
-                    scale,
-                    uiState.activeRotationAxis.name,
-                    rotationValue
-                ),
-                color = Color.White,
-                modifier = Modifier.shadow(elevation = 2.dp)
-            )
         }
     }
 }
