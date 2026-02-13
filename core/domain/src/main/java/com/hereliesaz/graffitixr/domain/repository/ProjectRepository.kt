@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.core.domain.repository
 
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.core.common.model.GraffitiProject
 import kotlinx.coroutines.flow.Flow
 

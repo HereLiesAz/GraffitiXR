@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.core.native
+package com.hereliesaz.graffitixr.nativebridge
 
 import android.graphics.Bitmap
 

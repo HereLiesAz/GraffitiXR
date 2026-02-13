@@ -53,6 +53,7 @@ class ProjectRepositoryImpl @Inject constructor(
         return _projects.value[id]
     }
 
+
     override suspend fun createProject(project: GraffitiProject) {
         saveToDisk(project)
         _projects.value = _projects.value + (project.id to project)
@@ -61,7 +62,7 @@ class ProjectRepositoryImpl @Inject constructor(
     override suspend fun updateProject(project: GraffitiProject) {
         val updated = project.copy(lastModified = System.currentTimeMillis())
         saveToDisk(updated)
-        _projects.value = _projects.value + (updated.id to updated)
+        _projects.value += (updated.id to updated)
     }
 
     override suspend fun deleteProject(id: String) {
@@ -69,7 +70,7 @@ class ProjectRepositoryImpl @Inject constructor(
             val dir = File(projectsDir, id)
             if (dir.exists()) dir.deleteRecursively()
         }
-        _projects.value = _projects.value - id
+        _projects.value -= id
     }
 
     // --- Teleological Implementation ---
