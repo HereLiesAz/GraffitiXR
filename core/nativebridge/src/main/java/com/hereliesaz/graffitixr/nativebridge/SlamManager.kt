@@ -1,68 +1,68 @@
 package com.hereliesaz.graffitixr.nativebridge
 
-import android.content.res.AssetManager
+import android.graphics.Bitmap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.nio.ByteBuffer
 
 /**
- * JNI Bridge to the MobileGS C++ Engine.
- * Synchronized with GraffitiJNI.cpp signatures.
+ * The Unified Native Interface.
  */
 class SlamManager {
 
-    companion object {
-        init {
-            System.loadLibrary("graffitixr")
-        }
-    }
-
     private var nativeHandle: Long = 0
+
     private val _mappingQuality = MutableStateFlow(0f)
     val mappingQuality: StateFlow<Float> = _mappingQuality.asStateFlow()
 
-    /**
-     * Initialize the native engine and return a pointer handle.
-     */
+    companion object {
+        init {
+            try {
+                System.loadLibrary("graffitixr")
+            } catch (e: UnsatisfiedLinkError) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    // --- Lifecycle ---
+
     fun initialize() {
         if (nativeHandle == 0L) {
             nativeHandle = initNativeJni()
         }
     }
 
-    /**
-     * Clean up native resources.
-     */
     fun destroy() {
         if (nativeHandle != 0L) {
             destroyNativeJni(nativeHandle)
-            nativeHandle = 0L
+            nativeHandle = 0
         }
     }
 
-    /**
-     * Update camera matrices.
-     */
-    fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
+    // --- Camera & Rendering ---
+
+    fun onSurfaceChanged(width: Int, height: Int) {
         if (nativeHandle != 0L) {
-            updateCameraJni(nativeHandle, viewMtx, projMtx)
-
-            // Update mapping quality metric based on point density
-            val points = getPointCountJni(nativeHandle)
-            _mappingQuality.value = (points / 2000f).coerceAtMost(1.0f)
+            onSurfaceChangedJni(nativeHandle, width, height)
         }
     }
 
-    /**
-     * Pass depth and color data to the SplaTAM engine.
-     * * @param depthBuffer Direct ByteBuffer containing depth data (Float, Meters)
-     * @param colorBuffer Direct ByteBuffer containing RGB data (Float 0..1 or Byte 0..255)
-     * @param width Width of the buffers
-     * @param height Height of the buffers
-     * @param pose 4x4 Model Matrix of the Camera (Column-Major)
-     * @param fov Vertical Field of View in Radians
-     */
+    fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
+        if (nativeHandle != 0L) {
+            updateCameraJni(nativeHandle, viewMatrix, projectionMatrix)
+        }
+    }
+
+    fun draw() {
+        if (nativeHandle != 0L) {
+            drawJni(nativeHandle)
+        }
+    }
+
+    // --- Data Ingestion ---
+
     fun feedDepthData(
         depthBuffer: ByteBuffer,
         colorBuffer: ByteBuffer?,
@@ -74,73 +74,83 @@ class SlamManager {
     ) {
         if (nativeHandle != 0L) {
             feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, stride, pose, fov)
+            val count = getPointCountJni(nativeHandle)
+            _mappingQuality.value = (count / 1000f).coerceIn(0f, 1f)
         }
     }
 
-    /**
-     * Sets the target descriptors (Fingerprint) for Teleological drift correction.
-     * The engine will use these to attempt to snap the coordinate system to the artwork.
-     *
-     * @param descriptorBytes Raw byte array of the ORB descriptors.
-     * @param rows Number of descriptors (features).
-     * @param cols Size of each descriptor (usually 32 for ORB).
-     * @param type OpenCV matrix type (usually CV_8U).
-     */
-    fun setTargetDescriptors(descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int) {
-        if (nativeHandle != 0L) {
-            setTargetDescriptorsJni(nativeHandle, descriptorBytes, rows, cols, type)
-        }
-    }
-
-    /**
-     * Triggers garbage collection on the map.
-     * @param ageThresholdFrames Points older than this many frames will be removed.
-     */
-    fun pruneMap(ageThresholdFrames: Int) {
-        if (nativeHandle != 0L) {
-            pruneMapJni(nativeHandle, ageThresholdFrames)
-        }
-    }
-
-    /**
-     * Trigger OpenGL draw call.
-     */
-    fun draw() {
-        if (nativeHandle != 0L) {
-            drawJni(nativeHandle)
-        }
-    }
-
-    fun onSurfaceChanged(width: Int, height: Int) {
-        if (nativeHandle != 0L) {
-            onSurfaceChangedJni(nativeHandle, width, height)
-        }
-    }
+    // --- Map Management ---
 
     fun saveWorld(path: String): Boolean {
-        return if (nativeHandle != 0L) saveWorld(nativeHandle, path) else false
+        if (nativeHandle == 0L) return false
+        return saveWorld(nativeHandle, path)
     }
 
     fun loadWorld(path: String): Boolean {
-        return if (nativeHandle != 0L) loadWorld(nativeHandle, path) else false
-    }
-
-    fun alignMap(transformMtx: FloatArray) {
-        if (nativeHandle != 0L) alignMapJni(nativeHandle, transformMtx)
+        if (nativeHandle == 0L) return false
+        return loadWorld(nativeHandle, path)
     }
 
     fun clearMap() {
         if (nativeHandle != 0L) {
             clearMapJni(nativeHandle)
-            _mappingQuality.value = 0f
         }
     }
 
-    // --- Native JNI declarations (Private) ---
+    fun pruneMap(ageThreshold: Int) {
+        if (nativeHandle != 0L) {
+            pruneMapJni(nativeHandle, ageThreshold)
+        }
+    }
+
+    fun setTargetDescriptors(descriptors: ByteArray, rows: Int, cols: Int, type: Int) {
+        if (nativeHandle != 0L) {
+            setTargetDescriptorsJni(nativeHandle, descriptors, rows, cols, type)
+        }
+    }
+
+    fun alignMap(transformMatrix: FloatArray) {
+        if (nativeHandle != 0L) {
+            alignMapJni(nativeHandle, transformMatrix)
+        }
+    }
+
+    // --- OpenCV Utilities ---
+
+    fun extractFeatures(bitmap: Bitmap): ByteArray? {
+        return extractFeaturesFromBitmap(bitmap)
+    }
+
+    fun extractFeaturesMetadata(bitmap: Bitmap): IntArray? {
+        return extractFeaturesMeta(bitmap)
+    }
+
+    /**
+     * Runs Canny edge detection on the input bitmap and writes the result to a new Bitmap.
+     */
+    fun detectEdges(bitmap: Bitmap): Bitmap? {
+        if (bitmap.config != Bitmap.Config.ARGB_8888) {
+            // Ensure config matches what JNI expects
+            // In a real app we might copy/convert here, but for now we assume correct input
+        }
+
+        val dst = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        try {
+            detectEdgesJni(bitmap, dst)
+            return dst
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
+
+    // --- Native Definitions ---
+
     private external fun initNativeJni(): Long
     private external fun destroyNativeJni(handle: Long)
+    private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
-
+    private external fun drawJni(handle: Long)
     private external fun feedDepthDataJni(
         handle: Long,
         depthBuffer: ByteBuffer,
@@ -148,32 +158,19 @@ class SlamManager {
         width: Int,
         height: Int,
         stride: Int,
-        pose: FloatArray,
+        poseMatrix: FloatArray,
         fov: Float
     )
-
-    private external fun setTargetDescriptorsJni(
-        handle: Long,
-        descriptorBytes: ByteArray,
-        rows: Int,
-        cols: Int,
-        type: Int
-    )
-
-    private external fun pruneMapJni(handle: Long, ageThreshold: Int)
-
-    private external fun drawJni(handle: Long)
     private external fun getPointCountJni(handle: Long): Int
-    private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun saveWorld(handle: Long, path: String): Boolean
     private external fun loadWorld(handle: Long, path: String): Boolean
-    private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
     private external fun clearMapJni(handle: Long)
+    private external fun pruneMapJni(handle: Long, ageThreshold: Int)
+    private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
+    private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
 
-    // --- Legacy Compatibility Layer (Deprecated) ---
-    fun init(assetManager: AssetManager) = initialize()
-    fun getExternalTextureId(): Int = 0
-    fun update(timestampNs: Long, position: FloatArray, rotation: FloatArray) { }
-    fun draw(renderPointCloud: Boolean) = draw()
-    fun reset() { destroy(); initialize() }
+    // Stateless Utilities
+    private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?
+    private external fun extractFeaturesMeta(bitmap: Bitmap): IntArray?
+    private external fun detectEdgesJni(src: Bitmap, dst: Bitmap)
 }

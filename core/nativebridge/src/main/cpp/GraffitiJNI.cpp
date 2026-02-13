@@ -7,30 +7,62 @@
 #include <opencv2/features2d.hpp>
 #include "MobileGS.h"
 
+// --- Helper Functions ---
+
 inline MobileGS* getEngine(jlong handle) {
     return reinterpret_cast<MobileGS*>(handle);
 }
 
-// Helper: Bitmap -> cv::Mat (Grayscale)
-bool bitmapToGrayscaleMat(JNIEnv *env, jobject bitmap, cv::Mat &dst) {
+// Bitmap -> cv::Mat (RGBA or Gray)
+bool bitmapToMat(JNIEnv *env, jobject bitmap, cv::Mat &dst, bool needGray) {
     AndroidBitmapInfo info;
     void *pixels = nullptr;
 
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) return false;
     if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return false;
+
     if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) return false;
 
     // Create Mat from raw pixels (RGBA)
     cv::Mat src(info.height, info.width, CV_8UC4, pixels);
 
-    // Convert to Grayscale
-    cv::cvtColor(src, dst, cv::COLOR_RGBA2GRAY);
+    if (needGray) {
+        cv::cvtColor(src, dst, cv::COLOR_RGBA2GRAY);
+    } else {
+        src.copyTo(dst);
+    }
+
+    AndroidBitmap_unlockPixels(env, bitmap);
+    return true;
+}
+
+// cv::Mat -> Bitmap (Writes into existing bitmap)
+bool matToBitmap(JNIEnv *env, const cv::Mat &src, jobject bitmap) {
+    AndroidBitmapInfo info;
+    void *pixels = nullptr;
+
+    if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) return false;
+    if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return false;
+
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) return false;
+
+    cv::Mat dst(info.height, info.width, CV_8UC4, pixels);
+
+    if (src.type() == CV_8UC1) {
+        cv::cvtColor(src, dst, cv::COLOR_GRAY2RGBA);
+    } else if (src.type() == CV_8UC3) {
+        cv::cvtColor(src, dst, cv::COLOR_BGR2RGBA);
+    } else if (src.type() == CV_8UC4) {
+        src.copyTo(dst);
+    }
 
     AndroidBitmap_unlockPixels(env, bitmap);
     return true;
 }
 
 extern "C" {
+
+// --- Engine Lifecycle ---
 
 JNIEXPORT jlong JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
@@ -46,11 +78,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyNativeJni(JNIEnv 
     }
 }
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
-        JNIEnv *env, jobject thiz, jlong handle, jfloatArray viewMtx, jfloatArray projMtx) {
-    if (handle == 0) return;
+// --- Camera & Rendering ---
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
+    if (handle == 0) return;
+    getEngine(handle)->onSurfaceChanged(width, height);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray viewMtx, jfloatArray projMtx) {
+    if (handle == 0) return;
     if (env->GetArrayLength(viewMtx) < 16 || env->GetArrayLength(projMtx) < 16) return;
 
     jfloat* view = env->GetFloatArrayElements(viewMtx, nullptr);
@@ -65,27 +103,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
-        JNIEnv *env, jobject thiz,
-        jlong handle,
-        jobject depthBuffer,
-        jobject colorBuffer,
-        jint width, jint height,
-        jint stride,
-        jfloatArray poseMatrix,
-        jfloat fov) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_drawJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    getEngine(handle)->draw();
+}
 
+// --- Data Ingestion ---
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject depthBuffer, jobject colorBuffer, jint width, jint height, jint stride, jfloatArray poseMatrix, jfloat fov) {
     if (handle == 0) return;
 
     auto* depthData = (uint16_t*)env->GetDirectBufferAddress(depthBuffer);
-    jlong capacity = env->GetDirectBufferCapacity(depthBuffer);
-
-    if (depthData && capacity >= 0) {
-        if ((long)height * stride > capacity) {
-            return;
-        }
-    }
-
     uint8_t* colorData = nullptr;
     if (colorBuffer != nullptr) {
         colorData = (uint8_t*)env->GetDirectBufferAddress(colorBuffer);
@@ -101,13 +130,64 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
     if (pose) env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
 }
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(
-        JNIEnv *env, jobject thiz,
-        jlong handle,
-        jbyteArray descriptorBytes,
-        jint rows, jint cols, jint type) {
+// --- Map Management ---
 
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
+    const char *nativePath = env->GetStringUTFChars(path, 0);
+    if (!nativePath) return false;
+
+    bool result = getEngine(handle)->saveModel(std::string(nativePath));
+
+    env->ReleaseStringUTFChars(path, nativePath);
+    return result;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
+    const char *nativePath = env->GetStringUTFChars(path, 0);
+    if (!nativePath) return false;
+
+    bool result = getEngine(handle)->loadModel(std::string(nativePath));
+
+    env->ReleaseStringUTFChars(path, nativePath);
+    return result;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMapJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    getEngine(handle)->clear();
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_pruneMapJni(JNIEnv *env, jobject thiz, jlong handle, jint ageThreshold) {
+    if (handle == 0) return;
+    getEngine(handle)->pruneMap(ageThreshold);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return 0;
+    return getEngine(handle)->getSplatCount();
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transformMtx) {
+    if (handle == 0) return;
+    if (env->GetArrayLength(transformMtx) < 16) return;
+
+    jfloat* transform = env->GetFloatArrayElements(transformMtx, nullptr);
+    if (transform) {
+        getEngine(handle)->alignMap(transform);
+        env->ReleaseFloatArrayElements(transformMtx, transform, 0);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(JNIEnv *env, jobject thiz, jlong handle, jbyteArray descriptorBytes, jint rows, jint cols, jint type) {
     if (handle == 0) return;
 
     jbyte* data = env->GetByteArrayElements(descriptorBytes, nullptr);
@@ -118,75 +198,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(
     }
 }
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_pruneMapJni(JNIEnv *env, jobject thiz, jlong handle, jint ageThreshold) {
-    if (handle == 0) return;
-    getEngine(handle)->pruneMap(ageThreshold);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_drawJni(JNIEnv *env, jobject thiz, jlong handle) {
-    if (handle == 0) return;
-    getEngine(handle)->draw();
-}
-
-JNIEXPORT jint JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz, jlong handle) {
-    if (handle == 0) return 0;
-    return getEngine(handle)->getSplatCount();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
-    if (handle == 0) return;
-    getEngine(handle)->onSurfaceChanged(width, height);
-}
-
-JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
-    if (handle == 0) return false;
-    const char *nativePath = env->GetStringUTFChars(path, 0);
-    if (!nativePath) return false;
-    bool result = getEngine(handle)->saveModel(std::string(nativePath));
-    env->ReleaseStringUTFChars(path, nativePath);
-    return result;
-}
-
-JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
-    if (handle == 0) return false;
-    const char *nativePath = env->GetStringUTFChars(path, 0);
-    if (!nativePath) return false;
-    bool result = getEngine(handle)->loadModel(std::string(nativePath));
-    env->ReleaseStringUTFChars(path, nativePath);
-    return result;
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transformMtx) {
-    if (handle == 0) return;
-    if (env->GetArrayLength(transformMtx) < 16) return;
-    jfloat* transform = env->GetFloatArrayElements(transformMtx, nullptr);
-    if (transform) {
-        getEngine(handle)->alignMap(transform);
-        env->ReleaseFloatArrayElements(transformMtx, transform, 0);
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMapJni(JNIEnv *env, jobject thiz, jlong handle) {
-    if (handle == 0) return;
-    getEngine(handle)->clear();
-}
+// --- OpenCV Utilities (Integrated) ---
 
 JNIEXPORT jbyteArray JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesFromBitmap(JNIEnv *env, jobject thiz, jobject bitmap) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesFromBitmap(JNIEnv *env, jobject thiz, jobject bitmap) {
     cv::Mat gray;
-    if (!bitmapToGrayscaleMat(env, bitmap, gray)) return nullptr;
+    if (!bitmapToMat(env, bitmap, gray, true)) return nullptr;
 
     auto orb = cv::ORB::create();
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
+
     orb->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
 
     if (descriptors.empty()) return nullptr;
@@ -194,17 +216,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesFromBitma
     int size = descriptors.total() * descriptors.elemSize();
     jbyteArray result = env->NewByteArray(size);
     env->SetByteArrayRegion(result, 0, size, (jbyte*)descriptors.data);
+
     return result;
 }
 
 JNIEXPORT jintArray JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesMeta(JNIEnv *env, jobject thiz, jobject bitmap) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesMeta(JNIEnv *env, jobject thiz, jobject bitmap) {
     cv::Mat gray;
-    if (!bitmapToGrayscaleMat(env, bitmap, gray)) return nullptr;
+    if (!bitmapToMat(env, bitmap, gray, true)) return nullptr;
 
     auto orb = cv::ORB::create();
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
+
     orb->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
 
     if (descriptors.empty()) return nullptr;
@@ -214,20 +238,27 @@ Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesMeta(JNIE
     meta[0] = descriptors.rows;
     meta[1] = descriptors.cols;
     meta[2] = descriptors.type();
+
     env->SetIntArrayRegion(result, 0, 3, meta);
+
     return result;
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_init(JNIEnv *env, jobject thiz, jint width, jint height) {}
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_detectEdgesJni(JNIEnv *env, jobject thiz, jobject srcBitmap, jobject dstBitmap) {
+    cv::Mat gray;
+    if (!bitmapToMat(env, srcBitmap, gray, true)) return;
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_cleanup(JNIEnv *env, jobject thiz) {}
+    cv::Mat edges;
+    // Canny constants: 50, 150 are standard "reasonable" defaults.
+    // In a real post-modern tool, these would be variables, but for now, we hardcode.
+    cv::Canny(gray, edges, 50, 150);
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_update(JNIEnv *env, jobject thiz, jlong matAddr, jfloatArray viewMatrix, jfloatArray projMatrix) {}
+    // Invert: Edges (white) become black, Background (black) becomes white.
+    // Better for "sketching" on walls.
+    cv::bitwise_not(edges, edges);
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_setTargetDescriptors(JNIEnv *env, jobject thiz, jbyteArray descriptorBytes, jint rows, jint cols, jint type) {}
+    matToBitmap(env, edges, dstBitmap);
+}
 
 } // extern "C"

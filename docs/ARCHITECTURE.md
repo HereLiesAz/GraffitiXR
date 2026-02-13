@@ -1,99 +1,86 @@
-# GraffitiXR Architecture
+# GRAFFITIXR ARCHITECTURE
 
-GraffitiXR uses a **Multi-Module Clean Architecture** designed for scalability, build performance, and separation of concerns.
+## Philosophy
+GraffitiXR is a "Thick Client" implementation. The logic lives on the device. The cloud is non-existent.
 
-## High-Level Overview
-
-The application is divided into three layers:
-
-1.  **App Layer (`:app`):** The integration point. It contains the `MainActivity`, dependency injection (Hilt) setup, and the global Navigation Graph.
-2.  **Feature Layer (`:feature`):** Contains the screens and business logic for specific user flows. Features do *not* depend on each other directly.
-3.  **Core Layer (`:core`):** Contains shared code, data models, design system, and native libraries.
-
-## Module Graph
+## High-Level Structure
+The application follows a standard **MVVM (Model-View-ViewModel)** pattern on the Android side, bridging into a **Custom Engine (MobileGS)** for the heavy lifting.
 
 ```mermaid
 graph TD
-    app --> feature:ar
-    app --> feature:editor
-    app --> feature:dashboard
-
-    feature:ar --> core:common
-    feature:ar --> core:domain
-    feature:ar --> core:design
-    feature:ar --> core:native
-
-    feature:editor --> core:common
-    feature:editor --> core:domain
-    feature:editor --> core:design
-    feature:editor --> core:native
-
-    feature:dashboard --> core:common
-    feature:dashboard --> core:domain
-    feature:dashboard --> core:design
-    feature:dashboard --> core:data
-
-    core:data --> core:domain
-    core:data --> core:common
-
-    core:native --> core:domain
-    core:native --> core:common (Optional)
-    
-    core:design --> core:common
-    
-    core:domain --> core:common
+    UI[Compose UI] --> VM[ViewModels]
+    VM --> SM[SlamManager]
+    SM -- JNI Boundary --> CPP[GraffitiJNI.cpp]
+    CPP --> MGS[MobileGS Engine]
+    CPP --> CV[OpenCV Utils]
 ```
+The Native Bridge (Unified)
+Previously a split system, the native bridge is now consolidated into a single pipeline.
 
-## Module Descriptions
+1. The Kotlin Gatekeeper: SlamManager
+   Location: core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt
 
-### `:app`
-*   **Role:** Application Entry Point.
-*   **Key Components:** `GraffitiApplication`, `MainActivity`, `MainViewModel` (Global State), `NavGraph`.
+Role: The Singleton source of truth. It manages the C++ pointer (nativeHandle).
 
-### `:feature:ar`
-*   **Role:** Augmented Reality experience.
-*   **Key Components:** `ArView` (Composable), `ArRenderer` (GLSurfaceView), `ArViewModel`, `TargetCreationFlow`.
-*   **Dependencies:** ARCore, OpenGL, OpenCV (via Native).
+Responsibility:
 
-### `:feature:editor`
-*   **Role:** Image manipulation and composition.
-*   **Key Components:** `EditorUi` (Composable), `EditorViewModel`, `ImageProcessor` (OpenCV).
-*   **Screens:** Mockup, Overlay, Trace.
+Initializing/Destroying the C++ engine.
 
-### `:feature:dashboard`
-*   **Role:** Project management and settings.
-*   **Key Components:** `ProjectLibraryScreen`, `SettingsScreen`, `DashboardViewModel`.
-*   **Dependencies:** `core:data` (for Persistence).
+Feeding Camera Frames (Depth/Color) to the SLAM system.
 
-### `:core:data`
-*   **Role:** Data persistence and repository implementation.
-*   **Key Components:** `ProjectRepositoryImpl`, `ProjectManager` (File I/O).
+Exposing StateFlows (e.g., mappingQuality) to the UI.
 
-### `:core:domain`
-*   **Role:** Pure business logic and data models.
-*   **Key Components:** `Project` (Model), `GraffitiProject` (Model), `ProjectRepository` (Interface).
+Providing utility functions for OpenCV features (ORB extraction).
 
-### `:core:common`
-*   **Role:** Universal utilities.
-*   **Key Components:** `LocationTracker`, `DispatcherProvider`, `UiState` (Shared Model).
+2. The C++ Implementation: GraffitiJNI.cpp
+   Location: core/nativebridge/src/main/cpp/GraffitiJNI.cpp
 
-### `:core:design`
-*   **Role:** Design System.
-*   **Key Components:** `AzNavRail`, `Theme`, `Typography`, Shared Components (`Knob`, `InfoDialog`).
+Role: The translator.
 
-### `:core:native`
-*   **Role:** High-performance C++ code.
-*   **Key Components:** `MobileGS` (Engine), `GraffitiJNI` (Bridge).
+Responsibility:
 
-## State Management
+Converts Java objects (ByteBuffers, Arrays, Bitmaps) into C++ structures (cv::Mat, pointers).
 
-Each feature manages its own state using `StateFlow` in a `ViewModel`.
-*   **Unidirectional Data Flow:** UI events -> ViewModel -> State Update -> UI Recomposition.
-*   **Persistence:** `EditorViewModel` and `DashboardViewModel` interact with `ProjectRepository` to save/load data.
+Calls methods on the MobileGS instance.
 
-## Native Integration
+3. The Engine: MobileGS
+   Location: core/nativebridge/src/main/cpp/MobileGS.h
 
-The `MobileGS` engine is written in C++17 and accessed via JNI.
-*   **Rendering:** Uses OpenGL ES 3.0 directly.
-*   **Mapping:** Performs SLAM and Gaussian Splatting logic.
-*   **Data Transfer:** Uses direct `ByteBuffer` passing for efficiency.
+Role: The brain.
+
+Responsibility:
+
+Tracking: Teleological SLAM (tracking against the future painting).
+
+Mapping: Gaussian Splatting storage and rendering.
+
+Keyframing: Managing the Voxel Confidence Map.
+
+Data Flow
+The AR Loop
+ARCore provides a Frame.
+
+ArRenderer extracts the Image (YUV/Depth) and Camera Pose.
+
+SlamManager.feedDepthData() is called with raw ByteBuffers.
+
+JNI locks the buffers and passes pointers to MobileGS.
+
+MobileGS updates the splats.
+
+ArRenderer calls SlamManager.draw().
+
+MobileGS renders the splats directly to the GL Surface.
+
+The Editor Loop (Image Processing)
+User selects an image.
+
+EditorViewModel loads the Bitmap.
+
+SlamManager.extractFeatures(bitmap) is called.
+
+JNI converts Bitmap to cv::Mat (Grayscale).
+
+OpenCV runs ORB detection.
+
+Descriptors are returned as ByteArray to Kotlin.

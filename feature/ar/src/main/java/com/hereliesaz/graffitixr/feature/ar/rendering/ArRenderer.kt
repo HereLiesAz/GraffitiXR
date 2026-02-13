@@ -20,10 +20,10 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
-import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.abs
@@ -47,7 +47,8 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
-    private val yuvToRgbConverter = YuvToRgbConverter(context)
+
+    // REMOVED: YuvToRgbConverter (Too slow for main thread)
 
     // State
     var showPointCloud = true
@@ -61,11 +62,14 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
     private var lastKeyframePose: Pose? = null
     private var lastKeyframeTime = 0L
 
+    // Concurrency Lock
+    private val isProcessingFrame = AtomicBoolean(false)
+
     // Config: Minimum changes required to trigger a new scan
     private val MIN_TRANSLATION_METERS = 0.1f // 10cm
     private val MIN_ROTATION_DEGREES = 10.0f // 10 degrees
-    private val MIN_INTERVAL_MS = 500L // Max 2 fps for scanning to prevent buffer starvation
-    private val MAX_INTERVAL_MS = 3000L // Force a scan every 3s even if stationary
+    private val MIN_INTERVAL_MS = 500L // Max 2 fps for scanning
+    private val MAX_INTERVAL_MS = 3000L // Force a scan every 3s
 
     // Capture
     private var pendingCaptureCallback: ((Bitmap) -> Unit)? = null
@@ -74,12 +78,6 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
     private val viewMatrix = FloatArray(16)
     private val projectionMatrix = FloatArray(16)
     private val modelMatrix = FloatArray(16)
-
-    // Buffers for Color Splats
-    private val COLOR_WIDTH = 320
-    private val COLOR_HEIGHT = 240
-    private var colorBitmap: Bitmap? = null
-    private var colorBuffer: ByteBuffer? = null
 
     // Lifecycle
     override fun onResume(owner: LifecycleOwner) {
@@ -127,11 +125,6 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
             pointCloudRenderer.createOnGlThread(context)
 
             slamManager.initialize()
-
-            // Init buffers
-            colorBitmap = Bitmap.createBitmap(COLOR_WIDTH, COLOR_HEIGHT, Bitmap.Config.ARGB_8888)
-            colorBuffer = ByteBuffer.allocateDirect(COLOR_WIDTH * COLOR_HEIGHT * 4).order(ByteOrder.nativeOrder())
-
             isInitialized = true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to init AR renderers", e)
@@ -179,11 +172,11 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
                 val currentPose = camera.pose
                 val now = System.currentTimeMillis()
 
-                if (shouldCaptureKeyframe(currentPose, now)) {
+                // Only attempt to process if we aren't already busy AND it's a keyframe
+                if (!isProcessingFrame.get() && shouldCaptureKeyframe(currentPose, now)) {
                     lastKeyframePose = currentPose
                     lastKeyframeTime = now
 
-                    // Periodic pruning to manage memory
                     if (Math.random() < 0.05) {
                         slamManager.pruneMap(300)
                     }
@@ -193,7 +186,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
                     val valY = projectionMatrix[5]
                     val fov = if (valY != 0f) (2.0 * atan(1.0 / valY)).toFloat() else 1.0f
 
-                    processDepthAndColor(frame, modelMatrix, fov)
+                    processDepth(frame, modelMatrix, fov)
                 }
             }
 
@@ -215,13 +208,9 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         val lastPose = lastKeyframePose ?: return true
         val timeDelta = now - lastKeyframeTime
 
-        // Rate Limiter
         if (timeDelta < MIN_INTERVAL_MS) return false
-
-        // Timeout
         if (timeDelta > MAX_INTERVAL_MS) return true
 
-        // Translation Delta
         val dx = currentPose.tx() - lastPose.tx()
         val dy = currentPose.ty() - lastPose.ty()
         val dz = currentPose.tz() - lastPose.tz()
@@ -229,7 +218,6 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
 
         if (distance > MIN_TRANSLATION_METERS) return true
 
-        // Rotation Delta
         val dot = (currentPose.qx() * lastPose.qx() +
                 currentPose.qy() * lastPose.qy() +
                 currentPose.qz() * lastPose.qz() +
@@ -244,9 +232,11 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
         return false
     }
 
-    private fun processDepthAndColor(frame: Frame, pose: FloatArray, fov: Float) {
+    private fun processDepth(frame: Frame, pose: FloatArray, fov: Float) {
+        // Lock to ensure we don't pile up requests
+        isProcessingFrame.set(true)
+
         var depthImage: Image? = null
-        var cameraImage: Image? = null
 
         try {
             depthImage = try {
@@ -255,20 +245,11 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
                 null
             }
 
-            cameraImage = try {
-                frame.acquireCameraImage()
-            } catch (e: NotYetAvailableException) {
-                null
-            }
+            // CRITICAL CHANGE: We do NOT acquire the Camera Image here.
+            // Converting it on CPU is too slow.
+            // We pass NULL to feedDepthData for colorBuffer.
 
-            if (depthImage != null && cameraImage != null) {
-                // 1. Process Color
-                yuvToRgbConverter.yuvToRgb(cameraImage, colorBitmap!!)
-
-                colorBuffer?.rewind()
-                colorBitmap!!.copyPixelsToBuffer(colorBuffer!!)
-
-                // 2. Process Depth
+            if (depthImage != null) {
                 val plane = depthImage.planes[0]
                 val depthBuffer = plane.buffer
                 val width = depthImage.width
@@ -277,7 +258,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
 
                 slamManager.feedDepthData(
                     depthBuffer = depthBuffer,
-                    colorBuffer = colorBuffer,
+                    colorBuffer = null, // Disable color to prevent CPU starvation
                     width = width,
                     height = height,
                     stride = stride,
@@ -286,11 +267,11 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, Default
                 )
             }
         } catch (e: Exception) {
-            // Log.e(TAG, "Error processing depth/color", e)
+            Log.e(TAG, "Error processing depth", e)
         } finally {
-            // CRITICAL: Ensure images are released to prevent "cpu_image_manager" errors
             depthImage?.close()
-            cameraImage?.close()
+            // Release Lock
+            isProcessingFrame.set(false)
         }
     }
 
