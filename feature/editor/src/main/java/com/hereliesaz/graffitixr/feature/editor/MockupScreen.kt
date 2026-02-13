@@ -49,9 +49,16 @@ fun MockupScreen(
                         // Background logic
                     } else if (activeLayer != null && !uiState.isImageLocked) {
                         viewModel.onGestureStart()
-                        viewModel.onScaleChanged(zoom)
-                        viewModel.onOffsetChanged(pan)
-                        viewModel.onRotationZChanged(rotation)
+                        val newScale = activeLayer.scale * zoom
+                        val newOffset = activeLayer.offset + pan
+                        val newRotationZ = activeLayer.rotationZ + rotation
+                        viewModel.setLayerTransform(
+                            scale = newScale,
+                            offset = newOffset,
+                            rx = activeLayer.rotationX,
+                            ry = activeLayer.rotationY,
+                            rz = newRotationZ
+                        )
                     }
                 }
             }
