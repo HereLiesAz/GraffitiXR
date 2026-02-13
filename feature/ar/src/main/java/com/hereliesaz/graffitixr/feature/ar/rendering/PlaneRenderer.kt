@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
 import android.opengl.GLES20
+import android.opengl.GLES30
 import android.opengl.Matrix
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
@@ -35,8 +36,11 @@ class PlaneRenderer {
      * Must be called on the OpenGL thread, typically in onSurfaceCreated().
      */
     fun createOnGlThread(context: Context) {
-        val vertexShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_VERTEX_SHADER, "shaders/plane.vert")
-        val passthroughShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_FRAGMENT_SHADER, "shaders/plane.frag")
+        val vertexShaderCode = context.assets.open("shaders/plane.vert").bufferedReader().use { it.readText() }
+        val fragmentShaderCode = context.assets.open("shaders/plane.frag").bufferedReader().use { it.readText() }
+
+        val vertexShader = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_VERTEX_SHADER, vertexShaderCode)
+        val passthroughShader = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_FRAGMENT_SHADER, fragmentShaderCode)
 
         planeProgram = GLES20.glCreateProgram()
         GLES20.glAttachShader(planeProgram, vertexShader)

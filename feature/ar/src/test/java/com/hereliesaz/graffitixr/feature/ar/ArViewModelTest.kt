@@ -92,11 +92,11 @@ class ArViewModelTest {
     fun `updateTrackingState updates target detected`() = runTest {
         assertEquals(false, viewModel.uiState.value.isTargetDetected)
 
-        viewModel.updateTrackingState(true, 1.0f)
+        viewModel.updateTrackingState("Tracking", 1, 100)
         assertEquals(true, viewModel.uiState.value.isTargetDetected)
         assertEquals("Tracking", viewModel.uiState.value.trackingState)
 
-        viewModel.updateTrackingState(false, 0.0f)
+        viewModel.updateTrackingState("Searching", 0, 0)
         assertEquals(false, viewModel.uiState.value.isTargetDetected)
         assertEquals("Searching", viewModel.uiState.value.trackingState)
     }
