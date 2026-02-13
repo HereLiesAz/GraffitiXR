@@ -35,6 +35,27 @@ The project uses a **Multi-Module Clean Architecture** to enforce separation of 
 3.  **Surveyor:** Photogrammetry data capture (Target Creation Flow).
 4.  **Local-First:** All processing is done on-device using a custom native engine.
 
+## Technical Specifications
+
+### 1. The Teleological Engine (MobileGS)
+We use a custom C++ native engine (`MobileGS`) that implements **Teleological SLAM**.
+* **Standard SLAM** asks: "Where am I based on the past?"
+* **Teleological SLAM** asks: "Where am I based on the future (the art)?"
+* **Capabilities:**
+    * **Drift Correction:** Uses the digital overlay as a "Ground Truth" to correct drift when the physical wall changes.
+    * **Voxel Pruning:** Automatically removes old feature points (bricks/cracks) when they are covered by paint, replacing them with new features from the artwork.
+
+### 2. The Rail (AzNavRail)
+A thumb-driven navigation paradigm designed for one-handed use.
+* **Modes:** AR, Overlay, Mockup, Trace.
+* **Design:** Layer-based editing (Opacity, Blend Modes, Transforms) accessible without blocking the view.
+
+### 3. Architecture
+* **`:core:domain`**: Pure business logic and Repository contracts.
+* **`:core:data`**: Disk I/O and JSON Serialization.
+* **`:core:native`**: C++17 Engine + OpenCV.
+* **`:feature:*`**: Jetpack Compose UI.
+
 ## Build Setup
 
 1.  **Prerequisites:** Android Studio (Ladybug+), JDK 17, ARCore-supported device.
