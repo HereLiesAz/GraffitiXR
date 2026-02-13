@@ -1,123 +1,261 @@
 package com.hereliesaz.graffitixr.feature.editor
 
-import android.app.Application
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import androidx.lifecycle.AndroidViewModel
+import androidx.compose.ui.geometry.Offset
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.graffitixr.common.model.BlendMode
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorPanel
+import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.InputStream
+import java.util.UUID
+import javax.inject.Inject
 
 /**
- * ViewModel for the Editor screen.
- * Handles image loading, background removal, and edge detection.
+ * ViewModel for the Image Editor feature.
+ * Manages layer composition, image adjustments, and transformation gestures.
  */
-class EditorViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class EditorViewModel @Inject constructor(
+    private val projectRepository: ProjectRepository,
+    @ApplicationContext private val context: Context
+) : ViewModel() {
 
+    // Internal mutable state
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
-    // Helpers
-    private val backgroundRemover = BackgroundRemover(application)
-    private val slamManager = SlamManager() // Ensure Singleton in DI in real app
+    private val _exportTrigger = MutableStateFlow(false)
+    val exportTrigger: StateFlow<Boolean> = _exportTrigger.asStateFlow()
 
-    fun onImageSelected(uri: Uri) {
+    // Helpers
+    // Instantiate helpers. In a production app, these should likely be injected Singletons.
+    private val backgroundRemover = BackgroundRemover(context)
+    private val slamManager = SlamManager()
+
+    fun setEditorMode(mode: EditorMode) {
+        _uiState.update { it.copy(editorMode = mode) }
+    }
+
+    fun setBackgroundImage(uri: Uri?) {
+        if (uri == null) return
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                _uiState.value = _uiState.value.copy(isLoading = true)
-                val bitmap = loadBitmapFromUri(uri)
-                _uiState.value = _uiState.value.copy(
-                    currentImage = bitmap,
-                    originalImage = bitmap, // Cache original for resets
-                    isLoading = false
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = "Failed to load image: ${e.message}"
+            val bitmap = loadBitmapFromUri(uri)
+            _uiState.update {
+                it.copy(
+                    backgroundImageUri = uri.toString(),
+                    backgroundBitmap = bitmap
                 )
             }
         }
     }
 
+    fun setMapPath(path: String) {
+        _uiState.update { it.copy(mapPath = path) }
+    }
+
+    fun onAddLayer(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val bitmap = loadBitmapFromUri(uri)
+            if (bitmap != null) {
+                val newLayer = Layer(
+                    id = UUID.randomUUID().toString(),
+                    name = "Layer ${_uiState.value.layers.size + 1}",
+                    bitmap = bitmap
+                )
+                _uiState.update {
+                    it.copy(
+                        layers = it.layers + newLayer,
+                        activeLayerId = newLayer.id
+                    )
+                }
+            }
+        }
+    }
+
+    fun onLayerActivated(layerId: String) {
+        _uiState.update { it.copy(activeLayerId = layerId) }
+    }
+
+    fun onLayerReordered(newOrder: List<String>) {
+        _uiState.update { state ->
+            val reordered = newOrder.mapNotNull { id -> state.layers.find { it.id == id } }
+            state.copy(layers = reordered)
+        }
+    }
+
+    fun onLayerRenamed(layerId: String, newName: String) {
+        _uiState.update { state ->
+            val newLayers = state.layers.map {
+                if (it.id == layerId) it.copy(name = newName) else it
+            }
+            state.copy(layers = newLayers)
+        }
+    }
+
+    fun onLayerRemoved(layerId: String) {
+        _uiState.update { state ->
+            val newLayers = state.layers.filter { it.id != layerId }
+            state.copy(layers = newLayers, activeLayerId = if (state.activeLayerId == layerId) null else state.activeLayerId)
+        }
+    }
+
+    fun toggleImageLock() {
+        _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
+    }
+
+    fun toggleHandedness() {
+        _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
+    }
+
+    fun onScaleChanged(scale: Float) {
+        updateActiveLayer { it.copy(scale = it.scale * scale) }
+    }
+
+    fun onOffsetChanged(offset: Offset) {
+        updateActiveLayer { it.copy(offset = it.offset + offset) }
+    }
+
+    fun onRotationZChanged(rotation: Float) {
+        updateActiveLayer { it.copy(rotationZ = it.rotationZ + rotation) }
+    }
+
+    fun onCycleRotationAxis() {
+        _uiState.update {
+            val nextAxis = when(it.activeRotationAxis) {
+                RotationAxis.X -> RotationAxis.Y
+                RotationAxis.Y -> RotationAxis.Z
+                RotationAxis.Z -> RotationAxis.X
+            }
+            it.copy(activeRotationAxis = nextAxis)
+        }
+    }
+
+    fun onGestureStart() {
+        _uiState.update { it.copy(gestureInProgress = true) }
+    }
+
+    fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
+        updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
+        _uiState.update { it.copy(gestureInProgress = false) }
+    }
+
+    // --- Image Processing ---
+
     fun onRemoveBackgroundClicked() {
-        val current = _uiState.value.currentImage ?: return
+        val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
+
+        _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(Dispatchers.Default) {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            // Correct usage: call instance method on the backgroundRemover instance
+            val result = backgroundRemover.removeBackground(activeLayer.bitmap)
+            val segmented = result.getOrNull()
 
-            val result = backgroundRemover.removeBackground(current)
-
-            result.onSuccess { segmented ->
-                _uiState.value = _uiState.value.copy(
-                    currentImage = segmented,
-                    isLoading = false
-                )
-            }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(
+            _uiState.update { state ->
+                state.copy(
                     isLoading = false,
-                    errorMessage = "Background removal failed: ${error.message}"
+                    layers = state.layers.map {
+                        // Ensure 'segmented' is a valid Bitmap before copying
+                        if (it.id == activeLayer.id && segmented != null) it.copy(bitmap = segmented) else it
+                    }
                 )
             }
         }
     }
 
     fun onLineDrawingClicked() {
-        val current = _uiState.value.currentImage ?: return
+        val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
+
+        _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(Dispatchers.Default) {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            // Use SlamManager for JNI edge detection
+            val edged = slamManager.detectEdges(activeLayer.bitmap)
 
-            // Offload JNI call to background thread to avoid UI stutter
-            val edgeBitmap = slamManager.detectEdges(current)
-
-            if (edgeBitmap != null) {
-                _uiState.value = _uiState.value.copy(
-                    currentImage = edgeBitmap,
-                    isLoading = false
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(
+            _uiState.update { state ->
+                state.copy(
                     isLoading = false,
-                    errorMessage = "Edge detection failed."
+                    layers = state.layers.map {
+                        if (it.id == activeLayer.id && edged != null) it.copy(bitmap = edged) else it
+                    }
                 )
             }
         }
     }
 
-    fun onResetImage() {
-        _uiState.value = _uiState.value.copy(
-            currentImage = _uiState.value.originalImage
-        )
+    // --- Panels ---
+
+    fun onAdjustClicked() {
+        _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) }
+    }
+
+    fun onColorClicked() {
+        _uiState.update { it.copy(activePanel = EditorPanel.COLOR) }
+    }
+
+    fun onCycleBlendMode() {
+        updateActiveLayer {
+            val modes = BlendMode.entries
+            val nextMode = modes[(it.blendMode.ordinal + 1) % modes.size]
+            it.copy(blendMode = nextMode)
+        }
+    }
+
+    // --- Export & Save ---
+
+    fun exportProject() {
+        _exportTrigger.value = true
+        _uiState.update { it.copy(hideUiForCapture = true) }
+    }
+
+    fun onExportComplete() {
+        _exportTrigger.value = false
+        _uiState.update { it.copy(hideUiForCapture = false) }
     }
 
     fun saveProject() {
-        // TODO: Map EditorUiState back to GraffitiProject and save
-        // This likely requires a Database/Repository which is outside the scope of "Wire the Editor"
+        viewModelScope.launch {
+            // TODO: Mapping logic to save to Repository
+        }
     }
 
-    fun onDismissError() {
-        _uiState.value = _uiState.value.copy(errorMessage = null)
+    // --- Utils ---
+
+    private fun updateActiveLayer(transform: (Layer) -> Layer) {
+        _uiState.update { state ->
+            val activeId = state.activeLayerId ?: return@update state
+            val newLayers = state.layers.map {
+                if (it.id == activeId) transform(it) else it
+            }
+            state.copy(layers = newLayers)
+        }
     }
 
     private fun loadBitmapFromUri(uri: Uri): Bitmap? {
-        val context = getApplication<Application>().applicationContext
-        val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-        return inputStream?.use {
-            BitmapFactory.decodeStream(it)
+        return try {
+            val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+            inputStream?.use { BitmapFactory.decodeStream(it) }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 }
-
-data class EditorUiState(
-    val currentImage: Bitmap? = null,
-    val originalImage: Bitmap? = null,
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null
-)
