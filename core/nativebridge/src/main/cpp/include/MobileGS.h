@@ -2,6 +2,8 @@
 #define MOBILE_GS_H
 
 #include <vector>
+#include <string>
+#include <unordered_map>
 #include <mutex>
 #include <memory>
 #include <unordered_map>

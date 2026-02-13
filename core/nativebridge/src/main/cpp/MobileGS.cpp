@@ -109,10 +109,12 @@ MobileGS::MobileGS() : mIsInitialized(false), mHasTarget(false), mFrameCount(0),
 
     LOGI("MobileGS Constructor");
 }
+)";
 
-MobileGS::~MobileGS() {
-    Cleanup();
-}
+const char* FRAGMENT_SHADER = R"(#version 300 es
+precision mediump float;
+in vec4 vColor;
+out vec4 FragColor;
 
 void MobileGS::Initialize(int width, int height) {
     mWidth = width;
@@ -156,8 +158,11 @@ void MobileGS::SetTargetDescriptors(const cv::Mat& descriptors) {
     LOGD("Target Descriptors Set: %d features. Teleology Active.", mTargetDescriptors.rows);
 }
 
-bool MobileGS::IsTrackingTarget() const {
-    return mHasTarget;
+// Matrix Mul Helper
+void mat4_mul_vec3(const float* mat, float x, float y, float z, float& out_x, float& out_y, float& out_z) {
+    out_x = mat[0] * x + mat[4] * y + mat[8] * z + mat[12];
+    out_y = mat[1] * x + mat[5] * y + mat[9] * z + mat[13];
+    out_z = mat[2] * x + mat[6] * y + mat[10] * z + mat[14];
 }
 
 void MobileGS::Update(const cv::Mat& cameraFrame, const float* viewMatrix, const float* projectionMatrix) {
@@ -170,62 +175,100 @@ void MobileGS::Update(const cv::Mat& cameraFrame, const float* viewMatrix, const
     ProcessFrame(cameraFrame);
 }
 
-void MobileGS::ProcessFrame(const cv::Mat& frame) {
-    std::vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
-
-    mOrb->detectAndCompute(frame, cv::noArray(), keypoints, descriptors);
-
-    if (descriptors.empty()) return;
-
-    MatchAndFuse(keypoints, descriptors);
+MobileGS::~MobileGS() {
+    clear();
+    if (mProgram != 0) {
+        glDeleteProgram(mProgram);
+        mProgram = 0;
+    }
 }
 
-void MobileGS::MatchAndFuse(const std::vector<cv::KeyPoint>& curKeypoints, const cv::Mat& curDescriptors) {
-    std::lock_guard<std::mutex> lock(mMapMutex);
+void MobileGS::initialize() {
+    LOGI("MobileGS Initialize");
+    if (mProgram == 0) {
+        mProgram = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
+        mLocMVP = glGetUniformLocation(mProgram, "uMVP");
+        mLocPointSize = glGetUniformLocation(mProgram, "uPointSize");
+    }
+}
 
-    // Initialization: If map is empty, create initial cloud on a virtual plane
-    if (mMapDescriptors.empty()) {
-        mMapKeypoints = curKeypoints;
-        curDescriptors.copyTo(mMapDescriptors);
+/**
+ * Projects depth pixels into 3D world space and adds them to the point cloud.
+ * Currently uses a naive "add everything" approach with spatial hashing in Chunks.
+ */
+void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
+                             int width, int height, int stride, const float* cameraPose, float fov) {
+    if (!depthPixels) return;
 
-        // Promote to 3D: Assume flat wall parallel to initial camera frame
-        mMapPoints3D.reserve(curKeypoints.size());
-        for (const auto& kp : curKeypoints) {
-            mMapPoints3D.push_back(UnprojectPoint(kp, DEFAULT_WALL_DEPTH));
+    // Intrinsics
+    // Assuming vertical FOV and aspect ratio
+    float aspect = (float)width / (float)height;
+    // fov is vertical fov in radians
+    // fy = h / (2 * tan(fov/2))
+    float fy = height / (2.0f * tan(fov / 2.0f));
+    float fx = fy; // Square pixels? width / (2 * tan(hfov/2))?
+    // If we assume same focal length for x and y
+    float cx = width / 2.0f;
+    float cy = height / 2.0f;
+
+    std::vector<Splat> newSplats;
+    // stride is in bytes. DEPTH16 is 2 bytes/pixel.
+    // So row stride in pixels (shorts) is stride / 2.
+    int rowStrideShorts = stride / 2;
+
+    for (int v = 0; v < height; v += SAMPLE_STRIDE) {
+        for (int u = 0; u < width; u += SAMPLE_STRIDE) {
+            uint16_t d_raw = depthPixels[v * rowStrideShorts + u];
+            if (d_raw == 0) continue;
+
+            float z_local = d_raw * 0.001f;
+            if (z_local < MIN_DEPTH || z_local > MAX_DEPTH) continue;
+
+            float x_local = (u - cx) * z_local / fx;
+            float y_local = (v - cy) * z_local / fy;
+
+            float x_world, y_world, z_world;
+            mat4_mul_vec3(cameraPose, x_local, y_local, -z_local, x_world, y_world, z_world);
+
+            Splat s;
+            s.x = x_world;
+            s.y = y_world;
+            s.z = z_world;
+            s.r = 0; s.g = 200; s.b = 128; // Tealish
+            s.confidence = 1.0f;
+            s.radius = 0.02f;
+            s.luminance = 0.5f;
+
+            newSplats.push_back(s);
         }
-        return;
     }
 
-    // --- 1. TARGET MATCHING (The Evolution Check) ---
-    std::vector<bool> isTargetFeature(curKeypoints.size(), false);
-    std::vector<int> targetMatchesIndices;
-
-    if (mHasTarget) {
-        std::vector<std::vector<cv::DMatch>> target_knn;
-        mMatcher->knnMatch(curDescriptors, mTargetDescriptors, target_knn, 2);
-
-        for (size_t i = 0; i < target_knn.size(); i++) {
-            if (target_knn[i].size() >= 2 &&
-                    target_knn[i][0].distance < RATIO_THRESH * target_knn[i][1].distance) {
-
-                int queryIdx = target_knn[i][0].queryIdx;
-                isTargetFeature[queryIdx] = true;
-                targetMatchesIndices.push_back(queryIdx);
-            }
-        }
+    // Add to chunk
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+    ChunkKey key = {0,0,0}; // Single chunk for now
+    if (mChunks.find(key) == mChunks.end()) {
+        mChunks[key] = Chunk();
     }
+
+    // Simple append with limit
+    Chunk& chunk = mChunks[key];
+    if (chunk.splatCount + newSplats.size() < MAX_SPLATS) {
+        chunk.splats.insert(chunk.splats.end(), newSplats.begin(), newSplats.end());
+        chunk.splatCount += newSplats.size();
+        chunk.isDirty = true;
+    }
+}
 
     // --- 2. MAP MATCHING (Localization) ---
     std::vector<std::vector<cv::DMatch>> map_knn;
     mMatcher->knnMatch(curDescriptors, mMapDescriptors, map_knn, 2);
 
-    std::vector<bool> isMapFeature(curKeypoints.size(), false);
-    for (size_t i = 0; i < map_knn.size(); i++) {
-        if (map_knn[i].size() >= 2 &&
-                map_knn[i][0].distance < RATIO_THRESH * map_knn[i][1].distance) {
-            isMapFeature[map_knn[i][0].queryIdx] = true;
-        }
+void MobileGS::draw() {
+    // Compile shader if not compiled
+    if (mProgram == 0) {
+        mProgram = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
+        mLocMVP = glGetUniformLocation(mProgram, "uMVP");
+        mLocPointSize = glGetUniformLocation(mProgram, "uPointSize");
     }
 
     // --- 3. FUSION & PRUNING ---
@@ -243,6 +286,8 @@ void MobileGS::MatchAndFuse(const std::vector<cv::KeyPoint>& curKeypoints, const
                 points3DToAdd.push_back(UnprojectPoint(curKeypoints[idx], DEFAULT_WALL_DEPTH));
                 descriptorsToAdd.push_back(curDescriptors.row(idx));
             }
+            glBufferData(GL_ARRAY_BUFFER, vboData.size() * sizeof(float), vboData.data(), GL_STATIC_DRAW);
+            chunk.isDirty = false;
         }
 
         // Pruning: Remove old map points that are spatially coincident with new paint
@@ -293,12 +338,9 @@ void MobileGS::MatchAndFuse(const std::vector<cv::KeyPoint>& curKeypoints, const
             }
         }
 
-        // Add new points
-        if (!descriptorsToAdd.empty()) {
-            mMapKeypoints.insert(mMapKeypoints.end(), pointsToAdd.begin(), pointsToAdd.end());
-            mMapPoints3D.insert(mMapPoints3D.end(), points3DToAdd.begin(), points3DToAdd.end());
-            cv::vconcat(mMapDescriptors, descriptorsToAdd, mMapDescriptors);
-        }
+        glDisableVertexAttribArray(0);
+        glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(2);
     }
 }
 
@@ -474,6 +516,7 @@ void MobileGS::MultiplyMatrixVector(const float* matrix, const float* in, float*
             out[i] += matrix[j * 4 + i] * in[j];
         }
     }
+    return count;
 }
 
 cv::Point2f MobileGS::ProjectPoint(const cv::Point3f& p3d) {

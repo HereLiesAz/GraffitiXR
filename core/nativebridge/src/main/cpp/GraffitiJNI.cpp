@@ -1,10 +1,5 @@
 #include <jni.h>
 #include <string>
-#include <android/bitmap.h>
-#include <android/log.h>
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/features2d.hpp>
 #include "MobileGS.h"
 
 #define LOG_TAG "GraffitiJNI"
@@ -32,6 +27,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_init(JNIEnv *env, jobjec
     gEngine->Initialize(width, height);
 }
 
+/**
+ * Destroys the C++ engine instance to free memory.
+ */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_cleanup(JNIEnv *env, jobject thiz) {
     if (gEngine) {
@@ -40,18 +38,20 @@ Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_cleanup(JNIEnv *env, job
     }
 }
 
+/**
+ * Updates the camera view and projection matrices.
+ */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_update(JNIEnv *env, jobject thiz, jlong matAddr, jfloatArray viewMatrix, jfloatArray projMatrix) {
     if (!gEngine) return;
 
-    cv::Mat* pMat = (cv::Mat*)matAddr;
-    jfloat* view = env->GetFloatArrayElements(viewMatrix, NULL);
-    jfloat* proj = env->GetFloatArrayElements(projMatrix, NULL);
+    jfloat* view = env->GetFloatArrayElements(viewMtx, nullptr);
+    jfloat* proj = env->GetFloatArrayElements(projMtx, nullptr);
 
-    gEngine->Update(*pMat, view, proj);
+    getEngine(handle)->updateCamera(view, proj);
 
-    env->ReleaseFloatArrayElements(viewMatrix, view, 0);
-    env->ReleaseFloatArrayElements(projMatrix, proj, 0);
+    env->ReleaseFloatArrayElements(viewMtx, view, 0);
+    env->ReleaseFloatArrayElements(projMtx, proj, 0);
 }
 
 JNIEXPORT void JNICALL
@@ -79,31 +79,48 @@ Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesFromBitma
         return NULL;
     }
 
-    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) {
-        LOGE("Failed to lock bitmap pixels");
-        return NULL;
+    jfloat* pose = env->GetFloatArrayElements(poseMatrix, nullptr);
+
+    if (depthData && pose) {
+        getEngine(handle)->feedDepthData(depthData, colorData, width, height, stride, pose, fov);
     }
 
-    // Convert Bitmap to Mat (Assume RGBA_8888)
-    cv::Mat img(info.height, info.width, CV_8UC4, pixels);
-    cv::Mat gray;
-    cv::cvtColor(img, gray, cv::COLOR_RGBA2GRAY);
+    env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
+}
 
-    AndroidBitmap_unlockPixels(env, bitmap);
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_drawJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    getEngine(handle)->draw();
+}
 
-    // Extract ORB
-    cv::Ptr<cv::ORB> orb = cv::ORB::create(1000);
-    std::vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
-    orb->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return 0;
+    return getEngine(handle)->getSplatCount();
+}
 
-    if (descriptors.empty()) return NULL;
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
+    if (handle == 0) return;
+    getEngine(handle)->onSurfaceChanged(width, height);
+}
 
-    // Serialize to byte array
-    size_t dataSize = descriptors.total() * descriptors.elemSize();
-    jbyteArray result = env->NewByteArray(dataSize);
-    env->SetByteArrayRegion(result, 0, dataSize, (jbyte*)descriptors.data);
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
+    const char *nativePath = env->GetStringUTFChars(path, 0);
+    bool result = getEngine(handle)->saveModel(std::string(nativePath));
+    env->ReleaseStringUTFChars(path, nativePath);
+    return result;
+}
 
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
+    const char *nativePath = env->GetStringUTFChars(path, 0);
+    bool result = getEngine(handle)->loadModel(std::string(nativePath));
+    env->ReleaseStringUTFChars(path, nativePath);
     return result;
 }
 
