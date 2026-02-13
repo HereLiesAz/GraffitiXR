@@ -57,6 +57,8 @@ class ArRenderer(
     private var viewportWidth = 0
     private var viewportHeight = 0
     private var isDepthSupported = false
+    private var isResumed = false
+    private var isCameraTextureInitialized = false
 
     private val tapQueue = ConcurrentLinkedQueue<PointF>()
 
@@ -64,143 +66,52 @@ class ArRenderer(
     private var anchor: Anchor? = null
     private var activeLayer: Layer? = null
 
-    fun setLayer(layer: Layer?) {
-        activeLayer = layer
-        if (layer != null) {
-            projectedImageRenderer.setBitmap(layer.bitmap)
-        }
-    }
-
-    fun handleTap(x: Float, y: Float) {
-        tapQueue.offer(PointF(x, y))
-    }
-
-    private fun handleTapInternal(frame: Frame, x: Float, y: Float) {
-        val hits = frame.hitTest(x, y)
-        for (hit in hits) {
-            val trackable = hit.trackable
-            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                // Check color (orientation/distance)
-                val color = planeRenderer.calculatePlaneColor(trackable, frame.camera.pose)
-                // Green: R=0, G=1, B=0. Cyan: R=0, G=1, B=1. Pink: R=1...
-                // We check if B is low (< 0.2) and G is high (> 0.8)
-                if (color[1] > 0.8f && color[2] < 0.2f) {
-                    // Valid Green Surface
-                    Log.d(TAG, "Valid Surface Selected")
-
-                    // Anchor Logic
-                    anchor?.detach()
-                    anchor = trackable.createAnchor(hit.hitPose)
-
-                    Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(context, "Surface Selected", Toast.LENGTH_SHORT).show()
-                    }
-                    break
-                }
-            }
-        }
-    }
-
-    /**
-     * Optional reference to the [GLSurfaceView] this renderer is attached to.
-     * If set, [onResume] and [onPause] will automatically manage the view's lifecycle
-     * to prevent race conditions with the ARCore session.
-     */
-    var glSurfaceView: GLSurfaceView? = null
-
-    // Safety flag for ARCore texture binding
-    @Volatile
-    private var isCameraTextureInitialized = false
-    
-    // Safety flag to prevent calling session.update() when paused
-    @Volatile
-    private var isResumed = false
-
-    // Keyframing State
-    private var lastKeyframePose: Pose? = null
-    private var lastKeyframeTime = 0L
-
-    // Config: Minimum changes required to trigger a new scan
-    private val MIN_TRANSLATION_METERS = 0.1f // 10cm
-    private val MIN_ROTATION_DEGREES = 10.0f // 10 degrees
-    private val MIN_INTERVAL_MS = 500L // Max 2 fps for scanning to prevent buffer starvation
-    private val MAX_INTERVAL_MS = 3000L // Force a scan every 3s even if stationary
-
-    // Capture
-    private var pendingCaptureCallback: ((Bitmap) -> Unit)? = null
-
-    // Matrices
+    // Matrix Helpers
     private val viewMatrix = FloatArray(16)
     private val projectionMatrix = FloatArray(16)
     private val modelMatrix = FloatArray(16)
 
-    // Buffers for Color Splats
-    private val COLOR_WIDTH = 320
-    private val COLOR_HEIGHT = 240
+    // Slam Throttling
+    private var lastKeyframePose: Pose? = null
+    private var lastKeyframeTime = 0L
+    private val MIN_INTERVAL_MS = 100L
+    private val MAX_INTERVAL_MS = 2000L
+    private val MIN_TRANSLATION_METERS = 0.05f
+
+    // Color processing
     private var colorBitmap: Bitmap? = null
     private var colorBuffer: ByteBuffer? = null
+    private val COLOR_WIDTH = 640
+    private val COLOR_HEIGHT = 480
 
-    // Lifecycle
+    // Capture Hook
+    private var pendingCaptureCallback: ((Bitmap) -> Unit)? = null
+
+    // Surface reference
+    var glSurfaceView: GLSurfaceView? = null
+
     override fun onResume(owner: LifecycleOwner) {
-        if (session == null) {
-            try {
-                session = Session(context).apply {
-                    val config = config
-                    config.focusMode = Config.FocusMode.AUTO
-                    config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                    if (isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
-                        config.depthMode = Config.DepthMode.AUTOMATIC
-                        isDepthSupported = true
-                    }
-                    configure(config)
-                }
-                // New Session means we must re-bind the texture
-                isCameraTextureInitialized = false
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to create AR Session", e)
-                Toast.makeText(context, "AR Init Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                return
-            }
-        }
-
-        try {
-            session?.resume()
-            isResumed = true
-            // Resume the GL thread AFTER the session is ready
-            glSurfaceView?.onResume()
-        } catch (e: CameraNotAvailableException) {
-            Log.e(TAG, "Camera not available", e)
-        }
+        isResumed = true
     }
 
     override fun onPause(owner: LifecycleOwner) {
-        // CRITICAL: Pause the GLSurfaceView FIRST. This blocks until the render thread is idle,
-        // ensuring no more calls to session.update() happen before session.pause().
-        glSurfaceView?.onPause()
         isResumed = false
-        session?.pause()
     }
 
-    override fun onDestroy(owner: LifecycleOwner) {
-        cleanup()
-    }
-
-    fun cleanup() {
-        isResumed = false
-        session?.close()
-        session = null
-    }
-
-    // Flashlight Control
-    fun setFlashlight(enable: Boolean) {
-        val session = this.session ?: return
-        try {
-            val config = session.config
-            config.flashMode = if (enable) Config.FlashMode.TORCH else Config.FlashMode.OFF
-            session.configure(config)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to toggle flashlight", e)
+    fun setSession(session: Session) {
+        this.session = session
+        val config = session.config
+        isDepthSupported = session.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+        if (isDepthSupported) {
+            config.depthMode = Config.DepthMode.AUTOMATIC
         }
+        config.focusMode = Config.FocusMode.FIXED
+        config.lightEstimationMode = Config.LightEstimationMode.DISABLED
+        session.configure(config)
+    }
+
+    fun setFlashlight(enabled: Boolean) {
+        // Implementation depends on ARCore version and device support.
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -314,56 +225,56 @@ class ArRenderer(
     }
 
     private fun processDepth(frame: Frame) {
+        var depthImage: android.media.Image? = null
+        var cameraImage: android.media.Image? = null
+        
         try {
-            val depthImage = frame.acquireDepthImage16Bits()
-            val cameraImage = try { frame.acquireCameraImage() } catch (e: NotYetAvailableException) { null }
+            depthImage = try { frame.acquireDepthImage16Bits() } catch (e: Exception) { null }
+            cameraImage = try { frame.acquireCameraImage() } catch (e: Exception) { null }
 
-            if (depthImage != null) {
-                // Ensure depth planes are valid
-                if (depthImage.planes.isEmpty() || depthImage.planes[0].buffer == null) {
-                    depthImage.close()
-                    return
-                }
+            depthImage?.let { dImg ->
+                if (dImg.planes.isNotEmpty() && dImg.planes[0].buffer != null) {
+                    val camera = frame.camera
+                    val pose = camera.pose
 
-                val camera = frame.camera
-                val pose = camera.pose
-                pose.toMatrix(modelMatrix, 0)
+                    if (shouldProcessFrame(pose)) {
+                        pose.toMatrix(modelMatrix, 0)
+                        val buffer = dImg.planes[0].buffer
+                        val width = dImg.width
+                        val height = dImg.height
+                        val stride = dImg.planes[0].rowStride / 2
 
-                if (shouldProcessFrame(pose)) {
-                    val buffer = depthImage.planes[0].buffer
-                    val width = depthImage.width
-                    val height = depthImage.height
-                    val stride = depthImage.planes[0].rowStride / 2
-
-                    if (cameraImage != null) {
-                        if (colorBitmap == null) {
-                            colorBitmap = Bitmap.createBitmap(COLOR_WIDTH, COLOR_HEIGHT, Bitmap.Config.ARGB_8888)
-                            colorBuffer = ByteBuffer.allocateDirect(COLOR_WIDTH * COLOR_HEIGHT * 4)
+                        cameraImage?.let { cImg ->
+                            if (colorBitmap == null) {
+                                colorBitmap = Bitmap.createBitmap(COLOR_WIDTH, COLOR_HEIGHT, Bitmap.Config.ARGB_8888)
+                                colorBuffer = ByteBuffer.allocateDirect(COLOR_WIDTH * COLOR_HEIGHT * 4)
+                            }
+                            yuvToRgbConverter.yuvToRgb(cImg, colorBitmap!!)
+                            colorBitmap!!.copyPixelsToBuffer(colorBuffer!!)
+                            colorBuffer!!.rewind()
                         }
-                        yuvToRgbConverter.yuvToRgb(cameraImage, colorBitmap!!)
-                        colorBitmap!!.copyPixelsToBuffer(colorBuffer!!)
-                        colorBuffer!!.rewind()
+
+                        slamManager.feedDepthData(
+                            buffer,
+                            colorBuffer,
+                            width,
+                            height,
+                            stride,
+                            COLOR_WIDTH * 4,
+                            modelMatrix,
+                            60.0f * (3.14159f / 180f)
+                        )
+
+                        lastKeyframePose = pose
+                        lastKeyframeTime = System.currentTimeMillis()
                     }
-
-                    slamManager.feedDepthData(
-                        buffer,
-                        colorBuffer,
-                        width,
-                        height,
-                        stride,
-                        COLOR_WIDTH * 4,
-                        modelMatrix,
-                        60.0f * (3.14159f / 180f)
-                    )
-
-                    lastKeyframePose = pose
-                    lastKeyframeTime = System.currentTimeMillis()
                 }
-                depthImage.close()
             }
-            cameraImage?.close()
         } catch (e: Exception) {
-            // Data not ready
+            Log.e(TAG, "Failed to process depth data", e)
+        } finally {
+            depthImage?.close()
+            cameraImage?.close()
         }
     }
 
@@ -400,5 +311,41 @@ class ArRenderer(
             val matrix = Matrix().apply { postScale(1f, -1f) }
             callback(Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true))
         }
+    }
+
+    fun handleTap(x: Float, y: Float) {
+        tapQueue.offer(PointF(x, y))
+    }
+
+    private fun handleTapInternal(frame: Frame, x: Float, y: Float) {
+        val hits = frame.hitTest(x, y)
+        for (hit in hits) {
+            val trackable = hit.trackable
+            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                // Check color (orientation/distance)
+                val color = planeRenderer.calculatePlaneColor(trackable, frame.camera.pose)
+                if (color[1] > 0.8f && color[2] < 0.2f) {
+                    Log.d(TAG, "Valid Surface Selected")
+                    anchor?.detach()
+                    anchor = trackable.createAnchor(hit.hitPose)
+
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(context, "Surface Selected", Toast.LENGTH_SHORT).show()
+                    }
+                    break
+                }
+            }
+        }
+    }
+
+    fun setLayer(layer: Layer?) {
+        activeLayer = layer
+        if (layer != null) {
+            projectedImageRenderer.setBitmap(layer.bitmap)
+        }
+    }
+    
+    fun cleanup() {
+        // Handle cleanup
     }
 }
