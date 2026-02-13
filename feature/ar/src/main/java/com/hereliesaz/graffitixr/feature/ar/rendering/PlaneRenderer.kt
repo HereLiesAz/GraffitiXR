@@ -18,7 +18,6 @@ class PlaneRenderer {
     private var planeModelUniform = 0
     private var planeModelViewProjectionUniform = 0
     private var gridControlUniform = 0
-    private var planeMatUniform = 0
 
     // Buffers
     private val vertexBuffer = ByteBuffer.allocateDirect(1000 * 4) // Reusable buffer (Float = 4 bytes)
@@ -44,7 +43,6 @@ class PlaneRenderer {
         planeModelUniform = GLES20.glGetUniformLocation(planeProgram, "u_PlaneModel")
         planeModelViewProjectionUniform = GLES20.glGetUniformLocation(planeProgram, "u_PlaneModelViewProjection")
         gridControlUniform = GLES20.glGetUniformLocation(planeProgram, "u_gridControl")
-        planeMatUniform = GLES20.glGetUniformLocation(planeProgram, "u_PlaneMat")
     }
 
     fun drawPlanes(session: Session, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
@@ -56,7 +54,6 @@ class PlaneRenderer {
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
         GLES20.glUniform1f(gridControlUniform, 1.0f)
-        GLES20.glUniform4f(planeMatUniform, 1.0f, 1.0f, 1.0f, 1.0f)
 
         for (plane in planes) {
             if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
@@ -94,39 +91,5 @@ class PlaneRenderer {
 
     companion object {
         private const val TAG = "PlaneRenderer"
-
-        // Strictly formatted GLSL 300 es
-        private const val VERTEX_SHADER = """#version 300 es
-layout(location = 0) in vec3 a_Position;
-uniform mat4 u_PlaneModel;
-uniform mat4 u_PlaneModelViewProjection;
-out vec3 v_WorldPos;
-out vec2 v_TexCoord;
-void main() {
-    gl_Position = u_PlaneModelViewProjection * vec4(a_Position, 1.0);
-    vec4 worldPos = u_PlaneModel * vec4(a_Position, 1.0);
-    v_WorldPos = worldPos.xyz;
-    v_TexCoord = a_Position.xz;
-}"""
-
-        private const val FRAGMENT_SHADER = """#version 300 es
-precision mediump float;
-in vec3 v_WorldPos;
-in vec2 v_TexCoord;
-uniform float u_gridControl;
-uniform vec4 u_PlaneMat;
-out vec4 FragColor;
-void main() {
-    float gridSize = 0.5;
-    float thickness = 0.02;
-    vec3 gridColor = vec3(1.0, 1.0, 1.0);
-    vec2 coord = v_WorldPos.xz / gridSize;
-    vec2 gridDist = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
-    float line = min(gridDist.x, gridDist.y);
-    float gridAlpha = 1.0 - min(line, 1.0);
-    float alpha = gridAlpha * u_gridControl;
-    float fillAlpha = 0.05 * u_gridControl;
-    FragColor = vec4(gridColor, max(alpha, fillAlpha));
-}"""
     }
 }

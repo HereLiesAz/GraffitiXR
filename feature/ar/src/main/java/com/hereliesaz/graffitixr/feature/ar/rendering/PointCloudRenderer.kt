@@ -11,37 +11,6 @@ import java.util.HashMap
 class PointCloudRenderer {
     private val TAG = "PointCloudRenderer"
 
-    private val vertexShaderCode = """
-        uniform mat4 u_MvpMatrix;
-        uniform float u_PointSize;
-        attribute vec4 a_Position; 
-        varying float v_Confidence;
-        void main() {
-           gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);
-           gl_PointSize = u_PointSize;
-           v_Confidence = a_Position.w;
-        }
-    """.trimIndent()
-
-    private val fragmentShaderCode = """
-        precision mediump float;
-        varying float v_Confidence;
-        void main() {
-            vec2 coord = gl_PointCoord - vec2(0.5);
-            if (length(coord) > 0.5) discard;
-            vec3 cyan = vec3(0.0, 1.0, 1.0);
-            vec3 pink = vec3(1.0, 0.0, 0.8);
-            vec3 green = vec3(0.0, 1.0, 0.0);
-            vec3 finalColor;
-            if (v_Confidence < 0.5) {
-                finalColor = mix(cyan, pink, v_Confidence * 2.0);
-            } else {
-                finalColor = mix(pink, green, (v_Confidence - 0.5) * 2.0);
-            }
-            gl_FragColor = vec4(finalColor, 1.0);
-        }
-    """.trimIndent()
-
     private var program: Int = 0
     private var positionHandle: Int = 0
     private var mvpMatrixHandle: Int = 0
@@ -56,6 +25,9 @@ class PointCloudRenderer {
     private val pointIdMap = HashMap<Int, Int>()
 
     fun createOnGlThread(context: Context) {
+        val vertexShaderCode = context.assets.open("shaders/point_cloud.vert").bufferedReader().use { it.readText() }
+        val fragmentShaderCode = context.assets.open("shaders/point_cloud.frag").bufferedReader().use { it.readText() }
+
         val vertexShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_VERTEX_SHADER, vertexShaderCode)
         val fragmentShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
 

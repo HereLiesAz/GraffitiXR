@@ -123,7 +123,11 @@ class ProjectRepositoryImpl @Inject constructor(
 
     override suspend fun deleteProject(id: String) = withContext(Dispatchers.IO) {
         val file = File(projectsDir, "$id.json")
-        if (file.exists()) file.delete()
+        if (file.exists()) {
+            if (!file.delete()) {
+                throw java.io.IOException("Failed to delete project file: ${file.absolutePath}")
+            }
+        }
 
         // If we deleted the current project, clear the selection
         if (_currentProject.value?.id == id) {
