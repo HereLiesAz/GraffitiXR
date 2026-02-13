@@ -5,16 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <mutex>
-#include <memory>
-#include <unordered_map>
-#include <string>
 #include <cmath>
-
-// OpenCV
-#include <opencv2/core.hpp>
-#include <opencv2/features2d.hpp>
-
-// OpenGL / GLM
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
 
@@ -69,30 +60,45 @@ struct Chunk {
 
 /**
  * The core C++ engine for MobileGS (Mobile Gaussian Splatting / SplaTAM).
- * Handles SLAM mapping (Teleological), point cloud fusion (Splatting), and OpenGL rendering.
+ * Handles SLAM mapping, point cloud fusion, and OpenGL rendering.
  */
 class MobileGS {
 public:
     MobileGS();
     ~MobileGS();
 
-    void Initialize(int width, int height);
-    void Cleanup();
-
-    // --- Teleological SLAM (OpenCV) ---
-    void Update(const cv::Mat& cameraFrame, const float* viewMatrix, const float* projectionMatrix);
-    void SetTargetDescriptors(const cv::Mat& descriptors);
-    bool IsTrackingTarget() const;
-
-    // --- Gaussian Splatting (OpenGL) ---
     /**
      * Ingests a new depth frame from ARCore and fuses it into the map.
+     *
+     * @param depthPixels Pointer to 16-bit depth image buffer (millimeters).
+     * @param colorPixels Pointer to color buffer (optional, can be null).
+     * @param width Width of the depth image.
+     * @param height Height of the depth image.
+     * @param stride Row stride of the depth image in bytes.
+     * @param cameraPose 4x4 Column-Major matrix representing camera pose in world space.
+     * @param fov Vertical Field of View in radians.
      */
     void feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
             int width, int height, int stride, const float* cameraPose, float fov);
 
+    /**
+     * Initializes the OpenGL context (shaders, buffers).
+     * Must be called on the GL thread.
+     */
+    void initialize();
+
+    /**
+     * Updates the camera matrices for the next draw call.
+     * @param view 4x4 View Matrix.
+     * @param proj 4x4 Projection Matrix.
+     */
     void updateCamera(const float* view, const float* proj);
+
+    /**
+     * Renders the point cloud to the currently bound framebuffer.
+     */
     void draw();
+
     void onSurfaceChanged(int width, int height);
     int getSplatCount();
     void clear();
@@ -101,47 +107,25 @@ public:
     bool loadModel(std::string path);
     void alignMap(const float* transform);
 
+    void setChunkSize(float meters) { mChunkSize = meters; }
+
 private:
-    int mWidth;
-    int mHeight;
-    bool mIsInitialized;
-
-    // --- Teleological State ---
-    cv::Ptr<cv::ORB> mOrb;
-    cv::Ptr<cv::DescriptorMatcher> mMatcher;
-    std::vector<cv::KeyPoint> mMapKeypoints; // 2D (Legacy/Debug)
-    std::vector<cv::Point3f> mMapPoints3D;   // 3D World Points (Sparse)
-    cv::Mat mMapDescriptors;
-    std::mutex mMapMutex;
-    cv::Mat mTargetDescriptors;
-    bool mHasTarget;
-
-    // Matrices (Shared)
-    float mViewMatrix[16];
-    float mProjMatrix[16];
-
-    // --- Splatting State ---
     float mChunkSize = 2.0f;
     float mVoxelSize = 0.05f;
     int mFrameCount = 0;
+
     glm::mat4 mStoredView;
     glm::mat4 mStoredProj;
     int mScreenWidth, mScreenHeight;
+
     std::unordered_map<ChunkKey, Chunk, ChunkKeyHash> mChunks;
     std::mutex mChunkMutex;
+
     GLuint mProgram = 0;
     GLint mLocMVP = -1;
     GLint mLocPointSize = -1;
 
-    // --- Internal Methods ---
-    void ProcessFrame(const cv::Mat& frame);
-    void MatchAndFuse(const std::vector<cv::KeyPoint>& keypoints, const cv::Mat& descriptors);
-    cv::Point2f ProjectPoint(const cv::Point3f& p3d);
-    cv::Point3f UnprojectPoint(const cv::KeyPoint& kpt, float depth);
-    void MultiplyMatrixVector(const float* matrix, const float* in, float* out);
-
     ChunkKey getChunkKey(float x, float y, float z);
-    float getLuminance(uint8_t r, uint8_t g, uint8_t b);
 };
 
 #endif // MOBILE_GS_H

@@ -32,12 +32,18 @@ class ArViewModelTest {
         Dispatchers.resetMain()
     }
 
-    /*
     @Test
+    @Ignore("Feature removed or not implemented in ViewModel yet")
     fun `togglePointCloud toggles state`() = runTest {
-        // Feature removed or not implemented in ViewModel yet
+        // Initial state is true by default in ArUiState definition
+        // val initialState = viewModel.uiState.value.showPointCloud
+        
+        // viewModel.togglePointCloud()
+        // assertEquals(!initialState, viewModel.uiState.value.showPointCloud)
+        
+        // viewModel.togglePointCloud()
+        // assertEquals(initialState, viewModel.uiState.value.showPointCloud)
     }
-    */
 
     @Test
     fun `toggleFlashlight toggles state`() = runTest {
@@ -51,12 +57,36 @@ class ArViewModelTest {
         assertEquals(false, viewModel.uiState.value.isFlashlightOn)
     }
 
-    /*
     @Test
+    @Ignore("Logic changed in ViewModel")
     fun `onFrameCaptured adds uri and bitmap to state`() = runTest {
-        // Logic changed in ViewModel
+        /*
+        val bitmap = mockk<Bitmap>()
+        val uri = mockk<Uri>()
+        
+        viewModel.onFrameCaptured(bitmap, uri)
+        
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        val state = viewModel.uiState.value
+        assert(state.capturedTargetUris.contains(uri))
+        assert(state.capturedTargetImages.contains(bitmap))
+        */
     }
-    */
+
+    @Test
+    @Ignore("Function removed")
+    fun `onTargetDetected updates state`() = runTest {
+        /*
+        assertEquals(false, viewModel.uiState.value.isTargetDetected)
+
+        viewModel.onTargetDetected(true)
+        assertEquals(true, viewModel.uiState.value.isTargetDetected)
+
+        viewModel.onTargetDetected(false)
+        assertEquals(false, viewModel.uiState.value.isTargetDetected)
+        */
+    }
 
     @Test
     fun `updateTrackingState updates target detected`() = runTest {
