@@ -86,9 +86,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
         }
     }
 
-    float* colorData = nullptr;
+    uint8_t* colorData = nullptr;
     if (colorBuffer != nullptr) {
-        colorData = (float*)env->GetDirectBufferAddress(colorBuffer);
+        colorData = (uint8_t*)env->GetDirectBufferAddress(colorBuffer);
     }
 
     if (env->GetArrayLength(poseMatrix) < 16) return;
@@ -101,10 +101,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
     if (pose) env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
 }
 
-/**
- * IMPLEMENTATION: Set Target Descriptors
- * Converts the Java byte array to a cv::Mat and passes it to MobileGS.
- */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(
         JNIEnv *env, jobject thiz,
@@ -116,11 +112,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(
 
     jbyte* data = env->GetByteArrayElements(descriptorBytes, nullptr);
     if (data) {
-        // Create Mat wrapping the data (deep copy happens inside setTargetDescriptors if used properly)
         cv::Mat descriptors(rows, cols, type, (void*)data);
         getEngine(handle)->setTargetDescriptors(descriptors);
         env->ReleaseByteArrayElements(descriptorBytes, data, 0);
     }
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_pruneMapJni(JNIEnv *env, jobject thiz, jlong handle, jint ageThreshold) {
+    if (handle == 0) return;
+    getEngine(handle)->pruneMap(ageThreshold);
 }
 
 JNIEXPORT void JNICALL
@@ -178,8 +179,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMapJni(JNIEnv *env,
     getEngine(handle)->clear();
 }
 
-// --- Stateless Utilities (GraffitiJNI.kt Object) ---
-
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesFromBitmap(JNIEnv *env, jobject thiz, jobject bitmap) {
     cv::Mat gray;
@@ -192,7 +191,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesFromBitma
 
     if (descriptors.empty()) return nullptr;
 
-    // Serialize to byte array
     int size = descriptors.total() * descriptors.elemSize();
     jbyteArray result = env->NewByteArray(size);
     env->SetByteArrayRegion(result, 0, size, (jbyte*)descriptors.data);
@@ -220,7 +218,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesMeta(JNIE
     return result;
 }
 
-// Stubs for legacy methods referenced in GraffitiJNI.kt
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_init(JNIEnv *env, jobject thiz, jint width, jint height) {}
 

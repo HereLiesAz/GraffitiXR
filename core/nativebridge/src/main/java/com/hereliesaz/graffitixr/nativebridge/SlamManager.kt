@@ -93,6 +93,16 @@ class SlamManager {
     }
 
     /**
+     * Triggers garbage collection on the map.
+     * @param ageThresholdFrames Points older than this many frames will be removed.
+     */
+    fun pruneMap(ageThresholdFrames: Int) {
+        if (nativeHandle != 0L) {
+            pruneMapJni(nativeHandle, ageThresholdFrames)
+        }
+    }
+
+    /**
      * Trigger OpenGL draw call.
      */
     fun draw() {
@@ -149,6 +159,8 @@ class SlamManager {
         cols: Int,
         type: Int
     )
+
+    private external fun pruneMapJni(handle: Long, ageThreshold: Int)
 
     private external fun drawJni(handle: Long)
     private external fun getPointCountJni(handle: Long): Int

@@ -82,7 +82,6 @@ GLuint createProgram(const char* vSource, const char* fSource) {
     glAttachShader(program, fShader);
     glLinkProgram(program);
 
-    // Check link status
     GLint linked;
     glGetProgramiv(program, GL_LINK_STATUS, &linked);
     if (!linked) {
@@ -97,7 +96,6 @@ GLuint createProgram(const char* vSource, const char* fSource) {
         program = 0;
     }
 
-    // Mark shaders for deletion (they will be deleted when program is deleted)
     glDeleteShader(vShader);
     glDeleteShader(fShader);
 
@@ -132,23 +130,67 @@ void MobileGS::initialize() {
     }
 }
 
-/**
- * Stores the target descriptors for teleological correction.
- * This does not yet trigger relocalization, but primes the engine with the target data.
- */
 void MobileGS::setTargetDescriptors(const cv::Mat& descriptors) {
     std::lock_guard<std::mutex> lock(mChunkMutex);
     descriptors.copyTo(mTargetDescriptors);
     mHasTarget = !mTargetDescriptors.empty();
-    LOGI("MobileGS: Target descriptors set. Rows: %d, Cols: %d", mTargetDescriptors.rows, mTargetDescriptors.cols);
+    LOGI("MobileGS: Target descriptors set. Rows: %d", mTargetDescriptors.rows);
+}
+
+/**
+ * Prunes the map by removing splats that haven't been seen recently.
+ * Prevents infinite memory growth.
+ */
+void MobileGS::pruneMap(int ageThresholdFrames) {
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+
+    int totalRemoved = 0;
+
+    // We can't prune frames newer than frameCount (obviously),
+    // but we remove things where mFrameCount - lastSeen > threshold
+
+    auto it = mChunks.begin();
+    while (it != mChunks.end()) {
+        Chunk& chunk = it->second;
+
+        // Remove old splats using erase-remove idiom
+        auto newEnd = std::remove_if(chunk.splats.begin(), chunk.splats.end(),
+                [this, ageThresholdFrames](const Splat& s) {
+                    return (this->mFrameCount - s.lastSeenFrame) > ageThresholdFrames;
+                });
+
+        int removedInChunk = std::distance(newEnd, chunk.splats.end());
+        totalRemoved += removedInChunk;
+
+        chunk.splats.erase(newEnd, chunk.splats.end());
+        chunk.splatCount = chunk.splats.size();
+
+        if (removedInChunk > 0) {
+            chunk.isDirty = true;
+        }
+
+        // If chunk is empty, remove it
+        if (chunk.splats.empty()) {
+            if (chunk.vbo != 0) glDeleteBuffers(1, &chunk.vbo);
+            it = mChunks.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    if (totalRemoved > 0) {
+        LOGI("Pruned %d splats. Total chunks: %zu", totalRemoved, mChunks.size());
+    }
 }
 
 /**
  * Projects depth pixels into 3D world space and adds them to the point cloud.
  */
-void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
+void MobileGS::feedDepthData(const uint16_t* depthPixels, const uint8_t* colorPixels,
         int width, int height, int stride, const float* cameraPose, float fov) {
     if (!depthPixels) return;
+
+    mFrameCount++;
 
     // Intrinsics
     float aspect = (float)width / (float)height;
@@ -179,10 +221,23 @@ void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixe
             s.x = x_world;
             s.y = y_world;
             s.z = z_world;
-            s.r = 0; s.g = 200; s.b = 128; // Tealish
+
+            // Sample Color if available
+            if (colorPixels) {
+                // Assume color buffer is RGBA packed, row major, size width*height
+                // Index = (v * width + u) * 4
+                int cIdx = (v * width + u) * 4;
+                s.r = colorPixels[cIdx];
+                s.g = colorPixels[cIdx+1];
+                s.b = colorPixels[cIdx+2];
+            } else {
+                s.r = 0; s.g = 200; s.b = 128; // Default Teal
+            }
+
             s.confidence = 1.0f;
             s.radius = 0.02f;
             s.luminance = 0.5f;
+            s.lastSeenFrame = mFrameCount;
 
             newSplats.push_back(s);
         }
@@ -197,6 +252,7 @@ void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixe
         }
 
         Chunk& chunk = mChunks[key];
+        // Only add if not overflowing (simple limit)
         if (chunk.splatCount < MAX_SPLATS / 10) {
             chunk.splats.push_back(s);
             chunk.splatCount++;
@@ -206,7 +262,6 @@ void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixe
 }
 
 void MobileGS::updateCamera(const float* view, const float* proj) {
-    // Copy to glm::mat4
     memcpy(&mStoredView[0][0], view, 16 * sizeof(float));
     memcpy(&mStoredProj[0][0], proj, 16 * sizeof(float));
 }
@@ -291,10 +346,7 @@ void MobileGS::clear() {
 bool MobileGS::saveModel(std::string path) {
     std::lock_guard<std::mutex> lock(mChunkMutex);
     std::ofstream outFile(path, std::ios::binary);
-    if (!outFile.is_open()) {
-        LOGE("Failed to open file for writing: %s", path.c_str());
-        return false;
-    }
+    if (!outFile.is_open()) return false;
 
     const char magic[] = "GXRM";
     outFile.write(magic, 4);
@@ -308,15 +360,12 @@ bool MobileGS::saveModel(std::string path) {
     }
     outFile.write(reinterpret_cast<const char*>(&totalSplats), sizeof(totalSplats));
 
-    LOGI("Saving model to %s. Splats: %d", path.c_str(), totalSplats);
-
     for (const auto& pair : mChunks) {
         const Chunk& chunk = pair.second;
         if (!chunk.splats.empty()) {
             outFile.write(reinterpret_cast<const char*>(chunk.splats.data()), chunk.splats.size() * sizeof(Splat));
         }
     }
-
     outFile.close();
     return true;
 }
@@ -325,36 +374,22 @@ bool MobileGS::loadModel(std::string path) {
     std::lock_guard<std::mutex> lock(mChunkMutex);
 
     for (auto& pair : mChunks) {
-        if (pair.second.vbo != 0) {
-            glDeleteBuffers(1, &pair.second.vbo);
-        }
+        if (pair.second.vbo != 0) glDeleteBuffers(1, &pair.second.vbo);
     }
     mChunks.clear();
 
     std::ifstream inFile(path, std::ios::binary);
-    if (!inFile.is_open()) {
-        LOGE("Failed to open file for reading: %s", path.c_str());
-        return false;
-    }
+    if (!inFile.is_open()) return false;
 
     char magic[4];
     inFile.read(magic, 4);
-    if (strncmp(magic, "GXRM", 4) != 0) {
-        LOGE("Invalid file format (Magic mismatch)");
-        return false;
-    }
+    if (strncmp(magic, "GXRM", 4) != 0) return false;
 
     int32_t version;
     inFile.read(reinterpret_cast<char*>(&version), sizeof(version));
-    if (version != 1) {
-        LOGE("Unsupported version: %d", version);
-        return false;
-    }
 
     int32_t totalSplats;
     inFile.read(reinterpret_cast<char*>(&totalSplats), sizeof(totalSplats));
-
-    LOGI("Loading model from %s. Splats: %d", path.c_str(), totalSplats);
 
     const int BATCH_SIZE = 10000;
     std::vector<Splat> buffer(BATCH_SIZE);
@@ -367,17 +402,13 @@ bool MobileGS::loadModel(std::string path) {
         for (int i = 0; i < toRead; ++i) {
             Splat& s = buffer[i];
             ChunkKey key = getChunkKey(s.x, s.y, s.z);
-            if (mChunks.find(key) == mChunks.end()) {
-                mChunks[key] = Chunk();
-            }
-            Chunk& chunk = mChunks[key];
-            chunk.splats.push_back(s);
-            chunk.splatCount++;
-            chunk.isDirty = true;
+            if (mChunks.find(key) == mChunks.end()) mChunks[key] = Chunk();
+            mChunks[key].splats.push_back(s);
+            mChunks[key].splatCount++;
+            mChunks[key].isDirty = true;
         }
         splatsRead += toRead;
     }
-
     inFile.close();
     return true;
 }

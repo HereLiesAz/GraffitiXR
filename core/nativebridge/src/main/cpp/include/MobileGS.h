@@ -74,8 +74,16 @@ public:
 
     /**
      * Ingests a new depth frame from ARCore and fuses it into the map.
+     *
+     * @param depthPixels Pointer to 16-bit depth image buffer (millimeters).
+     * @param colorPixels Pointer to RGBA byte buffer (optional).
+     * @param width Width of the depth image.
+     * @param height Height of the depth image.
+     * @param stride Row stride of the depth image in bytes.
+     * @param cameraPose 4x4 Column-Major matrix representing camera pose in world space.
+     * @param fov Vertical Field of View in radians.
      */
-    void feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
+    void feedDepthData(const uint16_t* depthPixels, const uint8_t* colorPixels,
             int width, int height, int stride, const float* cameraPose, float fov);
 
     /**
@@ -83,6 +91,12 @@ public:
      * This acts as the "Ground Truth" for Teleological SLAM.
      */
     void setTargetDescriptors(const cv::Mat& descriptors);
+
+    /**
+     * Removes points that haven't been observed recently to free up memory.
+     * @param ageThresholdFrames Points older than this (currentFrame - lastSeen) will be removed.
+     */
+    void pruneMap(int ageThresholdFrames);
 
     /**
      * Initializes the OpenGL context (shaders, buffers).
