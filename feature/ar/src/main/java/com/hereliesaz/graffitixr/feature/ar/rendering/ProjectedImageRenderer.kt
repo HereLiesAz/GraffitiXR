@@ -5,8 +5,8 @@ import android.graphics.Bitmap
 import android.opengl.GLES30
 import android.opengl.GLUtils
 import android.opengl.Matrix
-import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Anchor
+import com.hereliesaz.graffitixr.common.model.BlendMode
 import com.hereliesaz.graffitixr.common.model.Layer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
