@@ -22,6 +22,14 @@ import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 
+/**
+ * Composable screen for the Mockup Mode.
+ * Allows users to composite image layers over a static background image.
+ * Supports multi-touch gestures for scaling, rotating, and moving layers.
+ *
+ * @param uiState The current state of the editor.
+ * @param viewModel The viewmodel to handle gesture events.
+ */
 @Composable
 fun MockupScreen(
     uiState: EditorUiState,
@@ -110,6 +118,9 @@ fun MockupScreen(
     }
 }
 
+/**
+ * Maps the domain model [ModelBlendMode] to Compose [BlendMode].
+ */
 private fun mapBlendMode(mode: ModelBlendMode): BlendMode {
     return when(mode) {
         ModelBlendMode.SrcOver -> BlendMode.SrcOver

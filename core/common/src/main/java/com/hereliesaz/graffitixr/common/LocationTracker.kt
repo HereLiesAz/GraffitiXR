@@ -15,11 +15,21 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 
+/**
+ * A utility class for tracking device location using the Fused Location Provider.
+ *
+ * @property context The application context.
+ */
 class LocationTracker(private val context: Context) {
 
     private var fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
     private var locationCallback: LocationCallback? = null
 
+    /**
+     * Starts receiving location updates.
+     *
+     * @param onLocationUpdate A callback function that is invoked with the new [Location].
+     */
     @SuppressLint("MissingPermission")
     fun startLocationUpdates(onLocationUpdate: (Location) -> Unit) {
         if (!hasPermissions()) {
@@ -52,6 +62,9 @@ class LocationTracker(private val context: Context) {
         }
     }
 
+    /**
+     * Stops receiving location updates.
+     */
     fun stopLocationUpdates() {
         locationCallback?.let {
             fusedLocationClient.removeLocationUpdates(it)
@@ -59,6 +72,11 @@ class LocationTracker(private val context: Context) {
         locationCallback = null
     }
 
+    /**
+     * Checks if the required location permissions are granted.
+     *
+     * @return True if ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION are granted, false otherwise.
+     */
     fun hasPermissions(): Boolean {
         return ActivityCompat.checkSelfPermission(
             context,

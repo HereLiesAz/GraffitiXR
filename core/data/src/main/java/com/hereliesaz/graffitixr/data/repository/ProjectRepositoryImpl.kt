@@ -15,6 +15,13 @@ import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Implementation of [ProjectRepository] that uses [ProjectManager] for file system operations.
+ *
+ * @param context Application context.
+ * @param projectManager Helper class for low-level file I/O.
+ * @param ioDispatcher Coroutine dispatcher for blocking I/O operations (default: Dispatchers.IO).
+ */
 @Singleton
 class ProjectRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,

@@ -1,15 +1,10 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import com.hereliesaz.graffitixr.common.model.OverlayLayer
-import com.hereliesaz.graffitixr.common.model.GraffitiProject
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
-import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
-import io.mockk.every
+import android.graphics.Bitmap
+import android.net.Uri
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -23,18 +18,12 @@ import org.junit.Test
 class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
-    private val projectRepository: ProjectRepository = mockk(relaxed = true)
-    private val renderer: ArRenderer = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
-    
-    private val projectFlow = MutableStateFlow<GraffitiProject?>(null)
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        every { projectRepository.currentProject } returns projectFlow
-        
-        viewModel = ArViewModel(projectRepository)
+        viewModel = ArViewModel()
     }
 
     @After
@@ -43,42 +32,61 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `togglePointCloud updates state`() = runTest {
-        // Initial state
-        assertEquals(false, viewModel.uiState.value.showPointCloud)
+    fun `togglePointCloud toggles state`() = runTest {
+        // Initial state is true by default in ArUiState definition
+        val initialState = viewModel.uiState.value.showPointCloud
         
         viewModel.togglePointCloud()
+        assertEquals(!initialState, viewModel.uiState.value.showPointCloud)
         
-        assertEquals(true, viewModel.uiState.value.showPointCloud)
+        viewModel.togglePointCloud()
+        assertEquals(initialState, viewModel.uiState.value.showPointCloud)
     }
 
     @Test
-    fun `toggleFlashlight updates state`() = runTest {
-        // Initial state
+    fun `toggleFlashlight toggles state`() = runTest {
+        // Initial state is false
         assertEquals(false, viewModel.uiState.value.isFlashlightOn)
 
         viewModel.toggleFlashlight()
-
         assertEquals(true, viewModel.uiState.value.isFlashlightOn)
+
+        viewModel.toggleFlashlight()
+        assertEquals(false, viewModel.uiState.value.isFlashlightOn)
     }
 
     @Test
-    fun `onProgressUpdate updates mappingQualityScore`() = runTest {
-        viewModel.onProgressUpdate(0.75f, null)
-        assertEquals(0.75f, viewModel.uiState.value.mappingQualityScore)
-    }
-
-    @Test
-    fun `onFrameCaptured updates state with bitmap and uri`() = runTest {
-        val bitmap = mockk<android.graphics.Bitmap>()
-        val uri = mockk<android.net.Uri>()
+    fun `onFrameCaptured adds uri and bitmap to state`() = runTest {
+        val bitmap = mockk<Bitmap>()
+        val uri = mockk<Uri>()
         
         viewModel.onFrameCaptured(bitmap, uri)
         
         testDispatcher.scheduler.advanceUntilIdle()
         
-        assertEquals(true, viewModel.uiState.value.isArTargetCreated)
-        assert(viewModel.uiState.value.capturedTargetUris.contains(uri))
-        assert(viewModel.uiState.value.capturedTargetImages.contains(bitmap))
+        val state = viewModel.uiState.value
+        assert(state.capturedTargetUris.contains(uri))
+        assert(state.capturedTargetImages.contains(bitmap))
+    }
+
+    @Test
+    fun `onTargetDetected updates state`() = runTest {
+        assertEquals(false, viewModel.uiState.value.isTargetDetected)
+
+        viewModel.onTargetDetected(true)
+        assertEquals(true, viewModel.uiState.value.isTargetDetected)
+
+        viewModel.onTargetDetected(false)
+        assertEquals(false, viewModel.uiState.value.isTargetDetected)
+    }
+
+    @Test
+    fun `updateTrackingState updates state`() = runTest {
+        viewModel.updateTrackingState("Tracking", 1, 100)
+
+        val state = viewModel.uiState.value
+        assertEquals("Tracking", state.trackingState)
+        assertEquals(1, state.planeCount)
+        assertEquals(100, state.pointCloudCount)
     }
 }

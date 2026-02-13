@@ -13,6 +13,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 
+/**
+ * A Composable that hosts the ARCore [GLSurfaceView].
+ * It manages the lifecycle of the [ArRenderer] and reacts to state changes
+ * (e.g., toggling point cloud visibility or flashlight).
+ *
+ * @param viewModel The AR ViewModel.
+ * @param uiState The current UI state to render.
+ * @param onRendererCreated Callback to expose the created [ArRenderer] to the parent (e.g., for capture).
+ */
 @Composable
 fun ArView(
     viewModel: ArViewModel,

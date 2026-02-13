@@ -1,77 +1,99 @@
-# Architecture & State Management
+# GraffitiXR Architecture
 
-## The Unified State Pattern
+GraffitiXR uses a **Multi-Module Clean Architecture** designed for scalability, build performance, and separation of concerns.
 
-To resolve circular dependencies between feature modules (e.g., `feature:editor` needing AR data and `feature:ar` needing Editor context), we pulled all state definitions into **`:core:common`**.
+## High-Level Overview
 
-### Source of Truth
-The `UiState.kt` file in `:core:common` is the single source of truth for the application's data flow.
+The application is divided into three layers:
 
-#### 1. `EditorUiState`
-Controls the artistic workspace.
-* **Layers:** A list of `Layer` objects containing bitmap data, transforms (scale/rotation), and blending modes.
-* **Mode:** The active operational mode (`AR`, `STATIC`, `TRACE`).
-* **Background:** The reference image (`backgroundBitmap` or `mapPath` for 3D).
-
-#### 2. `ArUiState`
-Controls the computer vision session.
-* **Tracking:** Point cloud density and plane detection status.
-* **Target Creation:** Buffers for `tempCaptureBitmap` and the rectification flow (`capturedTargetUris`).
-
-## Data Flow
-
-1.  **Events:** UI Components (in `:feature`) fire events to their ViewModel.
-2.  **Mutation:** ViewModels (`MainViewModel`, `EditorViewModel`) mutate the StateFlow.
-3.  **Observation:** The UI observes the Unified State from `:core:common` and recomposes.
-
-## Module Graph
-# Architecture
+1.  **App Layer (`:app`):** The integration point. It contains the `MainActivity`, dependency injection (Hilt) setup, and the global Navigation Graph.
+2.  **Feature Layer (`:feature`):** Contains the screens and business logic for specific user flows. Features do *not* depend on each other directly.
+3.  **Core Layer (`:core`):** Contains shared code, data models, design system, and native libraries.
 
 ## Module Graph
 
 ```mermaid
 graph TD
-    App --> Feature_AR
-    App --> Feature_Editor
-    App --> Feature_Dashboard
+    app --> feature:ar
+    app --> feature:editor
+    app --> feature:dashboard
+
+    feature:ar --> core:common
+    feature:ar --> core:domain
+    feature:ar --> core:design
+    feature:ar --> core:native
+
+    feature:editor --> core:common
+    feature:editor --> core:domain
+    feature:editor --> core:design
+    feature:editor --> core:native
+
+    feature:dashboard --> core:common
+    feature:dashboard --> core:domain
+    feature:dashboard --> core:design
+    feature:dashboard --> core:data
+
+    core:data --> core:domain
+    core:data --> core:common
+
+    core:native --> core:domain
+    core:native --> core:common (Optional)
     
-    Feature_AR --> Core_Common
-    Feature_Editor --> Core_Common
-    Feature_Dashboard --> Core_Common
+    core:design --> core:common
     
-    Core_Common --> Core_Domain
-    Core_Domain --> Core_Data
+    core:domain --> core:common
 ```
 
-The "Unified State" Pattern
-We do not use isolated states per feature. We use a monolithic state object split by domain, residing in :core:common.
+## Module Descriptions
 
-UiState.kt
-EditorUiState:
+### `:app`
+*   **Role:** Application Entry Point.
+*   **Key Components:** `GraffitiApplication`, `MainActivity`, `MainViewModel` (Global State), `NavGraph`.
 
-layers: List of bitmaps and transforms.
+### `:feature:ar`
+*   **Role:** Augmented Reality experience.
+*   **Key Components:** `ArView` (Composable), `ArRenderer` (GLSurfaceView), `ArViewModel`, `TargetCreationFlow`.
+*   **Dependencies:** ARCore, OpenGL, OpenCV (via Native).
 
-editorMode: Controls the view strategy (AR, STATIC, TRACE).
+### `:feature:editor`
+*   **Role:** Image manipulation and composition.
+*   **Key Components:** `EditorUi` (Composable), `EditorViewModel`, `ImageProcessor` (OpenCV).
+*   **Screens:** Mockup, Overlay, Trace.
 
-mapPath: (New) Path to the 3D map/splat file for the 3D Mockup mode.
+### `:feature:dashboard`
+*   **Role:** Project management and settings.
+*   **Key Components:** `ProjectLibraryScreen`, `SettingsScreen`, `DashboardViewModel`.
+*   **Dependencies:** `core:data` (for Persistence).
 
-backgroundBitmap: Fallback 2D background.
+### `:core:data`
+*   **Role:** Data persistence and repository implementation.
+*   **Key Components:** `ProjectRepositoryImpl`, `ProjectManager` (File I/O).
 
-ArUiState:
+### `:core:domain`
+*   **Role:** Pure business logic and data models.
+*   **Key Components:** `Project` (Model), `GraffitiProject` (Model), `ProjectRepository` (Interface).
 
-isScanning: (New) Controls the SLAM mapping session state.
+### `:core:common`
+*   **Role:** Universal utilities.
+*   **Key Components:** `LocationTracker`, `DispatcherProvider`, `UiState` (Shared Model).
 
-pointCloudCount: Debug metric for SLAM quality.
+### `:core:design`
+*   **Role:** Design System.
+*   **Key Components:** `AzNavRail`, `Theme`, `Typography`, Shared Components (`Knob`, `InfoDialog`).
 
-capturedTargetUris: For the Surveyor flow.
+### `:core:native`
+*   **Role:** High-performance C++ code.
+*   **Key Components:** `MobileGS` (Engine), `GraffitiJNI` (Bridge).
 
-Key Components
-:feature:ar
-ArRenderer: Manages the GL surface and ARCore session.
+## State Management
 
-SlamManager: (New) Handles keyframe extraction and point cloud generation.
+Each feature manages its own state using `StateFlow` in a `ViewModel`.
+*   **Unidirectional Data Flow:** UI events -> ViewModel -> State Update -> UI Recomposition.
+*   **Persistence:** `EditorViewModel` and `DashboardViewModel` interact with `ProjectRepository` to save/load data.
 
-:feature:editor
-GsViewer: (New) A dedicated surface for rendering Gaussian Splats.
+## Native Integration
 
-MockupScreen: Switches between 2D Image composables and the 3D GsViewer based on EditorUiState.mapPath.
+The `MobileGS` engine is written in C++17 and accessed via JNI.
+*   **Rendering:** Uses OpenGL ES 3.0 directly.
+*   **Mapping:** Performs SLAM and Gaussian Splatting logic.
+*   **Data Transfer:** Uses direct `ByteBuffer` passing for efficiency.

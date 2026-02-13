@@ -15,6 +15,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+/**
+ * ViewModel for the Dashboard feature.
+ * Manages the list of available projects, new project creation, and location-based sorting.
+ */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val projectRepository: ProjectRepository
@@ -23,6 +27,9 @@ class DashboardViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    /**
+     * Triggers an asynchronous load of all available projects from the repository.
+     */
     fun loadAvailableProjects() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -36,6 +43,10 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Creates a new project with a timestamp-based name and sets it as active.
+     * @param isRightHanded User preference for UI layout (not currently stored in project, but passed for init).
+     */
     fun onNewProject(isRightHanded: Boolean) {
         viewModelScope.launch {
             // Auto-assigned filename (UUID based or Timestamp)
@@ -50,6 +61,10 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Opens an existing project.
+     * @param project The project metadata to load.
+     */
     fun openProject(project: GraffitiProject) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -66,6 +81,9 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Updates the current GPS location for tagging projects or sorting by distance.
+     */
     fun updateCurrentLocation(location: Location) {
         val gpsData = GpsData(location.latitude, location.longitude, location.altitude, location.accuracy, location.time)
         _uiState.update { it.copy(gpsData = gpsData) }

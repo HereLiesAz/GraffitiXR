@@ -37,6 +37,14 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+/**
+ * The main theme composable for GraffitiXR.
+ * Applies the Material 3 color scheme and typography.
+ *
+ * @param darkTheme Whether to use the dark theme (defaults to system setting).
+ * @param dynamicColor Whether to use Android 12+ dynamic colors (wallpaper-based).
+ * @param content The content to be styled.
+ */
 @Composable
 fun GraffitiXRTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
