@@ -9,16 +9,22 @@
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
 
+/**
+ * Represents a single Gaussian Splat (or point) in the 3D world.
+ */
 struct Splat {
-    float x, y, z;
-    float nx, ny, nz;
-    float radius;
-    uint8_t r, g, b;
-    float confidence;
-    uint32_t lastSeenFrame;
-    float luminance;
+    float x, y, z;        ///< Position in World Space
+    float nx, ny, nz;     ///< Normal vector (unused currently)
+    float radius;         ///< Radius of the splat
+    uint8_t r, g, b;      ///< Color (RGB 0-255)
+    float confidence;     ///< Confidence score of the point (0.0-1.0)
+    uint32_t lastSeenFrame; ///< Frame index when this point was last updated
+    float luminance;      ///< Calculated luminance for culling
 };
 
+/**
+ * Key for the spatial hash map (Chunk System).
+ */
 struct ChunkKey {
     int x, y, z;
     bool operator==(const ChunkKey& other) const {
@@ -26,6 +32,9 @@ struct ChunkKey {
     }
 };
 
+/**
+ * Hash function for ChunkKey.
+ */
 struct ChunkKeyHash {
     std::size_t operator()(const ChunkKey& k) const {
         size_t h1 = std::hash<int>{}(k.x);
@@ -35,35 +44,77 @@ struct ChunkKeyHash {
     }
 };
 
+/**
+ * A voxel chunk containing a subset of the point cloud.
+ * Used for efficient rendering and culling.
+ */
 struct Chunk {
-    bool isDirty;
-    bool isActive;
-    std::vector<Splat> splats;
-    GLuint vbo;
-    int splatCount;
+    bool isDirty;           ///< True if VBO needs to be updated
+    bool isActive;          ///< True if chunk is visible
+    std::vector<Splat> splats; ///< List of points in this chunk
+    GLuint vbo;             ///< OpenGL Vertex Buffer Object ID
+    int splatCount;         ///< Number of splats
 
     Chunk() : isDirty(true), isActive(true), vbo(0), splatCount(0) {}
 };
 
+/**
+ * The core C++ engine for MobileGS (Mobile Gaussian Splatting / SplaTAM).
+ * Handles SLAM mapping, point cloud fusion, and OpenGL rendering.
+ */
 class MobileGS {
 public:
     MobileGS();
     ~MobileGS();
 
-    // --- Core Pipeline (SplaTAM) ---
-    // CHANGED: depthPixels is now uint16_t* (raw millimeters)
+    /**
+     * Ingests a new depth frame from ARCore and fuses it into the map.
+     *
+     * @param depthPixels Pointer to 16-bit depth image buffer (millimeters).
+     * @param colorPixels Pointer to color buffer (optional, can be null).
+     * @param width Width of the depth image.
+     * @param height Height of the depth image.
+     * @param stride Row stride of the depth image in bytes.
+     * @param cameraPose 4x4 Column-Major matrix representing camera pose in world space.
+     * @param fov Vertical Field of View in radians.
+     */
     void feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
             int width, int height, int stride, const float* cameraPose, float fov);
 
     void update(const float* cameraPose);
     void render(const float* viewMatrix, const float* projMatrix);
 
+    /**
+     * Initializes the OpenGL context (shaders, buffers).
+     * Must be called on the GL thread.
+     */
     void initialize();
+
+    /**
+     * Updates the camera matrices for the next draw call.
+     * @param view 4x4 View Matrix.
+     * @param proj 4x4 Projection Matrix.
+     */
     void updateCamera(const float* view, const float* proj);
+
+    /**
+     * Renders the point cloud to the currently bound framebuffer.
+     */
     void draw();
 
+    /**
+     * Called when the surface size changes.
+     */
     void onSurfaceChanged(int width, int height);
+
+    /**
+     * Returns the total number of points in the map.
+     */
     int getSplatCount();
+
+    /**
+     * Clears the entire map and deletes GL buffers.
+     */
     void clear();
 
     bool saveModel(std::string path);

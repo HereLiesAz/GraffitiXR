@@ -15,6 +15,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
+/**
+ * ViewModel for the Image Editor feature.
+ * Handles the manipulation of layers, background images, and various editing tools
+ * (adjustments, transforms, blending).
+ */
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     @ApplicationContext private val context: Context
@@ -24,24 +29,43 @@ class EditorViewModel @Inject constructor(
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private val _exportTrigger = MutableStateFlow(false)
+    /**
+     * A flag to trigger the export/save process in the UI.
+     */
     val exportTrigger: StateFlow<Boolean> = _exportTrigger.asStateFlow()
 
+    /**
+     * Changes the current operating mode of the editor.
+     * @param mode The new [EditorMode].
+     */
     fun setEditorMode(mode: EditorMode) {
         _uiState.update { it.copy(editorMode = mode) }
     }
 
     fun setBackgroundImage(uri: Uri?) { }
 
+    /**
+     * Sets the path to the 3D map file for the 3D Mockup mode.
+     * @param path The file path to the .map (splats) file.
+     */
     fun setMapPath(path: String) {
         _uiState.update { it.copy(mapPath = path) }
     }
 
     fun onAddLayer(uri: Uri) { }
 
+    /**
+     * Sets the actively selected layer for editing.
+     * @param layerId The ID of the layer to select.
+     */
     fun onLayerActivated(layerId: String) {
         _uiState.update { it.copy(activeLayerId = layerId) }
     }
 
+    /**
+     * Updates the z-order of layers.
+     * @param newOrder A list of layer IDs in the new order.
+     */
     fun onLayerReordered(newOrder: List<String>) {
         _uiState.update { state ->
             val reordered = newOrder.mapNotNull { id -> state.layers.find { it.id == id } }
@@ -65,10 +89,16 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Toggles the lock state of the active layer to prevent accidental edits.
+     */
     fun toggleImageLock() {
         _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
     }
 
+    /**
+     * Toggles the UI layout between right-handed and left-handed modes.
+     */
     fun toggleHandedness() {
         _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     }
@@ -85,6 +115,9 @@ class EditorViewModel @Inject constructor(
         updateActiveLayer { it.copy(rotationZ = it.rotationZ + rotation) }
     }
 
+    /**
+     * Cycles through the active rotation axis (X, Y, Z) for 3D transforms.
+     */
     fun onCycleRotationAxis() {
         _uiState.update {
             val nextAxis = when(it.activeRotationAxis) {
@@ -124,11 +157,17 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Initiates the project export flow. Hides UI overlays.
+     */
     fun exportProject() {
         _exportTrigger.value = true
         _uiState.update { it.copy(hideUiForCapture = true) }
     }
 
+    /**
+     * Called when export is complete to restore the UI.
+     */
     fun onExportComplete() {
         _exportTrigger.value = false
         _uiState.update { it.copy(hideUiForCapture = false) }

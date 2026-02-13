@@ -14,6 +14,10 @@ import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
+/**
+ * The Single Activity for the application.
+ * Sets up the Compose content, Hilt injection, and the top-level Navigation Graph.
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 

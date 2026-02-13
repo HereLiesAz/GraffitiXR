@@ -105,6 +105,10 @@ void MobileGS::initialize() {
     }
 }
 
+/**
+ * Projects depth pixels into 3D world space and adds them to the point cloud.
+ * Currently uses a naive "add everything" approach with spatial hashing in Chunks.
+ */
 void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
                              int width, int height, int stride, const float* cameraPose, float fov) {
     if (!depthPixels) return;

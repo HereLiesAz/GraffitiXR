@@ -15,6 +15,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/**
+ * Implementation of [ProjectRepository] that uses [ProjectManager] for file system operations.
+ *
+ * @param context Application context.
+ * @param projectManager Helper class for low-level file I/O.
+ * @param ioDispatcher Coroutine dispatcher for blocking I/O operations (default: Dispatchers.IO).
+ */
 class ProjectRepositoryImpl @Inject constructor(
     private val context: Context,
     private val projectManager: ProjectManager,

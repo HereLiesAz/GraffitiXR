@@ -23,6 +23,11 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.atan
 
+/**
+ * The primary OpenGL renderer for the AR experience.
+ * Manages the ARCore [Session], handles the camera background rendering,
+ * and delegates SLAM/Point Cloud rendering to the native [SlamManager].
+ */
 class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private val TAG = "ArRenderer"

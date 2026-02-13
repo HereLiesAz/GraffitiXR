@@ -8,6 +8,10 @@ inline MobileGS* getEngine(jlong handle) {
 
 extern "C" {
 
+/**
+ * Initializes the C++ engine instance.
+ * @return A raw pointer (handle) to the MobileGS instance.
+ */
 JNIEXPORT jlong JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
     auto *engine = new MobileGS();
@@ -15,6 +19,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *en
     return reinterpret_cast<jlong>(engine);
 }
 
+/**
+ * Destroys the C++ engine instance to free memory.
+ */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyNativeJni(JNIEnv *env, jobject thiz, jlong handle) {
     if (handle != 0) {
@@ -22,6 +29,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyNativeJni(JNIEnv 
     }
 }
 
+/**
+ * Updates the camera view and projection matrices.
+ */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
         JNIEnv *env, jobject thiz, jlong handle, jfloatArray viewMtx, jfloatArray projMtx) {
@@ -36,6 +46,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
     env->ReleaseFloatArrayElements(projMtx, proj, 0);
 }
 
+/**
+ * Feeds raw depth data from the camera into the mapping engine.
+ * Handles the ByteBuffer locking and type conversion.
+ */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
         JNIEnv *env, jobject thiz,

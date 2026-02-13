@@ -1,129 +1,154 @@
-package com.hereliesaz.graffitixr.ui.components
+package com.hereliesaz.graffitixr.feature.ar
 
-import android.graphics.PointF
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlin.math.hypot
+import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.CaptureStep
 
+/**
+ * An overlay UI for the Target Creation process.
+ * Displays different controls based on the current [CaptureStep].
+ *
+ * @param uiState The current AR UI state.
+ * @param step The current step in the target creation flow.
+ * @param onPrimaryAction The primary button action (Capture, Rectify, Confirm).
+ * @param onCancel The cancel/back button action.
+ */
 @Composable
 fun TargetCreationOverlay(
-    onConfirm: (List<PointF>) -> Unit,
+    uiState: ArUiState,
+    step: CaptureStep,
+    onPrimaryAction: () -> Unit,
     onCancel: () -> Unit
 ) {
-    var size by remember { mutableStateOf(IntSize.Zero) }
-
-    // Default corners (normalized 0.0 - 1.0)
-    var topLeft by remember { mutableStateOf(Offset(0.2f, 0.2f)) }
-    var topRight by remember { mutableStateOf(Offset(0.8f, 0.2f)) }
-    var bottomRight by remember { mutableStateOf(Offset(0.8f, 0.8f)) }
-    var bottomLeft by remember { mutableStateOf(Offset(0.2f, 0.8f)) }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .onSizeChanged { size = it }
+            .padding(16.dp)
     ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        val w = size.width.toFloat()
-                        val h = size.height.toFloat()
-                        val pos = change.position
-
-                        val touchRadius = 100f // Hit test radius in pixels
-
-                        fun toPixel(norm: Offset) = Offset(norm.x * w, norm.y * h)
-                        fun dist(p1: Offset, p2: Offset) = hypot(p1.x - p2.x, p1.y - p2.y)
-
-                        // Check which corner is closest and move it
-                        when {
-                            dist(pos, toPixel(topLeft)) < touchRadius ->
-                                topLeft += Offset(dragAmount.x / w, dragAmount.y / h)
-                            dist(pos, toPixel(topRight)) < touchRadius ->
-                                topRight += Offset(dragAmount.x / w, dragAmount.y / h)
-                            dist(pos, toPixel(bottomRight)) < touchRadius ->
-                                bottomRight += Offset(dragAmount.x / w, dragAmount.y / h)
-                            dist(pos, toPixel(bottomLeft)) < touchRadius ->
-                                bottomLeft += Offset(dragAmount.x / w, dragAmount.y / h)
-                        }
-                    }
+        // Step-specific Content (Center/Background)
+        when (step) {
+            CaptureStep.CAPTURE -> {
+                // Camera Reticle or Guidance
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .align(Alignment.Center)
+                ) {
+                    Text(
+                        text = "Align Target Here",
+                        color = Color.White,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
                 }
+            }
+            CaptureStep.RECTIFY -> {
+                // Show captured bitmap if available
+                uiState.tempCaptureBitmap?.let { bitmap ->
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Captured Target",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+                Text(
+                    text = "Drag corners to unwarp",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 40.dp)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .padding(8.dp)
+                )
+            }
+            CaptureStep.REVIEW -> {
+                // Show processed target
+                uiState.tempCaptureBitmap?.let { bitmap ->
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Review Target",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            }
+            else -> {}
+        }
+
+        // Bottom Controls
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = 32.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val w = size.width.toFloat()
-            val h = size.height.toFloat()
-
-            val p1 = Offset(topLeft.x * w, topLeft.y * h)
-            val p2 = Offset(topRight.x * w, topRight.y * h)
-            val p3 = Offset(bottomRight.x * w, bottomRight.y * h)
-            val p4 = Offset(bottomLeft.x * w, bottomLeft.y * h)
-
-            // Draw the Quad
-            val path = Path().apply {
-                moveTo(p1.x, p1.y)
-                lineTo(p2.x, p2.y)
-                lineTo(p3.x, p3.y)
-                lineTo(p4.x, p4.y)
-                close()
+            // Cancel / Retake Button
+            FilledTonalButton(
+                onClick = onCancel,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (step == CaptureStep.CAPTURE) "Cancel" else "Retake")
             }
 
-            drawPath(
-                path = path,
-                color = Color.Green,
-                style = Stroke(width = 5f)
-            )
+            Spacer(modifier = Modifier.width(16.dp))
 
-            // Draw Handles
-            drawCircle(Color.Red, radius = 20f, center = p1)
-            drawCircle(Color.Red, radius = 20f, center = p2)
-            drawCircle(Color.Red, radius = 20f, center = p3)
-            drawCircle(Color.Red, radius = 20f, center = p4)
-        }
-
-        // Action Buttons
-        Button(
-            onClick = {
-                // Convert to Android PointF for backend processing
-                val points = listOf(
-                    PointF(topLeft.x, topLeft.y),
-                    PointF(topRight.x, topRight.y),
-                    PointF(bottomRight.x, bottomRight.y),
-                    PointF(bottomLeft.x, bottomLeft.y)
-                )
-                onConfirm(points)
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            Text("RECTIFY")
-        }
-
-        Button(
-            onClick = onCancel,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp)
-        ) {
-            Text("CANCEL")
+            // Primary Action Button
+            Button(
+                onClick = onPrimaryAction,
+                modifier = Modifier.weight(1f)
+            ) {
+                when (step) {
+                    CaptureStep.CAPTURE -> {
+                        Icon(Icons.Default.Camera, contentDescription = "Capture")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Capture")
+                    }
+                    CaptureStep.RECTIFY -> {
+                        Icon(Icons.Default.Check, contentDescription = "Next")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Next")
+                    }
+                    CaptureStep.REVIEW -> {
+                        Icon(Icons.Default.Check, contentDescription = "Confirm")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Save")
+                    }
+                    else -> {}
+                }
+            }
         }
     }
 }

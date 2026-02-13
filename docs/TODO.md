@@ -1,203 +1,47 @@
-# GraffitiXR Project Roadmap & To-Do
-
-This document tracks the development status, future enhancements, and identified gaps in the GraffitiXR application.
-
----
-
-## **V1.15 AzNavRail Upgrade & Surveyor Mode (Current)**
-
--   **[x] AzNavRail Upgrade:**
-    -   [x] Upgrade `AzNavRail` library to version 5.18.
-    -   [x] Refactor `MainScreen` to use native `infoScreen` and `isLoading` properties.
-    -   [x] Refactor `SaveProjectDialog` to use `AzTextBox`.
--   **[x] Surveyor Mode (Mapping):**
-    -   [x] Implement `MappingActivity` UI with `SceneLayout` and controls.
-    -   [x] Replace `SlamCore` with local `SlamManager` to resolve compilation and integration issues.
-    -   [x] Implement `saveMap` functionality via `SlamManager` native interface.
-    -   [x] Update `SphereSLAM` library to v0.4.27.167 to fix build and resolution issues.
-    -   [x] **Load Map:** Add functionality to load and visualize previously saved SLAM maps.
-    -   [x] **Native Photosphere Capture:** Integrate native `savePhotosphere` API for high-quality environment maps.
-
-## **V1.14 UI/UX Enhancements (Completed)**
-
--   **[x] Trace Mode Improvements:**
-    -   [x] Simplified unlock gesture (Simultaneous Volume Up + Down).
-    -   [x] Added persistent, self-dismissing unlock instructions popup.
-    -   [x] Trigger instructions on lock, resume, volume press, and 4-tap gesture.
-
-## **V1.16 Rectify Image Targeting (Current)**
-
--   **[x] Rectify Image Workflow:**
-    -   [x] Implement "Rectify Image" mode for creating planar targets from angled photos.
-    -   [x] Create `UnwarpScreen` with 4-point corner selection and magnifier loop.
-    -   [x] Integrate OpenCV `getPerspectiveTransform` and `warpPerspective` for image rectification.
-    -   [x] Add entry point in `TargetCreationOverlay`.
-    -   [x] **Fix Grid Capture:** Implemented frame capture logic in `ArRenderer` to fix "Start" button unresponsiveness.
-
-## **V1.13 Guided Target Creation (Completed)**
-
--   **[x] Guided Grid Creation:**
-    -   [x] Implement "Guided Grid" workflow for AR target creation.
-    -   [x] Add "Guided Points" (4 X's) workflow.
-    -   [x] Create UI for choosing between Capture, Grid, and Points.
-    -   [x] Implement dynamic grid generation and configuration (Rows x Cols).
-    -   [x] Allow re-positioning of the grid anchor during creation.
-
-## **V1.12 Android XR Readiness (Completed)**
-
--   **[x] Integrate Android XR SDK:**
-    -   [x] Add dependencies for `androidx.xr.runtime`, `scenecore`, `compose`, `arcore`.
-    -   [x] Update build configuration to `compileSdk 36`.
-    -   [x] **Optimize AR Render Loop:** Throttle bounding box updates to reduce UI jank.
-
-## **V1.11 Documentation Overhaul (Completed)**
-
--   **[x] Comprehensive Documentation:**
-    -   [x] Create `docs/` folder structure.
-    -   [x] Create `AGENT_GUIDE.md`, `UI_UX.md`, `auth.md`, `conduct.md`, `data_layer.md`, `fauxpas.md`, `misc.md`, `performance.md`, `screens.md`, `task_flow.md`, `testing.md`, `workflow.md`.
-    -   [x] Update `AGENTS.md` with index and strict rules.
-    -   [x] Add KDocs to critical files (`MainViewModel`, `UiState`, `ArRenderer`, `MainActivity`, `ProjectManager`, `ArView`).
-
----
-
-## **V1.6 Enhancements (Completed)**
-
--   **[x] UI Layout Reorganization:**
-    -   [x] Reorganized Navigation Rail: Moved adjustment items to "Image", created "Target" host for target-related items.
-    -   [x] Consolidate controls: Adjustments (Opacity, Contrast, Saturation) are now grouped in a bottom panel.
--   **[x] Improved Adjustments UI:**
-    -   [x] Replaced adjustment sliders with rotatable Knobs.
-    -   [x] Implemented a transparent `AdjustmentsPanel` at the bottom of the screen.
-    -   [x] Added persistent Undo/Redo buttons alongside the adjustments.
-    -   [x] Ensure controls do not obscure the image (transparent background).
-
-## **V1.5 Completed Features**
-
--   **[x] Refactor from Vuforia Engine to ARCore:**
-    -   [x] Removed all Vuforia dependencies and code.
-    -   [x] Integrate the ARCore SDK.
-    -   [x] Implement runtime Image Target creation using the device camera.
--   **[x] Mock-up Mode:**
-    -   [x] Users can select a static background image.
-    -   [x] A four-point transformation UI allows users to warp the overlay image.
-    -   [x] Two-finger gestures for scaling and rotating the overlay are implemented.
--   **[x] On-the-Go Mode (Non-AR Camera):**
-    -   [x] A fallback mode overlays the image on the live camera feed for non-AR devices.
--   **[x] Core UI and Image Adjustments:**
-    -   [x] UI for selecting overlay and background images.
-    -   [x] Functional sliders for opacity, contrast, and saturation.
-    -   [x] Background removal for the overlay image.
--   **[x] Code & Project Documentation:**
-    -   [x] Added comprehensive KDocs to all classes, methods, and properties.
-    -   [x] Rewrote `README.md`, `AGENTS.md`, and `BLUEPRINT.md` to align with the project vision.
--   **[x] Robustness and Error Handling:**
-    -   [x] Implemented error handling for background removal failures.
-    -   [x] Implemented user guidance for AR plane detection failures.
--   **[x] Automated Tests:**
-    -   [x] Added a suite of unit tests for the `MainViewModel`.
--   **[x] UI Refinements:**
-    -   [x] Refined the Adjustment Slider UI into an integrated, animated panel.
--   **[x] Enhance User Experience (UX):**
-    -   [x] **Create User Onboarding:** Design and implement a tutorial or onboarding flow to explain the two different modes (Mock-up and On-the-Go) to new users.
-    -   [x] **Add Gesture Feedback:** Provide visual feedback in Mock-up mode when a scale or rotation gesture is active.
--   **[x] Keep track of the real-world image's progress as the original fingerprint is eventually covered by it completely.
--   **[x] Undo/Redo Functionality:**
-    -   [x] Implement undo and redo buttons to revert or reapply image adjustments.
--   **[x] Refine Gesture Feedback UI:**
-    -   [x] Replace the full-screen gesture feedback with a more subtle, non-intrusive indicator.
--   **[x] Optimize Progress Calculation Performance:**
-    -   [x] Refactor the progress calculation logic to avoid recalculating the entire bitmap on every update.
--   **[x] Add "Save/Export" Feature:**
-    -   [x] Allow users to save or export the final composed image from any of the modes.
-    -   [x] Allow users to save the marks or griding "fingerprint" and overlay location, size, and orientation.
-    -   [x] Saving the project includes the fingerprint and undo/redo history.
--   **[x] Implement Advanced Image Editing:**
-    -   [x] Add more advanced image adjustment tools like color balance or blending modes.
-    -   [x] **Curves Adjustment:** Implement a user interface for adjusting the image's tonal range using curves.
--   **[x] Create a Project Library:**
-    -   [x] Implement functionality to save, load, and manage different mock-up projects (background, overlay, settings).
--   **[x] Improve UX Flow and Navigation:**
-    -   [x] Reorganize navigation rail items into logical groups (Project, Mode, Image, Adjustments).
-    -   [x] Implement a multi-step onboarding tutorial in HelpScreen.
-
----
-
-## **V1.7 Features**
-
--   **[x] Settings Screen:**
-    -   [x] Added a centralized Settings screen accessible from the Navigation Rail.
-    -   [x] Displays App Version and Permissions status.
-    -   [x] Implemented GitHub update check for experimental releases.
-
-## V1.10 Features (Current)
-
--   **[x] Critical Bug Fixes & UX Enhancements:**
-    -   [x] **Fix AR Drag:** Implemented single-touch drag to place anchor in AR mode.
-    -   [x] **Two-Finger Drag:** Implemented global two-finger drag (pan) to move AR anchor.
-    -   [x] **Fix Camera Lag:** Resolved camera resource conflict when switching from Overlay to AR mode.
-    -   [x] **Fix Grid Creation:** Resolved black screen issue in Refinement step by fixing FileProvider paths.
-    -   [x] **Robust Auto-Save:** Implemented periodic auto-save to persist application state.
-    -   [x] **Grid Orientation:** Fixed sideways fingerprint grid issue by rotating captured frames.
-    -   [x] **Flashlight:** Added flashlight toggle for AR and Overlay modes.
-    -   [x] **Magic Align:** Added button to flatten image rotation.
-    -   [x] **UI Polish:** Updated Settings navigation, Undo/Redo styling, and Refinement visualization.
-
-## V1.9 Features (Completed)
-
--   **[x] Robust Bug Reporting:**
-    -   [x] Implement a global crash handler to catch uncaught exceptions.
-    -   [x] Create a `CrashActivity` to display error details to the user.
-    -   [x] Integrate with GitHub Issues to automatically pre-fill bug reports.
-    -   [x] Ensure bug reports trigger the "Jules" AI agent for automatic handling.
-
-## **Project Backlog**
-
-All items completed. Ready for the next phase of development.
-# Project Roadmap & Backlog
+# GraffitiXR Roadmap & Backlog
 
 ## 🔴 High Priority (The Core)
 
-- [x] **Voxel Map Culling:** The `MobileGS` engine now performs a "Garbage Collector" pass that deletes points with `opacity < 0.3` and `age > 2000ms` when the map buffer reaches 95% capacity.
-- [x] **Serialization Speed:** The `.map` save functionality has been moved to `Dispatchers.IO` in Kotlin, calling a synchronous C++ `saveModel` function to prevent UI freezes (ANRs).
+- [x] **Voxel Map Culling:** `MobileGS` garbage collection for old points.
+- [x] **Serialization Speed:** Async map saving.
+- [x] **Modularization:** Complete refactoring into `:core` and `:feature` modules.
+- [ ] **Unit Testing:** Increase coverage for new ViewModels and Repositories.
 
 ## 🟡 Medium Priority (Features)
 
-- [x] **"Ghost" Toggle:** A button to toggle the rendered splats on/off. Sometimes the green dots get in the way of seeing the actual wall art.
-- [x] **Fingerprint Aging:** The ORB descriptors should age out. If a wall changes significantly (painted over), the old fingerprint prevents re-localization. We need a "Force Rescan" button.
-- [x] **Left-Handed Mode:** Invert the AzNavRail alignment in `MainScreen.kt`.
+- [x] **"Ghost" Toggle:** Toggle point cloud visibility.
+- [x] **Fingerprint Aging:** Handle outdated ORB descriptors.
+- [x] **Left-Handed Mode:** Invert AzNavRail alignment.
+- [ ] **Mockup Mode - Mesh Warp:** Non-linear warping for curved surfaces.
 
 ## 🟢 Low Priority (Polish)
 
-- [ ] **Mockup Mode - Perspective Warp:** The current 2D perspective warp is linear. Add a "Mesh Warp" for curved surfaces (pillars).
+- [ ] **Cloud Anchors:** Multi-user AR sessions.
+- [ ] **Occlusion:** Person/Object masking.
 
-## ❌ Deprecated / Won't Do
+## Completed Features (Archive)
 
+### V1.16 Rectify Image Targeting
+- [x] Rectify Image mode.
+- [x] `UnwarpScreen` with OpenCV perspective transform.
 
+### V1.15 AzNavRail Upgrade & Surveyor Mode
+- [x] `AzNavRail` v5.18.
+- [x] `SlamManager` replacing `SlamCore`.
+- [x] Native Photosphere capture.
 
+### V1.14 UI/UX Enhancements
+- [x] Trace Mode improvements (Gestures, Instructions).
 
-# Roadmap
+### V1.13 Guided Target Creation
+- [x] Guided Grid workflow.
+- [x] Dynamic grid generation.
 
-## Phase 1: Foundation (Completed)
-- [x] Multi-module project structure setup.
-- [x] ARCore integration with basic plane detection.
-- [x] Jetpack Compose UI with `AzNavRail`.
-- [x] Basic Image Editor (Translate, Scale, Rotate).
+### V1.12 Android XR Readiness
+- [x] Android XR SDK integration.
+- [x] `compileSdk 36`.
 
-## Phase 2: Core Editing (Current)
-- [x] Layer System (Add, Remove, Reorder).
-- [x] Blend Modes (Multiply, Overlay, Screen, etc.).
-- [x] Project Persistence (Save/Load).
-- [x] Trace Mode (High contrast overlay).
-- [ ] Color Adjustment Tools (Saturation, Brightness, Contrast).
-- [ ] Masking & Eraser Tools.
-
-## Phase 3: Advanced AR (Next)
-- [x] Target Creation Flow (Capture -> Rectify -> Track).
-- [ ] Cloud Anchors for persistent multi-user sessions.
-- [ ] Occlusion handling (Person/Object masking).
-- [ ] Light Estimation for realistic rendering.
-
-## Phase 4: Surveyor & 3D (Experimental)
-- [x] Basic Gaussian Splatting Viewer integration (Stubbed).
-- [ ] Photogrammetry capture pipeline.
-- [ ] 3D Model import (.glb/.gltf) support.
+### Architecture & Documentation
+- [x] Multi-module split.
+- [x] "God Object" ViewModel refactoring.
+- [x] Comprehensive documentation update.

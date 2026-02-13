@@ -17,16 +17,33 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+/**
+ * Interface for providing URIs for files. Abstraction allows for easier testing.
+ */
 interface UriProvider {
     fun getUriForFile(file: File): Uri
 }
 
+/**
+ * Default implementation using [Uri.fromFile].
+ */
 class DefaultUriProvider : UriProvider {
     override fun getUriForFile(file: File): Uri {
         return Uri.fromFile(file)
     }
 }
 
+/**
+ * Manages the low-level file system operations for GraffitiXR projects.
+ * Handles saving/loading JSON metadata and image assets (thumbnails, targets).
+ *
+ * Project Structure:
+ * - /files/projects/{projectId}/
+ *   - project.json (Metadata)
+ *   - thumbnail.png (Preview)
+ *   - target_0.png (Target images)
+ *   - map.bin (SLAM map)
+ */
 class ProjectManager(
     private val context: Context,
     private val uriProvider: UriProvider = DefaultUriProvider()
@@ -38,12 +55,18 @@ class ProjectManager(
         encodeDefaults = true
     }
 
+    /**
+     * Returns a list of project IDs (directory names) found in storage.
+     */
     fun getProjectList(context: Context): List<String> {
         val projectsDir = File(context.filesDir, "projects")
         if (!projectsDir.exists()) return emptyList()
         return projectsDir.listFiles()?.filter { it.isDirectory }?.map { it.name } ?: emptyList()
     }
 
+    /**
+     * Deletes a project directory and all its contents.
+     */
     fun deleteProject(context: Context, projectName: String) {
         val projectDir = File(context.filesDir, "projects/$projectName")
         if (projectDir.exists()) {
@@ -51,13 +74,24 @@ class ProjectManager(
         }
     }
 
-    // FIX: Added missing method required by MainViewModel.finalizeMap()
+    /**
+     * Returns the absolute path to the map.bin file for a given project.
+     * Ensures the project directory exists.
+     */
     fun getMapPath(context: Context, projectId: String): String {
         val root = File(context.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()
         return File(root, "map.bin").absolutePath
     }
 
+    /**
+     * Saves project metadata and optional assets to disk.
+     *
+     * @param context Application context.
+     * @param projectData The project metadata to serialize.
+     * @param targetImages Optional list of bitmaps to save as target images.
+     * @param thumbnail Optional bitmap to save as the project thumbnail.
+     */
     suspend fun saveProject(context: Context, projectData: GraffitiProject, targetImages: List<Bitmap>? = null, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
@@ -101,6 +135,9 @@ class ProjectManager(
         File(root, "project.json").writeText(jsonString)
     }
 
+    /**
+     * Loads a full project including bitmaps into memory.
+     */
     suspend fun loadProject(context: Context, projectId: String): LoadedProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         val projectFile = File(root, "project.json")
@@ -122,6 +159,9 @@ class ProjectManager(
         }
     }
 
+    /**
+     * Loads only the metadata for a project (faster than full load).
+     */
     suspend fun loadProjectMetadata(context: Context, projectId: String): GraffitiProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         val projectFile = File(root, "project.json")
@@ -136,6 +176,9 @@ class ProjectManager(
         }
     }
 
+    /**
+     * Zips the project folder into a single file at the specified URI.
+     */
     fun exportProjectToUri(context: Context, projectId: String, uri: Uri) {
         val sourceFolder = File(context.filesDir, "projects/$projectId")
         if (!sourceFolder.exists()) return

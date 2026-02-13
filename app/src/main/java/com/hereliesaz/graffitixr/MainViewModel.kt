@@ -9,6 +9,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
+/**
+ * State representing the global application status, distinct from specific features.
+ *
+ * @property isTouchLocked Whether the screen touch input is disabled (Trace Mode).
+ * @property showUnlockInstructions Whether to show the "how to unlock" hint.
+ * @property isCapturingTarget Whether the global target creation flow is active.
+ * @property captureStep The current step in the target creation wizard.
+ */
 data class MainUiState(
     val isTouchLocked: Boolean = false,
     val showUnlockInstructions: Boolean = false,
@@ -16,20 +24,34 @@ data class MainUiState(
     val captureStep: CaptureStep = CaptureStep.NONE
 )
 
+/**
+ * The top-level ViewModel for the application.
+ * Manages cross-cutting concerns like touch locking, global navigation states (Target Creation Flow),
+ * and app-wide UI overlays.
+ */
 @HiltViewModel
 class MainViewModel @Inject constructor() : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
+    /**
+     * Enables or disables the touch lock (used in Trace Mode).
+     */
     fun setTouchLocked(locked: Boolean) {
         _uiState.update { it.copy(isTouchLocked = locked) }
     }
 
+    /**
+     * Shows or hides the unlock instructions dialog.
+     */
     fun showUnlockInstructions(show: Boolean) {
         _uiState.update { it.copy(showUnlockInstructions = show) }
     }
 
+    /**
+     * Initiates the AR Target Creation flow.
+     */
     fun startTargetCapture() {
         _uiState.update {
             it.copy(
@@ -39,14 +61,23 @@ class MainViewModel @Inject constructor() : ViewModel() {
         }
     }
 
+    /**
+     * Advances or regresses the target creation step manually.
+     */
     fun setCaptureStep(step: CaptureStep) {
         _uiState.update { it.copy(captureStep = step) }
     }
 
+    /**
+     * Resets the capture flow to the initial capture step (e.g., from Review back to Capture).
+     */
     fun onRetakeCapture() {
         _uiState.update { it.copy(captureStep = CaptureStep.CAPTURE) }
     }
 
+    /**
+     * Finalizes the target creation and exits the flow.
+     */
     fun onConfirmTargetCreation() {
         _uiState.update {
             it.copy(
@@ -56,6 +87,9 @@ class MainViewModel @Inject constructor() : ViewModel() {
         }
     }
 
+    /**
+     * Cancels the target creation and exits the flow.
+     */
     fun onCancelCaptureClicked() {
         _uiState.update {
             it.copy(

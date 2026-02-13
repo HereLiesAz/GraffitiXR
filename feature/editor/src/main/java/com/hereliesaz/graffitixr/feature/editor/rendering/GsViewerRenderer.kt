@@ -7,6 +7,14 @@ import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
+/**
+ * A specialized GLRenderer for viewing 3D Gaussian Splat maps (Mockup Mode).
+ * Unlike [ArRenderer], this does not use the camera feed or ARCore.
+ * It uses a [VirtualCamera] to navigate the 3D scene.
+ *
+ * @param context The application context.
+ * @param mapPath The file path to the .bin map file to load.
+ */
 class GsViewerRenderer(
     private val context: Context,
     private val mapPath: String
