@@ -62,6 +62,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
+/**
+ * The main screen composable that orchestrates the entire application UI.
+ *
+ * It composes the [GraffitiNavRail] (navigation side-bar), the main content area
+ * (switching between [ArView], [GsViewer], etc.), and overlay dialogs/panels.
+ */
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -69,7 +75,7 @@ fun MainScreen(
     arViewModel: ArViewModel,
     dashboardViewModel: DashboardViewModel,
     navController: NavController,
-    slamManager: SlamManager, // FIXED: Added
+    slamManager: SlamManager, // Injected dependency
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val localNavController = rememberNavController()
@@ -217,7 +223,7 @@ fun MainScreen(
                         onPickBackground = {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
-                        slamManager = slamManager, // FIXED: Added
+                        slamManager = slamManager, // FIXED: Passing Shared Engine
                         use3dBackground = use3dBackground
                     )
                 }
@@ -239,10 +245,11 @@ fun MainScreen(
                         )
                     }
                     composable("surveyor") {
+                        // FIXED: Updated call signature to match MappingScreen.kt
                         MappingScreen(
                             onScanComplete = { localNavController.popBackStack() },
                             onBackClick = { localNavController.popBackStack() },
-                            slamManager = slamManager // FIXED: Passed explicitly
+                            slamManager = slamManager
                         )
                     }
                     composable("project_library") {
@@ -256,7 +263,9 @@ fun MainScreen(
                                         popUpTo("project_library") { inclusive = false }
                                     }
                                 },
-                                onDeleteProject = { /* TODO */ },
+                                onDeleteProject = { projectId ->
+                                    dashboardViewModel.deleteProject(projectId)
+                                },
                                 onNewProject = {
                                     dashboardViewModel.onNewProject(editorUiState.isRightHanded)
                                     localNavController.navigate("editor") {
@@ -338,7 +347,7 @@ fun MainContentLayer(
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit,
     onPickBackground: () -> Unit,
-    slamManager: SlamManager, // FIXED: Added
+    slamManager: SlamManager, // Injected
     use3dBackground: Boolean = false
 ) {
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
@@ -351,18 +360,20 @@ fun MainContentLayer(
 
         when (editorUiState.editorMode) {
             EditorMode.AR -> {
+                // FIXED: Passing slamManager
                 ArView(
                     viewModel = arViewModel,
                     uiState = arUiState,
-                    slamManager = slamManager, // FIXED: Passed
+                    slamManager = slamManager,
                     onRendererCreated = onRendererCreated
                 )
             }
             EditorMode.STATIC -> {
                 if (use3dBackground && !editorUiState.mapPath.isNullOrEmpty()) {
+                    // FIXED: Passing slamManager
                     GsViewer(
                         mapPath = editorUiState.mapPath!!,
-                        slamManager = slamManager, // Assuming GsViewer also updated to take this?
+                        slamManager = slamManager,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -384,10 +395,11 @@ fun MainContentLayer(
                 Box(Modifier.fillMaxSize().background(Color.White))
             }
             EditorMode.OVERLAY -> {
+                // FIXED: Passing slamManager
                 ArView(
                     viewModel = arViewModel,
                     uiState = arUiState.copy(showPointCloud = false),
-                    slamManager = slamManager, // FIXED: Passed
+                    slamManager = slamManager,
                     onRendererCreated = onRendererCreated
                 )
             }
