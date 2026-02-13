@@ -41,6 +41,8 @@ graph TD
     
     Core_Common --> Core_Domain
     Core_Domain --> Core_Data
+```
+
 The "Unified State" Pattern
 We do not use isolated states per feature. We use a monolithic state object split by domain, residing in :core:common.
 
