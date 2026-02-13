@@ -1,43 +1,34 @@
-package com.hereliesaz.graffitixr.domain.repository
+package com.hereliesaz.graffitixr.core.domain.repository
 
-import com.hereliesaz.graffitixr.common.model.GraffitiProject
-import kotlinx.coroutines.flow.StateFlow
+import com.hereliesaz.graffitixr.core.common.model.GraffitiProject
+import kotlinx.coroutines.flow.Flow
 
 interface ProjectRepository {
+    /**
+     * Observes the list of all projects, sorted by last modified.
+     */
+    val projects: Flow<List<GraffitiProject>>
+
+    suspend fun getProject(id: String): GraffitiProject?
+    suspend fun createProject(project: GraffitiProject)
+    suspend fun updateProject(project: GraffitiProject)
+    suspend fun deleteProject(id: String)
+
+    // --- Teleological Additions ---
 
     /**
-     * The currently active project being edited.
+     * Saves a binary blob (ORB descriptors, SLAM map) to the project folder.
+     * Returns the absolute path of the saved file.
      */
-    val currentProject: StateFlow<GraffitiProject?>
+    suspend fun saveArtifact(projectId: String, filename: String, data: ByteArray): String
 
     /**
-     * Loads a project from disk by ID.
+     * Updates the pointer to the "Future Wall" fingerprint (Target).
      */
-    suspend fun loadProject(projectId: String): Result<GraffitiProject>
+    suspend fun updateTargetFingerprint(projectId: String, path: String)
 
     /**
-     * Creates a new project and sets it as active.
+     * Updates the pointer to the SLAM voxel map.
      */
-    suspend fun createProject(name: String): GraffitiProject
-
-    /**
-     * Updates the current project state (autosave).
-     * @param transform A function that takes the current project and returns the modified one.
-     */
-    suspend fun updateProject(transform: (GraffitiProject) -> GraffitiProject)
-
-    /**
-     * Returns a list of all available projects.
-     */
-    suspend fun getProjects(): List<GraffitiProject>
-
-    /**
-     * Saves the current state to disk immediately.
-     */
-    suspend fun saveProject(): Result<Unit>
-
-    /**
-     * Closes the current project and clears memory.
-     */
-    suspend fun closeProject()
+    suspend fun updateMapPath(projectId: String, path: String)
 }

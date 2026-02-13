@@ -2,95 +2,56 @@
 #define MOBILE_GS_H
 
 #include <vector>
-#include <string>
-#include <unordered_map>
 #include <mutex>
-#include <cmath>
-#include <GLES3/gl3.h>
-#include <glm/glm.hpp>
-
-struct Splat {
-    float x, y, z;
-    float nx, ny, nz;
-    float radius;
-    uint8_t r, g, b;
-    float confidence;
-    uint32_t lastSeenFrame;
-    float luminance;
-};
-
-struct ChunkKey {
-    int x, y, z;
-    bool operator==(const ChunkKey& other) const {
-        return x == other.x && y == other.y && z == other.z;
-    }
-};
-
-struct ChunkKeyHash {
-    std::size_t operator()(const ChunkKey& k) const {
-        size_t h1 = std::hash<int>{}(k.x);
-        size_t h2 = std::hash<int>{}(k.y);
-        size_t h3 = std::hash<int>{}(k.z);
-        return h1 ^ (h2 << 1) ^ (h3 << 2);
-    }
-};
-
-struct Chunk {
-    bool isDirty;
-    bool isActive;
-    std::vector<Splat> splats;
-    GLuint vbo;
-    int splatCount;
-
-    Chunk() : isDirty(true), isActive(true), vbo(0), splatCount(0) {}
-};
+#include <memory>
+#include <opencv2/core.hpp>
+#include <opencv2/features2d.hpp>
 
 class MobileGS {
 public:
     MobileGS();
     ~MobileGS();
 
-    // --- Core Pipeline (SplaTAM) ---
-    // CHANGED: depthPixels is now uint16_t* (raw millimeters)
-    void feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
-            int width, int height, int stride, const float* cameraPose, float fov);
+    void Initialize(int width, int height);
+    void Update(const cv::Mat& cameraFrame, const float* viewMatrix, const float* projectionMatrix);
+    void Draw();
+    void Cleanup();
 
-    void update(const float* cameraPose);
-    void render(const float* viewMatrix, const float* projMatrix);
-
-    void initialize();
-    void updateCamera(const float* view, const float* proj);
-    void draw();
-
-    void onSurfaceChanged(int width, int height);
-    int getSplatCount();
-    void clear();
-
-    bool saveModel(std::string path);
-    bool loadModel(std::string path);
-    void alignMap(const float* transform);
-
-    void setChunkSize(float meters) { mChunkSize = meters; }
+    // Teleological SLAM methods
+    void SetTargetDescriptors(const cv::Mat& descriptors);
+    bool IsTrackingTarget() const;
 
 private:
-    float mChunkSize = 2.0f;
-    float mVoxelSize = 0.05f;
-    int mFrameCount = 0;
+    int mWidth;
+    int mHeight;
+    bool mIsInitialized;
 
-    glm::mat4 mStoredView;
-    glm::mat4 mStoredProj;
-    int mScreenWidth, mScreenHeight;
+    // SLAM Components
+    cv::Ptr<cv::ORB> mOrb;
+    cv::Ptr<cv::DescriptorMatcher> mMatcher;
 
-    std::unordered_map<ChunkKey, Chunk, ChunkKeyHash> mChunks;
-    std::mutex mChunkMutex;
+    // The Map (Current Reality)
+    std::vector<cv::KeyPoint> mMapKeypoints; // 2D (Legacy/Debug)
+    std::vector<cv::Point3f> mMapPoints3D;   // 3D World Points
+    cv::Mat mMapDescriptors;
+    std::mutex mMapMutex;
 
-    GLuint mProgram = 0;
-    GLint mLocMVP = -1;
-    GLint mLocPointSize = -1;
+    // The Target (The Goal/Overlay)
+    cv::Mat mTargetDescriptors;
+    bool mHasTarget;
 
-    ChunkKey getChunkKey(float x, float y, float z);
-    float getLuminance(uint8_t r, uint8_t g, uint8_t b);
-    void fuseSplat(Splat& target, const Splat& source);
+    // Matrices
+    float mViewMatrix[16];
+    float mProjMatrix[16];
+
+    // Internal methods
+    void ProcessFrame(const cv::Mat& frame);
+    void MatchAndFuse(const std::vector<cv::KeyPoint>& keypoints, const cv::Mat& descriptors);
+
+    // Math Helpers
+    cv::Point2f ProjectPoint(const cv::Point3f& p3d);
+    cv::Point3f UnprojectPoint(const cv::KeyPoint& kpt, float depth);
+    void MultiplyMatrixVector(const float* matrix, const float* in, float* out);
 };
 
 #endif // MOBILE_GS_H

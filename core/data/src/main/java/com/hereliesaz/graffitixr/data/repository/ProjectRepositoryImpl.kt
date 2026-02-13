@@ -2,81 +2,107 @@ package com.hereliesaz.graffitixr.data.repository
 
 import android.content.Context
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
-import com.hereliesaz.graffitixr.data.ProjectManager
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
+import com.hereliesaz.graffitixr.core.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.data.local.ProjectSerializer
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class ProjectRepositoryImpl @Inject constructor(
-    private val context: Context,
-    private val projectManager: ProjectManager,
-    // Using IO dispatcher for file operations
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    @ApplicationContext private val context: Context,
+    private val serializer: ProjectSerializer
 ) : ProjectRepository {
 
-    private val _currentProject = MutableStateFlow<GraffitiProject?>(null)
-    override val currentProject: StateFlow<GraffitiProject?> = _currentProject.asStateFlow()
+    private val projectsDir = File(context.filesDir, "projects")
+    private val _projects = MutableStateFlow<Map<String, GraffitiProject>>(emptyMap())
 
-    override suspend fun loadProject(projectId: String): Result<GraffitiProject> = withContext(ioDispatcher) {
-        try {
-            val loadedProject = projectManager.loadProject(context, projectId)
-            if (loadedProject != null) {
-                _currentProject.value = loadedProject.projectData
-                Result.success(loadedProject.projectData)
-            } else {
-                Result.failure(Exception("Project not found"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+    // Expose flow from domain interface
+    override val projects: Flow<List<GraffitiProject>> = _projects.map {
+        it.values.toList().sortedByDescending { p -> p.lastModified }
+    }
+
+    init {
+        if (!projectsDir.exists()) projectsDir.mkdirs()
+        refresh()
+    }
+
+    private fun refresh() {
+        val loaded = projectsDir.listFiles()?.mapNotNull { dir ->
+            val metaFile = File(dir, "project.json")
+            if (metaFile.exists()) {
+                try {
+                    serializer.decode(metaFile.readText())
+                } catch (e: Exception) {
+                    null
+                }
+            } else null
+        }?.associateBy { it.id } ?: emptyMap()
+
+        _projects.value = loaded
+    }
+
+    override suspend fun getProject(id: String): GraffitiProject? {
+        return _projects.value[id]
+    }
+
+    override suspend fun createProject(project: GraffitiProject) {
+        saveToDisk(project)
+        _projects.value = _projects.value + (project.id to project)
+    }
+
+    override suspend fun updateProject(project: GraffitiProject) {
+        val updated = project.copy(lastModified = System.currentTimeMillis())
+        saveToDisk(updated)
+        _projects.value = _projects.value + (updated.id to updated)
+    }
+
+    override suspend fun deleteProject(id: String) {
+        withContext(Dispatchers.IO) {
+            val dir = File(projectsDir, id)
+            if (dir.exists()) dir.deleteRecursively()
+        }
+        _projects.value = _projects.value - id
+    }
+
+    // --- Teleological Implementation ---
+
+    override suspend fun saveArtifact(projectId: String, filename: String, data: ByteArray): String {
+        return withContext(Dispatchers.IO) {
+            val dir = File(projectsDir, projectId)
+            if (!dir.exists()) dir.mkdirs()
+
+            val file = File(dir, filename)
+            FileOutputStream(file).use { it.write(data) }
+
+            file.absolutePath
         }
     }
 
-    override suspend fun createProject(name: String): GraffitiProject = withContext(ioDispatcher) {
-        // Force Recompile
-        val newProject = GraffitiProject(name = name)
-        _currentProject.value = newProject
-        projectManager.saveProject(context, newProject, emptyList())
-        newProject
+    override suspend fun updateTargetFingerprint(projectId: String, path: String) {
+        val current = _projects.value[projectId] ?: return
+        updateProject(current.copy(targetFingerprintPath = path))
     }
 
-    override suspend fun updateProject(transform: (GraffitiProject) -> GraffitiProject) {
-        _currentProject.update { current ->
-            if (current == null) return@update null
-            val updated = transform(current).copy(lastModified = System.currentTimeMillis())
-            // Fire and forget save to avoid blocking UI
-            // In a real prod app, use a queue or worker
-            CoroutineScope(ioDispatcher).launch {
-                projectManager.saveProject(context, updated, null)
-            }
-            updated
+    override suspend fun updateMapPath(projectId: String, path: String) {
+        val current = _projects.value[projectId] ?: return
+        updateProject(current.copy(mapPath = path))
+    }
+
+    private suspend fun saveToDisk(project: GraffitiProject) {
+        withContext(Dispatchers.IO) {
+            val dir = File(projectsDir, project.id)
+            if (!dir.exists()) dir.mkdirs()
+
+            val metaFile = File(dir, "project.json")
+            metaFile.writeText(serializer.encode(project))
         }
-    }
-
-    override suspend fun getProjects(): List<GraffitiProject> = withContext(ioDispatcher) {
-        projectManager.getProjectList(context).mapNotNull { id ->
-            projectManager.loadProjectMetadata(context, id)
-        }
-    }
-
-    override suspend fun saveProject(): Result<Unit> = withContext(ioDispatcher) {
-        val current = _currentProject.value ?: return@withContext Result.failure(Exception("No active project"))
-        try {
-            projectManager.saveProject(context, current, null)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun closeProject() {
-        _currentProject.value = null
     }
 }

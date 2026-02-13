@@ -2,6 +2,8 @@ package com.hereliesaz.graffitixr.common.model
 
 import android.net.Uri
 import android.os.Parcelable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.common.serialization.BlendModeSerializer
 import com.hereliesaz.graffitixr.common.serialization.OffsetSerializer
 import com.hereliesaz.graffitixr.common.serialization.UriSerializer
@@ -56,47 +58,50 @@ data class GraffitiProject(
     val thumbnailUri: Uri? = null,
 
     val targetImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
-
     val refinementPaths: List<RefinementPath> = emptyList(),
 
+    // Legacy Editor State (Kept for backward compatibility)
     val opacity: Float = 1f,
     val brightness: Float = 0f,
     val contrast: Float = 1f,
     val saturation: Float = 1f,
-
     val colorBalanceR: Float = 1f,
     val colorBalanceG: Float = 1f,
     val colorBalanceB: Float = 1f,
-
     val scale: Float = 1f,
     val rotationX: Float = 0f,
     val rotationY: Float = 0f,
     val rotationZ: Float = 0f,
 
     @Serializable(with = OffsetSerializer::class)
-    val offset: androidx.compose.ui.geometry.Offset = androidx.compose.ui.geometry.Offset.Zero,
+    val offset: Offset = Offset.Zero,
 
     @Serializable(with = BlendModeSerializer::class)
-    val blendMode: androidx.compose.ui.graphics.BlendMode = androidx.compose.ui.graphics.BlendMode.SrcOver,
+    val blendMode: BlendMode = BlendMode.SrcOver,
 
     val fingerprint: Fingerprint? = null,
 
+    // Teleological Fingerprinting (NEW)
+    // Stores the path to the ORB descriptor file extracted from the digital overlay.
+    // This allows the SLAM engine to recognize the "Future Wall" as a valid anchor.
+    val targetFingerprintPath: String? = null,
+
     // Using a simpler representation for drawing paths (list of point lists)
-    // Serialization of Pair<Float, Float> needs to be handled or simplified.
-    // For now we assume standard list serialization works for basic types if Pair is serializable
-    // Pair is Serializable in Kotlin.
     val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
 
     val progressPercentage: Float = 0f,
-
     val evolutionImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
 
     val gpsData: GpsData? = null,
     val sensorData: SensorData? = null,
     val calibrationSnapshots: List<CalibrationSnapshot> = emptyList(),
 
+    // Multi-layer support
     val layers: List<OverlayLayer> = emptyList(),
 
     // Neural Scan ID
-    val cloudAnchorId: String? = null
+    val cloudAnchorId: String? = null,
+
+    // Path to the localized map file (.bin) if using native SLAM
+    val mapPath: String? = null
 )
