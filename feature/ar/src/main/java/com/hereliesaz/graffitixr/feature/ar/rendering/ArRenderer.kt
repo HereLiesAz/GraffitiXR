@@ -114,6 +114,10 @@ class ArRenderer(
     }
 
     override fun onDestroy(owner: LifecycleOwner) {
+        cleanup()
+    }
+
+    fun cleanup() {
         session?.close()
         session = null
     }
