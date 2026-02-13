@@ -1,71 +1,69 @@
 #!/bin/bash
-set -e
+# setup_libs.sh
+# Downloads and configures external dependencies (OpenCV) for GraffitiXR.
+# TARGET: core/nativebridge/libs
 
-echo "Setting up dependencies in root /libs/..."
+# Configuration
+OPENCV_VERSION="4.9.0"
+OPENCV_ZIP="opencv-${OPENCV_VERSION}-android-sdk.zip"
+OPENCV_URL="https://github.com/opencv/opencv/releases/download/${OPENCV_VERSION}/${OPENCV_ZIP}"
+TARGET_BASE="core/nativebridge/libs"
+TARGET_OPENCV="${TARGET_BASE}/opencv"
 
-# Ensure libs exists
-mkdir -p libs
+echo "========================================"
+echo "GraffitiXR Library Setup"
+echo "Target: ${TARGET_BASE}"
+echo "========================================"
 
-# Fetch dependencies branch
-git fetch origin dependencies
-
-# --- OpenCV ---
-# CRITICAL: OpenCV expects to be in an 'sdk' subfolder for its internal CMake relative paths to work.
-echo "Restoring OpenCV to libs/opencv/sdk..."
-rm -rf opencv libs/opencv
-mkdir -p libs/opencv
-
-# Checkout 'opencv' folder from dependencies branch
-git checkout origin/dependencies -- opencv
-
-# Move contents to libs/opencv/sdk
-mv opencv libs/opencv/sdk
-
-# PATCH: Fix deprecated Proguard file and JVM target in OpenCV
-OPENCV_BUILD_GRADLE="libs/opencv/sdk/build.gradle"
-if [ -f "$OPENCV_BUILD_GRADLE" ]; then
-    echo "Patching OpenCV build.gradle..."
-
-    # Replace proguard-android.txt with proguard-android-optimize.txt
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s/proguard-android.txt/proguard-android-optimize.txt/g" "$OPENCV_BUILD_GRADLE"
-    else
-        sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" "$OPENCV_BUILD_GRADLE"
-    fi
-
-    # Ensure Kotlin JVM Target 17
-    if ! grep -q "jvmTarget" "$OPENCV_BUILD_GRADLE"; then
-        echo "Adding Kotlin JVM Target 17..."
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' '/compileOptions {/i\
-    kotlinOptions {\
-        jvmTarget = "17"\
-    }\
-' "$OPENCV_BUILD_GRADLE"
-        else
-            sed -i '/compileOptions {/i\
-    kotlinOptions {\
-        jvmTarget = "17"\
-    }\
-' "$OPENCV_BUILD_GRADLE"
-        fi
-    fi
-    echo "Patch applied successfully to $OPENCV_BUILD_GRADLE"
+# 1. Create Target Directory
+if [ ! -d "$TARGET_BASE" ]; then
+    echo "[+] Creating directory: $TARGET_BASE"
+    mkdir -p "$TARGET_BASE"
 fi
 
-# --- GLM ---
-echo "Restoring GLM..."
-rm -rf libs/glm
-mkdir -p libs/glm
-curl -L -o glm.zip https://github.com/g-truc/glm/archive/refs/tags/1.0.1.zip
-unzip -q glm.zip
-mv glm-1.0.1/glm libs/glm/glm
-rm -rf glm-1.0.1 glm.zip
+# 2. Download OpenCV
+if [ -d "$TARGET_OPENCV" ]; then
+    echo "[!] OpenCV directory already exists at $TARGET_OPENCV"
+    read -p "Re-download and overwrite? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Skipping OpenCV setup."
+        exit 0
+    fi
+    rm -rf "$TARGET_OPENCV"
+fi
 
-# --- AARs (LiteRT & MLKit) ---
-echo "Restoring LiteRT and MLKit AARs..."
-git checkout origin/dependencies -- litert-2.1.0.aar mlkit-subject-segmentation.aar
-mv litert-2.1.0.aar libs/
-mv mlkit-subject-segmentation.aar libs/
+echo "[+] Downloading OpenCV Android SDK ${OPENCV_VERSION}..."
+# Use curl or wget depending on availability
+if command -v wget &> /dev/null; then
+    wget -O "${TARGET_BASE}/${OPENCV_ZIP}" "$OPENCV_URL"
+elif command -v curl &> /dev/null; then
+    curl -L -o "${TARGET_BASE}/${OPENCV_ZIP}" "$OPENCV_URL"
+else
+    echo "Error: Neither wget nor curl found."
+    exit 1
+fi
 
-echo "Dependencies setup complete. Please Sync Gradle in Android Studio."
+# 3. Extract
+echo "[+] Extracting ${OPENCV_ZIP}..."
+unzip -q "${TARGET_BASE}/${OPENCV_ZIP}" -d "$TARGET_BASE"
+
+# 4. Rename/Structure
+# The zip extracts to 'OpenCV-android-sdk'. We rename it to 'opencv'.
+if [ -d "${TARGET_BASE}/OpenCV-android-sdk" ]; then
+    echo "[+] Configuring path..."
+    mv "${TARGET_BASE}/OpenCV-android-sdk" "$TARGET_OPENCV"
+else
+    echo "[!] Error: Extraction failed or folder structure unexpected."
+    exit 1
+fi
+
+# 5. Cleanup
+echo "[+] Cleaning up..."
+rm "${TARGET_BASE}/${OPENCV_ZIP}"
+
+echo "========================================"
+echo "SUCCESS"
+echo "OpenCV installed at: ${TARGET_OPENCV}"
+echo "Ensure settings.gradle.kts points to: project(\":opencv\").projectDir = file(\"core/nativebridge/libs/opencv/sdk\")"
+echo "========================================"

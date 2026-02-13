@@ -41,7 +41,7 @@ public class CharucoBoard extends Board {
      * The first markers in the dictionary are used to fill the white chessboard squares.
      */
     public CharucoBoard(Size size, float squareLength, float markerLength, Dictionary dictionary, Mat ids) {
-        super(CharucoBoard_0(size.width, size.height, squareLength, markerLength, dictionary.getNativeObjAddr(), ids.nativeObj));
+        super(CharucoBoard_0(size.width, size.height, squareLength, markerLength, dictionary.nativeObj, ids.nativeObj));
     }
 
     /**
@@ -54,7 +54,7 @@ public class CharucoBoard extends Board {
      * The first markers in the dictionary are used to fill the white chessboard squares.
      */
     public CharucoBoard(Size size, float squareLength, float markerLength, Dictionary dictionary) {
-        super(CharucoBoard_1(size.width, size.height, squareLength, markerLength, dictionary.getNativeObjAddr()));
+        super(CharucoBoard_1(size.width, size.height, squareLength, markerLength, dictionary.nativeObj));
     }
 
 
@@ -180,7 +180,7 @@ public class CharucoBoard extends Board {
     // C++:  bool cv::aruco::CharucoBoard::checkCharucoCornersCollinear(Mat charucoIds)
     private static native boolean checkCharucoCornersCollinear_0(long nativeObj, long charucoIds_nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

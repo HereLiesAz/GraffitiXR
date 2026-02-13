@@ -23,10 +23,7 @@ import org.opencv.core.Mat;
 public class Dictionary {
 
     protected final long nativeObj;
-    protected Dictionary(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected Dictionary(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -177,19 +174,8 @@ public class Dictionary {
 
 
     //
-    // C++: static Mat cv::aruco::Dictionary::getBitsFromByteList(Mat byteList, int markerSize, int rotationId = 0)
+    // C++: static Mat cv::aruco::Dictionary::getBitsFromByteList(Mat byteList, int markerSize)
     //
-
-    /**
-     * Transform list of bytes to matrix of bits
-     * @param byteList automatically generated
-     * @param markerSize automatically generated
-     * @param rotationId automatically generated
-     * @return automatically generated
-     */
-    public static Mat getBitsFromByteList(Mat byteList, int markerSize, int rotationId) {
-        return new Mat(getBitsFromByteList_0(byteList.nativeObj, markerSize, rotationId));
-    }
 
     /**
      * Transform list of bytes to matrix of bits
@@ -198,7 +184,7 @@ public class Dictionary {
      * @return automatically generated
      */
     public static Mat getBitsFromByteList(Mat byteList, int markerSize) {
-        return new Mat(getBitsFromByteList_1(byteList.nativeObj, markerSize));
+        return new Mat(getBitsFromByteList_0(byteList.nativeObj, markerSize));
     }
 
 
@@ -284,9 +270,8 @@ public class Dictionary {
     // C++: static Mat cv::aruco::Dictionary::getByteListFromBits(Mat bits)
     private static native long getByteListFromBits_0(long bits_nativeObj);
 
-    // C++: static Mat cv::aruco::Dictionary::getBitsFromByteList(Mat byteList, int markerSize, int rotationId = 0)
-    private static native long getBitsFromByteList_0(long byteList_nativeObj, int markerSize, int rotationId);
-    private static native long getBitsFromByteList_1(long byteList_nativeObj, int markerSize);
+    // C++: static Mat cv::aruco::Dictionary::getBitsFromByteList(Mat byteList, int markerSize)
+    private static native long getBitsFromByteList_0(long byteList_nativeObj, int markerSize);
 
     // C++: Mat Dictionary::bytesList
     private static native long get_bytesList_0(long nativeObj);
@@ -306,7 +291,7 @@ public class Dictionary {
     // C++: void Dictionary::maxCorrectionBits
     private static native void set_maxCorrectionBits_0(long nativeObj, int maxCorrectionBits);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

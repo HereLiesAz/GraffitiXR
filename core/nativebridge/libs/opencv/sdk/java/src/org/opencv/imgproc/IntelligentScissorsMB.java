@@ -24,10 +24,7 @@ import org.opencv.imgproc.IntelligentScissorsMB;
 public class IntelligentScissorsMB {
 
     protected final long nativeObj;
-    protected IntelligentScissorsMB(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected IntelligentScissorsMB(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -265,7 +262,7 @@ public class IntelligentScissorsMB {
      *
      * @param targetPt The target point
      * @param contour The list of pixels which contains optimal path between the source and the target points of the image. Type is CV_32SC2 (compatible with {@code std::vector&lt;Point&gt;})
-     * @param backward Flag to indicate reverse order of retrieved pixels (use "true" value to fetch points from the target to the source point)
+     * @param backward Flag to indicate reverse order of retrived pixels (use "true" value to fetch points from the target to the source point)
      */
     public void getContour(Point targetPt, Mat contour, boolean backward) {
         getContour_0(nativeObj, targetPt.x, targetPt.y, contour.nativeObj, backward);
@@ -324,7 +321,7 @@ public class IntelligentScissorsMB {
     private static native void getContour_0(long nativeObj, double targetPt_x, double targetPt_y, long contour_nativeObj, boolean backward);
     private static native void getContour_1(long nativeObj, double targetPt_x, double targetPt_y, long contour_nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

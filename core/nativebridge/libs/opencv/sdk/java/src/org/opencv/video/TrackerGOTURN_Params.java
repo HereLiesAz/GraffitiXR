@@ -10,10 +10,7 @@ package org.opencv.video;
 public class TrackerGOTURN_Params {
 
     protected final long nativeObj;
-    protected TrackerGOTURN_Params(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected TrackerGOTURN_Params(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -87,7 +84,7 @@ public class TrackerGOTURN_Params {
     // C++: void TrackerGOTURN_Params::modelBin
     private static native void set_modelBin_0(long nativeObj, String modelBin);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

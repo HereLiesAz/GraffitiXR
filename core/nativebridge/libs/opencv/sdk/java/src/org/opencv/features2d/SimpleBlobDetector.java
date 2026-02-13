@@ -68,25 +68,10 @@ public class SimpleBlobDetector extends Feature2D {
     // C++: static Ptr_SimpleBlobDetector cv::SimpleBlobDetector::create(SimpleBlobDetector_Params parameters = SimpleBlobDetector::Params())
     //
 
-    /**
-     * Flag to enable contour collection.
-     *       If set to true, the detector will store the contours of the detected blobs in memory,
-     *       which can be retrieved after the detect() call using getBlobContours().
-     *       <b>Note:</b> Default value is false.
-     * @param parameters automatically generated
-     * @return automatically generated
-     */
     public static SimpleBlobDetector create(SimpleBlobDetector_Params parameters) {
-        return SimpleBlobDetector.__fromPtr__(create_0(parameters.getNativeObjAddr()));
+        return SimpleBlobDetector.__fromPtr__(create_0(parameters.nativeObj));
     }
 
-    /**
-     * Flag to enable contour collection.
-     *       If set to true, the detector will store the contours of the detected blobs in memory,
-     *       which can be retrieved after the detect() call using getBlobContours().
-     *       <b>Note:</b> Default value is false.
-     * @return automatically generated
-     */
     public static SimpleBlobDetector create() {
         return SimpleBlobDetector.__fromPtr__(create_1());
     }
@@ -97,7 +82,7 @@ public class SimpleBlobDetector extends Feature2D {
     //
 
     public void setParams(SimpleBlobDetector_Params params) {
-        setParams_0(nativeObj, params.getNativeObjAddr());
+        setParams_0(nativeObj, params.nativeObj);
     }
 
 
@@ -123,12 +108,6 @@ public class SimpleBlobDetector extends Feature2D {
     // C++:  vector_vector_Point cv::SimpleBlobDetector::getBlobContours()
     //
 
-    /**
-     * Returns the contours of the blobs detected during the last call to detect().
-     *   <b>Note:</b> The REF: Params::collectContours parameter must be set to true before calling
-     *   detect() for this method to return any data.
-     * @return automatically generated
-     */
     public List<MatOfPoint> getBlobContours() {
         List<MatOfPoint> retVal = new ArrayList<MatOfPoint>();
         Mat retValMat = new Mat(getBlobContours_0(nativeObj));
@@ -160,7 +139,7 @@ public class SimpleBlobDetector extends Feature2D {
     // C++:  vector_vector_Point cv::SimpleBlobDetector::getBlobContours()
     private static native long getBlobContours_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

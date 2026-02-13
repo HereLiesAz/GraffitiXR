@@ -931,7 +931,7 @@ public class Dnn {
      * @return 4-dimensional Mat.
      */
     public static Mat blobFromImageWithParams(Mat image, Image2BlobParams param) {
-        return new Mat(blobFromImageWithParams_0(image.nativeObj, param.getNativeObjAddr()));
+        return new Mat(blobFromImageWithParams_0(image.nativeObj, param.nativeObj));
     }
 
     /**
@@ -953,7 +953,7 @@ public class Dnn {
     //
 
     public static void blobFromImageWithParams(Mat image, Mat blob, Image2BlobParams param) {
-        blobFromImageWithParams_2(image.nativeObj, blob.nativeObj, param.getNativeObjAddr());
+        blobFromImageWithParams_2(image.nativeObj, blob.nativeObj, param.nativeObj);
     }
 
     public static void blobFromImageWithParams(Mat image, Mat blob) {
@@ -977,7 +977,7 @@ public class Dnn {
      */
     public static Mat blobFromImagesWithParams(List<Mat> images, Image2BlobParams param) {
         Mat images_mat = Converters.vector_Mat_to_Mat(images);
-        return new Mat(blobFromImagesWithParams_0(images_mat.nativeObj, param.getNativeObjAddr()));
+        return new Mat(blobFromImagesWithParams_0(images_mat.nativeObj, param.nativeObj));
     }
 
     /**
@@ -1001,7 +1001,7 @@ public class Dnn {
 
     public static void blobFromImagesWithParams(List<Mat> images, Mat blob, Image2BlobParams param) {
         Mat images_mat = Converters.vector_Mat_to_Mat(images);
-        blobFromImagesWithParams_2(images_mat.nativeObj, blob.nativeObj, param.getNativeObjAddr());
+        blobFromImagesWithParams_2(images_mat.nativeObj, blob.nativeObj, param.nativeObj);
     }
 
     public static void blobFromImagesWithParams(List<Mat> images, Mat blob) {

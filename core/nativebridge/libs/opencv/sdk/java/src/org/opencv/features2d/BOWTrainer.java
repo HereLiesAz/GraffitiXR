@@ -18,10 +18,7 @@ import org.opencv.utils.Converters;
 public class BOWTrainer {
 
     protected final long nativeObj;
-    protected BOWTrainer(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected BOWTrainer(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -137,7 +134,7 @@ public class BOWTrainer {
     // C++:  Mat cv::BOWTrainer::cluster(Mat descriptors)
     private static native long cluster_1(long nativeObj, long descriptors_nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

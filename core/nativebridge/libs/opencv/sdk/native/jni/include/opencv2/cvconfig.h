@@ -78,9 +78,6 @@
 /* IJG JPEG codec */
 #define HAVE_JPEG
 
-/* JPEG XL codec */
-/* #undef HAVE_JPEGXL */
-
 /* GDCM DICOM codec */
 /* #undef HAVE_GDCM */
 

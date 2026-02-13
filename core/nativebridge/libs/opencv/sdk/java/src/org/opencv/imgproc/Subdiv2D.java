@@ -19,10 +19,7 @@ import org.opencv.utils.Converters;
 public class Subdiv2D {
 
     protected final long nativeObj;
-    protected Subdiv2D(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected Subdiv2D(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -78,33 +75,17 @@ public class Subdiv2D {
 
 
     //
-    // C++:   cv::Subdiv2D::Subdiv2D(Rect2f rect2f)
-    //
-
-    // Unknown type 'Rect2f' (I), skipping the function
-
-
-    //
     // C++:  void cv::Subdiv2D::initDelaunay(Rect rect)
     //
 
     /**
-     *
-     *
-     *     Creates a new empty Delaunay subdivision
+     * Creates a new empty Delaunay subdivision
      *
      *     @param rect Rectangle that includes all of the 2D points that are to be added to the subdivision.
      */
     public void initDelaunay(Rect rect) {
         initDelaunay_0(nativeObj, rect.x, rect.y, rect.width, rect.height);
     }
-
-
-    //
-    // C++:  void cv::Subdiv2D::initDelaunay(Rect2f rect)
-    //
-
-    // Unknown type 'Rect2f' (I), skipping the function
 
 
     //
@@ -567,7 +548,7 @@ public class Subdiv2D {
     private static native int edgeDst_0(long nativeObj, int edge, double[] dstpt_out);
     private static native int edgeDst_1(long nativeObj, int edge);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

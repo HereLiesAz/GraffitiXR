@@ -12,10 +12,7 @@ package org.opencv.objdetect;
 public class DetectorParameters {
 
     protected final long nativeObj;
-    protected DetectorParameters(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected DetectorParameters(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -871,7 +868,7 @@ public class DetectorParameters {
     // C++: void DetectorParameters::minMarkerLengthRatioOriginalImg
     private static native void set_minMarkerLengthRatioOriginalImg_0(long nativeObj, float minMarkerLengthRatioOriginalImg);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

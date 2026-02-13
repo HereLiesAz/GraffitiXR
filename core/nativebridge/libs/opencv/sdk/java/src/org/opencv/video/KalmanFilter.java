@@ -18,10 +18,7 @@ import org.opencv.core.Mat;
 public class KalmanFilter {
 
     protected final long nativeObj;
-    protected KalmanFilter(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected KalmanFilter(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -373,7 +370,7 @@ public class KalmanFilter {
     // C++: void KalmanFilter::errorCovPost
     private static native void set_errorCovPost_0(long nativeObj, long errorCovPost_nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

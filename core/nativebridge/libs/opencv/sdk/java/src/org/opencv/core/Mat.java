@@ -4,10 +4,14 @@ import java.nio.ByteBuffer;
 
 // C++: class Mat
 //javadoc: Mat
-public class Mat extends CleanableMat {
+public class Mat {
+
+    public final long nativeObj;
 
     public Mat(long addr) {
-        super(addr);
+        if (addr == 0)
+            throw new UnsupportedOperationException("Native object address is NULL");
+        nativeObj = addr;
     }
 
     //
@@ -16,7 +20,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat()
     public Mat() {
-        super(n_Mat());
+        nativeObj = n_Mat();
     }
 
     //
@@ -25,7 +29,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(rows, cols, type)
     public Mat(int rows, int cols, int type) {
-        super(n_Mat(rows, cols, type));
+        nativeObj = n_Mat(rows, cols, type);
     }
 
     //
@@ -34,7 +38,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(rows, cols, type, data)
     public Mat(int rows, int cols, int type, ByteBuffer data) {
-        super(n_Mat(rows, cols, type, data));
+        nativeObj = n_Mat(rows, cols, type, data);
     }
 
     //
@@ -43,7 +47,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(rows, cols, type, data, step)
     public Mat(int rows, int cols, int type, ByteBuffer data, long step) {
-        super(n_Mat(rows, cols, type, data, step));
+        nativeObj = n_Mat(rows, cols, type, data, step);
     }
 
     //
@@ -52,7 +56,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(size, type)
     public Mat(Size size, int type) {
-        super(n_Mat(size.width, size.height, type));
+        nativeObj = n_Mat(size.width, size.height, type);
     }
 
     //
@@ -61,7 +65,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(sizes, type)
     public Mat(int[] sizes, int type) {
-        super(n_Mat(sizes.length, sizes, type));
+        nativeObj = n_Mat(sizes.length, sizes, type);
     }
 
     //
@@ -70,7 +74,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(rows, cols, type, s)
     public Mat(int rows, int cols, int type, Scalar s) {
-        super(n_Mat(rows, cols, type, s.val[0], s.val[1], s.val[2], s.val[3]));
+        nativeObj = n_Mat(rows, cols, type, s.val[0], s.val[1], s.val[2], s.val[3]);
     }
 
     //
@@ -79,7 +83,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(size, type, s)
     public Mat(Size size, int type, Scalar s) {
-        super(n_Mat(size.width, size.height, type, s.val[0], s.val[1], s.val[2], s.val[3]));
+        nativeObj = n_Mat(size.width, size.height, type, s.val[0], s.val[1], s.val[2], s.val[3]);
     }
 
     //
@@ -88,7 +92,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(sizes, type, s)
     public Mat(int[] sizes, int type, Scalar s) {
-        super(n_Mat(sizes.length, sizes, type, s.val[0], s.val[1], s.val[2], s.val[3]));
+        nativeObj = n_Mat(sizes.length, sizes, type, s.val[0], s.val[1], s.val[2], s.val[3]);
     }
 
     //
@@ -97,12 +101,12 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(m, rowRange, colRange)
     public Mat(Mat m, Range rowRange, Range colRange) {
-        super(n_Mat(m.nativeObj, rowRange.start, rowRange.end, colRange.start, colRange.end));
+        nativeObj = n_Mat(m.nativeObj, rowRange.start, rowRange.end, colRange.start, colRange.end);
     }
 
     // javadoc: Mat::Mat(m, rowRange)
     public Mat(Mat m, Range rowRange) {
-        super(n_Mat(m.nativeObj, rowRange.start, rowRange.end));
+        nativeObj = n_Mat(m.nativeObj, rowRange.start, rowRange.end);
     }
 
     //
@@ -111,7 +115,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(m, ranges)
     public Mat(Mat m, Range[] ranges) {
-        super(n_Mat(m.nativeObj, ranges));
+        nativeObj = n_Mat(m.nativeObj, ranges);
     }
 
     //
@@ -120,7 +124,7 @@ public class Mat extends CleanableMat {
 
     // javadoc: Mat::Mat(m, roi)
     public Mat(Mat m, Rect roi) {
-        super(n_Mat(m.nativeObj, roi.y, roi.y + roi.height, roi.x, roi.x + roi.width));
+        nativeObj = n_Mat(m.nativeObj, roi.y, roi.y + roi.height, roi.x, roi.x + roi.width);
     }
 
     //
@@ -748,6 +752,12 @@ public class Mat extends CleanableMat {
     // javadoc: Mat::zeros(sizes, type)
     public static Mat zeros(int[] sizes, int type) {
         return new Mat(n_zeros(sizes.length, sizes, type));
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        n_delete(nativeObj);
+        super.finalize();
     }
 
     // javadoc:Mat::toString()
@@ -1823,6 +1833,9 @@ public class Mat extends CleanableMat {
 
     // C++: static Mat Mat::zeros(int ndims, const int* sizes, int type)
     private static native long n_zeros(int ndims, int[] sizes, int type);
+
+    // native support for java finalize()
+    private static native void n_delete(long nativeObj);
 
     private static native int nPutD(long self, int row, int col, int count, double[] data);
 

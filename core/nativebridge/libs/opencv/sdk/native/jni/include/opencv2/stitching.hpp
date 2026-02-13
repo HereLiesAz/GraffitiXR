@@ -299,13 +299,8 @@ public:
      */
     CV_WRAP Status stitch(InputArrayOfArrays images, InputArrayOfArrays masks, OutputArray pano);
 
-    /** @brief Returns indeces of input images used in panorama stitching
-     */
-    CV_WRAP std::vector<int> component() const { return indices_; }
-
-    /** Returns estimated camera parameters for all stitched images
-     */
-    CV_WRAP std::vector<cv::detail::CameraParams> cameras() const { return cameras_; }
+    std::vector<int> component() const { return indices_; }
+    std::vector<detail::CameraParams> cameras() const { return cameras_; }
     CV_WRAP double workScale() const { return work_scale_; }
 
     /** @brief Return the mask of the panorama.

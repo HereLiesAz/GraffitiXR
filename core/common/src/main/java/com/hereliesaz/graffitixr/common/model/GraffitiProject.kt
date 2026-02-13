@@ -73,6 +73,7 @@ data class GraffitiProject(
     val rotationY: Float = 0f,
     val rotationZ: Float = 0f,
 
+
     @Serializable(with = OffsetSerializer::class)
     val offset: Offset = Offset.Zero,
 
@@ -103,5 +104,7 @@ data class GraffitiProject(
     val cloudAnchorId: String? = null,
 
     // Path to the localized map file (.bin) if using native SLAM
-    val mapPath: String? = null
+    val mapPath: String? = null,
+    val targetFingerprint: String? = null,
+    val isRightHanded: Boolean = true
 )

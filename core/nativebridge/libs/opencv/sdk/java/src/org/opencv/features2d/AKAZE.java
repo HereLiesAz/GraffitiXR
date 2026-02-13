@@ -418,7 +418,7 @@ public class AKAZE extends Feature2D {
     // C++:  int cv::AKAZE::getMaxPoints()
     private static native int getMaxPoints_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

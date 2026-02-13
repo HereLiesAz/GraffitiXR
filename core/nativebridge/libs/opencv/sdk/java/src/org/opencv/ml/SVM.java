@@ -796,7 +796,7 @@ public class SVM extends StatModel {
     // C++: static Ptr_SVM cv::ml::SVM::load(String filepath)
     private static native long load_0(String filepath);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

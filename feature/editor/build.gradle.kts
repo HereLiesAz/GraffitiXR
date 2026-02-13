@@ -28,7 +28,7 @@ dependencies {
     implementation(project(":core:design"))
 
     // ADDED: Required for GsViewer / SlamManager
-    implementation(project(":core:native"))
+    implementation(project(":core:nativebridge"))
 
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)

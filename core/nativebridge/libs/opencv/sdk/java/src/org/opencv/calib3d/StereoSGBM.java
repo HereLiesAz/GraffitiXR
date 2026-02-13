@@ -651,7 +651,7 @@ public class StereoSGBM extends StereoMatcher {
     private static native long create_10(int minDisparity);
     private static native long create_11();
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

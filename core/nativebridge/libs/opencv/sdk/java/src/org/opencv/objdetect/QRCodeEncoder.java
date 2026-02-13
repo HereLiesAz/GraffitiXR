@@ -21,10 +21,7 @@ import org.opencv.utils.Converters;
 public class QRCodeEncoder {
 
     protected final long nativeObj;
-    protected QRCodeEncoder(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected QRCodeEncoder(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -41,7 +38,6 @@ public class QRCodeEncoder {
 
     // C++: enum ECIEncodings (cv.QRCodeEncoder.ECIEncodings)
     public static final int
-            ECI_SHIFT_JIS = 20,
             ECI_UTF8 = 26;
 
 
@@ -66,7 +62,7 @@ public class QRCodeEncoder {
      * @return automatically generated
      */
     public static QRCodeEncoder create(QRCodeEncoder_Params parameters) {
-        return QRCodeEncoder.__fromPtr__(create_0(parameters.getNativeObjAddr()));
+        return QRCodeEncoder.__fromPtr__(create_0(parameters.nativeObj));
     }
 
     /**
@@ -109,16 +105,6 @@ public class QRCodeEncoder {
     }
 
 
-
-/** Generates QR code from input string.
-@param encoded_info Input bytes to encode.
-@param qrcode Generated QR code.
-*/
-public void encode(byte[] encoded_info, Mat qrcode) {
-    encode_1(nativeObj, encoded_info, qrcode.nativeObj);
-}
-
-
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
@@ -136,11 +122,7 @@ public void encode(byte[] encoded_info, Mat qrcode) {
     // C++:  void cv::QRCodeEncoder::encodeStructuredAppend(String encoded_info, vector_Mat& qrcodes)
     private static native void encodeStructuredAppend_0(long nativeObj, String encoded_info, long qrcodes_mat_nativeObj);
 
-
-private static native void encode_1(long nativeObj, byte[] encoded_info, long qrcode_nativeObj);
-
-
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

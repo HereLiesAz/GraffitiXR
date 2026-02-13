@@ -106,7 +106,7 @@ public class BOWKMeansTrainer extends BOWTrainer {
     // C++:  Mat cv::BOWKMeansTrainer::cluster(Mat descriptors)
     private static native long cluster_1(long nativeObj, long descriptors_nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

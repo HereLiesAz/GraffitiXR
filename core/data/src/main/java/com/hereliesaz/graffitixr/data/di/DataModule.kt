@@ -1,20 +1,22 @@
 package com.hereliesaz.graffitixr.data.di
 
+import android.content.Context
 import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
-import com.hereliesaz.graffitixr.core.domain.repository.ProjectRepository
-import dagger.Binds
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class DataModule {
+object DataModule {
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindProjectRepository(
-        impl: ProjectRepositoryImpl
-    ): ProjectRepository
+    fun provideProjectRepository(@ApplicationContext context: Context): ProjectRepository {
+        return ProjectRepositoryImpl(context)
+    }
 }

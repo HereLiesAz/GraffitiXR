@@ -10,10 +10,7 @@ package org.opencv.objdetect;
 public class QRCodeDetectorAruco_Params {
 
     protected final long nativeObj;
-    protected QRCodeDetectorAruco_Params(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected QRCodeDetectorAruco_Params(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -207,7 +204,7 @@ public class QRCodeDetectorAruco_Params {
     // C++: void QRCodeDetectorAruco_Params::scaleTimingPatternScore
     private static native void set_scaleTimingPatternScore_0(long nativeObj, float scaleTimingPatternScore);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

@@ -21,10 +21,7 @@ package org.opencv.core;
 public class Algorithm {
 
     protected final long nativeObj;
-    protected Algorithm(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected Algorithm(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -124,7 +121,7 @@ public class Algorithm {
     // C++:  String cv::Algorithm::getDefaultName()
     private static native String getDefaultName_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

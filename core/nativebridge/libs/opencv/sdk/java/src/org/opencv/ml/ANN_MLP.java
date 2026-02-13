@@ -626,7 +626,7 @@ public class ANN_MLP extends StatModel {
     // C++: static Ptr_ANN_MLP cv::ml::ANN_MLP::load(String filepath)
     private static native long load_0(String filepath);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

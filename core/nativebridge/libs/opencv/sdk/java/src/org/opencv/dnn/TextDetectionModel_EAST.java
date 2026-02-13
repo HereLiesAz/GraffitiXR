@@ -31,7 +31,7 @@ public class TextDetectionModel_EAST extends TextDetectionModel {
      * @param network Net object
      */
     public TextDetectionModel_EAST(Net network) {
-        super(TextDetectionModel_EAST_0(network.getNativeObjAddr()));
+        super(TextDetectionModel_EAST_0(network.nativeObj));
     }
 
 
@@ -139,7 +139,7 @@ public class TextDetectionModel_EAST extends TextDetectionModel {
     // C++:  float cv::dnn::TextDetectionModel_EAST::getNMSThreshold()
     private static native float getNMSThreshold_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

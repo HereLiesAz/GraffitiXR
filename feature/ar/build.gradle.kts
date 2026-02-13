@@ -35,7 +35,7 @@ dependencies {
     implementation(project(":core:design"))
 
     // Native Engine (MobileGS)
-    implementation(project(":core:native"))
+    implementation(project(":core:nativebridge"))
 
     // Compose
     implementation(libs.androidx.compose.ui)

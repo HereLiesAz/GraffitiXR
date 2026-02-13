@@ -207,33 +207,6 @@ public class VariationalRefinement extends DenseOpticalFlow {
 
 
     //
-    // C++:  float cv::VariationalRefinement::getEpsilon()
-    //
-
-    /**
-     * Norm value shift for robust penalizer
-     * SEE: setEpsilon
-     * @return automatically generated
-     */
-    public float getEpsilon() {
-        return getEpsilon_0(nativeObj);
-    }
-
-
-    //
-    // C++:  void cv::VariationalRefinement::setEpsilon(float val)
-    //
-
-    /**
-     *  getEpsilon SEE: getEpsilon
-     * @param val automatically generated
-     */
-    public void setEpsilon(float val) {
-        setEpsilon_0(nativeObj, val);
-    }
-
-
-    //
     // C++: static Ptr_VariationalRefinement cv::VariationalRefinement::create()
     //
 
@@ -292,16 +265,10 @@ public class VariationalRefinement extends DenseOpticalFlow {
     // C++:  void cv::VariationalRefinement::setGamma(float val)
     private static native void setGamma_0(long nativeObj, float val);
 
-    // C++:  float cv::VariationalRefinement::getEpsilon()
-    private static native float getEpsilon_0(long nativeObj);
-
-    // C++:  void cv::VariationalRefinement::setEpsilon(float val)
-    private static native void setEpsilon_0(long nativeObj, float val);
-
     // C++: static Ptr_VariationalRefinement cv::VariationalRefinement::create()
     private static native long create_0();
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

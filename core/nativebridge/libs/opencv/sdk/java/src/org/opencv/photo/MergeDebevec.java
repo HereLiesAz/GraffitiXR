@@ -56,7 +56,7 @@ public class MergeDebevec extends MergeExposures {
     // C++:  void cv::MergeDebevec::process(vector_Mat src, Mat& dst, Mat times)
     private static native void process_1(long nativeObj, long src_mat_nativeObj, long dst_nativeObj, long times_nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

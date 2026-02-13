@@ -11,16 +11,13 @@
 #include <string>
 #include <array>
 #include <tuple> // tuple, tuple_size
-#include <map>
 
 #include <opencv2/gapi/opencv_includes.hpp>
 #include <opencv2/gapi/util/any.hpp>
-#include <opencv2/gapi/util/optional.hpp>
 
 #include <opencv2/core/cvdef.h>     // GAPI_EXPORTS
 #include <opencv2/gapi/gkernel.hpp> // GKernelPackage
 #include <opencv2/gapi/infer.hpp>   // Generic
-#include <opencv2/gapi/infer/workload_type.hpp>
 
 namespace cv {
 namespace gapi {
@@ -159,22 +156,11 @@ struct GAPI_EXPORTS_W_SIMPLE OpenVINO {
 
     Constructs OpenVINO parameters based on device type information.
 
-    @param dev_type Target device type to use. ("CPU", "GPU", "GPU.0" etc)
+    @param dev_type Target device type to use. ("CPU_FP32", "GPU_FP16", etc)
     */
     GAPI_WRAP
     explicit OpenVINO(const std::string &dev_type)
         : device_type(dev_type) {
-    }
-
-    /** @brief Class constructor.
-
-    Constructs OpenVINO parameters based on map of options passed.
-
-    * @param params A map of parameter names and their corresponding string values.
-    */
-    GAPI_WRAP
-    explicit OpenVINO(const std::map<std::string, std::string>& params)
-        : params_map(params) {
     }
 
     /** @brief Specifies OpenVINO Execution Provider cache dir.
@@ -187,10 +173,6 @@ struct GAPI_EXPORTS_W_SIMPLE OpenVINO {
     */
     GAPI_WRAP
     OpenVINO& cfgCacheDir(const std::string &dir) {
-        if (!params_map.empty()) {
-            cv::util::throw_error(std::logic_error("ep::OpenVINO cannot be changed if"
-                                                   "created from the parameters map."));
-        }
         cache_dir = dir;
         return *this;
     }
@@ -205,10 +187,6 @@ struct GAPI_EXPORTS_W_SIMPLE OpenVINO {
     */
     GAPI_WRAP
     OpenVINO& cfgNumThreads(size_t nthreads) {
-        if (!params_map.empty()) {
-            cv::util::throw_error(std::logic_error("ep::OpenVINO cannot be changed if"
-                                                   "created from the parameters map."));
-        }
         num_of_threads = nthreads;
         return *this;
     }
@@ -222,10 +200,6 @@ struct GAPI_EXPORTS_W_SIMPLE OpenVINO {
     */
     GAPI_WRAP
     OpenVINO& cfgEnableOpenCLThrottling() {
-        if (!params_map.empty()) {
-            cv::util::throw_error(std::logic_error("ep::OpenVINO cannot be changed if"
-                                                   "created from the parameters map."));
-        }
         enable_opencl_throttling = true;
         return *this;
     }
@@ -242,10 +216,6 @@ struct GAPI_EXPORTS_W_SIMPLE OpenVINO {
     */
     GAPI_WRAP
     OpenVINO& cfgEnableDynamicShapes() {
-        if (!params_map.empty()) {
-            cv::util::throw_error(std::logic_error("ep::OpenVINO cannot be changed if"
-                                                   "created from the parameters map."));
-        }
         enable_dynamic_shapes = true;
         return *this;
     }
@@ -255,7 +225,6 @@ struct GAPI_EXPORTS_W_SIMPLE OpenVINO {
     size_t num_of_threads = 0;
     bool enable_opencl_throttling = false;
     bool enable_dynamic_shapes = false;
-    std::map<std::string, std::string> params_map;
 };
 
 /**
@@ -353,10 +322,8 @@ struct ParamDesc {
     std::unordered_map<std::string, std::pair<cv::Scalar, cv::Scalar> > generic_mstd;
     std::unordered_map<std::string, bool> generic_norm;
 
-    std::map<std::string, std::string> session_options;
     std::vector<cv::gapi::onnx::ep::EP> execution_providers;
     bool disable_mem_pattern;
-    cv::util::optional<int> opt_level;
 };
 } // namespace detail
 
@@ -638,30 +605,6 @@ public:
         return *this;
     }
 
-    /** @brief Configures session options for ONNX Runtime.
-
-    This function is used to set various session options for the ONNX Runtime
-    session by accepting a map of key-value pairs.
-
-    @param options A map of session option to be applied to the ONNX Runtime session.
-    @return the reference on modified object.
-    */
-    Params<Net>& cfgSessionOptions(const std::map<std::string, std::string>& options) {
-        desc.session_options.insert(options.begin(), options.end());
-        return *this;
-    }
-
-    /** @brief Configures optimization level for ONNX Runtime.
-
-    @param opt_level [optimization level]: Valid values are 0 (disable), 1 (basic), 2 (extended), 99 (all).
-    Please see onnxruntime_c_api.h (enum GraphOptimizationLevel) for the full list of all optimization levels.
-    @return the reference on modified object.
-    */
-    Params<Net>& cfgOptLevel(const int opt_level) {
-        desc.opt_level = cv::util::make_optional(opt_level);
-        return *this;
-    }
-
     // BEGIN(G-API's network parametrization API)
     GBackend      backend() const { return cv::gapi::onnx::backend(); }
     std::string   tag()     const { return Net::tag(); }
@@ -689,7 +632,7 @@ public:
     @param model_path path to model file (.onnx file).
     */
     Params(const std::string& tag, const std::string& model_path)
-        : desc{ model_path, 0u, 0u, {}, {}, {}, {}, {}, {}, {}, {}, {}, true, {}, {}, {}, {}, false, {} }, m_tag(tag) {}
+        : desc{model_path, 0u, 0u, {}, {}, {}, {}, {}, {}, {}, {}, {}, true, {}, {}, {}, false }, m_tag(tag) {}
 
     /** @see onnx::Params::cfgMeanStdDev. */
     void cfgMeanStdDev(const std::string &layer,
@@ -733,16 +676,6 @@ public:
         desc.disable_mem_pattern = true;
     }
 
-    /** @see onnx::Params::cfgSessionOptions. */
-    void cfgSessionOptions(const std::map<std::string, std::string>& options) {
-        desc.session_options.insert(options.begin(), options.end());
-    }
-
-/** @see onnx::Params::cfgOptLevel. */
-    void cfgOptLevel(const int opt_level) {
-        desc.opt_level = cv::util::make_optional(opt_level);
-    }
-
     // BEGIN(G-API's network parametrization API)
     GBackend      backend() const { return cv::gapi::onnx::backend(); }
     std::string   tag()     const { return m_tag; }
@@ -753,16 +686,8 @@ protected:
     std::string m_tag;
 };
 
-class WorkloadTypeONNX : public WorkloadType {};
-using WorkloadTypeONNXPtr = std::shared_ptr<cv::gapi::onnx::WorkloadTypeONNX>;
-
 } // namespace onnx
 } // namespace gapi
-namespace detail {
-template<> struct CompileArgTag<cv::gapi::onnx::WorkloadTypeONNXPtr> {
-    static const char* tag() { return "gapi.onnx.workload_type"; }
-};
-} // namespace detail
 } // namespace cv
 
 #endif // OPENCV_GAPI_INFER_HPP

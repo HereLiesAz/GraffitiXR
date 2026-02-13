@@ -44,7 +44,6 @@
 #define OPENCV_CUDA_VEC_TRAITS_HPP
 
 #include "common.hpp"
-#include "cuda_compat.hpp"
 
 /** @file
  * @deprecated Use @ref cudev instead.
@@ -54,9 +53,6 @@
 
 namespace cv { namespace cuda { namespace device
 {
-    using cv::cuda::device::compat::double4;
-    using cv::cuda::device::compat::make_double4;
-
     template<typename T, int N> struct TypeVec;
 
     struct __align__(8) uchar8

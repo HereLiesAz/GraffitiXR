@@ -45,7 +45,6 @@
 
 #include "vec_traits.hpp"
 #include "saturate_cast.hpp"
-#include "cuda_compat.hpp"
 
 /** @file
  * @deprecated Use @ref cudev instead.
@@ -55,8 +54,6 @@
 
 namespace cv { namespace cuda { namespace device
 {
-    using cv::cuda::device::compat::double4;
-    using cv::cuda::device::compat::make_double4;
 
 // saturate_cast
 

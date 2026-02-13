@@ -19,10 +19,7 @@ import org.opencv.utils.Converters;
 public class CascadeClassifier {
 
     protected final long nativeObj;
-    protected CascadeClassifier(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected CascadeClassifier(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -642,7 +639,7 @@ public class CascadeClassifier {
     // C++: static bool cv::CascadeClassifier::convert(String oldcascade, String newcascade)
     private static native boolean convert_0(String oldcascade, String newcascade);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

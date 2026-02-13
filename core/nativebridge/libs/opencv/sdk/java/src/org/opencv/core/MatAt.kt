@@ -47,50 +47,49 @@ inline fun <reified T> Mat.at(idx: IntArray) : Atable<T> =
 
 class AtableUByte(val mat: Mat, val indices: IntArray): Atable<UByte> {
 
-
     constructor(mat: Mat, row: Int, col: Int) : this(mat, intArrayOf(row, col))
 
     override fun getV(): UByte {
-        val data = ByteArray(1)
+        val data = UByteArray(1)
         mat.get(indices, data)
-        return data[0].toUByte()
+        return data[0]
     }
 
     override fun setV(v: UByte) {
-        val data = byteArrayOf(v.toByte())
+        val data = ubyteArrayOf(v)
         mat.put(indices, data)
     }
 
     override fun getV2c(): Tuple2<UByte> {
-        val data = ByteArray(2)
+        val data = UByteArray(2)
         mat.get(indices, data)
-        return Tuple2(data[0].toUByte(), data[1].toUByte())
+        return Tuple2(data[0], data[1])
     }
 
     override fun setV2c(v: Tuple2<UByte>) {
-        val data = byteArrayOf(v._0.toByte(), v._1.toByte())
+        val data = ubyteArrayOf(v._0, v._1)
         mat.put(indices, data)
     }
 
     override fun getV3c(): Tuple3<UByte> {
-        val data = ByteArray(3)
+        val data = UByteArray(3)
         mat.get(indices, data)
-        return Tuple3(data[0].toUByte(), data[1].toUByte(), data[2].toUByte())
+        return Tuple3(data[0], data[1], data[2])
     }
 
     override fun setV3c(v: Tuple3<UByte>) {
-        val data = byteArrayOf(v._0.toByte(), v._1.toByte(), v._2.toByte())
+        val data = ubyteArrayOf(v._0, v._1, v._2)
         mat.put(indices, data)
     }
 
     override fun getV4c(): Tuple4<UByte> {
-        val data = ByteArray(4)
+        val data = UByteArray(4)
         mat.get(indices, data)
-        return Tuple4(data[0].toUByte(), data[1].toUByte(), data[2].toUByte(), data[3].toUByte())
+        return Tuple4(data[0], data[1], data[2], data[3])
     }
 
     override fun setV4c(v: Tuple4<UByte>) {
-        val data = byteArrayOf(v._0.toByte(), v._1.toByte(), v._2.toByte(), v._3.toByte())
+        val data = ubyteArrayOf(v._0, v._1, v._2, v._3)
         mat.put(indices, data)
     }
 }
@@ -100,47 +99,46 @@ class AtableUShort(val mat: Mat, val indices: IntArray): Atable<UShort> {
     constructor(mat: Mat, row: Int, col: Int) : this(mat, intArrayOf(row, col))
 
     override fun getV(): UShort {
-        val data = ShortArray(1)
+        val data = UShortArray(1)
         mat.get(indices, data)
-        return data[0].toUShort()
+        return data[0]
     }
 
     override fun setV(v: UShort) {
-        val data = shortArrayOf(v.toShort())
+        val data = ushortArrayOf(v)
         mat.put(indices, data)
     }
 
     override fun getV2c(): Tuple2<UShort> {
-        val data = ShortArray(2)
+        val data = UShortArray(2)
         mat.get(indices, data)
-        return Tuple2(data[0].toUShort(), data[1].toUShort())
+        return Tuple2(data[0], data[1])
     }
 
-
     override fun setV2c(v: Tuple2<UShort>) {
-        val data = shortArrayOf(v._0.toShort(), v._1.toShort())
+        val data = ushortArrayOf(v._0, v._1)
         mat.put(indices, data)
     }
 
     override fun getV3c(): Tuple3<UShort> {
-        val data = ShortArray(3)
+        val data = UShortArray(3)
         mat.get(indices, data)
-        return Tuple3(data[0].toUShort(), data[1].toUShort(), data[2].toUShort())
+        return Tuple3(data[0], data[1], data[2])
     }
 
     override fun setV3c(v: Tuple3<UShort>) {
-        val data = shortArrayOf(v._0.toShort(), v._1.toShort(), v._2.toShort())
+        val data = ushortArrayOf(v._0, v._1, v._2)
         mat.put(indices, data)
     }
 
     override fun getV4c(): Tuple4<UShort> {
-        val data = ShortArray(4)
+        val data = UShortArray(4)
         mat.get(indices, data)
-        return Tuple4(data[0].toUShort(), data[1].toUShort(), data[2].toUShort(), data[3].toUShort())
+        return Tuple4(data[0], data[1], data[2], data[3])
     }
 
     override fun setV4c(v: Tuple4<UShort>) {
-        val data = shortArrayOf(v._0.toShort(), v._1.toShort(), v._2.toShort(), v._3.toShort())
+        val data = ushortArrayOf(v._0, v._1, v._2, v._3)
         mat.put(indices, data)
     }
 }

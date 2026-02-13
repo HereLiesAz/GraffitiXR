@@ -1,8 +1,5 @@
 package com.hereliesaz.graffitixr
 
-import android.content.ContentValues
-import android.graphics.Bitmap
-import android.provider.MediaStore
 import android.view.PixelCopy
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -41,9 +38,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.*
-import com.hereliesaz.aznavrail.model.AzButtonShape
-import com.hereliesaz.aznavrail.model.AzDockingSide
-import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -66,10 +60,6 @@ import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun MainScreen(
@@ -109,6 +99,7 @@ fun MainScreen(
         onRendererCreated(renderer)
     }
 
+    // Effect: Handle Export Trigger
     LaunchedEffect(exportTrigger) {
         if (exportTrigger && window != null) {
             delay(300)
@@ -187,191 +178,30 @@ fun MainScreen(
 
     val isRailVisible = !editorUiState.hideUiForCapture && !uiState.isTouchLocked
 
-    val activeHighlightColor = remember(editorUiState.activeRotationAxis) {
-        when (editorUiState.activeRotationAxis) {
-            RotationAxis.X -> Color.Red
-            RotationAxis.Y -> Color.Green
-            RotationAxis.Z -> Color.Blue
-        }
-    }
-
     AzHostActivityLayout(navController = localNavController) {
+        // --- 1. THE RAIL (Strictly Extracted) ---
         if (isRailVisible) {
-            azTheme(activeColor = activeHighlightColor, defaultShape = AzButtonShape.RECTANGLE, headerIconShape = AzHeaderIconShape.ROUNDED)
-            azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
-
-            azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
-            azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
-                performHaptic()
-                if (hasCameraPermission) {
-                    editorViewModel.setEditorMode(EditorMode.AR)
-                } else {
-                    requestPermissions()
-                }
-            })
-            azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
-                performHaptic()
-                if (hasCameraPermission) {
-                    editorViewModel.setEditorMode(EditorMode.OVERLAY)
-                } else {
-                    requestPermissions()
-                }
-            })
-            azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
-                performHaptic()
-                editorViewModel.setEditorMode(EditorMode.STATIC)
-            })
-            azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
-                performHaptic()
-                editorViewModel.setEditorMode(EditorMode.TRACE)
-            })
-
-            azDivider()
-
-            if (editorUiState.editorMode == EditorMode.AR) {
-                azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
-                azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
-                    performHaptic()
-                    if (hasCameraPermission) {
-                        viewModel.startTargetCapture()
-                        resetDialogs()
-                    } else {
-                        requestPermissions()
-                    }
-                })
-                azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
-                    performHaptic()
-                    if (hasCameraPermission) {
-                        localNavController.navigate("surveyor")
-                        resetDialogs()
-                    } else {
-                        requestPermissions()
-                    }
-                })
-                azDivider()
-            }
-
-            azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
-
-            if (editorUiState.editorMode == EditorMode.STATIC) {
-                azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
-                    performHaptic()
-                    resetDialogs()
-                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-
-                if (has3dModel) {
-                    azRailSubToggle(
-                        id = "toggle_3d",
-                        hostId = "design_host",
-                        isChecked = use3dBackground,
-                        toggleOnText = "3D View",
-                        toggleOffText = "2D View",
-                        info = "Switch Mockup",
-                        onClick = {
-                            performHaptic()
-                            use3dBackground = !use3dBackground
-                        }
-                    )
-                }
-            }
-
-            val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else navStrings.open
-            val openButtonId = if (editorUiState.layers.isNotEmpty()) "add_layer" else "image"
-            azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
-                performHaptic()
-                resetDialogs()
-                overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
-
-            editorUiState.layers.reversed().forEach { layer ->
-                azRailRelocItem(
-                    id = "layer_${layer.id}", hostId = "design_host", text = layer.name,
-                    onClick = {
-                        performHaptic()
-                        if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
-                    },
-                    onRelocate = { _, _, newOrder -> editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed()) }
-                ) {
-                    inputItem(hint = "Rename") { editorViewModel.onLayerRenamed(layer.id, it) }
-                    listItem(text = "Remove") { editorViewModel.onLayerRemoved(layer.id) }
-                }
-            }
-
-            if (editorUiState.layers.isNotEmpty()) {
-                azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
-                    performHaptic()
-                    editorViewModel.onRemoveBackgroundClicked()
-                    resetDialogs()
-                })
-                azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
-                    performHaptic()
-                    editorViewModel.onLineDrawingClicked()
-                    resetDialogs()
-                })
-                azDivider()
-                azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
-                    performHaptic()
-                    editorViewModel.onAdjustClicked()
-                    resetDialogs()
-                }
-                azRailSubItem(id = "balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
-                    performHaptic()
-                    editorViewModel.onColorClicked()
-                    resetDialogs()
-                }
-                azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
-                    performHaptic()
-                    editorViewModel.onCycleBlendMode()
-                    resetDialogs()
-                })
-                azRailSubToggle(id = "lock_image", hostId = "design_host", isChecked = editorUiState.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Prevent accidental moves", onClick = {
-                    performHaptic()
-                    editorViewModel.toggleImageLock()
-                })
-            }
-            azDivider()
-            azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
-            azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
-                performHaptic()
-                editorViewModel.saveProject()
-                resetDialogs()
-            }
-            azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
-                performHaptic()
-                localNavController.navigate("project_library")
-                resetDialogs()
-            }
-            azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo) {
-                performHaptic()
-                editorViewModel.exportProject()
-                resetDialogs()
-            }
-            azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
-                performHaptic()
-                localNavController.navigate("settings")
-                resetDialogs()
-            }
-            azDivider()
-
-            azRailItem(id = "help", text = "Help", info = "Show Help") {
-                performHaptic()
-                showInfoScreen = true
-                resetDialogs()
-            }
-            if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
-                performHaptic()
-                arViewModel.toggleFlashlight()
-                resetDialogs()
-            })
-            if (editorUiState.editorMode == EditorMode.TRACE) azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
-                performHaptic()
-                viewModel.setTouchLocked(true)
-                resetDialogs()
-            })
+            GraffitiNavRail(
+                navStrings = navStrings,
+                editorUiState = editorUiState,
+                editorViewModel = editorViewModel,
+                viewModel = viewModel,
+                arViewModel = arViewModel,
+                navController = localNavController,
+                hasCameraPermission = hasCameraPermission,
+                requestPermissions = requestPermissions,
+                performHaptic = performHaptic,
+                resetDialogs = resetDialogs,
+                backgroundImagePicker = backgroundImagePicker,
+                overlayImagePicker = overlayImagePicker,
+                has3dModel = has3dModel,
+                use3dBackground = use3dBackground,
+                onToggle3dBackground = { use3dBackground = !use3dBackground },
+                onShowInfoScreen = { showInfoScreen = true }
+            )
         }
 
-        // Background / Content Area
+        // --- 2. MAIN BACKGROUND / CONTENT ---
         background(weight = 0) {
             if (currentNavRoute == "editor" || currentNavRoute == null) {
                 val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.White else Color.Black
@@ -393,7 +223,7 @@ fun MainScreen(
             }
         }
 
-        // Onscreen Overlays & Navigation Host
+        // --- 3. ONSCREEN OVERLAYS ---
         onscreen(alignment = Alignment.Center) {
             Box(modifier = Modifier.fillMaxSize()) {
                 AzNavHost(startDestination = "project_library") {
@@ -449,7 +279,6 @@ fun MainScreen(
                     }
                 }
 
-                // Fixed: Explicitly passing 'true' to showUnlockInstructions
                 TouchLockOverlay(uiState.isTouchLocked) {
                     viewModel.showUnlockInstructions(true)
                 }
@@ -583,52 +412,6 @@ fun MainContentLayer(
     }
 }
 
-// ... [Helper functions remain same as before] ...
-fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
-    val view = window.decorView
-    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-    try {
-        PixelCopy.request(window, android.graphics.Rect(0, 0, view.width, view.height), bitmap, { copyResult ->
-            if (copyResult == PixelCopy.SUCCESS) {
-                onCaptured(bitmap)
-            }
-        }, android.os.Handler(android.os.Looper.getMainLooper()))
-    } catch (e: IllegalArgumentException) {
-        e.printStackTrace()
-    }
-}
-
-fun saveExportedImage(context: android.content.Context, bitmap: Bitmap) {
-    val filename = "GraffitiXR_Export_${System.currentTimeMillis()}.png"
-    val contentValues = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-        put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
-        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/GraffitiXR")
-    }
-
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-
-    uri?.let {
-        resolver.openOutputStream(it)?.use { stream ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-        }
-    }
-}
-
-fun saveBitmapToCache(context: android.content.Context, bitmap: Bitmap): android.net.Uri? {
-    val filename = "Target_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg"
-    val file = File(context.cacheDir, filename)
-    FileOutputStream(file).use { out ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-    }
-    return androidx.core.content.FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        file
-    )
-}
-
 @Composable
 private fun LayersOverlay(
     layers: List<Layer>,
@@ -653,12 +436,8 @@ private fun LayersOverlay(
 
                 // Transforms
                 withTransform({
-                    // Order matters.
-                    // 1. Translate (offset)
                     translate(layer.offset.x, layer.offset.y)
-                    // 2. Rotate around center
                     rotate(layer.rotationZ, pivot = Offset(centerX, centerY))
-                    // 3. Scale around center
                     scale(layer.scale, layer.scale, pivot = Offset(centerX, centerY))
                 }) {
                     drawImage(
@@ -671,38 +450,5 @@ private fun LayersOverlay(
                 }
             }
         }
-    }
-}
-
-private fun mapBlendMode(mode: ModelBlendMode): BlendMode {
-    return when(mode) {
-        ModelBlendMode.SrcOver -> BlendMode.SrcOver
-        ModelBlendMode.Multiply -> BlendMode.Multiply
-        ModelBlendMode.Screen -> BlendMode.Screen
-        ModelBlendMode.Overlay -> BlendMode.Overlay
-        ModelBlendMode.Darken -> BlendMode.Darken
-        ModelBlendMode.Lighten -> BlendMode.Lighten
-        ModelBlendMode.ColorDodge -> BlendMode.ColorDodge
-        ModelBlendMode.ColorBurn -> BlendMode.ColorBurn
-        ModelBlendMode.Difference -> BlendMode.Difference
-        ModelBlendMode.Exclusion -> BlendMode.Exclusion
-        ModelBlendMode.Hue -> BlendMode.Hue
-        ModelBlendMode.Saturation -> BlendMode.Saturation
-        ModelBlendMode.Color -> BlendMode.Color
-        ModelBlendMode.Luminosity -> BlendMode.Luminosity
-        ModelBlendMode.Clear -> BlendMode.Clear
-        ModelBlendMode.Src -> BlendMode.Src
-        ModelBlendMode.Dst -> BlendMode.Dst
-        ModelBlendMode.DstOver -> BlendMode.DstOver
-        ModelBlendMode.SrcIn -> BlendMode.SrcIn
-        ModelBlendMode.DstIn -> BlendMode.DstIn
-        ModelBlendMode.SrcOut -> BlendMode.SrcOut
-        ModelBlendMode.DstOut -> BlendMode.DstOut
-        ModelBlendMode.SrcAtop -> BlendMode.SrcAtop
-        ModelBlendMode.DstAtop -> BlendMode.DstAtop
-        ModelBlendMode.Xor -> BlendMode.Xor
-        ModelBlendMode.Plus -> BlendMode.Plus
-        ModelBlendMode.Modulate -> BlendMode.Modulate
-        else -> BlendMode.SrcOver
     }
 }

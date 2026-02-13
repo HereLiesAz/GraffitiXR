@@ -486,7 +486,7 @@ public class MSER extends Feature2D {
     // C++:  String cv::MSER::getDefaultName()
     private static native String getDefaultName_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

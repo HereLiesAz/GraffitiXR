@@ -475,14 +475,7 @@ public:
     template<typename _Tp2> operator Rect_<_Tp2>() const;
 
     //! checks whether the rectangle contains the point
-    /*! @warning After OpenCV 4.11.0, when calling Rect.contains() with cv::Point2f / cv::Point2d point, point should not convert/round to int.
-     * ```
-     * Rect_<int> r(0,0,500,500); Point_<float> pt(250.0f, 499.9f);
-     * r.contains(pt) returns false.(OpenCV 4.10.0 or before)
-     * r.contains(pt) returns true. (OpenCV 4.11.0 or later)
-     * ```
-     */
-    template<typename _Tp2> inline bool contains(const Point_<_Tp2>& pt) const;
+    bool contains(const Point_<_Tp>& pt) const;
 
     _Tp x; //!< x coordinate of the top-left corner
     _Tp y; //!< y coordinate of the top-left corner
@@ -565,7 +558,7 @@ public:
     //! returns the minimal up-right integer rectangle containing the rotated rectangle
     CV_WRAP Rect boundingRect() const;
     //! returns the minimal (exact) floating point rectangle containing the rotated rectangle, not intended for use with images
-    CV_WRAP Rect2f boundingRect2f() const;
+    Rect_<float> boundingRect2f() const;
     //! returns the rectangle mass center
     CV_PROP_RW Point2f center;
     //! returns width and height of the rectangle
@@ -1868,29 +1861,12 @@ Rect_<_Tp>::operator Rect_<_Tp2>() const
     return Rect_<_Tp2>(saturate_cast<_Tp2>(x), saturate_cast<_Tp2>(y), saturate_cast<_Tp2>(width), saturate_cast<_Tp2>(height));
 }
 
-template<typename _Tp> template<typename _Tp2> inline
-bool Rect_<_Tp>::contains(const Point_<_Tp2>& pt) const
+template<typename _Tp> inline
+bool Rect_<_Tp>::contains(const Point_<_Tp>& pt) const
 {
     return x <= pt.x && pt.x < x + width && y <= pt.y && pt.y < y + height;
 }
-// See https://github.com/opencv/opencv/issues/26016
-template<> template<> inline
-bool Rect_<int>::contains(const Point_<double>& pt) const
-{
-    // std::numeric_limits<int>::digits is 31.
-    // std::numeric_limits<double>::digits is 53.
-    // So conversion int->double does not lead to accuracy errors.
-    const Rect_<double> _rect(static_cast<double>(x), static_cast<double>(y), static_cast<double>(width), static_cast<double>(height));
-    return _rect.contains(pt);
-}
-template<> template<> inline
-bool Rect_<int>::contains(const Point_<float>& _pt) const
-{
-    // std::numeric_limits<float>::digits is 24.
-    // std::numeric_limits<double>::digits is 53.
-    // So conversion float->double does not lead to accuracy errors.
-    return contains(Point_<double>(static_cast<double>(_pt.x), static_cast<double>(_pt.y)));
-}
+
 
 template<typename _Tp> static inline
 Rect_<_Tp>& operator += ( Rect_<_Tp>& a, const Point_<_Tp>& b )
@@ -1931,7 +1907,7 @@ template<typename _Tp> static inline
 Rect_<_Tp>& operator &= ( Rect_<_Tp>& a, const Rect_<_Tp>& b )
 {
     if (a.empty() || b.empty()) {
-        a = Rect_<_Tp>();
+        a = Rect();
         return a;
     }
     const Rect_<_Tp>& Rx_min = (a.x < b.x) ? a : b;
@@ -1945,7 +1921,7 @@ Rect_<_Tp>& operator &= ( Rect_<_Tp>& a, const Rect_<_Tp>& b )
     // Let us first deal with the following case.
     if ((Rx_min.x < 0 && Rx_min.x + Rx_min.width < Rx_max.x) ||
         (Ry_min.y < 0 && Ry_min.y + Ry_min.height < Ry_max.y)) {
-        a = Rect_<_Tp>();
+        a = Rect();
         return a;
     }
     // We now know that either Rx_min.x >= 0, or
@@ -1957,7 +1933,7 @@ Rect_<_Tp>& operator &= ( Rect_<_Tp>& a, const Rect_<_Tp>& b )
     a.x = Rx_max.x;
     a.y = Ry_max.y;
     if (a.empty())
-        a = Rect_<_Tp>();
+        a = Rect();
     return a;
 }
 

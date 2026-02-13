@@ -364,7 +364,7 @@ public class BRISK extends Feature2D {
     // C++:  float cv::BRISK::getPatternScale()
     private static native float getPatternScale_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

@@ -434,7 +434,7 @@ public class SIFT extends Feature2D {
     // C++:  double cv::SIFT::getSigma()
     private static native double getSigma_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

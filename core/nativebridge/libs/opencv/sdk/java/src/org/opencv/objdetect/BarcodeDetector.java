@@ -6,8 +6,6 @@ package org.opencv.objdetect;
 import java.util.ArrayList;
 import java.util.List;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfFloat;
-import org.opencv.objdetect.BarcodeDetector;
 import org.opencv.utils.Converters;
 
 // C++: class BarcodeDetector
@@ -97,105 +95,6 @@ public class BarcodeDetector extends GraphicalCodeDetector {
     }
 
 
-    //
-    // C++:  double cv::barcode::BarcodeDetector::getDownsamplingThreshold()
-    //
-
-    /**
-     * Get detector downsampling threshold.
-     *
-     * @return detector downsampling threshold
-     */
-    public double getDownsamplingThreshold() {
-        return getDownsamplingThreshold_0(nativeObj);
-    }
-
-
-    //
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDownsamplingThreshold(double thresh)
-    //
-
-    /**
-     * Set detector downsampling threshold.
-     *
-     * By default, the detect method resizes the input image to this limit if the smallest image size is is greater than the threshold.
-     * Increasing this value can improve detection accuracy and the number of results at the expense of performance.
-     * Correlates with detector scales. Setting this to a large value will disable downsampling.
-     * @param thresh downsampling limit to apply (default 512)
-     * SEE: setDetectorScales
-     * @return automatically generated
-     */
-    public BarcodeDetector setDownsamplingThreshold(double thresh) {
-        return new BarcodeDetector(setDownsamplingThreshold_0(nativeObj, thresh));
-    }
-
-
-    //
-    // C++:  void cv::barcode::BarcodeDetector::getDetectorScales(vector_float& sizes)
-    //
-
-    /**
-     * Returns detector box filter sizes.
-     *
-     * @param sizes output parameter for returning the sizes.
-     */
-    public void getDetectorScales(MatOfFloat sizes) {
-        Mat sizes_mat = sizes;
-        getDetectorScales_0(nativeObj, sizes_mat.nativeObj);
-    }
-
-
-    //
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDetectorScales(vector_float sizes)
-    //
-
-    /**
-     * Set detector box filter sizes.
-     *
-     * Adjusts the value and the number of box filters used in the detect step.
-     * The filter sizes directly correlate with the expected line widths for a barcode. Corresponds to expected barcode distance.
-     * If the downsampling limit is increased, filter sizes need to be adjusted in an inversely proportional way.
-     * @param sizes box filter sizes, relative to minimum dimension of the image (default [0.01, 0.03, 0.06, 0.08])
-     * @return automatically generated
-     */
-    public BarcodeDetector setDetectorScales(MatOfFloat sizes) {
-        Mat sizes_mat = sizes;
-        return new BarcodeDetector(setDetectorScales_0(nativeObj, sizes_mat.nativeObj));
-    }
-
-
-    //
-    // C++:  double cv::barcode::BarcodeDetector::getGradientThreshold()
-    //
-
-    /**
-     * Get detector gradient magnitude threshold.
-     *
-     * @return detector gradient magnitude threshold.
-     */
-    public double getGradientThreshold() {
-        return getGradientThreshold_0(nativeObj);
-    }
-
-
-    //
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setGradientThreshold(double thresh)
-    //
-
-    /**
-     * Set detector gradient magnitude threshold.
-     *
-     * Sets the coherence threshold for detected bounding boxes.
-     * Increasing this value will generate a closer fitted bounding box width and can reduce false-positives.
-     * Values between 16 and 1024 generally work, while too high of a value will remove valid detections.
-     * @param thresh gradient magnitude threshold (default 64).
-     * @return automatically generated
-     */
-    public BarcodeDetector setGradientThreshold(double thresh) {
-        return new BarcodeDetector(setGradientThreshold_0(nativeObj, thresh));
-    }
-
-
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
@@ -216,25 +115,7 @@ public class BarcodeDetector extends GraphicalCodeDetector {
     private static native boolean detectAndDecodeWithType_0(long nativeObj, long img_nativeObj, List<String> decoded_info, List<String> decoded_type, long points_nativeObj);
     private static native boolean detectAndDecodeWithType_1(long nativeObj, long img_nativeObj, List<String> decoded_info, List<String> decoded_type);
 
-    // C++:  double cv::barcode::BarcodeDetector::getDownsamplingThreshold()
-    private static native double getDownsamplingThreshold_0(long nativeObj);
-
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDownsamplingThreshold(double thresh)
-    private static native long setDownsamplingThreshold_0(long nativeObj, double thresh);
-
-    // C++:  void cv::barcode::BarcodeDetector::getDetectorScales(vector_float& sizes)
-    private static native void getDetectorScales_0(long nativeObj, long sizes_mat_nativeObj);
-
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setDetectorScales(vector_float sizes)
-    private static native long setDetectorScales_0(long nativeObj, long sizes_mat_nativeObj);
-
-    // C++:  double cv::barcode::BarcodeDetector::getGradientThreshold()
-    private static native double getGradientThreshold_0(long nativeObj);
-
-    // C++:  BarcodeDetector cv::barcode::BarcodeDetector::setGradientThreshold(double thresh)
-    private static native long setGradientThreshold_0(long nativeObj, double thresh);
-
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

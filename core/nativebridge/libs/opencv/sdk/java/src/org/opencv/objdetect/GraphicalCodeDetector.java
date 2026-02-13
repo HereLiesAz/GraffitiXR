@@ -13,10 +13,7 @@ import org.opencv.utils.Converters;
 public class GraphicalCodeDetector {
 
     protected final long nativeObj;
-    protected GraphicalCodeDetector(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected GraphicalCodeDetector(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -163,14 +160,6 @@ public class GraphicalCodeDetector {
      *     @param decoded_info UTF8-encoded output vector of string or empty vector of string if the codes cannot be decoded.
      *     @param points optional output vector of vertices of the found graphical code quadrangles. Will be empty if not found.
      *     @param straight_code The optional vector of images containing binarized codes
-     *
-     * <ul>
-     *   <li>
-     *      If there are QR codes encoded with a Structured Append mode on the image and all of them detected and decoded correctly,
-     *     method writes a full message to position corresponds to 0-th code in a sequence. The rest of QR codes from the same sequence
-     *     have empty string.
-     *   </li>
-     * </ul>
      * @return automatically generated
      */
     public boolean detectAndDecodeMulti(Mat img, List<String> decoded_info, Mat points, List<Mat> straight_code) {
@@ -186,14 +175,6 @@ public class GraphicalCodeDetector {
      *     @param img grayscale or color (BGR) image containing graphical codes.
      *     @param decoded_info UTF8-encoded output vector of string or empty vector of string if the codes cannot be decoded.
      *     @param points optional output vector of vertices of the found graphical code quadrangles. Will be empty if not found.
-     *
-     * <ul>
-     *   <li>
-     *      If there are QR codes encoded with a Structured Append mode on the image and all of them detected and decoded correctly,
-     *     method writes a full message to position corresponds to 0-th code in a sequence. The rest of QR codes from the same sequence
-     *     have empty string.
-     *   </li>
-     * </ul>
      * @return automatically generated
      */
     public boolean detectAndDecodeMulti(Mat img, List<String> decoded_info, Mat points) {
@@ -204,86 +185,10 @@ public class GraphicalCodeDetector {
      * Both detects and decodes graphical codes
      *     @param img grayscale or color (BGR) image containing graphical codes.
      *     @param decoded_info UTF8-encoded output vector of string or empty vector of string if the codes cannot be decoded.
-     *
-     * <ul>
-     *   <li>
-     *      If there are QR codes encoded with a Structured Append mode on the image and all of them detected and decoded correctly,
-     *     method writes a full message to position corresponds to 0-th code in a sequence. The rest of QR codes from the same sequence
-     *     have empty string.
-     *   </li>
-     * </ul>
      * @return automatically generated
      */
     public boolean detectAndDecodeMulti(Mat img, List<String> decoded_info) {
         return detectAndDecodeMulti_2(nativeObj, img.nativeObj, decoded_info);
-    }
-
-
-    //
-    // C++:  NativeByteArray cv::GraphicalCodeDetector::detectAndDecode(Mat img, Mat& points = Mat(), Mat& straight_code = Mat())
-    //
-
-    public byte[] detectAndDecodeBytes(Mat img, Mat points, Mat straight_code) {
-        return detectAndDecodeBytes_0(nativeObj, img.nativeObj, points.nativeObj, straight_code.nativeObj);
-    }
-
-    public byte[] detectAndDecodeBytes(Mat img, Mat points) {
-        return detectAndDecodeBytes_1(nativeObj, img.nativeObj, points.nativeObj);
-    }
-
-    public byte[] detectAndDecodeBytes(Mat img) {
-        return detectAndDecodeBytes_2(nativeObj, img.nativeObj);
-    }
-
-
-    //
-    // C++:  NativeByteArray cv::GraphicalCodeDetector::decode(Mat img, Mat points, Mat& straight_code = Mat())
-    //
-
-    public byte[] decodeBytes(Mat img, Mat points, Mat straight_code) {
-        return decodeBytes_0(nativeObj, img.nativeObj, points.nativeObj, straight_code.nativeObj);
-    }
-
-    public byte[] decodeBytes(Mat img, Mat points) {
-        return decodeBytes_1(nativeObj, img.nativeObj, points.nativeObj);
-    }
-
-
-    //
-    // C++:  bool cv::GraphicalCodeDetector::decodeMulti(Mat img, Mat points, vector_NativeByteArray& decoded_info, vector_Mat& straight_code = vector_Mat())
-    //
-
-    public boolean decodeBytesMulti(Mat img, Mat points, List<byte[]> decoded_info, List<Mat> straight_code) {
-        Mat straight_code_mat = new Mat();
-        boolean retVal = decodeBytesMulti_0(nativeObj, img.nativeObj, points.nativeObj, decoded_info, straight_code_mat.nativeObj);
-        Converters.Mat_to_vector_Mat(straight_code_mat, straight_code);
-        straight_code_mat.release();
-        return retVal;
-    }
-
-    public boolean decodeBytesMulti(Mat img, Mat points, List<byte[]> decoded_info) {
-        return decodeBytesMulti_1(nativeObj, img.nativeObj, points.nativeObj, decoded_info);
-    }
-
-
-    //
-    // C++:  bool cv::GraphicalCodeDetector::detectAndDecodeMulti(Mat img, vector_NativeByteArray& decoded_info, Mat& points = Mat(), vector_Mat& straight_code = vector_Mat())
-    //
-
-    public boolean detectAndDecodeBytesMulti(Mat img, List<byte[]> decoded_info, Mat points, List<Mat> straight_code) {
-        Mat straight_code_mat = new Mat();
-        boolean retVal = detectAndDecodeBytesMulti_0(nativeObj, img.nativeObj, decoded_info, points.nativeObj, straight_code_mat.nativeObj);
-        Converters.Mat_to_vector_Mat(straight_code_mat, straight_code);
-        straight_code_mat.release();
-        return retVal;
-    }
-
-    public boolean detectAndDecodeBytesMulti(Mat img, List<byte[]> decoded_info, Mat points) {
-        return detectAndDecodeBytesMulti_1(nativeObj, img.nativeObj, decoded_info, points.nativeObj);
-    }
-
-    public boolean detectAndDecodeBytesMulti(Mat img, List<byte[]> decoded_info) {
-        return detectAndDecodeBytesMulti_2(nativeObj, img.nativeObj, decoded_info);
     }
 
 
@@ -318,25 +223,7 @@ public class GraphicalCodeDetector {
     private static native boolean detectAndDecodeMulti_1(long nativeObj, long img_nativeObj, List<String> decoded_info, long points_nativeObj);
     private static native boolean detectAndDecodeMulti_2(long nativeObj, long img_nativeObj, List<String> decoded_info);
 
-    // C++:  NativeByteArray cv::GraphicalCodeDetector::detectAndDecode(Mat img, Mat& points = Mat(), Mat& straight_code = Mat())
-    private static native byte[] detectAndDecodeBytes_0(long nativeObj, long img_nativeObj, long points_nativeObj, long straight_code_nativeObj);
-    private static native byte[] detectAndDecodeBytes_1(long nativeObj, long img_nativeObj, long points_nativeObj);
-    private static native byte[] detectAndDecodeBytes_2(long nativeObj, long img_nativeObj);
-
-    // C++:  NativeByteArray cv::GraphicalCodeDetector::decode(Mat img, Mat points, Mat& straight_code = Mat())
-    private static native byte[] decodeBytes_0(long nativeObj, long img_nativeObj, long points_nativeObj, long straight_code_nativeObj);
-    private static native byte[] decodeBytes_1(long nativeObj, long img_nativeObj, long points_nativeObj);
-
-    // C++:  bool cv::GraphicalCodeDetector::decodeMulti(Mat img, Mat points, vector_NativeByteArray& decoded_info, vector_Mat& straight_code = vector_Mat())
-    private static native boolean decodeBytesMulti_0(long nativeObj, long img_nativeObj, long points_nativeObj, List<byte[]> decoded_info, long straight_code_mat_nativeObj);
-    private static native boolean decodeBytesMulti_1(long nativeObj, long img_nativeObj, long points_nativeObj, List<byte[]> decoded_info);
-
-    // C++:  bool cv::GraphicalCodeDetector::detectAndDecodeMulti(Mat img, vector_NativeByteArray& decoded_info, Mat& points = Mat(), vector_Mat& straight_code = vector_Mat())
-    private static native boolean detectAndDecodeBytesMulti_0(long nativeObj, long img_nativeObj, List<byte[]> decoded_info, long points_nativeObj, long straight_code_mat_nativeObj);
-    private static native boolean detectAndDecodeBytesMulti_1(long nativeObj, long img_nativeObj, List<byte[]> decoded_info, long points_nativeObj);
-    private static native boolean detectAndDecodeBytesMulti_2(long nativeObj, long img_nativeObj, List<byte[]> decoded_info);
-
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

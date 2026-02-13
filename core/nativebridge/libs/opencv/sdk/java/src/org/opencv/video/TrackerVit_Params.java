@@ -10,10 +10,7 @@ import org.opencv.core.Scalar;
 public class TrackerVit_Params {
 
     protected final long nativeObj;
-    protected TrackerVit_Params(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected TrackerVit_Params(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -119,24 +116,6 @@ public class TrackerVit_Params {
     }
 
 
-    //
-    // C++: float TrackerVit_Params::tracking_score_threshold
-    //
-
-    public float get_tracking_score_threshold() {
-        return get_tracking_score_threshold_0(nativeObj);
-    }
-
-
-    //
-    // C++: void TrackerVit_Params::tracking_score_threshold
-    //
-
-    public void set_tracking_score_threshold(float tracking_score_threshold) {
-        set_tracking_score_threshold_0(nativeObj, tracking_score_threshold);
-    }
-
-
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
@@ -177,13 +156,7 @@ public class TrackerVit_Params {
     // C++: void TrackerVit_Params::stdvalue
     private static native void set_stdvalue_0(long nativeObj, double stdvalue_val0, double stdvalue_val1, double stdvalue_val2, double stdvalue_val3);
 
-    // C++: float TrackerVit_Params::tracking_score_threshold
-    private static native float get_tracking_score_threshold_0(long nativeObj);
-
-    // C++: void TrackerVit_Params::tracking_score_threshold
-    private static native void set_tracking_score_threshold_0(long nativeObj, float tracking_score_threshold);
-
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

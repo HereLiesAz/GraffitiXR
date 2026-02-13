@@ -1,27 +1,17 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import android.content.Context
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 
-/**
- * A Composable that hosts the ARCore [GLSurfaceView].
- * It manages the lifecycle of the [ArRenderer] and reacts to state changes
- * (e.g., toggling point cloud visibility or flashlight).
- *
- * @param viewModel The AR ViewModel.
- * @param uiState The current UI state to render.
- * @param onRendererCreated Callback to expose the created [ArRenderer] to the parent (e.g., for capture).
- */
 @Composable
 fun ArView(
     viewModel: ArViewModel,
@@ -30,53 +20,38 @@ fun ArView(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val renderer = remember { ArRenderer(context) }
 
-    val arRenderer = remember {
-        ArRenderer(context).also {
-            onRendererCreated(it)
-        }
-    }
+    LaunchedEffect(renderer) { onRendererCreated(renderer) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> arRenderer.onResume(lifecycleOwner)
-                Lifecycle.Event.ON_PAUSE -> arRenderer.onPause(lifecycleOwner)
-                Lifecycle.Event.ON_DESTROY -> arRenderer.cleanup()
+                Lifecycle.Event.ON_RESUME -> renderer.onResume(lifecycleOwner)
+                Lifecycle.Event.ON_PAUSE -> renderer.onPause(lifecycleOwner)
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            arRenderer.cleanup()
+            renderer.cleanup()
         }
     }
 
-    LaunchedEffect(uiState.showPointCloud) {
-        arRenderer.showPointCloud = uiState.showPointCloud
-    }
-
-    LaunchedEffect(uiState.isFlashlightOn) {
-        arRenderer.setFlashlight(uiState.isFlashlightOn)
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.newTargetImage.collect { (bitmap, name) ->
-            arRenderer.setupAugmentedImageDatabase(bitmap, name)
-        }
-    }
+    LaunchedEffect(uiState.isFlashlightOn) { renderer.setFlashlight(uiState.isFlashlightOn) }
+    LaunchedEffect(uiState.showPointCloud) { renderer.showPointCloud = uiState.showPointCloud }
 
     AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { ctx: Context ->
+        factory = { ctx ->
             GLSurfaceView(ctx).apply {
                 preserveEGLContextOnPause = true
                 setEGLContextClientVersion(3)
                 setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                setRenderer(arRenderer)
+                setRenderer(renderer)
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             }
-        }
+        },
+        modifier = Modifier.fillMaxSize()
     )
 }

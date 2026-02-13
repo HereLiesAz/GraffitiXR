@@ -140,7 +140,7 @@ public class MergeMertens extends MergeExposures {
     // C++:  void cv::MergeMertens::setExposureWeight(float exposure_weight)
     private static native void setExposureWeight_0(long nativeObj, float exposure_weight);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

@@ -15,10 +15,7 @@ import org.opencv.ml.ParamGrid;
 public class ParamGrid {
 
     protected final long nativeObj;
-    protected ParamGrid(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected ParamGrid(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -157,7 +154,7 @@ public class ParamGrid {
     // C++: void ParamGrid::logStep
     private static native void set_logStep_0(long nativeObj, double logStep);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

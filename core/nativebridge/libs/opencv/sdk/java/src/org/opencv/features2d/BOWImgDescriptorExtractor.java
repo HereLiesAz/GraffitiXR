@@ -26,10 +26,7 @@ import org.opencv.utils.Converters;
 public class BOWImgDescriptorExtractor {
 
     protected final long nativeObj;
-    protected BOWImgDescriptorExtractor(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected BOWImgDescriptorExtractor(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -150,7 +147,7 @@ public class BOWImgDescriptorExtractor {
     // C++:  int cv::BOWImgDescriptorExtractor::descriptorType()
     private static native int descriptorType_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

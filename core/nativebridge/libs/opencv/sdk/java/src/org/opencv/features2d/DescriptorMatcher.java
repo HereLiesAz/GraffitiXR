@@ -664,7 +664,7 @@ public class DescriptorMatcher extends Algorithm {
     // C++: static Ptr_DescriptorMatcher cv::DescriptorMatcher::create(DescriptorMatcher_MatcherType matcherType)
     private static native long create_1(int matcherType);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

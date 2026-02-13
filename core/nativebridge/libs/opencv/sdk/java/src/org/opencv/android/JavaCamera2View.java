@@ -46,7 +46,6 @@ public class JavaCamera2View extends CameraBridgeViewBase {
     protected ImageReader mImageReader;
     protected int mPreviewFormat = ImageFormat.YUV_420_888;
     protected int mRequestTemplate = CameraDevice.TEMPLATE_PREVIEW;
-    private int mFrameRotation;
 
     protected CameraDevice mCameraDevice;
     protected CameraCaptureSession mCaptureSession;
@@ -87,8 +86,8 @@ public class JavaCamera2View extends CameraBridgeViewBase {
         }
     }
 
-    protected boolean selectCamera() {
-        Log.i(LOGTAG, "selectCamera");
+    protected boolean initializeCamera() {
+        Log.i(LOGTAG, "initializeCamera");
         CameraManager manager = (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
         try {
             String camList[] = manager.getCameraIdList();
@@ -96,10 +95,8 @@ public class JavaCamera2View extends CameraBridgeViewBase {
                 Log.e(LOGTAG, "Error: camera isn't detected.");
                 return false;
             }
-            boolean chosen = false;  // remember whether the camera ID is set.
             if (mCameraIndex == CameraBridgeViewBase.CAMERA_ID_ANY) {
                 mCameraID = camList[0];
-                chosen = true;
             } else {
                 for (String cameraID : camList) {
                     CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraID);
@@ -109,15 +106,18 @@ public class JavaCamera2View extends CameraBridgeViewBase {
                             characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT)
                     ) {
                         mCameraID = cameraID;
-                        chosen = true;
                         break;
                     }
                 }
             }
-            if (mCameraID == null || !chosen) { // make JavaCamera2View behaves in the same way as JavaCameraView
-                Log.i(LOGTAG, "Selecting camera by index (" + mCameraIndex + ")");
+            if (mCameraID != null) {
+                Log.i(LOGTAG, "Opening camera: " + mCameraID);
+                manager.openCamera(mCameraID, mStateCallback, mBackgroundHandler);
+            } else { // make JavaCamera2View behaves in the same way as JavaCameraView
+                Log.i(LOGTAG, "Trying to open camera with the value (" + mCameraIndex + ")");
                 if (mCameraIndex < camList.length) {
                     mCameraID = camList[mCameraIndex];
+                    manager.openCamera(mCameraID, mStateCallback, mBackgroundHandler);
                 } else {
                     // CAMERA_DISCONNECTED is used when the camera id is no longer valid
                     throw new CameraAccessException(CameraAccessException.CAMERA_DISCONNECTED);
@@ -125,11 +125,11 @@ public class JavaCamera2View extends CameraBridgeViewBase {
             }
             return true;
         } catch (CameraAccessException e) {
-            Log.e(LOGTAG, "selectCamera - Camera Access Exception", e);
+            Log.e(LOGTAG, "OpenCamera - Camera Access Exception", e);
         } catch (IllegalArgumentException e) {
-            Log.e(LOGTAG, "selectCamera - Illegal Argument Exception", e);
+            Log.e(LOGTAG, "OpenCamera - Illegal Argument Exception", e);
         } catch (SecurityException e) {
-            Log.e(LOGTAG, "selectCamera - Security Exception", e);
+            Log.e(LOGTAG, "OpenCamera - Security Exception", e);
         }
         return false;
     }
@@ -204,7 +204,6 @@ public class JavaCamera2View extends CameraBridgeViewBase {
             mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
                 @Override
                 public void onImageAvailable(ImageReader reader) {
-
                     Image image = reader.acquireLatestImage();
                     if (image == null)
                         return;
@@ -214,9 +213,8 @@ public class JavaCamera2View extends CameraBridgeViewBase {
                     assert (planes.length == 3);
                     assert (image.getFormat() == mPreviewFormat);
 
-                    RotatedCameraFrame tempFrame = new RotatedCameraFrame(new JavaCamera2Frame(image), mFrameRotation);
+                    JavaCamera2Frame tempFrame = new JavaCamera2Frame(image);
                     deliverAndDrawFrame(tempFrame);
-                    tempFrame.mFrame.release();
                     tempFrame.release();
                     image.close();
                 }
@@ -305,22 +303,11 @@ public class JavaCamera2View extends CameraBridgeViewBase {
     protected boolean connectCamera(int width, int height) {
         Log.i(LOGTAG, "setCameraPreviewSize(" + width + "x" + height + ")");
         startBackgroundThread();
-        selectCamera();
+        initializeCamera();
         try {
-            CameraManager manager = (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
-            CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraID);
-            mFrameRotation = getFrameRotation(
-                    characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT,
-                    characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION));
-
             boolean needReconfig = calcPreviewSize(width, height);
-            if (mFrameRotation % 180 == 0) {
-                mFrameWidth = mPreviewSize.getWidth();
-                mFrameHeight = mPreviewSize.getHeight();
-            } else {
-                mFrameWidth = mPreviewSize.getHeight();
-                mFrameHeight = mPreviewSize.getWidth();
-            }
+            mFrameWidth = mPreviewSize.getWidth();
+            mFrameHeight = mPreviewSize.getHeight();
 
             if ((getLayoutParams().width == LayoutParams.MATCH_PARENT) && (getLayoutParams().height == LayoutParams.MATCH_PARENT))
                 mScale = Math.min(((float)height)/mFrameHeight, ((float)width)/mFrameWidth);
@@ -335,16 +322,12 @@ public class JavaCamera2View extends CameraBridgeViewBase {
                     mCaptureSession.close();
                     mCaptureSession = null;
                 }
+                createCameraPreviewSession();
             }
 
             if (mFpsMeter != null) {
                 mFpsMeter.setResolution(mFrameWidth, mFrameHeight);
             }
-
-            Log.i(LOGTAG, "Opening camera: " + mCameraID);
-            manager.openCamera(mCameraID, mStateCallback, mBackgroundHandler);
-        } catch (CameraAccessException e) {
-            Log.e(LOGTAG, "OpenCamera - Camera Access Exception", e);
         } catch (RuntimeException e) {
             throw new RuntimeException("Interrupted while setCameraPreviewSize.", e);
         }
@@ -459,7 +442,6 @@ public class JavaCamera2View extends CameraBridgeViewBase {
             mGray = new Mat();
         }
 
-        @Override
         public void release() {
             mRgba.release();
             mGray.release();

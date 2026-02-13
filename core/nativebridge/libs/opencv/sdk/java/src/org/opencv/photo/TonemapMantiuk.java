@@ -75,7 +75,7 @@ public class TonemapMantiuk extends Tonemap {
     // C++:  void cv::TonemapMantiuk::setSaturation(float saturation)
     private static native void setSaturation_0(long nativeObj, float saturation);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

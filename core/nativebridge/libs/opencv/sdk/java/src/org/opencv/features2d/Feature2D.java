@@ -293,7 +293,7 @@ public class Feature2D extends Algorithm {
     // C++:  String cv::Feature2D::getDefaultName()
     private static native String getDefaultName_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

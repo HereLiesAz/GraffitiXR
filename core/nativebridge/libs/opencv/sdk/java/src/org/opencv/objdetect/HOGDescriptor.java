@@ -34,10 +34,7 @@ import org.opencv.utils.Converters;
 public class HOGDescriptor {
 
     protected final long nativeObj;
-    protected HOGDescriptor(long addr) {
-      nativeObj = addr;
-      
-    }
+    protected HOGDescriptor(long addr) { nativeObj = addr; }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -888,7 +885,7 @@ public class HOGDescriptor {
     // C++: bool HOGDescriptor::signedGradient
     private static native boolean get_signedGradient_0(long nativeObj);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }

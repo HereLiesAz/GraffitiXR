@@ -1,14 +1,22 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.graphics.Bitmap
-import android.graphics.Matrix
+import android.net.Uri
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.graffitixr.core.domain.repository.ProjectRepository // IMPORT FROM DOMAIN
-import com.hereliesaz.graffitixr.nativebridge.GraffitiJNI
+import com.hereliesaz.graffitixr.common.model.BlendMode
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorPanel
+import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 /**
@@ -93,17 +101,6 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     }
 
-            val warpedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-            val bytes = GraffitiJNI.extractFeaturesFromBitmap(warpedBitmap)
-            val meta = GraffitiJNI.extractFeaturesMeta(warpedBitmap)
-
-            if (bytes != null && meta != null) {
-                val filename = "target_${System.currentTimeMillis()}.orb"
-                projectRepository.saveArtifact(project.id, filename, bytes)
-                projectRepository.updateTargetFingerprint(project.id, filename)
-                GraffitiJNI.setTargetDescriptors(bytes, meta[0], meta[1], meta[2])
-            }
-
     fun onRotationZChanged(rotation: Float) {
         updateActiveLayer { it.copy(rotationZ = it.rotationZ + rotation) }
     }
@@ -144,7 +141,7 @@ class EditorViewModel @Inject constructor(
 
     fun onCycleBlendMode() {
         updateActiveLayer {
-            val modes = BlendMode.values()
+            val modes = BlendMode.entries
             val nextMode = modes[(it.blendMode.ordinal + 1) % modes.size]
             it.copy(blendMode = nextMode)
         }
@@ -175,8 +172,6 @@ class EditorViewModel @Inject constructor(
                 if (it.id == activeId) transform(it) else it
             }
             state.copy(layers = newLayers)
-            if (warpedBitmap != bitmap) warpedBitmap.recycle()
-            _isProcessing.value = false
         }
     }
 }

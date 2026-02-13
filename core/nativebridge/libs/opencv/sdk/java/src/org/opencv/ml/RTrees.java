@@ -238,7 +238,7 @@ public class RTrees extends DTrees {
     private static native long load_0(String filepath, String nodeName);
     private static native long load_1(String filepath);
 
-    // native support for java finalize() or cleaner
+    // native support for java finalize()
     private static native void delete(long nativeObj);
 
 }
