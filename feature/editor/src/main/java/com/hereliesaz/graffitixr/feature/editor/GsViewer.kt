@@ -14,6 +14,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.feature.editor.rendering.GsViewerRenderer
 import kotlin.math.sqrt
 
+/**
+ * A Composable that renders the 3D SLAM map using the native MobileGS engine.
+ * It uses [GsViewerRenderer] to handle OpenGL rendering and [SlamManager] for data processing.
+ */
 @SuppressLint("ClickableViewAccessibility")
 @Composable
 fun GsViewer(

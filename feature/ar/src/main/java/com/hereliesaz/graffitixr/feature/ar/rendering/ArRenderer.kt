@@ -179,6 +179,7 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
                     colorBuffer = null,
                     width = depthImage.width,
                     height = depthImage.height,
+                    stride = depthImage.planes[0].rowStride,
                     pose = pose,
                     fov = fov
                 )
