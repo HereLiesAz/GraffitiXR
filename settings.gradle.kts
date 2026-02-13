@@ -15,4 +15,4 @@ include(":core:common", ":core:domain", ":core:data", ":core:nativebridge", ":co
 include(":feature:ar", ":feature:editor", ":feature:dashboard")
 
 include(":opencv")
-project(":opencv").projectDir = file("libs/opencv/sdk")
+project(":opencv").projectDir = file("core/nativebridge/libs/opencv/sdk")

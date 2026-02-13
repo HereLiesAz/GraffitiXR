@@ -58,9 +58,22 @@ A thumb-driven navigation paradigm designed for one-handed use.
 
 ## Build Setup
 
-1.  **Prerequisites:** Android Studio (Ladybug+), JDK 17, ARCore-supported device.
-2.  **NDK:** Required for OpenCV and CMake tasks.
-3.  **Build Variant:** `debug` (Signed with debug keystore).
+1.  **Prerequisites:**
+    *   Android Studio (Ladybug+)
+    *   JDK 17
+    *   ARCore-supported device
+
+2.  **SDK Tools:**
+    *   **NDK (Side-by-side):** Required for native compilation.
+    *   **CMake:** You **must** install version **3.22.1** specifically via the SDK Manager.
+
+3.  **OpenCV Setup:**
+    Before building, run the setup script to download and configure OpenCV:
+    ```bash
+    ./setup_libs.sh
+    ```
+
+4.  **Build Variant:** Select `debug` (Signed with debug keystore).
 
 ## Documentation
 

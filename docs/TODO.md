@@ -58,12 +58,12 @@
 **Status:** Updated to reflect that SLAM and 3D Mockups are now active features.
 # Roadmap
 
-## Phase 1: Foundation (In Progress)
+## Phase 1: Foundation (Completed)
 - [x] Multi-module project structure setup.
 - [x] ARCore integration with basic plane detection.
 - [x] Jetpack Compose UI with `AzNavRail`.
 - [x] Unified State Architecture implementation.
-- [ ] **Save:** Project saving functionality (Currently a stub).
+- [x] **Save:** Project saving functionality.
 
 ## Phase 2: Core Editing (Completed)
 - [x] Layer System (Add, Remove, Reorder).
