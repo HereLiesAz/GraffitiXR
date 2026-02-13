@@ -18,6 +18,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
@@ -54,6 +55,10 @@ class ArRenderer(
     // Safety flag for ARCore texture binding
     @Volatile
     private var isCameraTextureInitialized = false
+    
+    // Safety flag to prevent calling session.update() when paused
+    @Volatile
+    private var isResumed = false
 
     // Keyframing State
     private var lastKeyframePose: Pose? = null
@@ -104,12 +109,14 @@ class ArRenderer(
 
         try {
             session?.resume()
+            isResumed = true
         } catch (e: CameraNotAvailableException) {
             Log.e(TAG, "Camera not available", e)
         }
     }
 
     override fun onPause(owner: LifecycleOwner) {
+        isResumed = false
         session?.pause()
     }
 
@@ -118,6 +125,7 @@ class ArRenderer(
     }
 
     fun cleanup() {
+        isResumed = false
         session?.close()
         session = null
     }
@@ -162,6 +170,7 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
+        if (!isResumed) return
         val currentSession = session ?: return
 
         // CRITICAL FIX: Ensure texture is bound before updating.
@@ -211,6 +220,8 @@ class ArRenderer(
                 pendingCaptureCallback = null
             }
 
+        } catch (e: SessionPausedException) {
+            Log.w(TAG, "Session paused during update", e)
         } catch (e: Exception) {
             if (Math.random() < 0.05) Log.e(TAG, "Exception on render loop", e)
         }
