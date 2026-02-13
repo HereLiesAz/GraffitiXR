@@ -201,3 +201,29 @@ All items completed. Ready for the next phase of development.
 - [x] Basic Gaussian Splatting Viewer integration (Stubbed).
 - [ ] Photogrammetry capture pipeline.
 - [ ] 3D Model import (.glb/.gltf) support.
+
+**Status:** Updated to reflect that SLAM and 3D Mockups are now active features.
+# Roadmap
+
+## Phase 1: Foundation (Completed)
+- [x] Multi-module project structure setup.
+- [x] ARCore integration with basic plane detection.
+- [x] Jetpack Compose UI with `AzNavRail`.
+- [x] Unified State Architecture implementation.
+
+## Phase 2: Core Editing (Completed)
+- [x] Layer System (Add, Remove, Reorder).
+- [x] Blend Modes (Multiply, Overlay, Screen, etc.).
+- [x] Trace Mode (High contrast overlay).
+- [x] Target Creation Flow (Capture -> Rectify).
+
+## Phase 3: 3D & SLAM (Current Focus)
+- [x] **SphereSLAM:** Basic keyframe and point cloud capture (`MappingScreen`).
+- [x] **3D Mockup:** Integration of `GsViewer` into the Editor.
+- [ ] **Splat Training:** On-device training of Gaussian Splats from SLAM data (Currently offline/cloud only).
+- [ ] **Live Occlusion:** Using the sparse point cloud for real-time occlusion in AR mode.
+
+## Phase 4: Polish & Scaling
+- [ ] **Cloud Anchors:** Multi-user sessions.
+- [ ] **LiDAR:** Mesh generation for Pro devices.
+- [ ] **Optimizations:** Vulkan backend for Splat rasterization.

@@ -1,57 +1,34 @@
-# GraffitiXR Codebase Analysis
+# Codebase Analysis: The Autopsy
 
-## Overview
-The GraffitiXR project aims for a robust, local-first AR application using a multi-module architecture. While the directory structure reflects this intent, the actual code implementation suffers from significant coupling and architectural "leaks."
+**Date:** 2026-02-12
+**Status:** Functional but Fragile
 
-## Key Issues
+## The Good
+1.  **Directory Structure:** The flattening of the module hierarchy (removing the deep nesting of `features`) was successful. The physical layout mirrors the logical architecture.
+2.  **Native Separation:** The `core:native` module correctly isolates the C++ horror from the Kotlin UI. The JNI bridge (`SlamManager`) is clean and uses Coroutines for state flow.
+3.  **UI System:** `AzNavRail` is consistently implemented. The "thumb-first" philosophy is evident in the Compose hierarchy.
 
-### 1. Monolithic `MainViewModel` (The God Object)
-The `MainViewModel` in the `:app` module violates the separation of concerns. It currently handles:
--   **AR State & Logic:** Directly references `ArRenderer` and manages `ArState`.
--   **Editor Actions:** Implements `EditorActions` interface and handles image manipulation.
--   **Project Management:** Handles loading, saving, and sorting projects.
--   **GPS/Location:** Manages location updates.
--   **Global UI State:** Maintains a massive `UiState` data class that mixes AR, Editor, and Dashboard states.
+## The Bad (Technical Debt)
+### 1. The Monolith Lives (`MainViewModel`)
+Despite the refactoring strategy, `MainViewModel` remains a "God Object."
+* **Evidence:** It imports `ArRenderer`, manages `MainUiState` (which duplicates flags from feature states), and handles permission logic.
+* **Risk:** Any change to the AR flow requires recompiling the App module. It breaks the isolation of the `feature:ar` module.
 
-**Impact:** This makes the `app` module heavy and dependent on logic that should reside in feature modules. It prevents true modular isolation.
+### 2. State Duplication
+We have `ArUiState` (in `common`) and `EditorUiState` (in `common`).
+* **Issue:** The `UiState` is defined in `core:common`, but `MainViewModel` *also* maintains a local `MainUiState` for things like `isTouchLocked`.
+* **Consequence:** There are two sources of truth for "Is the app busy?".
 
-### 2. "Leaky" `core:common` Module
-The `core:common` module, intended for universal utilities, contains heavy feature dependencies:
--   **ARCore:** Included in `build.gradle.kts` but seemingly unused in code.
--   **OpenCV:** Included and used for `ensureOpenCVLoaded`.
--   **Location:** Includes `LocationTracker`.
+### 3. Native Volatility
+The `MobileGS` engine is raw C++.
+* **Memory:** There is no automatic lifecycle management for the C++ heap. If `GraffitiApplication` dies unexpectedly, or if `ArRenderer` isn't disposed correctly, we leak OpenGL contexts.
+* **Thread Safety:** `SlamManager` calls native methods from `Dispatchers.IO`, but the C++ engine likely accesses shared state (`mChunks`) without sufficient mutex locking in the render loop.
 
-**Impact:** Any module depending on `core:common` (which is all of them) inherits these heavy dependencies, increasing build times and blurring boundaries. `core:domain` (pure data) should not depend on ARCore or OpenCV implementations.
+## The Ugly (UX Gaps)
+* **Fingerprint Aging:** The code creates fingerprints (ORB descriptors) but never updates them. If a user paints over a wall, the app will fail to relocalize, with no UI feedback to "Rescan."
+* **Error Handling:** The `CrashHandler` exists, but it's a catch-all. Specific errors in the AR session (e.g., "Camera in use") often result in a silent black screen rather than a helpful toast.
 
-### 3. Mixed Responsibilities in `UiState`
-The `UiState` class (likely in `core:common` or `core:domain`) acts as a global bucket.
--   It mixes `layers` (Editor) with `arState` (AR) and `availableProjects` (Dashboard).
--   Changes to AR state trigger recompositions in Editor UI and vice-versa.
-
-### 4. Testing Gaps
-The testing suite is minimal. The monolithic nature of `MainViewModel` makes it difficult to unit test specific features in isolation.
-
-## Refactoring Plan (The "Ralph" Loop)
-
-### Phase 1: ViewModel Splitting
-We will decompose `MainViewModel` into feature-specific ViewModels:
-1.  **`ArViewModel` (in `:feature:ar`):** Handles AR session, `ArRenderer` bridge, mapping logic, and point cloud toggles.
-2.  **`EditorViewModel` (in `:feature:editor`):** Handles layer manipulation, image adjustments, and transformation logic.
-3.  **`DashboardViewModel` (in `:feature:dashboard`):** Handles project listing, creation, and settings.
-
-### Phase 2: State Decomposition
-We will split `UiState` into:
--   `ArUiState`
--   `EditorUiState`
--   `DashboardUiState`
-
-These will be exposed by their respective ViewModels. The `MainScreen` will either coordinate them or, preferably, the Navigation Graph will instantiate them only for the relevant screens.
-
-### Phase 3: Core Cleanup
--   Remove `libs.arcore.client` from `:core:common`.
--   Evaluate if `LocationTracker` belongs in `:core:data` or a specific feature.
--   Ensure `:core:domain` remains pure.
-
-### Phase 4: Documentation & Testing
--   Update `architecture.md` to reflect the strict boundaries.
--   Add unit tests for the new, smaller ViewModels.
+## Recommendations
+1.  **Kill MainViewModel:** Move `isTouchLocked` to a `GlobalUiState` in `core:common` and let feature ViewModels observe it.
+2.  **Mutex the Splats:** Ensure `MobileGS.cpp` uses `std::mutex` around the voxel map during both `update()` (Write) and `draw()` (Read).
+3.  **Implement Aging:** Add a timestamp to `Fingerprint`. If `CurrentTime - FingerprintTime > 30 Days`, prompt user to Rescan.
