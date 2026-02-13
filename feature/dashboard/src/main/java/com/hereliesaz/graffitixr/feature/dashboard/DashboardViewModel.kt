@@ -63,8 +63,13 @@ class DashboardViewModel @Inject constructor(
      */
     fun deleteProject(projectId: String) {
         viewModelScope.launch {
-            repository.deleteProject(projectId)
-            loadAvailableProjects()
+            try {
+                repository.deleteProject(projectId)
+                loadAvailableProjects()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("DashboardViewModel", "Error deleting project: $projectId", e)
+            }
         }
     }
 }
