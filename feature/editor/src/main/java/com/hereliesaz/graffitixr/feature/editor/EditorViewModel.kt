@@ -39,6 +39,7 @@ import com.hereliesaz.graffitixr.common.model.OverlayLayer
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
+    private val slamManager: SlamManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -50,9 +51,7 @@ class EditorViewModel @Inject constructor(
     val exportTrigger: StateFlow<Boolean> = _exportTrigger.asStateFlow()
 
     // Helpers
-    // Instantiate helpers. In a production app, these should likely be injected Singletons.
     private val backgroundRemover = BackgroundRemover(context)
-    private val slamManager = SlamManager()
 
     fun setEditorMode(mode: EditorMode) {
         _uiState.update { it.copy(editorMode = mode) }
@@ -169,7 +168,6 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(Dispatchers.Default) {
-            // Correct usage: call instance method on the backgroundRemover instance
             val result = backgroundRemover.removeBackground(activeLayer.bitmap)
             val segmented = result.getOrNull()
 
@@ -177,7 +175,6 @@ class EditorViewModel @Inject constructor(
                 state.copy(
                     isLoading = false,
                     layers = state.layers.map {
-                        // Ensure 'segmented' is a valid Bitmap before copying
                         if (it.id == activeLayer.id && segmented != null) it.copy(bitmap = segmented) else it
                     }
                 )
@@ -186,23 +183,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun onLineDrawingClicked() {
-        val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
-
-        _uiState.update { it.copy(isLoading = true) }
-
-        viewModelScope.launch(Dispatchers.Default) {
-            // Use SlamManager for JNI edge detection
-            val edged = slamManager.detectEdges(activeLayer.bitmap)
-
-            _uiState.update { state ->
-                state.copy(
-                    isLoading = false,
-                    layers = state.layers.map {
-                        if (it.id == activeLayer.id && edged != null) it.copy(bitmap = edged) else it
-                    }
-                )
-            }
-        }
+        // Feature temporarily disabled until detectEdges is added to SlamManager JNI
     }
 
     // --- Panels ---
@@ -279,15 +260,13 @@ class EditorViewModel @Inject constructor(
 
                 // 3. Save World (SLAM Map) if data exists
                 var mapPath = _uiState.value.mapPath
-                if (slamManager.getPointCount() > 50) { // Arbitrary threshold to avoid saving empty maps
-                    val mapFilename = "world_${System.currentTimeMillis()}.bin"
-                    val projectDir = File(context.filesDir, "projects/$projectId")
-                    if (!projectDir.exists()) projectDir.mkdirs()
+                val mapFilename = "world_${System.currentTimeMillis()}.bin"
+                val projectDir = File(context.filesDir, "projects/$projectId")
+                if (!projectDir.exists()) projectDir.mkdirs()
 
-                    val mapFile = File(projectDir, mapFilename)
-                    if (slamManager.saveWorld(mapFile.absolutePath)) {
-                        mapPath = mapFile.absolutePath
-                    }
+                val mapFile = File(projectDir, mapFilename)
+                if (slamManager.saveMap(mapFile.absolutePath)) {
+                    mapPath = mapFile.absolutePath
                 }
 
                 // 4. Update Project Object

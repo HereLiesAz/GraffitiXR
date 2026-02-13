@@ -42,6 +42,9 @@ android {
         }
         jniLibs {
             pickFirsts += "**/libc++_shared.so"
+            // FIX: OpenCV is included both via AAR (libs.opencv) and project module (:opencv)
+            // Pick first to resolve duplication
+            pickFirsts += "**/libopencv_java4.so"
         }
     }
 
@@ -66,7 +69,12 @@ dependencies {
     implementation(project(":feature:dashboard"))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+    
+    // Use the project module instead of the AAR to avoid duplication if possible, 
+    // or keep pickFirsts. Since :opencv is included in many places, 
+    // we'll rely on pickFirsts in the app packaging.
     implementation(libs.opencv)
+
     implementation(libs.arcore.client)
     implementation(libs.androidx.activity.ktx)
     implementation(libs.navigation.compose)
