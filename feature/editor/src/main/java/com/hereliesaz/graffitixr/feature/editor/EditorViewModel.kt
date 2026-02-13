@@ -24,9 +24,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.InputStream
 import java.util.UUID
 import javax.inject.Inject
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
+import com.hereliesaz.graffitixr.common.model.OverlayLayer
 
 /**
  * ViewModel for the Image Editor feature.
@@ -232,8 +236,77 @@ class EditorViewModel @Inject constructor(
     }
 
     fun saveProject() {
-        viewModelScope.launch {
-            // TODO: Mapping logic to save to Repository
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                // 1. Get or Create Project
+                val currentProject = projectRepository.currentProject.value ?: GraffitiProject(
+                    name = "Project ${System.currentTimeMillis()}"
+                )
+                val projectId = currentProject.id
+
+                // 2. Save Layers (Serialize Bitmaps to Disk)
+                val overlayLayers = _uiState.value.layers.map { layer ->
+                    val stream = ByteArrayOutputStream()
+                    layer.bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                    val bytes = stream.toByteArray()
+                    val filename = "layer_${layer.id}.png"
+
+                    // Returns absolute path string
+                    val path = projectRepository.saveArtifact(projectId, filename, bytes)
+                    val fileUri = Uri.fromFile(File(path))
+
+                    OverlayLayer(
+                        id = layer.id,
+                        name = layer.name,
+                        uri = fileUri,
+                        scale = layer.scale,
+                        offset = layer.offset,
+                        rotationX = layer.rotationX,
+                        rotationY = layer.rotationY,
+                        rotationZ = layer.rotationZ,
+                        isVisible = layer.isVisible,
+                        opacity = layer.opacity,
+                        blendMode = layer.blendMode,
+                        saturation = layer.saturation,
+                        contrast = layer.contrast,
+                        brightness = layer.brightness,
+                        colorBalanceR = layer.colorBalanceR,
+                        colorBalanceG = layer.colorBalanceG,
+                        colorBalanceB = layer.colorBalanceB
+                    )
+                }
+
+                // 3. Save World (SLAM Map) if data exists
+                var mapPath = _uiState.value.mapPath
+                if (slamManager.getPointCount() > 50) { // Arbitrary threshold to avoid saving empty maps
+                    val mapFilename = "world_${System.currentTimeMillis()}.bin"
+                    val projectDir = File(context.filesDir, "projects/$projectId")
+                    if (!projectDir.exists()) projectDir.mkdirs()
+
+                    val mapFile = File(projectDir, mapFilename)
+                    if (slamManager.saveWorld(mapFile.absolutePath)) {
+                        mapPath = mapFile.absolutePath
+                    }
+                }
+
+                // 4. Update Project Object
+                val updatedProject = currentProject.copy(
+                    lastModified = System.currentTimeMillis(),
+                    layers = overlayLayers,
+                    mapPath = mapPath,
+                    isRightHanded = _uiState.value.isRightHanded,
+                    // Persist background if set
+                    backgroundImageUri = _uiState.value.backgroundImageUri?.let { Uri.parse(it) }
+                )
+
+                // 5. Persist to Disk
+                projectRepository.updateProject(updatedProject)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
         }
     }
 

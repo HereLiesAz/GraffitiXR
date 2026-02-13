@@ -99,11 +99,11 @@ println "OpenCV: " +openCVersionName + " " + project.buildscript.sourceFile
 
 android {
     namespace 'org.opencv'
-    compileSdkVersion 31
+    compileSdkVersion 36
 
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 31
+        minSdkVersion 29
+        targetSdkVersion 36
 
         versionCode openCVersionCode
         versionName openCVersionName
@@ -134,7 +134,7 @@ android {
                 doNotStrip '**/*.so'  // controlled by OpenCV CMake scripts
             }
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
         }
     }
 
