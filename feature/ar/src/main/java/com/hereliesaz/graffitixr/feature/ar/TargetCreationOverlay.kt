@@ -92,13 +92,30 @@ fun TargetCreationOverlay(
                 )
             }
             CaptureStep.REVIEW -> {
-                // Show processed target
-                uiState.tempCaptureBitmap?.let { bitmap ->
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Review Target",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
+                // Show processed target (Extracted Markings)
+                // Use a dark background to make the white lines visible
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.8f))
+                ) {
+                    uiState.tempCaptureBitmap?.let { bitmap ->
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Review Extracted Target",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                    Text(
+                        text = "Review Extracted Markings",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 40.dp)
                     )
                 }
             }
