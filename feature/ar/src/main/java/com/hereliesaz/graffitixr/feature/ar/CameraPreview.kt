@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.util.Log
 import androidx.camera.core.CameraSelector
@@ -21,7 +20,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import java.nio.ByteBuffer
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -47,48 +45,38 @@ fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    
-    // Executor for camera operations
-    val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
-    
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
     val previewView = remember { PreviewView(context) }
-    
-    // Use case: ImageCapture. We intentionally don't set OUTPUT_FORMAT_JPEG explicitly 
-    // because some devices/versions might default to it or support only it with minimize latency,
-    // but we will verify the format in the callback.
-    val imageCapture = remember { 
+
+    // Use case: ImageCapture
+    val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-            .build() 
+            .build()
     }
 
     // Connect controller
     DisposableEffect(controller) {
         controller.onCaptureRequested = {
-            if (!cameraExecutor.isShutdown) {
-                // We use the main executor for the callback itself to simplify UI interaction
-                // The actual image capture work happens on the camera thread + background IO
-                imageCapture.takePicture(
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageCapturedCallback() {
-                        override fun onCaptureSuccess(image: ImageProxy) {
-                            try {
-                                // Convert ImageProxy to Bitmap
-                                val bitmap = imageProxyToBitmap(image)
-                                onPhotoCaptured(bitmap)
-                            } catch (e: Exception) {
-                                Log.e("CameraPreview", "Failed to process image: ${e.message}", e)
-                            } finally {
-                                image.close()
-                            }
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            Log.e("CameraPreview", "Photo capture failed: ${exception.message}", exception)
+            imageCapture.takePicture(
+                cameraExecutor,
+                object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+                        // Convert ImageProxy to Bitmap
+                        val bitmap = imageProxyToBitmap(image)
+                        image.close()
+                        // Callback on Main Thread
+                        ContextCompat.getMainExecutor(context).execute {
+                            onPhotoCaptured(bitmap)
                         }
                     }
-                )
-            }
+
+                    override fun onError(exception: ImageCaptureException) {
+                        Log.e("CameraPreview", "Photo capture failed: ${exception.message}", exception)
+                    }
+                }
+            )
         }
         onDispose {
             controller.onCaptureRequested = null
@@ -100,7 +88,7 @@ fun CameraPreview(
         val cameraProvider = context.getCameraProvider()
         val preview = Preview.Builder().build()
         preview.setSurfaceProvider(previewView.surfaceProvider)
-        
+
         val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
         try {
@@ -130,17 +118,11 @@ private suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspend
 }
 
 private fun imageProxyToBitmap(image: ImageProxy): Bitmap {
-    // Explicitly check format
-    if (image.format != ImageFormat.JPEG) {
-        throw IllegalArgumentException("Expected JPEG format, but got ${image.format}. YUV conversion is not yet implemented.")
-    }
-
     val buffer: ByteBuffer = image.planes[0].buffer
     val bytes = ByteArray(buffer.remaining())
     buffer.get(bytes)
     val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        ?: throw IllegalArgumentException("Failed to decode JPEG byte array")
-    
+
     // Rotate if needed
     val rotation = image.imageInfo.rotationDegrees
     if (rotation != 0) {

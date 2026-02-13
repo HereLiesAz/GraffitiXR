@@ -49,7 +49,7 @@ fun TargetCreationFlow(
                     controller = cameraController,
                     onPhotoCaptured = onPhotoCaptured
                 )
-                
+
                 TargetCreationOverlay(
                     uiState = uiState,
                     step = CaptureStep.CAPTURE,

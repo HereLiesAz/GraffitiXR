@@ -66,10 +66,11 @@ class ArRenderer(
         for (hit in hits) {
             val trackable = hit.trackable
             if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
-                // Check semantic classification instead of raw color
-                val result = planeRenderer.classifyPlane(trackable, frame.camera.pose)
-                
-                if (result == PlaneRenderer.PlaneMatchResult.MATCH) {
+                // Check color (orientation/distance)
+                val color = planeRenderer.calculatePlaneColor(trackable, frame.camera.pose)
+                // Green: R=0, G=1, B=0. Cyan: R=0, G=1, B=1. Pink: R=1...
+                // We check if B is low (< 0.2) and G is high (> 0.8)
+                if (color[1] > 0.8f && color[2] < 0.2f) {
                     // Valid Green Surface
                     Log.d(TAG, "Valid Surface Selected")
                     Handler(Looper.getMainLooper()).post {
