@@ -6,6 +6,8 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include <cstddef>
+#include <glm/gtc/type_ptr.hpp>
 
 #define LOG_TAG "MobileGS"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -18,28 +20,69 @@ const float MAX_DEPTH = 5.0f;
 const int MAX_SPLATS = 500000;
 const float VOXEL_SIZE = 0.02f; // 2cm
 
+const float QUAD_VERTICES[] = {
+    -1.0f, -1.0f,
+     1.0f, -1.0f,
+    -1.0f,  1.0f,
+     1.0f,  1.0f
+};
+
 // Shaders
+// 3D Gaussian Splatting Vertex Shader
+// Renders a 3D scaled and rotated quad
 const char* VERTEX_SHADER = R"(#version 300 es
-layout(location = 0) in vec3 aPosition;
-layout(location = 1) in vec3 aColor;
-layout(location = 2) in float aOpacity;
-uniform mat4 uMVP;
-uniform float uPointSize;
+layout(location = 0) in vec2 aQuadVert; // Unit quad vertex (Attribute 0 - Divisor 0)
+layout(location = 1) in vec3 aPosition; // Instance pos (Attribute 1 - Divisor 1)
+layout(location = 2) in vec3 aScale;    // Instance scale (Attribute 2 - Divisor 1)
+layout(location = 3) in vec4 aRotation; // Instance rot (Attribute 3 - Divisor 1)
+layout(location = 4) in vec3 aColor;    // Instance color (Attribute 4 - Divisor 1)
+layout(location = 5) in float aOpacity; // Instance opacity (Attribute 5 - Divisor 1)
+
+uniform mat4 uView;
+uniform mat4 uProj;
+
 out vec4 vColor;
+out vec2 vUV;
+
+// Helper: Rotate vector by quaternion
+vec3 rotateVector(vec3 v, vec4 q) {
+    return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+}
+
 void main() {
-    gl_Position = uMVP * vec4(aPosition, 1.0);
-    gl_PointSize = uPointSize / gl_Position.w;
+    // 1. Scale
+    // We multiply by 3.0 to cover +/- 3 sigma (99.7% of energy)
+    vec3 scaledVert = vec3(aQuadVert, 0.0) * aScale * 3.0;
+
+    // 2. Rotate
+    vec3 rotatedVert = rotateVector(scaledVert, aRotation);
+
+    // 3. Translate
+    vec3 worldPos = aPosition + rotatedVert;
+
+    // 4. Project
+    gl_Position = uProj * uView * vec4(worldPos, 1.0);
+
     vColor = vec4(aColor, aOpacity);
+    vUV = aQuadVert * 3.0; // Pass scaled UVs for gaussian calc
 }
 )";
 
 const char* FRAGMENT_SHADER = R"(#version 300 es
 precision mediump float;
 in vec4 vColor;
+in vec2 vUV;
 out vec4 FragColor;
 void main() {
-    if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
-    FragColor = vColor;
+    // Gaussian Falloff
+    // alpha = exp(-0.5 * (x^2 + y^2))
+    float distSq = dot(vUV, vUV);
+    float alpha = exp(-0.5 * distSq);
+
+    // Hard cutoff at 3 sigma (which is u=3, distSq=9)
+    if (distSq > 9.0 || alpha < 0.01) discard;
+
+    FragColor = vec4(vColor.rgb, vColor.a * alpha);
 }
 )";
 
@@ -99,19 +142,11 @@ GLuint createProgram(const char* vSource, const char* fSource) {
     return program;
 }
 
-// Matrix Mul Helper
-void mat4_mul_vec3(const float* mat, float x, float y, float z, float& out_x, float& out_y, float& out_z) {
-    out_x = mat[0] * x + mat[4] * y + mat[8] * z + mat[12];
-    out_y = mat[1] * x + mat[5] * y + mat[9] * z + mat[13];
-    out_z = mat[2] * x + mat[6] * y + mat[10] * z + mat[14];
-}
-
-MobileGS::MobileGS() : mFrameCount(0), mProgram(0), mLocMVP(-1), mLocPointSize(-1), mVBO(0), mGlDirty(true) {
+MobileGS::MobileGS() : mFrameCount(0), mProgram(0), mLocView(-1), mLocProj(-1), mVBO_Quad(0), mVBO_Instance(0), mGlDirty(true) {
     LOGI("MobileGS Constructor");
 }
 
 MobileGS::~MobileGS() {
-    // Note: GL cleanup in destructor is dangerous if context is already gone
     clear();
 }
 
@@ -119,33 +154,44 @@ void MobileGS::initialize() {
     if (mProgram == 0) {
         LOGI("MobileGS Initialize: Compiling Shaders");
         mProgram = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
-        mLocMVP = glGetUniformLocation(mProgram, "uMVP");
-        mLocPointSize = glGetUniformLocation(mProgram, "uPointSize");
+        mLocView = glGetUniformLocation(mProgram, "uView");
+        mLocProj = glGetUniformLocation(mProgram, "uProj");
 
-        // Mark dirty to force VBO creation/upload in next draw
+        // Mark dirty
         mGlDirty = true;
     }
 }
 
-// NEW: Called when surface changes to invalidate old GL handles
 void MobileGS::resetGL() {
     LOGI("MobileGS: Resetting GL State");
     mProgram = 0;
-    mVBO = 0;
-    mLocMVP = -1;
-    mLocPointSize = -1;
+    mVBO_Quad = 0;
+    mVBO_Instance = 0;
+    mLocView = -1;
+    mLocProj = -1;
     mGlDirty = true;
-    // We DO NOT clear mSplats. Data persists.
 }
 
 void MobileGS::uploadSplatData() {
-    if (mSplats.empty()) return;
-
-    if (mVBO == 0) {
-        glGenBuffers(1, &mVBO);
+    // 1. Setup Quad VBO (Once)
+    if (mVBO_Quad == 0) {
+        glGenBuffers(1, &mVBO_Quad);
+        glBindBuffer(GL_ARRAY_BUFFER, mVBO_Quad);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(QUAD_VERTICES), QUAD_VERTICES, GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+    if (mSplats.empty()) return;
+
+    // 2. Setup Instance VBO
+    if (mVBO_Instance == 0) {
+        glGenBuffers(1, &mVBO_Instance);
+    }
+
+    // Sort before upload (Painter's Algorithm for Alpha)
+    sortSplats();
+
+    glBindBuffer(GL_ARRAY_BUFFER, mVBO_Instance);
     glBufferData(GL_ARRAY_BUFFER, mSplats.size() * sizeof(Splat), mSplats.data(), GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -153,59 +199,66 @@ void MobileGS::uploadSplatData() {
 }
 
 void MobileGS::draw() {
-    if (mProgram == 0) return;
-    if (mSplats.empty()) return;
+    if (mProgram == 0 || mSplats.empty()) return;
 
-    // Use Program
     glUseProgram(mProgram);
 
     // Update Uniforms
-    updateMVP();
-    glUniformMatrix4fv(mLocMVP, 1, GL_FALSE, mMVPMatrix);
-    glUniform1f(mLocPointSize, 20.0f); // Base point size
+    glUniformMatrix4fv(mLocView, 1, GL_FALSE, glm::value_ptr(mViewMat));
+    glUniformMatrix4fv(mLocProj, 1, GL_FALSE, glm::value_ptr(mProjMat));
 
-    // Upload Data if needed (Context switch or new points)
-    if (mGlDirty) {
-        uploadSplatData();
-    }
+    // Ensure data is on GPU (Sorted and Uploaded)
+    // Note: Re-uploading every frame to handle sorting.
+    uploadSplatData();
 
-    if (mVBO == 0) return; // Should have been created above
+    if (mVBO_Quad == 0 || mVBO_Instance == 0) return;
 
-    glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+    // --- Vertex Specification ---
 
-    // Attribute 0: Position (x, y, z)
+    // 1. Quad Vertices (Attribute 0) - Per Vertex
+    glBindBuffer(GL_ARRAY_BUFFER, mVBO_Quad);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glVertexAttribDivisor(0, 0);
 
-    // Attribute 1: Color (r, g, b)
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(3 * sizeof(float)));
+    // 2. Instance Attributes - Per Instance
+    glBindBuffer(GL_ARRAY_BUFFER, mVBO_Instance);
+    size_t stride = sizeof(Splat);
 
-    // Attribute 2: Opacity
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(6 * sizeof(float)));
+    // Helper lambda for cleanliness
+    auto setAttrib = [&](int loc, int size, int type, bool norm, size_t offset) {
+        glEnableVertexAttribArray(loc);
+        glVertexAttribPointer(loc, size, type, norm, stride, (void*)offset);
+        glVertexAttribDivisor(loc, 1);
+    };
 
-    // Draw
-    glDrawArrays(GL_POINTS, 0, mSplats.size());
+    setAttrib(1, 3, GL_FLOAT, GL_FALSE, offsetof(Splat, pos));
+    setAttrib(2, 3, GL_FLOAT, GL_FALSE, offsetof(Splat, scale));
+    setAttrib(3, 4, GL_FLOAT, GL_FALSE, offsetof(Splat, rot));
+    setAttrib(4, 3, GL_FLOAT, GL_FALSE, offsetof(Splat, color));
+    setAttrib(5, 1, GL_FLOAT, GL_FALSE, offsetof(Splat, opacity));
+
+    // Draw Instanced
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, mSplats.size());
 
     // Cleanup
-    glDisableVertexAttribArray(0);
-    glDisableVertexAttribArray(1);
-    glDisableVertexAttribArray(2);
+    for(int i=0; i<=5; i++) {
+        glDisableVertexAttribArray(i);
+        glVertexAttribDivisor(i, 0); // Reset divisor
+    }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void MobileGS::updateMVP() {
-    // Simple Matrix Multiply: MVP = Proj * View
-    // Assumes Column Major
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            mMVPMatrix[j * 4 + i] = 0.0f;
-            for (int k = 0; k < 4; k++) {
-                mMVPMatrix[j * 4 + i] += mProjMatrix[k * 4 + i] * mViewMatrix[j * 4 + k];
-            }
-        }
-    }
+void MobileGS::sortSplats() {
+    // Sort Back-to-Front (Farthest first) for alpha blending
+    // Using distance squared to camera position
+    std::sort(mSplats.begin(), mSplats.end(), [this](const Splat& a, const Splat& b) {
+        glm::vec3 diff1 = a.pos - mCamPos;
+        glm::vec3 diff2 = b.pos - mCamPos;
+        float d1 = glm::dot(diff1, diff1);
+        float d2 = glm::dot(diff2, diff2);
+        return d1 > d2;
+    });
 }
 
 void MobileGS::setTargetDescriptors(const cv::Mat& descriptors) {
@@ -239,18 +292,25 @@ void MobileGS::onSurfaceChanged(int width, int height) {
 }
 
 void MobileGS::updateCamera(float* viewMtx, float* projMtx) {
-    memcpy(mViewMatrix, viewMtx, 16 * sizeof(float));
-    memcpy(mProjMatrix, projMtx, 16 * sizeof(float));
+    mViewMat = glm::make_mat4(viewMtx);
+    mProjMat = glm::make_mat4(projMtx);
+
+    // Extract Camera Position (Inverse of View Matrix)
+    // View = R * T. InvView = T^-1 * R^-1.
+    // Easier: glm::inverse(mViewMat)[3] gives the translation component of inverse, which is cam pos.
+    glm::mat4 invView = glm::inverse(mViewMat);
+    mCamPos = glm::vec3(invView[3]);
 }
 
 void MobileGS::feedDepthData(uint16_t* depthData, uint8_t* colorData, int width, int height, int stride, float* poseMtx, float fov) {
     std::lock_guard<std::mutex> lock(mChunkMutex);
 
-    // Safety check on limits
     if (mSplats.size() >= MAX_SPLATS) return;
 
-    // Simple Voxel Hashing Implementation
-    // Iterate depth image with stride
+    glm::mat4 poseMat = glm::make_mat4(poseMtx);
+    float tanHalfFov = tan(fov * 0.5f);
+    float aspectRatio = (float)width / height;
+
     for (int y = 0; y < height; y += SAMPLE_STRIDE) {
         for (int x = 0; x < width; x += SAMPLE_STRIDE) {
             int idx = y * stride + x;
@@ -258,53 +318,74 @@ void MobileGS::feedDepthData(uint16_t* depthData, uint8_t* colorData, int width,
 
             if (depth < MIN_DEPTH || depth > MAX_DEPTH) continue;
 
-            // Unproject to Camera Space
+            // 1. Unproject
             float ndc_x = ((float)x / width) * 2.0f - 1.0f;
             float ndc_y = ((float)y / height) * 2.0f - 1.0f;
 
-            // Simple Pinhole approximation for now (should use intrinsics)
-            float tanHalfFov = tan(fov * 0.5f);
-            float aspectRatio = (float)width / height;
+            // Camera Space (Assuming OpenGL Coordinate System: -Z forward, +Y up)
             float cam_x = ndc_x * depth * tanHalfFov * aspectRatio;
-            float cam_y = ndc_y * depth * tanHalfFov; // Y is inverted in some systems, checking... assuming GL standard
+            float cam_y = ndc_y * depth * tanHalfFov;
             float cam_z = -depth;
 
-            // Transform to World Space
-            float world_x, world_y, world_z;
-            mat4_mul_vec3(poseMtx, cam_x, cam_y, cam_z, world_x, world_y, world_z);
+            glm::vec4 camPos(cam_x, cam_y, cam_z, 1.0f);
+            glm::vec4 worldPos = poseMat * camPos;
 
-            // Voxel Key
+            // 2. Voxel Hashing
             VoxelKey key = {
-                    (int)floor(world_x / VOXEL_SIZE),
-                    (int)floor(world_y / VOXEL_SIZE),
-                    (int)floor(world_z / VOXEL_SIZE)
+                    (int)floor(worldPos.x / VOXEL_SIZE),
+                    (int)floor(worldPos.y / VOXEL_SIZE),
+                    (int)floor(worldPos.z / VOXEL_SIZE)
             };
 
-            // Check Grid
             if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
                 // New Splat
                 Splat s;
-                s.x = world_x; s.y = world_y; s.z = world_z;
+                s.pos = glm::vec3(worldPos);
 
-                // Color extraction (if available)
+                // Scale initialization
+                float pixelSize = 2.0f * depth * tanHalfFov / height;
+                float splatScale = pixelSize * SAMPLE_STRIDE * 1.5f;
+                s.scale = glm::vec3(splatScale);
+
+                // Rotation: Identity for now
+                s.rot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+                // Color
                 if (colorData) {
-                    // NV21/YUV logic required here usually, assuming RGB input for simplicity in this snippet
-                    // In reality, ARCore gives YUV. We pass generic 0.5 grey if raw.
-                    // For the sake of this fix, let's assume valid data or default.
-                    s.r = 1.0f; s.g = 1.0f; s.b = 1.0f;
+                    // Assuming RGBA buffer from JNI
+                    int pIdx = (y * width + x) * 4;
+                    s.color = glm::vec3(
+                        colorData[pIdx] / 255.0f,
+                        colorData[pIdx + 1] / 255.0f,
+                        colorData[pIdx + 2] / 255.0f
+                    );
                 } else {
-                    s.r = 0.0f; s.g = 1.0f; s.b = 0.0f; // Green default
+                    s.color = glm::vec3(0.0f, 1.0f, 0.0f);
                 }
-                s.opacity = 0.1f; // Initial confidence
+                s.opacity = 0.5f;
 
                 mSplats.push_back(s);
                 mVoxelGrid[key] = mSplats.size() - 1;
                 mGlDirty = true;
             } else {
-                // Update Existing (Integration)
-                int idx = mVoxelGrid[key];
-                Splat& s = mSplats[idx];
-                // Running average position could go here
+                // Update Existing
+                int splatIdx = mVoxelGrid[key];
+                Splat& s = mSplats[splatIdx];
+
+                // Moving Average for Position (Densification/Refinement)
+                s.pos = glm::mix(s.pos, glm::vec3(worldPos), 0.1f);
+
+                // Update Color
+                if (colorData) {
+                    int pIdx = (y * width + x) * 4;
+                    glm::vec3 newColor(
+                        colorData[pIdx] / 255.0f,
+                        colorData[pIdx + 1] / 255.0f,
+                        colorData[pIdx + 2] / 255.0f
+                    );
+                    s.color = glm::mix(s.color, newColor, 0.1f);
+                }
+
                 if (s.opacity < 1.0f) s.opacity += 0.05f;
             }
         }
@@ -318,7 +399,7 @@ bool MobileGS::saveModel(const std::string& path) {
 
     // Header "GXRM"
     out.write("GXRM", 4);
-    int version = 1;
+    int version = 2; // Bump to v2 for new Splat struct
     out.write((char*)&version, sizeof(int));
 
     int count = mSplats.size();
@@ -327,6 +408,13 @@ bool MobileGS::saveModel(const std::string& path) {
     out.write((char*)mSplats.data(), count * sizeof(Splat));
     return true;
 }
+
+// Backward compatibility struct
+struct SplatV1 {
+    float x, y, z;
+    float r, g, b;
+    float opacity;
+};
 
 bool MobileGS::loadModel(const std::string& path) {
     std::lock_guard<std::mutex> lock(mChunkMutex);
@@ -343,17 +431,39 @@ bool MobileGS::loadModel(const std::string& path) {
     int count;
     in.read((char*)&count, sizeof(int));
 
-    mSplats.resize(count);
-    in.read((char*)mSplats.data(), count * sizeof(Splat));
+    if (version == 1) {
+        // Upgrade from V1
+        std::vector<SplatV1> oldSplats(count);
+        in.read((char*)oldSplats.data(), count * sizeof(SplatV1));
+
+        mSplats.clear();
+        mSplats.reserve(count);
+        for(const auto& os : oldSplats) {
+            Splat s;
+            s.pos = glm::vec3(os.x, os.y, os.z);
+            s.color = glm::vec3(os.r, os.g, os.b);
+            s.opacity = os.opacity;
+            // Defaults
+            s.scale = glm::vec3(0.05f); // 5cm default
+            s.rot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            mSplats.push_back(s);
+        }
+    } else if (version == 2) {
+        mSplats.resize(count);
+        in.read((char*)mSplats.data(), count * sizeof(Splat));
+    } else {
+        LOGE("Unknown map version: %d", version);
+        return false;
+    }
 
     // Rebuild Voxel Grid
     mVoxelGrid.clear();
-    for(int i=0; i<count; i++) {
+    for(int i=0; i<mSplats.size(); i++) {
         const Splat& s = mSplats[i];
         VoxelKey key = {
-                (int)floor(s.x / VOXEL_SIZE),
-                (int)floor(s.y / VOXEL_SIZE),
-                (int)floor(s.z / VOXEL_SIZE)
+                (int)floor(s.pos.x / VOXEL_SIZE),
+                (int)floor(s.pos.y / VOXEL_SIZE),
+                (int)floor(s.pos.z / VOXEL_SIZE)
         };
         mVoxelGrid[key] = i;
     }

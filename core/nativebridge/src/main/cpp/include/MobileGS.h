@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <GLES3/gl3.h>
 #include <opencv2/core.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 // Voxel Key for Spatial Hashing
 struct VoxelKey {
@@ -23,8 +25,10 @@ struct VoxelKeyHash {
 };
 
 struct Splat {
-    float x, y, z;
-    float r, g, b;
+    glm::vec3 pos;
+    glm::vec3 scale;
+    glm::quat rot;
+    glm::vec3 color;
     float opacity; // Used for confidence
 };
 
@@ -57,9 +61,14 @@ public:
 private:
     // GL State
     GLuint mProgram = 0;
-    GLint mLocMVP = -1;
-    GLint mLocPointSize = -1;
-    GLuint mVBO = 0;
+    GLint mLocView = -1;
+    GLint mLocProj = -1;
+    GLint mLocCamPos = -1;
+
+    // Instancing buffers
+    GLuint mVBO_Quad = 0;      // Static unit quad
+    GLuint mVBO_Instance = 0;  // Dynamic splat data
+
     bool mGlDirty = true; // Signals need to re-upload VBO
 
     // Data State
@@ -68,9 +77,9 @@ private:
     std::mutex mChunkMutex;
 
     // Matrices
-    float mViewMatrix[16];
-    float mProjMatrix[16];
-    float mMVPMatrix[16];
+    glm::mat4 mViewMat;
+    glm::mat4 mProjMat;
+    glm::vec3 mCamPos;
 
     // Target (Teleological)
     cv::Mat mTargetDescriptors;
@@ -80,8 +89,9 @@ private:
     int mViewportWidth = 0;
     int mViewportHeight = 0;
 
-    void updateMVP();
+    void updateMatrices();
     void uploadSplatData(); // Helper to send mSplats to GPU
+    void sortSplats();
 };
 
 #endif // MOBILE_GS_H
