@@ -5,11 +5,14 @@ import android.opengl.GLES20
 import android.opengl.GLES30
 import android.opengl.Matrix
 import com.google.ar.core.Plane
+import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 class PlaneRenderer {
     private var planeProgram = 0
@@ -18,6 +21,7 @@ class PlaneRenderer {
     private var planeModelUniform = 0
     private var planeModelViewProjectionUniform = 0
     private var gridControlUniform = 0
+    private var planeColorUniform = 0
 
     // Buffers
     private val vertexBuffer = ByteBuffer.allocateDirect(1000 * 4) // Reusable buffer (Float = 4 bytes)
@@ -43,9 +47,10 @@ class PlaneRenderer {
         planeModelUniform = GLES20.glGetUniformLocation(planeProgram, "u_PlaneModel")
         planeModelViewProjectionUniform = GLES20.glGetUniformLocation(planeProgram, "u_PlaneModelViewProjection")
         gridControlUniform = GLES20.glGetUniformLocation(planeProgram, "u_gridControl")
+        planeColorUniform = GLES20.glGetUniformLocation(planeProgram, "u_Color")
     }
 
-    fun drawPlanes(session: Session, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
+    fun drawPlanes(session: Session, viewMatrix: FloatArray, projectionMatrix: FloatArray, cameraPose: Pose) {
         val planes = session.getAllTrackables(Plane::class.java)
 
         GLES20.glUseProgram(planeProgram)
@@ -59,6 +64,10 @@ class PlaneRenderer {
             if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
                 continue
             }
+            
+            val color = calculatePlaneColor(plane, cameraPose)
+            GLES20.glUniform4fv(planeColorUniform, 1, color, 0)
+            
             drawPlane(plane, viewMatrix, projectionMatrix)
         }
 
@@ -87,6 +96,56 @@ class PlaneRenderer {
         GLES20.glVertexAttribPointer(posAttr, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, count)
         GLES20.glDisableVertexAttribArray(posAttr)
+    }
+
+    // --- Classification Logic ---
+
+    enum class PlaneMatchResult {
+        MATCH,      // Green: Parallel and close enough
+        NO_MATCH,   // Pink: Perpendicular
+        SUBOPTIMAL  // Cyan: Parallel but too far/suboptimal angle
+    }
+
+    fun classifyPlane(plane: Plane, cameraPose: Pose): PlaneMatchResult {
+        val planeNormal = FloatArray(4)
+        plane.centerPose.getTransformedAxis(1, 1.0f, planeNormal, 0) // Y axis is normal
+
+        val cameraForward = FloatArray(4)
+        cameraPose.getTransformedAxis(2, -1.0f, cameraForward, 0) // -Z axis is forward
+
+        val dot = planeNormal[0] * cameraForward[0] + planeNormal[1] * cameraForward[1] + planeNormal[2] * cameraForward[2]
+        val absDot = abs(dot)
+
+        // Dot product close to 0 means perpendicular (normal perpendicular to view dir)
+        // Dot product close to 1 means parallel (normal parallel to view dir)
+
+        if (absDot < 0.3f) {
+            return PlaneMatchResult.NO_MATCH // Perpendicular
+        } else if (absDot > 0.7f) {
+            val dist = calculateDistance(plane.centerPose, cameraPose)
+            return if (dist < 3.0f) {
+                PlaneMatchResult.MATCH // Parallel and Close
+            } else {
+                PlaneMatchResult.SUBOPTIMAL // Parallel but Far
+            }
+        } else {
+            return PlaneMatchResult.SUBOPTIMAL // Intermediate Angle
+        }
+    }
+
+    fun calculatePlaneColor(plane: Plane, cameraPose: Pose): FloatArray {
+        return when (classifyPlane(plane, cameraPose)) {
+            PlaneMatchResult.MATCH -> floatArrayOf(0.0f, 1.0f, 0.0f, 0.3f)       // Green
+            PlaneMatchResult.NO_MATCH -> floatArrayOf(1.0f, 0.4f, 0.7f, 0.3f)    // Pink
+            PlaneMatchResult.SUBOPTIMAL -> floatArrayOf(0.0f, 1.0f, 1.0f, 0.3f)  // Cyan
+        }
+    }
+    
+    private fun calculateDistance(p1: Pose, p2: Pose): Float {
+        val dx = p1.tx() - p2.tx()
+        val dy = p1.ty() - p2.ty()
+        val dz = p1.tz() - p2.tz()
+        return sqrt(dx*dx + dy*dy + dz*dz)
     }
 
     companion object {

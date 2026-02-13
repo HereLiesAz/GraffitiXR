@@ -1,7 +1,11 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
+import android.graphics.Bitmap
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
@@ -19,7 +23,7 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
  * @param onConfirm Callback when the user accepts the final target.
  * @param onRetake Callback to restart the capture process.
  * @param onCancel Callback to exit the flow completely.
- * @param onCaptureShutter Callback when the shutter button is pressed.
+ * @param onPhotoCaptured Callback with the captured bitmap.
  * @param onUnwarpImage Callback with the 4 corner points to perform rectification.
  */
 @Composable
@@ -31,35 +35,35 @@ fun TargetCreationFlow(
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
-    onCaptureShutter: () -> Unit,
+    onPhotoCaptured: (Bitmap) -> Unit,
     onCalibrationPointCaptured: (Offset) -> Unit,
     onUnwarpImage: (List<Offset>) -> Unit
 ) {
-    // This composable manages the UI overlays for the target creation process
-    // (Capture -> Rectify -> Review)
+    val cameraController = rememberCameraController()
 
     when (captureStep) {
         CaptureStep.CAPTURE -> {
-            // Camera Overlay is handled by ArView, we just need the shutter button
-            TargetCreationOverlay(
-                uiState = uiState,
-                step = CaptureStep.CAPTURE,
-                onPrimaryAction = onCaptureShutter,
-                onCancel = onCancel
-            )
+            Box(Modifier.fillMaxSize()) {
+                // Background Camera Preview
+                CameraPreview(
+                    controller = cameraController,
+                    onPhotoCaptured = onPhotoCaptured
+                )
+                
+                TargetCreationOverlay(
+                    uiState = uiState,
+                    step = CaptureStep.CAPTURE,
+                    onPrimaryAction = { cameraController.takePicture() },
+                    onCancel = onCancel
+                )
+            }
         }
         CaptureStep.RECTIFY -> {
-            // Show the captured bitmap and allow corner dragging
-            // For now, assuming rectification logic is handled by a dedicated view or dialog
-            // invoking onUnwarpImage when done.
-            TargetCreationOverlay(
-                uiState = uiState,
-                step = CaptureStep.RECTIFY,
-                onPrimaryAction = {
-                    // Mock: just pass 4 corners of the screen/image
-                    onUnwarpImage(listOf(Offset(0f,0f), Offset(100f,0f), Offset(100f,100f), Offset(0f,100f)))
-                },
-                onCancel = onRetake
+            UnwarpScreen(
+                isRightHanded = isRightHanded,
+                targetImage = uiState.tempCaptureBitmap,
+                onConfirm = onUnwarpImage,
+                onRetake = onRetake
             )
         }
         CaptureStep.REVIEW -> {

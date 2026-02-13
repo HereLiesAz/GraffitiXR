@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.graphics.PointF
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.os.Handler
@@ -13,6 +14,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
+import com.google.ar.core.Plane
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -23,6 +25,7 @@ import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.sqrt
@@ -51,6 +54,33 @@ class ArRenderer(
     private var viewportWidth = 0
     private var viewportHeight = 0
     private var isDepthSupported = false
+
+    private val tapQueue = ConcurrentLinkedQueue<PointF>()
+
+    fun handleTap(x: Float, y: Float) {
+        tapQueue.offer(PointF(x, y))
+    }
+
+    private fun handleTapInternal(frame: Frame, x: Float, y: Float) {
+        val hits = frame.hitTest(x, y)
+        for (hit in hits) {
+            val trackable = hit.trackable
+            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                // Check semantic classification instead of raw color
+                val result = planeRenderer.classifyPlane(trackable, frame.camera.pose)
+                
+                if (result == PlaneRenderer.PlaneMatchResult.MATCH) {
+                    // Valid Green Surface
+                    Log.d(TAG, "Valid Surface Selected")
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(context, "Surface Selected", Toast.LENGTH_SHORT).show()
+                    }
+                    // TODO: Place anchor or emit event
+                    break
+                }
+            }
+        }
+    }
 
     /**
      * Optional reference to the [GLSurfaceView] this renderer is attached to.
@@ -157,18 +187,22 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
 
-        // Sub-renderers
-        backgroundRenderer.createOnGlThread(context)
-        planeRenderer.createOnGlThread(context)
-        pointCloudRenderer.createOnGlThread(context)
+        try {
+            // Sub-renderers
+            backgroundRenderer.createOnGlThread(context)
+            planeRenderer.createOnGlThread(context)
+            pointCloudRenderer.createOnGlThread(context)
 
-        // Mark as needs initialization since we have a texture ID now
-        isCameraTextureInitialized = false
+            // Mark as needs initialization since we have a texture ID now
+            isCameraTextureInitialized = false
 
-        // Reset the native engine's GL state because we are in a new EGLContext.
-        slamManager.resetGLState()
-        // Then re-initialize (compiles shaders for this context)
-        slamManager.initialize()
+            // Reset the native engine's GL state because we are in a new EGLContext.
+            slamManager.resetGLState()
+            // Then re-initialize (compiles shaders for this context)
+            slamManager.initialize()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize GL components", e)
+        }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -213,19 +247,29 @@ class ArRenderer(
             // 2. Handle Tracking
             if (camera.trackingState == TrackingState.TRACKING) {
                 // Draw Planes (Helper)
-                planeRenderer.drawPlanes(currentSession, viewMatrix, projectionMatrix)
+                planeRenderer.drawPlanes(currentSession, viewMatrix, projectionMatrix, camera.pose)
 
-                // Update Slam Manager Camera
-                slamManager.updateCamera(viewMatrix, projectionMatrix)
-
-                // FEED DEPTH DATA (If available)
-                if (isDepthSupported) {
-                    processDepth(frame)
+                // Handle Taps
+                val tap = tapQueue.poll()
+                if (tap != null) {
+                    handleTapInternal(frame, tap.x, tap.y)
                 }
 
-                // 3. Draw Point Cloud (Splat)
-                if (showPointCloud) {
-                    slamManager.draw()
+                try {
+                    // Update Slam Manager Camera
+                    slamManager.updateCamera(viewMatrix, projectionMatrix)
+
+                    // FEED DEPTH DATA (If available)
+                    if (isDepthSupported) {
+                        processDepth(frame)
+                    }
+
+                    // 3. Draw Point Cloud (Splat)
+                    if (showPointCloud) {
+                        slamManager.draw()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in native SLAM rendering", e)
                 }
             }
 
@@ -248,6 +292,12 @@ class ArRenderer(
             val cameraImage = try { frame.acquireCameraImage() } catch (e: NotYetAvailableException) { null }
 
             if (depthImage != null) {
+                // Ensure depth planes are valid
+                if (depthImage.planes.isEmpty() || depthImage.planes[0].buffer == null) {
+                    depthImage.close()
+                    return
+                }
+
                 val camera = frame.camera
                 val pose = camera.pose
                 pose.toMatrix(modelMatrix, 0)
