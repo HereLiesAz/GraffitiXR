@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
-import android.media.Image
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.os.Handler
@@ -12,7 +11,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Pose
@@ -26,9 +24,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
-import kotlin.math.abs
-import kotlin.math.acos
-import kotlin.math.atan
 import kotlin.math.sqrt
 
 /**
@@ -52,10 +47,13 @@ class ArRenderer(
 
     // State
     var showPointCloud = true
-    private var isInitialized = false
     private var viewportWidth = 0
     private var viewportHeight = 0
     private var isDepthSupported = false
+
+    // Safety flag for ARCore texture binding
+    @Volatile
+    private var isCameraTextureInitialized = false
 
     // Keyframing State
     private var lastKeyframePose: Pose? = null
@@ -95,6 +93,8 @@ class ArRenderer(
                     }
                     configure(config)
                 }
+                // New Session means we must re-bind the texture
+                isCameraTextureInitialized = false
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to create AR Session", e)
                 Toast.makeText(context, "AR Init Failed: ${e.message}", Toast.LENGTH_LONG).show()
@@ -113,13 +113,12 @@ class ArRenderer(
         session?.pause()
     }
 
-    fun cleanup() {
+    override fun onDestroy(owner: LifecycleOwner) {
         session?.close()
         session = null
-        // NOTE: We do NOT destroy slamManager here as it is shared.
     }
 
-    // --- NEW: Flashlight Control ---
+    // Flashlight Control
     fun setFlashlight(enable: Boolean) {
         val session = this.session ?: return
         try {
@@ -139,7 +138,10 @@ class ArRenderer(
         planeRenderer.createOnGlThread(context)
         pointCloudRenderer.createOnGlThread(context)
 
-        // CRITICAL: Reset the native engine's GL state because we are in a new EGLContext.
+        // Mark as needs initialization since we have a texture ID now
+        isCameraTextureInitialized = false
+
+        // Reset the native engine's GL state because we are in a new EGLContext.
         slamManager.resetGLState()
         // Then re-initialize (compiles shaders for this context)
         slamManager.initialize()
@@ -149,17 +151,28 @@ class ArRenderer(
         viewportWidth = width
         viewportHeight = height
         GLES30.glViewport(0, 0, width, height)
-        session?.setDisplayGeometry(0, width, height) // 0 = Rotation.ROTATION_0 assumption
+        session?.setDisplayGeometry(0, width, height)
         slamManager.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
-        if (session == null) return
+        val currentSession = session ?: return
+
+        // CRITICAL FIX: Ensure texture is bound before updating.
+        if (!isCameraTextureInitialized) {
+            val texId = backgroundRenderer.textureId
+            if (texId != -1) {
+                currentSession.setCameraTextureName(texId)
+                isCameraTextureInitialized = true
+            } else {
+                return // Texture not ready yet
+            }
+        }
 
         try {
-            val frame = session!!.update()
+            val frame = currentSession.update()
             val camera = frame.camera
 
             // 1. Draw Camera Background
@@ -171,64 +184,15 @@ class ArRenderer(
 
             // 2. Handle Tracking
             if (camera.trackingState == TrackingState.TRACKING) {
-
                 // Draw Planes (Helper)
-                planeRenderer.drawPlanes(session!!, viewMatrix, projectionMatrix)
+                planeRenderer.drawPlanes(currentSession, viewMatrix, projectionMatrix)
 
                 // Update Slam Manager Camera
                 slamManager.updateCamera(viewMatrix, projectionMatrix)
 
                 // FEED DEPTH DATA (If available)
                 if (isDepthSupported) {
-                    try {
-                        val depthImage = frame.acquireDepthImage16Bits()
-                        // FIXED: acquireCameraImage returns Image, not tryAcquire
-                        val cameraImage = try { frame.acquireCameraImage() } catch (e: NotYetAvailableException) { null }
-
-                        if (depthImage != null) {
-                            val pose = camera.pose
-                            // Convert pose to matrix
-                            pose.toMatrix(modelMatrix, 0)
-
-                            // Throttle scanning based on movement to save battery
-                            if (shouldProcessFrame(pose)) {
-                                val buffer = depthImage.planes[0].buffer
-                                val width = depthImage.width
-                                val height = depthImage.height
-                                val stride = depthImage.planes[0].rowStride / 2 // Short (2 bytes)
-
-                                // Process Color (Optional, expensive)
-                                if (cameraImage != null) {
-                                    if (colorBitmap == null) {
-                                        colorBitmap = Bitmap.createBitmap(COLOR_WIDTH, COLOR_HEIGHT, Bitmap.Config.ARGB_8888)
-                                        colorBuffer = ByteBuffer.allocateDirect(COLOR_WIDTH * COLOR_HEIGHT * 4)
-                                    }
-                                    // Resize/Convert YUV to small Bitmap for color sampling
-                                    yuvToRgbConverter.yuvToRgb(cameraImage, colorBitmap!!)
-                                    colorBitmap!!.copyPixelsToBuffer(colorBuffer!!)
-                                    colorBuffer!!.rewind()
-                                }
-
-                                // Send to Native Engine
-                                slamManager.feedDepthData(
-                                    buffer,
-                                    colorBuffer,
-                                    width,
-                                    height,
-                                    stride,
-                                    modelMatrix,
-                                    60.0f * (3.14159f / 180f) // Approx vertical FOV in radians
-                                )
-
-                                lastKeyframePose = pose
-                                lastKeyframeTime = System.currentTimeMillis()
-                            }
-                            depthImage.close()
-                        }
-                        cameraImage?.close()
-                    } catch (e: Exception) {
-                        // Depth/Image not ready or other error
-                    }
+                    processDepth(frame)
                 }
 
                 // 3. Draw Point Cloud (Splat)
@@ -244,7 +208,54 @@ class ArRenderer(
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Exception on render loop", e)
+            if (Math.random() < 0.05) Log.e(TAG, "Exception on render loop", e)
+        }
+    }
+
+    private fun processDepth(frame: Frame) {
+        try {
+            val depthImage = frame.acquireDepthImage16Bits()
+            val cameraImage = try { frame.acquireCameraImage() } catch (e: NotYetAvailableException) { null }
+
+            if (depthImage != null) {
+                val camera = frame.camera
+                val pose = camera.pose
+                pose.toMatrix(modelMatrix, 0)
+
+                if (shouldProcessFrame(pose)) {
+                    val buffer = depthImage.planes[0].buffer
+                    val width = depthImage.width
+                    val height = depthImage.height
+                    val stride = depthImage.planes[0].rowStride / 2
+
+                    if (cameraImage != null) {
+                        if (colorBitmap == null) {
+                            colorBitmap = Bitmap.createBitmap(COLOR_WIDTH, COLOR_HEIGHT, Bitmap.Config.ARGB_8888)
+                            colorBuffer = ByteBuffer.allocateDirect(COLOR_WIDTH * COLOR_HEIGHT * 4)
+                        }
+                        yuvToRgbConverter.yuvToRgb(cameraImage, colorBitmap!!)
+                        colorBitmap!!.copyPixelsToBuffer(colorBuffer!!)
+                        colorBuffer!!.rewind()
+                    }
+
+                    slamManager.feedDepthData(
+                        buffer,
+                        colorBuffer,
+                        width,
+                        height,
+                        stride,
+                        modelMatrix,
+                        60.0f * (3.14159f / 180f)
+                    )
+
+                    lastKeyframePose = pose
+                    lastKeyframeTime = System.currentTimeMillis()
+                }
+                depthImage.close()
+            }
+            cameraImage?.close()
+        } catch (e: Exception) {
+            // Data not ready
         }
     }
 
@@ -252,15 +263,11 @@ class ArRenderer(
         if (lastKeyframePose == null) return true
 
         val timeDelta = System.currentTimeMillis() - lastKeyframeTime
-        if (timeDelta < MIN_INTERVAL_MS) return false // Rate limit
-        if (timeDelta > MAX_INTERVAL_MS) return true // Force update
+        if (timeDelta < MIN_INTERVAL_MS) return false
+        if (timeDelta > MAX_INTERVAL_MS) return true
 
-        // Calculate Delta
         val dist = distance(lastKeyframePose!!, currentPose)
-        if (dist > MIN_TRANSLATION_METERS) return true
-
-        // Rotation check could go here
-        return false
+        return dist > MIN_TRANSLATION_METERS
     }
 
     private fun distance(p1: Pose, p2: Pose): Float {
@@ -275,22 +282,15 @@ class ArRenderer(
     }
 
     private fun captureFrameInternal(w: Int, h: Int, callback: (Bitmap) -> Unit) {
-        val screenshotSize = w * h
-        val buf = ByteBuffer.allocateDirect(screenshotSize * 4)
-        buf.order(ByteOrder.nativeOrder())
+        if (w <= 0 || h <= 0) return
+        val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
         GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
 
         Handler(Looper.getMainLooper()).post {
             val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            buf.rewind()
-            bitmap.copyPixelsFromBuffer(buf)
-
-            // Flip Y because OpenGL is bottom-left
-            val matrix = Matrix()
-            matrix.preScale(1.0f, -1.0f)
-            val flippedBitmap = Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true)
-
-            callback(flippedBitmap)
+            bitmap.copyPixelsFromBuffer(buf.rewind())
+            val matrix = Matrix().apply { postScale(1f, -1f) }
+            callback(Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true))
         }
     }
 }
