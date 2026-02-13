@@ -46,5 +46,5 @@ The project uses a **Multi-Module Clean Architecture** to enforce separation of 
 
 * [**Architecture:**](docs/ARCHITECTURE.md) High-level module graph and state management.
 * [**Pipeline:**](docs/PIPELINE_3D.md) **(Deep Dive)** Technical specs for SphereSLAM and Gaussian Splatting.
-* [**Data Formats:**](docs/DATA_FORMATS.md) Binary layouts for Maps and Projects.
+* [**Data Formats:**](docs/data_formats.md) Binary layouts for Maps and Projects.
 * [**Roadmap:**](docs/TODO.md) Future plans.
