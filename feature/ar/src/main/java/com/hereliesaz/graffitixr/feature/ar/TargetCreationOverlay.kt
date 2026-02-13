@@ -59,7 +59,7 @@ fun TargetCreationOverlay(
                 // Camera Reticle or Guidance
                 Box(
                     modifier = Modifier
-                        .size(200.dp)
+                        .size(300.dp)
                         .background(Color.White.copy(alpha = 0.2f))
                         .align(Alignment.Center)
                 ) {
