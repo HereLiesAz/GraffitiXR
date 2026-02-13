@@ -21,6 +21,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.min
+import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -567,7 +575,9 @@ fun MainContentLayer(
                     }
                 } else Modifier
 
-                Box(modifier = modifier.fillMaxSize())
+                Box(modifier = modifier.fillMaxSize()) {
+                    LayersOverlay(layers = editorUiState.layers)
+                }
             }
         }
     }
@@ -617,4 +627,82 @@ fun saveBitmapToCache(context: android.content.Context, bitmap: Bitmap): android
         "${context.packageName}.fileprovider",
         file
     )
+}
+
+@Composable
+private fun LayersOverlay(
+    layers: List<Layer>,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.fillMaxSize()) {
+        layers.forEach { layer ->
+            if (layer.isVisible) {
+                val imageBitmap = layer.bitmap.asImageBitmap()
+                val srcWidth = imageBitmap.width.toFloat()
+                val srcHeight = imageBitmap.height.toFloat()
+
+                // ContentScale.Fit logic
+                val scaleFactor = min(size.width / srcWidth, size.height / srcHeight)
+                val drawnWidth = srcWidth * scaleFactor
+                val drawnHeight = srcHeight * scaleFactor
+                val topLeftX = (size.width - drawnWidth) / 2
+                val topLeftY = (size.height - drawnHeight) / 2
+
+                val centerX = size.width / 2
+                val centerY = size.height / 2
+
+                // Transforms
+                withTransform({
+                    // Order matters.
+                    // 1. Translate (offset)
+                    translate(layer.offset.x, layer.offset.y)
+                    // 2. Rotate around center
+                    rotate(layer.rotationZ, pivot = Offset(centerX, centerY))
+                    // 3. Scale around center
+                    scale(layer.scale, layer.scale, pivot = Offset(centerX, centerY))
+                }) {
+                    drawImage(
+                        image = imageBitmap,
+                        dstOffset = IntOffset(topLeftX.toInt(), topLeftY.toInt()),
+                        dstSize = IntSize(drawnWidth.toInt(), drawnHeight.toInt()),
+                        alpha = layer.opacity,
+                        blendMode = mapBlendMode(layer.blendMode)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun mapBlendMode(mode: ModelBlendMode): BlendMode {
+    return when(mode) {
+        ModelBlendMode.SrcOver -> BlendMode.SrcOver
+        ModelBlendMode.Multiply -> BlendMode.Multiply
+        ModelBlendMode.Screen -> BlendMode.Screen
+        ModelBlendMode.Overlay -> BlendMode.Overlay
+        ModelBlendMode.Darken -> BlendMode.Darken
+        ModelBlendMode.Lighten -> BlendMode.Lighten
+        ModelBlendMode.ColorDodge -> BlendMode.ColorDodge
+        ModelBlendMode.ColorBurn -> BlendMode.ColorBurn
+        ModelBlendMode.Difference -> BlendMode.Difference
+        ModelBlendMode.Exclusion -> BlendMode.Exclusion
+        ModelBlendMode.Hue -> BlendMode.Hue
+        ModelBlendMode.Saturation -> BlendMode.Saturation
+        ModelBlendMode.Color -> BlendMode.Color
+        ModelBlendMode.Luminosity -> BlendMode.Luminosity
+        ModelBlendMode.Clear -> BlendMode.Clear
+        ModelBlendMode.Src -> BlendMode.Src
+        ModelBlendMode.Dst -> BlendMode.Dst
+        ModelBlendMode.DstOver -> BlendMode.DstOver
+        ModelBlendMode.SrcIn -> BlendMode.SrcIn
+        ModelBlendMode.DstIn -> BlendMode.DstIn
+        ModelBlendMode.SrcOut -> BlendMode.SrcOut
+        ModelBlendMode.DstOut -> BlendMode.DstOut
+        ModelBlendMode.SrcAtop -> BlendMode.SrcAtop
+        ModelBlendMode.DstAtop -> BlendMode.DstAtop
+        ModelBlendMode.Xor -> BlendMode.Xor
+        ModelBlendMode.Plus -> BlendMode.Plus
+        ModelBlendMode.Modulate -> BlendMode.Modulate
+        else -> BlendMode.SrcOver
+    }
 }

@@ -68,11 +68,12 @@ class SlamManager {
         colorBuffer: ByteBuffer?,
         width: Int,
         height: Int,
+        stride: Int,
         pose: FloatArray,
         fov: Float
     ) {
         if (nativeHandle != 0L) {
-            feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, pose, fov)
+            feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, stride, pose, fov)
         }
     }
 
@@ -122,6 +123,7 @@ class SlamManager {
         colorBuffer: ByteBuffer?,
         width: Int,
         height: Int,
+        stride: Int,
         pose: FloatArray,
         fov: Float
     )

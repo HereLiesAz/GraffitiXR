@@ -53,7 +53,7 @@ public:
     // --- Core Pipeline (SplaTAM) ---
     // CHANGED: depthPixels is now uint16_t* (raw millimeters)
     void feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
-            int width, int height, const float* cameraPose, float fov);
+            int width, int height, int stride, const float* cameraPose, float fov);
 
     void update(const float* cameraPose);
     void render(const float* viewMatrix, const float* projMatrix);
@@ -83,6 +83,10 @@ private:
 
     std::unordered_map<ChunkKey, Chunk, ChunkKeyHash> mChunks;
     std::mutex mChunkMutex;
+
+    GLuint mProgram = 0;
+    GLint mLocMVP = -1;
+    GLint mLocPointSize = -1;
 
     ChunkKey getChunkKey(float x, float y, float z);
     float getLuminance(uint8_t r, uint8_t g, uint8_t b);

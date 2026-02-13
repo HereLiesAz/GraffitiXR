@@ -43,6 +43,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
         jobject depthBuffer,
         jobject colorBuffer,
         jint width, jint height,
+        jint stride,
         jfloatArray poseMatrix,
         jfloat fov) {
 
@@ -60,7 +61,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
     jfloat* pose = env->GetFloatArrayElements(poseMatrix, nullptr);
 
     if (depthData && pose) {
-        getEngine(handle)->feedDepthData(depthData, colorData, width, height, pose, fov);
+        getEngine(handle)->feedDepthData(depthData, colorData, width, height, stride, pose, fov);
     }
 
     env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
