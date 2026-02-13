@@ -9,6 +9,30 @@ import com.hereliesaz.graffitixr.common.serialization.OffsetSerializer
 import com.hereliesaz.graffitixr.common.serialization.BlendModeSerializer
 import java.util.UUID
 
+/**
+ * Represents a persistent image layer in a [GraffitiProject].
+ * Unlike the transient [Layer] used in UI state, this class is serializable
+ * and stores the URI reference rather than the loaded Bitmap.
+ *
+ * @property id Unique identifier for the layer.
+ * @property name Display name of the layer.
+ * @property uri The content URI of the image file.
+ * @property scale The scale factor of the layer.
+ * @property offset The 2D translation offset.
+ * @property rotationX Rotation around the X-axis (degrees).
+ * @property rotationY Rotation around the Y-axis (degrees).
+ * @property rotationZ Rotation around the Z-axis (degrees).
+ * @property opacity The opacity (alpha) of the layer (0.0 - 1.0).
+ * @property blendMode The blending mode used for composition.
+ * @property brightness Brightness adjustment (-1.0 to 1.0, 0 is neutral).
+ * @property contrast Contrast adjustment (0.0 to 2.0+, 1.0 is neutral).
+ * @property saturation Saturation adjustment (0.0 to 2.0+, 1.0 is neutral).
+ * @property colorBalanceR Red channel multiplier (1.0 is neutral).
+ * @property colorBalanceG Green channel multiplier (1.0 is neutral).
+ * @property colorBalanceB Blue channel multiplier (1.0 is neutral).
+ * @property isImageLocked If true, the layer cannot be transformed or edited.
+ * @property isVisible If false, the layer is not rendered.
+ */
 @Serializable
 data class OverlayLayer(
     val id: String = UUID.randomUUID().toString(),

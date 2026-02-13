@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 
 object GraffitiJNI {
     init {
-        System.loadLibrary("graffitixr_native")
+        System.loadLibrary("graffitixr")
         System.loadLibrary("opencv_java4")
     }
 

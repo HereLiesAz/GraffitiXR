@@ -10,13 +10,22 @@
 #define LOG_TAG "GraffitiJNI"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-// Global Engine Instance
+// Global Engine Instance (Legacy/GraffitiJNI Object)
 static std::unique_ptr<MobileGS> gEngine;
+
+// Helper for SlamManager (Handle-based)
+inline MobileGS* getEngine(jlong handle) {
+    return reinterpret_cast<MobileGS*>(handle);
+}
 
 extern "C" {
 
+// =================================================================================================
+// GraffitiJNI (Singleton/Object Interface)
+// =================================================================================================
+
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_init(JNIEnv *env, jobject thiz, jint width, jint height) {
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_init(JNIEnv *env, jobject thiz, jint width, jint height) {
     if (!gEngine) {
         gEngine = std::make_unique<MobileGS>();
     }
@@ -24,7 +33,7 @@ Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_init(JNIEnv *env, jobject
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_cleanup(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_cleanup(JNIEnv *env, jobject thiz) {
     if (gEngine) {
         gEngine->Cleanup();
         gEngine.reset();
@@ -32,7 +41,7 @@ Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_cleanup(JNIEnv *env, jobj
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_update(JNIEnv *env, jobject thiz, jlong matAddr, jfloatArray viewMatrix, jfloatArray projMatrix) {
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_update(JNIEnv *env, jobject thiz, jlong matAddr, jfloatArray viewMatrix, jfloatArray projMatrix) {
     if (!gEngine) return;
 
     cv::Mat* pMat = (cv::Mat*)matAddr;
@@ -45,10 +54,8 @@ Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_update(JNIEnv *env, jobje
     env->ReleaseFloatArrayElements(projMatrix, proj, 0);
 }
 
-// --- Teleological Functions ---
-
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_setTargetDescriptors(JNIEnv *env, jobject thiz, jbyteArray descriptorBytes, jint rows, jint cols, jint type) {
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_setTargetDescriptors(JNIEnv *env, jobject thiz, jbyteArray descriptorBytes, jint rows, jint cols, jint type) {
     if (!gEngine) return;
 
     jbyte* data = env->GetByteArrayElements(descriptorBytes, NULL);
@@ -63,7 +70,7 @@ Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_setTargetDescriptors(JNIE
 }
 
 JNIEXPORT jbyteArray JNICALL
-Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_extractFeaturesFromBitmap(JNIEnv *env, jobject thiz, jobject bitmap) {
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesFromBitmap(JNIEnv *env, jobject thiz, jobject bitmap) {
     AndroidBitmapInfo info;
     void* pixels;
 
@@ -101,12 +108,7 @@ Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_extractFeaturesFromBitmap
 }
 
 JNIEXPORT jintArray JNICALL
-Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_extractFeaturesMeta(JNIEnv *env, jobject thiz, jobject bitmap) {
-    // Helper to return [rows, cols, type] for the extracted features
-    // Must be called on the same bitmap state to ensure consistency,
-    // ideally passing the mat directly, but for JNI simplicity we re-process or assume consistency.
-    // For production optimization: do both extraction and meta in one call returning a struct/object.
-
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesMeta(JNIEnv *env, jobject thiz, jobject bitmap) {
     AndroidBitmapInfo info;
     void* pixels;
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) return NULL;
@@ -134,4 +136,115 @@ Java_com_hereliesaz_graffitixr_core_native_GraffitiJNI_extractFeaturesMeta(JNIEn
     return meta;
 }
 
+// =================================================================================================
+// SlamManager (Instance/Handle Interface)
+// =================================================================================================
+
+JNIEXPORT jlong JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
+    auto *engine = new MobileGS();
+    // Note: Initialize(w, h) is called separately or we should add it here?
+    // SlamManager.kt calls onSurfaceChanged which calls Initialize/Resize.
+    return reinterpret_cast<jlong>(engine);
 }
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyNativeJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle != 0) {
+        delete getEngine(handle);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
+        JNIEnv *env, jobject thiz, jlong handle, jfloatArray viewMtx, jfloatArray projMtx) {
+    if (handle == 0) return;
+
+    jfloat* view = env->GetFloatArrayElements(viewMtx, nullptr);
+    jfloat* proj = env->GetFloatArrayElements(projMtx, nullptr);
+
+    getEngine(handle)->updateCamera(view, proj);
+
+    env->ReleaseFloatArrayElements(viewMtx, view, 0);
+    env->ReleaseFloatArrayElements(projMtx, proj, 0);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
+        JNIEnv *env, jobject thiz,
+        jlong handle,
+        jobject depthBuffer,
+        jobject colorBuffer,
+        jint width, jint height,
+        jint stride,
+        jfloatArray poseMatrix,
+        jfloat fov) {
+
+    if (handle == 0) return;
+
+    auto* depthData = (uint16_t*)env->GetDirectBufferAddress(depthBuffer);
+    float* colorData = nullptr;
+    if (colorBuffer != nullptr) {
+        colorData = (float*)env->GetDirectBufferAddress(colorBuffer);
+    }
+
+    jfloat* pose = env->GetFloatArrayElements(poseMatrix, nullptr);
+
+    if (depthData && pose) {
+        getEngine(handle)->feedDepthData(depthData, colorData, width, height, stride, pose, fov);
+    }
+
+    env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_drawJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    getEngine(handle)->draw();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_getPointCountJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return 0;
+    return getEngine(handle)->getSplatCount();
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
+    if (handle == 0) return;
+    getEngine(handle)->Initialize(width, height); // Initialize calls onSurfaceChanged logic basically
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
+    const char *nativePath = env->GetStringUTFChars(path, 0);
+    bool result = getEngine(handle)->saveModel(std::string(nativePath));
+    env->ReleaseStringUTFChars(path, nativePath);
+    return result;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorld(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle == 0) return false;
+    const char *nativePath = env->GetStringUTFChars(path, 0);
+    bool result = getEngine(handle)->loadModel(std::string(nativePath));
+    env->ReleaseStringUTFChars(path, nativePath);
+    return result;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transformMtx) {
+    if (handle == 0) return;
+    jfloat* transform = env->GetFloatArrayElements(transformMtx, nullptr);
+    getEngine(handle)->alignMap(transform);
+    env->ReleaseFloatArrayElements(transformMtx, transform, 0);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMapJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    getEngine(handle)->clear();
+}
+
+} // extern "C"

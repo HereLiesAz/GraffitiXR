@@ -34,6 +34,21 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
 
+/**
+ * A circular knob control for adjusting a floating-point value.
+ * Supports vertical drag gestures to change value, and double-tap to reset to default.
+ *
+ * @param text The label displayed below the knob.
+ * @param value The current value controlled by the knob.
+ * @param onValueChange Callback invoked when the value changes.
+ * @param onValueChangeStart Callback invoked when the user starts dragging.
+ * @param onValueChangeFinished Callback invoked when the user stops dragging.
+ * @param valueRange The valid range of values (min..max).
+ * @param modifier The modifier to be applied to the layout.
+ * @param color The primary color of the knob indicator.
+ * @param defaultValue The value to reset to on double-tap.
+ * @param valueFormatter Function to format the value for accessibility state description.
+ */
 @Composable
 fun Knob(
     text: String,
