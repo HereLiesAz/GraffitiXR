@@ -60,6 +60,8 @@ import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -88,6 +90,7 @@ fun MainScreen(
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
     val exportTrigger by editorViewModel.exportTrigger.collectAsState()
 
+    val scope = rememberCoroutineScope()
     val view = LocalView.current
     val context = LocalContext.current
     val window = (view.context as? android.app.Activity)?.window
@@ -311,7 +314,27 @@ fun MainScreen(
                             isRightHanded = editorUiState.isRightHanded,
                             captureStep = uiState.captureStep,
                             context = context,
-                            onConfirm = viewModel::onConfirmTargetCreation,
+                            onConfirm = {
+                                val bitmapToSave = arUiState.tempCaptureBitmap
+                                if (bitmapToSave != null) {
+                                    scope.launch(Dispatchers.IO) {
+                                        val uri = saveBitmapToCache(context, bitmapToSave)
+                                        if (uri != null) {
+                                            withContext(Dispatchers.Main) {
+                                                arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                                viewModel.onConfirmTargetCreation()
+                                            }
+                                        } else {
+                                            // Fallback if save fails (just close or log)
+                                            withContext(Dispatchers.Main) {
+                                                viewModel.onConfirmTargetCreation()
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    viewModel.onConfirmTargetCreation()
+                                }
+                            },
                             onRetake = viewModel::onRetakeCapture,
                             onCancel = viewModel::onCancelCaptureClicked,
                             onCaptureShutter = {
@@ -324,10 +347,13 @@ fun MainScreen(
                             onUnwarpImage = { points ->
                                 arUiState.tempCaptureBitmap?.let { src ->
                                     ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                                        saveBitmapToCache(context, unwarped)?.let { uri ->
-                                            arViewModel.onFrameCaptured(unwarped, uri)
-                                            viewModel.setCaptureStep(CaptureStep.REVIEW)
-                                        }
+                                        // Highlight markings (Edge Detection)
+                                        // This extracts the graffiti from the wall background
+                                        val extracted = ImageProcessor.detectEdges(unwarped) ?: unwarped
+
+                                        // Update preview with extracted version
+                                        arViewModel.setTempCapture(extracted)
+                                        viewModel.setCaptureStep(CaptureStep.REVIEW)
                                     }
                                 }
                             }

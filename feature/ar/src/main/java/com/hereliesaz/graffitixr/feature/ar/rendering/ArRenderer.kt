@@ -157,18 +157,22 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
 
-        // Sub-renderers
-        backgroundRenderer.createOnGlThread(context)
-        planeRenderer.createOnGlThread(context)
-        pointCloudRenderer.createOnGlThread(context)
+        try {
+            // Sub-renderers
+            backgroundRenderer.createOnGlThread(context)
+            planeRenderer.createOnGlThread(context)
+            pointCloudRenderer.createOnGlThread(context)
 
-        // Mark as needs initialization since we have a texture ID now
-        isCameraTextureInitialized = false
+            // Mark as needs initialization since we have a texture ID now
+            isCameraTextureInitialized = false
 
-        // Reset the native engine's GL state because we are in a new EGLContext.
-        slamManager.resetGLState()
-        // Then re-initialize (compiles shaders for this context)
-        slamManager.initialize()
+            // Reset the native engine's GL state because we are in a new EGLContext.
+            slamManager.resetGLState()
+            // Then re-initialize (compiles shaders for this context)
+            slamManager.initialize()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize GL components", e)
+        }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -215,17 +219,21 @@ class ArRenderer(
                 // Draw Planes (Helper)
                 planeRenderer.drawPlanes(currentSession, viewMatrix, projectionMatrix)
 
-                // Update Slam Manager Camera
-                slamManager.updateCamera(viewMatrix, projectionMatrix)
+                try {
+                    // Update Slam Manager Camera
+                    slamManager.updateCamera(viewMatrix, projectionMatrix)
 
-                // FEED DEPTH DATA (If available)
-                if (isDepthSupported) {
-                    processDepth(frame)
-                }
+                    // FEED DEPTH DATA (If available)
+                    if (isDepthSupported) {
+                        processDepth(frame)
+                    }
 
-                // 3. Draw Point Cloud (Splat)
-                if (showPointCloud) {
-                    slamManager.draw()
+                    // 3. Draw Point Cloud (Splat)
+                    if (showPointCloud) {
+                        slamManager.draw()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in native SLAM rendering", e)
                 }
             }
 
@@ -248,6 +256,12 @@ class ArRenderer(
             val cameraImage = try { frame.acquireCameraImage() } catch (e: NotYetAvailableException) { null }
 
             if (depthImage != null) {
+                // Ensure depth planes are valid
+                if (depthImage.planes.isEmpty() || depthImage.planes[0].buffer == null) {
+                    depthImage.close()
+                    return
+                }
+
                 val camera = frame.camera
                 val pose = camera.pose
                 pose.toMatrix(modelMatrix, 0)

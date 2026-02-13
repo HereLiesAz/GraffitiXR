@@ -73,6 +73,9 @@ class BackgroundRenderer {
         GLES30.glGetProgramiv(backgroundProgram, GLES30.GL_LINK_STATUS, linkStatus, 0)
         if (linkStatus[0] == 0) {
             Log.e("BackgroundRenderer", "Link Error: " + GLES30.glGetProgramInfoLog(backgroundProgram))
+            GLES30.glDeleteProgram(backgroundProgram)
+            backgroundProgram = 0
+            return
         }
 
         quadPositionParam = GLES30.glGetAttribLocation(backgroundProgram, "a_Position")
@@ -81,6 +84,8 @@ class BackgroundRenderer {
     }
 
     fun draw(frame: Frame) {
+        if (backgroundProgram == 0) return
+
         if (frame.hasDisplayGeometryChanged() || !hasTransformed) {
             frame.transformCoordinates2d(
                 Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
