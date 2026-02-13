@@ -19,7 +19,7 @@ The project uses a **Multi-Module Clean Architecture** to enforce separation of 
     *   **`:design`**: The design system (`AzNavRail`, Theme, Components like `Knob`, `InfoDialog`).
     *   **`:domain`**: Pure data models and repository interfaces (`ProjectRepository`, `SettingsRepository`).
     *   **`:data`**: Repository implementations, File I/O, and data persistence logic.
-    *   **`:native`**: C++ native code (`MobileGS`, `GraffitiJNI`) and OpenCV integration.
+    *   **`:nativebridge`**: C++ native code (`MobileGS`, `GraffitiJNI`) integrating OpenCV and OpenGL ES.
 * **`:feature`**:
     *   **`:ar`**: ARCore implementation, `ArView`, `ArViewModel`, and `TargetCreationFlow`.
     *   **`:editor`**: The canvas workspace (`MockupScreen`, `OverlayScreen`, `TraceScreen`, `EditorViewModel`).
@@ -53,7 +53,7 @@ A thumb-driven navigation paradigm designed for one-handed use.
 ### 3. Architecture
 * **`:core:domain`**: Pure business logic and Repository contracts.
 * **`:core:data`**: Disk I/O and JSON Serialization.
-* **`:core:native`**: C++17 Engine + OpenCV.
+* **`:core:nativebridge`**: C++17 Engine (MobileGS) implementing both Teleological SLAM (OpenCV) and Gaussian Splatting (OpenGL).
 * **`:feature:*`**: Jetpack Compose UI.
 
 ## Build Setup

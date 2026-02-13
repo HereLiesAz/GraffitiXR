@@ -61,6 +61,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
+/**
+ * The main screen composable that orchestrates the entire application UI.
+ *
+ * It composes the [GraffitiNavRail] (navigation side-bar), the main content area
+ * (switching between [ArView], [GsViewer], etc.), and overlay dialogs/panels.
+ *
+ * @param viewModel The global application ViewModel.
+ * @param editorViewModel ViewModel for the editor/canvas feature.
+ * @param arViewModel ViewModel for AR features.
+ * @param dashboardViewModel ViewModel for project management.
+ * @param navController The navigation controller (unused, local one created inside).
+ * @param onRendererCreated Callback invoked when the [ArRenderer] is initialized.
+ */
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,

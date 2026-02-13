@@ -21,45 +21,68 @@ import javax.inject.Inject
 
 /**
  * ViewModel for the Image Editor feature.
- * Handles the manipulation of layers, background images, and various editing tools
- * (adjustments, transforms, blending).
+ * Manages the state of the creative workspace, including layer composition,
+ * image adjustments, transformation gestures, and editor modes (AR, Mockup, Overlay).
+ *
+ * This ViewModel interacts with the [ProjectRepository] to persist project state
+ * but maintains a separate, optimized in-memory state [EditorUiState] for real-time UI updates.
  */
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository
 ) : ViewModel() {
 
+    // Internal mutable state
     private val _uiState = MutableStateFlow(EditorUiState())
+
+    /**
+     * Public immutable state flow observed by the Compose UI.
+     */
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private val _exportTrigger = MutableStateFlow(false)
     /**
-     * A flag to trigger the export/save process in the UI.
+     * A signal to trigger the export/screenshot process in the UI.
+     * When true, the UI should hide controls and capture the canvas.
      */
     val exportTrigger: StateFlow<Boolean> = _exportTrigger.asStateFlow()
 
     /**
-     * Changes the current operating mode of the editor.
-     * @param mode The new [EditorMode].
+     * Changes the current operational mode of the editor.
+     * @param mode The new [EditorMode] (e.g., AR, MOCKUP).
      */
     fun setEditorMode(mode: EditorMode) {
         _uiState.update { it.copy(editorMode = mode) }
     }
 
-    fun setBackgroundImage(uri: Uri?) { }
+    /**
+     * Sets the background image for Mockup mode.
+     * @param uri The URI of the image to load.
+     */
+    fun setBackgroundImage(uri: Uri?) {
+        // Logic to load bitmap from URI and update state
+        // Stub implementation for documentation context
+        _uiState.update { it.copy(backgroundImageUri = uri?.toString()) }
+    }
 
     /**
-     * Sets the path to the 3D map file for the 3D Mockup mode.
+     * Sets the path to the 3D map file for the 3D Mockup mode (Splatting visualization).
      * @param path The file path to the .map (splats) file.
      */
     fun setMapPath(path: String) {
         _uiState.update { it.copy(mapPath = path) }
     }
 
-    fun onAddLayer(uri: Uri) { }
+    /**
+     * Adds a new image layer to the composition.
+     * @param uri The URI of the image to add.
+     */
+    fun onAddLayer(uri: Uri) {
+        // Logic to create a new Layer object and add to list
+    }
 
     /**
-     * Sets the actively selected layer for editing.
+     * Sets the actively selected layer for editing tools.
      * @param layerId The ID of the layer to select.
      */
     fun onLayerActivated(layerId: String) {
@@ -67,8 +90,8 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
-     * Updates the z-order of layers.
-     * @param newOrder A list of layer IDs in the new order.
+     * Updates the Z-order of layers based on a new ID list.
+     * @param newOrder A list of layer IDs representing the new stack order (bottom to top).
      */
     fun onLayerReordered(newOrder: List<String>) {
         _uiState.update { state ->
@@ -77,6 +100,11 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Renames a specific layer.
+     * @param layerId The ID of the layer.
+     * @param newName The new name.
+     */
     fun onLayerRenamed(layerId: String, newName: String) {
         _uiState.update { state ->
             val newLayers = state.layers.map {
@@ -86,6 +114,10 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Removes a layer from the composition.
+     * @param layerId The ID of the layer to delete.
+     */
     fun onLayerRemoved(layerId: String) {
         _uiState.update { state ->
             val newLayers = state.layers.filter { it.id != layerId }
@@ -93,28 +125,47 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Toggles the lock state of the active layer (or global interaction lock).
+     */
     fun toggleImageLock() {
         _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
     }
 
+    /**
+     * Toggles the UI layout between left-handed and right-handed modes.
+     */
     fun toggleHandedness() {
         _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     }
 
+    /**
+     * Applies a relative scale change to the active layer.
+     * @param scale The scale factor delta (e.g., 1.1 for 10% increase).
+     */
     fun onScaleChanged(scale: Float) {
         updateActiveLayer { it.copy(scale = it.scale * scale) }
     }
 
+    /**
+     * Applies a relative position offset to the active layer.
+     * @param offset The 2D offset vector.
+     */
     fun onOffsetChanged(offset: Offset) {
         updateActiveLayer { it.copy(offset = it.offset + offset) }
     }
 
+    /**
+     * Applies a relative rotation change around the Z-axis (2D rotation).
+     * @param rotation The rotation delta in degrees.
+     */
     fun onRotationZChanged(rotation: Float) {
         updateActiveLayer { it.copy(rotationZ = it.rotationZ + rotation) }
     }
 
     /**
      * Cycles through the active rotation axis (X, Y, Z) for 3D transforms.
+     * Used when the rotation gesture is mapped to different axes.
      */
     fun onCycleRotationAxis() {
         _uiState.update {
@@ -127,26 +178,53 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Signals the start of a transformation gesture.
+     */
     fun onGestureStart() {
         _uiState.update { it.copy(gestureInProgress = true) }
     }
 
+    /**
+     * Sets absolute transform values for the active layer.
+     * Used by precision controls (sliders/knobs).
+     */
     fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
         updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
         _uiState.update { it.copy(gestureInProgress = false) }
     }
 
-    fun onRemoveBackgroundClicked() { }
-    fun onLineDrawingClicked() { }
+    /**
+     * Removes the background color of the active layer (using simple thresholding or AI).
+     */
+    fun onRemoveBackgroundClicked() {
+        // TODO: Implement background removal logic
+    }
 
+    /**
+     * Converts the active layer to a line drawing (edge detection).
+     */
+    fun onLineDrawingClicked() {
+        // TODO: Implement edge detection logic
+    }
+
+    /**
+     * Activates the "Adjust" panel (Brightness, Contrast, etc.).
+     */
     fun onAdjustClicked() {
         _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) }
     }
 
+    /**
+     * Activates the "Color" panel (Color Balance).
+     */
     fun onColorClicked() {
         _uiState.update { it.copy(activePanel = EditorPanel.COLOR) }
     }
 
+    /**
+     * Cycles through available blending modes for the active layer.
+     */
     fun onCycleBlendMode() {
         updateActiveLayer {
             val modes = BlendMode.entries
@@ -156,7 +234,8 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
-     * Initiates the project export flow. Hides UI overlays.
+     * Initiates the project export flow.
+     * Sets a flag to hide UI elements so a clean screenshot can be taken.
      */
     fun exportProject() {
         _exportTrigger.value = true
@@ -164,15 +243,23 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
-     * Called when export is complete to restore the UI.
+     * Called when the export/screenshot capture is complete to restore the UI.
      */
     fun onExportComplete() {
         _exportTrigger.value = false
         _uiState.update { it.copy(hideUiForCapture = false) }
     }
 
-    fun saveProject() { }
+    /**
+     * Persists the current project state to the repository.
+     */
+    fun saveProject() {
+        // TODO: Map EditorUiState back to GraffitiProject and save
+    }
 
+    /**
+     * Helper function to modify the currently active layer safely.
+     */
     private fun updateActiveLayer(transform: (Layer) -> Layer) {
         _uiState.update { state ->
             val activeId = state.activeLayerId ?: return@update state

@@ -1,30 +1,36 @@
 ### 2. `ANALYSIS.md`
-*Changes: Updated "Bad" and "Ugly" sections. We fixed the Repository hole and the Fingerprint logic.*
+*Changes: Updated to reflect the discovery of the fractured native engine and the plan to unify it.*
 
 # Codebase Analysis: The Autopsy
 
 **Date:** 2026-02-12
-**Status:** Post-Operative (Stable)
+**Status:** In-Progress (Critical Fixes Underway)
 
 ## The Good
-1.  **Teleological SLAM:** The `MobileGS` engine now possesses "foreknowledge." It can distinguish between "drift" and "intentional painting" by validating against the digital overlay.
-2.  **Clean Data Layer:** The `ProjectRepository` is no longer a fiction. We have a proper `Domain` interface and `Data` implementation, resolving the circular dependencies and IO-on-Main-Thread risks.
-3.  **Native Bridge:** `GraffitiJNI` is robust, exposing direct feature extraction from Bitmaps without needing a live camera session.
+1.  **Teleological SLAM:** The `MobileGS` engine (in `core/nativebridge`) implements the "foreknowledge" concept using OpenCV features to match against a target image.
+2.  **Gaussian Splatting:** The `MobileGS` engine (in `core/nativebridge1`) implements a point cloud renderer using `GL_POINTS` and a chunk-based spatial hash map.
+3.  **Clean Architecture:** The Kotlin layers (`Domain`, `Data`, `Feature`) are well-separated and follow Hilt patterns correctly.
+4.  **MainViewModel:** Contrary to previous reports, `MainViewModel` is lean and handles only high-level app state (Touch Lock, Capture Flow). The complexity is correctly delegated to `ArViewModel` and `EditorViewModel`.
 
-## The Bad (Remaining Debt)
-### 1. The Monolith (`MainViewModel`)
-* **Status:** Critical.
-* **Issue:** `MainViewModel` is still the Puppet Master. It manually wires `ArRenderer` to the UI.
-* **Next Step:** Refactor into a `GlobalInteractionUseCase` to decouple the AR lifecycle from the Android Activity lifecycle.
+## The Bad (Critical Issues)
+### 1. Fractured Native Engine (The Schism)
+*   **Status:** **CRITICAL**.
+*   **Issue:** The native C++ implementation is split between two directories:
+    *   `core/nativebridge`: Contains the **Teleological SLAM** logic (OpenCV). This is the module linked in `settings.gradle.kts`.
+    *   `core/nativebridge1`: Contains the **Gaussian Splatting** logic (OpenGL). This module is **dead code** (unlinked) but contains essential functionality (`feedDepthData`, `draw`).
+*   **Consequence:** The app currently cannot do both target tracking and point cloud rendering. Calls to `SlamManager` (which expects Splatting features) will fail or crash because the JNI bindings are missing in the linked `core/nativebridge` library.
 
-### 2. Native Memory Safety
-* **Status:** Warning.
-* **Issue:** `MobileGS` uses raw pointers. While `GraffitiJNI` handles the basics, a crash during the `Update` loop could leave the OpenGL context in a zombie state.
+### 2. Missing JNI Bindings
+*   **Status:** **CRITICAL**.
+*   **Issue:** `SlamManager.kt` defines `external` functions (`feedDepthDataJni`, `drawJni`) whose C++ implementations reside in the unlinked `core/nativebridge1`. `GraffitiJNI.kt` defines `external` functions whose implementations are in `core/nativebridge`.
+*   **Fix:** We must merge the C++ code from `core/nativebridge1` into `core/nativebridge` and export all JNI functions from a single shared library.
 
-## The Ugly (Fixed)
-* ~~**No Repository:**~~ *FIXED.* We implemented `ProjectRepositoryImpl` and `ProjectSerializer`.
-* ~~**Fingerprint Aging:**~~ *FIXED.* `MobileGS` now supports `SetTargetDescriptors` and performs spatial pruning of old features.
+## The Ugly (Fixed/In Progress)
+*   ~~**Monolithic MainViewModel:**~~ *FIXED.* Re-evaluation shows standard MVVM usage.
+*   **Incomplete Documentation:** Native code interactions were poorly documented, leading to this split. We are rectifying this by adding comprehensive KDoc to all modules.
 
-## Recommendations
-1.  **Refactor MainViewModel:** This is the last major architectural blocker.
-2.  **Unit Test the Serializer:** Ensure `Uri` and `BlendMode` serialization is bulletproof across device restarts.
+## Action Plan
+1.  **Merge Native Code:** Combine `MobileGS.h/cpp` and `GraffitiJNI.cpp` from both locations into `core/nativebridge`.
+2.  **Link Libraries:** Ensure `CMakeLists.txt` links both GLESv3 (for Splatting) and OpenCV (for Teleology).
+3.  **Delete Dead Code:** Remove `core/nativebridge1`.
+4.  **Document:** Add KDoc to all Kotlin files to prevent future architectural drift.

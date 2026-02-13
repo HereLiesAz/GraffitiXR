@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
@@ -27,13 +28,21 @@ import kotlin.math.atan
  * The primary OpenGL renderer for the AR experience.
  * Manages the ARCore [Session], handles the camera background rendering,
  * and delegates SLAM/Point Cloud rendering to the native [SlamManager].
+ *
+ * This class implements [GLSurfaceView.Renderer] to draw on the GL thread
+ * and [DefaultLifecycleObserver] to manage AR session lifecycle.
+ *
+ * @property context The application context.
  */
-class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
+class ArRenderer(private val context: Context) : GLSurfaceView.Renderer, DefaultLifecycleObserver {
 
     private val TAG = "ArRenderer"
 
     // Components
+    /** The native SLAM engine manager. */
     val slamManager = SlamManager()
+
+    /** The active ARCore session. Null if not initialized or destroyed. */
     var session: Session? = null
         private set
 
@@ -42,7 +51,9 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private val pointCloudRenderer = PointCloudRenderer()
 
     // State
+    /** Controls the visibility of the point cloud visualization. */
     var showPointCloud = true
+
     private var viewportWidth = 0
     private var viewportHeight = 0
     private var isDepthSupported = false
@@ -57,7 +68,12 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private val modelMatrix = FloatArray(16)
 
     // Lifecycle
-    fun onResume(owner: LifecycleOwner) {
+
+    /**
+     * Called when the host activity/fragment resumes.
+     * Initializes or resumes the AR Session.
+     */
+    override fun onResume(owner: LifecycleOwner) {
         if (session == null) {
             try {
                 session = Session(context).apply {
@@ -84,10 +100,17 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
-    fun onPause(owner: LifecycleOwner) {
+    /**
+     * Called when the host activity/fragment pauses.
+     * Pauses the AR Session to release camera resources.
+     */
+    override fun onPause(owner: LifecycleOwner) {
         session?.pause()
     }
 
+    /**
+     * Cleans up all resources, closes the AR session, and destroys the native engine.
+     */
     fun cleanup() {
         session?.close()
         session = null
@@ -152,9 +175,16 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 // Only process depth every 3rd frame to prevent CPU starvation
                 frameSkipper++
                 if (frameSkipper % 3 == 0) {
-                    camera.pose.toMatrix(modelMatrix, 0)
+                    // Get Camera Pose (Model Matrix)
+                    // ARCore Pose to Matrix
+                    val pose = camera.pose
+                    pose.toMatrix(modelMatrix, 0)
+
+                    // Calculate Vertical FOV from Projection Matrix
+                    // P[5] = 1 / tan(fov/2) -> fov = 2 * atan(1/P[5])
                     val valY = projectionMatrix[5]
                     val fov = if (valY != 0f) (2.0 * atan(1.0 / valY)).toFloat() else 1.0f
+
                     processDepth(frame, modelMatrix, fov)
                 }
             }
@@ -175,30 +205,53 @@ class ArRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
+    /**
+     * Extracts 16-bit depth image from the frame and feeds it to the native engine.
+     */
     private fun processDepth(frame: Frame, pose: FloatArray, fov: Float) {
         try {
+            // Acquire depth image
             val depthImage = frame.acquireDepthImage16Bits()
             if (depthImage != null) {
+                val plane = depthImage.planes[0]
+                val buffer = plane.buffer
+                val width = depthImage.width
+                val height = depthImage.height
+                val stride = plane.rowStride
+
                 slamManager.feedDepthData(
-                    depthBuffer = depthImage.planes[0].buffer,
-                    colorBuffer = null,
-                    width = depthImage.width,
-                    height = depthImage.height,
-                    stride = depthImage.planes[0].rowStride,
+                    depthBuffer = buffer,
+                    colorBuffer = null, // TODO: Feed color buffer for colored splats
+                    width = width,
+                    height = height,
+                    stride = stride,
                     pose = pose,
                     fov = fov
                 )
                 depthImage.close()
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            // Depth not available or closed
+        }
     }
 
+    /**
+     * Schedules a frame capture on the next draw call.
+     * @param callback Function to receive the captured Bitmap.
+     */
     fun captureFrame(callback: (Bitmap) -> Unit) {
         pendingCaptureCallback = callback
     }
 
-    fun setFlashlight(on: Boolean) { }
+    fun setFlashlight(on: Boolean) {
+        // TODO: Implement flashlight control via Config
+    }
 
+    /**
+     * Adds an Augmented Image to the database dynamically.
+     * @param bitmap The image to track.
+     * @param name Unique name for the image.
+     */
     fun setupAugmentedImageDatabase(bitmap: Bitmap?, name: String) {
         if (bitmap == null || session == null) return
         try {

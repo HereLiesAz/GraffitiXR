@@ -28,6 +28,8 @@ data class MainUiState(
  * The top-level ViewModel for the application.
  * Manages cross-cutting concerns like touch locking, global navigation states (Target Creation Flow),
  * and app-wide UI overlays.
+ *
+ * This ViewModel is scoped to the [MainActivity] lifecycle and survives navigation changes.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor() : ViewModel() {
@@ -37,6 +39,7 @@ class MainViewModel @Inject constructor() : ViewModel() {
 
     /**
      * Enables or disables the touch lock (used in Trace Mode).
+     * When locked, most UI interactions are intercepted.
      */
     fun setTouchLocked(locked: Boolean) {
         _uiState.update { it.copy(isTouchLocked = locked) }
@@ -44,6 +47,7 @@ class MainViewModel @Inject constructor() : ViewModel() {
 
     /**
      * Shows or hides the unlock instructions dialog.
+     * Triggered when the user attempts to interact with a locked screen.
      */
     fun showUnlockInstructions(show: Boolean) {
         _uiState.update { it.copy(showUnlockInstructions = show) }
@@ -51,6 +55,7 @@ class MainViewModel @Inject constructor() : ViewModel() {
 
     /**
      * Initiates the AR Target Creation flow.
+     * Sets the state to capture mode.
      */
     fun startTargetCapture() {
         _uiState.update {
@@ -63,6 +68,7 @@ class MainViewModel @Inject constructor() : ViewModel() {
 
     /**
      * Advances or regresses the target creation step manually.
+     * @param step The new [CaptureStep].
      */
     fun setCaptureStep(step: CaptureStep) {
         _uiState.update { it.copy(captureStep = step) }
