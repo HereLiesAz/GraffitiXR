@@ -1,96 +1,123 @@
 package com.hereliesaz.graffitixr.nativebridge
 
-import android.content.Context
-import android.util.Log
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import android.graphics.Bitmap
+import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class SlamManager @Inject constructor(
-    private val context: Context
-) {
-    private val nativeMutex = Mutex()
-    private var isInitialized = false
+class SlamManager @Inject constructor() {
+
+    private var nativeHandle: Long = 0
 
     companion object {
         init {
             try {
-                System.loadLibrary("graffitixr_native")
+                System.loadLibrary("graffitixr")
             } catch (e: UnsatisfiedLinkError) {
-                Log.e("SlamManager", "Failed to load native library: ${e.message}")
+                // Ignore in tests
+            } catch (e: SecurityException) {
+                // Ignore
             }
         }
     }
 
-    private external fun nativeInit(assetManager: Any): Boolean
-    private external fun nativeResize(width: Int, height: Int)
-    private external fun nativeUpdateCamera(viewMtx: FloatArray, projMtx: FloatArray)
-    private external fun nativeDraw()
-    private external fun nativeLoadMap(path: String): Boolean
-    private external fun nativeSaveMap(path: String): Boolean
-    private external fun nativeReset()
+    /**
+     * Initializes the native engine.
+     * Safe to call multiple times; internally checks if already initialized.
+     */
+    fun initialize() {
+        if (nativeHandle == 0L) {
+            nativeHandle = initNativeJni()
+        }
+    }
 
-    suspend fun initialize(): Boolean {
-        return nativeMutex.withLock {
-            if (!isInitialized) {
-                val assetManager = context.applicationContext.assets
-                isInitialized = nativeInit(assetManager)
-                if (isInitialized) {
-                    Log.d("SlamManager", "Native Engine Initialized")
-                }
+    /**
+     * CRITICAL: Resets the OpenGL state (Program, VBOs) without deleting the map data.
+     * Must be called when the GLSurfaceView context changes (e.g. switching screens).
+     */
+    fun resetGLState() {
+        if (nativeHandle != 0L) {
+            resetGLJni(nativeHandle)
+        }
+    }
+
+    fun destroy() {
+        if (nativeHandle != 0L) {
+            destroyNativeJni(nativeHandle)
+            nativeHandle = 0
+        }
+    }
+
+    fun onSurfaceChanged(width: Int, height: Int) {
+        if (nativeHandle != 0L) onSurfaceChangedJni(nativeHandle, width, height)
+    }
+
+    fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
+        if (nativeHandle != 0L) updateCameraJni(nativeHandle, viewMtx, projMtx)
+    }
+
+    fun feedDepthData(depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float) {
+        if (nativeHandle != 0L) feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, depthStride, colorStride, poseMtx, fov)
+    }
+
+    fun draw() {
+        if (nativeHandle != 0L) drawJni(nativeHandle)
+    }
+
+    fun saveWorld(path: String): Boolean {
+        return if (nativeHandle != 0L) saveWorld(nativeHandle, path) else false
+    }
+
+    fun loadWorld(path: String): Boolean {
+        return if (nativeHandle != 0L) loadWorld(nativeHandle, path) else false
+    }
+
+    fun clearMap() {
+        if (nativeHandle != 0L) clearMapJni(nativeHandle)
+    }
+
+    fun getPointCount(): Int {
+        return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
+    }
+
+    // NEW: Property to satisfy UI binding
+    val mappingQuality: String
+        get() {
+            val count = getPointCount()
+            return when {
+                count < 100 -> "POOR"
+                count < 1000 -> "FAIR"
+                count < 5000 -> "GOOD"
+                else -> "EXCELLENT"
             }
-            isInitialized
         }
+
+    // --- OpenCV Utils ---
+    fun detectEdges(bitmap: Bitmap): Bitmap? {
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        detectEdgesJni(bitmap, result)
+        return result
     }
 
-    suspend fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
-        nativeMutex.withLock {
-            if (isInitialized) {
-                nativeUpdateCamera(viewMtx, projMtx)
-            }
-        }
-    }
+    // --- Native Interface ---
+    private external fun initNativeJni(): Long
+    private external fun resetGLJni(handle: Long) // NEW
+    private external fun destroyNativeJni(handle: Long)
+    private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
+    private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
+    private external fun feedDepthDataJni(handle: Long, depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float)
+    private external fun drawJni(handle: Long)
+    private external fun saveWorld(handle: Long, path: String): Boolean
+    private external fun loadWorld(handle: Long, path: String): Boolean
+    private external fun clearMapJni(handle: Long)
+    private external fun pruneMapJni(handle: Long, ageThreshold: Int)
+    private external fun getPointCountJni(handle: Long): Int
+    private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
+    private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
 
-    suspend fun draw() {
-        nativeMutex.withLock {
-            if (isInitialized) {
-                nativeDraw()
-            }
-        }
-    }
-
-    suspend fun resize(width: Int, height: Int) {
-        nativeMutex.withLock {
-            if (isInitialized) {
-                nativeResize(width, height)
-            }
-        }
-    }
-
-    suspend fun saveMap(path: String): Boolean {
-        return nativeMutex.withLock {
-            if (isInitialized) {
-                nativeSaveMap(path)
-            } else false
-        }
-    }
-
-    suspend fun loadMap(path: String): Boolean {
-        return nativeMutex.withLock {
-            if (isInitialized) {
-                nativeLoadMap(path)
-            } else false
-        }
-    }
-
-    suspend fun reset() {
-        nativeMutex.withLock {
-            if (isInitialized) {
-                nativeReset()
-                isInitialized = false
-            }
-        }
-    }
+    // OpenCV
+    private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?
+    private external fun extractFeaturesMeta(bitmap: Bitmap): IntArray?
+    private external fun detectEdgesJni(srcBitmap: Bitmap, dstBitmap: Bitmap)
 }

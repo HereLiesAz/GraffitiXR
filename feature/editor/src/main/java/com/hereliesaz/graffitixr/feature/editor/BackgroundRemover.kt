@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -12,7 +14,7 @@ import kotlinx.coroutines.tasks.await
  * * Why ML Kit? because rewriting a semantic segmentation network in C++
  * for a phone on a Friday night is not my idea of a good time.
  */
-class BackgroundRemover(private val context: Context) {
+class BackgroundRemover @Inject constructor(@ApplicationContext private val context: Context) {
 
     private val options = SubjectSegmenterOptions.Builder()
         .enableForegroundBitmap()

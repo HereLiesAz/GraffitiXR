@@ -39,4 +39,7 @@ dependencies {
     
     implementation(project(":opencv"))
     implementation(libs.play.services.location)
+
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

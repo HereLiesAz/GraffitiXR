@@ -54,4 +54,8 @@ dependencies {
 
     // AZ Nav Rail (Ensure this is available if used in Editor, though usually in App)
     implementation(libs.az.nav.rail)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -41,7 +41,7 @@ suspend fun applyCurves(bitmap: Bitmap, points: List<Offset>): Bitmap = withCont
     Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
 }
 
-private fun createLut(points: List<Offset>): IntArray {
+internal fun createLut(points: List<Offset>): IntArray {
     val lut = IntArray(256)
     val sortedPoints = points.sortedBy { it.x }
 
