@@ -11,17 +11,12 @@ import javax.microedition.khronos.opengles.GL10
  * A specialized GLRenderer for viewing 3D Gaussian Splat maps (Mockup Mode).
  * Unlike [ArRenderer], this does not use the camera feed or ARCore.
  * It uses a [VirtualCamera] to navigate the 3D scene.
- *
- * @param context The application context.
- * @param mapPath The file path to the .bin map file to load.
  */
 class GsViewerRenderer(
     private val context: Context,
-    private val mapPath: String
+    private val mapPath: String,
+    private val slamManager: SlamManager // INJECTED: Shared Engine
 ) : GLSurfaceView.Renderer {
-
-    // Engine
-    val slamManager = SlamManager()
 
     // Camera
     val camera = VirtualCamera()
@@ -30,12 +25,14 @@ class GsViewerRenderer(
     private var isModelLoaded = false
 
     fun cleanup() {
-        slamManager.destroy()
+        // We do NOT destroy the shared slamManager here.
+        // But we might want to clear the specific view state if needed.
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES30.glClearColor(0.05f, 0.05f, 0.05f, 1.0f) // Dark grey background for editor
+        GLES30.glClearColor(0.05f, 0.05f, 0.05f, 1.0f) // Dark grey background
 
+        // Ensure engine is ready (idempotent check inside manager)
         slamManager.initialize()
 
         // Load the model immediately on startup
@@ -57,7 +54,7 @@ class GsViewerRenderer(
             // 1. Push Virtual Camera Matrices to Engine
             slamManager.updateCamera(camera.viewMatrix, camera.projectionMatrix)
 
-            // 2. Render
+            // 2. Render shared point cloud
             slamManager.draw()
         }
     }

@@ -7,8 +7,15 @@ import androidx.activity.compose.setContent
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.nativebridge.ensureOpenCVLoaded
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MappingActivity : ComponentActivity() {
+
+    // INJECT THE SINGLETON ENGINE
+    @Inject lateinit var slamManager: SlamManager
 
     private var arRenderer: ArRenderer? = null
 
@@ -19,7 +26,8 @@ class MappingActivity : ComponentActivity() {
         setContent {
             GraffitiXRTheme {
                 MappingScreen(
-                    onMapSaved = { mapId -> 
+                    slamManager = slamManager, // Pass down to screen
+                    onMapSaved = { mapId ->
                         runOnUiThread {
                             Toast.makeText(this, "Map Saved: $mapId", Toast.LENGTH_SHORT).show()
                             finish()

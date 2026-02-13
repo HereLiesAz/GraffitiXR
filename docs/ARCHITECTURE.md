@@ -1,19 +1,38 @@
 # GRAFFITIXR ARCHITECTURE
 
 ## Philosophy
-GraffitiXR is a "Thick Client" implementation. The logic lives on the device. The cloud is non-existent.
+Local-first. Offline-dominant. Performance-critical.
 
-## High-Level Structure
-The application follows a standard **MVVM (Model-View-ViewModel)** pattern on the Android side, bridging into a **Custom Engine (MobileGS)** for the heavy lifting.
+## The Core: MobileGS (Native)
+The engine is a C++ implementation of Gaussian Splatting, optimized for Android.
+* **Location:** `core/nativebridge/src/main/cpp`
+* **Access:** Strictly via `SlamManager` (Kotlin).
 
+## The Bridge: SlamManager (Singleton)
+A Hilt-provided Singleton that lives as long as the Application.
+* **Role:** Manages the C++ pointer (`nativeHandle`).
+* **Injection:** `@Inject lateinit var slamManager: SlamManager`
+* **Lifecycle:** Initialized once. Destroyed never (practically).
+
+## The Build System
+* **Language:** Kotlin + C++17
+* **DI:** Hilt (via KSP)
+* **Build:** Gradle (Kotlin DSL)
+
+## Data Flow
 ```mermaid
 graph TD
-    UI[Compose UI] --> VM[ViewModels]
-    VM --> SM[SlamManager]
-    SM -- JNI Boundary --> CPP[GraffitiJNI.cpp]
-    CPP --> MGS[MobileGS Engine]
-    CPP --> CV[OpenCV Utils]
+    AR[AR Renderer] -- Depth/Pose --> SM[SlamManager]
+    ED[Editor ViewModel] -- Bitmap --> SM
+    SM -- JNI --> Cpp[Native Engine]
+    Cpp -- OpenGL --> Surface[GLSurfaceView]
 ```
+
+Security
+Network: Default trust anchors + User CAs (Debug).
+
+Analytics: Disabled.
+
 The Native Bridge (Unified)
 Previously a split system, the native bridge is now consolidated into a single pipeline.
 

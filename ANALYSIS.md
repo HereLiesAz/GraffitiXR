@@ -43,3 +43,43 @@
 1.  **Wire the Editor:** Implement `onRemoveBackgroundClicked` and `onLineDrawingClicked`.
 2.  **Unify Renderers:** Create a shared `SplatRenderer` class.
 3.  **Testing:** Stop ignoring tests and fix the `ArViewModelTest`.
+
+
+# GRAFFITIXR: AUTOPSY & ANALYSIS
+
+## STATUS: POST-OP (RECOVERING)
+**Date:** 02/13/2026
+**Condition:** The patient has survived the transplant. The `SlamManager` is now a Singleton, the Editor is wired to the brain, and we stopped the immune system (SSL) from rejecting the organs.
+
+---
+
+## 1. RECENT SURGERIES (COMPLETED)
+
+### [FIXED] The Dependency Injection Fracture
+* **Issue:** Multiple instances of `SlamManager` were causing split-brain physics.
+* **Fix:** Enforced `SingletonComponent` via Hilt.
+* **Correction:** Switched from `kapt` (dead) to `KSP` (alive) for annotation processing.
+
+### [FIXED] The Network Paranoia
+* **Issue:** App crashed on SSL handshake due to missing trust anchors (and likely `mitmproxy` interference).
+* **Fix:** Injected `network_security_config.xml` to trust User CAs and silenced Firebase analytics.
+
+### [FIXED] The Native Bridge Schism
+* **Issue:** Conflicting JNI entry points.
+* **Fix:** `GraffitiJNI` is dead. `SlamManager` is the sole monarch.
+
+---
+
+## 2. ACTIVE RISKS
+
+### A. The "Ghost" Renderer
+* **Severity:** MEDIUM
+* **Status:** Mitigated by Singleton, but context switching between AR and Editor SurfaceViews might still drop textures. Watch for black screens.
+
+### B. Testing Apathy
+* **Severity:** LOW
+* **Status:** Tests are still ignored. The code works, but we don't know *why* it works.
+
+## 3. NEXT STEPS
+* **Verify:** Run the app. If it crashes, check the logs for "dlopen failed" or Hilt injection errors.
+* **Refine:** The Edge Detection (Canny) parameters are hardcoded. Make them dynamic.
