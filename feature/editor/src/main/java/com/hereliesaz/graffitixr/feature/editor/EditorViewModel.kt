@@ -101,6 +101,14 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     }
 
+    fun onScaleChanged(scale: Float) {
+        updateActiveLayer { it.copy(scale = it.scale * scale) }
+    }
+
+    fun onOffsetChanged(offset: Offset) {
+        updateActiveLayer { it.copy(offset = it.offset + offset) }
+    }
+
     fun onRotationZChanged(rotation: Float) {
         updateActiveLayer { it.copy(rotationZ = it.rotationZ + rotation) }
     }
