@@ -1,36 +1,85 @@
-### 2. `ANALYSIS.md`
-*Changes: Updated to reflect the discovery of the fractured native engine and the plan to unify it.*
+# GRAFFITIXR: AUTOPSY & ANALYSIS
 
-# Codebase Analysis: The Autopsy
+## STATUS: POST-OP (STABLE)
+**Date:** 02/13/2026
+**Condition:** The patient is recovering from major reconstructive surgery on the Native Bridge. The schism between `GraffitiJNI` and `SlamManager` has been healed.
 
-**Date:** 2026-02-12
-**Status:** In-Progress (Critical Fixes Underway)
+---
 
-## The Good
-1.  **Teleological SLAM:** The `MobileGS` engine (in `core/nativebridge`) implements the "foreknowledge" concept using OpenCV features to match against a target image.
-2.  **Gaussian Splatting:** The `MobileGS` engine (in `core/nativebridge1`) implements a point cloud renderer using `GL_POINTS` and a chunk-based spatial hash map.
-3.  **Clean Architecture:** The Kotlin layers (`Domain`, `Data`, `Feature`) are well-separated and follow Hilt patterns correctly.
-4.  **MainViewModel:** Contrary to previous reports, `MainViewModel` is lean and handles only high-level app state (Touch Lock, Capture Flow). The complexity is correctly delegated to `ArViewModel` and `EditorViewModel`.
+## 1. CRITICAL ISSUES (Active)
 
-## The Bad (Critical Issues)
-### 1. Fractured Native Engine (The Schism)
-*   **Status:** **CRITICAL**.
-*   **Issue:** The native C++ implementation is split between two directories:
-    *   `core/nativebridge`: Contains the **Teleological SLAM** logic (OpenCV). This is the module linked in `settings.gradle.kts`.
-    *   `core/nativebridge1`: Contains the **Gaussian Splatting** logic (OpenGL). This module is **dead code** (unlinked) but contains essential functionality (`feedDepthData`, `draw`).
-*   **Consequence:** The app currently cannot do both target tracking and point cloud rendering. Calls to `SlamManager` (which expects Splatting features) will fail or crash because the JNI bindings are missing in the linked `core/nativebridge` library.
+### A. The "Ghost" Renderer
+* **Severity:** MEDIUM
+* **Symptoms:** `GsViewerRenderer` and `ArRenderer` are duplicated rendering pipelines.
+* **Diagnosis:** Both attempt to draw the point cloud, but `GsViewerRenderer` (Editor) likely re-initializes the engine or fights for context.
+* **Plan:** Abstract the `MobileGS` drawing calls so they can be injected into *any* GLSurfaceView renderer without re-initializing the physics engine.
 
-### 2. Missing JNI Bindings
-*   **Status:** **CRITICAL**.
-*   **Issue:** `SlamManager.kt` defines `external` functions (`feedDepthDataJni`, `drawJni`) whose C++ implementations reside in the unlinked `core/nativebridge1`. `GraffitiJNI.kt` defines `external` functions whose implementations are in `core/nativebridge`.
-*   **Fix:** We must merge the C++ code from `core/nativebridge1` into `core/nativebridge` and export all JNI functions from a single shared library.
+### B. The Lobotomized Editor
+* **Severity:** HIGH
+* **Symptoms:** `EditorViewModel` contains multiple `// TODO` blocks for core features (Background Removal, Edge Detection).
+* **Diagnosis:** The brain is there, but the nerves aren't connected to the muscles. `BackgroundRemover` and `ImageProcessor` exist but are uncalled.
+* **Plan:** Wire up the Coroutines in `EditorViewModel` to process Bitmaps off the main thread.
 
-## The Ugly (Fixed/In Progress)
-*   ~~**Monolithic MainViewModel:**~~ *FIXED.* Re-evaluation shows standard MVVM usage.
-*   **Incomplete Documentation:** Native code interactions were poorly documented, leading to this split. We are rectifying this by adding comprehensive KDoc to all modules.
+---
 
-## Action Plan
-1.  **Merge Native Code:** Combine `MobileGS.h/cpp` and `GraffitiJNI.cpp` from both locations into `core/nativebridge`.
-2.  **Link Libraries:** Ensure `CMakeLists.txt` links both GLESv3 (for Splatting) and OpenCV (for Teleology).
-3.  **Delete Dead Code:** Remove `core/nativebridge1`.
-4.  **Document:** Add KDoc to all Kotlin files to prevent future architectural drift.
+## 2. RESOLVED ISSUES
+
+### [FIXED] The Native Bridge Schism
+* **Issue:** Two conflicting entry points (`GraffitiJNI.kt` vs `SlamManager.kt`) caused linker errors and runtime crashes.
+* **Fix:** `GraffitiJNI.kt` was executed. `SlamManager.kt` was promoted to the sole JNI interface. `GraffitiJNI.cpp` was rewritten to route all calls through `Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_*`.
+* **Files Affected:** `SlamManager.kt`, `GraffitiJNI.cpp`.
+* **Deletions:** `GraffitiJNI.kt`, `SlamReflectionHelper.kt`.
+
+---
+
+## 3. ARCHITECTURAL OVERVIEW (Current)
+
+* **UI Layer:** Jetpack Compose (Kotlin)
+* **Logic Layer:** ViewModels (Kotlin)
+* **Bridge Layer:** `SlamManager` (Kotlin) <--> `GraffitiJNI.cpp` (C++)
+* **Engine Layer:** `MobileGS` (C++) + OpenCV (C++)
+
+## 4. NEXT STEPS
+1.  **Wire the Editor:** Implement `onRemoveBackgroundClicked` and `onLineDrawingClicked`.
+2.  **Unify Renderers:** Create a shared `SplatRenderer` class.
+3.  **Testing:** Stop ignoring tests and fix the `ArViewModelTest`.
+
+
+# GRAFFITIXR: AUTOPSY & ANALYSIS
+
+## STATUS: POST-OP (RECOVERING)
+**Date:** 02/13/2026
+**Condition:** The patient has survived the transplant. The `SlamManager` is now a Singleton, the Editor is wired to the brain, and we stopped the immune system (SSL) from rejecting the organs.
+
+---
+
+## 1. RECENT SURGERIES (COMPLETED)
+
+### [FIXED] The Dependency Injection Fracture
+* **Issue:** Multiple instances of `SlamManager` were causing split-brain physics.
+* **Fix:** Enforced `SingletonComponent` via Hilt.
+* **Correction:** Switched from `kapt` (dead) to `KSP` (alive) for annotation processing.
+
+### [FIXED] The Network Paranoia
+* **Issue:** App crashed on SSL handshake due to missing trust anchors (and likely `mitmproxy` interference).
+* **Fix:** Injected `network_security_config.xml` to trust User CAs and silenced Firebase analytics.
+
+### [FIXED] The Native Bridge Schism
+* **Issue:** Conflicting JNI entry points.
+* **Fix:** `GraffitiJNI` is dead. `SlamManager` is the sole monarch.
+
+---
+
+## 2. ACTIVE RISKS
+
+### A. The "Ghost" Renderer
+* **Severity:** MEDIUM
+* **Status:** Mitigated by Singleton, but context switching between AR and Editor SurfaceViews might still drop textures. Watch for black screens.
+
+### B. Testing Apathy
+* **Severity:** LOW
+* **Status:** Tests are still ignored. The code works, but we don't know *why* it works.
+
+## 3. NEXT STEPS
+* **Verify:** Run the app. If it crashes, check the logs for "dlopen failed" or Hilt injection errors.
+* **Refine:** The Edge Detection (Canny) parameters are hardcoded. Make them dynamic.

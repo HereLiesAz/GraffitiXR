@@ -1,16 +1,14 @@
 package com.hereliesaz.graffitixr.nativebridge
 
-import android.content.res.AssetManager
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import android.graphics.Bitmap
 import java.nio.ByteBuffer
+import javax.inject.Inject
+import javax.inject.Singleton
 
-/**
- * JNI Bridge to the MobileGS C++ Engine.
- * Synchronized with GraffitiJNI.cpp signatures.
- */
-class SlamManager {
+@Singleton
+class SlamManager @Inject constructor() {
+
+    private var nativeHandle: Long = 0
 
     companion object {
         init {
@@ -18,12 +16,9 @@ class SlamManager {
         }
     }
 
-    private var nativeHandle: Long = 0
-    private val _mappingQuality = MutableStateFlow(0f)
-    val mappingQuality: StateFlow<Float> = _mappingQuality.asStateFlow()
-
     /**
-     * Initialize the native engine and return a pointer handle.
+     * Initializes the native engine.
+     * Safe to call multiple times; internally checks if already initialized.
      */
     fun initialize() {
         if (nativeHandle == 0L) {
@@ -32,64 +27,36 @@ class SlamManager {
     }
 
     /**
-     * Clean up native resources.
+     * CRITICAL: Resets the OpenGL state (Program, VBOs) without deleting the map data.
+     * Must be called when the GLSurfaceView context changes (e.g. switching screens).
      */
+    fun resetGLState() {
+        if (nativeHandle != 0L) {
+            resetGLJni(nativeHandle)
+        }
+    }
+
     fun destroy() {
         if (nativeHandle != 0L) {
             destroyNativeJni(nativeHandle)
-            nativeHandle = 0L
-        }
-    }
-
-    /**
-     * Update camera matrices.
-     */
-    fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
-        if (nativeHandle != 0L) {
-            updateCameraJni(nativeHandle, viewMtx, projMtx)
-
-            // Update mapping quality metric based on point density
-            val points = getPointCountJni(nativeHandle)
-            _mappingQuality.value = (points / 2000f).coerceAtMost(1.0f)
-        }
-    }
-
-    /**
-     * Pass depth and color data to the SplaTAM engine.
-     * * @param depthBuffer Direct ByteBuffer containing depth data (Float, Meters)
-     * @param colorBuffer Direct ByteBuffer containing RGB data (Float 0..1 or Byte 0..255)
-     * @param width Width of the buffers
-     * @param height Height of the buffers
-     * @param pose 4x4 Model Matrix of the Camera (Column-Major)
-     * @param fov Vertical Field of View in Radians
-     */
-    fun feedDepthData(
-        depthBuffer: ByteBuffer,
-        colorBuffer: ByteBuffer?,
-        width: Int,
-        height: Int,
-        stride: Int,
-        pose: FloatArray,
-        fov: Float
-    ) {
-        if (nativeHandle != 0L) {
-            feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, stride, pose, fov)
-        }
-    }
-
-    /**
-     * Trigger OpenGL draw call.
-     */
-    fun draw() {
-        if (nativeHandle != 0L) {
-            drawJni(nativeHandle)
+            nativeHandle = 0
         }
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
-        if (nativeHandle != 0L) {
-            onSurfaceChangedJni(nativeHandle, width, height)
-        }
+        if (nativeHandle != 0L) onSurfaceChangedJni(nativeHandle, width, height)
+    }
+
+    fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
+        if (nativeHandle != 0L) updateCameraJni(nativeHandle, viewMtx, projMtx)
+    }
+
+    fun feedDepthData(depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, stride: Int, poseMtx: FloatArray, fov: Float) {
+        if (nativeHandle != 0L) feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, stride, poseMtx, fov)
+    }
+
+    fun draw() {
+        if (nativeHandle != 0L) drawJni(nativeHandle)
     }
 
     fun saveWorld(path: String): Boolean {
@@ -100,46 +67,51 @@ class SlamManager {
         return if (nativeHandle != 0L) loadWorld(nativeHandle, path) else false
     }
 
-    fun alignMap(transformMtx: FloatArray) {
-        if (nativeHandle != 0L) alignMapJni(nativeHandle, transformMtx)
-    }
-
     fun clearMap() {
-        if (nativeHandle != 0L) {
-            clearMapJni(nativeHandle)
-            _mappingQuality.value = 0f
-        }
+        if (nativeHandle != 0L) clearMapJni(nativeHandle)
     }
 
-    // --- Native JNI declarations (Private) ---
+    fun getPointCount(): Int {
+        return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
+    }
+
+    // NEW: Property to satisfy UI binding
+    val mappingQuality: String
+        get() {
+            val count = getPointCount()
+            return when {
+                count < 100 -> "POOR"
+                count < 1000 -> "FAIR"
+                count < 5000 -> "GOOD"
+                else -> "EXCELLENT"
+            }
+        }
+
+    // --- OpenCV Utils ---
+    fun detectEdges(bitmap: Bitmap): Bitmap? {
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        detectEdgesJni(bitmap, result)
+        return result
+    }
+
+    // --- Native Interface ---
     private external fun initNativeJni(): Long
+    private external fun resetGLJni(handle: Long) // NEW
     private external fun destroyNativeJni(handle: Long)
-    private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
-
-    // UPDATED SIGNATURE
-    private external fun feedDepthDataJni(
-        handle: Long,
-        depthBuffer: ByteBuffer,
-        colorBuffer: ByteBuffer?,
-        width: Int,
-        height: Int,
-        stride: Int,
-        pose: FloatArray,
-        fov: Float
-    )
-
-    private external fun drawJni(handle: Long)
-    private external fun getPointCountJni(handle: Long): Int
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
+    private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
+    private external fun feedDepthDataJni(handle: Long, depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, stride: Int, poseMtx: FloatArray, fov: Float)
+    private external fun drawJni(handle: Long)
     private external fun saveWorld(handle: Long, path: String): Boolean
     private external fun loadWorld(handle: Long, path: String): Boolean
-    private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
     private external fun clearMapJni(handle: Long)
+    private external fun pruneMapJni(handle: Long, ageThreshold: Int)
+    private external fun getPointCountJni(handle: Long): Int
+    private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
+    private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
 
-    // --- Legacy Compatibility Layer (Deprecated) ---
-    fun init(assetManager: AssetManager) = initialize()
-    fun getExternalTextureId(): Int = 0
-    fun update(timestampNs: Long, position: FloatArray, rotation: FloatArray) { }
-    fun draw(renderPointCloud: Boolean) = draw()
-    fun reset() { destroy(); initialize() }
+    // OpenCV
+    private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?
+    private external fun extractFeaturesMeta(bitmap: Bitmap): IntArray?
+    private external fun detectEdgesJni(srcBitmap: Bitmap, dstBitmap: Bitmap)
 }

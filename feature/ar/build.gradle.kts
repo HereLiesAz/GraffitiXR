@@ -45,10 +45,11 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    // FIX: Added for hiltViewModel()
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
-    // CRITICAL: Dependencies moved here from core:common
     implementation(libs.arcore.client)
-    implementation(project(":opencv")) // Local OpenCV module
+    implementation(project(":opencv"))
 
     implementation(libs.az.nav.rail)
     implementation(libs.androidx.activity.compose)

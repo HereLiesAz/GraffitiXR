@@ -12,7 +12,9 @@ import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * The Single Activity for the application.
@@ -20,6 +22,8 @@ import dagger.hilt.android.AndroidEntryPoint
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var slamManager: SlamManager
 
     private val mainViewModel: MainViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
@@ -36,15 +40,13 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val mainState by mainViewModel.uiState.collectAsState()
 
-                // If touch is locked, we might want to hide system bars or keep screen on
-                // Note: Ideally handled via WindowInsetsController or flags in a SideEffect
-
                 MainScreen(
                     viewModel = mainViewModel,
                     editorViewModel = editorViewModel,
                     arViewModel = arViewModel,
                     dashboardViewModel = dashboardViewModel,
                     navController = navController,
+                    slamManager = slamManager, // PASSED DOWN
                     onRendererCreated = { renderer ->
                         arRenderer = renderer
                     }
@@ -55,7 +57,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Renderer lifecycle handled by Composables now
     }
 
     override fun onPause() {
