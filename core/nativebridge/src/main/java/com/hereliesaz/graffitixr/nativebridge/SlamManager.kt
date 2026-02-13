@@ -1,36 +1,38 @@
 package com.hereliesaz.graffitixr.nativebridge
 
 import android.graphics.Bitmap
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import java.nio.ByteBuffer
+import javax.inject.Inject
+import javax.inject.Singleton
 
-/**
- * The Unified Native Interface.
- */
-class SlamManager {
+@Singleton
+class SlamManager @Inject constructor() {
 
     private var nativeHandle: Long = 0
 
-    private val _mappingQuality = MutableStateFlow(0f)
-    val mappingQuality: StateFlow<Float> = _mappingQuality.asStateFlow()
-
     companion object {
         init {
-            try {
-                System.loadLibrary("graffitixr")
-            } catch (e: UnsatisfiedLinkError) {
-                e.printStackTrace()
-            }
+            System.loadLibrary("graffitixr")
         }
     }
 
-    // --- Lifecycle ---
-
+    /**
+     * Initializes the native engine.
+     * Safe to call multiple times; internally checks if already initialized.
+     */
     fun initialize() {
         if (nativeHandle == 0L) {
             nativeHandle = initNativeJni()
+        }
+    }
+
+    /**
+     * CRITICAL: Resets the OpenGL state (Program, VBOs) without deleting the map data.
+     * Must be called when the GLSurfaceView context changes (e.g. switching screens).
+     */
+    fun resetGLState() {
+        if (nativeHandle != 0L) {
+            resetGLJni(nativeHandle)
         }
     }
 
@@ -41,136 +43,75 @@ class SlamManager {
         }
     }
 
-    // --- Camera & Rendering ---
-
     fun onSurfaceChanged(width: Int, height: Int) {
-        if (nativeHandle != 0L) {
-            onSurfaceChangedJni(nativeHandle, width, height)
-        }
+        if (nativeHandle != 0L) onSurfaceChangedJni(nativeHandle, width, height)
     }
 
-    fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
-        if (nativeHandle != 0L) {
-            updateCameraJni(nativeHandle, viewMatrix, projectionMatrix)
-        }
+    fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
+        if (nativeHandle != 0L) updateCameraJni(nativeHandle, viewMtx, projMtx)
+    }
+
+    fun feedDepthData(depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, stride: Int, poseMtx: FloatArray, fov: Float) {
+        if (nativeHandle != 0L) feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, stride, poseMtx, fov)
     }
 
     fun draw() {
-        if (nativeHandle != 0L) {
-            drawJni(nativeHandle)
-        }
+        if (nativeHandle != 0L) drawJni(nativeHandle)
     }
-
-    // --- Data Ingestion ---
-
-    fun feedDepthData(
-        depthBuffer: ByteBuffer,
-        colorBuffer: ByteBuffer?,
-        width: Int,
-        height: Int,
-        stride: Int,
-        pose: FloatArray,
-        fov: Float
-    ) {
-        if (nativeHandle != 0L) {
-            feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, stride, pose, fov)
-            val count = getPointCountJni(nativeHandle)
-            _mappingQuality.value = (count / 1000f).coerceIn(0f, 1f)
-        }
-    }
-
-    // --- Map Management ---
 
     fun saveWorld(path: String): Boolean {
-        if (nativeHandle == 0L) return false
-        return saveWorld(nativeHandle, path)
+        return if (nativeHandle != 0L) saveWorld(nativeHandle, path) else false
     }
 
     fun loadWorld(path: String): Boolean {
-        if (nativeHandle == 0L) return false
-        return loadWorld(nativeHandle, path)
+        return if (nativeHandle != 0L) loadWorld(nativeHandle, path) else false
     }
 
     fun clearMap() {
-        if (nativeHandle != 0L) {
-            clearMapJni(nativeHandle)
+        if (nativeHandle != 0L) clearMapJni(nativeHandle)
+    }
+
+    fun getPointCount(): Int {
+        return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
+    }
+
+    // NEW: Property to satisfy UI binding
+    val mappingQuality: String
+        get() {
+            val count = getPointCount()
+            return when {
+                count < 100 -> "POOR"
+                count < 1000 -> "FAIR"
+                count < 5000 -> "GOOD"
+                else -> "EXCELLENT"
+            }
         }
-    }
 
-    fun pruneMap(ageThreshold: Int) {
-        if (nativeHandle != 0L) {
-            pruneMapJni(nativeHandle, ageThreshold)
-        }
-    }
-
-    fun setTargetDescriptors(descriptors: ByteArray, rows: Int, cols: Int, type: Int) {
-        if (nativeHandle != 0L) {
-            setTargetDescriptorsJni(nativeHandle, descriptors, rows, cols, type)
-        }
-    }
-
-    fun alignMap(transformMatrix: FloatArray) {
-        if (nativeHandle != 0L) {
-            alignMapJni(nativeHandle, transformMatrix)
-        }
-    }
-
-    // --- OpenCV Utilities ---
-
-    fun extractFeatures(bitmap: Bitmap): ByteArray? {
-        return extractFeaturesFromBitmap(bitmap)
-    }
-
-    fun extractFeaturesMetadata(bitmap: Bitmap): IntArray? {
-        return extractFeaturesMeta(bitmap)
-    }
-
-    /**
-     * Runs Canny edge detection on the input bitmap and writes the result to a new Bitmap.
-     */
+    // --- OpenCV Utils ---
     fun detectEdges(bitmap: Bitmap): Bitmap? {
-        if (bitmap.config != Bitmap.Config.ARGB_8888) {
-            // Ensure config matches what JNI expects
-            // In a real app we might copy/convert here, but for now we assume correct input
-        }
-
-        val dst = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-        try {
-            detectEdgesJni(bitmap, dst)
-            return dst
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
-        }
+        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        detectEdgesJni(bitmap, result)
+        return result
     }
 
-    // --- Native Definitions ---
-
+    // --- Native Interface ---
     private external fun initNativeJni(): Long
+    private external fun resetGLJni(handle: Long) // NEW
     private external fun destroyNativeJni(handle: Long)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
+    private external fun feedDepthDataJni(handle: Long, depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, stride: Int, poseMtx: FloatArray, fov: Float)
     private external fun drawJni(handle: Long)
-    private external fun feedDepthDataJni(
-        handle: Long,
-        depthBuffer: ByteBuffer,
-        colorBuffer: ByteBuffer?,
-        width: Int,
-        height: Int,
-        stride: Int,
-        poseMatrix: FloatArray,
-        fov: Float
-    )
-    private external fun getPointCountJni(handle: Long): Int
     private external fun saveWorld(handle: Long, path: String): Boolean
     private external fun loadWorld(handle: Long, path: String): Boolean
     private external fun clearMapJni(handle: Long)
     private external fun pruneMapJni(handle: Long, ageThreshold: Int)
-    private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
+    private external fun getPointCountJni(handle: Long): Int
     private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
+    private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
 
-    // Stateless Utilities
+    // OpenCV
     private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?
     private external fun extractFeaturesMeta(bitmap: Bitmap): IntArray?
-    private external fun detectEdgesJni(src: Bitmap, dst: Bitmap)
+    private external fun detectEdgesJni(srcBitmap: Bitmap, dstBitmap: Bitmap)
 }

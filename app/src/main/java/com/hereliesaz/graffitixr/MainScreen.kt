@@ -57,23 +57,11 @@ import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.*
 import com.hereliesaz.graffitixr.feature.editor.GsViewer
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
-/**
- * The main screen composable that orchestrates the entire application UI.
- *
- * It composes the [GraffitiNavRail] (navigation side-bar), the main content area
- * (switching between [ArView], [GsViewer], etc.), and overlay dialogs/panels.
- *
- * @param viewModel The global application ViewModel.
- * @param editorViewModel ViewModel for the editor/canvas feature.
- * @param arViewModel ViewModel for AR features.
- * @param dashboardViewModel ViewModel for project management.
- * @param navController The navigation controller (unused, local one created inside).
- * @param onRendererCreated Callback invoked when the [ArRenderer] is initialized.
- */
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -81,6 +69,7 @@ fun MainScreen(
     arViewModel: ArViewModel,
     dashboardViewModel: DashboardViewModel,
     navController: NavController,
+    slamManager: SlamManager, // FIXED: Added
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val localNavController = rememberNavController()
@@ -192,7 +181,7 @@ fun MainScreen(
     val isRailVisible = !editorUiState.hideUiForCapture && !uiState.isTouchLocked
 
     AzHostActivityLayout(navController = localNavController) {
-        // --- 1. THE RAIL (Strictly Extracted) ---
+        // --- 1. THE RAIL ---
         if (isRailVisible) {
             GraffitiNavRail(
                 navStrings = navStrings,
@@ -228,6 +217,7 @@ fun MainScreen(
                         onPickBackground = {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
+                        slamManager = slamManager, // FIXED: Added
                         use3dBackground = use3dBackground
                     )
                 }
@@ -250,9 +240,9 @@ fun MainScreen(
                     }
                     composable("surveyor") {
                         MappingScreen(
-                            onMapSaved = { /* Optional callback */ },
-                            onExit = { localNavController.popBackStack() },
-                            onRendererCreated = { /* handled internally */ }
+                            onScanComplete = { localNavController.popBackStack() },
+                            onBackClick = { localNavController.popBackStack() },
+                            slamManager = slamManager // FIXED: Passed explicitly
                         )
                     }
                     composable("project_library") {
@@ -348,6 +338,7 @@ fun MainContentLayer(
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit,
     onPickBackground: () -> Unit,
+    slamManager: SlamManager, // FIXED: Added
     use3dBackground: Boolean = false
 ) {
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
@@ -363,6 +354,7 @@ fun MainContentLayer(
                 ArView(
                     viewModel = arViewModel,
                     uiState = arUiState,
+                    slamManager = slamManager, // FIXED: Passed
                     onRendererCreated = onRendererCreated
                 )
             }
@@ -370,6 +362,7 @@ fun MainContentLayer(
                 if (use3dBackground && !editorUiState.mapPath.isNullOrEmpty()) {
                     GsViewer(
                         mapPath = editorUiState.mapPath!!,
+                        slamManager = slamManager, // Assuming GsViewer also updated to take this?
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -394,6 +387,7 @@ fun MainContentLayer(
                 ArView(
                     viewModel = arViewModel,
                     uiState = arUiState.copy(showPointCloud = false),
+                    slamManager = slamManager, // FIXED: Passed
                     onRendererCreated = onRendererCreated
                 )
             }

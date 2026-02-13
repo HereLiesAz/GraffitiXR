@@ -11,16 +11,19 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 
 @Composable
 fun ArView(
     viewModel: ArViewModel,
     uiState: ArUiState,
+    slamManager: SlamManager, // FIXED: Added
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val renderer = remember { ArRenderer(context) }
+    // FIXED: Passed slamManager to constructor
+    val renderer = remember { ArRenderer(context, slamManager) }
 
     LaunchedEffect(renderer) { onRendererCreated(renderer) }
 

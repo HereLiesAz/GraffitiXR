@@ -8,7 +8,6 @@
 #include "MobileGS.h"
 
 // --- Helper Functions ---
-
 inline MobileGS* getEngine(jlong handle) {
     return reinterpret_cast<MobileGS*>(handle);
 }
@@ -17,15 +16,12 @@ inline MobileGS* getEngine(jlong handle) {
 bool bitmapToMat(JNIEnv *env, jobject bitmap, cv::Mat &dst, bool needGray) {
     AndroidBitmapInfo info;
     void *pixels = nullptr;
-
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) return false;
     if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return false;
-
     if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) return false;
 
     // Create Mat from raw pixels (RGBA)
     cv::Mat src(info.height, info.width, CV_8UC4, pixels);
-
     if (needGray) {
         cv::cvtColor(src, dst, cv::COLOR_RGBA2GRAY);
     } else {
@@ -40,14 +36,11 @@ bool bitmapToMat(JNIEnv *env, jobject bitmap, cv::Mat &dst, bool needGray) {
 bool matToBitmap(JNIEnv *env, const cv::Mat &src, jobject bitmap) {
     AndroidBitmapInfo info;
     void *pixels = nullptr;
-
     if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) return false;
     if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return false;
-
     if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) return false;
 
     cv::Mat dst(info.height, info.width, CV_8UC4, pixels);
-
     if (src.type() == CV_8UC1) {
         cv::cvtColor(src, dst, cv::COLOR_GRAY2RGBA);
     } else if (src.type() == CV_8UC3) {
@@ -69,6 +62,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *en
     auto *engine = new MobileGS();
     engine->initialize();
     return reinterpret_cast<jlong>(engine);
+}
+
+// NEW: Reset GL State
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle != 0) {
+        getEngine(handle)->resetGL();
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -114,7 +115,10 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject depthBuffer, jobject colorBuffer, jint width, jint height, jint stride, jfloatArray poseMatrix, jfloat fov) {
     if (handle == 0) return;
 
+    // SAFETY: Use GetDirectBufferAddress. Caller must ensure DirectByteBuffer.
     auto* depthData = (uint16_t*)env->GetDirectBufferAddress(depthBuffer);
+    if (!depthData) return; // FIX: Added nullptr check
+
     uint8_t* colorData = nullptr;
     if (colorBuffer != nullptr) {
         colorData = (uint8_t*)env->GetDirectBufferAddress(colorBuffer);
@@ -123,11 +127,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv 
     if (env->GetArrayLength(poseMatrix) < 16) return;
     jfloat* pose = env->GetFloatArrayElements(poseMatrix, nullptr);
 
-    if (depthData && pose) {
+    if (pose) {
         getEngine(handle)->feedDepthData(depthData, colorData, width, height, stride, pose, fov);
+        env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
     }
-
-    if (pose) env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
 }
 
 // --- Map Management ---
@@ -137,9 +140,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorld(JNIEnv *env, j
     if (handle == 0) return false;
     const char *nativePath = env->GetStringUTFChars(path, 0);
     if (!nativePath) return false;
-
     bool result = getEngine(handle)->saveModel(std::string(nativePath));
-
     env->ReleaseStringUTFChars(path, nativePath);
     return result;
 }
@@ -149,9 +150,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorld(JNIEnv *env, j
     if (handle == 0) return false;
     const char *nativePath = env->GetStringUTFChars(path, 0);
     if (!nativePath) return false;
-
     bool result = getEngine(handle)->loadModel(std::string(nativePath));
-
     env->ReleaseStringUTFChars(path, nativePath);
     return result;
 }
@@ -178,7 +177,6 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transformMtx) {
     if (handle == 0) return;
     if (env->GetArrayLength(transformMtx) < 16) return;
-
     jfloat* transform = env->GetFloatArrayElements(transformMtx, nullptr);
     if (transform) {
         getEngine(handle)->alignMap(transform);
@@ -189,7 +187,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env,
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(JNIEnv *env, jobject thiz, jlong handle, jbyteArray descriptorBytes, jint rows, jint cols, jint type) {
     if (handle == 0) return;
-
     jbyte* data = env->GetByteArrayElements(descriptorBytes, nullptr);
     if (data) {
         cv::Mat descriptors(rows, cols, type, (void*)data);
@@ -208,7 +205,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesFromBitma
     auto orb = cv::ORB::create();
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
-
     orb->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
 
     if (descriptors.empty()) return nullptr;
@@ -216,7 +212,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesFromBitma
     int size = descriptors.total() * descriptors.elemSize();
     jbyteArray result = env->NewByteArray(size);
     env->SetByteArrayRegion(result, 0, size, (jbyte*)descriptors.data);
-
     return result;
 }
 
@@ -228,7 +223,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesMeta(JNIE
     auto orb = cv::ORB::create();
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
-
     orb->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
 
     if (descriptors.empty()) return nullptr;
@@ -238,9 +232,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesMeta(JNIE
     meta[0] = descriptors.rows;
     meta[1] = descriptors.cols;
     meta[2] = descriptors.type();
-
     env->SetIntArrayRegion(result, 0, 3, meta);
-
     return result;
 }
 
@@ -251,7 +243,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_detectEdgesJni(JNIEnv *e
 
     cv::Mat edges;
     // Canny constants: 50, 150 are standard "reasonable" defaults.
-    // In a real post-modern tool, these would be variables, but for now, we hardcode.
     cv::Canny(gray, edges, 50, 150);
 
     // Invert: Edges (white) become black, Background (black) becomes white.

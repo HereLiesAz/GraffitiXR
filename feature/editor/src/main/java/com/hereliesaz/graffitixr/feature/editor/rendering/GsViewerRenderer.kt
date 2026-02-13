@@ -32,11 +32,14 @@ class GsViewerRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.05f, 0.05f, 0.05f, 1.0f) // Dark grey background
 
-        // Ensure engine is ready (idempotent check inside manager)
+        // CRITICAL: Reset Native GL State for this new Surface Context
+        slamManager.resetGLState()
+        // Re-initialize engine shaders
         slamManager.initialize()
 
         // Load the model immediately on startup
         if (mapPath.isNotEmpty()) {
+            // Note: loading might block, better off-thread in real app, but ok for now
             isModelLoaded = slamManager.loadWorld(mapPath)
         }
     }
