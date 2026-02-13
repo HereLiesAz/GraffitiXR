@@ -232,8 +232,8 @@ fun MainScreen(
                                             viewModel.onConfirmTargetCreation()
                                         }
                                     } else {
-                                        // Fallback if save fails (just close or log)
                                         withContext(Dispatchers.Main) {
+                                            android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
                                             viewModel.onConfirmTargetCreation()
                                         }
                                     }

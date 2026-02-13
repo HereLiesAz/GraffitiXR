@@ -112,7 +112,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_drawJni(JNIEnv *env, job
 // --- Data Ingestion ---
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject depthBuffer, jobject colorBuffer, jint width, jint height, jint stride, jfloatArray poseMatrix, jfloat fov) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject depthBuffer, jobject colorBuffer, jint width, jint height, jint depthStride, jint colorStride, jfloatArray poseMatrix, jfloat fov) {
     if (handle == 0) return;
 
     // SAFETY: Use GetDirectBufferAddress. Caller must ensure DirectByteBuffer.
@@ -128,7 +128,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv 
     jfloat* pose = env->GetFloatArrayElements(poseMatrix, nullptr);
 
     if (pose) {
-        getEngine(handle)->feedDepthData(depthData, colorData, width, height, stride, pose, fov);
+        getEngine(handle)->feedDepthData(depthData, colorData, width, height, depthStride, colorStride, pose, fov);
         env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
     }
 }

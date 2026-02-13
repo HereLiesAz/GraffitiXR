@@ -51,8 +51,8 @@ class SlamManager @Inject constructor() {
         if (nativeHandle != 0L) updateCameraJni(nativeHandle, viewMtx, projMtx)
     }
 
-    fun feedDepthData(depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, stride: Int, poseMtx: FloatArray, fov: Float) {
-        if (nativeHandle != 0L) feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, stride, poseMtx, fov)
+    fun feedDepthData(depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float) {
+        if (nativeHandle != 0L) feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, depthStride, colorStride, poseMtx, fov)
     }
 
     fun draw() {
@@ -100,7 +100,7 @@ class SlamManager @Inject constructor() {
     private external fun destroyNativeJni(handle: Long)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
-    private external fun feedDepthDataJni(handle: Long, depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, stride: Int, poseMtx: FloatArray, fov: Float)
+    private external fun feedDepthDataJni(handle: Long, depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float)
     private external fun drawJni(handle: Long)
     private external fun saveWorld(handle: Long, path: String): Boolean
     private external fun loadWorld(handle: Long, path: String): Boolean

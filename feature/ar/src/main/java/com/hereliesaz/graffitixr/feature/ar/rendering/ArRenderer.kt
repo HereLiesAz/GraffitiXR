@@ -325,6 +325,7 @@ class ArRenderer(
                         width,
                         height,
                         stride,
+                        COLOR_WIDTH * 4,
                         modelMatrix,
                         60.0f * (3.14159f / 180f)
                     )

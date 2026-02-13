@@ -64,10 +64,10 @@ class PlaneRenderer {
             if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
                 continue
             }
-
+            
             val color = calculatePlaneColor(plane, cameraPose)
             GLES20.glUniform4fv(planeColorUniform, 1, color, 0)
-
+            
             drawPlane(plane, viewMatrix, projectionMatrix)
         }
 
@@ -98,7 +98,15 @@ class PlaneRenderer {
         GLES20.glDisableVertexAttribArray(posAttr)
     }
 
-    fun calculatePlaneColor(plane: Plane, cameraPose: Pose): FloatArray {
+    // --- Classification Logic ---
+
+    enum class PlaneMatchResult {
+        MATCH,      // Green: Parallel and close enough
+        NO_MATCH,   // Pink: Perpendicular
+        SUBOPTIMAL  // Cyan: Parallel but too far/suboptimal angle
+    }
+
+    fun classifyPlane(plane: Plane, cameraPose: Pose): PlaneMatchResult {
         val planeNormal = FloatArray(4)
         plane.centerPose.getTransformedAxis(1, 1.0f, planeNormal, 0) // Y axis is normal
 
@@ -108,25 +116,32 @@ class PlaneRenderer {
         val dot = planeNormal[0] * cameraForward[0] + planeNormal[1] * cameraForward[1] + planeNormal[2] * cameraForward[2]
         val absDot = abs(dot)
 
-        // Green: Parallel (facing each other)
-        // Pink: Perpendicular
-        // Cyan: Parallel but not close enough
+        // Dot product close to 0 means perpendicular (normal perpendicular to view dir)
+        // Dot product close to 1 means parallel (normal parallel to view dir)
 
-        return if (absDot < 0.3f) {
-             floatArrayOf(1.0f, 0.4f, 0.7f, 0.3f) // Pink
+        if (absDot < 0.3f) {
+            return PlaneMatchResult.NO_MATCH // Perpendicular
         } else if (absDot > 0.7f) {
-             val dist = calculateDistance(plane.centerPose, cameraPose)
-             if (dist < 3.0f) { // 3 meters
-                 floatArrayOf(0.0f, 1.0f, 0.0f, 0.3f) // Green
-             } else {
-                 floatArrayOf(0.0f, 1.0f, 1.0f, 0.3f) // Cyan
-             }
+            val dist = calculateDistance(plane.centerPose, cameraPose)
+            return if (dist < 3.0f) {
+                PlaneMatchResult.MATCH // Parallel and Close
+            } else {
+                PlaneMatchResult.SUBOPTIMAL // Parallel but Far
+            }
         } else {
-             floatArrayOf(0.0f, 1.0f, 1.0f, 0.3f) // Cyan (intermediate)
+            return PlaneMatchResult.SUBOPTIMAL // Intermediate Angle
         }
     }
 
-    fun calculateDistance(p1: Pose, p2: Pose): Float {
+    fun calculatePlaneColor(plane: Plane, cameraPose: Pose): FloatArray {
+        return when (classifyPlane(plane, cameraPose)) {
+            PlaneMatchResult.MATCH -> floatArrayOf(0.0f, 1.0f, 0.0f, 0.3f)       // Green
+            PlaneMatchResult.NO_MATCH -> floatArrayOf(1.0f, 0.4f, 0.7f, 0.3f)    // Pink
+            PlaneMatchResult.SUBOPTIMAL -> floatArrayOf(0.0f, 1.0f, 1.0f, 0.3f)  // Cyan
+        }
+    }
+    
+    private fun calculateDistance(p1: Pose, p2: Pose): Float {
         val dx = p1.tx() - p2.tx()
         val dy = p1.ty() - p2.ty()
         val dz = p1.tz() - p2.tz()
