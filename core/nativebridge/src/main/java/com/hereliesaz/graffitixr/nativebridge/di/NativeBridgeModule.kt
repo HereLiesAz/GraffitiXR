@@ -1,9 +1,11 @@
 package com.hereliesaz.graffitixr.nativebridge.di
 
+import android.content.Context
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -13,11 +15,7 @@ object NativeBridgeModule {
 
     @Provides
     @Singleton
-    fun provideSlamManager(): SlamManager {
-        val manager = SlamManager()
-        // Initialize the engine immediately upon creation to ensure it's ready
-        // for any consumer (AR or Editor).
-        manager.initialize()
-        return manager
+    fun provideSlamManager(@ApplicationContext context: Context): SlamManager {
+        return SlamManager(context)
     }
 }

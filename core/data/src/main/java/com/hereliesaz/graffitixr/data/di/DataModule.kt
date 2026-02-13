@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.data.di
 
 import android.content.Context
+import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.Module
@@ -16,7 +17,16 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideProjectRepository(@ApplicationContext context: Context): ProjectRepository {
-        return ProjectRepositoryImpl(context)
+    fun provideProjectManager(@ApplicationContext context: Context): ProjectManager {
+        return ProjectManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideProjectRepository(
+        @ApplicationContext context: Context,
+        projectManager: ProjectManager
+    ): ProjectRepository {
+        return ProjectRepositoryImpl(context, projectManager)
     }
 }
