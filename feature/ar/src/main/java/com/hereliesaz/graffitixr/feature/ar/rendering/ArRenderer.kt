@@ -52,6 +52,13 @@ class ArRenderer(
     private var viewportHeight = 0
     private var isDepthSupported = false
 
+    /**
+     * Optional reference to the [GLSurfaceView] this renderer is attached to.
+     * If set, [onResume] and [onPause] will automatically manage the view's lifecycle
+     * to prevent race conditions with the ARCore session.
+     */
+    var glSurfaceView: GLSurfaceView? = null
+
     // Safety flag for ARCore texture binding
     @Volatile
     private var isCameraTextureInitialized = false
@@ -110,12 +117,17 @@ class ArRenderer(
         try {
             session?.resume()
             isResumed = true
+            // Resume the GL thread AFTER the session is ready
+            glSurfaceView?.onResume()
         } catch (e: CameraNotAvailableException) {
             Log.e(TAG, "Camera not available", e)
         }
     }
 
     override fun onPause(owner: LifecycleOwner) {
+        // CRITICAL: Pause the GLSurfaceView FIRST. This blocks until the render thread is idle,
+        // ensuring no more calls to session.update() happen before session.pause().
+        glSurfaceView?.onPause()
         isResumed = false
         session?.pause()
     }
@@ -185,6 +197,9 @@ class ArRenderer(
         }
 
         try {
+            // Re-check isResumed right before update to minimize race window
+            if (!isResumed) return
+
             val frame = currentSession.update()
             val camera = frame.camera
 

@@ -63,6 +63,9 @@ fun MappingScreen(
                     renderer = r
                     setRenderer(r)
                     renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                    
+                    // Link the view to the renderer for lifecycle synchronization
+                    r.glSurfaceView = this
 
                     // Attach lifecycle
                     lifecycleOwner.lifecycle.addObserver(r)

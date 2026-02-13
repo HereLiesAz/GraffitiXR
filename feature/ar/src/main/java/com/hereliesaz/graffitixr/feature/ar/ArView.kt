@@ -53,6 +53,9 @@ fun ArView(
                 setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                 setRenderer(renderer)
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                
+                // Link the view to the renderer for lifecycle synchronization
+                renderer.glSurfaceView = this
             }
         },
         modifier = Modifier.fillMaxSize()
