@@ -12,6 +12,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 
@@ -20,6 +21,7 @@ fun ArView(
     viewModel: ArViewModel,
     uiState: ArUiState,
     slamManager: SlamManager, // FIXED: Added
+    activeLayer: Layer? = null,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val context = LocalContext.current
@@ -46,6 +48,7 @@ fun ArView(
 
     LaunchedEffect(uiState.isFlashlightOn) { renderer.setFlashlight(uiState.isFlashlightOn) }
     LaunchedEffect(uiState.showPointCloud) { renderer.showPointCloud = uiState.showPointCloud }
+    LaunchedEffect(activeLayer) { renderer.setLayer(activeLayer) }
 
     AndroidView(
         factory = { ctx ->

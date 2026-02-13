@@ -12,6 +12,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
@@ -21,6 +22,7 @@ import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
@@ -47,6 +49,7 @@ class ArRenderer(
     private val backgroundRenderer = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
+    private val projectedImageRenderer = ProjectedImageRenderer()
     private val yuvToRgbConverter = YuvToRgbConverter(context)
 
     // State
@@ -56,6 +59,17 @@ class ArRenderer(
     private var isDepthSupported = false
 
     private val tapQueue = ConcurrentLinkedQueue<PointF>()
+
+    // Anchor State
+    private var anchor: Anchor? = null
+    private var activeLayer: Layer? = null
+
+    fun setLayer(layer: Layer?) {
+        activeLayer = layer
+        if (layer != null) {
+            projectedImageRenderer.setBitmap(layer.bitmap)
+        }
+    }
 
     fun handleTap(x: Float, y: Float) {
         tapQueue.offer(PointF(x, y))
@@ -73,10 +87,14 @@ class ArRenderer(
                 if (color[1] > 0.8f && color[2] < 0.2f) {
                     // Valid Green Surface
                     Log.d(TAG, "Valid Surface Selected")
+
+                    // Anchor Logic
+                    anchor?.detach()
+                    anchor = trackable.createAnchor(hit.hitPose)
+
                     Handler(Looper.getMainLooper()).post {
                         Toast.makeText(context, "Surface Selected", Toast.LENGTH_SHORT).show()
                     }
-                    // TODO: Place anchor or emit event
                     break
                 }
             }
@@ -193,6 +211,7 @@ class ArRenderer(
             backgroundRenderer.createOnGlThread(context)
             planeRenderer.createOnGlThread(context)
             pointCloudRenderer.createOnGlThread(context)
+            projectedImageRenderer.createOnGlThread(context)
 
             // Mark as needs initialization since we have a texture ID now
             isCameraTextureInitialized = false
@@ -249,6 +268,13 @@ class ArRenderer(
             if (camera.trackingState == TrackingState.TRACKING) {
                 // Draw Planes (Helper)
                 planeRenderer.drawPlanes(currentSession, viewMatrix, projectionMatrix, camera.pose)
+
+                // Draw Anchored Image
+                anchor?.let {
+                    if (it.trackingState == TrackingState.TRACKING && activeLayer != null) {
+                        projectedImageRenderer.draw(viewMatrix, projectionMatrix, it, activeLayer!!)
+                    }
+                }
 
                 // Handle Taps
                 val tap = tapQueue.poll()

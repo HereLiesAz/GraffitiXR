@@ -380,6 +380,8 @@ fun MainContentLayer(
         val onCycle: () -> Unit = editorViewModel::onCycleRotationAxis
         val onStart: () -> Unit = editorViewModel::onGestureStart
 
+        val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
+
         when (editorUiState.editorMode) {
             EditorMode.AR -> {
                 // FIXED: Passing slamManager
@@ -387,6 +389,7 @@ fun MainContentLayer(
                     viewModel = arViewModel,
                     uiState = arUiState,
                     slamManager = slamManager,
+                    activeLayer = activeLayer,
                     onRendererCreated = onRendererCreated
                 )
             }
@@ -422,6 +425,7 @@ fun MainContentLayer(
                     viewModel = arViewModel,
                     uiState = arUiState.copy(showPointCloud = false),
                     slamManager = slamManager,
+                    activeLayer = activeLayer,
                     onRendererCreated = onRendererCreated
                 )
             }

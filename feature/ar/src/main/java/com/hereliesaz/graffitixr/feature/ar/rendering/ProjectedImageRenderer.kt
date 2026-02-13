@@ -7,7 +7,7 @@ import android.opengl.GLUtils
 import android.opengl.Matrix
 import androidx.compose.ui.graphics.BlendMode
 import com.google.ar.core.Anchor
-import com.hereliesaz.graffitixr.common.model.OverlayLayer
+import com.hereliesaz.graffitixr.common.model.Layer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -89,7 +89,7 @@ class ProjectedImageRenderer {
         }
     }
 
-    fun draw(viewMtx: FloatArray, projMtx: FloatArray, anchor: Anchor, layer: OverlayLayer) {
+    fun draw(viewMtx: FloatArray, projMtx: FloatArray, anchor: Anchor, layer: Layer) {
         if (!isTextureLoaded && pendingBitmap == null) return
         updateTexture()
         GLES30.glUseProgram(program)

@@ -22,6 +22,7 @@ class PlaneRenderer {
     private var planeModelViewProjectionUniform = 0
     private var gridControlUniform = 0
     private var planeColorUniform = 0
+    private var isOutlineUniform = 0
 
     // Buffers
     private val vertexBuffer = ByteBuffer.allocateDirect(1000 * 4) // Reusable buffer (Float = 4 bytes)
@@ -48,6 +49,7 @@ class PlaneRenderer {
         planeModelViewProjectionUniform = GLES20.glGetUniformLocation(planeProgram, "u_PlaneModelViewProjection")
         gridControlUniform = GLES20.glGetUniformLocation(planeProgram, "u_gridControl")
         planeColorUniform = GLES20.glGetUniformLocation(planeProgram, "u_Color")
+        isOutlineUniform = GLES20.glGetUniformLocation(planeProgram, "u_IsOutline")
     }
 
     fun drawPlanes(session: Session, viewMatrix: FloatArray, projectionMatrix: FloatArray, cameraPose: Pose) {
@@ -91,10 +93,19 @@ class PlaneRenderer {
         GLES20.glUniformMatrix4fv(planeModelUniform, 1, false, modelMatrix, 0)
         GLES20.glUniformMatrix4fv(planeModelViewProjectionUniform, 1, false, modelViewProjectionMatrix, 0)
 
-        val posAttr = GLES20.glGetAttribLocation(planeProgram, "a_Position")
+        val posAttr = GLES20.glGetAttribLocation(planeProgram, "a_PositionXZ")
         GLES20.glEnableVertexAttribArray(posAttr)
         GLES20.glVertexAttribPointer(posAttr, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
+
+        // Draw Fill
+        GLES20.glUniform1i(isOutlineUniform, 0)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, count)
+
+        // Draw Outline
+        GLES20.glUniform1i(isOutlineUniform, 1)
+        GLES20.glLineWidth(5.0f)
+        GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, count)
+
         GLES20.glDisableVertexAttribArray(posAttr)
     }
 
@@ -121,7 +132,7 @@ class PlaneRenderer {
 
         if (absDot < 0.3f) {
             return PlaneMatchResult.NO_MATCH // Perpendicular
-        } else if (absDot > 0.7f) {
+        } else if (absDot > 0.95f) {
             val dist = calculateDistance(plane.centerPose, cameraPose)
             return if (dist < 3.0f) {
                 PlaneMatchResult.MATCH // Parallel and Close

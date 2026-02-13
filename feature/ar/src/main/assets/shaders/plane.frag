@@ -4,8 +4,13 @@ in vec3 v_WorldPos;
 in vec2 v_TexCoord;
 uniform float u_gridControl;
 uniform vec4 u_Color;
+uniform int u_IsOutline;
 out vec4 FragColor;
 void main() {
+    if (u_IsOutline == 1) {
+        FragColor = u_Color;
+        return;
+    }
     float gridSize = 0.5;
     float thickness = 0.02;
     vec3 gridColor = u_Color.rgb;
