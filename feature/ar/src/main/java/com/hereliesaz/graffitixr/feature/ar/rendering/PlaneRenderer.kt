@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
 import android.opengl.GLES20
+import android.opengl.GLES30
 import android.opengl.Matrix
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
@@ -29,9 +30,11 @@ class PlaneRenderer {
     private val modelViewProjectionMatrix = FloatArray(16)
 
     fun createOnGlThread(context: Context) {
-        // INLINED SHADERS to prevent asset loading errors
-        val vertexShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_VERTEX_SHADER, VERTEX_SHADER)
-        val passthroughShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER)
+        val vertexShaderCode = context.assets.open("shaders/plane.vert").bufferedReader().use { it.readText() }
+        val fragmentShaderCode = context.assets.open("shaders/plane.frag").bufferedReader().use { it.readText() }
+
+        val vertexShader = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_VERTEX_SHADER, vertexShaderCode)
+        val passthroughShader = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_FRAGMENT_SHADER, fragmentShaderCode)
 
         planeProgram = GLES20.glCreateProgram()
         GLES20.glAttachShader(planeProgram, vertexShader)

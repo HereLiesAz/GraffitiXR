@@ -13,4 +13,11 @@ class GraffitiApplication : Application() {
         super.onCreate()
         // Initialization logic handled by Hilt modules.
     }
+
+    companion object {
+        init {
+            System.loadLibrary("opencv_java4")
+            System.loadLibrary("graffitixr")
+        }
+    }
 }
