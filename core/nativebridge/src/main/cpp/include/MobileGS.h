@@ -6,8 +6,12 @@
 #include <unordered_map>
 #include <mutex>
 #include <cmath>
+#include <fstream>
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
+
+// OpenCV Support
+#include <opencv2/core.hpp>
 
 /**
  * Represents a single Gaussian Splat (or point) in the 3D world.
@@ -17,6 +21,7 @@ struct Splat {
     float nx, ny, nz;     ///< Normal vector (unused currently)
     float radius;         ///< Radius of the splat
     uint8_t r, g, b;      ///< Color (RGB 0-255)
+    uint8_t pad;          ///< Padding for alignment
     float confidence;     ///< Confidence score of the point (0.0-1.0)
     uint32_t lastSeenFrame; ///< Frame index when this point was last updated
     float luminance;      ///< Calculated luminance for culling
@@ -69,28 +74,23 @@ public:
 
     /**
      * Ingests a new depth frame from ARCore and fuses it into the map.
-     *
-     * @param depthPixels Pointer to 16-bit depth image buffer (millimeters).
-     * @param colorPixels Pointer to color buffer (optional, can be null).
-     * @param width Width of the depth image.
-     * @param height Height of the depth image.
-     * @param stride Row stride of the depth image in bytes.
-     * @param cameraPose 4x4 Column-Major matrix representing camera pose in world space.
-     * @param fov Vertical Field of View in radians.
      */
     void feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
             int width, int height, int stride, const float* cameraPose, float fov);
 
     /**
+     * Sets the visual descriptors of the target (digital art) that we want to track.
+     * This acts as the "Ground Truth" for Teleological SLAM.
+     */
+    void setTargetDescriptors(const cv::Mat& descriptors);
+
+    /**
      * Initializes the OpenGL context (shaders, buffers).
-     * Must be called on the GL thread.
      */
     void initialize();
 
     /**
      * Updates the camera matrices for the next draw call.
-     * @param view 4x4 View Matrix.
-     * @param proj 4x4 Projection Matrix.
      */
     void updateCamera(const float* view, const float* proj);
 
@@ -117,6 +117,10 @@ private:
     glm::mat4 mStoredView;
     glm::mat4 mStoredProj;
     int mScreenWidth, mScreenHeight;
+
+    // Teleological Data
+    cv::Mat mTargetDescriptors;
+    bool mHasTarget = false;
 
     std::unordered_map<ChunkKey, Chunk, ChunkKeyHash> mChunks;
     std::mutex mChunkMutex;

@@ -78,6 +78,21 @@ class SlamManager {
     }
 
     /**
+     * Sets the target descriptors (Fingerprint) for Teleological drift correction.
+     * The engine will use these to attempt to snap the coordinate system to the artwork.
+     *
+     * @param descriptorBytes Raw byte array of the ORB descriptors.
+     * @param rows Number of descriptors (features).
+     * @param cols Size of each descriptor (usually 32 for ORB).
+     * @param type OpenCV matrix type (usually CV_8U).
+     */
+    fun setTargetDescriptors(descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int) {
+        if (nativeHandle != 0L) {
+            setTargetDescriptorsJni(nativeHandle, descriptorBytes, rows, cols, type)
+        }
+    }
+
+    /**
      * Trigger OpenGL draw call.
      */
     fun draw() {
@@ -116,7 +131,6 @@ class SlamManager {
     private external fun destroyNativeJni(handle: Long)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
 
-    // UPDATED SIGNATURE
     private external fun feedDepthDataJni(
         handle: Long,
         depthBuffer: ByteBuffer,
@@ -126,6 +140,14 @@ class SlamManager {
         stride: Int,
         pose: FloatArray,
         fov: Float
+    )
+
+    private external fun setTargetDescriptorsJni(
+        handle: Long,
+        descriptorBytes: ByteArray,
+        rows: Int,
+        cols: Int,
+        type: Int
     )
 
     private external fun drawJni(handle: Long)

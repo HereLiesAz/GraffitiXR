@@ -4,6 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 
 #define LOG_TAG "MobileGS"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -132,27 +133,32 @@ void MobileGS::initialize() {
 }
 
 /**
+ * Stores the target descriptors for teleological correction.
+ * This does not yet trigger relocalization, but primes the engine with the target data.
+ */
+void MobileGS::setTargetDescriptors(const cv::Mat& descriptors) {
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+    descriptors.copyTo(mTargetDescriptors);
+    mHasTarget = !mTargetDescriptors.empty();
+    LOGI("MobileGS: Target descriptors set. Rows: %d, Cols: %d", mTargetDescriptors.rows, mTargetDescriptors.cols);
+}
+
+/**
  * Projects depth pixels into 3D world space and adds them to the point cloud.
- * Currently uses a naive "add everything" approach with spatial hashing in Chunks.
  */
 void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
-                             int width, int height, int stride, const float* cameraPose, float fov) {
+        int width, int height, int stride, const float* cameraPose, float fov) {
     if (!depthPixels) return;
 
     // Intrinsics
-    // Assuming vertical FOV and aspect ratio
     float aspect = (float)width / (float)height;
     // fov is vertical fov in radians
-    // fy = h / (2 * tan(fov/2))
     float fy = height / (2.0f * tan(fov / 2.0f));
-    float fx = fy; // Square pixels? width / (2 * tan(hfov/2))?
-    // If we assume same focal length for x and y
+    float fx = fy;
     float cx = width / 2.0f;
     float cy = height / 2.0f;
 
     std::vector<Splat> newSplats;
-    // stride is in bytes. DEPTH16 is 2 bytes/pixel.
-    // So row stride in pixels (shorts) is stride / 2.
     int rowStrideShorts = stride / 2;
 
     for (int v = 0; v < height; v += SAMPLE_STRIDE) {
@@ -191,8 +197,7 @@ void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixe
         }
 
         Chunk& chunk = mChunks[key];
-        // Simple append with limit
-        if (chunk.splatCount < MAX_SPLATS / 10) { // Distribute max splats across chunks roughly
+        if (chunk.splatCount < MAX_SPLATS / 10) {
             chunk.splats.push_back(s);
             chunk.splatCount++;
             chunk.isDirty = true;
@@ -207,7 +212,6 @@ void MobileGS::updateCamera(const float* view, const float* proj) {
 }
 
 void MobileGS::draw() {
-    // Compile shader if not compiled
     if (mProgram == 0) {
         mProgram = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
         mLocMVP = glGetUniformLocation(mProgram, "uMVP");
@@ -216,9 +220,6 @@ void MobileGS::draw() {
 
     glUseProgram(mProgram);
 
-    // Compute MVP
-    // We need View and Proj from updateCamera
-    // Multiplied
     glm::mat4 vp = mStoredProj * mStoredView;
     glUniformMatrix4fv(mLocMVP, 1, GL_FALSE, &vp[0][0]);
     glUniform1f(mLocPointSize, 15.0f); // Default point size
@@ -231,9 +232,6 @@ void MobileGS::draw() {
         if (chunk.isDirty) {
             if (chunk.vbo == 0) glGenBuffers(1, &chunk.vbo);
             glBindBuffer(GL_ARRAY_BUFFER, chunk.vbo);
-            // We need to pack data for VBO
-            // Position (3f), Color (3f), Opacity (1f)?
-            // Shader expects: 0: vec3 pos, 1: vec3 color, 2: float opacity
 
             std::vector<float> vboData;
             vboData.reserve(chunk.splats.size() * 7);
@@ -291,13 +289,97 @@ void MobileGS::clear() {
 }
 
 bool MobileGS::saveModel(std::string path) {
-    // Stub - Persistence not implemented yet
-    return false;
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+    std::ofstream outFile(path, std::ios::binary);
+    if (!outFile.is_open()) {
+        LOGE("Failed to open file for writing: %s", path.c_str());
+        return false;
+    }
+
+    const char magic[] = "GXRM";
+    outFile.write(magic, 4);
+
+    int32_t version = 1;
+    outFile.write(reinterpret_cast<const char*>(&version), sizeof(version));
+
+    int32_t totalSplats = 0;
+    for (const auto& pair : mChunks) {
+        totalSplats += pair.second.splatCount;
+    }
+    outFile.write(reinterpret_cast<const char*>(&totalSplats), sizeof(totalSplats));
+
+    LOGI("Saving model to %s. Splats: %d", path.c_str(), totalSplats);
+
+    for (const auto& pair : mChunks) {
+        const Chunk& chunk = pair.second;
+        if (!chunk.splats.empty()) {
+            outFile.write(reinterpret_cast<const char*>(chunk.splats.data()), chunk.splats.size() * sizeof(Splat));
+        }
+    }
+
+    outFile.close();
+    return true;
 }
 
 bool MobileGS::loadModel(std::string path) {
-    // Stub - Persistence not implemented yet
-    return false;
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+
+    for (auto& pair : mChunks) {
+        if (pair.second.vbo != 0) {
+            glDeleteBuffers(1, &pair.second.vbo);
+        }
+    }
+    mChunks.clear();
+
+    std::ifstream inFile(path, std::ios::binary);
+    if (!inFile.is_open()) {
+        LOGE("Failed to open file for reading: %s", path.c_str());
+        return false;
+    }
+
+    char magic[4];
+    inFile.read(magic, 4);
+    if (strncmp(magic, "GXRM", 4) != 0) {
+        LOGE("Invalid file format (Magic mismatch)");
+        return false;
+    }
+
+    int32_t version;
+    inFile.read(reinterpret_cast<char*>(&version), sizeof(version));
+    if (version != 1) {
+        LOGE("Unsupported version: %d", version);
+        return false;
+    }
+
+    int32_t totalSplats;
+    inFile.read(reinterpret_cast<char*>(&totalSplats), sizeof(totalSplats));
+
+    LOGI("Loading model from %s. Splats: %d", path.c_str(), totalSplats);
+
+    const int BATCH_SIZE = 10000;
+    std::vector<Splat> buffer(BATCH_SIZE);
+    int splatsRead = 0;
+
+    while (splatsRead < totalSplats) {
+        int toRead = std::min(BATCH_SIZE, totalSplats - splatsRead);
+        inFile.read(reinterpret_cast<char*>(buffer.data()), toRead * sizeof(Splat));
+
+        for (int i = 0; i < toRead; ++i) {
+            Splat& s = buffer[i];
+            ChunkKey key = getChunkKey(s.x, s.y, s.z);
+            if (mChunks.find(key) == mChunks.end()) {
+                mChunks[key] = Chunk();
+            }
+            Chunk& chunk = mChunks[key];
+            chunk.splats.push_back(s);
+            chunk.splatCount++;
+            chunk.isDirty = true;
+        }
+        splatsRead += toRead;
+    }
+
+    inFile.close();
+    return true;
 }
 
 void MobileGS::alignMap(const float* transform) {

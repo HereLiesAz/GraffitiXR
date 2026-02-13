@@ -1,17 +1,37 @@
 #include <jni.h>
 #include <string>
+#include <vector>
+#include <android/bitmap.h>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/features2d.hpp>
 #include "MobileGS.h"
 
 inline MobileGS* getEngine(jlong handle) {
     return reinterpret_cast<MobileGS*>(handle);
 }
 
+// Helper: Bitmap -> cv::Mat (Grayscale)
+bool bitmapToGrayscaleMat(JNIEnv *env, jobject bitmap, cv::Mat &dst) {
+    AndroidBitmapInfo info;
+    void *pixels = nullptr;
+
+    if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) return false;
+    if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return false;
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) return false;
+
+    // Create Mat from raw pixels (RGBA)
+    cv::Mat src(info.height, info.width, CV_8UC4, pixels);
+
+    // Convert to Grayscale
+    cv::cvtColor(src, dst, cv::COLOR_RGBA2GRAY);
+
+    AndroidBitmap_unlockPixels(env, bitmap);
+    return true;
+}
+
 extern "C" {
 
-/**
- * Initializes the C++ engine instance.
- * @return A raw pointer (handle) to the MobileGS instance.
- */
 JNIEXPORT jlong JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
     auto *engine = new MobileGS();
@@ -19,9 +39,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *en
     return reinterpret_cast<jlong>(engine);
 }
 
-/**
- * Destroys the C++ engine instance to free memory.
- */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyNativeJni(JNIEnv *env, jobject thiz, jlong handle) {
     if (handle != 0) {
@@ -29,9 +46,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyNativeJni(JNIEnv 
     }
 }
 
-/**
- * Updates the camera view and projection matrices.
- */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
         JNIEnv *env, jobject thiz, jlong handle, jfloatArray viewMtx, jfloatArray projMtx) {
@@ -50,10 +64,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(
     if (proj) env->ReleaseFloatArrayElements(projMtx, proj, 0);
 }
 
-/**
- * Feeds raw depth data from the camera into the mapping engine.
- * Handles the ByteBuffer locking and type conversion.
- */
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
         JNIEnv *env, jobject thiz,
@@ -67,16 +77,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
 
     if (handle == 0) return;
 
-    // CHANGED: Cast to uint16_t* (unsigned short) instead of float*
-    // ARCore DEPTH16 is 16-bit integers
     auto* depthData = (uint16_t*)env->GetDirectBufferAddress(depthBuffer);
     jlong capacity = env->GetDirectBufferCapacity(depthBuffer);
 
-    // Basic bounds check
     if (depthData && capacity >= 0) {
-         if ((long)height * stride > capacity) {
-             return; // Out of bounds risk
-         }
+        if ((long)height * stride > capacity) {
+            return;
+        }
     }
 
     float* colorData = nullptr;
@@ -92,6 +99,28 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(
     }
 
     if (pose) env->ReleaseFloatArrayElements(poseMatrix, pose, 0);
+}
+
+/**
+ * IMPLEMENTATION: Set Target Descriptors
+ * Converts the Java byte array to a cv::Mat and passes it to MobileGS.
+ */
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(
+        JNIEnv *env, jobject thiz,
+        jlong handle,
+        jbyteArray descriptorBytes,
+        jint rows, jint cols, jint type) {
+
+    if (handle == 0) return;
+
+    jbyte* data = env->GetByteArrayElements(descriptorBytes, nullptr);
+    if (data) {
+        // Create Mat wrapping the data (deep copy happens inside setTargetDescriptors if used properly)
+        cv::Mat descriptors(rows, cols, type, (void*)data);
+        getEngine(handle)->setTargetDescriptors(descriptors);
+        env->ReleaseByteArrayElements(descriptorBytes, data, 0);
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -148,5 +177,60 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMapJni(JNIEnv *env,
     if (handle == 0) return;
     getEngine(handle)->clear();
 }
+
+// --- Stateless Utilities (GraffitiJNI.kt Object) ---
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesFromBitmap(JNIEnv *env, jobject thiz, jobject bitmap) {
+    cv::Mat gray;
+    if (!bitmapToGrayscaleMat(env, bitmap, gray)) return nullptr;
+
+    auto orb = cv::ORB::create();
+    std::vector<cv::KeyPoint> keypoints;
+    cv::Mat descriptors;
+    orb->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
+
+    if (descriptors.empty()) return nullptr;
+
+    // Serialize to byte array
+    int size = descriptors.total() * descriptors.elemSize();
+    jbyteArray result = env->NewByteArray(size);
+    env->SetByteArrayRegion(result, 0, size, (jbyte*)descriptors.data);
+    return result;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_extractFeaturesMeta(JNIEnv *env, jobject thiz, jobject bitmap) {
+    cv::Mat gray;
+    if (!bitmapToGrayscaleMat(env, bitmap, gray)) return nullptr;
+
+    auto orb = cv::ORB::create();
+    std::vector<cv::KeyPoint> keypoints;
+    cv::Mat descriptors;
+    orb->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
+
+    if (descriptors.empty()) return nullptr;
+
+    jintArray result = env->NewIntArray(3);
+    jint meta[3];
+    meta[0] = descriptors.rows;
+    meta[1] = descriptors.cols;
+    meta[2] = descriptors.type();
+    env->SetIntArrayRegion(result, 0, 3, meta);
+    return result;
+}
+
+// Stubs for legacy methods referenced in GraffitiJNI.kt
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_init(JNIEnv *env, jobject thiz, jint width, jint height) {}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_cleanup(JNIEnv *env, jobject thiz) {}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_update(JNIEnv *env, jobject thiz, jlong matAddr, jfloatArray viewMatrix, jfloatArray projMatrix) {}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_GraffitiJNI_setTargetDescriptors(JNIEnv *env, jobject thiz, jbyteArray descriptorBytes, jint rows, jint cols, jint type) {}
 
 } // extern "C"
