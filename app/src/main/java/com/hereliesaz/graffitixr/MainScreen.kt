@@ -214,7 +214,57 @@ fun MainScreen(
 
         // --- 2. MAIN BACKGROUND / CONTENT ---
         background(weight = 0) {
-            if (currentNavRoute == "editor" || currentNavRoute == null) {
+            if (uiState.isCapturingTarget) {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                    TargetCreationFlow(
+                        uiState = arUiState,
+                        isRightHanded = editorUiState.isRightHanded,
+                        captureStep = uiState.captureStep,
+                        context = context,
+                        onConfirm = {
+                            val bitmapToSave = arUiState.tempCaptureBitmap
+                            if (bitmapToSave != null) {
+                                scope.launch(Dispatchers.IO) {
+                                    val uri = saveBitmapToCache(context, bitmapToSave)
+                                    if (uri != null) {
+                                        withContext(Dispatchers.Main) {
+                                            arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                            viewModel.onConfirmTargetCreation()
+                                        }
+                                    } else {
+                                        // Fallback if save fails (just close or log)
+                                        withContext(Dispatchers.Main) {
+                                            viewModel.onConfirmTargetCreation()
+                                        }
+                                    }
+                                }
+                            } else {
+                                viewModel.onConfirmTargetCreation()
+                            }
+                        },
+                        onRetake = viewModel::onRetakeCapture,
+                        onCancel = viewModel::onCancelCaptureClicked,
+                        onPhotoCaptured = { bitmap ->
+                            arViewModel.setTempCapture(bitmap)
+                            viewModel.setCaptureStep(CaptureStep.RECTIFY)
+                        },
+                        onCalibrationPointCaptured = { },
+                        onUnwarpImage = { points ->
+                            arUiState.tempCaptureBitmap?.let { src ->
+                                ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                                    // Highlight markings (Edge Detection)
+                                    // This extracts the graffiti from the wall background
+                                    val extracted = ImageProcessor.detectEdges(unwarped) ?: unwarped
+
+                                    // Update preview with extracted version
+                                    arViewModel.setTempCapture(extracted)
+                                    viewModel.setCaptureStep(CaptureStep.REVIEW)
+                                }
+                            }
+                        }
+                    )
+                }
+            } else if (currentNavRoute == "editor" || currentNavRoute == null) {
                 val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.White else Color.Black
                 Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
                     MainContentLayer(
@@ -305,60 +355,6 @@ fun MainScreen(
                         content = "Design and project graffiti onto physical walls using AR.",
                         onDismiss = { showInfoScreen = false }
                     )
-                }
-
-                if (uiState.isCapturingTarget) {
-                    Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
-                        TargetCreationFlow(
-                            uiState = arUiState,
-                            isRightHanded = editorUiState.isRightHanded,
-                            captureStep = uiState.captureStep,
-                            context = context,
-                            onConfirm = {
-                                val bitmapToSave = arUiState.tempCaptureBitmap
-                                if (bitmapToSave != null) {
-                                    scope.launch(Dispatchers.IO) {
-                                        val uri = saveBitmapToCache(context, bitmapToSave)
-                                        if (uri != null) {
-                                            withContext(Dispatchers.Main) {
-                                                arViewModel.onFrameCaptured(bitmapToSave, uri)
-                                                viewModel.onConfirmTargetCreation()
-                                            }
-                                        } else {
-                                            // Fallback if save fails (just close or log)
-                                            withContext(Dispatchers.Main) {
-                                                viewModel.onConfirmTargetCreation()
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    viewModel.onConfirmTargetCreation()
-                                }
-                            },
-                            onRetake = viewModel::onRetakeCapture,
-                            onCancel = viewModel::onCancelCaptureClicked,
-                            onCaptureShutter = {
-                                renderRef?.captureFrame { bitmap ->
-                                    arViewModel.setTempCapture(bitmap)
-                                    viewModel.setCaptureStep(CaptureStep.RECTIFY)
-                                }
-                            },
-                            onCalibrationPointCaptured = { },
-                            onUnwarpImage = { points ->
-                                arUiState.tempCaptureBitmap?.let { src ->
-                                    ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                                        // Highlight markings (Edge Detection)
-                                        // This extracts the graffiti from the wall background
-                                        val extracted = ImageProcessor.detectEdges(unwarped) ?: unwarped
-
-                                        // Update preview with extracted version
-                                        arViewModel.setTempCapture(extracted)
-                                        viewModel.setCaptureStep(CaptureStep.REVIEW)
-                                    }
-                                }
-                            }
-                        )
-                    }
                 }
             }
         }

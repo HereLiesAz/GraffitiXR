@@ -1,9 +1,11 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.opengl.GLSurfaceView
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
@@ -58,6 +60,12 @@ fun ArView(
                 renderer.glSurfaceView = this
             }
         },
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { offset ->
+                    renderer.handleTap(offset.x, offset.y)
+                })
+            }
     )
 }

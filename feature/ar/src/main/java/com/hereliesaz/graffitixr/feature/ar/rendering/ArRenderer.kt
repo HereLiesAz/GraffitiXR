@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.graphics.PointF
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.os.Handler
@@ -13,6 +14,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
+import com.google.ar.core.Plane
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -23,6 +25,7 @@ import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.sqrt
@@ -51,6 +54,34 @@ class ArRenderer(
     private var viewportWidth = 0
     private var viewportHeight = 0
     private var isDepthSupported = false
+
+    private val tapQueue = ConcurrentLinkedQueue<PointF>()
+
+    fun handleTap(x: Float, y: Float) {
+        tapQueue.offer(PointF(x, y))
+    }
+
+    private fun handleTapInternal(frame: Frame, x: Float, y: Float) {
+        val hits = frame.hitTest(x, y)
+        for (hit in hits) {
+            val trackable = hit.trackable
+            if (trackable is Plane && trackable.isPoseInPolygon(hit.hitPose)) {
+                // Check color (orientation/distance)
+                val color = planeRenderer.calculatePlaneColor(trackable, frame.camera.pose)
+                // Green: R=0, G=1, B=0. Cyan: R=0, G=1, B=1. Pink: R=1...
+                // We check if B is low (< 0.2) and G is high (> 0.8)
+                if (color[1] > 0.8f && color[2] < 0.2f) {
+                    // Valid Green Surface
+                    Log.d(TAG, "Valid Surface Selected")
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(context, "Surface Selected", Toast.LENGTH_SHORT).show()
+                    }
+                    // TODO: Place anchor or emit event
+                    break
+                }
+            }
+        }
+    }
 
     /**
      * Optional reference to the [GLSurfaceView] this renderer is attached to.
@@ -217,7 +248,13 @@ class ArRenderer(
             // 2. Handle Tracking
             if (camera.trackingState == TrackingState.TRACKING) {
                 // Draw Planes (Helper)
-                planeRenderer.drawPlanes(currentSession, viewMatrix, projectionMatrix)
+                planeRenderer.drawPlanes(currentSession, viewMatrix, projectionMatrix, camera.pose)
+
+                // Handle Taps
+                val tap = tapQueue.poll()
+                if (tap != null) {
+                    handleTapInternal(frame, tap.x, tap.y)
+                }
 
                 try {
                     // Update Slam Manager Camera
