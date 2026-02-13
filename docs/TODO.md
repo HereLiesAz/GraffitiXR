@@ -16,7 +16,6 @@
 
 ## 🟢 Low Priority (Polish)
 
-- [ ] **Cloud Anchors:** Multi-user AR sessions.
 - [ ] **Occlusion:** Person/Object masking.
 
 ## Completed Features (Archive)
@@ -48,7 +47,6 @@
 
 ## Phase 3: Advanced AR (Next)
 - [x] Target Creation Flow (Capture -> Rectify -> Track).
-- [ ] Cloud Anchors for persistent multi-user sessions.
 - [ ] Occlusion handling (Person/Object masking).
 - [ ] Light Estimation for realistic rendering.
 
@@ -60,11 +58,12 @@
 **Status:** Updated to reflect that SLAM and 3D Mockups are now active features.
 # Roadmap
 
-## Phase 1: Foundation (Completed)
+## Phase 1: Foundation (In Progress)
 - [x] Multi-module project structure setup.
 - [x] ARCore integration with basic plane detection.
 - [x] Jetpack Compose UI with `AzNavRail`.
 - [x] Unified State Architecture implementation.
+- [ ] **Save:** Project saving functionality (Currently a stub).
 
 ## Phase 2: Core Editing (Completed)
 - [x] Layer System (Add, Remove, Reorder).
@@ -79,6 +78,5 @@
 - [ ] **Live Occlusion:** Using the sparse point cloud for real-time occlusion in AR mode.
 
 ## Phase 4: Polish & Scaling
-- [ ] **Cloud Anchors:** Multi-user sessions.
 - [ ] **LiDAR:** Mesh generation for Pro devices.
 - [ ] **Optimizations:** Vulkan backend for Splat rasterization.
