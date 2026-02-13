@@ -1,25 +1,30 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "com.hereliesaz.graffitixr.domain"
     compileSdk = 36
+
     defaultConfig {
         minSdk = 29
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
+    // CRITICAL FIX: Import core:common so Domain can see GraffitiProject
     implementation(project(":core:common"))
-    implementation(libs.androidx.compose.ui.geometry)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.androidx.compose.ui.graphics)
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlinx.coroutines.android)
 }
