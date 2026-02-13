@@ -29,3 +29,5 @@ We welcome pull requests, but this is a specialized tool with strict architectur
 * **Unit Tests:** Required for all ViewModel logic (`src/test`).
 * **UI Tests:** We use simple Compose rule tests.
 * **Native Tests:** There are currently no unit tests for the C++ layer (it's hard). Test visually on a device with `Debug` build variant enabled to see the "Splat Debug" colors.
+
+

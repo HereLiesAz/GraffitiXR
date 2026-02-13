@@ -1,286 +1,208 @@
-#include "MobileGS.h"
+#include <jni.h>
+#include <string>
+#include <vector>
+#include <map>
+#include <mutex>
+#include <android/log.h>
 #include <cmath>
 #include <algorithm>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <fstream>
-#include <iostream>
+#include <cstring>
 
-glm::mat4 makeMat4(const float* d) {
-    return glm::make_mat4(d);
+#define LOG_TAG "MobileGS"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+// --- Constants ---
+// Downsample factor to prevent OOM. 4 = process 1/16th of pixels.
+const int SAMPLE_STRIDE = 4;
+// Cull points that are too close or too far (in meters)
+const float MIN_DEPTH = 0.2f;
+const float MAX_DEPTH = 5.0f;
+// Max splats to keep in memory to maintain framerate
+const int MAX_GAUSSIANS = 200000;
+
+// --- Data Structures ---
+
+struct Gaussian {
+    float x, y, z;          // Position
+    float r, g, b, opacity; // Color/Alpha
+    float scale_x, scale_y, scale_z;
+    float rot_w, rot_x, rot_y, rot_z; // Quaternion
+};
+
+struct Chunk {
+    int id;
+    std::vector<Gaussian> gaussians;
+    bool is_dirty;
+};
+
+// --- Global State ---
+
+std::map<int, Chunk> chunks;
+std::mutex chunks_mutex;
+bool is_initialized = false;
+int global_gaussian_count = 0;
+
+// --- Helper Functions ---
+
+void clear_memory() {
+    std::lock_guard<std::mutex> lock(chunks_mutex);
+    chunks.clear();
+    global_gaussian_count = 0;
+    LOGI("Memory cleared. All chunks destroyed.");
 }
 
-MobileGS::MobileGS() {
-    mChunkSize = 2.0f;
-    mVoxelSize = 0.05f;
-    mScreenWidth = 1080;
-    mScreenHeight = 1920;
-    mStoredView = glm::mat4(1.0f);
-    mStoredProj = glm::mat4(1.0f);
+// Matrix multiplication helper (4x4 * 4x1)
+void mat4_mul_vec3(const float* mat, float x, float y, float z, float& out_x, float& out_y, float& out_z) {
+    // Column-major order expected from Android OpenGL/Matrix.java
+    out_x = mat[0] * x + mat[4] * y + mat[8] * z + mat[12];
+    out_y = mat[1] * x + mat[5] * y + mat[9] * z + mat[13];
+    out_z = mat[2] * x + mat[6] * y + mat[10] * z + mat[14];
+    // We ignore W division here assuming standard affine rigid body transform
 }
 
-MobileGS::~MobileGS() {
-    clear();
+// --- JNI Interfaces ---
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_core_native_MobileGS_init(JNIEnv* env, jobject /* this */) {
+    LOGI("Initializing MobileGS Native Bridge");
+    clear_memory();
+    is_initialized = true;
 }
 
-void MobileGS::initialize() {
-    clear();
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_core_native_MobileGS_cleanup(JNIEnv* env, jobject /* this */) {
+    LOGI("Cleaning up MobileGS Native Bridge");
+    clear_memory();
+    is_initialized = false;
 }
 
-void MobileGS::clear() {
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-    for (auto& pair : mChunks) {
-        if (pair.second.vbo != 0) {
-            glDeleteBuffers(1, &pair.second.vbo);
-        }
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_core_native_MobileGS_addGaussian(
+        JNIEnv* env,
+        jobject /* this */,
+        jint chunkId,
+        jfloat x, jfloat y, jfloat z,
+        jfloat r, jfloat g, jfloat b, jfloat opacity,
+        jfloat sx, jfloat sy, jfloat sz,
+        jfloat rw, jfloat rx, jfloat ry, jfloat rz) {
+
+    if (!is_initialized) return;
+
+    std::lock_guard<std::mutex> lock(chunks_mutex);
+
+    Gaussian g_data = {x, y, z, r, g, b, opacity, sx, sy, sz, rw, rx, ry, rz};
+
+    if (chunks.find(chunkId) == chunks.end()) {
+        chunks[chunkId] = Chunk{chunkId, {}, true};
     }
-    mChunks.clear();
-    mFrameCount = 0;
+
+    chunks[chunkId].gaussians.push_back(g_data);
+    chunks[chunkId].is_dirty = true;
+    global_gaussian_count++;
 }
 
-void MobileGS::updateCamera(const float* view, const float* proj) {
-    if (view) mStoredView = makeMat4(view);
-    if (proj) mStoredProj = makeMat4(proj);
+extern "C" JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_core_native_MobileGS_getGaussianCount(JNIEnv* env, jobject /* this */) {
+    if (!is_initialized) return 0;
+    // Atomic read preferred, but mutex is safer
+    std::lock_guard<std::mutex> lock(chunks_mutex);
+    return global_gaussian_count;
 }
 
-void MobileGS::draw() {
-    render(glm::value_ptr(mStoredView), glm::value_ptr(mStoredProj));
-}
+/**
+ * CORE FEATURE IMPLEMENTATION: Depth to Point Cloud
+ * * @param byteBuffer DirectByteBuffer containing DEPTH16 data (unsigned short, mm)
+ * @param width Width of the depth image
+ * @param height Height of the depth image
+ * @param poseMatrixArray 16-float array representing the Camera-to-World transform
+ */
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_core_native_MobileGS_updateSlam(
+        JNIEnv* env,
+        jobject /* this */,
+        jobject byteBuffer,
+        jint width,
+        jint height,
+        jfloatArray poseMatrixArray) {
 
-void MobileGS::onSurfaceChanged(int width, int height) {
-    mScreenWidth = width;
-    mScreenHeight = height;
-}
+    if (!is_initialized) return;
 
-int MobileGS::getSplatCount() {
-    int total = 0;
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-    for (const auto& pair : mChunks) {
-        total += pair.second.splats.size();
-    }
-    return total;
-}
-
-void MobileGS::alignMap(const float* transform) {
-}
-
-bool MobileGS::saveModel(std::string path) {
-    std::ofstream out(path, std::ios::binary);
-    if (!out) return false;
-
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-    size_t chunkCount = mChunks.size();
-    out.write((char*)&chunkCount, sizeof(size_t));
-
-    for (const auto& pair : mChunks) {
-        const Chunk& c = pair.second;
-        size_t splatCount = c.splats.size();
-        out.write((char*)&splatCount, sizeof(size_t));
-        if (splatCount > 0) {
-            out.write((char*)c.splats.data(), splatCount * sizeof(Splat));
-        }
-    }
-    out.close();
-    return true;
-}
-
-bool MobileGS::loadModel(std::string path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) return false;
-
-    clear();
-
-    size_t chunkCount;
-    in.read((char*)&chunkCount, sizeof(size_t));
-
-    for (size_t i = 0; i < chunkCount; i++) {
-        size_t splatCount;
-        in.read((char*)&splatCount, sizeof(size_t));
-        if (splatCount > 0) {
-            std::vector<Splat> tempSplats(splatCount);
-            in.read((char*)tempSplats.data(), splatCount * sizeof(Splat));
-
-            if (!tempSplats.empty()) {
-                ChunkKey key = getChunkKey(tempSplats[0].x, tempSplats[0].y, tempSplats[0].z);
-                mChunks[key].splats = tempSplats;
-                mChunks[key].isDirty = true;
-            }
-        }
-    }
-    in.close();
-    return true;
-}
-
-ChunkKey MobileGS::getChunkKey(float x, float y, float z) {
-    return ChunkKey{
-            (int)floor(x / mChunkSize),
-            (int)floor(y / mChunkSize),
-            (int)floor(z / mChunkSize)
-    };
-}
-
-float MobileGS::getLuminance(uint8_t r, uint8_t g, uint8_t b) {
-    return 0.299f * r + 0.587f * g + 0.114f * b;
-}
-
-void MobileGS::fuseSplat(Splat& target, const Splat& source) {
-    float lumDiff = std::abs(target.luminance - source.luminance);
-    float lumThreshold = 50.0f;
-
-    if (lumDiff > lumThreshold) {
-        target.confidence = std::min(target.confidence + 0.05f, 1.0f);
-        target.lastSeenFrame = source.lastSeenFrame;
+    // 1. Get Depth Data
+    uint16_t* depthData = (uint16_t*)env->GetDirectBufferAddress(byteBuffer);
+    if (depthData == nullptr) {
+        LOGE("updateSlam: Buffer is null!");
         return;
     }
 
-    float alpha = 0.1f;
+    // 2. Get Pose Matrix
+    float poseMatrix[16];
+    env->GetFloatArrayRegion(poseMatrixArray, 0, 16, poseMatrix);
 
-    target.x = target.x * (1.0f - alpha) + source.x * alpha;
-    target.y = target.y * (1.0f - alpha) + source.y * alpha;
-    target.z = target.z * (1.0f - alpha) + source.z * alpha;
-
-    target.nx = target.nx * (1.0f - alpha) + source.nx * alpha;
-    target.ny = target.ny * (1.0f - alpha) + source.ny * alpha;
-    target.nz = target.nz * (1.0f - alpha) + source.nz * alpha;
-
-    float invLen = 1.0f / sqrt(target.nx*target.nx + target.ny*target.ny + target.nz*target.nz + 0.0001f);
-    target.nx *= invLen; target.ny *= invLen; target.nz *= invLen;
-
-    target.radius = target.radius * (1.0f - alpha) + source.radius * alpha;
-
-    target.r = (uint8_t)(target.r * (1.0f - alpha) + source.r * alpha);
-    target.g = (uint8_t)(target.g * (1.0f - alpha) + source.g * alpha);
-    target.b = (uint8_t)(target.b * (1.0f - alpha) + source.b * alpha);
-
-    target.luminance = getLuminance(target.r, target.g, target.b);
-    target.confidence = std::min(target.confidence + 0.2f, 1.0f);
-    target.lastSeenFrame = source.lastSeenFrame;
-}
-
-// CHANGED: depthPixels type from float* to uint16_t*
-void MobileGS::feedDepthData(const uint16_t* depthPixels, const float* colorPixels,
-        int width, int height, const float* cameraPose, float fov) {
-    mFrameCount++;
-    glm::mat4 pose = makeMat4(cameraPose);
-    glm::vec3 camPos = glm::vec3(pose[3]);
-
-    std::lock_guard<std::mutex> lock(mChunkMutex);
-
-    int stride = 4;
-    float fx = (width / 2.0f) / tan(fov / 2.0f);
-    float fy = fx;
+    // 3. Setup Intrinsics (Approximation for standard mobile camera ~60-70 deg FOV)
+    // Ideally these should be passed from Kotlin, but this makes it functional NOW.
+    float fx = width * 0.7f;
+    float fy = width * 0.7f; // Square pixels assumption
     float cx = width / 2.0f;
     float cy = height / 2.0f;
 
-    for (int v = 0; v < height; v += stride) {
-        for (int u = 0; u < width; u += stride) {
-            int idx = v * width + u;
+    std::vector<Gaussian> newSplats;
+    newSplats.reserve((width * height) / (SAMPLE_STRIDE * SAMPLE_STRIDE));
 
-            // CHANGED: Read uint16 raw depth (millimeters)
-            uint16_t rawDepth = depthPixels[idx];
+    // 4. Process Pixels
+    for (int v = 0; v < height; v += SAMPLE_STRIDE) {
+        for (int u = 0; u < width; u += SAMPLE_STRIDE) {
 
-            // 0 means no data in ARCore Depth16
-            if (rawDepth == 0) continue;
+            // Read depth (mm) and convert to meters
+            uint16_t d_raw = depthData[v * width + u];
+            if (d_raw == 0) continue; // Invalid depth
 
-            // CHANGED: Convert mm to meters
-            float d = (float)rawDepth * 0.001f;
+            float z_local = d_raw * 0.001f;
 
-            if (d <= 0.1f || d > 4.0f) continue;
+            // Cull depth
+            if (z_local < MIN_DEPTH || z_local > MAX_DEPTH) continue;
 
-            float z_cam = -d;
-            float x_cam = (u - cx) * d / fx;
-            float y_cam = (v - cy) * d / fy;
+            // Unproject to Camera Space
+            float x_local = (u - cx) * z_local / fx;
+            float y_local = (v - cy) * z_local / fy;
 
-            glm::vec4 worldPos = pose * glm::vec4(x_cam, y_cam, z_cam, 1.0f);
+            // Transform to World Space
+            float x_world, y_world, z_world;
+            mat4_mul_vec3(poseMatrix, x_local, y_local, -z_local, x_world, y_world, z_world);
+            // Note: -z_local because OpenGL camera looks down -Z
 
-            Splat s;
-            s.x = worldPos.x;
-            s.y = worldPos.y;
-            s.z = worldPos.z;
-
-            glm::vec3 dirToCam = glm::normalize(camPos - glm::vec3(s.x, s.y, s.z));
-            s.nx = dirToCam.x; s.ny = dirToCam.y; s.nz = dirToCam.z;
-            s.radius = d * (stride / fx) * 1.5f;
-
-            if (colorPixels) {
-                s.r = (uint8_t)(colorPixels[idx * 3 + 0] * 255.0f);
-                s.g = (uint8_t)(colorPixels[idx * 3 + 1] * 255.0f);
-                s.b = (uint8_t)(colorPixels[idx * 3 + 2] * 255.0f);
-            } else {
-                s.r = 255; s.g = 255; s.b = 255;
-            }
-            s.luminance = getLuminance(s.r, s.g, s.b);
-            s.confidence = 0.5f;
-            s.lastSeenFrame = mFrameCount;
-
-            ChunkKey key = getChunkKey(s.x, s.y, s.z);
-            Chunk& chunk = mChunks[key];
-
-            bool found = false;
-            float mergeDistSq = mVoxelSize * mVoxelSize;
-
-            for (auto& existing : chunk.splats) {
-                float dx = existing.x - s.x;
-                float dy = existing.y - s.y;
-                float dz = existing.z - s.z;
-                if (dx*dx + dy*dy + dz*dz < mergeDistSq) {
-                    fuseSplat(existing, s);
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
-                chunk.splats.push_back(s);
-            }
-            chunk.isDirty = true;
+            // Create Gaussian
+            // We give them a default "Ghostly" look (Green/Blue tint) per your aesthetic
+            Gaussian g_data = {
+                    x_world, y_world, z_world,
+                    0.0f, 0.8f, 0.5f, 0.6f,   // Color: Teal, Semi-transparent
+                    0.02f, 0.02f, 0.02f,      // Scale: Small points
+                    1.0f, 0.0f, 0.0f, 0.0f    // Rotation: Identity
+            };
+            newSplats.push_back(g_data);
         }
     }
-}
 
-void MobileGS::update(const float* cameraPose) {}
+    // 5. Update State
+    // We use a dedicated "Live Scan" chunk ID (e.g., 9999) and replace it or append?
+    // For a mapping system, we append. For a viewer, we might replace.
+    // Let's Append to Chunk 0 for now, but check limits.
 
-void MobileGS::render(const float* viewMatrix, const float* projMatrix) {
-    std::lock_guard<std::mutex> lock(mChunkMutex);
+    std::lock_guard<std::mutex> lock(chunks_mutex);
 
-    for (auto& pair : mChunks) {
-        Chunk& c = pair.second;
-        if (c.splats.empty()) continue;
-
-        if (c.isDirty) {
-            if (c.vbo == 0) glGenBuffers(1, &c.vbo);
-
-            std::vector<float> buffer;
-            buffer.reserve(c.splats.size() * 7);
-
-            for (const auto& s : c.splats) {
-                if (s.confidence < 0.3f) continue;
-                buffer.push_back(s.x);
-                buffer.push_back(s.y);
-                buffer.push_back(s.z);
-                buffer.push_back(s.r / 255.0f);
-                buffer.push_back(s.g / 255.0f);
-                buffer.push_back(s.b / 255.0f);
-                buffer.push_back(s.radius);
-            }
-
-            glBindBuffer(GL_ARRAY_BUFFER, c.vbo);
-            glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(), GL_STATIC_DRAW);
-            c.splatCount = buffer.size() / 7;
-            c.isDirty = false;
-        }
-
-        if (c.splatCount > 0) {
-            glBindBuffer(GL_ARRAY_BUFFER, c.vbo);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(6 * sizeof(float)));
-            glDrawArrays(GL_POINTS, 0, c.splatCount);
-        }
+    if (global_gaussian_count > MAX_GAUSSIANS) {
+        // Simple ring buffer logic or clear logic could go here.
+        // For now, we just stop adding to preserve stability.
+        return;
     }
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    int chunkId = 0;
+    if (chunks.find(chunkId) == chunks.end()) {
+        chunks[chunkId] = Chunk{chunkId, {}, true};
+    }
+
+    // Append new splats
+    chunks[chunkId].gaussians.insert(chunks[chunkId].gaussians.end(), newSplats.begin(), newSplats.end());
+    chunks[chunkId].is_dirty = true;
+    global_gaussian_count += newSplats.size();
 }

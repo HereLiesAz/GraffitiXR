@@ -159,7 +159,6 @@ All items completed. Ready for the next phase of development.
 
 - [x] **Voxel Map Culling:** The `MobileGS` engine now performs a "Garbage Collector" pass that deletes points with `opacity < 0.3` and `age > 2000ms` when the map buffer reaches 95% capacity.
 - [x] **Serialization Speed:** The `.map` save functionality has been moved to `Dispatchers.IO` in Kotlin, calling a synchronous C++ `saveModel` function to prevent UI freezes (ANRs).
-- [ ] **AzNavRail Haptics:** Add haptic feedback when scrolling through rail items so the user can "feel" the menu without looking.
 
 ## 🟡 Medium Priority (Features)
 
@@ -170,10 +169,35 @@ All items completed. Ready for the next phase of development.
 ## 🟢 Low Priority (Polish)
 
 - [ ] **Mockup Mode - Perspective Warp:** The current 2D perspective warp is linear. Add a "Mesh Warp" for curved surfaces (pillars).
-- [ ] **App Icon:** The current icon is a placeholder. Needs something that screams "Cyberpunk Spray Can."
 
 ## ❌ Deprecated / Won't Do
 
-- [ ] ~~Cloud Anchors Integration~~ (Removed: Privacy Policy update).
-- [ ] ~~Social Gallery~~ (Removed: Scope creep).
-- [ ] ~~iOS Port~~ (No: Apple's restrictive file system makes the `.gxr` zip container logic a nightmare).
+
+
+
+# Roadmap
+
+## Phase 1: Foundation (Completed)
+- [x] Multi-module project structure setup.
+- [x] ARCore integration with basic plane detection.
+- [x] Jetpack Compose UI with `AzNavRail`.
+- [x] Basic Image Editor (Translate, Scale, Rotate).
+
+## Phase 2: Core Editing (Current)
+- [x] Layer System (Add, Remove, Reorder).
+- [x] Blend Modes (Multiply, Overlay, Screen, etc.).
+- [x] Project Persistence (Save/Load).
+- [x] Trace Mode (High contrast overlay).
+- [ ] Color Adjustment Tools (Saturation, Brightness, Contrast).
+- [ ] Masking & Eraser Tools.
+
+## Phase 3: Advanced AR (Next)
+- [x] Target Creation Flow (Capture -> Rectify -> Track).
+- [ ] Cloud Anchors for persistent multi-user sessions.
+- [ ] Occlusion handling (Person/Object masking).
+- [ ] Light Estimation for realistic rendering.
+
+## Phase 4: Surveyor & 3D (Experimental)
+- [x] Basic Gaussian Splatting Viewer integration (Stubbed).
+- [ ] Photogrammetry capture pipeline.
+- [ ] 3D Model import (.glb/.gltf) support.
