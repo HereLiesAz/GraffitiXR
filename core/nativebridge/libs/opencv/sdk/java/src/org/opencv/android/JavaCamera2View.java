@@ -238,7 +238,16 @@ public class JavaCamera2View extends CameraBridgeViewBase {
             CameraDevice c = mCameraDevice;
             mCameraDevice = null;
             if (null != mCaptureSession) {
-                mCaptureSession.close();
+                try {
+                    mCaptureSession.stopRepeating();
+                } catch (Exception e) {
+                    Log.w(LOGTAG, "stopRepeating failed: " + e.getMessage());
+                }
+                try {
+                    mCaptureSession.close();
+                } catch (Exception e) {
+                    Log.w(LOGTAG, "mCaptureSession.close() failed: " + e.getMessage());
+                }
                 mCaptureSession = null;
             }
             if (null != c) {
@@ -319,7 +328,16 @@ public class JavaCamera2View extends CameraBridgeViewBase {
             if (needReconfig) {
                 if (null != mCaptureSession) {
                     Log.d(LOGTAG, "closing existing previewSession");
-                    mCaptureSession.close();
+                    try {
+                        mCaptureSession.stopRepeating();
+                    } catch (Exception e) {
+                        Log.w(LOGTAG, "stopRepeating failed: " + e.getMessage());
+                    }
+                    try {
+                        mCaptureSession.close();
+                    } catch (Exception e) {
+                        Log.w(LOGTAG, "mCaptureSession.close() failed: " + e.getMessage());
+                    }
                     mCaptureSession = null;
                 }
                 createCameraPreviewSession();

@@ -145,7 +145,16 @@ public class Camera2Renderer extends CameraGLRendererBase {
         try {
             mCameraOpenCloseLock.acquire();
             if (null != mCaptureSession) {
-                mCaptureSession.close();
+                try {
+                    mCaptureSession.stopRepeating();
+                } catch (Exception e) {
+                    Log.w(LOGTAG, "stopRepeating failed: " + e.getMessage());
+                }
+                try {
+                    mCaptureSession.close();
+                } catch (Exception e) {
+                    Log.w(LOGTAG, "mCaptureSession.close() failed: " + e.getMessage());
+                }
                 mCaptureSession = null;
             }
             if (null != mCameraDevice) {
@@ -289,7 +298,16 @@ public class Camera2Renderer extends CameraGLRendererBase {
             }
             if (null != mCaptureSession) {
                 Log.d(LOGTAG, "closing existing previewSession");
-                mCaptureSession.close();
+                try {
+                    mCaptureSession.stopRepeating();
+                } catch (Exception e) {
+                    Log.w(LOGTAG, "stopRepeating failed: " + e.getMessage());
+                }
+                try {
+                    mCaptureSession.close();
+                } catch (Exception e) {
+                    Log.w(LOGTAG, "mCaptureSession.close() failed: " + e.getMessage());
+                }
                 mCaptureSession = null;
             }
             mCameraOpenCloseLock.release();
