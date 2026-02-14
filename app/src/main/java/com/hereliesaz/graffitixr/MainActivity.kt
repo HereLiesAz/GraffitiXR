@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
@@ -37,6 +39,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             GraffitiXRTheme {
                 val navController = rememberNavController()
+                val mainState by mainViewModel.uiState.collectAsState()
 
                 MainScreen(
                     viewModel = mainViewModel,
@@ -45,12 +48,24 @@ class MainActivity : ComponentActivity() {
                     dashboardViewModel = dashboardViewModel,
                     navController = navController,
                     slamManager = slamManager,
-                    projectRepository = projectRepository,
+                    projectRepository = projectRepository, // ADDED
                     onRendererCreated = { renderer ->
                         arRenderer = renderer
                     }
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
     }
 }

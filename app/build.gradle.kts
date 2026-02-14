@@ -78,7 +78,6 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.az.nav.rail)
     implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.hilt.navigation.compose)
     
     // Hilt
     implementation(libs.hilt.android)

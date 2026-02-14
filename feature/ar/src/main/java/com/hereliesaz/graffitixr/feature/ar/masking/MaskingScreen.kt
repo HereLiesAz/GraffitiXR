@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
@@ -80,7 +79,6 @@ fun MaskingUi(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .zIndex(10f)
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = onPathStarted,
