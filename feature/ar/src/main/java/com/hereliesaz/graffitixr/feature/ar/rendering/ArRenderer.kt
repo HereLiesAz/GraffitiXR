@@ -269,6 +269,19 @@ class ArRenderer(
     fun setLayer(layer: Layer?) {}
     fun handleTap(x: Float, y: Float) {}
 
+    fun saveKeyframe(path: String) {
+        val view = glSurfaceView ?: return
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        
+        PixelCopy.request(view, bitmap, { result ->
+            if (result == PixelCopy.SUCCESS) {
+                // Ensure we use the latest camera pose matrix from the last draw call
+                slamManager.saveKeyframe(bitmap, cameraPoseMatrix, path)
+            }
+            bitmap.recycle()
+        }, android.os.Handler(android.os.Looper.getMainLooper()))
+    }
+
     fun cleanup() {
         rendererScope.cancel()
         session?.close()

@@ -33,7 +33,7 @@ class VulkanRenderer @Inject constructor(
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        // TODO: Signal destruction to native
+        slamManager.destroyVulkan()
     }
 
     override fun onResume(owner: LifecycleOwner) {

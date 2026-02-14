@@ -76,6 +76,7 @@ public:
     // Vulkan Support
     void initVulkan(void* nativeWindow);
     void resizeVulkan(int width, int height);
+    void destroyVulkan();
 
     // Rendering
     void draw();

@@ -40,6 +40,14 @@ void VulkanBackend::resize(int width, int height) {
     LOGI("Vulkan Resize: %dx%d", width, height);
 }
 
+void VulkanBackend::destroySurface() {
+    if (mSurface != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
+        mSurface = VK_NULL_HANDLE;
+        LOGI("Vulkan Surface Destroyed");
+    }
+}
+
 void VulkanBackend::cleanup() {
     if (mSurface != VK_NULL_HANDLE) {
         vkDestroySurfaceKHR(mInstance, mSurface, nullptr);

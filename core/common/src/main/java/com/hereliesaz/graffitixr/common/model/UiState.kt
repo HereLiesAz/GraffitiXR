@@ -32,7 +32,10 @@ data class ArUiState(
     
     // NEW: Sensor and Location Data
     val gpsData: GpsData? = null,
-    val sensorData: SensorData? = null
+    val sensorData: SensorData? = null,
+
+    // NEW: Photogrammetry
+    val pendingKeyframePath: String? = null
 )
 
 /**

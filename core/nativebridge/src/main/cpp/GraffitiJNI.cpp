@@ -88,6 +88,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resizeVulkanJni(JNIEnv *
     }
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyVulkanJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle != 0) {
+        getEngine(handle)->destroyVulkan();
+    }
+}
+
 // NEW: Reset GL State
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLJni(JNIEnv *env, jobject thiz, jlong handle) {
@@ -236,17 +243,52 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *
     if (handle == 0) return false;
     
     const char *nativePath = env->GetStringUTFChars(path, 0);
+    if (!nativePath) return false;
+
     jfloat* poseData = env->GetFloatArrayElements(pose, nullptr);
+    if (!poseData) {
+        env->ReleaseStringUTFChars(path, nativePath);
+        return false;
+    }
     
-    // Save image and pose metadata to disk
-    // For photogrammetry, we'd typically save as JPG/PNG + JSON
-    LOGI("Saving keyframe to %s", nativePath);
+    std::string basePath(nativePath);
+    std::string imagePath = basePath + ".jpg";
+    std::string posePath = basePath + ".pose";
+
+    // 1. Save Image
+    cv::Mat mat;
+    bool imageSaved = false;
+    if (bitmapToMat(env, image, mat, false)) {
+        cv::Mat bgr;
+        if (mat.channels() == 4) {
+            cv::cvtColor(mat, bgr, cv::COLOR_RGBA2BGR);
+        } else {
+            mat.copyTo(bgr);
+        }
+        imageSaved = cv::imwrite(imagePath, bgr);
+        if (!imageSaved) {
+            LOGE("OpenCV imwrite failed for path: %s", imagePath.c_str());
+        }
+    } else {
+        LOGE("Failed to convert bitmap to mat for keyframe");
+    }
     
-    // Implementation would use OpenCV to save image and a simple fstream for pose
+    // 2. Save Pose
+    bool poseSaved = false;
+    std::ofstream out(posePath);
+    if (out.is_open()) {
+        for (int i = 0; i < 16; ++i) {
+            out << poseData[i] << (i == 15 ? "" : " ");
+        }
+        out.close();
+        poseSaved = true;
+    } else {
+        LOGE("Failed to open pose file for writing: %s", posePath.c_str());
+    }
     
     env->ReleaseFloatArrayElements(pose, poseData, JNI_ABORT);
     env->ReleaseStringUTFChars(path, nativePath);
-    return true;
+    return imageSaved && poseSaved;
 }
 
 JNIEXPORT void JNICALL

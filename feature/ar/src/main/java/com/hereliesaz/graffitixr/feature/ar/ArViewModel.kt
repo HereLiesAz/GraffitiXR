@@ -113,6 +113,30 @@ class ArViewModel @Inject constructor(
     }
 
     /**
+     * Signals that a keyframe should be captured for photogrammetry.
+     * The actual capture is performed by the Renderer when it observes this signal.
+     */
+    fun captureKeyframe() {
+        viewModelScope.launch {
+            val project = projectRepository.currentProject.value ?: return@launch
+            val timestamp = System.currentTimeMillis()
+            val filename = "keyframe_$timestamp"
+            val path = "${project.id}/photogrammetry/$filename"
+            
+            // In a real implementation, we might use a Flow or SharedFlow to signal the Renderer
+            // For now, we'll just update the state with the pending capture path
+            _uiState.update { it.copy(pendingKeyframePath = path) }
+        }
+    }
+
+    /**
+     * Clears the pending keyframe capture signal.
+     */
+    fun onKeyframeCaptured() {
+        _uiState.update { it.copy(pendingKeyframePath = null) }
+    }
+
+    /**
      * Updates the current GPS location data.
      */
     fun updateLocation(data: GpsData) {

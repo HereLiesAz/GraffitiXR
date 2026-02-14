@@ -246,6 +246,12 @@ void MobileGS::resizeVulkan(int width, int height) {
     }
 }
 
+void MobileGS::destroyVulkan() {
+    if (mVulkanBackend != nullptr) {
+        mVulkanBackend->destroySurface();
+    }
+}
+
 void MobileGS::uploadMesh() {
     if (!mMeshDirty || mMeshVertices.empty()) return;
 

@@ -13,6 +13,7 @@ public:
     bool initialize();
     bool initSurface(void* nativeWindow);
     void resize(int width, int height);
+    void destroySurface();
     bool createComputePipeline(const uint32_t* code, size_t size); // NEW: For splat rasterization
     void cleanup();
 
