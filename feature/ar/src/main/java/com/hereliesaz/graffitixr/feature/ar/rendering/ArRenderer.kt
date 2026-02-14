@@ -3,10 +3,12 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.graphics.Bitmap
 import android.opengl.GLES20
+import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.util.Log
 import android.view.PixelCopy
 import com.google.ar.core.Config
+import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
@@ -51,8 +53,8 @@ class ArRenderer(
         try {
             backgroundRenderer.createOnGlThread(context)
             slamManager.initialize()
-            // INDICATE splatted areas without blocking the view
-            slamManager.setVisualizationMode(1) // POINT_CLOUD
+            // INDICATE splatted areas using Fog of War removal
+            slamManager.setVisualizationMode(3) // FOG_OF_WAR
         } catch (e: IOException) {
             Log.e(TAG, "Failed to read asset file", e)
         }
@@ -156,6 +158,8 @@ class ArRenderer(
                 slamManager.draw()
             }
 
+        } catch (e: com.google.ar.core.exceptions.SessionPausedException) {
+            // Expected during app pause, ignore gracefully
         } catch (t: Throwable) {
             Log.e(TAG, "Exception on the OpenGL thread", t)
         }
@@ -226,6 +230,7 @@ class ArRenderer(
     }
 
     fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
+        glSurfaceView?.onResume()
         if (session == null) {
             try {
                 session = Session(context)
@@ -257,6 +262,7 @@ class ArRenderer(
     fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
         displayRotationHelper.onPause()
         session?.pause()
+        glSurfaceView?.onPause()
     }
 
     fun setFlashlight(on: Boolean) {}

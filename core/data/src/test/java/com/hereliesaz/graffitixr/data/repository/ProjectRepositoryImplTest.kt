@@ -16,6 +16,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -78,5 +79,31 @@ class ProjectRepositoryImplTest {
         
         val retrievedProject = repository.getProject(project.id)
         assertEquals("Updated Name", retrievedProject?.name)
+    }
+
+    @Test
+    fun `saveArtifact saves data to correct file`() = runTest {
+        val project = repository.createProject("Artifact Project")
+        val data = "test data".toByteArray()
+        val filename = "test.bin"
+        
+        val path = repository.saveArtifact(project.id, filename, data)
+        
+        val file = File(path)
+        assertTrue(file.exists())
+        assertEquals("test data", file.readText())
+    }
+
+    @Test
+    fun `updateTargetFingerprint updates path in metadata`() = runTest {
+        val project = repository.createProject("Fingerprint Project")
+        val path = "/path/to/fingerprint"
+        
+        // We need to set it as current first for some updateProject variations, 
+        // but getProject/updateProject works on ID.
+        repository.updateTargetFingerprint(project.id, path)
+        
+        val updated = repository.getProject(project.id)
+        assertEquals(path, updated?.targetFingerprintPath)
     }
 }

@@ -50,7 +50,8 @@ enum class EngineStatus : int {
 enum class SplatVisualizationMode : int {
     GAUSSIAN = 0,
     POINT_CLOUD = 1,
-    WIREFRAME = 2
+    WIREFRAME = 2,
+    FOG_OF_WAR = 3
 };
 
 class MobileGS {
@@ -93,8 +94,10 @@ public:
 private:
     // GL State
     GLuint mProgram = 0;
+    GLuint mFogProgram = 0; // NEW: Fog overlay shader
     GLint mLocView = -1;
     GLint mLocProj = -1;
+    GLint mLocFogColor = -1;
 
     // Mesh State
     GLuint mMeshVBO = 0;

@@ -56,7 +56,7 @@ fun ArView(
             GLSurfaceView(ctx).apply {
                 preserveEGLContextOnPause = true
                 setEGLContextClientVersion(3)
-                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                setEGLConfigChooser(8, 8, 8, 8, 16, 8)
                 setRenderer(renderer)
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                 

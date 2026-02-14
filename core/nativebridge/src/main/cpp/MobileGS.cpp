@@ -76,13 +76,13 @@ out vec4 FragColor;
 
 uniform float u_LightIntensity;
 uniform vec3 u_LightColor;
-uniform int u_VizMode; // 0=Gaussian, 1=Point, 2=Wireframe
+uniform int u_VizMode; // 0=Gaussian, 1=Point, 2=Wireframe, 3=Fog
 
 void main() {
     float distSq = dot(vUV, vUV);
     float alpha = 1.0;
 
-    if (u_VizMode == 0) {
+    if (u_VizMode == 0 || u_VizMode == 3) {
         // Gaussian Falloff
         alpha = exp(-0.5 * distSq);
         if (distSq > 9.0 || alpha < 0.01) discard;
@@ -99,6 +99,22 @@ void main() {
     // Apply Light Estimation
     vec3 litColor = vColor.rgb * u_LightIntensity * u_LightColor;
     FragColor = vec4(litColor, vColor.a * alpha);
+}
+)";
+
+const char* FOG_VERTEX_SHADER = R"(#version 300 es
+layout(location = 0) in vec2 aPosition;
+void main() {
+    gl_Position = vec4(aPosition, 0.0, 1.0);
+}
+)";
+
+const char* FOG_FRAGMENT_SHADER = R"(#version 300 es
+precision mediump float;
+uniform vec4 u_FogColor;
+out vec4 FragColor;
+void main() {
+    FragColor = u_FogColor;
 }
 )";
 
@@ -180,6 +196,9 @@ void MobileGS::initialize() {
         mLocView = glGetUniformLocation(mProgram, "uView");
         mLocProj = glGetUniformLocation(mProgram, "uProj");
 
+        mFogProgram = createProgram(FOG_VERTEX_SHADER, FOG_FRAGMENT_SHADER);
+        mLocFogColor = glGetUniformLocation(mFogProgram, "u_FogColor");
+
         // Mark dirty
         mGlDirty = true;
     }
@@ -192,10 +211,13 @@ void MobileGS::initialize() {
 void MobileGS::resetGL() {
     LOGI("MobileGS: Resetting GL State");
     mProgram = 0;
+    mFogProgram = 0;
     mVBO_Quad = 0;
     mVBO_Instance = 0;
+    mMeshVBO = 0;
     mLocView = -1;
     mLocProj = -1;
+    mLocFogColor = -1;
     mGlDirty = true;
 }
 
@@ -267,6 +289,21 @@ void MobileGS::uploadSplatData() {
 void MobileGS::draw() {
     if (mProgram == 0 || mSplats.empty()) return;
 
+    // --- PHASE 0: Stencil Setup for Fog of War ---
+    bool useFog = (mVizMode == 3);
+    if (useFog) {
+        glEnable(GL_STENCIL_TEST);
+        glStencilMask(0xFF);
+        glClearStencil(0);
+        glClear(GL_STENCIL_BUFFER_BIT);
+        
+        // Render splats into stencil ONLY
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+        glDepthMask(GL_FALSE);
+    }
+
     glUseProgram(mProgram);
 
     // Update Uniforms
@@ -282,12 +319,14 @@ void MobileGS::draw() {
 
     if (mVBO_Quad == 0 || mVBO_Instance == 0) return;
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
+    if (!useFog) {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+    }
 
     // --- PHASE 1: Render Mesh for Occlusion ---
     if (mMeshVBO != 0 && mMeshVertexCount > 0) {
-        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE); // Don't draw color
+        if (!useFog) glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE); // Don't draw color
         glDepthMask(GL_TRUE); // Write to depth
         
         glBindBuffer(GL_ARRAY_BUFFER, mMeshVBO);
@@ -297,11 +336,11 @@ void MobileGS::draw() {
         glDrawArrays(GL_TRIANGLES, 0, mMeshVertexCount);
         
         glDisableVertexAttribArray(0);
-        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Re-enable color
+        if (!useFog) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Re-enable color
     }
 
     // --- PHASE 2: Draw Splats ---
-    glDepthMask(GL_FALSE); // Don't overwrite occlusion depth from mesh
+    if (!useFog) glDepthMask(GL_FALSE); // Don't overwrite occlusion depth from mesh
 
     // 1. Quad Vertices (Attribute 0) - Per Vertex
     glBindBuffer(GL_ARRAY_BUFFER, mVBO_Quad);
@@ -327,13 +366,30 @@ void MobileGS::draw() {
     setAttrib(5, 1, GL_FLOAT, GL_FALSE, offsetof(Splat, opacity));
 
     // Draw Instanced
-    glEnable(GL_DEPTH_TEST); // ENABLE DEPTH TEST
-    glDepthMask(GL_TRUE); // Write to Depth Buffer
-
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, mSplats.size());
 
-    glDisable(GL_DEPTH_TEST); // Cleanup
-    glDepthMask(GL_FALSE);
+    // --- PHASE 3: Draw Fog Overlay where stencil is 0 ---
+    if (useFog) {
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        glStencilFunc(GL_EQUAL, 0, 0xFF); // Draw where splats ARE NOT
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        
+        glUseProgram(mFogProgram);
+        glUniform4f(mLocFogColor, 0.0f, 0.0f, 0.0f, 0.7f); // Dark transparent layer
+        
+        glBindBuffer(GL_ARRAY_BUFFER, mVBO_Quad);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glVertexAttribDivisor(0, 0);
+        
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        
+        glDisable(GL_STENCIL_TEST);
+        glDisable(GL_BLEND);
+    }
 
     // Cleanup
     for(int i=0; i<=5; i++) {
