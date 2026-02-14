@@ -102,7 +102,7 @@ class SlamManager @Inject constructor() {
 
     // --- Native Interface ---
     private external fun initNativeJni(): Long
-    private external fun resetGLJni(handle: Long) // NEW
+    private external fun resetGLJni(handle: Long)
     private external fun destroyNativeJni(handle: Long)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)

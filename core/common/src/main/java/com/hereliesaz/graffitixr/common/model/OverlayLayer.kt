@@ -36,9 +36,9 @@ data class OverlayLayer(
     val brightness: Float = 0f,
     val contrast: Float = 1.0f,
     val saturation: Float = 1.0f,
-    val colorBalanceR: Float = 1.0f,
-    val colorBalanceG: Float = 1.0f,
-    val colorBalanceB: Float = 1.0f,
+    val colorBalanceR: Float = 0f,
+    val colorBalanceG: Float = 0f,
+    val colorBalanceB: Float = 0f,
 
     val isImageLocked: Boolean = false,
     val isVisible: Boolean = true

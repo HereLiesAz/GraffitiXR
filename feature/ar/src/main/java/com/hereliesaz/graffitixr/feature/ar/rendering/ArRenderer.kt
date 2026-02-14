@@ -20,23 +20,17 @@ class ArRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
-        runBlocking {
-            slamManager.initialize()
-        }
+        slamManager.initialize()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
-        runBlocking {
-            slamManager.resize(width, height)
-        }
+        slamManager.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        runBlocking {
-            slamManager.draw()
-        }
+        slamManager.draw()
     }
 
     fun onResume(owner: androidx.lifecycle.LifecycleOwner) {}

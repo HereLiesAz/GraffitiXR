@@ -3,9 +3,7 @@ package com.hereliesaz.graffitixr.feature.editor.rendering
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.util.Log
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import kotlinx.coroutines.runBlocking
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -29,32 +27,26 @@ class GsViewerRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.05f, 0.05f, 0.05f, 1.0f)
 
-        runBlocking {
-            slamManager.reset()
-            slamManager.initialize()
+        slamManager.resetGLState()
+        slamManager.initialize()
 
-            if (mapPath.isNotEmpty()) {
-                isModelLoaded = slamManager.loadMap(mapPath)
-            }
+        if (mapPath.isNotEmpty()) {
+            isModelLoaded = slamManager.loadWorld(mapPath)
         }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES30.glViewport(0, 0, width, height)
         camera.setAspectRatio(width, height)
-        runBlocking {
-            slamManager.resize(width, height)
-        }
+        slamManager.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
         if (isModelLoaded) {
-            runBlocking {
-                slamManager.updateCamera(camera.viewMatrix, camera.projectionMatrix)
-                slamManager.draw()
-            }
+            slamManager.updateCamera(camera.viewMatrix, camera.projectionMatrix)
+            slamManager.draw()
         }
     }
 
