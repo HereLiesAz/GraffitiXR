@@ -116,7 +116,32 @@ fun WarpableImage(
                     paint.color = android.graphics.Color.WHITE
                     paint.style = Paint.Style.STROKE
                     paint.strokeWidth = 2f
-                    // TODO: Draw lines connecting mesh points for better visualization
+                    
+                    // Horizontal lines
+                    for (y in 0..gridRows) {
+                        for (x in 0 until gridCols) {
+                            val idx = (y * (gridCols + 1) + x) * 2
+                            val nextIdx = (y * (gridCols + 1) + (x + 1)) * 2
+                            canvas.nativeCanvas.drawLine(
+                                verts[idx], verts[idx + 1],
+                                verts[nextIdx], verts[nextIdx + 1],
+                                paint
+                            )
+                        }
+                    }
+
+                    // Vertical lines
+                    for (x in 0..gridCols) {
+                        for (y in 0 until gridRows) {
+                            val idx = (y * (gridCols + 1) + x) * 2
+                            val nextIdx = ((y + 1) * (gridCols + 1) + x) * 2
+                            canvas.nativeCanvas.drawLine(
+                                verts[idx], verts[idx + 1],
+                                verts[nextIdx], verts[nextIdx + 1],
+                                paint
+                            )
+                        }
+                    }
                 }
             }
         }
