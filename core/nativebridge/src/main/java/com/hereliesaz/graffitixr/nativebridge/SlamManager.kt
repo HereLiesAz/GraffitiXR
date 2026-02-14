@@ -28,7 +28,7 @@ class SlamManager @Inject constructor() {
      */
     fun initialize() {
         if (nativeHandle == 0L) {
-            nativeHandle = initNativeJni()
+            nativeHandle = createNativeInstance()
         }
     }
 
@@ -101,7 +101,7 @@ class SlamManager @Inject constructor() {
     }
 
     // --- Native Interface ---
-    private external fun initNativeJni(): Long
+    private external fun createNativeInstance(): Long
     private external fun resetGLJni(handle: Long)
     private external fun destroyNativeJni(handle: Long)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
