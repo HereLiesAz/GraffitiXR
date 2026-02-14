@@ -121,6 +121,7 @@ private:
     glm::mat4 mViewMat;
     glm::mat4 mProjMat;
     glm::vec3 mCamPos;
+    glm::vec3 mLastCamPos;
 
     // Light Estimation
     float mLightIntensity = 1.0f;

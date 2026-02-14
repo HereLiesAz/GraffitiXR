@@ -102,6 +102,10 @@ fun AzNavHostScope.GraffitiNavRail(
                 requestPermissions()
             }
         })
+        azRailSubItem(id = "capture_keyframe", hostId = "target_host", text = "Keyframe", info = "Save for reconstruction", onClick = {
+            performHaptic()
+            arViewModel.captureKeyframe()
+        })
         azDivider()
     }
 

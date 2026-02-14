@@ -126,6 +126,14 @@ fun MainScreen(
         }
     }
 
+    // Effect: Handle Photogrammetry Keyframe Capture
+    LaunchedEffect(arUiState.pendingKeyframePath) {
+        arUiState.pendingKeyframePath?.let { path ->
+            renderRef?.saveKeyframe(path)
+            arViewModel.onKeyframeCaptured()
+        }
+    }
+
     val navStrings = remember {
         NavStrings(
             modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",

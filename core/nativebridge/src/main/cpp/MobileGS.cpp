@@ -267,6 +267,8 @@ void MobileGS::uploadMesh() {
 }
 
 void MobileGS::uploadSplatData() {
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+
     // 1. Setup Quad VBO (Once)
     if (mVBO_Quad == 0) {
         glGenBuffers(1, &mVBO_Quad);
@@ -276,6 +278,12 @@ void MobileGS::uploadSplatData() {
     }
 
     if (mSplats.empty()) return;
+
+    // Optimization: Only sort/upload if dirty or camera moved significantly (> 5cm)
+    float camDistSq = glm::dot(mCamPos - mLastCamPos, mCamPos - mLastCamPos);
+    bool camMoved = camDistSq > (0.05f * 0.05f);
+
+    if (!mGlDirty && !camMoved && mVBO_Instance != 0) return;
 
     // 2. Setup Instance VBO
     if (mVBO_Instance == 0) {
@@ -289,6 +297,7 @@ void MobileGS::uploadSplatData() {
     glBufferData(GL_ARRAY_BUFFER, mSplats.size() * sizeof(Splat), mSplats.data(), GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+    mLastCamPos = mCamPos;
     mGlDirty = false;
 }
 
@@ -722,6 +731,15 @@ void MobileGS::alignMap(float* transformMtx) {
 
 bool MobileGS::importModel3D(const std::string& path) {
     LOGI("Importing 3D model from %s", path.c_str());
+    
+    std::ifstream f(path.c_str());
+    if (!f.good()) {
+        LOGE("3D Model file not found: %s", path.c_str());
+        return false;
+    }
+
     // TODO: Integrate tinygltf or similar for .glb/.gltf
-    return true;
+    // Currently returns false to indicate lack of full implementation in v1.0
+    LOGE("3D Model import not implemented in this build.");
+    return false;
 }
