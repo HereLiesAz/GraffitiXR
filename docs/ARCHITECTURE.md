@@ -26,6 +26,7 @@ graph TD
     ED[Editor ViewModel] -- Bitmap --> SM
     SM -- JNI --> Cpp[Native Engine]
     Cpp -- OpenGL --> Surface[GLSurfaceView]
+    AR -- PnP Correction --> SM -- alignMap() --> Cpp
 ```
 
 Security

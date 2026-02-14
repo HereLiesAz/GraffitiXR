@@ -25,7 +25,8 @@ fun MappingScreen(
     onBackClick: () -> Unit,
     onScanComplete: () -> Unit,
     viewModel: ArViewModel = hiltViewModel(),
-    slamManager: SlamManager
+    slamManager: SlamManager,
+    projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -46,7 +47,7 @@ fun MappingScreen(
                     setEGLContextClientVersion(3)
                     setEGLConfigChooser(8, 8, 8, 8, 16, 0)
 
-                    val r = ArRenderer(ctx, slamManager)
+                    val r = ArRenderer(ctx, slamManager, projectRepository)
                     renderer = r
                     setRenderer(r)
                     renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY

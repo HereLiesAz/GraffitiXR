@@ -195,6 +195,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(
     }
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_trainStepJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle == 0) return;
+    getEngine(handle)->trainStep();
+}
+
 // --- OpenCV Utilities (Integrated) ---
 
 JNIEXPORT jbyteArray JNICALL

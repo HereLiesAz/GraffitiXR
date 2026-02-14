@@ -10,13 +10,16 @@ import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 
+import com.hereliesaz.graffitixr.feature.ar.masking.MaskingScreen
+
 /**
  * Manages the UI flow for creating a new AR target (fingerprint).
  *
  * This composable acts as a state machine controller, switching between:
  * 1. [CaptureStep.CAPTURE]: Showing the camera feed and a shutter button.
  * 2. [CaptureStep.RECTIFY]: Showing the captured image with 4 draggable corners to unwarp perspective.
- * 3. [CaptureStep.REVIEW]: Showing the final unwarped target for confirmation.
+ * 3. [CaptureStep.MASK]: Masking the image.
+ * 4. [CaptureStep.REVIEW]: Showing the final unwarped target for confirmation.
  *
  * @param uiState Current AR UI state containing the captured bitmap.
  * @param captureStep The current step in the creation process.
@@ -25,6 +28,7 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
  * @param onCancel Callback to exit the flow completely.
  * @param onPhotoCaptured Callback with the captured bitmap.
  * @param onUnwarpImage Callback with the 4 corner points to perform rectification.
+ * @param onMaskConfirmed Callback when masking is done.
  */
 @Composable
 fun TargetCreationFlow(
@@ -37,7 +41,8 @@ fun TargetCreationFlow(
     onCancel: () -> Unit,
     onPhotoCaptured: (Bitmap) -> Unit,
     onCalibrationPointCaptured: (Offset) -> Unit,
-    onUnwarpImage: (List<Offset>) -> Unit
+    onUnwarpImage: (List<Offset>) -> Unit,
+    onMaskConfirmed: (Bitmap) -> Unit
 ) {
     val cameraController = rememberCameraController()
 
@@ -63,6 +68,13 @@ fun TargetCreationFlow(
                 isRightHanded = isRightHanded,
                 targetImage = uiState.tempCaptureBitmap,
                 onConfirm = onUnwarpImage,
+                onRetake = onRetake
+            )
+        }
+        CaptureStep.MASK -> {
+            MaskingScreen(
+                targetImage = uiState.tempCaptureBitmap,
+                onConfirm = onMaskConfirmed,
                 onRetake = onRetake
             )
         }

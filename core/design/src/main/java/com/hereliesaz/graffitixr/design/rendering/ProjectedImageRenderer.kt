@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.feature.ar.rendering
+package com.hereliesaz.graffitixr.design.rendering
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -11,6 +11,10 @@ import com.hereliesaz.graffitixr.common.model.Layer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/**
+ * A GL helper to render a 2D image (Layer) projected onto a 3D quad.
+ * Supports AR anchors or raw transformation matrices.
+ */
 class ProjectedImageRenderer {
     private var program: Int = 0
     private var positionHandle: Int = 0
@@ -89,12 +93,23 @@ class ProjectedImageRenderer {
         }
     }
 
+    /**
+     * Draw using an ARCore Anchor.
+     */
     fun draw(viewMtx: FloatArray, projMtx: FloatArray, anchor: Anchor, layer: Layer) {
+        val anchorMatrix = FloatArray(16)
+        anchor.pose.toMatrix(anchorMatrix, 0)
+        draw(viewMtx, projMtx, anchorMatrix, layer)
+    }
+
+    /**
+     * Draw using a raw 4x4 model-to-world pose matrix.
+     */
+    fun draw(viewMtx: FloatArray, projMtx: FloatArray, poseMtx: FloatArray, layer: Layer) {
         if (!isTextureLoaded && pendingBitmap == null) return
         updateTexture()
         GLES30.glUseProgram(program)
-        val anchorMatrix = FloatArray(16)
-        anchor.pose.toMatrix(anchorMatrix, 0)
+        
         Matrix.setIdentityM(modelMatrix, 0)
         val xOffsetMeters = layer.offset.x * 0.001f
         val yOffsetMeters = layer.offset.y * -0.001f
@@ -103,11 +118,14 @@ class ProjectedImageRenderer {
         Matrix.rotateM(modelMatrix, 0, layer.rotationY, 0f, 1f, 0f)
         Matrix.rotateM(modelMatrix, 0, layer.rotationZ, 0f, 0f, 1f)
         Matrix.scaleM(modelMatrix, 0, layer.scale, layer.scale, 1f)
+        
         val worldMatrix = FloatArray(16)
-        Matrix.multiplyMM(worldMatrix, 0, anchorMatrix, 0, modelMatrix, 0)
+        Matrix.multiplyMM(worldMatrix, 0, poseMtx, 0, modelMatrix, 0)
+        
         val viewWorld = FloatArray(16)
         Matrix.multiplyMM(viewWorld, 0, viewMtx, 0, worldMatrix, 0)
         Matrix.multiplyMM(mvpMatrix, 0, projMtx, 0, viewWorld, 0)
+        
         GLES30.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
         GLES30.glUniform1f(alphaHandle, layer.opacity)
         GLES30.glUniform3f(colorBalanceHandle, layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB)

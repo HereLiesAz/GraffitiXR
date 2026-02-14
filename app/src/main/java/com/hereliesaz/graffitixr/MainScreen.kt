@@ -78,6 +78,7 @@ fun MainScreen(
     dashboardViewModel: DashboardViewModel,
     navController: NavController,
     slamManager: SlamManager, // Injected dependency
+    projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val localNavController = rememberNavController()
@@ -252,15 +253,21 @@ fun MainScreen(
                         onUnwarpImage = { points ->
                             arUiState.tempCaptureBitmap?.let { src ->
                                 ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                                    // Highlight markings (Edge Detection)
-                                    // This extracts the graffiti from the wall background
-                                    val extracted = ImageProcessor.detectEdges(unwarped) ?: unwarped
-
-                                    // Update preview with extracted version
-                                    arViewModel.setTempCapture(extracted)
-                                    viewModel.setCaptureStep(CaptureStep.REVIEW)
+                                    // Update preview with unwarped version
+                                    arViewModel.setTempCapture(unwarped)
+                                    // Go to Masking step
+                                    viewModel.setCaptureStep(CaptureStep.MASK)
                                 }
                             }
+                        },
+                        onMaskConfirmed = { maskedBitmap ->
+                            // Highlight markings (Edge Detection) could happen here or after masking
+                            // This extracts the graffiti from the wall background
+                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+
+                            // Update preview with extracted/masked version
+                            arViewModel.setTempCapture(extracted)
+                            viewModel.setCaptureStep(CaptureStep.REVIEW)
                         }
                     )
                 }
@@ -277,6 +284,7 @@ fun MainScreen(
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
                         slamManager = slamManager, // FIXED: Passing Shared Engine
+                        projectRepository = projectRepository,
                         use3dBackground = use3dBackground
                     )
                 }
@@ -302,7 +310,8 @@ fun MainScreen(
                         MappingScreen(
                             onScanComplete = { localNavController.popBackStack() },
                             onBackClick = { localNavController.popBackStack() },
-                            slamManager = slamManager
+                            slamManager = slamManager,
+                            projectRepository = projectRepository
                         )
                     }
                     composable("project_library") {
@@ -370,6 +379,7 @@ fun MainContentLayer(
     onRendererCreated: (ArRenderer) -> Unit,
     onPickBackground: () -> Unit,
     slamManager: SlamManager, // Injected
+    projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
     use3dBackground: Boolean = false
 ) {
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
@@ -389,16 +399,18 @@ fun MainContentLayer(
                     viewModel = arViewModel,
                     uiState = arUiState,
                     slamManager = slamManager,
+                    projectRepository = projectRepository,
                     activeLayer = activeLayer,
                     onRendererCreated = onRendererCreated
                 )
             }
             EditorMode.STATIC -> {
                 if (use3dBackground && !editorUiState.mapPath.isNullOrEmpty()) {
-                    // FIXED: Passing slamManager
+                    // FIXED: Passing slamManager and activeLayer
                     GsViewer(
                         mapPath = editorUiState.mapPath!!,
                         slamManager = slamManager,
+                        activeLayer = activeLayer,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -425,6 +437,7 @@ fun MainContentLayer(
                     viewModel = arViewModel,
                     uiState = arUiState.copy(showPointCloud = false),
                     slamManager = slamManager,
+                    projectRepository = projectRepository,
                     activeLayer = activeLayer,
                     onRendererCreated = onRendererCreated
                 )
@@ -437,6 +450,8 @@ fun MainContentLayer(
         if (editorUiState.layers.isNotEmpty()) {
             if (editorUiState.editorMode == EditorMode.AR && arUiState.isTargetDetected) {
                 // AR Scene rendering
+            } else if (editorUiState.editorMode == EditorMode.STATIC && use3dBackground) {
+                // Already rendered in 3D inside GsViewer
             } else {
                 val modifier = if (!editorUiState.isImageLocked) {
                     Modifier.pointerInput(Unit) {

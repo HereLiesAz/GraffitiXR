@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr.feature.ar.rendering
+package com.hereliesaz.graffitixr.design.rendering
 
 import android.content.Context
 import android.opengl.GLES20

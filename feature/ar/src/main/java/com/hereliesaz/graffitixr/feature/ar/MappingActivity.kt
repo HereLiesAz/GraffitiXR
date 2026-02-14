@@ -12,6 +12,7 @@ import javax.inject.Inject
 class MappingActivity : ComponentActivity() {
 
     @Inject lateinit var slamManager: SlamManager
+    @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,7 +21,8 @@ class MappingActivity : ComponentActivity() {
                 MappingScreen(
                     onBackClick = { finish() },
                     onScanComplete = { finish() }, // Simplified nav
-                    slamManager = slamManager // FIXED: Passed injected instance
+                    slamManager = slamManager, // FIXED: Passed injected instance
+                    projectRepository = projectRepository
                 )
             }
         }

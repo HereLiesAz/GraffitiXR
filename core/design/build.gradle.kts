@@ -40,4 +40,7 @@ dependencies {
     // MISSING DEPENDENCY RESTORED:
     // Required for legacy vector drawables using ?attr/colorControlNormal
     implementation(libs.androidx.appcompat)
+    
+    // ADDED: Required for shared 3D rendering (ProjectedImageRenderer)
+    implementation(libs.arcore.client)
 }

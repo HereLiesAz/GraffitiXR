@@ -24,6 +24,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var slamManager: SlamManager
+    @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 
     private val mainViewModel: MainViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
@@ -46,7 +47,8 @@ class MainActivity : ComponentActivity() {
                     arViewModel = arViewModel,
                     dashboardViewModel = dashboardViewModel,
                     navController = navController,
-                    slamManager = slamManager, // PASSED DOWN
+                    slamManager = slamManager,
+                    projectRepository = projectRepository, // ADDED
                     onRendererCreated = { renderer ->
                         arRenderer = renderer
                     }

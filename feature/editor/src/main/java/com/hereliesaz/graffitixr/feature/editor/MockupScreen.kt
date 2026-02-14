@@ -50,7 +50,7 @@ fun MockupScreen(
                 detectTransformGestures { _, pan, zoom, rotation ->
                     if (uiState.isEditingBackground) {
                         // Background logic
-                    } else if (activeLayer != null && !uiState.isImageLocked && uiState.editorMode != EditorMode.MOCKUP) { // Disable affine gestures in Warp mode
+                    } else if (activeLayer != null && !activeLayer.isImageLocked && uiState.editorMode != EditorMode.MOCKUP) { // Disable affine gestures in Warp mode
                         viewModel.onGestureStart()
                         val newScale = activeLayer.scale * zoom
                         val newOffset = activeLayer.offset + pan
@@ -118,7 +118,7 @@ fun MockupScreen(
                                 rotationZ = layer.rotationZ
                                 alpha = layer.opacity
                             },
-                        isEditable = !uiState.isImageLocked,
+                        isEditable = !layer.isImageLocked,
                         meshState = layer.warpMesh,
                         onMeshChanged = { newMesh ->
                             viewModel.onLayerWarpChanged(layer.id, newMesh)

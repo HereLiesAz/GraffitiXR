@@ -51,6 +51,9 @@ public:
     // Rendering
     void draw();
 
+    // Splat Training / Refinement
+    void trainStep();
+
     // Map Management
     bool saveModel(const std::string& path);
     bool loadModel(const std::string& path);

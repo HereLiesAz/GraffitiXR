@@ -67,6 +67,10 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
+    // MLKit
+    implementation(libs.mlkit.subject.segmentation)
+    implementation(libs.kotlinx.coroutines.play.services)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

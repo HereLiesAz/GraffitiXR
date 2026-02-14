@@ -5,18 +5,18 @@
 - [x] **Voxel Map Culling:** `MobileGS` garbage collection for old points.
 - [x] **Serialization Speed:** Async map saving.
 - [x] **Modularization:** Complete refactoring into `:core` and `:feature` modules.
-- [ ] **Unit Testing:** Increase coverage for new ViewModels and Repositories.
+- [x] **Unit Testing:** Increase coverage for new ViewModels and Repositories.
 
 ## 🟡 Medium Priority (Features)
 
 - [x] **"Ghost" Toggle:** Toggle point cloud visibility.
 - [x] **Fingerprint Aging:** Handle outdated ORB descriptors.
 - [x] **Left-Handed Mode:** Invert AzNavRail alignment.
-- [ ] **Mockup Mode - Mesh Warp:** Non-linear warping for curved surfaces.
+- [x] **Mockup Mode - Mesh Warp:** Non-linear warping for curved surfaces.
 
 ## 🟢 Low Priority (Polish)
 
-- [ ] **Occlusion:** Person/Object masking.
+- [x] **Occlusion:** Person/Object masking.
 
 ## Completed Features (Archive)
 
@@ -74,9 +74,9 @@
 ## Phase 3: 3D & SLAM (Current Focus)
 - [x] **SphereSLAM:** Basic keyframe and point cloud capture (`MappingScreen`).
 - [x] **3D Mockup:** Integration of `GsViewer` into the Editor.
-- [ ] **Splat Training:** On-device training of Gaussian Splats from SLAM data (Currently offline/cloud only).
-- [ ] **Live Occlusion:** Using the sparse point cloud for real-time occlusion in AR mode.
+- [x] **Splat Training:** On-device training of Gaussian Splats from SLAM data (Online refinement implemented).
+- [x] **Live Occlusion:** Using the sparse point cloud for real-time occlusion in AR mode.
 
 ## Phase 4: Polish & Scaling
 - [ ] **LiDAR:** Mesh generation for Pro devices.
-- [ ] **Optimizations:** Vulkan backend for Splat rasterization.
+- [ ] **Optimizations:** Vulkan backend for Splat rasterization (Stubbed).

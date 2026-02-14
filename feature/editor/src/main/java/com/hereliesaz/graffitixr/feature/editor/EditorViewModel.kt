@@ -13,6 +13,7 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
@@ -117,7 +118,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun toggleImageLock() {
-        _uiState.update { it.copy(isImageLocked = !it.isImageLocked) }
+        updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }
     }
 
     fun toggleHandedness() {
@@ -233,10 +234,6 @@ class EditorViewModel @Inject constructor(
         _exportTrigger.value = false
         _uiState.update { it.copy(hideUiForCapture = false) }
     }
-
-import com.hereliesaz.graffitixr.common.model.OverlayLayer
-
-// ...
 
     fun saveProject() {
         viewModelScope.launch(dispatchers.io) {

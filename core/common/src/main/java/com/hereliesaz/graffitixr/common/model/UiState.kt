@@ -92,6 +92,8 @@ enum class CaptureStep {
     CAPTURE,
     /** Rectifying (unwarping) the captured image. */
     RECTIFY,
+    /** Masking the image to select the target area. */
+    MASK,
     /** Reviewing the final target image. */
     REVIEW
 }
@@ -135,6 +137,7 @@ data class Layer(
     val rotationY: Float = 0f,
     val rotationZ: Float = 0f,
     val isVisible: Boolean = true,
+    val isImageLocked: Boolean = false, // Added per-layer lock
     val opacity: Float = 1f,
     val blendMode: BlendMode = BlendMode.SrcOver,
 

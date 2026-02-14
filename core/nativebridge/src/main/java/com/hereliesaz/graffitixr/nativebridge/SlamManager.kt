@@ -28,7 +28,7 @@ class SlamManager @Inject constructor() {
      */
     fun initialize() {
         if (nativeHandle == 0L) {
-            nativeHandle = createNativeInstance()
+            nativeHandle = initNativeJni()
         }
     }
 
@@ -77,6 +77,14 @@ class SlamManager @Inject constructor() {
         if (nativeHandle != 0L) clearMapJni(nativeHandle)
     }
 
+    fun alignMap(transformMtx: FloatArray) {
+        if (nativeHandle != 0L) alignMapJni(nativeHandle, transformMtx)
+    }
+
+    fun trainStep() {
+        if (nativeHandle != 0L) trainStepJni(nativeHandle)
+    }
+
     fun getPointCount(): Int {
         return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
     }
@@ -101,7 +109,7 @@ class SlamManager @Inject constructor() {
     }
 
     // --- Native Interface ---
-    private external fun createNativeInstance(): Long
+    private external fun initNativeJni(): Long
     private external fun resetGLJni(handle: Long)
     private external fun destroyNativeJni(handle: Long)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
@@ -115,6 +123,7 @@ class SlamManager @Inject constructor() {
     private external fun getPointCountJni(handle: Long): Int
     private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
     private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
+    private external fun trainStepJni(handle: Long)
 
     // OpenCV
     private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?

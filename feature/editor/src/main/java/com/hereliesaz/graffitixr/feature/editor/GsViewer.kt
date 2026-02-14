@@ -7,10 +7,12 @@ import android.view.MotionEvent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.feature.editor.rendering.GsViewerRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlin.math.sqrt
@@ -24,13 +26,19 @@ import kotlin.math.sqrt
 fun GsViewer(
     mapPath: String,
     slamManager: SlamManager, // FIXED: Added
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    activeLayer: Layer? = null
 ) {
     val context = LocalContext.current
 
     // Initialize Renderer with the map file path AND shared engine
     val renderer = remember(mapPath) {
         GsViewerRenderer(context, mapPath, slamManager)
+    }
+
+    // Update active layer in renderer when it changes
+    LaunchedEffect(activeLayer) {
+        renderer.activeLayer = activeLayer
     }
 
     DisposableEffect(renderer) {

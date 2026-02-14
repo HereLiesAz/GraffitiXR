@@ -3,6 +3,9 @@ package com.hereliesaz.graffitixr.feature.editor.rendering
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
+import android.opengl.Matrix
+import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.design.rendering.ProjectedImageRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -19,6 +22,13 @@ class GsViewerRenderer(
 
     val camera = VirtualCamera()
     private var isModelLoaded = false
+    private val layerRenderer = ProjectedImageRenderer()
+    
+    var activeLayer: Layer? = null
+        set(value) {
+            field = value
+            value?.let { layerRenderer.setBitmap(it.bitmap) }
+        }
 
     fun cleanup() {
         // No-op for shared slamManager
@@ -29,6 +39,7 @@ class GsViewerRenderer(
 
         slamManager.resetGLState()
         slamManager.initialize()
+        layerRenderer.createOnGlThread(context)
 
         if (mapPath.isNotEmpty()) {
             isModelLoaded = slamManager.loadWorld(mapPath)
@@ -45,8 +56,18 @@ class GsViewerRenderer(
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
         if (isModelLoaded) {
-            slamManager.updateCamera(camera.viewMatrix, camera.projectionMatrix)
+            val view = camera.viewMatrix
+            val proj = camera.projectionMatrix
+            
+            slamManager.updateCamera(view, proj)
             slamManager.draw()
+
+            // Draw Active Layer in 3D
+            activeLayer?.let { layer ->
+                val identity = FloatArray(16)
+                Matrix.setIdentityM(identity, 0)
+                layerRenderer.draw(view, proj, identity, layer)
+            }
         }
     }
 

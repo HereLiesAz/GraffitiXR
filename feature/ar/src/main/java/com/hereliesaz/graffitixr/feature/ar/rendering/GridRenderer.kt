@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.Matrix
+import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 

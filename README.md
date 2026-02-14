@@ -42,8 +42,9 @@ We use a custom C++ native engine (`MobileGS`) that implements **Teleological SL
 * **Standard SLAM** asks: "Where am I based on the past?"
 * **Teleological SLAM** asks: "Where am I based on the future (the art)?"
 * **Capabilities:**
-    * **Drift Correction:** Uses the digital overlay as a "Ground Truth" to correct drift when the physical wall changes.
+    * **Active Drift Correction:** Uses the digital overlay as a "Ground Truth" to correct drift when the physical wall changes.
     * **Voxel Pruning:** Automatically removes old feature points (bricks/cracks) when they are covered by paint, replacing them with new features from the artwork.
+    * **Splat Training:** Real-time refinement of the point cloud confidence.
 
 ### 2. The Rail (AzNavRail)
 A thumb-driven navigation paradigm designed for one-handed use.

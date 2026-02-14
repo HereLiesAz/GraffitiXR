@@ -274,6 +274,52 @@ void MobileGS::setTargetDescriptors(const cv::Mat& descriptors) {
     LOGI("MobileGS: Target descriptors set. Rows: %d", mTargetDescriptors.rows);
 }
 
+void MobileGS::trainStep() {
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+    
+    // Simple "Training" / Refinement Loop
+    // 1. Densify: Already handled in feedDepthData by adding new points in empty voxels.
+    // 2. Prune: Remove points with low opacity (confidence).
+    
+    // We iterate backwards to safely erase
+    for (int i = mSplats.size() - 1; i >= 0; i--) {
+        Splat& s = mSplats[i];
+        
+        // Decay opacity slightly every frame to simulate "forgetting" if not re-observed
+        // But only if we are actively training (this method called)
+        s.opacity *= 0.99f; 
+
+        // Pruning threshold
+        if (s.opacity < 0.1f) {
+            // Remove from vector (swap with last and pop)
+            // Note: This breaks the voxel grid indices! We need to rebuild voxel grid or handle it.
+            // For performance, we might batch prune or rebuild grid periodically.
+            // Here we do a swap-remove, but we MUST invalidate the VoxelGrid.
+            
+            if (i != mSplats.size() - 1) {
+                mSplats[i] = mSplats.back();
+            }
+            mSplats.pop_back();
+            mGlDirty = true;
+        }
+    }
+    
+    // If we pruned significantly, rebuild the grid
+    // For now, simpler to just clear grid and rebuild if we change structure
+    if (mGlDirty) {
+        mVoxelGrid.clear();
+        for(int i=0; i<mSplats.size(); i++) {
+            const Splat& s = mSplats[i];
+            VoxelKey key = {
+                    (int)floor(s.pos.x / VOXEL_SIZE),
+                    (int)floor(s.pos.y / VOXEL_SIZE),
+                    (int)floor(s.pos.z / VOXEL_SIZE)
+            };
+            mVoxelGrid[key] = i;
+        }
+    }
+}
+
 void MobileGS::pruneMap(int ageThresholdFrames) {
     std::lock_guard<std::mutex> lock(mChunkMutex);
     // Placeholder for pruning logic
@@ -484,6 +530,33 @@ bool MobileGS::loadModel(const std::string& path) {
 }
 
 void MobileGS::alignMap(float* transformMtx) {
-    // Apply transform to all points
-    // Placeholder
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+    
+    glm::mat4 T = glm::make_mat4(transformMtx);
+    glm::mat3 R = glm::mat3(T);
+    glm::vec3 t = glm::vec3(T[3]);
+    glm::quat q = glm::quat_cast(R);
+
+    for (auto& s : mSplats) {
+        // 1. Position: P' = R*P + t
+        s.pos = R * s.pos + t;
+        
+        // 2. Rotation: q' = q_align * q_old
+        s.rot = q * s.rot;
+    }
+
+    // 3. Rebuild Voxel Grid
+    mVoxelGrid.clear();
+    for(int i=0; i<mSplats.size(); i++) {
+        const Splat& s = mSplats[i];
+        VoxelKey key = {
+                (int)floor(s.pos.x / VOXEL_SIZE),
+                (int)floor(s.pos.y / VOXEL_SIZE),
+                (int)floor(s.pos.z / VOXEL_SIZE)
+        };
+        mVoxelGrid[key] = i;
+    }
+
+    mGlDirty = true;
+    LOGI("MobileGS: Map aligned with correction matrix.");
 }

@@ -21,13 +21,14 @@ fun ArView(
     viewModel: ArViewModel,
     uiState: ArUiState,
     slamManager: SlamManager, // FIXED: Added
+    projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository, // ADDED
     activeLayer: Layer? = null,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    // FIXED: Passed slamManager to constructor
-    val renderer = remember { ArRenderer(context, slamManager) }
+    // FIXED: Passed slamManager and projectRepository
+    val renderer = remember { ArRenderer(context, slamManager, projectRepository) }
 
     LaunchedEffect(renderer) { onRendererCreated(renderer) }
 
