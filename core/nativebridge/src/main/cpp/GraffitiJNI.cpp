@@ -1,11 +1,13 @@
 #include <jni.h>
 #include <string>
 #include <vector>
+#include <fstream>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
 #include <android/log.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 #include <opencv2/features2d.hpp>
 #include "MobileGS.h"
 

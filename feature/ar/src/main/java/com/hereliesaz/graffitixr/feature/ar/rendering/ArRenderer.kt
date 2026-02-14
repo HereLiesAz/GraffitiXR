@@ -38,12 +38,12 @@ class ArRenderer(
     private var session: Session? = null
     private val displayRotationHelper = DisplayRotationHelper(context)
     private val backgroundRenderer = BackgroundRenderer()
-    
+
     // Matrix buffers
     private val viewMatrix = FloatArray(16)
     private val projectionMatrix = FloatArray(16)
     private val cameraPoseMatrix = FloatArray(16)
-    
+
     // Teleological Loop State
     private var lastCorrectionTime = 0L
     private var isCorrecting = false
@@ -51,6 +51,11 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         try {
+            // FIX: Reset native GL state because we have a new EGLContext.
+            // This prevents the "Ghost Renderer" crash where the singleton engine
+            // tries to use VBOs from a destroyed activity.
+            slamManager.resetGLState()
+
             backgroundRenderer.createOnGlThread(context)
             slamManager.initialize()
             // INDICATE splatted areas using Fog of War removal
@@ -83,13 +88,13 @@ class ArRenderer(
             // Update SLAM Manager with Camera Matrices
             camera.getViewMatrix(viewMatrix, 0)
             camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
-            
+
             // Get Camera Pose for SLAM
             val pose = camera.pose
             pose.toMatrix(cameraPoseMatrix, 0)
 
             slamManager.updateCamera(viewMatrix, projectionMatrix)
-            
+
             // NEW: Light Estimation
             frame.lightEstimate?.let { estimate ->
                 val intensity = estimate.pixelIntensity
@@ -109,16 +114,17 @@ class ArRenderer(
             val depthMode = session.config.depthMode
             if (depthMode == Config.DepthMode.AUTOMATIC || depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
                 try {
-                        val depthImage = if (depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
-                            frame.acquireRawDepthImage16Bits()
-                        } else {
-                            frame.acquireDepthImage16Bits()
-                        }
-                        val cameraImage = frame.acquireCameraImage() // For color mapping
+                    val depthImage = if (depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
+                        frame.acquireRawDepthImage16Bits()
+                    } else {
+                        frame.acquireDepthImage16Bits()
+                    }
+                    val cameraImage = frame.acquireCameraImage() // For color mapping
 
+                    if (depthImage != null && cameraImage != null) {
                         val depthBuffer = depthImage.planes[0].buffer
                         val colorBuffer = cameraImage.planes[0].buffer
-                        
+
                         val intrinsics = camera.imageIntrinsics
                         val fovY = (2.0 * Math.atan(intrinsics.principalPoint[1] / intrinsics.focalLength[1].toDouble())).toFloat()
 
@@ -146,7 +152,8 @@ class ArRenderer(
 
                         depthImage.close()
                         cameraImage.close()
-                    } catch (e: Exception) {
+                    }
+                } catch (e: Exception) {
                     // Depth or Camera image not available yet, ignore
                 }
             }
@@ -165,9 +172,9 @@ class ArRenderer(
 
     private fun performTeleologicalCorrection(camera: com.google.ar.core.Camera) {
         val view = glSurfaceView ?: return
-        
+
         isCorrecting = true
-        
+
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         PixelCopy.request(view, bitmap, { result ->
             if (result == PixelCopy.SUCCESS) {
@@ -175,16 +182,16 @@ class ArRenderer(
                     try {
                         val project = projectRepository.currentProject.value
                         val fingerprint = project?.fingerprint
-                        
+
                         if (fingerprint != null) {
                             val intrinsics = camera.imageIntrinsics
                             val intrinsicsArray = floatArrayOf(
                                 intrinsics.focalLength[0], intrinsics.focalLength[1],
                                 intrinsics.principalPoint[0], intrinsics.principalPoint[1]
                             )
-                            
+
                             val tTargetToCamera = ImageProcessingUtils.solvePnP(bitmap, fingerprint, intrinsicsArray)
-                            
+
                             if (tTargetToCamera != null) {
                                 val tWorldToCamera = Mat(4, 4, CvType.CV_64F)
                                 for (i in 0..3) {
@@ -192,11 +199,11 @@ class ArRenderer(
                                         tWorldToCamera.put(i, j, cameraPoseMatrix[j * 4 + i].toDouble())
                                     }
                                 }
-                                
+
                                 val tCameraToWorld = tWorldToCamera.inv()
                                 val tTargetToWorld = Mat()
                                 org.opencv.core.Core.gemm(tCameraToWorld, tTargetToCamera, 1.0, Mat(), 0.0, tTargetToWorld)
-                                
+
                                 val correctionArray = FloatArray(16)
                                 for(i in 0..3) {
                                     for(j in 0..3) {
@@ -204,9 +211,9 @@ class ArRenderer(
                                         correctionArray[j * 4 + i] = tTargetToWorld.get(i, j)[0].toFloat()
                                     }
                                 }
-                                
+
                                 slamManager.alignMap(correctionArray)
-                                
+
                                 tWorldToCamera.release()
                                 tCameraToWorld.release()
                                 tTargetToWorld.release()
@@ -233,14 +240,14 @@ class ArRenderer(
             try {
                 session = Session(context)
                 val config = Config(session)
-                
+
                 // Prefer RAW_DEPTH (LiDAR) if available, fallback to AUTOMATIC
                 config.depthMode = if (session!!.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY)) {
                     Config.DepthMode.RAW_DEPTH_ONLY
                 } else {
                     Config.DepthMode.AUTOMATIC
                 }
-                
+
                 config.focusMode = Config.FocusMode.AUTO
                 config.updateMode = Config.UpdateMode.BLOCKING
                 session!!.configure(config)
@@ -266,19 +273,6 @@ class ArRenderer(
     fun setFlashlight(on: Boolean) {}
     fun setLayer(layer: Layer?) {}
     fun handleTap(x: Float, y: Float) {}
-
-    fun saveKeyframe(path: String) {
-        val view = glSurfaceView ?: return
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        
-        PixelCopy.request(view, bitmap, { result ->
-            if (result == PixelCopy.SUCCESS) {
-                // Ensure we use the latest camera pose matrix from the last draw call
-                slamManager.saveKeyframe(bitmap, cameraPoseMatrix, path)
-            }
-            bitmap.recycle()
-        }, android.os.Handler(android.os.Looper.getMainLooper()))
-    }
 
     fun cleanup() {
         rendererScope.cancel()
