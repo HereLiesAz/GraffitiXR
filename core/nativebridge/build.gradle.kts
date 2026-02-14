@@ -37,5 +37,5 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(libs.arcore.client)
-    implementation(libs.opencv)
+    implementation(project(":opencv"))
 }

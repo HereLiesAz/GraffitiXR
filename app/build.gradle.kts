@@ -67,22 +67,17 @@ dependencies {
     implementation(project(":feature:ar"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:dashboard"))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.material3)
-    
-    // Use the project module instead of the AAR to avoid duplication if possible, 
-    // or keep pickFirsts. Since :opencv is included in many places, 
-    // we'll rely on pickFirsts in the app packaging.
-    implementation(libs.opencv)
 
-    implementation(libs.arcore.client)
-    implementation(libs.androidx.activity.ktx)
-    implementation(libs.navigation.compose)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.az.nav.rail)
-    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(project(":opencv"))
+    
+    // UI & Compose
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.navigation.compose)
+    implementation(libs.az.nav.rail)
+    implementation(libs.androidx.compose.material.icons.extended)
     
     // Hilt
     implementation(libs.hilt.android)

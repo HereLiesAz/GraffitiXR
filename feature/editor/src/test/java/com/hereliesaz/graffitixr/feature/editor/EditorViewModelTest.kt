@@ -13,10 +13,7 @@ import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.coEvery
 import io.mockk.every
-import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
-import io.mockk.verify
+import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -24,6 +21,8 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
+import org.junit.Assert.assertNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -153,12 +152,12 @@ class EditorViewModelTest {
         
         // Mock successful background removal
         val resultBitmap = mockk<Bitmap>()
-        coEvery { backgroundRemover.removeBackground(any()) } returns Result.success(resultBitmap)
+        coEvery { backgroundRemover.removeBackground(any<Bitmap>()) } returns Result.success(resultBitmap)
         
         viewModel.onRemoveBackgroundClicked()
         testDispatcher.scheduler.advanceUntilIdle()
         
-        coEvery { backgroundRemover.removeBackground(any()) }
+        coEvery { backgroundRemover.removeBackground(any<Bitmap>()) }
         assertFalse(viewModel.uiState.value.isLoading)
     }
     
@@ -173,5 +172,45 @@ class EditorViewModelTest {
         
         viewModel.toggleImageLock()
         assertFalse(viewModel.uiState.value.isImageLocked)
+    }
+
+    @Test
+    fun `saveProject calls createProject when no project exists`() = runTest {
+        // Mock no current project
+        every { projectRepository.currentProject.value } returns null
+        
+        val uri = mockk<Uri>(relaxed = true)
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        viewModel.saveProject()
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        coVerify { projectRepository.createProject(any<com.hereliesaz.graffitixr.common.model.GraffitiProject>()) }
+    }
+
+    @Test
+    fun `onLayerRemoved removes layer and clears active ID if necessary`() = runTest {
+        val uri = mockk<Uri>(relaxed = true)
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerRemoved(layerId)
+        
+        assertTrue(viewModel.uiState.value.layers.isEmpty())
+        assertNull(viewModel.uiState.value.activeLayerId)
+    }
+
+    @Test
+    fun `saveProject calls updateProject when project exists`() = runTest {
+        // Mock existing project
+        val existingProject = mockk<com.hereliesaz.graffitixr.common.model.GraffitiProject>(relaxed = true)
+        every { projectRepository.currentProject.value } returns existingProject
+        
+        viewModel.saveProject()
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        coVerify { projectRepository.updateProject(any<com.hereliesaz.graffitixr.common.model.GraffitiProject>()) }
     }
 }

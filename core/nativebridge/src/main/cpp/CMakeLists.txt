@@ -4,6 +4,8 @@ project("graffitixr")
 
 # --- OPTIMIZATIONS ---
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++17 -ffast-math -fopenmp")
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
 # --- DEPENDENCY PATHS ---
 if(NOT DEFINED LIBS_DIR)
