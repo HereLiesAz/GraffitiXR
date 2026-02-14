@@ -92,13 +92,11 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `updateTrackingState updates metrics`() = runTest {
-        viewModel.updateTrackingState("TRACKING", 2, 100)
-        
-        val state = viewModel.uiState.value
-        assertEquals("TRACKING", state.trackingState)
-        assertEquals(2, state.planeCount)
-        assertEquals(100, state.pointCloudCount)
-        assertTrue(state.isTargetDetected)
+    fun `onTargetDetected updates state`() = runTest {
+        viewModel.onTargetDetected(true)
+        assertTrue(viewModel.uiState.value.isTargetDetected)
+
+        viewModel.onTargetDetected(false)
+        assertFalse(viewModel.uiState.value.isTargetDetected)
     }
 }

@@ -71,12 +71,16 @@
 - [x] Trace Mode (High contrast overlay).
 - [x] Target Creation Flow (Capture -> Rectify).
 
-## Phase 3: 3D & SLAM (Current Focus)
+## Phase 3: 3D & SLAM (Completed)
 - [x] **SphereSLAM:** Basic keyframe and point cloud capture (`MappingScreen`).
 - [x] **3D Mockup:** Integration of `GsViewer` into the Editor.
 - [x] **Splat Training:** On-device training of Gaussian Splats from SLAM data (Online refinement implemented).
 - [x] **Live Occlusion:** Using the sparse point cloud for real-time occlusion in AR mode.
+- [x] **Target Masking:** MLKit-powered subject segmentation for target isolation.
 
-## Phase 4: Polish & Scaling
+## Phase 4: Polish & Scaling (Current Focus)
 - [ ] **LiDAR:** Mesh generation for Pro devices.
 - [ ] **Optimizations:** Vulkan backend for Splat rasterization (Stubbed).
+- [x] **Modularization:** Project fully refactored into `:core` and `:feature` modules.
+- [x] **Hardening:** Network security config and telemetry silencing.
+- [x] **Unit Testing:** Coverage expanded for critical ViewModels and serialization.
