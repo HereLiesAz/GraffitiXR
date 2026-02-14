@@ -83,7 +83,8 @@ class EditorViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         layers = it.layers + newLayer,
-                        activeLayerId = newLayer.id
+                        activeLayerId = newLayer.id,
+                        isImageLocked = newLayer.isImageLocked
                     )
                 }
             }
@@ -91,7 +92,13 @@ class EditorViewModel @Inject constructor(
     }
 
     fun onLayerActivated(layerId: String) {
-        _uiState.update { it.copy(activeLayerId = layerId) }
+        _uiState.update { state ->
+            val layer = state.layers.find { it.id == layerId }
+            state.copy(
+                activeLayerId = layerId,
+                isImageLocked = layer?.isImageLocked ?: false
+            )
+        }
     }
 
     fun onLayerReordered(newOrder: List<String>) {
@@ -113,7 +120,13 @@ class EditorViewModel @Inject constructor(
     fun onLayerRemoved(layerId: String) {
         _uiState.update { state ->
             val newLayers = state.layers.filter { it.id != layerId }
-            state.copy(layers = newLayers, activeLayerId = if (state.activeLayerId == layerId) null else state.activeLayerId)
+            val newActiveId = if (state.activeLayerId == layerId) null else state.activeLayerId
+            val isLocked = if (newActiveId != null) {
+                newLayers.find { it.id == newActiveId }?.isImageLocked ?: false
+            } else {
+                false
+            }
+            state.copy(layers = newLayers, activeLayerId = newActiveId, isImageLocked = isLocked)
         }
     }
 
@@ -290,10 +303,15 @@ class EditorViewModel @Inject constructor(
     private fun updateActiveLayer(transform: (Layer) -> Layer) {
         _uiState.update { state ->
             val activeId = state.activeLayerId ?: return@update state
+            var isLocked = state.isImageLocked
             val newLayers = state.layers.map {
-                if (it.id == activeId) transform(it) else it
+                if (it.id == activeId) {
+                    val newLayer = transform(it)
+                    isLocked = newLayer.isImageLocked
+                    newLayer
+                } else it
             }
-            state.copy(layers = newLayers)
+            state.copy(layers = newLayers, isImageLocked = isLocked)
         }
     }
 

@@ -164,6 +164,10 @@ class EditorViewModelTest {
     
     @Test
     fun `toggleImageLock updates state`() = runTest {
+        val uri = mockk<Uri>(relaxed = true)
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
         viewModel.toggleImageLock()
         assertTrue(viewModel.uiState.value.isImageLocked)
         
