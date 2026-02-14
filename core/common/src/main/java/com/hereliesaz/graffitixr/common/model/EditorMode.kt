@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.common.model
 
 enum class EditorMode {
     EDIT,
+    MOCKUP,
     AR,
     OVERLAY,
     STATIC,

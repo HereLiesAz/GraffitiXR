@@ -239,7 +239,13 @@ void MobileGS::draw() {
     setAttrib(5, 1, GL_FLOAT, GL_FALSE, offsetof(Splat, opacity));
 
     // Draw Instanced
+    glEnable(GL_DEPTH_TEST); // ENABLE DEPTH TEST
+    glDepthMask(GL_TRUE); // Write to Depth Buffer
+
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, mSplats.size());
+
+    glDisable(GL_DEPTH_TEST); // Cleanup
+    glDepthMask(GL_FALSE);
 
     // Cleanup
     for(int i=0; i<=5; i++) {

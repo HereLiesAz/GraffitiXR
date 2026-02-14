@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.model.BlendMode
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorPanel
@@ -18,7 +19,6 @@ import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,7 +37,8 @@ class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
     @ApplicationContext private val context: Context,
     private val backgroundRemover: BackgroundRemover,
-    private val slamManager: SlamManager
+    private val slamManager: SlamManager,
+    private val dispatchers: DispatcherProvider
 ) : ViewModel() {
 
     // Internal mutable state
@@ -53,7 +54,7 @@ class EditorViewModel @Inject constructor(
 
     fun setBackgroundImage(uri: Uri?) {
         if (uri == null) return
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatchers.io) {
             val bitmap = loadBitmapFromUri(uri)
             _uiState.update {
                 it.copy(
@@ -69,7 +70,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun onAddLayer(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatchers.io) {
             val bitmap = loadBitmapFromUri(uri)
             if (bitmap != null) {
                 val newLayer = Layer(
@@ -154,6 +155,10 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(gestureInProgress = false) }
     }
 
+    fun onLayerWarpChanged(layerId: String, newMesh: List<Float>) {
+        updateActiveLayer { if (it.id == layerId) it.copy(warpMesh = newMesh) else it }
+    }
+
     // --- Image Processing ---
 
     fun onRemoveBackgroundClicked() {
@@ -161,7 +166,7 @@ class EditorViewModel @Inject constructor(
 
         _uiState.update { it.copy(isLoading = true) }
 
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch(dispatchers.default) {
             // Correct usage: call instance method on the backgroundRemover instance
             val result = backgroundRemover.removeBackground(activeLayer.bitmap)
             val segmented = result.getOrNull()
@@ -183,7 +188,7 @@ class EditorViewModel @Inject constructor(
 
         _uiState.update { it.copy(isLoading = true) }
 
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch(dispatchers.default) {
             // Use SlamManager for JNI edge detection
             val edged = slamManager.detectEdges(activeLayer.bitmap)
 

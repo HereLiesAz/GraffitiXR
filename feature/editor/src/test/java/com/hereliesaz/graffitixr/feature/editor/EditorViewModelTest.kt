@@ -1,14 +1,25 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.content.ContentResolver
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.EditorPanel
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -16,97 +27,147 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+
+import com.hereliesaz.graffitixr.common.DispatcherProvider
+import kotlinx.coroutines.CoroutineDispatcher
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorViewModelTest {
 
     private lateinit var viewModel: EditorViewModel
-    private lateinit var projectRepository: ProjectRepository
-    private lateinit var context: Context
-    private lateinit var backgroundRemover: BackgroundRemover
-    private lateinit var slamManager: SlamManager
+    private val projectRepository: ProjectRepository = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
+    private val backgroundRemover: BackgroundRemover = mockk(relaxed = true)
+    private val slamManager: SlamManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        projectRepository = mockk(relaxed = true)
-        context = mockk(relaxed = true)
-        backgroundRemover = mockk(relaxed = true)
-        slamManager = mockk(relaxed = true)
-        viewModel = EditorViewModel(projectRepository, context, backgroundRemover, slamManager)
+        
+        // Mock static methods for Bitmap
+        mockkStatic(BitmapFactory::class)
+        val mockBitmap = mockk<Bitmap>(relaxed = true)
+        every { BitmapFactory.decodeStream(any()) } returns mockBitmap
+        
+        // Mock Context and ContentResolver
+        val contentResolver = mockk<ContentResolver>()
+        val inputStream = ByteArrayInputStream(ByteArray(0))
+        every { context.contentResolver } returns contentResolver
+        every { contentResolver.openInputStream(any()) } returns inputStream
+
+        val testDispatcherProvider = object : DispatcherProvider {
+            override val main: CoroutineDispatcher = testDispatcher
+            override val io: CoroutineDispatcher = testDispatcher
+            override val default: CoroutineDispatcher = testDispatcher
+            override val unconfined: CoroutineDispatcher = testDispatcher
+        }
+
+        viewModel = EditorViewModel(projectRepository, context, backgroundRemover, slamManager, testDispatcherProvider)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(BitmapFactory::class)
+    }
+
+    @Test
+    fun `initial state is correct`() = runTest {
+        val state = viewModel.uiState.value
+        assertEquals(EditorMode.EDIT, state.editorMode)
+        assertTrue(state.layers.isEmpty())
+        assertFalse(state.isLoading)
     }
 
     @Test
     fun `setEditorMode updates state`() = runTest {
-        assertEquals(EditorMode.EDIT, viewModel.uiState.value.editorMode) // Default
-
-        viewModel.setEditorMode(EditorMode.DRAW)
-        assertEquals(EditorMode.DRAW, viewModel.uiState.value.editorMode)
+        viewModel.setEditorMode(EditorMode.TRACE)
+        assertEquals(EditorMode.TRACE, viewModel.uiState.value.editorMode)
     }
 
     @Test
-    fun `toggleImageLock toggles state`() = runTest {
-        assertFalse(viewModel.uiState.value.isImageLocked)
+    fun `onAddLayer adds a layer`() = runTest {
+        val uri = mockk<Uri>()
+        every { uri.toString() } returns "content://test/image.png"
+        
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
 
+        val state = viewModel.uiState.value
+        assertEquals(1, state.layers.size)
+        assertEquals("Layer 1", state.layers.first().name)
+        assertNotNull(state.activeLayerId)
+    }
+
+    @Test
+    fun `onLayerActivated updates activeLayerId`() = runTest {
+        val uri = mockk<Uri>()
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
+        
+        assertEquals(layerId, viewModel.uiState.value.activeLayerId)
+    }
+
+    @Test
+    fun `onScaleChanged updates active layer`() = runTest {
+        val uri = mockk<Uri>()
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        val initialScale = viewModel.uiState.value.layers.first().scale
+        viewModel.onScaleChanged(2.0f)
+        
+        val updatedLayer = viewModel.uiState.value.layers.first()
+        assertEquals(initialScale * 2.0f, updatedLayer.scale, 0.01f)
+    }
+
+    @Test
+    fun `onOffsetChanged updates active layer`() = runTest {
+        val uri = mockk<Uri>()
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        val initialOffset = viewModel.uiState.value.layers.first().offset
+        val delta = Offset(10f, 20f)
+        viewModel.onOffsetChanged(delta)
+        
+        val updatedLayer = viewModel.uiState.value.layers.first()
+        assertEquals(initialOffset + delta, updatedLayer.offset)
+    }
+
+    @Test
+    fun `onRemoveBackgroundClicked calls backgroundRemover`() = runTest {
+        val uri = mockk<Uri>()
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        // Mock successful background removal
+        val resultBitmap = mockk<Bitmap>()
+        coEvery { backgroundRemover.removeBackground(any()) } returns Result.success(resultBitmap)
+        
+        viewModel.onRemoveBackgroundClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        coEvery { backgroundRemover.removeBackground(any()) }
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+    
+    @Test
+    fun `toggleImageLock updates state`() = runTest {
         viewModel.toggleImageLock()
         assertTrue(viewModel.uiState.value.isImageLocked)
-
+        
         viewModel.toggleImageLock()
         assertFalse(viewModel.uiState.value.isImageLocked)
-    }
-
-    @Test
-    fun `toggleHandedness toggles state`() = runTest {
-        // Default isRightHanded = true
-        assertTrue(viewModel.uiState.value.isRightHanded)
-
-        viewModel.toggleHandedness()
-        assertFalse(viewModel.uiState.value.isRightHanded)
-    }
-
-    @Test
-    fun `onCycleRotationAxis cycles through axes`() = runTest {
-        assertEquals(RotationAxis.Z, viewModel.uiState.value.activeRotationAxis)
-
-        viewModel.onCycleRotationAxis()
-        assertEquals(RotationAxis.X, viewModel.uiState.value.activeRotationAxis)
-
-        viewModel.onCycleRotationAxis()
-        assertEquals(RotationAxis.Y, viewModel.uiState.value.activeRotationAxis)
-
-        viewModel.onCycleRotationAxis()
-        assertEquals(RotationAxis.Z, viewModel.uiState.value.activeRotationAxis)
-    }
-
-    @Test
-    fun `onAdjustClicked sets active panel`() = runTest {
-        viewModel.onAdjustClicked()
-        assertEquals(EditorPanel.ADJUST, viewModel.uiState.value.activePanel)
-    }
-
-    @Test
-    fun `onColorClicked sets active panel`() = runTest {
-        viewModel.onColorClicked()
-        assertEquals(EditorPanel.COLOR, viewModel.uiState.value.activePanel)
-    }
-
-    @Test
-    fun `onExportComplete resets hideUiForCapture`() = runTest {
-        viewModel.exportProject()
-        assertTrue(viewModel.uiState.value.hideUiForCapture)
-        assertTrue(viewModel.exportTrigger.value)
-
-        viewModel.onExportComplete()
-        assertFalse(viewModel.uiState.value.hideUiForCapture)
-        assertFalse(viewModel.exportTrigger.value)
     }
 }

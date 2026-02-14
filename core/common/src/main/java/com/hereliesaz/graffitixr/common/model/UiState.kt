@@ -143,7 +143,10 @@ data class Layer(
     val brightness: Float = 0f,
     val colorBalanceR: Float = 0f,
     val colorBalanceG: Float = 0f,
-    val colorBalanceB: Float = 0f
+    val colorBalanceB: Float = 0f,
+
+    // Warp Mesh (Flattened array of [x, y] coordinates)
+    val warpMesh: List<Float>? = null
 )
 
 /**
