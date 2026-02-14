@@ -29,10 +29,10 @@
     <string name="nav_outline">Outline</string>
     <string name="nav_outline_info">Convert to outline</string>
     <string name="nav_adjust">Adjust</string>
-    <string name="nav_adjust_info">Tweak image properties</string>
-    <string name="nav_balance">Balance</string>
-    <string name="nav_balance_info">Adjust RGB balance</string>
-    <string name="nav_blending">Blending</string>
+    <string name="nav_adjust_info">Colors</string>
+    <string name="nav_balance">Color</string>
+    <string name="nav_balance_info">Adjust RGB tint</string>
+    <string name="nav_blending">Blend</string>
     <string name="nav_blending_info">Change blend mode</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_new">New</string>

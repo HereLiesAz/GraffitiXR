@@ -17,6 +17,7 @@ import com.hereliesaz.aznavrail.AzTextBoxDefaults
 
 @Composable
 fun SaveProjectDialog(
+    initialName: String,
     onDismissRequest: () -> Unit,
     onSaveRequest: (String) -> Unit
 ) {
@@ -32,6 +33,7 @@ fun SaveProjectDialog(
             // Here we just use it directly.
 
             AzTextBox(
+                value = initialName,
                 hint = "Project Name",
                 onSubmit = { text ->
                     if (text.isNotBlank()) {

@@ -60,7 +60,7 @@ AzHostActivityLayout(navController = navController) {
 
     // 3. Advanced (Optional)
     azAdvanced(
-        infoScreen = false
+        infoScreen = false 
     )
 
     // Define Rail Items (Visible on collapsed rail)

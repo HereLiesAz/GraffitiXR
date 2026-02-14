@@ -65,6 +65,8 @@ class EditorViewModelTest {
             val uriString = it.invocation.args[0] as String
             val mUri = mockk<Uri>()
             every { mUri.toString() } returns uriString
+            every { mUri.scheme } returns if (uriString.contains("://")) uriString.split("://")[0] else null
+            every { mUri.path } returns if (uriString.contains("://")) uriString.split("://")[1] else uriString
             mUri
         }
         
@@ -107,8 +109,7 @@ class EditorViewModelTest {
 
     @Test
     fun `onAddLayer adds a layer`() = runTest {
-        val uri = mockk<Uri>()
-        every { uri.toString() } returns "content://test/image.png"
+        val uri = Uri.parse("content://test/image.png")
         
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -121,7 +122,7 @@ class EditorViewModelTest {
 
     @Test
     fun `onLayerActivated updates activeLayerId`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
@@ -133,7 +134,7 @@ class EditorViewModelTest {
 
     @Test
     fun `onScaleChanged updates active layer`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
@@ -146,7 +147,7 @@ class EditorViewModelTest {
 
     @Test
     fun `onOffsetChanged updates active layer`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
@@ -165,8 +166,7 @@ class EditorViewModelTest {
         currentProjectFlow.value = project
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val uri = mockk<Uri>()
-        every { uri.toString() } returns "content://test/image.png"
+        val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
@@ -182,7 +182,8 @@ class EditorViewModelTest {
         coVerify { projectRepository.saveArtifact("test-proj", any(), any()) }
         assertFalse(viewModel.uiState.value.isLoading)
         // Verify URI was updated
-        assertEquals("file:///path/to/artifact.png", viewModel.uiState.value.layers.first().uri.toString())
+        val actualUri = viewModel.uiState.value.layers.first().uri.toString()
+        assertEquals("file:///path/to/artifact.png", actualUri)
     }
 
     @Test
@@ -192,8 +193,7 @@ class EditorViewModelTest {
         currentProjectFlow.value = project
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val uri = mockk<Uri>()
-        every { uri.toString() } returns "content://test/image.png"
+        val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
@@ -209,12 +209,13 @@ class EditorViewModelTest {
         coVerify { projectRepository.saveArtifact("test-proj", any(), any()) }
         assertFalse(viewModel.uiState.value.isLoading)
         // Verify URI was updated
-        assertEquals("file:///path/to/line.png", viewModel.uiState.value.layers.first().uri.toString())
+        val actualUri = viewModel.uiState.value.layers.first().uri.toString()
+        assertEquals("file:///path/to/line.png", actualUri)
     }
     
     @Test
     fun `toggleImageLock updates state`() = runTest {
-        val uri = mockk<Uri>(relaxed = true)
+        val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -231,7 +232,7 @@ class EditorViewModelTest {
         currentProjectFlow.value = null
         testDispatcher.scheduler.advanceUntilIdle()
         
-        val uri = mockk<Uri>(relaxed = true)
+        val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
@@ -243,7 +244,7 @@ class EditorViewModelTest {
 
     @Test
     fun `onLayerRemoved removes layer and clears active ID if necessary`() = runTest {
-        val uri = mockk<Uri>(relaxed = true)
+        val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         

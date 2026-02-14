@@ -51,7 +51,7 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingScreen
-import com.hereliesaz.graffitixr.feature.ar.TargetCreationFlow
+import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
@@ -141,7 +141,7 @@ fun MainScreen(
             isolate = "Isolate", isolateInfo = "Remove BG",
             outline = "Outline", outlineInfo = "Line Art",
             adjust = "Adjust", adjustInfo = "Colors",
-            balance = "Balance", balanceInfo = "Color Tint",
+            balance = "Color", balanceInfo = "Color Tint",
             build = "Blend", blendingInfo = "Blend Mode",
             settings = "Settings", project = "Project",
             new = "New", newInfo = "Clear Canvas",
@@ -193,6 +193,7 @@ fun MainScreen(
     }
 
     val isRailVisible = !editorUiState.hideUiForCapture && !uiState.isTouchLocked
+    val targetCreationState = com.hereliesaz.graffitixr.feature.ar.rememberTargetCreationState()
 
     AzHostActivityLayout(navController = localNavController) {
         // --- 1. THE RAIL ---
@@ -222,60 +223,22 @@ fun MainScreen(
         background(weight = 0) {
             if (uiState.isCapturingTarget) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                    TargetCreationFlow(
+                    com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground(
                         uiState = arUiState,
-                        isRightHanded = editorUiState.isRightHanded,
                         captureStep = uiState.captureStep,
-                        context = context,
-                        onConfirm = {
-                            val bitmapToSave = arUiState.tempCaptureBitmap
-                            if (bitmapToSave != null) {
-                                scope.launch(Dispatchers.IO) {
-                                    val uri = saveBitmapToCache(context, bitmapToSave)
-                                    if (uri != null) {
-                                        withContext(Dispatchers.Main) {
-                                            arViewModel.onFrameCaptured(bitmapToSave, uri)
-                                            viewModel.onConfirmTargetCreation()
-                                        }
-                                    } else {
-                                        withContext(Dispatchers.Main) {
-                                            android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
-                                            viewModel.onConfirmTargetCreation()
-                                        }
-                                    }
-                                }
-                            } else {
-                                viewModel.onConfirmTargetCreation()
-                            }
-                        },
-                        onRetake = viewModel::onRetakeCapture,
-                        onCancel = viewModel::onCancelCaptureClicked,
+                        state = targetCreationState,
                         onPhotoCaptured = { bitmap ->
                             arViewModel.setTempCapture(bitmap)
                             viewModel.setCaptureStep(CaptureStep.RECTIFY)
-                        },
-                        onCalibrationPointCaptured = { },
-                        onUnwarpImage = { points ->
-                            arUiState.tempCaptureBitmap?.let { src ->
-                                ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                                    // Update preview with unwarped version
-                                    arViewModel.setTempCapture(unwarped)
-                                    // Go to Masking step
-                                    viewModel.setCaptureStep(CaptureStep.MASK)
-                                }
-                            }
-                        },
-                        onMaskConfirmed = { maskedBitmap ->
-                            // Highlight markings (Edge Detection) could happen here or after masking
-                            // This extracts the graffiti from the wall background
-                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
-
-                            // Update preview with extracted/masked version
-                            arViewModel.setTempCapture(extracted)
-                            viewModel.setCaptureStep(CaptureStep.REVIEW)
                         }
                     )
                 }
+            } else if (currentNavRoute == "surveyor") {
+                com.hereliesaz.graffitixr.feature.ar.MappingBackground(
+                    slamManager = slamManager,
+                    projectRepository = projectRepository,
+                    onRendererCreated = onRendererCreatedWrapper
+                )
             } else if (currentNavRoute == "editor" || currentNavRoute == null) {
                 val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
                 Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
@@ -301,6 +264,51 @@ fun MainScreen(
         // --- 3. ONSCREEN OVERLAYS ---
         onscreen(alignment = Alignment.Center) {
             Box(modifier = Modifier.fillMaxSize()) {
+                if (uiState.isCapturingTarget) {
+                    com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
+                        uiState = arUiState,
+                        isRightHanded = editorUiState.isRightHanded,
+                        captureStep = uiState.captureStep,
+                        state = targetCreationState,
+                        onConfirm = {
+                            val bitmapToSave = arUiState.tempCaptureBitmap
+                            if (bitmapToSave != null) {
+                                scope.launch(Dispatchers.IO) {
+                                    val uri = saveBitmapToCache(context, bitmapToSave)
+                                    if (uri != null) {
+                                        withContext(Dispatchers.Main) {
+                                            arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                            viewModel.onConfirmTargetCreation()
+                                        }
+                                    } else {
+                                        withContext(Dispatchers.Main) {
+                                            android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
+                                            viewModel.onConfirmTargetCreation()
+                                        }
+                                    }
+                                }
+                            } else {
+                                viewModel.onConfirmTargetCreation()
+                            }
+                        },
+                        onRetake = viewModel::onRetakeCapture,
+                        onCancel = viewModel::onCancelCaptureClicked,
+                        onUnwarpConfirm = { points ->
+                            arUiState.tempCaptureBitmap?.let { src ->
+                                ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                                    arViewModel.setTempCapture(unwarped)
+                                    viewModel.setCaptureStep(CaptureStep.MASK)
+                                }
+                            }
+                        },
+                        onMaskConfirmed = { maskedBitmap ->
+                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+                            arViewModel.setTempCapture(extracted)
+                            viewModel.setCaptureStep(CaptureStep.REVIEW)
+                        }
+                    )
+                }
+
                 AzNavHost(startDestination = "project_library") {
                     composable("editor") {
                         EditorUi(
@@ -311,12 +319,8 @@ fun MainScreen(
                         )
                     }
                     composable("surveyor") {
-                        // FIXED: Updated call signature to match MappingScreen.kt
-                        MappingScreen(
-                            onScanComplete = { localNavController.popBackStack() },
-                            onBackClick = { localNavController.popBackStack() },
-                            slamManager = slamManager,
-                            projectRepository = projectRepository
+                        com.hereliesaz.graffitixr.feature.ar.MappingUi(
+                            onScanComplete = { localNavController.popBackStack() }
                         )
                     }
                     composable("project_library") {
@@ -373,6 +377,7 @@ fun MainScreen(
 
                 if (showSaveDialog) {
                     SaveProjectDialog(
+                        initialName = projectRepository.currentProject.value?.name ?: "",
                         onDismissRequest = { showSaveDialog = false },
                         onSaveRequest = { name ->
                             editorViewModel.saveProject(name)

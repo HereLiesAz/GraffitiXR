@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.io.InputStream
 import java.util.UUID
 import javax.inject.Inject
@@ -591,10 +592,20 @@ class EditorViewModel @Inject constructor(
 
     private fun loadBitmapFromUri(uri: Uri): Bitmap? {
         return try {
-            val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            inputStream?.use { BitmapFactory.decodeStream(it) }
+            if (uri.scheme == "file") {
+                val file = File(uri.path ?: return null)
+                if (file.exists()) {
+                    BitmapFactory.decodeFile(file.absolutePath)
+                } else {
+                    Log.w("EditorViewModel", "loadBitmapFromUri: File does not exist: ${file.absolutePath}")
+                    null
+                }
+            } else {
+                val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+                inputStream?.use { BitmapFactory.decodeStream(it) }
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("EditorViewModel", "Error loading bitmap from URI: $uri", e)
             null
         }
     }

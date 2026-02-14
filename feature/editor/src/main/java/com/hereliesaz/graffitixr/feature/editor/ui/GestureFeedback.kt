@@ -42,9 +42,9 @@ fun GestureFeedback(
                         }
                         if (uiState.gestureInProgress) {
                              val scalePct = (activeLayer.scale * 100).toInt()
-                             "Axis: $axisName | Scale: ${scalePct}%"
+                             "Rotation: $axisName | Scale: ${scalePct}%"
                         } else {
-                             "Rotation Axis: $axisName"
+                             "Rotation: $axisName"
                         }
                     }
                     else -> {

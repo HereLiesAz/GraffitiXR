@@ -3,60 +3,30 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 
-/**
- * An overlay UI for the Target Creation process.
- * Displays different controls based on the current [CaptureStep].
- *
- * @param uiState The current AR UI state.
- * @param step The current step in the target creation flow.
- * @param onPrimaryAction The primary button action (Capture, Rectify, Confirm).
- * @param onCancel The cancel/back button action.
- */
 @Composable
-fun TargetCreationOverlay(
+fun TargetCreationOverlayBackground(
     uiState: ArUiState,
-    step: CaptureStep,
-    onPrimaryAction: () -> Unit,
-    onCancel: () -> Unit
+    step: CaptureStep
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Step-specific Content (Center/Background)
+    Box(modifier = Modifier.fillMaxSize()) {
         when (step) {
             CaptureStep.CAPTURE -> {
-                // Camera Reticle or Guidance
                 Box(
                     modifier = Modifier
                         .size(300.dp)
@@ -71,7 +41,6 @@ fun TargetCreationOverlay(
                 }
             }
             CaptureStep.RECTIFY -> {
-                // Show captured bitmap if available
                 uiState.tempCaptureBitmap?.let { bitmap ->
                     Image(
                         bitmap = bitmap.asImageBitmap(),
@@ -80,20 +49,8 @@ fun TargetCreationOverlay(
                         contentScale = ContentScale.Fit
                     )
                 }
-                Text(
-                    text = "Drag corners to unwarp",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 40.dp)
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .padding(8.dp)
-                )
             }
             CaptureStep.REVIEW -> {
-                // Show processed target (Extracted Markings)
-                // Use a dark background to make the white lines visible
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -109,15 +66,46 @@ fun TargetCreationOverlay(
                             contentScale = ContentScale.Fit
                         )
                     }
-                    Text(
-                        text = "Review Extracted Markings",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 40.dp)
-                    )
                 }
+            }
+            else -> {}
+        }
+    }
+}
+
+@Composable
+fun TargetCreationOverlayUi(
+    uiState: ArUiState,
+    step: CaptureStep,
+    onPrimaryAction: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        // Titles/Instructions
+        when (step) {
+            CaptureStep.RECTIFY -> {
+                Text(
+                    text = "Drag corners to unwarp",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                        .padding(8.dp)
+                )
+            }
+            CaptureStep.REVIEW -> {
+                Text(
+                    text = "Review Extracted Markings",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                        .padding(8.dp)
+                )
             }
             else -> {}
         }
@@ -127,10 +115,9 @@ fun TargetCreationOverlay(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(bottom = 32.dp),
+                .padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Cancel / Retake Button
             FilledTonalButton(
                 onClick = onCancel,
                 modifier = Modifier.weight(1f)
@@ -142,7 +129,6 @@ fun TargetCreationOverlay(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Primary Action Button
             Button(
                 onClick = onPrimaryAction,
                 modifier = Modifier.weight(1f)
