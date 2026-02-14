@@ -134,6 +134,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLightJni(JNIEnv *e
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setVisualizationModeJni(JNIEnv *env, jobject thiz, jlong handle, jint mode) {
+    if (handle != 0) {
+        getEngine(handle)->setVisualizationMode(mode);
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_drawJni(JNIEnv *env, jobject thiz, jlong handle) {
     if (handle == 0) return;
     getEngine(handle)->draw();

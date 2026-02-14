@@ -158,7 +158,7 @@ GLuint createProgram(const char* vSource, const char* fSource) {
     return program;
 }
 
-MobileGS::MobileGS() : mFrameCount(0), mProgram(0), mLocView(-1), mLocProj(-1), mMeshVBO(0), mVBO_Quad(0), mVBO_Instance(0), mGlDirty(true) {
+MobileGS::MobileGS() : mFrameCount(0), mProgram(0), mLocView(-1), mLocProj(-1), mMeshVBO(0), mVBO_Quad(0), mVBO_Instance(0), mGlDirty(true), mVizMode(0) {
     mVulkanBackend = new VulkanBackend();
     LOGI("MobileGS Constructor");
 }
@@ -274,6 +274,7 @@ void MobileGS::draw() {
     glUniformMatrix4fv(mLocProj, 1, GL_FALSE, glm::value_ptr(mProjMat));
     glUniform1f(glGetUniformLocation(mProgram, "u_LightIntensity"), mLightIntensity);
     glUniform3fv(glGetUniformLocation(mProgram, "u_LightColor"), 1, glm::value_ptr(mLightColor));
+    glUniform1i(glGetUniformLocation(mProgram, "u_VizMode"), mVizMode);
 
     // Ensure data is on GPU
     uploadSplatData();
@@ -444,6 +445,10 @@ void MobileGS::updateCamera(float* viewMtx, float* projMtx) {
 void MobileGS::updateLight(float intensity, float r, float g, float b) {
     mLightIntensity = intensity;
     mLightColor = glm::vec3(r, g, b);
+}
+
+void MobileGS::setVisualizationMode(int mode) {
+    mVizMode = mode;
 }
 
 void MobileGS::feedDepthData(uint16_t* depthData, uint8_t* colorData, int width, int height, int depthStride, int colorStride, float* poseMtx, float fov) {

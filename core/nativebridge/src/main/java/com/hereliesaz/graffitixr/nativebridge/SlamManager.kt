@@ -61,6 +61,10 @@ class SlamManager @Inject constructor() {
         if (nativeHandle != 0L) updateLightJni(nativeHandle, intensity, r, g, b)
     }
 
+    fun setVisualizationMode(mode: Int) {
+        if (nativeHandle != 0L) setVisualizationModeJni(nativeHandle, mode)
+    }
+
     fun feedDepthData(depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float) {
         if (nativeHandle != 0L) feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, depthStride, colorStride, poseMtx, fov)
     }
@@ -139,6 +143,7 @@ class SlamManager @Inject constructor() {
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
     private external fun updateLightJni(handle: Long, intensity: Float, r: Float, g: Float, b: Float)
+    private external fun setVisualizationModeJni(handle: Long, mode: Int)
     private external fun feedDepthDataJni(handle: Long, depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float)
     private external fun drawJni(handle: Long)
     private external fun saveWorld(handle: Long, path: String): Boolean

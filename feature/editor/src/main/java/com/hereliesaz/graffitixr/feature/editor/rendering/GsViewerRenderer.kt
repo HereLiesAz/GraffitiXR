@@ -39,6 +39,8 @@ class GsViewerRenderer(
 
         slamManager.resetGLState()
         slamManager.initialize()
+        // Use full Gaussian Splats for 3D Mockup mode
+        slamManager.setVisualizationMode(0) // GAUSSIAN
         layerRenderer.createOnGlThread(context)
 
         if (mapPath.isNotEmpty()) {

@@ -130,6 +130,8 @@ private:
     int mViewportWidth = 0;
     int mViewportHeight = 0;
 
+    int mVizMode = 0; // NEW: Visualization mode
+
     VulkanBackend* mVulkanBackend = nullptr;
 
     void uploadSplatData(); // Helper to send mSplats to GPU

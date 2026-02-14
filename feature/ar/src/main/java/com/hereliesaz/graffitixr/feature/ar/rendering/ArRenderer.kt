@@ -51,6 +51,8 @@ class ArRenderer(
         try {
             backgroundRenderer.createOnGlThread(context)
             slamManager.initialize()
+            // INDICATE splatted areas without blocking the view
+            slamManager.setVisualizationMode(1) // POINT_CLOUD
         } catch (e: IOException) {
             Log.e(TAG, "Failed to read asset file", e)
         }
