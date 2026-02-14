@@ -155,6 +155,10 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(gestureInProgress = false) }
     }
 
+    fun onLayerWarpChanged(layerId: String, newMesh: List<Float>) {
+        updateActiveLayer { if (it.id == layerId) it.copy(warpMesh = newMesh) else it }
+    }
+
     // --- Image Processing ---
 
     fun onRemoveBackgroundClicked() {

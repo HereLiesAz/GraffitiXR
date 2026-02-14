@@ -22,6 +22,9 @@ import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 
+import com.hereliesaz.graffitixr.feature.editor.rendering.WarpableImage
+import com.hereliesaz.graffitixr.common.model.EditorMode
+
 /**
  * Composable screen for the Mockup Mode.
  * Allows users to composite image layers over a static background image.
@@ -47,7 +50,7 @@ fun MockupScreen(
                 detectTransformGestures { _, pan, zoom, rotation ->
                     if (uiState.isEditingBackground) {
                         // Background logic
-                    } else if (activeLayer != null && !uiState.isImageLocked) {
+                    } else if (activeLayer != null && !uiState.isImageLocked && uiState.editorMode != EditorMode.MOCKUP) { // Disable affine gestures in Warp mode
                         viewModel.onGestureStart()
                         val newScale = activeLayer.scale * zoom
                         val newOffset = activeLayer.offset + pan
@@ -99,31 +102,51 @@ fun MockupScreen(
 
         uiState.layers.forEach { layer ->
             if (layer.isVisible) {
-                // TODO: Implement Mesh Warp (Non-linear deformation).
-                // Requires custom DrawScope or OpenGL shader.
-                // Current implementation only supports affine transforms (Scale, Rotate, Translate).
-
-                Image(
-                    bitmap = layer.bitmap.asImageBitmap(),
-                    contentDescription = layer.name,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = layer.scale
-                            scaleY = layer.scale
-                            translationX = layer.offset.x
-                            translationY = layer.offset.y
-                            rotationX = layer.rotationX
-                            rotationY = layer.rotationY
-                            rotationZ = layer.rotationZ
-                            alpha = layer.opacity
-                        },
-                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
-                        Color.Transparent,
-                        blendMode = mapBlendMode(layer.blendMode)
-                    ),
-                    contentScale = ContentScale.Fit
-                )
+                // If in Mockup/Warp mode, use WarpableImage
+                // Otherwise use standard Image with affine transforms
+                // Note: WarpableImage handles its own mesh state locally for now
+                if (uiState.editorMode == EditorMode.MOCKUP && layer.id == uiState.activeLayerId) {
+                     WarpableImage(
+                        bitmap = layer.bitmap.asImageBitmap(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = layer.offset.x
+                                translationY = layer.offset.y
+                                scaleX = layer.scale
+                                scaleY = layer.scale
+                                rotationZ = layer.rotationZ
+                                alpha = layer.opacity
+                            },
+                        isEditable = !uiState.isImageLocked,
+                        meshState = layer.warpMesh,
+                        onMeshChanged = { newMesh ->
+                            viewModel.onLayerWarpChanged(layer.id, newMesh)
+                        }
+                    )
+                } else {
+                    Image(
+                        bitmap = layer.bitmap.asImageBitmap(),
+                        contentDescription = layer.name,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = layer.scale
+                                scaleY = layer.scale
+                                translationX = layer.offset.x
+                                translationY = layer.offset.y
+                                rotationX = layer.rotationX
+                                rotationY = layer.rotationY
+                                rotationZ = layer.rotationZ
+                                alpha = layer.opacity
+                            },
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
+                            Color.Transparent,
+                            blendMode = mapBlendMode(layer.blendMode)
+                        ),
+                        contentScale = ContentScale.Fit
+                    )
+                }
             }
         }
     }
