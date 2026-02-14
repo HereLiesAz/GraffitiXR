@@ -33,6 +33,11 @@ struct Splat {
     float opacity; // Used for confidence
 };
 
+struct MeshVertex {
+    glm::vec3 pos;
+    glm::vec3 normal;
+};
+
 class MobileGS {
 public:
     MobileGS();
@@ -47,6 +52,7 @@ public:
     void onSurfaceChanged(int width, int height);
     void updateCamera(float* viewMtx, float* projMtx);
     void feedDepthData(uint16_t* depthData, uint8_t* colorData, int width, int height, int depthStride, int colorStride, float* poseMtx, float fov);
+    void updateMesh(float* vertices, int vertexCount); // NEW: Update surface mesh
     void setTargetDescriptors(const cv::Mat& descriptors);
 
     // Rendering
@@ -67,12 +73,18 @@ private:
     GLuint mProgram = 0;
     GLint mLocView = -1;
     GLint mLocProj = -1;
+
+    // Mesh State
+    GLuint mMeshVBO = 0;
+    int mMeshVertexCount = 0;
+    std::vector<MeshVertex> mMeshVertices;
     
     // Instancing buffers
     GLuint mVBO_Quad = 0;      // Static unit quad
     GLuint mVBO_Instance = 0;  // Dynamic splat data
     
     bool mGlDirty = true; // Signals need to re-upload VBO
+    bool mMeshDirty = false;
 
     // Data State
     std::vector<Splat> mSplats;
@@ -95,6 +107,7 @@ private:
     VulkanBackend* mVulkanBackend = nullptr;
 
     void uploadSplatData(); // Helper to send mSplats to GPU
+    void uploadMesh();
     void sortSplats();
 };
 

@@ -197,11 +197,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setTargetDescriptorsJni(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_trainStepJni(JNIEnv *env, jobject thiz, jlong handle) {
-    if (handle == 0) return;
-    getEngine(handle)->trainStep();
+    if (handle != 0) {
+        getEngine(handle)->trainStep();
+    }
 }
 
-// --- OpenCV Utilities (Integrated) ---
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateMeshJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray vertices) {
+    if (handle == 0) return;
+    jfloat* verts = env->GetFloatArrayElements(vertices, nullptr);
+    jint count = env->GetArrayLength(vertices);
+    getEngine(handle)->updateMesh(verts, count / 3);
+    env->ReleaseFloatArrayElements(vertices, verts, JNI_ABORT);
+}
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesFromBitmap(JNIEnv *env, jobject thiz, jobject bitmap) {

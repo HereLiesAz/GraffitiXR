@@ -89,6 +89,10 @@ class SlamManager @Inject constructor() {
         return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
     }
 
+    fun updateMesh(vertices: FloatArray) {
+        if (nativeHandle != 0L) updateMeshJni(nativeHandle, vertices)
+    }
+
     // NEW: Property to satisfy UI binding
     val mappingQuality: String
         get() {
@@ -124,6 +128,7 @@ class SlamManager @Inject constructor() {
     private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
     private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
     private external fun trainStepJni(handle: Long)
+    private external fun updateMeshJni(handle: Long, vertices: FloatArray)
 
     // OpenCV
     private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?
