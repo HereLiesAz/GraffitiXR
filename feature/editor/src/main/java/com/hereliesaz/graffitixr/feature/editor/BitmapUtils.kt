@@ -110,4 +110,16 @@ object BitmapUtils {
         matrix.postRotate(degrees)
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
+
+    /**
+     * Converts a [Bitmap] to a [ByteArray] in PNG format.
+     *
+     * @param bitmap The source bitmap.
+     * @return The [ByteArray] representation of the bitmap.
+     */
+    fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
+        val stream = java.io.ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        return stream.toByteArray()
+    }
 }

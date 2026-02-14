@@ -61,7 +61,7 @@ data class ArUiState(
 data class EditorUiState(
     val activeLayerId: String? = null,
     val layers: List<Layer> = emptyList(),
-    val editorMode: EditorMode = EditorMode.EDIT,
+    val editorMode: EditorMode = EditorMode.TRACE,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val isRightHanded: Boolean = true,
     val isImageLocked: Boolean = false,

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,6 +18,7 @@ import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
+import com.hereliesaz.graffitixr.feature.editor.BitmapUtils
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -59,14 +61,16 @@ class EditorViewModel @Inject constructor(
     private val maxStackSize = 20
     private var isAdjusting = false
     
-    // Flag to prevent recursive saving when loading
+    // Flags to prevent feedback loops during sync
     private var isRestoring = false
+    private var isSaving = false
+    private var lastRestoredProjectId: String? = null
 
     init {
         // 1. Observe Project Changes (State Restoration)
         viewModelScope.launch(dispatchers.main) {
             projectRepository.currentProject.collectLatest { project ->
-                if (project != null && !isRestoring) {
+                if (project != null && !isRestoring && !isSaving) {
                     restoreProjectState(project)
                 }
             }
@@ -84,7 +88,7 @@ class EditorViewModel @Inject constructor(
                     old.isRightHanded == new.isRightHanded
                 }
                 .collect { 
-                    if (!isRestoring) {
+                    if (!isRestoring && !isSaving) {
                         saveProject() 
                     }
                 }
@@ -92,49 +96,58 @@ class EditorViewModel @Inject constructor(
     }
 
     private fun restoreProjectState(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) {
+        val isFirstLoad = lastRestoredProjectId != project.id
+        lastRestoredProjectId = project.id
+
         isRestoring = true
         viewModelScope.launch(dispatchers.io) {
-            // Load Bitmaps for layers
-            val restoredLayers = project.layers.mapNotNull { overlayLayer ->
-                loadBitmapFromUri(overlayLayer.uri)?.let { bitmap ->
-                    Layer(
-                        id = overlayLayer.id,
-                        name = overlayLayer.name,
-                        bitmap = bitmap,
-                        uri = overlayLayer.uri,
-                        offset = overlayLayer.offset,
-                        scale = overlayLayer.scale,
-                        rotationX = overlayLayer.rotationX,
-                        rotationY = overlayLayer.rotationY,
-                        rotationZ = overlayLayer.rotationZ,
-                        opacity = overlayLayer.opacity,
-                        blendMode = overlayLayer.blendMode,
-                        brightness = overlayLayer.brightness,
-                        contrast = overlayLayer.contrast,
-                        saturation = overlayLayer.saturation,
-                        colorBalanceR = overlayLayer.colorBalanceR,
-                        colorBalanceG = overlayLayer.colorBalanceG,
-                        colorBalanceB = overlayLayer.colorBalanceB,
-                        isImageLocked = overlayLayer.isImageLocked,
-                        isVisible = overlayLayer.isVisible,
-                        warpMesh = overlayLayer.warpMesh
+            try {
+                // Load Bitmaps for layers
+                val restoredLayers = project.layers.mapNotNull { overlayLayer ->
+                    loadBitmapFromUri(overlayLayer.uri)?.let { bitmap ->
+                        Layer(
+                            id = overlayLayer.id,
+                            name = overlayLayer.name,
+                            bitmap = bitmap,
+                            uri = overlayLayer.uri,
+                            offset = overlayLayer.offset,
+                            scale = overlayLayer.scale,
+                            rotationX = overlayLayer.rotationX,
+                            rotationY = overlayLayer.rotationY,
+                            rotationZ = overlayLayer.rotationZ,
+                            opacity = overlayLayer.opacity,
+                            blendMode = overlayLayer.blendMode,
+                            brightness = overlayLayer.brightness,
+                            contrast = overlayLayer.contrast,
+                            saturation = overlayLayer.saturation,
+                            colorBalanceR = overlayLayer.colorBalanceR,
+                            colorBalanceG = overlayLayer.colorBalanceG,
+                            colorBalanceB = overlayLayer.colorBalanceB,
+                            isImageLocked = overlayLayer.isImageLocked,
+                            isVisible = overlayLayer.isVisible,
+                            warpMesh = overlayLayer.warpMesh
+                        )
+                    }
+                }
+
+                val backgroundBitmap = project.backgroundImageUri?.let { loadBitmapFromUri(it) }
+
+                _uiState.update {
+                    it.copy(
+                        layers = restoredLayers,
+                        backgroundImageUri = project.backgroundImageUri?.toString(),
+                        backgroundBitmap = backgroundBitmap,
+                        mapPath = project.mapPath,
+                        activeLayerId = if (isFirstLoad) restoredLayers.firstOrNull()?.id else it.activeLayerId,
+                        isRightHanded = project.isRightHanded,
+                        editorMode = if (isFirstLoad) EditorMode.TRACE else it.editorMode
                     )
                 }
+            } catch (e: Exception) {
+                Log.e("EditorViewModel", "Error restoring project state", e)
+            } finally {
+                isRestoring = false
             }
-
-            val backgroundBitmap = project.backgroundImageUri?.let { loadBitmapFromUri(it) }
-
-            _uiState.update {
-                it.copy(
-                    layers = restoredLayers,
-                    backgroundImageUri = project.backgroundImageUri?.toString(),
-                    backgroundBitmap = backgroundBitmap,
-                    mapPath = project.mapPath,
-                    activeLayerId = restoredLayers.firstOrNull()?.id,
-                    isRightHanded = project.isRightHanded
-                )
-            }
-            isRestoring = false
         }
     }
 
@@ -384,43 +397,71 @@ class EditorViewModel @Inject constructor(
 
     fun onRemoveBackgroundClicked() {
         val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
+        val projectId = projectRepository.currentProject.value?.id ?: return
 
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(dispatchers.default) {
-            // Correct usage: call instance method on the backgroundRemover instance
             val result = backgroundRemover.removeBackground(activeLayer.bitmap)
             val segmented = result.getOrNull()
 
-            _uiState.update { state ->
-                state.copy(
-                    isLoading = false,
-                    layers = state.layers.map {
-                        // Ensure 'segmented' is a valid Bitmap before copying
-                        if (it.id == activeLayer.id && segmented != null) it.copy(bitmap = segmented) else it
+            if (segmented != null) {
+                try {
+                    val filename = "layer_${activeLayer.id}_processed_${System.currentTimeMillis()}.png"
+                    val bytes = BitmapUtils.bitmapToByteArray(segmented)
+                    val newPath = projectRepository.saveArtifact(projectId, filename, bytes)
+                    val newUri = Uri.parse("file://$newPath")
+
+                    _uiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            layers = state.layers.map {
+                                if (it.id == activeLayer.id) it.copy(bitmap = segmented, uri = newUri) else it
+                            }
+                        )
                     }
-                )
+                    saveProject()
+                } catch (e: Exception) {
+                    Log.e("EditorViewModel", "Failed to save processed layer", e)
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            } else {
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
 
     fun onLineDrawingClicked() {
         val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
+        val projectId = projectRepository.currentProject.value?.id ?: return
 
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(dispatchers.default) {
-            // Use SlamManager for JNI edge detection
-            // This now returns black lines on transparent background
             val edged = slamManager.detectEdges(activeLayer.bitmap)
 
-            _uiState.update { state ->
-                state.copy(
-                    isLoading = false,
-                    layers = state.layers.map {
-                        if (it.id == activeLayer.id && edged != null) it.copy(bitmap = edged) else it
+            if (edged != null) {
+                try {
+                    val filename = "layer_${activeLayer.id}_outlined_${System.currentTimeMillis()}.png"
+                    val bytes = BitmapUtils.bitmapToByteArray(edged)
+                    val newPath = projectRepository.saveArtifact(projectId, filename, bytes)
+                    val newUri = Uri.parse("file://$newPath")
+
+                    _uiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            layers = state.layers.map {
+                                if (it.id == activeLayer.id) it.copy(bitmap = edged, uri = newUri) else it
+                            }
+                        )
                     }
-                )
+                    saveProject()
+                } catch (e: Exception) {
+                    Log.e("EditorViewModel", "Failed to save outlined layer", e)
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            } else {
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
@@ -500,26 +541,33 @@ class EditorViewModel @Inject constructor(
                 slamManager.saveWorld(mapPath)
             }
 
-            if (currentProject != null) {
-                val updatedProject = currentProject.copy(
-                    name = name ?: currentProject.name,
-                    layers = overlayLayers,
-                    backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
-                    mapPath = currentState.mapPath,
-                    isRightHanded = currentState.isRightHanded,
-                    lastModified = System.currentTimeMillis()
-                )
-                projectRepository.updateProject(updatedProject)
-            } else {
-                // Create new if none exists
-                val newProject = com.hereliesaz.graffitixr.common.model.GraffitiProject(
-                    name = name ?: "New Project ${System.currentTimeMillis()}",
-                    layers = overlayLayers,
-                    backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
-                    mapPath = currentState.mapPath,
-                    isRightHanded = currentState.isRightHanded
-                )
-                projectRepository.createProject(newProject)
+            isSaving = true // Prevent feedback loop
+            try {
+                if (currentProject != null) {
+                    val updatedProject = currentProject.copy(
+                        name = name ?: currentProject.name,
+                        layers = overlayLayers,
+                        backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
+                        mapPath = currentState.mapPath,
+                        isRightHanded = currentState.isRightHanded,
+                        lastModified = System.currentTimeMillis()
+                    )
+                    projectRepository.updateProject(updatedProject)
+                } else {
+                    // Create new if none exists
+                    val newProject = com.hereliesaz.graffitixr.common.model.GraffitiProject(
+                        name = name ?: "New Project ${System.currentTimeMillis()}",
+                        layers = overlayLayers,
+                        backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
+                        mapPath = currentState.mapPath,
+                        isRightHanded = currentState.isRightHanded
+                    )
+                    projectRepository.createProject(newProject)
+                }
+            } finally {
+                // Small delay to ensure the repository emission is processed while isSaving is still true
+                kotlinx.coroutines.delay(100) 
+                isSaving = false
             }
         }
     }

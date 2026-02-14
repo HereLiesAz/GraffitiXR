@@ -52,10 +52,21 @@ class EditorViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { projectRepository.currentProject } returns currentProjectFlow
         
-        // Mock static methods for Bitmap
+        // Mock static methods for Bitmap and Uri
         mockkStatic(BitmapFactory::class)
+        mockkStatic(Uri::class)
+        
         val mockBitmap = mockk<Bitmap>(relaxed = true)
+        every { mockBitmap.width } returns 100
+        every { mockBitmap.height } returns 100
         every { BitmapFactory.decodeStream(any()) } returns mockBitmap
+        
+        every { Uri.parse(any()) } answers {
+            val uriString = it.invocation.args[0] as String
+            val mUri = mockk<Uri>()
+            every { mUri.toString() } returns uriString
+            mUri
+        }
         
         // Mock Context and ContentResolver
         val contentResolver = mockk<ContentResolver>()
@@ -77,20 +88,21 @@ class EditorViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
         unmockkStatic(BitmapFactory::class)
+        unmockkStatic(Uri::class)
     }
 
     @Test
     fun `initial state is correct`() = runTest {
         val state = viewModel.uiState.value
-        assertEquals(EditorMode.EDIT, state.editorMode)
+        assertEquals(EditorMode.TRACE, state.editorMode)
         assertTrue(state.layers.isEmpty())
         assertFalse(state.isLoading)
     }
 
     @Test
     fun `setEditorMode updates state`() = runTest {
-        viewModel.setEditorMode(EditorMode.TRACE)
-        assertEquals(EditorMode.TRACE, viewModel.uiState.value.editorMode)
+        viewModel.setEditorMode(EditorMode.MOCKUP)
+        assertEquals(EditorMode.MOCKUP, viewModel.uiState.value.editorMode)
     }
 
     @Test
@@ -147,20 +159,57 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `onRemoveBackgroundClicked calls backgroundRemover`() = runTest {
+    fun `onRemoveBackgroundClicked calls backgroundRemover and saves artifact`() = runTest {
+        // Mock current project for ID
+        val project = GraffitiProject(id = "test-proj", name = "Test")
+        currentProjectFlow.value = project
+        testDispatcher.scheduler.advanceUntilIdle()
+
         val uri = mockk<Uri>()
+        every { uri.toString() } returns "content://test/image.png"
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
         // Mock successful background removal
-        val resultBitmap = mockk<Bitmap>()
+        val resultBitmap = mockk<Bitmap>(relaxed = true)
         coEvery { backgroundRemover.removeBackground(any<Bitmap>()) } returns Result.success(resultBitmap)
+        coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/artifact.png"
         
         viewModel.onRemoveBackgroundClicked()
         testDispatcher.scheduler.advanceUntilIdle()
         
-        coEvery { backgroundRemover.removeBackground(any<Bitmap>()) }
+        coVerify { backgroundRemover.removeBackground(any<Bitmap>()) }
+        coVerify { projectRepository.saveArtifact("test-proj", any(), any()) }
         assertFalse(viewModel.uiState.value.isLoading)
+        // Verify URI was updated
+        assertEquals("file:///path/to/artifact.png", viewModel.uiState.value.layers.first().uri.toString())
+    }
+
+    @Test
+    fun `onLineDrawingClicked calls slamManager and saves artifact`() = runTest {
+        // Mock current project for ID
+        val project = GraffitiProject(id = "test-proj", name = "Test")
+        currentProjectFlow.value = project
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val uri = mockk<Uri>()
+        every { uri.toString() } returns "content://test/image.png"
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        // Mock successful edge detection
+        val resultBitmap = mockk<Bitmap>(relaxed = true)
+        coEvery { slamManager.detectEdges(any<Bitmap>()) } returns resultBitmap
+        coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/line.png"
+        
+        viewModel.onLineDrawingClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        coVerify { slamManager.detectEdges(any<Bitmap>()) }
+        coVerify { projectRepository.saveArtifact("test-proj", any(), any()) }
+        assertFalse(viewModel.uiState.value.isLoading)
+        // Verify URI was updated
+        assertEquals("file:///path/to/line.png", viewModel.uiState.value.layers.first().uri.toString())
     }
     
     @Test
@@ -179,7 +228,8 @@ class EditorViewModelTest {
     @Test
     fun `saveProject calls createProject when no project exists`() = runTest {
         // Mock no current project
-        every { projectRepository.currentProject.value } returns null
+        currentProjectFlow.value = null
+        testDispatcher.scheduler.advanceUntilIdle()
         
         val uri = mockk<Uri>(relaxed = true)
         viewModel.onAddLayer(uri)
@@ -207,8 +257,9 @@ class EditorViewModelTest {
     @Test
     fun `saveProject calls updateProject when project exists`() = runTest {
         // Mock existing project
-        val existingProject = mockk<com.hereliesaz.graffitixr.common.model.GraffitiProject>(relaxed = true)
-        every { projectRepository.currentProject.value } returns existingProject
+        val existingProject = GraffitiProject(id = "test-proj", name = "Test")
+        currentProjectFlow.value = existingProject
+        testDispatcher.scheduler.advanceUntilIdle()
         
         viewModel.saveProject()
         testDispatcher.scheduler.advanceUntilIdle()
