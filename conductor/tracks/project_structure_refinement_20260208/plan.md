@@ -1,12 +1,12 @@
 # Implementation Plan - Project Structure Refinement
 
-## Phase 1: Analysis & Dependency Graph Verification
+## Phase 1: Analysis & Dependency Graph Verification [checkpoint: 824f873]
 - [x] Task: Analyze current Gradle dependency graph to identify violations of the Clean Architecture layering. [de7fc5c]
     - [x] Run `./gradlew :app:dependencies` and visualize the graph.
     - [x] Identify any `feature` -> `feature` dependencies.
     - [x] Identify any circular dependencies involving `core:native`.
 - [x] Task: Document the violations found and update `spec.md` if new constraints are discovered. [de7fc5c]
-- [ ] Task: Conductor - User Manual Verification 'Analysis & Dependency Graph Verification' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Analysis & Dependency Graph Verification' (Protocol in workflow.md) [824f873]
 
 ## Phase 2: Core Native Isolation
 - [ ] Task: Audit `core:native` for JNI boundary leaks.
@@ -17,13 +17,22 @@
     - [ ] Ensure `core:native` implementation does not depend back on upper-layer Kotlin code (except via defined JNI callbacks).
 - [ ] Task: Conductor - User Manual Verification 'Core Native Isolation' (Protocol in workflow.md)
 
-## Phase 3: Feature Module Standardization
+## Phase 3: Feature Module Standardization & Cleanup
 - [ ] Task: Decouple any inter-dependent Feature modules.
     - [ ] Refactor direct calls between `feature:ar`, `feature:editor`, and `feature:dashboard`.
     - [ ] Introduce shared interfaces in `core:domain` or `core:common` to handle communication (Dependency Inversion).
+- [ ] Task: Cleanup AndroidManifest.xml files.
+    - [ ] Remove deprecated `package` attributes from source manifests (use namespace in build.gradle).
+    - [ ] Fix namespace collisions (e.g., `org.opencv`).
 - [ ] Task: Conductor - User Manual Verification 'Feature Module Standardization' (Protocol in workflow.md)
 
-## Phase 4: Final Verification
+## Phase 4: Final Verification & Hardening
+- [ ] Task: Expand Test Suite.
+    - [ ] Increase unit test coverage for `EditorViewModel` and `ArRenderer`.
+    - [ ] Add basic instrumentation tests for critical flows if feasible.
+- [ ] Task: Harden Application.
+    - [ ] Review ProGuard/R8 rules.
+    - [ ] Verify error handling in JNI bridges.
 - [ ] Task: Perform a clean build of the entire project.
     - [ ] Run `./gradlew clean assembleDebug`.
 - [ ] Task: Run unit tests to ensure refactoring didn't break existing logic.
