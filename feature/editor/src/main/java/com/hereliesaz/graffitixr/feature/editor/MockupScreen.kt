@@ -65,22 +65,12 @@ fun MockupScreen(
                 detectTransformGestures { _, pan, zoom, rotation ->
                     if (uiState.isEditingBackground) {
                         // Background logic
-                    } else if (activeLayer != null && !activeLayer.isImageLocked && uiState.editorMode != EditorMode.MOCKUP) { // Disable affine gestures in Warp mode
+                    } else if (activeLayer != null && !activeLayer.isImageLocked) {
                         viewModel.onGestureStart()
-                        val newScale = activeLayer.scale * zoom
-                        val newOffset = activeLayer.offset + pan
-                        
-                        // Apply rotation to the active axis
-                        viewModel.onRotationChanged(rotation)
-                        viewModel.setLayerTransform(
-                            scale = newScale,
-                            offset = newOffset,
-                            rx = activeLayer.rotationX,
-                            ry = activeLayer.rotationY,
-                            rz = activeLayer.rotationZ
-                        )
+                        viewModel.onTransformGesture(pan, zoom, rotation)
                     }
                 }
+                viewModel.onGestureEnd()
             }
     ) {
         if (uiState.backgroundBitmap != null) {

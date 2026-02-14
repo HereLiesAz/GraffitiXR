@@ -76,15 +76,25 @@ out vec4 FragColor;
 
 uniform float u_LightIntensity;
 uniform vec3 u_LightColor;
+uniform int u_VizMode; // 0=Gaussian, 1=Point, 2=Wireframe
 
 void main() {
-    // Gaussian Falloff
-    // alpha = exp(-0.5 * (x^2 + y^2))
     float distSq = dot(vUV, vUV);
-    float alpha = exp(-0.5 * distSq);
+    float alpha = 1.0;
 
-    // Hard cutoff at 3 sigma (which is u=3, distSq=9)
-    if (distSq > 9.0 || alpha < 0.01) discard;
+    if (u_VizMode == 0) {
+        // Gaussian Falloff
+        alpha = exp(-0.5 * distSq);
+        if (distSq > 9.0 || alpha < 0.01) discard;
+    } else if (u_VizMode == 1) {
+        // Point Cloud: Only draw center core
+        if (distSq > 0.1) discard;
+        alpha = 0.8;
+    } else if (u_VizMode == 2) {
+        // Wireframe: Thin ring
+        if (distSq < 8.0 || distSq > 9.0) discard;
+        alpha = 0.5;
+    }
 
     // Apply Light Estimation
     vec3 litColor = vColor.rgb * u_LightIntensity * u_LightColor;

@@ -47,6 +47,12 @@ enum class EngineStatus : int {
     ERROR_IO_FAILURE = -5
 };
 
+enum class SplatVisualizationMode : int {
+    GAUSSIAN = 0,
+    POINT_CLOUD = 1,
+    WIREFRAME = 2
+};
+
 class MobileGS {
 public:
     MobileGS();
@@ -61,6 +67,7 @@ public:
     void onSurfaceChanged(int width, int height);
     void updateCamera(float* viewMtx, float* projMtx);
     void updateLight(float intensity, float r, float g, float b); // NEW: Light estimation
+    void setVisualizationMode(int mode); // NEW: Visualization mode
     void feedDepthData(uint16_t* depthData, uint8_t* colorData, int width, int height, int depthStride, int colorStride, float* poseMtx, float fov);
     void updateMesh(float* vertices, int vertexCount); // NEW: Update surface mesh
     void setTargetDescriptors(const cv::Mat& descriptors);

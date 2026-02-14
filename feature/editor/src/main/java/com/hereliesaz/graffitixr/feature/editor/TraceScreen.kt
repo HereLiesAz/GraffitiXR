@@ -52,19 +52,10 @@ fun TraceScreen(
                 detectTransformGestures { _, pan, zoom, rotation ->
                     if (activeLayer != null && !activeLayer.isImageLocked) {
                         viewModel.onGestureStart()
-                        val newScale = activeLayer.scale * zoom
-                        val newOffset = activeLayer.offset + pan
-                        
-                        viewModel.onRotationChanged(rotation)
-                        viewModel.setLayerTransform(
-                            scale = newScale,
-                            offset = newOffset,
-                            rx = activeLayer.rotationX,
-                            ry = activeLayer.rotationY,
-                            rz = activeLayer.rotationZ
-                        )
+                        viewModel.onTransformGesture(pan, zoom, rotation)
                     }
                 }
+                viewModel.onGestureEnd()
             }
     ) {
 

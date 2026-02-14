@@ -246,6 +246,22 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun onTransformGesture(pan: Offset, zoom: Float, rotation: Float) {
+        updateActiveLayer { layer ->
+            val newScale = layer.scale * zoom
+            val newOffset = layer.offset + pan
+            
+            val axis = _uiState.value.activeRotationAxis
+            layer.copy(
+                scale = newScale,
+                offset = newOffset,
+                rotationX = if (axis == RotationAxis.X) layer.rotationX + rotation else layer.rotationX,
+                rotationY = if (axis == RotationAxis.Y) layer.rotationY + rotation else layer.rotationY,
+                rotationZ = if (axis == RotationAxis.Z) layer.rotationZ + rotation else layer.rotationZ
+            )
+        }
+    }
+
     fun onCycleRotationAxis() {
         _uiState.update {
             val nextAxis = when(it.activeRotationAxis) {
@@ -274,7 +290,6 @@ class EditorViewModel @Inject constructor(
 
     fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
         updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
-        onGestureEnd()
     }
 
     fun onLayerWarpChanged(layerId: String, newMesh: List<Float>) {
