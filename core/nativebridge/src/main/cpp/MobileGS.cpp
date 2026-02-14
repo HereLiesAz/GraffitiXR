@@ -149,6 +149,10 @@ MobileGS::MobileGS() : mFrameCount(0), mProgram(0), mLocView(-1), mLocProj(-1), 
 
 MobileGS::~MobileGS() {
     clear();
+    if (mMeshVBO != 0) glDeleteBuffers(1, &mMeshVBO);
+    if (mVBO_Quad != 0) glDeleteBuffers(1, &mVBO_Quad);
+    if (mVBO_Instance != 0) glDeleteBuffers(1, &mVBO_Instance);
+    if (mProgram != 0) glDeleteProgram(mProgram);
     
     delete mVulkanBackend;
 }
