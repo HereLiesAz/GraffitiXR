@@ -128,6 +128,7 @@ data class Layer(
     val id: String,
     val name: String,
     val bitmap: Bitmap,
+    val uri: Uri, // Added for persistence
     val offset: Offset = Offset.Zero,
     val scale: Float = 1f,
     val rotationX: Float = 0f,

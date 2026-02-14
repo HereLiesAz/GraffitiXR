@@ -76,7 +76,8 @@ class EditorViewModel @Inject constructor(
                 val newLayer = Layer(
                     id = UUID.randomUUID().toString(),
                     name = "Layer ${_uiState.value.layers.size + 1}",
-                    bitmap = bitmap
+                    bitmap = bitmap,
+                    uri = uri
                 )
                 _uiState.update {
                     it.copy(
@@ -233,9 +234,57 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(hideUiForCapture = false) }
     }
 
+import com.hereliesaz.graffitixr.common.model.OverlayLayer
+
+// ...
+
     fun saveProject() {
-        viewModelScope.launch {
-            // TODO: Mapping logic to save to Repository
+        viewModelScope.launch(dispatchers.io) {
+            val currentState = _uiState.value
+            val currentProject = projectRepository.currentProject.value
+            
+            val overlayLayers = currentState.layers.map { layer ->
+                OverlayLayer(
+                    id = layer.id,
+                    name = layer.name,
+                    uri = layer.uri,
+                    scale = layer.scale,
+                    offset = layer.offset,
+                    rotationX = layer.rotationX,
+                    rotationY = layer.rotationY,
+                    rotationZ = layer.rotationZ,
+                    opacity = layer.opacity,
+                    blendMode = layer.blendMode,
+                    brightness = layer.brightness,
+                    contrast = layer.contrast,
+                    saturation = layer.saturation,
+                    colorBalanceR = layer.colorBalanceR,
+                    colorBalanceG = layer.colorBalanceG,
+                    colorBalanceB = layer.colorBalanceB,
+                    isImageLocked = layer.isImageLocked,
+                    isVisible = layer.isVisible,
+                    warpMesh = layer.warpMesh
+                )
+            }
+
+            if (currentProject != null) {
+                val updatedProject = currentProject.copy(
+                    layers = overlayLayers,
+                    backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
+                    mapPath = currentState.mapPath,
+                    lastModified = System.currentTimeMillis()
+                )
+                projectRepository.updateProject(updatedProject)
+            } else {
+                // Create new if none exists
+                val newProject = com.hereliesaz.graffitixr.common.model.GraffitiProject(
+                    name = "New Project ${System.currentTimeMillis()}",
+                    layers = overlayLayers,
+                    backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
+                    mapPath = currentState.mapPath
+                )
+                projectRepository.createProject(newProject)
+            }
         }
     }
 
