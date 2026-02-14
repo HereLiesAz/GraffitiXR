@@ -35,6 +35,7 @@ timber = "5.0.1"
 uiGeometry = "1.10.3"
 accompanistPermissions = "0.37.3"
 datastore = "1.2.0"
+databindingCompiler = "9.0.0"
 
 [libraries]
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
@@ -83,6 +84,7 @@ play-services-base = { group = "com.google.android.gms", name = "play-services-b
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+androidx-databinding-compiler = { group = "androidx.databinding", name = "databinding-compiler", version.ref = "databindingCompiler" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

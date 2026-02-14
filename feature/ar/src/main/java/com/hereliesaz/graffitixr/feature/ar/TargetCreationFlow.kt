@@ -1,7 +1,10 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import com.hereliesaz.graffitixr.common.model.ArUiState
@@ -12,7 +15,22 @@ import com.hereliesaz.graffitixr.feature.ar.masking.applyAutoMask
 import kotlinx.coroutines.launch
 
 /**
- * State object for Target Creation Flow to share state between Background and UI.
+ * Manages the UI flow for creating a new AR target (fingerprint).
+ *
+ * This composable acts as a state machine controller, switching between:
+ * 1. [CaptureStep.CAPTURE]: Showing the camera feed and a shutter button.
+ * 2. [CaptureStep.RECTIFY]: Showing the captured image with 4 draggable corners to unwarp perspective.
+ * 3. [CaptureStep.MASK]: Masking the image.
+ * 4. [CaptureStep.REVIEW]: Showing the final unwarped target for confirmation.
+ *
+ * @param uiState Current AR UI state containing the captured bitmap.
+ * @param captureStep The current step in the creation process.
+ * @param onConfirm Callback when the user accepts the final target.
+ * @param onRetake Callback to restart the capture process.
+ * @param onCancel Callback to exit the flow completely.
+ * @param onPhotoCaptured Callback with the captured bitmap.
+ * @param onUnwarpImage Callback with the 4 corner points to perform rectification.
+ * @param onMaskConfirmed Callback when masking is done.
  */
 class TargetCreationState(
     val unwarpPoints: MutableList<Offset>,
@@ -97,28 +115,37 @@ fun TargetCreationBackground(
 }
 
 @Composable
-fun TargetCreationUi(
+fun TargetCreationFlow(
     uiState: ArUiState,
     isRightHanded: Boolean,
     captureStep: CaptureStep,
-    state: TargetCreationState,
+    context: Context,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
-    onUnwarpConfirm: (List<Offset>) -> Unit,
+    onPhotoCaptured: (Bitmap) -> Unit,
+    onCalibrationPointCaptured: (Offset) -> Unit,
+    onUnwarpImage: (List<Offset>) -> Unit,
     onMaskConfirmed: (Bitmap) -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    var isProcessingMask by remember { mutableStateOf(false) }
+    val cameraController = rememberCameraController()
 
     when (captureStep) {
         CaptureStep.CAPTURE -> {
-            TargetCreationOverlayUi(
-                uiState = uiState,
-                step = CaptureStep.CAPTURE,
-                onPrimaryAction = { state.cameraController.takePicture() },
-                onCancel = onCancel
-            )
+            Box(Modifier.fillMaxSize()) {
+                // Background Camera Preview
+                CameraPreview(
+                    controller = cameraController,
+                    onPhotoCaptured = onPhotoCaptured
+                )
+
+                TargetCreationOverlay(
+                    uiState = uiState,
+                    step = CaptureStep.CAPTURE,
+                    onPrimaryAction = { cameraController.takePicture() },
+                    onCancel = onCancel
+                )
+            }
         }
         CaptureStep.RECTIFY -> {
             UnwarpUi(
