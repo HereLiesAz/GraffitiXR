@@ -58,7 +58,7 @@ extern "C" {
 // --- Engine Lifecycle ---
 
 JNIEXPORT jlong JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_createNativeInstance(JNIEnv *env, jobject thiz) {
     auto *engine = new MobileGS();
     engine->initialize();
     return reinterpret_cast<jlong>(engine);
