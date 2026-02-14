@@ -61,7 +61,7 @@ class EditorViewModel @Inject constructor(
     private val redoStack = ArrayDeque<EditorUiState>()
     private val maxStackSize = 20
     private var isAdjusting = false
-    
+
     // Flags to prevent feedback loops during sync
     private var isRestoring = false
     private var isSaving = false
@@ -81,16 +81,16 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.io) {
             _uiState
                 .debounce(2000L) // Wait 2 seconds of inactivity
-                .distinctUntilChanged { old, new -> 
+                .distinctUntilChanged { old, new ->
                     // Only save if meaningful data changed (ignore transient UI flags)
-                    old.layers == new.layers && 
-                    old.backgroundImageUri == new.backgroundImageUri &&
-                    old.mapPath == new.mapPath &&
-                    old.isRightHanded == new.isRightHanded
+                    old.layers == new.layers &&
+                            old.backgroundImageUri == new.backgroundImageUri &&
+                            old.mapPath == new.mapPath &&
+                            old.isRightHanded == new.isRightHanded
                 }
-                .collect { 
+                .collect {
                     if (!isRestoring && !isSaving) {
-                        saveProject() 
+                        saveProject()
                     }
                 }
         }
@@ -348,7 +348,7 @@ class EditorViewModel @Inject constructor(
         updateActiveLayer { layer ->
             val newScale = layer.scale * zoom
             val newOffset = layer.offset + pan
-            
+
             val axis = _uiState.value.activeRotationAxis
             layer.copy(
                 scale = newScale,
@@ -470,14 +470,14 @@ class EditorViewModel @Inject constructor(
     // --- Panels ---
 
     fun onAdjustClicked() {
-        _uiState.update { 
+        _uiState.update {
             val nextPanel = if (it.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST
             it.copy(activePanel = nextPanel)
         }
     }
 
     fun onColorClicked() {
-        _uiState.update { 
+        _uiState.update {
             val nextPanel = if (it.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR
             it.copy(activePanel = nextPanel)
         }
@@ -511,7 +511,7 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.io) {
             val currentState = _uiState.value
             val currentProject = projectRepository.currentProject.value
-            
+
             val overlayLayers = currentState.layers.map { layer ->
                 OverlayLayer(
                     id = layer.id,
@@ -537,9 +537,15 @@ class EditorViewModel @Inject constructor(
             }
 
             // 1. Save Native World Map
+            // FIX: Transactional saving. If native map fails to save, abort to prevent metadata desync.
             val mapPath = currentState.mapPath
             if (mapPath != null) {
-                slamManager.saveWorld(mapPath)
+                val success = slamManager.saveWorld(mapPath)
+                if (!success) {
+                    Log.e("EditorViewModel", "Failed to save native world map. Aborting project save to prevent corruption.")
+                    // In a real scenario, emit a side effect here to show a Toast
+                    return@launch
+                }
             }
 
             isSaving = true // Prevent feedback loop
@@ -567,7 +573,7 @@ class EditorViewModel @Inject constructor(
                 }
             } finally {
                 // Small delay to ensure the repository emission is processed while isSaving is still true
-                kotlinx.coroutines.delay(100) 
+                kotlinx.coroutines.delay(100)
                 isSaving = false
             }
         }

@@ -1,14 +1,14 @@
 #include <jni.h>
 #include <string>
 #include <vector>
-s#include <fstream>
+#include <fstream>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
 #include <android/log.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/imgcodecs.hpp>
 #include <opencv2/features2d.hpp>
+#include <opencv2/imgcodecs.hpp> // Added for cv::imwrite
 #include "MobileGS.h"
 
 #define LOG_TAG "GraffitiJNI"
@@ -90,13 +90,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resizeVulkanJni(JNIEnv *
     }
 }
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyVulkanJni(JNIEnv *env, jobject thiz, jlong handle) {
-    if (handle != 0) {
-        getEngine(handle)->destroyVulkan();
-    }
-}
-
 // NEW: Reset GL State
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLJni(JNIEnv *env, jobject thiz, jlong handle) {
@@ -123,7 +116,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChangedJni(JNIE
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray view_mtx, jfloatArray proj_mtx) {
     if (handle == 0) return;
-    
+
     jfloat* view = env->GetFloatArrayElements(view_mtx, nullptr);
     jfloat* proj = env->GetFloatArrayElements(proj_mtx, nullptr);
 
@@ -243,7 +236,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env,
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *env, jobject thiz, jlong handle, jobject image, jfloatArray pose, jstring path) {
     if (handle == 0) return false;
-    
+
     const char *nativePath = env->GetStringUTFChars(path, 0);
     if (!nativePath) return false;
 
@@ -252,7 +245,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *
         env->ReleaseStringUTFChars(path, nativePath);
         return false;
     }
-    
+
     std::string basePath(nativePath);
     std::string imagePath = basePath + ".jpg";
     std::string posePath = basePath + ".pose";
@@ -274,7 +267,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *
     } else {
         LOGE("Failed to convert bitmap to mat for keyframe");
     }
-    
+
     // 2. Save Pose
     bool poseSaved = false;
     std::ofstream out(posePath);
@@ -287,7 +280,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *
     } else {
         LOGE("Failed to open pose file for writing: %s", posePath.c_str());
     }
-    
+
     env->ReleaseFloatArrayElements(pose, poseData, JNI_ABORT);
     env->ReleaseStringUTFChars(path, nativePath);
     return imageSaved && poseSaved;

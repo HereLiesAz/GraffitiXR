@@ -15,7 +15,7 @@ class SlamManager @Inject constructor() {
             try {
                 System.loadLibrary("graffitixr")
             } catch (e: UnsatisfiedLinkError) {
-                // Ignore in tests
+                // Ignore in tests or if lib isn't found
             } catch (e: SecurityException) {
                 // Ignore
             }
@@ -101,6 +101,7 @@ class SlamManager @Inject constructor() {
         return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
     }
 
+    // MISSING FUNCTION RESTORED
     fun saveKeyframe(image: Bitmap, pose: FloatArray, path: String): Boolean {
         return if (nativeHandle != 0L) saveKeyframeJni(nativeHandle, image, pose, path) else false
     }
@@ -115,10 +116,6 @@ class SlamManager @Inject constructor() {
 
     fun resizeVulkan(width: Int, height: Int) {
         if (nativeHandle != 0L) resizeVulkanJni(nativeHandle, width, height)
-    }
-
-    fun destroyVulkan() {
-        if (nativeHandle != 0L) destroyVulkanJni(nativeHandle)
     }
 
     // NEW: Property to satisfy UI binding
@@ -157,13 +154,13 @@ class SlamManager @Inject constructor() {
     private external fun pruneMapJni(handle: Long, ageThreshold: Int)
     private external fun getPointCountJni(handle: Long): Int
     private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
+    // MISSING JNI DEF RESTORED
     private external fun saveKeyframeJni(handle: Long, image: Bitmap, pose: FloatArray, path: String): Boolean
     private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
     private external fun trainStepJni(handle: Long)
     private external fun updateMeshJni(handle: Long, vertices: FloatArray)
     private external fun initVulkanJni(handle: Long, surface: android.view.Surface)
     private external fun resizeVulkanJni(handle: Long, width: Int, height: Int)
-    private external fun destroyVulkanJni(handle: Long)
 
     // OpenCV
     private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?
