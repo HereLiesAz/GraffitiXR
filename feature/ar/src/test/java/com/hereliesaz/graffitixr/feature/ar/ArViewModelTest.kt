@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
 import android.net.Uri
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,6 +14,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -95,11 +97,39 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onTargetDetected updates state`() = runTest {
+    fun `onTargetDetected updates state`() {
         viewModel.onTargetDetected(true)
         assertTrue(viewModel.uiState.value.isTargetDetected)
 
         viewModel.onTargetDetected(false)
         assertFalse(viewModel.uiState.value.isTargetDetected)
+    }
+
+    @Test
+    fun `captureKeyframe sets pendingKeyframePath`() = runTest {
+        // Mock current project
+        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(id = "test-id", name = "Test")
+        every { projectRepository.currentProject.value } returns project
+        
+        viewModel.captureKeyframe()
+        testDispatcher.scheduler.advanceUntilIdle()
+        
+        val path = viewModel.uiState.value.pendingKeyframePath
+        assertNotNull(path)
+        assertTrue(path!!.contains("test-id/photogrammetry/keyframe_"))
+    }
+
+    @Test
+    fun `onKeyframeCaptured clears pendingKeyframePath`() = runTest {
+        // Mock current project
+        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(id = "test-id", name = "Test")
+        every { projectRepository.currentProject.value } returns project
+        
+        viewModel.captureKeyframe()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.pendingKeyframePath)
+        
+        viewModel.onKeyframeCaptured()
+        assertNull(viewModel.uiState.value.pendingKeyframePath)
     }
 }

@@ -109,14 +109,13 @@ class ArRenderer(
             val depthMode = session.config.depthMode
             if (depthMode == Config.DepthMode.AUTOMATIC || depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
                 try {
-                    val depthImage = if (depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
-                        frame.acquireRawDepthImage16Bits()
-                    } else {
-                        frame.acquireDepthImage16Bits()
-                    }
-                    val cameraImage = frame.acquireCameraImage() // For color mapping
+                        val depthImage = if (depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
+                            frame.acquireRawDepthImage16Bits()
+                        } else {
+                            frame.acquireDepthImage16Bits()
+                        }
+                        val cameraImage = frame.acquireCameraImage() // For color mapping
 
-                    if (depthImage != null && cameraImage != null) {
                         val depthBuffer = depthImage.planes[0].buffer
                         val colorBuffer = cameraImage.planes[0].buffer
                         
@@ -147,8 +146,7 @@ class ArRenderer(
 
                         depthImage.close()
                         cameraImage.close()
-                    }
-                } catch (e: Exception) {
+                    } catch (e: Exception) {
                     // Depth or Camera image not available yet, ignore
                 }
             }

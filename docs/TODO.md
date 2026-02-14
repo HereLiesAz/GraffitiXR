@@ -20,11 +20,17 @@
 - [x] **Light Estimation:** Realistic lighting for virtual projections.
 
 ## Phase 4: Final Polishing & Optimization `[DONE]`
-- [x] **Vulkan Backend:** Scaffolded for high-density splat rasterization.
+- [x] **Vulkan Backend:** Scaffolded for high-density splat rasterization (Lifecycle refined).
 - [x] **Multi-Lens Depth:** Support for dual-camera depth sensing.
-- [x] **3D Imports:** .glb/.gltf support (JNI stubbed for v1.0).
-- [x] **Photogrammetry:** Keyframe capture pipeline for external reconstruction.
+- [x] **3D Imports:** .glb/.gltf support (Stub improved).
+- [x] **Photogrammetry:** Keyframe capture pipeline fully implemented (OpenCV + Pose metadata).
 - [x] **CI/CD:** Static analysis (Checkstyle) and build hardening.
+
+## Production Readiness Refinement `[DONE]`
+- [x] **Thread Safety:** Fixed critical race condition in `MobileGS::uploadSplatData`.
+- [x] **Performance:** Optimized splat sorting and VBO uploads based on camera movement.
+- [x] **UI Integration:** Added "Keyframe" capture entry point to the navigation rail.
+- [x] **Code Quality:** Resolved compiler warnings and cleaned up redundant null checks in `ArRenderer`.
 
 ## Ongoing
 - [ ] UI/UX refinement for one-handed operation.
