@@ -142,7 +142,7 @@ GLuint createProgram(const char* vSource, const char* fSource) {
     return program;
 }
 
-MobileGS::MobileGS() : mFrameCount(0), mProgram(0), mLocView(-1), mLocProj(-1), mVBO_Quad(0), mVBO_Instance(0), mGlDirty(true) {
+MobileGS::MobileGS() : mFrameCount(0), mProgram(0), mLocView(-1), mLocProj(-1), mMeshVBO(0), mVBO_Quad(0), mVBO_Instance(0), mGlDirty(true) {
     mVulkanBackend = new VulkanBackend();
     LOGI("MobileGS Constructor");
 }
@@ -177,6 +177,33 @@ void MobileGS::resetGL() {
     mLocView = -1;
     mLocProj = -1;
     mGlDirty = true;
+}
+
+void MobileGS::updateMesh(float* vertices, int vertexCount) {
+    std::lock_guard<std::mutex> lock(mChunkMutex);
+    mMeshVertices.clear();
+    for (int i = 0; i < vertexCount; ++i) {
+        MeshVertex v;
+        v.pos = glm::vec3(vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2]);
+        v.normal = glm::vec3(0, 1, 0); // Simplified normal
+        mMeshVertices.push_back(v);
+    }
+    mMeshVertexCount = vertexCount;
+    mMeshDirty = true;
+}
+
+void MobileGS::uploadMesh() {
+    if (!mMeshDirty || mMeshVertices.empty()) return;
+
+    if (mMeshVBO == 0) {
+        glGenBuffers(1, &mMeshVBO);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, mMeshVBO);
+    glBufferData(GL_ARRAY_BUFFER, mMeshVertices.size() * sizeof(MeshVertex), mMeshVertices.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    mMeshDirty = false;
 }
 
 void MobileGS::uploadSplatData() {
