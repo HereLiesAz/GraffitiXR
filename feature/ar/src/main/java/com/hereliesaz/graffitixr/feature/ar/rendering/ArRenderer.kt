@@ -232,10 +232,10 @@ class ArRenderer(
                 val filter = com.google.ar.core.CameraConfigFilter(session)
                 filter.facingDirection = com.google.ar.core.CameraConfig.Facing.BACK
                 
-                // Prioritize Stereo Camera configs for better depth mapping on dual-lens devices
+// Prioritize Stereo Camera configs for better depth mapping on dual-lens devices
                 val configs = session!!.getSupportedCameraConfigs(filter)
                 val dualCameraConfig = configs.find { config ->
-                    config.stereoCameraMetadata == com.google.ar.core.CameraConfig.StereoCameraMetadata.SUPPORTED
+                    config.         stereoCameraMetadata == com.google.ar.core.CameraConfig.StereoCameraMetadata.SUPPORTED
                 }
                 
                 dualCameraConfig?.let {

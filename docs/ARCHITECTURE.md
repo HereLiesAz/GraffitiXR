@@ -1,115 +1,53 @@
-# GRAFFITIXR ARCHITECTURE
+# GraffitiXR Architecture
 
-## Philosophy
-Local-first. Offline-dominant. Performance-critical. **Strict Offline Policy:** `INTERNET` permission is removed to ensure absolute privacy and reliable field use.
+## High-Level Overview
 
-## The Core: MobileGS (Native)
-The engine is a C++ implementation of Gaussian Splatting and Teleological SLAM, optimized for Android.
-* **Location:** `core/nativebridge/src/main/cpp`
-* **Backends:**
-    * **OpenGL ES 3.0:** Default rasterization via instancing.
-    * **Vulkan (Experimental):** Compute-shader backend for high-density splat rendering.
-* **Access:** Strictly via `SlamManager` (Kotlin).
+GraffitiXR follows a multi-module Clean Architecture pattern, optimized for high-performance native rendering and local-first data persistence.
 
-## Sensors & Mapping
-* **LiDAR (Pro Devices):** High-fidelity surface mapping via `RAW_DEPTH_ONLY`. Mesh vertices are generated in Kotlin and refined in C++.
-* **Standard Depth:** Automatic depth API used as a fallback on non-LiDAR devices.
-
-## The Bridge: SlamManager (Singleton)
-A Hilt-provided Singleton that lives as long as the Application.
-* **Role:** Manages the C++ pointer (`nativeHandle`).
-* **Injection:** `@Inject lateinit var slamManager: SlamManager`
-* **Lifecycle:** Initialized once. Destroyed never (practically).
-
-## The Build System
-* **Language:** Kotlin + C++17
-* **DI:** Hilt (via KSP)
-* **Build:** Gradle (Kotlin DSL)
-* **Quality:** `Checkstyle` enforced for Kotlin and Java; `clang-format` recommended for C++.
-
-## Data Flow
 ```mermaid
 graph TD
-    AR[AR Renderer] -- Depth/Pose --> SM[SlamManager]
-    MS[MeshGenerator] -- Vertices --> SM
-    ED[Editor ViewModel] -- Bitmap --> SM
-    SM -- JNI --> Cpp[Native Engine]
-    Cpp -- OpenGL/Vulkan --> Surface[GLSurfaceView/SurfaceView]
-    AR -- PnP Correction --> SM -- alignMap() --> Cpp
+    App[":app"] --> FeatureAR[":feature:ar"]
+    App --> FeatureEditor[":feature:editor"]
+    App --> FeatureDash[":feature:dashboard"]
+    
+    FeatureAR --> CoreNative[":core:nativebridge"]
+    FeatureEditor --> CoreDomain[":core:domain"]
+    
+    CoreNative --> CoreCPP[":core:cpp"]
+    CoreCPP --> Vulkan[Vulkan SDK]
+    CoreCPP --> GLES[OpenGL ES 3.0]
+    CoreCPP --> OpenCV[OpenCV 4.x]
 ```
 
-## Security
-* **Network:** Cleartext traffic disabled; no internet access permitted.
-* **Logging:** Verbose and Debug logs automatically stripped in release builds.
-* **Analytics:** Disabled.
+## Module Definitions
 
-The Native Bridge (Unified)
-Previously a split system, the native bridge is now consolidated into a single pipeline.
+### feature:ar
+Responsible for ARCore session management, camera frame acquisition, and sensor fusion. It feeds raw depth and image data into the native engine.
+- **Key Component:** `ArRenderer.kt` - Orchestrates the AR loop, light estimation, and mesh generation.
+- **Key Component:** `MeshGenerator.kt` - Converts LiDAR depth maps into occlusion meshes.
 
-1. The Kotlin Gatekeeper: SlamManager
-   Location: core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt
+### feature:editor
+Provides tools for mural preparation.
+- **Key Component:** `WarpableImage.kt` - Implements 3x3 Mesh Warp for projective geometry corrections.
 
-Role: The Singleton source of truth. It manages the C++ pointer (nativeHandle).
+### core:nativebridge
+The JNI boundary. Handles memory management (DirectByteBuffers) and ensures robust lifecycle transitions between Kotlin and C++.
+- **Key Component:** `SlamManager.kt` - Singleton managing the native engine handle.
 
-Responsibility:
+### core:cpp (MobileGS)
+The heart of the application. A C++17 engine implementing:
+- **3D Gaussian Splatting:** High-fidelity point cloud rendering.
+- **Voxel Hashing:** Efficient spatial mapping of the environment.
+- **Teleological Loop:** Auto-alignment via solvePnP.
+- **Vulkan Backend:** Hardware-abstracted rendering pipeline.
 
-Initializing/Destroying the C++ engine.
+## Data Flow (Teleological Loop)
+1.  **Observation:** Camera captures environment.
+2.  **Estimation:** ARCore provides 6DOF pose.
+3.  **Correction:** OpenCV matches current frame against stored fingerprint.
+4.  **Alignment:** Native engine updates global map transform to minimize drift.
 
-Feeding Camera Frames (Depth/Color) to the SLAM system.
-
-Exposing StateFlows (e.g., mappingQuality) to the UI.
-
-Providing utility functions for OpenCV features (ORB extraction).
-
-2. The C++ Implementation: GraffitiJNI.cpp
-   Location: core/nativebridge/src/main/cpp/GraffitiJNI.cpp
-
-Role: The translator.
-
-Responsibility:
-
-Converts Java objects (ByteBuffers, Arrays, Bitmaps) into C++ structures (cv::Mat, pointers).
-
-Calls methods on the MobileGS instance.
-
-3. The Engine: MobileGS
-   Location: core/nativebridge/src/main/cpp/MobileGS.h
-
-Role: The brain.
-
-Responsibility:
-
-Tracking: Teleological SLAM (tracking against the future painting).
-
-Mapping: Gaussian Splatting storage and rendering.
-
-Keyframing: Managing the Voxel Confidence Map.
-
-Data Flow
-The AR Loop
-ARCore provides a Frame.
-
-ArRenderer extracts the Image (YUV/Depth) and Camera Pose.
-
-SlamManager.feedDepthData() is called with raw ByteBuffers.
-
-JNI locks the buffers and passes pointers to MobileGS.
-
-MobileGS updates the splats.
-
-ArRenderer calls SlamManager.draw().
-
-MobileGS renders the splats directly to the GL Surface.
-
-The Editor Loop (Image Processing)
-User selects an image.
-
-EditorViewModel loads the Bitmap.
-
-SlamManager.extractFeatures(bitmap) is called.
-
-JNI converts Bitmap to cv::Mat (Grayscale).
-
-OpenCV runs ORB detection.
-
-Descriptors are returned as ByteArray to Kotlin.
+## Rendering Pipeline
+1.  **Depth Pass:** Render LiDAR/Stereo mesh to depth buffer (Occlusion).
+2.  **Splat Pass:** Draw Gaussian Splats with additive blending and depth testing.
+3.  **Composite:** Overlay 2D UI and layers.

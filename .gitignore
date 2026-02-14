@@ -60,3 +60,4 @@ refactor*.sh
 */.cxx/*
 
 build_output*.txt
+/changes.diff

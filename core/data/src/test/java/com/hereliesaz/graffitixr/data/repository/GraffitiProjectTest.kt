@@ -32,8 +32,10 @@ class GraffitiProjectTest {
 
     @Test
     fun `serialization preserves all fields`() {
+        // Use a mock URI that returns a valid string representation
         val mockUri = mockk<android.net.Uri>()
-        every { android.net.Uri.parse(any()) } returns mockUri
+        every { mockUri.toString() } returns "file://test"
+        every { android.net.Uri.parse("file://test") } returns mockUri
 
         val project = GraffitiProject(
             id = "test-id",
@@ -41,7 +43,7 @@ class GraffitiProjectTest {
             layers = listOf(
                 OverlayLayer(
                     id = "layer-1",
-                    uri = android.net.Uri.parse("file://test"),
+                    uri = mockUri,
                     warpMesh = listOf(0f, 1f, 2f, 3f),
                     isImageLocked = true
                 )

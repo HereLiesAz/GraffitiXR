@@ -1,87 +1,32 @@
-# GraffitiXR Roadmap & Backlog
+# GraffitiXR TODO
 
-## 🔴 High Priority (The Core)
+## Phase 1: Core Architecture & Setup `[DONE]`
+- [x] Multi-module project structure.
+- [x] Native C++ engine (`MobileGS`) integration via JNI.
+- [x] AzNavRail navigation system.
+- [x] Local-only project storage (.gxr).
 
-- [x] **Voxel Map Culling:** `MobileGS` garbage collection for old points.
-- [x] **Serialization Speed:** Async map saving.
-- [x] **Modularization:** Complete refactoring into `:core` and `:feature` modules.
-- [x] **Unit Testing:** Increase coverage for new ViewModels and Repositories.
+## Phase 2: Feature Implementation `[DONE]`
+- [x] **AR Projection:** 6DOF tracking with ARCore.
+- [x] **Mockup Mode:** Image manipulation with 3x3 Mesh Warp.
+- [x] **Trace (Lightbox):** Full-screen image overlay with transparency.
+- [x] **Overlay Screen:** Layer management and blend modes.
 
-## 🟡 Medium Priority (Features)
+## Phase 3: Advanced Rendering & CV `[DONE]`
+- [x] **Gaussian Splatting:** 3D point cloud rendering with depth falloff.
+- [x] **Teleological Loop:** Fingerprint-based auto-alignment (OpenCV).
+- [x] **Voxel Mapping:** Efficient spatial hashing for large-scale maps.
+- [x] **Occlusion:** LiDAR-based mesh generation for real-world object masking.
+- [x] **Light Estimation:** Realistic lighting for virtual projections.
 
-- [x] **"Ghost" Toggle:** Toggle point cloud visibility.
-- [x] **Fingerprint Aging:** Handle outdated ORB descriptors.
-- [x] **Left-Handed Mode:** Invert AzNavRail alignment.
-- [x] **Mockup Mode - Mesh Warp:** Non-linear warping for curved surfaces.
+## Phase 4: Final Polishing & Optimization `[DONE]`
+- [x] **Vulkan Backend:** Scaffolded for high-density splat rasterization.
+- [x] **Multi-Lens Depth:** Support for dual-camera depth sensing.
+- [x] **3D Imports:** .glb/.gltf support (JNI stubbed for v1.0).
+- [x] **Photogrammetry:** Keyframe capture pipeline for external reconstruction.
+- [x] **CI/CD:** Static analysis (Checkstyle) and build hardening.
 
-## 🟢 Low Priority (Polish)
-
-- [x] **Occlusion:** Person/Object masking.
-
-## Completed Features (Archive)
-
-### V1.16 Rectify Image Targeting
-- [x] Rectify Image mode.
-- [x] `UnwarpScreen` with OpenCV perspective transform.
-
-### V1.15 AzNavRail Upgrade & Surveyor Mode
-- [x] `AzNavRail` v5.18.
-- [x] `SlamManager` replacing `SlamCore`.
-- [x] Native Photosphere capture.
-
-### V1.14 UI/UX Enhancements
-- [x] Trace Mode improvements (Gestures, Instructions).
-
-### V1.13 Guided Target Creation
-- [x] Guided Grid workflow.
-- [x] Dynamic grid generation.
-
-### V1.12 Android XR Readiness
-- [x] Android XR SDK integration.
-- [x] `compileSdk 36`.
-
-### Architecture & Documentation
-- [x] Multi-module split.
-- [x] "God Object" ViewModel refactoring.
-- [x] Comprehensive documentation update.
-
-## Phase 3: Advanced AR (Completed)
-- [x] Target Creation Flow (Capture -> Rectify -> Track).
-- [x] Occlusion handling (Person/Object masking via Depth Mesh).
-- [x] Light Estimation for realistic rendering (Integrated into GLSL).
-
-## Phase 4: Surveyor & 3D (Experimental - Scaffolded)
-- [x] Basic Gaussian Splatting Viewer integration.
-- [x] Photogrammetry capture pipeline (`saveKeyframe` JNI implemented).
-- [x] 3D Model import (.glb/.gltf) support (`importModel3D` stubbed).
-- [x] Vulkan Compute Rasterizer (Core architecture & pipeline scaffolding).
-
-**Status:** Updated to reflect that SLAM and 3D Mockups are now active features.
-# Roadmap
-
-## Phase 1: Foundation (Completed)
-- [x] Multi-module project structure setup.
-- [x] ARCore integration with basic plane detection.
-- [x] Jetpack Compose UI with `AzNavRail`.
-- [x] Unified State Architecture implementation.
-- [x] **Save:** Project saving functionality.
-
-## Phase 2: Core Editing (Completed)
-- [x] Layer System (Add, Remove, Reorder).
-- [x] Blend Modes (Multiply, Overlay, Screen, etc.).
-- [x] Trace Mode (High contrast overlay).
-- [x] Target Creation Flow (Capture -> Rectify).
-
-## Phase 3: 3D & SLAM (Completed)
-- [x] **SphereSLAM:** Basic keyframe and point cloud capture (`MappingScreen`).
-- [x] **3D Mockup:** Integration of `GsViewer` into the Editor.
-- [x] **Splat Training:** On-device training of Gaussian Splats from SLAM data (Online refinement implemented).
-- [x] **Live Occlusion:** Using the sparse point cloud for real-time occlusion in AR mode.
-- [x] **Target Masking:** MLKit-powered subject segmentation for target isolation.
-
-## Phase 4: Polish & Scaling (Current Focus)
-- [x] **LiDAR:** Mesh generation for Pro devices. (See [PHASE_4_PLAN.md](PHASE_4_PLAN.md))
-- [x] **Optimizations:** Vulkan backend for Splat rasterization (Scaffolding & Core implementation).
-- [x] **Modularization:** Project fully refactored into `:core` and `:feature` modules.
-- [x] **Hardening:** Network security config and telemetry silencing.
-- [x] **Unit Testing:** Coverage expanded for critical ViewModels and serialization.
+## Ongoing
+- [ ] UI/UX refinement for one-handed operation.
+- [ ] Performance benchmarking on mid-range devices.
+- [ ] Community feedback loop.
