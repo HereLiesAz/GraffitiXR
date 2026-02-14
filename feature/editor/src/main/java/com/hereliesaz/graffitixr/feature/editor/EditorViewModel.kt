@@ -20,9 +20,13 @@ import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.InputStream
@@ -33,6 +37,7 @@ import javax.inject.Inject
  * ViewModel for the Image Editor feature.
  * Manages layer composition, image adjustments, and transformation gestures.
  */
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
@@ -53,6 +58,85 @@ class EditorViewModel @Inject constructor(
     private val redoStack = ArrayDeque<EditorUiState>()
     private val maxStackSize = 20
     private var isAdjusting = false
+    
+    // Flag to prevent recursive saving when loading
+    private var isRestoring = false
+
+    init {
+        // 1. Observe Project Changes (State Restoration)
+        viewModelScope.launch(dispatchers.main) {
+            projectRepository.currentProject.collectLatest { project ->
+                if (project != null && !isRestoring) {
+                    restoreProjectState(project)
+                }
+            }
+        }
+
+        // 2. Automatic Saving (Debounced)
+        viewModelScope.launch(dispatchers.io) {
+            _uiState
+                .debounce(2000L) // Wait 2 seconds of inactivity
+                .distinctUntilChanged { old, new -> 
+                    // Only save if meaningful data changed (ignore transient UI flags)
+                    old.layers == new.layers && 
+                    old.backgroundImageUri == new.backgroundImageUri &&
+                    old.mapPath == new.mapPath &&
+                    old.isRightHanded == new.isRightHanded
+                }
+                .collect { 
+                    if (!isRestoring) {
+                        saveProject() 
+                    }
+                }
+        }
+    }
+
+    private fun restoreProjectState(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) {
+        isRestoring = true
+        viewModelScope.launch(dispatchers.io) {
+            // Load Bitmaps for layers
+            val restoredLayers = project.layers.mapNotNull { overlayLayer ->
+                loadBitmapFromUri(overlayLayer.uri)?.let { bitmap ->
+                    Layer(
+                        id = overlayLayer.id,
+                        name = overlayLayer.name,
+                        bitmap = bitmap,
+                        uri = overlayLayer.uri,
+                        offset = overlayLayer.offset,
+                        scale = overlayLayer.scale,
+                        rotationX = overlayLayer.rotationX,
+                        rotationY = overlayLayer.rotationY,
+                        rotationZ = overlayLayer.rotationZ,
+                        opacity = overlayLayer.opacity,
+                        blendMode = overlayLayer.blendMode,
+                        brightness = overlayLayer.brightness,
+                        contrast = overlayLayer.contrast,
+                        saturation = overlayLayer.saturation,
+                        colorBalanceR = overlayLayer.colorBalanceR,
+                        colorBalanceG = overlayLayer.colorBalanceG,
+                        colorBalanceB = overlayLayer.colorBalanceB,
+                        isImageLocked = overlayLayer.isImageLocked,
+                        isVisible = overlayLayer.isVisible,
+                        warpMesh = overlayLayer.warpMesh
+                    )
+                }
+            }
+
+            val backgroundBitmap = project.backgroundImageUri?.let { loadBitmapFromUri(it) }
+
+            _uiState.update {
+                it.copy(
+                    layers = restoredLayers,
+                    backgroundImageUri = project.backgroundImageUri?.toString(),
+                    backgroundBitmap = backgroundBitmap,
+                    mapPath = project.mapPath,
+                    activeLayerId = restoredLayers.firstOrNull()?.id,
+                    isRightHanded = project.isRightHanded
+                )
+            }
+            isRestoring = false
+        }
+    }
 
     fun setEditorMode(mode: EditorMode) {
         _uiState.update { it.copy(editorMode = mode) }
@@ -410,12 +494,19 @@ class EditorViewModel @Inject constructor(
                 )
             }
 
+            // 1. Save Native World Map
+            val mapPath = currentState.mapPath
+            if (mapPath != null) {
+                slamManager.saveWorld(mapPath)
+            }
+
             if (currentProject != null) {
                 val updatedProject = currentProject.copy(
                     name = name ?: currentProject.name,
                     layers = overlayLayers,
                     backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
                     mapPath = currentState.mapPath,
+                    isRightHanded = currentState.isRightHanded,
                     lastModified = System.currentTimeMillis()
                 )
                 projectRepository.updateProject(updatedProject)
@@ -425,7 +516,8 @@ class EditorViewModel @Inject constructor(
                     name = name ?: "New Project ${System.currentTimeMillis()}",
                     layers = overlayLayers,
                     backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
-                    mapPath = currentState.mapPath
+                    mapPath = currentState.mapPath,
+                    isRightHanded = currentState.isRightHanded
                 )
                 projectRepository.createProject(newProject)
             }

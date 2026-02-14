@@ -3,12 +3,17 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.GpsData
+import com.hereliesaz.graffitixr.common.model.SensorData
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -17,7 +22,9 @@ import javax.inject.Inject
  * target capture workflow, and tracking status updates.
  */
 @HiltViewModel
-class ArViewModel @Inject constructor() : ViewModel() {
+class ArViewModel @Inject constructor(
+    private val projectRepository: ProjectRepository
+) : ViewModel() {
 
     // Internal mutable state
     private val _uiState = MutableStateFlow(ArUiState())
@@ -103,5 +110,25 @@ class ArViewModel @Inject constructor() : ViewModel() {
      */
     fun onTargetDetected(detected: Boolean) {
         _uiState.update { it.copy(isTargetDetected = detected) }
+    }
+
+    /**
+     * Updates the current GPS location data.
+     */
+    fun updateLocation(data: GpsData) {
+        _uiState.update { it.copy(gpsData = data) }
+        viewModelScope.launch {
+            projectRepository.updateProject { it.copy(gpsData = data) }
+        }
+    }
+
+    /**
+     * Updates the current device orientation data.
+     */
+    fun updateSensors(data: SensorData) {
+        _uiState.update { it.copy(sensorData = data) }
+        viewModelScope.launch {
+            projectRepository.updateProject { it.copy(sensorData = data) }
+        }
     }
 }

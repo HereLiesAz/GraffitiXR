@@ -28,7 +28,11 @@ data class ArUiState(
     val isFlashlightOn: Boolean = false,
     val tempCaptureBitmap: Bitmap? = null,
     val capturedTargetUris: List<Uri> = emptyList(),
-    val capturedTargetImages: List<Bitmap> = emptyList()
+    val capturedTargetImages: List<Bitmap> = emptyList(),
+    
+    // NEW: Sensor and Location Data
+    val gpsData: GpsData? = null,
+    val sensorData: SensorData? = null
 )
 
 /**

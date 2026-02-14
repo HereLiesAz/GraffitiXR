@@ -18,16 +18,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
+    private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = ArViewModel()
+        viewModel = ArViewModel(projectRepository)
     }
 
     @After

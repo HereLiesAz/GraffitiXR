@@ -41,6 +41,7 @@ class EditorViewModelTest {
 
     private lateinit var viewModel: EditorViewModel
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
+    private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
     private val backgroundRemover: BackgroundRemover = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
@@ -49,6 +50,7 @@ class EditorViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        every { projectRepository.currentProject } returns currentProjectFlow
         
         // Mock static methods for Bitmap
         mockkStatic(BitmapFactory::class)
