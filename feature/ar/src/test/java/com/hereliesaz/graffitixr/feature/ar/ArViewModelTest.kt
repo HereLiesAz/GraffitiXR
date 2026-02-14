@@ -5,15 +5,18 @@ import android.net.Uri
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.Ignore
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArViewModelTest {
@@ -33,71 +36,69 @@ class ArViewModelTest {
     }
 
     @Test
-    @Ignore("Feature removed or not implemented in ViewModel yet")
-    fun `togglePointCloud toggles state`() = runTest {
-        // Initial state is true by default in ArUiState definition
-        // val initialState = viewModel.uiState.value.showPointCloud
-        
-        // viewModel.togglePointCloud()
-        // assertEquals(!initialState, viewModel.uiState.value.showPointCloud)
-        
-        // viewModel.togglePointCloud()
-        // assertEquals(initialState, viewModel.uiState.value.showPointCloud)
+    fun `initial state is correct`() = runTest {
+        val state = viewModel.uiState.first()
+        assertFalse(state.isFlashlightOn)
+        assertTrue(state.showPointCloud)
+        assertNull(state.tempCaptureBitmap)
+        assertFalse(state.isTargetDetected)
     }
 
     @Test
-    fun `toggleFlashlight toggles state`() = runTest {
-        // Initial state is false
-        assertEquals(false, viewModel.uiState.value.isFlashlightOn)
+    fun `toggleFlashlight updates state`() = runTest {
+        viewModel.toggleFlashlight()
+        assertTrue(viewModel.uiState.value.isFlashlightOn)
 
         viewModel.toggleFlashlight()
-        assertEquals(true, viewModel.uiState.value.isFlashlightOn)
-
-        viewModel.toggleFlashlight()
-        assertEquals(false, viewModel.uiState.value.isFlashlightOn)
+        assertFalse(viewModel.uiState.value.isFlashlightOn)
     }
 
     @Test
-    @Ignore("Logic changed in ViewModel")
-    fun `onFrameCaptured adds uri and bitmap to state`() = runTest {
-        /*
+    fun `togglePointCloud updates state`() = runTest {
+        viewModel.togglePointCloud()
+        assertFalse(viewModel.uiState.value.showPointCloud)
+
+        viewModel.togglePointCloud()
+        assertTrue(viewModel.uiState.value.showPointCloud)
+    }
+
+    @Test
+    fun `setTempCapture updates bitmap`() = runTest {
+        val bitmap = mockk<Bitmap>()
+        viewModel.setTempCapture(bitmap)
+        assertEquals(bitmap, viewModel.uiState.value.tempCaptureBitmap)
+    }
+
+    @Test
+    fun `resetCapture clears bitmap`() = runTest {
+        val bitmap = mockk<Bitmap>()
+        viewModel.setTempCapture(bitmap)
+        viewModel.resetCapture()
+        assertNull(viewModel.uiState.value.tempCaptureBitmap)
+    }
+
+    @Test
+    fun `onFrameCaptured updates state`() = runTest {
         val bitmap = mockk<Bitmap>()
         val uri = mockk<Uri>()
         
         viewModel.onFrameCaptured(bitmap, uri)
         
-        testDispatcher.scheduler.advanceUntilIdle()
+        val state = viewModel.uiState.value
+        assertNull(state.tempCaptureBitmap)
+        assertTrue(state.isTargetDetected)
+        assertTrue(state.capturedTargetUris.contains(uri))
+        assertTrue(state.capturedTargetImages.contains(bitmap))
+    }
+
+    @Test
+    fun `updateTrackingState updates metrics`() = runTest {
+        viewModel.updateTrackingState("TRACKING", 2, 100)
         
         val state = viewModel.uiState.value
-        assert(state.capturedTargetUris.contains(uri))
-        assert(state.capturedTargetImages.contains(bitmap))
-        */
-    }
-
-    @Test
-    @Ignore("Function removed")
-    fun `onTargetDetected updates state`() = runTest {
-        /*
-        assertEquals(false, viewModel.uiState.value.isTargetDetected)
-
-        viewModel.onTargetDetected(true)
-        assertEquals(true, viewModel.uiState.value.isTargetDetected)
-
-        viewModel.onTargetDetected(false)
-        assertEquals(false, viewModel.uiState.value.isTargetDetected)
-        */
-    }
-
-    @Test
-    fun `updateTrackingState updates target detected`() = runTest {
-        assertEquals(false, viewModel.uiState.value.isTargetDetected)
-
-        viewModel.updateTrackingState("Tracking", 1, 100)
-        assertEquals(true, viewModel.uiState.value.isTargetDetected)
-        assertEquals("Tracking", viewModel.uiState.value.trackingState)
-
-        viewModel.updateTrackingState("Searching", 0, 0)
-        assertEquals(false, viewModel.uiState.value.isTargetDetected)
-        assertEquals("Searching", viewModel.uiState.value.trackingState)
+        assertEquals("TRACKING", state.trackingState)
+        assertEquals(2, state.planeCount)
+        assertEquals(100, state.pointCloudCount)
+        assertTrue(state.isTargetDetected)
     }
 }

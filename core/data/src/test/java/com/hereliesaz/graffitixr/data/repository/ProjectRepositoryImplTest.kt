@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.data.repository
 
 import android.content.Context
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
+import com.hereliesaz.graffitixr.data.ProjectManager
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +37,8 @@ class ProjectRepositoryImplTest {
         Dispatchers.setMain(testDispatcher)
         context = mockk()
         every { context.filesDir } returns tempFolder.root
-        repository = ProjectRepositoryImpl(context)
+        val projectManager = ProjectManager(context)
+        repository = ProjectRepositoryImpl(context, projectManager)
     }
 
     @After

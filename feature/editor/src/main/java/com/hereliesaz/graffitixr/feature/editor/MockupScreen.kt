@@ -99,6 +99,10 @@ fun MockupScreen(
 
         uiState.layers.forEach { layer ->
             if (layer.isVisible) {
+                // TODO: Implement Mesh Warp (Non-linear deformation).
+                // Requires custom DrawScope or OpenGL shader.
+                // Current implementation only supports affine transforms (Scale, Rotate, Translate).
+
                 Image(
                     bitmap = layer.bitmap.asImageBitmap(),
                     contentDescription = layer.name,

@@ -30,6 +30,11 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+
+        // TODO: Implement Depth/Occlusion here.
+        // 1. Get Depth Texture from ARCore.
+        // 2. Pass Depth Texture to MobileGS (SlamManager) for occlusion culling.
+
         slamManager.draw()
     }
 
