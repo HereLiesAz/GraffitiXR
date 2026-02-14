@@ -5,12 +5,17 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import javax.inject.Inject
 
 /**
  * A stub implementation of a Vulkan-based Renderer for future optimizations.
  * This class provides the entry point for switching the rendering backend from OpenGL ES to Vulkan.
  */
-class VulkanRenderer(private val context: Context) : SurfaceHolder.Callback, DefaultLifecycleObserver {
+class VulkanRenderer @Inject constructor(
+    private val context: Context,
+    private val slamManager: SlamManager
+) : SurfaceHolder.Callback, DefaultLifecycleObserver {
 
     private var surfaceView: SurfaceView? = null
 
@@ -20,16 +25,15 @@ class VulkanRenderer(private val context: Context) : SurfaceHolder.Callback, Def
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
-        // TODO: Initialize Vulkan Instance and Device
-        // initVulkan(holder.surface)
+        slamManager.initVulkan(holder.surface)
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        // TODO: Recreate Swapchain
+        slamManager.resizeVulkan(width, height)
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        // TODO: Destroy Vulkan Resources
+        // TODO: Signal destruction to native
     }
 
     override fun onResume(owner: LifecycleOwner) {

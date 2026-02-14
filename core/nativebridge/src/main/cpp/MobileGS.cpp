@@ -73,6 +73,10 @@ precision mediump float;
 in vec4 vColor;
 in vec2 vUV;
 out vec4 FragColor;
+
+uniform float u_LightIntensity;
+uniform vec3 u_LightColor;
+
 void main() {
     // Gaussian Falloff
     // alpha = exp(-0.5 * (x^2 + y^2))
@@ -82,7 +86,9 @@ void main() {
     // Hard cutoff at 3 sigma (which is u=3, distSq=9)
     if (distSq > 9.0 || alpha < 0.01) discard;
 
-    FragColor = vec4(vColor.rgb, vColor.a * alpha);
+    // Apply Light Estimation
+    vec3 litColor = vColor.rgb * u_LightIntensity * u_LightColor;
+    FragColor = vec4(litColor, vColor.a * alpha);
 }
 )";
 
@@ -196,6 +202,18 @@ void MobileGS::updateMesh(float* vertices, int vertexCount) {
     mMeshDirty = true;
 }
 
+void MobileGS::initVulkan(void* nativeWindow) {
+    if (mVulkanBackend != nullptr) {
+        mVulkanBackend->initSurface(nativeWindow);
+    }
+}
+
+void MobileGS::resizeVulkan(int width, int height) {
+    if (mVulkanBackend != nullptr) {
+        mVulkanBackend->resize(width, height);
+    }
+}
+
 void MobileGS::uploadMesh() {
     if (!mMeshDirty || mMeshVertices.empty()) return;
 
@@ -244,14 +262,35 @@ void MobileGS::draw() {
     // Update Uniforms
     glUniformMatrix4fv(mLocView, 1, GL_FALSE, glm::value_ptr(mViewMat));
     glUniformMatrix4fv(mLocProj, 1, GL_FALSE, glm::value_ptr(mProjMat));
+    glUniform1f(glGetUniformLocation(mProgram, "u_LightIntensity"), mLightIntensity);
+    glUniform3fv(glGetUniformLocation(mProgram, "u_LightColor"), 1, glm::value_ptr(mLightColor));
 
-    // Ensure data is on GPU (Sorted and Uploaded)
-    // Note: Re-uploading every frame to handle sorting.
+    // Ensure data is on GPU
     uploadSplatData();
+    uploadMesh();
 
     if (mVBO_Quad == 0 || mVBO_Instance == 0) return;
 
-    // --- Vertex Specification ---
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // --- PHASE 1: Render Mesh for Occlusion ---
+    if (mMeshVBO != 0 && mMeshVertexCount > 0) {
+        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE); // Don't draw color
+        glDepthMask(GL_TRUE); // Write to depth
+        
+        glBindBuffer(GL_ARRAY_BUFFER, mMeshVBO);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, pos));
+        
+        glDrawArrays(GL_TRIANGLES, 0, mMeshVertexCount);
+        
+        glDisableVertexAttribArray(0);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Re-enable color
+    }
+
+    // --- PHASE 2: Draw Splats ---
+    glDepthMask(GL_FALSE); // Don't overwrite occlusion depth from mesh
 
     // 1. Quad Vertices (Attribute 0) - Per Vertex
     glBindBuffer(GL_ARRAY_BUFFER, mVBO_Quad);
@@ -390,6 +429,11 @@ void MobileGS::updateCamera(float* viewMtx, float* projMtx) {
     // Easier: glm::inverse(mViewMat)[3] gives the translation component of inverse, which is cam pos.
     glm::mat4 invView = glm::inverse(mViewMat);
     mCamPos = glm::vec3(invView[3]);
+}
+
+void MobileGS::updateLight(float intensity, float r, float g, float b) {
+    mLightIntensity = intensity;
+    mLightColor = glm::vec3(r, g, b);
 }
 
 void MobileGS::feedDepthData(uint16_t* depthData, uint8_t* colorData, int width, int height, int depthStride, int colorStride, float* poseMtx, float fov) {
@@ -597,4 +641,10 @@ void MobileGS::alignMap(float* transformMtx) {
 
     mGlDirty = true;
     LOGI("MobileGS: Map aligned with correction matrix.");
+}
+
+bool MobileGS::importModel3D(const std::string& path) {
+    LOGI("Importing 3D model from %s", path.c_str());
+    // TODO: Integrate tinygltf or similar for .glb/.gltf
+    return true;
 }

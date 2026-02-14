@@ -1,12 +1,19 @@
 # GRAFFITIXR ARCHITECTURE
 
 ## Philosophy
-Local-first. Offline-dominant. Performance-critical.
+Local-first. Offline-dominant. Performance-critical. **Strict Offline Policy:** `INTERNET` permission is removed to ensure absolute privacy and reliable field use.
 
 ## The Core: MobileGS (Native)
-The engine is a C++ implementation of Gaussian Splatting, optimized for Android.
+The engine is a C++ implementation of Gaussian Splatting and Teleological SLAM, optimized for Android.
 * **Location:** `core/nativebridge/src/main/cpp`
+* **Backends:**
+    * **OpenGL ES 3.0:** Default rasterization via instancing.
+    * **Vulkan (Experimental):** Compute-shader backend for high-density splat rendering.
 * **Access:** Strictly via `SlamManager` (Kotlin).
+
+## Sensors & Mapping
+* **LiDAR (Pro Devices):** High-fidelity surface mapping via `RAW_DEPTH_ONLY`. Mesh vertices are generated in Kotlin and refined in C++.
+* **Standard Depth:** Automatic depth API used as a fallback on non-LiDAR devices.
 
 ## The Bridge: SlamManager (Singleton)
 A Hilt-provided Singleton that lives as long as the Application.
@@ -18,21 +25,23 @@ A Hilt-provided Singleton that lives as long as the Application.
 * **Language:** Kotlin + C++17
 * **DI:** Hilt (via KSP)
 * **Build:** Gradle (Kotlin DSL)
+* **Quality:** `Checkstyle` enforced for Kotlin and Java; `clang-format` recommended for C++.
 
 ## Data Flow
 ```mermaid
 graph TD
     AR[AR Renderer] -- Depth/Pose --> SM[SlamManager]
+    MS[MeshGenerator] -- Vertices --> SM
     ED[Editor ViewModel] -- Bitmap --> SM
     SM -- JNI --> Cpp[Native Engine]
-    Cpp -- OpenGL --> Surface[GLSurfaceView]
+    Cpp -- OpenGL/Vulkan --> Surface[GLSurfaceView/SurfaceView]
     AR -- PnP Correction --> SM -- alignMap() --> Cpp
 ```
 
-Security
-Network: Default trust anchors + User CAs (Debug).
-
-Analytics: Disabled.
+## Security
+* **Network:** Cleartext traffic disabled; no internet access permitted.
+* **Logging:** Verbose and Debug logs automatically stripped in release builds.
+* **Analytics:** Disabled.
 
 The Native Bridge (Unified)
 Previously a split system, the native bridge is now consolidated into a single pipeline.

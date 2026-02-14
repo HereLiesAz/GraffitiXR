@@ -28,12 +28,13 @@ The project uses a **Multi-Module Clean Architecture** to enforce separation of 
 ## Key Features
 
 1.  **AR Projection:** Map images onto physical surfaces with occlusion and light estimation.
-2.  **Editor:**
-    *   **Mockup Mode:** 2D layer composition on a static background.
+2.  **LiDAR Mesh Generation:** (NEW) Real-time 3D surface reconstruction on Pro devices for pixel-perfect alignment.
+3.  **Editor:**
+    *   **Mockup Mode:** 2D layer composition on a static background with Mesh Warp.
     *   **Trace Mode:** High-contrast edge detection for physical tracing.
     *   **Overlay Mode:** Static camera overlay for quick alignment.
-3.  **Surveyor:** Photogrammetry data capture (Target Creation Flow).
-4.  **Local-First:** All processing is done on-device using a custom native engine.
+4.  **Surveyor:** Photogrammetry data capture (Target Creation Flow).
+5.  **Local-First & Offline:** Strictly on-device processing. **INTERNET permission removed** to guarantee privacy and field-reliability.
 
 ## Technical Specifications
 
@@ -41,9 +42,12 @@ The project uses a **Multi-Module Clean Architecture** to enforce separation of 
 We use a custom C++ native engine (`MobileGS`) that implements **Teleological SLAM**.
 * **Standard SLAM** asks: "Where am I based on the past?"
 * **Teleological SLAM** asks: "Where am I based on the future (the art)?"
+* **Rendering Backends:**
+    * **OpenGL ES 3.0:** Primary backend for cross-device compatibility.
+    * **Vulkan (Experimental):** Optimized compute-shader backend for Gaussian Splat rasterization.
 * **Capabilities:**
-    * **Active Drift Correction:** Uses the digital overlay as a "Ground Truth" to correct drift when the physical wall changes.
-    * **Voxel Pruning:** Automatically removes old feature points (bricks/cracks) when they are covered by paint, replacing them with new features from the artwork.
+    * **Active Drift Correction:** Uses the digital overlay as a "Ground Truth" to correct drift.
+    * **LiDAR Integration:** Directly ingests `RAW_DEPTH` data for high-fidelity surface mapping.
     * **Splat Training:** Real-time refinement of the point cloud confidence.
 
 ### 2. The Rail (AzNavRail)

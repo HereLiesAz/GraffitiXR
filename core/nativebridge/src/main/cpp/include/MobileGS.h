@@ -38,6 +38,15 @@ struct MeshVertex {
     glm::vec3 normal;
 };
 
+enum class EngineStatus : int {
+    SUCCESS = 0,
+    ERROR_NOT_INITIALIZED = -1,
+    ERROR_INVALID_ARGUMENT = -2,
+    ERROR_OUT_OF_MEMORY = -3,
+    ERROR_GPU_ERROR = -4,
+    ERROR_IO_FAILURE = -5
+};
+
 class MobileGS {
 public:
     MobileGS();
@@ -51,9 +60,14 @@ public:
     // Input
     void onSurfaceChanged(int width, int height);
     void updateCamera(float* viewMtx, float* projMtx);
+    void updateLight(float intensity, float r, float g, float b); // NEW: Light estimation
     void feedDepthData(uint16_t* depthData, uint8_t* colorData, int width, int height, int depthStride, int colorStride, float* poseMtx, float fov);
     void updateMesh(float* vertices, int vertexCount); // NEW: Update surface mesh
     void setTargetDescriptors(const cv::Mat& descriptors);
+
+    // Vulkan Support
+    void initVulkan(void* nativeWindow);
+    void resizeVulkan(int width, int height);
 
     // Rendering
     void draw();
@@ -64,6 +78,7 @@ public:
     // Map Management
     bool saveModel(const std::string& path);
     bool loadModel(const std::string& path);
+    bool importModel3D(const std::string& path); // NEW: .glb/.gltf import
     void pruneMap(int ageThreshold);
     void alignMap(float* transformMtx);
     int getSplatCount();
@@ -95,6 +110,10 @@ private:
     glm::mat4 mViewMat;
     glm::mat4 mProjMat;
     glm::vec3 mCamPos;
+
+    // Light Estimation
+    float mLightIntensity = 1.0f;
+    glm::vec3 mLightColor = glm::vec3(1.0f);
 
     // Target (Teleological)
     cv::Mat mTargetDescriptors;

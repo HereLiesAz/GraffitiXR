@@ -41,3 +41,10 @@
 -keepclassmembers class kotlinx.coroutines.android.AndroidDispatcherFactory {
     <init>();
 }
+
+# --- Telemetry & Privacy Hardening ---
+# Silence debug and verbose logs in release builds
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+}

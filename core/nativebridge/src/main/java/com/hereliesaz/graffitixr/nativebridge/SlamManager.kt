@@ -57,6 +57,10 @@ class SlamManager @Inject constructor() {
         if (nativeHandle != 0L) updateCameraJni(nativeHandle, viewMtx, projMtx)
     }
 
+    fun updateLight(intensity: Float, r: Float, g: Float, b: Float) {
+        if (nativeHandle != 0L) updateLightJni(nativeHandle, intensity, r, g, b)
+    }
+
     fun feedDepthData(depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float) {
         if (nativeHandle != 0L) feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, depthStride, colorStride, poseMtx, fov)
     }
@@ -71,6 +75,10 @@ class SlamManager @Inject constructor() {
 
     fun loadWorld(path: String): Boolean {
         return if (nativeHandle != 0L) loadWorld(nativeHandle, path) else false
+    }
+
+    fun importModel3D(path: String): Boolean {
+        return if (nativeHandle != 0L) importModel3DJni(nativeHandle, path) else false
     }
 
     fun clearMap() {
@@ -89,8 +97,20 @@ class SlamManager @Inject constructor() {
         return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
     }
 
+    fun saveKeyframe(image: Bitmap, pose: FloatArray, path: String): Boolean {
+        return if (nativeHandle != 0L) saveKeyframeJni(nativeHandle, image, pose, path) else false
+    }
+
     fun updateMesh(vertices: FloatArray) {
         if (nativeHandle != 0L) updateMeshJni(nativeHandle, vertices)
+    }
+
+    fun initVulkan(surface: android.view.Surface) {
+        if (nativeHandle != 0L) initVulkanJni(nativeHandle, surface)
+    }
+
+    fun resizeVulkan(width: Int, height: Int) {
+        if (nativeHandle != 0L) resizeVulkanJni(nativeHandle, width, height)
     }
 
     // NEW: Property to satisfy UI binding
@@ -118,17 +138,22 @@ class SlamManager @Inject constructor() {
     private external fun destroyNativeJni(handle: Long)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
+    private external fun updateLightJni(handle: Long, intensity: Float, r: Float, g: Float, b: Float)
     private external fun feedDepthDataJni(handle: Long, depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float)
     private external fun drawJni(handle: Long)
     private external fun saveWorld(handle: Long, path: String): Boolean
     private external fun loadWorld(handle: Long, path: String): Boolean
+    private external fun importModel3DJni(handle: Long, path: String): Boolean
     private external fun clearMapJni(handle: Long)
     private external fun pruneMapJni(handle: Long, ageThreshold: Int)
     private external fun getPointCountJni(handle: Long): Int
     private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
+    private external fun saveKeyframeJni(handle: Long, image: Bitmap, pose: FloatArray, path: String): Boolean
     private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
     private external fun trainStepJni(handle: Long)
     private external fun updateMeshJni(handle: Long, vertices: FloatArray)
+    private external fun initVulkanJni(handle: Long, surface: android.view.Surface)
+    private external fun resizeVulkanJni(handle: Long, width: Int, height: Int)
 
     // OpenCV
     private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?

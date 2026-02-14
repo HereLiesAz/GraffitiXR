@@ -3,20 +3,18 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.graphics.Bitmap
 import android.opengl.GLES20
-import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.util.Log
 import android.view.PixelCopy
 import com.google.ar.core.Config
-import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
-import com.hereliesaz.graffitixr.design.rendering.ProjectedImageRenderer
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
+import com.hereliesaz.graffitixr.feature.ar.util.MeshGenerator
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.*
 import org.opencv.core.CvType
@@ -67,13 +65,12 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        if (session == null) return
-
-        displayRotationHelper.updateSessionIfNeeded(session!!)
+        val session = this.session ?: return
+        displayRotationHelper.updateSessionIfNeeded(session)
 
         try {
-            session!!.setCameraTextureName(backgroundRenderer.textureId)
-            val frame = session!!.update()
+            session.setCameraTextureName(backgroundRenderer.textureId)
+            val frame = session.update()
             val camera = frame.camera
 
             // Draw Background (Camera Feed)
@@ -88,6 +85,14 @@ class ArRenderer(
             pose.toMatrix(cameraPoseMatrix, 0)
 
             slamManager.updateCamera(viewMatrix, projectionMatrix)
+            
+            // NEW: Light Estimation
+            frame.lightEstimate?.let { estimate ->
+                val intensity = estimate.pixelIntensity
+                val colorCorrection = FloatArray(4)
+                estimate.getColorCorrection(colorCorrection, 0)
+                slamManager.updateLight(intensity, colorCorrection[0], colorCorrection[1], colorCorrection[2])
+            }
 
             // --- TELEOLOGICAL LOOP CLOSURE ---
             val now = System.currentTimeMillis()
@@ -97,7 +102,7 @@ class ArRenderer(
             }
 
             // Handle Depth for Occlusion & Mapping
-            val depthMode = session!!.config.depthMode
+            val depthMode = session.config.depthMode
             if (depthMode == Config.DepthMode.AUTOMATIC || depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
                 try {
                     val depthImage = if (depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
@@ -114,19 +119,31 @@ class ArRenderer(
                         val intrinsics = camera.imageIntrinsics
                         val fovY = (2.0 * Math.atan(intrinsics.principalPoint[1] / intrinsics.focalLength[1].toDouble())).toFloat()
 
-                    slamManager.feedDepthData(
-                        depthBuffer = depthBuffer,
-                        colorBuffer = colorBuffer,
-                        width = depthImage.width,
-                        height = depthImage.height,
-                        depthStride = depthImage.planes[0].rowStride,
-                        colorStride = cameraImage.planes[0].rowStride,
-                        poseMtx = cameraPoseMatrix,
-                        fov = fovY
-                    )
+                        slamManager.feedDepthData(
+                            depthBuffer = depthBuffer,
+                            colorBuffer = colorBuffer,
+                            width = depthImage.width,
+                            height = depthImage.height,
+                            depthStride = depthImage.planes[0].rowStride,
+                            colorStride = cameraImage.planes[0].rowStride,
+                            poseMtx = cameraPoseMatrix,
+                            fov = fovY
+                        )
 
-                    depthImage.close()
-                    cameraImage.close()
+                        // NEW: Generate Mesh for precise surface projection
+                        if (depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
+                            val meshVertices = MeshGenerator.generateMesh(
+                                depthBuffer = depthBuffer.asShortBuffer(),
+                                width = depthImage.width,
+                                height = depthImage.height,
+                                intrinsics = camera.imageIntrinsics
+                            )
+                            slamManager.updateMesh(meshVertices)
+                        }
+
+                        depthImage.close()
+                        cameraImage.close()
+                    }
                 } catch (e: Exception) {
                     // Depth or Camera image not available yet, ignore
                 }
@@ -210,9 +227,25 @@ class ArRenderer(
         if (session == null) {
             try {
                 session = Session(context)
+                
+                // NEW: Dual-Lens / Multi-Camera Depth Sensing Support
+                val filter = com.google.ar.core.CameraConfigFilter(session)
+                filter.facingDirection = com.google.ar.core.CameraConfig.Facing.BACK
+                
+                // Prioritize Stereo Camera configs for better depth mapping on dual-lens devices
+                val configs = session!!.getSupportedCameraConfigs(filter)
+                val dualCameraConfig = configs.find { config ->
+                    config.stereoCameraMetadata == com.google.ar.core.CameraConfig.StereoCameraMetadata.SUPPORTED
+                }
+                
+                dualCameraConfig?.let {
+                    session!!.cameraConfig = it
+                    Log.i(TAG, "Dual-lens camera configuration selected.")
+                }
+
                 val config = Config(session)
                 
-                // Prefer RAW_DEPTH (LiDAR) if available, fallback to AUTOMATIC
+                // Prefer RAW_DEPTH (LiDAR) if available, fallback to AUTOMATIC (which fused dual-lens if configured)
                 config.depthMode = if (session!!.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY)) {
                     Config.DepthMode.RAW_DEPTH_ONLY
                 } else {

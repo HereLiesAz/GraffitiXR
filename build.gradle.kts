@@ -8,9 +8,17 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.compose) apply false
     alias(libs.plugins.kotlinx.serialization) apply false
     alias(libs.plugins.kotlin.parcelize) apply false
+    id("checkstyle")
 }
 
 subprojects {
+    apply(plugin = "checkstyle")
+
+    checkstyle {
+        toolVersion = "10.12.4"
+        configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+    }
+
     plugins.withType<com.android.build.gradle.BasePlugin> {
         apply(plugin = "org.jetbrains.kotlin.android")
         
