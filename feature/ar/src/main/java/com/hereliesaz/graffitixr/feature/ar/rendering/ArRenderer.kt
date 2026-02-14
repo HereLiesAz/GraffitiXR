@@ -227,25 +227,9 @@ class ArRenderer(
         if (session == null) {
             try {
                 session = Session(context)
-                
-                // NEW: Dual-Lens / Multi-Camera Depth Sensing Support
-                val filter = com.google.ar.core.CameraConfigFilter(session)
-                filter.facingDirection = com.google.ar.core.CameraConfig.Facing.BACK
-                
-// Prioritize Stereo Camera configs for better depth mapping on dual-lens devices
-                val configs = session!!.getSupportedCameraConfigs(filter)
-                val dualCameraConfig = configs.find { config ->
-                    config.         stereoCameraMetadata == com.google.ar.core.CameraConfig.StereoCameraMetadata.SUPPORTED
-                }
-                
-                dualCameraConfig?.let {
-                    session!!.cameraConfig = it
-                    Log.i(TAG, "Dual-lens camera configuration selected.")
-                }
-
                 val config = Config(session)
                 
-                // Prefer RAW_DEPTH (LiDAR) if available, fallback to AUTOMATIC (which fused dual-lens if configured)
+                // Prefer RAW_DEPTH (LiDAR) if available, fallback to AUTOMATIC
                 config.depthMode = if (session!!.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY)) {
                     Config.DepthMode.RAW_DEPTH_ONLY
                 } else {

@@ -168,10 +168,10 @@ class EditorViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.toggleImageLock()
-        assertTrue(viewModel.uiState.value.isImageLocked)
+        assertTrue(viewModel.uiState.value.layers.first().isImageLocked)
         
         viewModel.toggleImageLock()
-        assertFalse(viewModel.uiState.value.isImageLocked)
+        assertFalse(viewModel.uiState.value.layers.first().isImageLocked)
     }
 
     @Test
