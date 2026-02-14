@@ -13,23 +13,28 @@ import kotlinx.coroutines.launch
 
 /**
  * State object for Target Creation Flow to share state between Background and UI.
+ * Uses MutableState for all properties to ensure recomposition across layers.
  */
 class TargetCreationState(
     val unwarpPoints: MutableList<Offset>,
-    var activeUnwarpPointIndex: Int,
-    var magnifierPosition: Offset,
+    activeUnwarpPointIndexState: MutableState<Int>,
+    magnifierPositionState: MutableState<Offset>,
     val maskPath: Path,
-    var currentMaskPath: Path?,
+    currentMaskPathState: MutableState<Path?>,
     val cameraController: CameraController
-)
+) {
+    var activeUnwarpPointIndex by activeUnwarpPointIndexState
+    var magnifierPosition by magnifierPositionState
+    var currentMaskPath by currentMaskPathState
+}
 
 @Composable
 fun rememberTargetCreationState(): TargetCreationState {
     val unwarpPoints = remember { mutableStateListOf<Offset>() }
-    var activeUnwarpPointIndex by remember { mutableStateOf(-1) }
-    var magnifierPosition by remember { mutableStateOf(Offset.Zero) }
-    val maskPath by remember { mutableStateOf(Path()) }
-    var currentMaskPath by remember { mutableStateOf<Path?>(null) }
+    val activeUnwarpPointIndex = remember { mutableStateOf(-1) }
+    val magnifierPosition = remember { mutableStateOf(Offset.Zero) }
+    val maskPath = remember { Path() }
+    val currentMaskPath = remember { mutableStateOf<Path?>(null) }
     val cameraController = rememberCameraController()
 
     return remember {
@@ -41,10 +46,6 @@ fun rememberTargetCreationState(): TargetCreationState {
             currentMaskPath,
             cameraController
         )
-    }.apply {
-        this.activeUnwarpPointIndex = activeUnwarpPointIndex
-        this.magnifierPosition = magnifierPosition
-        this.currentMaskPath = currentMaskPath
     }
 }
 
@@ -55,13 +56,12 @@ fun TargetCreationBackground(
     state: TargetCreationState,
     onPhotoCaptured: (Bitmap) -> Unit
 ) {
-    // Initialize unwarp points when image changes
     LaunchedEffect(uiState.tempCaptureBitmap) {
         if (state.unwarpPoints.isEmpty() && uiState.tempCaptureBitmap != null) {
-            state.unwarpPoints.add(Offset(0.2f, 0.2f)) // TL
-            state.unwarpPoints.add(Offset(0.8f, 0.2f)) // TR
-            state.unwarpPoints.add(Offset(0.8f, 0.8f)) // BR
-            state.unwarpPoints.add(Offset(0.2f, 0.8f)) // BL
+            state.unwarpPoints.add(Offset(0.2f, 0.2f))
+            state.unwarpPoints.add(Offset(0.8f, 0.2f))
+            state.unwarpPoints.add(Offset(0.8f, 0.8f))
+            state.unwarpPoints.add(Offset(0.2f, 0.8f))
         }
     }
 
@@ -77,22 +77,14 @@ fun TargetCreationBackground(
             UnwarpBackground(
                 targetImage = uiState.tempCaptureBitmap,
                 points = state.unwarpPoints,
-                activePointIndex = state.activeUnwarpPointIndex,
-                onPointIndexChanged = { state.activeUnwarpPointIndex = it },
-                onMagnifierPositionChanged = { state.magnifierPosition = it }
+                activePointIndex = state.activeUnwarpPointIndex
             )
         }
         CaptureStep.MASK -> {
             MaskingBackground(
                 targetImage = uiState.tempCaptureBitmap,
                 maskPath = state.maskPath,
-                currentPath = state.currentMaskPath,
-                onPathStarted = { state.currentMaskPath = Path().apply { moveTo(it.x, it.y) } },
-                onPathFinished = {
-                    state.currentMaskPath?.let { state.maskPath.addPath(it) }
-                    state.currentMaskPath = null
-                },
-                onPathDragged = { state.currentMaskPath?.relativeLineTo(it.x, it.y) }
+                currentPath = state.currentMaskPath
             )
         }
         CaptureStep.REVIEW -> {
@@ -133,6 +125,8 @@ fun TargetCreationUi(
                 points = state.unwarpPoints,
                 activePointIndex = state.activeUnwarpPointIndex,
                 magnifierPosition = state.magnifierPosition,
+                onPointIndexChanged = { state.activeUnwarpPointIndex = it },
+                onMagnifierPositionChanged = { state.magnifierPosition = it },
                 onConfirm = onUnwarpConfirm,
                 onRetake = onRetake
             )
@@ -141,6 +135,14 @@ fun TargetCreationUi(
             MaskingUi(
                 targetImage = uiState.tempCaptureBitmap,
                 isProcessing = isProcessingMask,
+                maskPath = state.maskPath,
+                currentPath = state.currentMaskPath,
+                onPathStarted = { state.currentMaskPath = Path().apply { moveTo(it.x, it.y) } },
+                onPathFinished = {
+                    state.currentMaskPath?.let { state.maskPath.addPath(it) }
+                    state.currentMaskPath = null
+                },
+                onPathDragged = { state.currentMaskPath?.relativeLineTo(it.x, it.y) },
                 onConfirm = onMaskConfirmed,
                 onRetake = onRetake,
                 onAutoMask = {

@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
@@ -31,10 +32,7 @@ import kotlinx.coroutines.withContext
 fun MaskingBackground(
     targetImage: Bitmap?,
     maskPath: Path,
-    currentPath: Path?,
-    onPathStarted: (Offset) -> Unit,
-    onPathFinished: () -> Unit,
-    onPathDragged: (Offset) -> Unit
+    currentPath: Path?
 ) {
     if (targetImage == null) return
 
@@ -46,20 +44,7 @@ fun MaskingBackground(
             contentScale = androidx.compose.ui.layout.ContentScale.Fit
         )
         
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = onPathStarted,
-                        onDragEnd = onPathFinished,
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            onPathDragged(dragAmount)
-                        }
-                    )
-                }
-        ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             drawPath(
                 path = maskPath,
                 color = Color.Green.copy(alpha = 0.5f),
@@ -81,13 +66,32 @@ fun MaskingBackground(
 fun MaskingUi(
     targetImage: Bitmap?,
     isProcessing: Boolean,
+    maskPath: Path,
+    currentPath: Path?,
+    onPathStarted: (Offset) -> Unit,
+    onPathFinished: () -> Unit,
+    onPathDragged: (Offset) -> Unit,
     onConfirm: (Bitmap) -> Unit,
     onRetake: () -> Unit,
     onAutoMask: () -> Unit
 ) {
     if (targetImage == null) return
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(10f)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = onPathStarted,
+                    onDragEnd = onPathFinished,
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onPathDragged(dragAmount)
+                    }
+                )
+            }
+    ) {
         if (isProcessing) {
             CircularProgressIndicator(Modifier.align(Alignment.Center))
         }
