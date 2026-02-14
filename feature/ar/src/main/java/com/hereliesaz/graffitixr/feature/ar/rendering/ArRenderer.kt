@@ -97,9 +97,14 @@ class ArRenderer(
             }
 
             // Handle Depth for Occlusion & Mapping
-            if (session!!.config.depthMode == Config.DepthMode.AUTOMATIC) {
+            val depthMode = session!!.config.depthMode
+            if (depthMode == Config.DepthMode.AUTOMATIC || depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
                 try {
-                    val depthImage = frame.acquireDepthImage16Bits()
+                    val depthImage = if (depthMode == Config.DepthMode.RAW_DEPTH_ONLY) {
+                        frame.acquireRawDepthImage16Bits()
+                    } else {
+                        frame.acquireDepthImage16Bits()
+                    }
                     val cameraImage = frame.acquireCameraImage() // For color mapping
 
                     if (depthImage != null && cameraImage != null) {
@@ -109,20 +114,19 @@ class ArRenderer(
                         val intrinsics = camera.imageIntrinsics
                         val fovY = (2.0 * Math.atan(intrinsics.principalPoint[1] / intrinsics.focalLength[1].toDouble())).toFloat()
 
-                        slamManager.feedDepthData(
-                            depthBuffer = depthBuffer,
-                            colorBuffer = colorBuffer,
-                            width = depthImage.width,
-                            height = depthImage.height,
-                            depthStride = depthImage.planes[0].rowStride,
-                            colorStride = cameraImage.planes[0].rowStride,
-                            poseMtx = cameraPoseMatrix,
-                            fov = fovY
-                        )
-                    }
+                    slamManager.feedDepthData(
+                        depthBuffer = depthBuffer,
+                        colorBuffer = colorBuffer,
+                        width = depthImage.width,
+                        height = depthImage.height,
+                        depthStride = depthImage.planes[0].rowStride,
+                        colorStride = cameraImage.planes[0].rowStride,
+                        poseMtx = cameraPoseMatrix,
+                        fov = fovY
+                    )
 
-                    depthImage?.close()
-                    cameraImage?.close()
+                    depthImage.close()
+                    cameraImage.close()
                 } catch (e: Exception) {
                     // Depth or Camera image not available yet, ignore
                 }
@@ -207,7 +211,14 @@ class ArRenderer(
             try {
                 session = Session(context)
                 val config = Config(session)
-                config.depthMode = Config.DepthMode.AUTOMATIC
+                
+                // Prefer RAW_DEPTH (LiDAR) if available, fallback to AUTOMATIC
+                config.depthMode = if (session!!.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY)) {
+                    Config.DepthMode.RAW_DEPTH_ONLY
+                } else {
+                    Config.DepthMode.AUTOMATIC
+                }
+                
                 config.focusMode = Config.FocusMode.AUTO
                 config.updateMode = Config.UpdateMode.BLOCKING
                 session!!.configure(config)

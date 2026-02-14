@@ -79,7 +79,7 @@
 - [x] **Target Masking:** MLKit-powered subject segmentation for target isolation.
 
 ## Phase 4: Polish & Scaling (Current Focus)
-- [ ] **LiDAR:** Mesh generation for Pro devices.
+- [ ] **LiDAR:** Mesh generation for Pro devices. (See [PHASE_4_PLAN.md](PHASE_4_PLAN.md))
 - [ ] **Optimizations:** Vulkan backend for Splat rasterization (Stubbed).
 - [x] **Modularization:** Project fully refactored into `:core` and `:feature` modules.
 - [x] **Hardening:** Network security config and telemetry silencing.

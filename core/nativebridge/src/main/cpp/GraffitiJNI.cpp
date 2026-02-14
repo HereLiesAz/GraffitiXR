@@ -243,7 +243,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesMeta(JNIE
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz.graffitixr_nativebridge_SlamManager_detectEdgesJni(JNIEnv *env, jobject thiz, jobject srcBitmap, jobject dstBitmap) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_detectEdgesJni(JNIEnv *env, jobject thiz, jobject srcBitmap, jobject dstBitmap) {
     cv::Mat gray;
     if (!bitmapToMat(env, srcBitmap, gray, true)) return;
 

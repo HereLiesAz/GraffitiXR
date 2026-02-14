@@ -143,11 +143,14 @@ GLuint createProgram(const char* vSource, const char* fSource) {
 }
 
 MobileGS::MobileGS() : mFrameCount(0), mProgram(0), mLocView(-1), mLocProj(-1), mVBO_Quad(0), mVBO_Instance(0), mGlDirty(true) {
+    mVulkanBackend = new VulkanBackend();
     LOGI("MobileGS Constructor");
 }
 
 MobileGS::~MobileGS() {
     clear();
+    
+    delete mVulkanBackend;
 }
 
 void MobileGS::initialize() {
@@ -159,6 +162,10 @@ void MobileGS::initialize() {
 
         // Mark dirty
         mGlDirty = true;
+    }
+
+    if (mVulkanBackend != nullptr) {
+        mVulkanBackend->initialize();
     }
 }
 

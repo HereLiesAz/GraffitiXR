@@ -34,6 +34,7 @@ add_library(
         SHARED
         GraffitiJNI.cpp
         MobileGS.cpp
+        VulkanBackend.cpp
 )
 
 # --- INCLUDE DIRECTORIES ---
@@ -48,6 +49,7 @@ target_include_directories(
 find_library(log-lib log)
 find_library(android-lib android)
 find_library(gles3-lib GLESv3)
+find_library(vulkan-lib vulkan)
 
 # --- LINKING ---
 target_link_libraries(
@@ -61,6 +63,7 @@ target_link_libraries(
         ${log-lib}
         ${android-lib}
         ${gles3-lib}
+        ${vulkan-lib}
         jnigraphics
         EGL
 )

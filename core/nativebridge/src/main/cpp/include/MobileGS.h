@@ -9,6 +9,7 @@
 #include <opencv2/core.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include "VulkanBackend.h"
 
 // Voxel Key for Spatial Hashing
 struct VoxelKey {
@@ -90,6 +91,8 @@ private:
     int mFrameCount = 0;
     int mViewportWidth = 0;
     int mViewportHeight = 0;
+
+    VulkanBackend* mVulkanBackend = nullptr;
 
     void uploadSplatData(); // Helper to send mSplats to GPU
     void sortSplats();
