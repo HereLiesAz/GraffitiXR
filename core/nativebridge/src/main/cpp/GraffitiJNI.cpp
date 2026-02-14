@@ -1,7 +1,7 @@
 #include <jni.h>
 #include <string>
 #include <vector>
-#include <fstream>
+s#include <fstream>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
 #include <android/log.h>
