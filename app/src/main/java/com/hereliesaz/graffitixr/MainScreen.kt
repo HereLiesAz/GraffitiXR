@@ -64,6 +64,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
+
 /**
  * The main screen composable that orchestrates the entire application UI.
  *
@@ -100,6 +103,7 @@ fun MainScreen(
     val performHaptic = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
 
     var use3dBackground by remember { mutableStateOf(false) }
+    var showSaveDialog by remember { mutableStateOf(false) }
 
     val has3dModel = remember(editorUiState.mapPath) {
         !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
@@ -209,7 +213,8 @@ fun MainScreen(
                 has3dModel = has3dModel,
                 use3dBackground = use3dBackground,
                 onToggle3dBackground = { use3dBackground = !use3dBackground },
-                onShowInfoScreen = { showInfoScreen = true }
+                onShowInfoScreen = { showInfoScreen = true },
+                onSaveProject = { showSaveDialog = true } // Use the dialog
             )
         }
 
@@ -272,7 +277,7 @@ fun MainScreen(
                     )
                 }
             } else if (currentNavRoute == "editor" || currentNavRoute == null) {
-                val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.White else Color.Black
+                val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
                 Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
                     MainContentLayer(
                         editorUiState = editorUiState,
@@ -365,6 +370,16 @@ fun MainScreen(
                         onDismiss = { showInfoScreen = false }
                     )
                 }
+
+                if (showSaveDialog) {
+                    SaveProjectDialog(
+                        onDismissRequest = { showSaveDialog = false },
+                        onSaveRequest = { name ->
+                            editorViewModel.saveProject(name)
+                            showSaveDialog = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -378,23 +393,15 @@ fun MainContentLayer(
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit,
     onPickBackground: () -> Unit,
-    slamManager: SlamManager, // Injected
+    slamManager: SlamManager,
     projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
     use3dBackground: Boolean = false
 ) {
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
-
-        val onScale: (Float) -> Unit = editorViewModel::onScaleChanged
-        val onOffset: (Offset) -> Unit = editorViewModel::onOffsetChanged
-        val onRotZ: (Float) -> Unit = editorViewModel::onRotationZChanged
-        val onCycle: () -> Unit = editorViewModel::onCycleRotationAxis
-        val onStart: () -> Unit = editorViewModel::onGestureStart
-
         val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
 
         when (editorUiState.editorMode) {
             EditorMode.AR -> {
-                // FIXED: Passing slamManager
                 ArView(
                     viewModel = arViewModel,
                     uiState = arUiState,
@@ -403,10 +410,13 @@ fun MainContentLayer(
                     activeLayer = activeLayer,
                     onRendererCreated = onRendererCreated
                 )
+                // If no target detected, allow manual placement overlay
+                if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
+                    OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+                }
             }
-            EditorMode.STATIC -> {
+            EditorMode.STATIC, EditorMode.MOCKUP -> {
                 if (use3dBackground && !editorUiState.mapPath.isNullOrEmpty()) {
-                    // FIXED: Passing slamManager and activeLayer
                     GsViewer(
                         mapPath = editorUiState.mapPath!!,
                         slamManager = slamManager,
@@ -414,59 +424,27 @@ fun MainContentLayer(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    if (editorUiState.backgroundBitmap != null) {
-                        Image(
-                            bitmap = editorUiState.backgroundBitmap!!.asImageBitmap(),
-                            contentDescription = "Mockup Background",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No Background Image", color = Color.Gray)
-                        }
-                    }
+                    MockupScreen(uiState = editorUiState, viewModel = editorViewModel)
                 }
             }
             EditorMode.TRACE -> {
-                Box(Modifier.fillMaxSize().background(Color.White))
+                TraceScreen(uiState = editorUiState, viewModel = editorViewModel)
             }
             EditorMode.OVERLAY -> {
-                // FIXED: Passing slamManager
-                ArView(
-                    viewModel = arViewModel,
-                    uiState = arUiState.copy(showPointCloud = false),
-                    slamManager = slamManager,
-                    projectRepository = projectRepository,
-                    activeLayer = activeLayer,
-                    onRendererCreated = onRendererCreated
-                )
+                Box(Modifier.fillMaxSize()) {
+                    ArView(
+                        viewModel = arViewModel,
+                        uiState = arUiState.copy(showPointCloud = false),
+                        slamManager = slamManager,
+                        projectRepository = projectRepository,
+                        activeLayer = activeLayer,
+                        onRendererCreated = onRendererCreated
+                    )
+                    OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+                }
             }
             else -> {
                 Box(Modifier.fillMaxSize().background(Color.Black))
-            }
-        }
-
-        if (editorUiState.layers.isNotEmpty()) {
-            if (editorUiState.editorMode == EditorMode.AR && arUiState.isTargetDetected) {
-                // AR Scene rendering
-            } else if (editorUiState.editorMode == EditorMode.STATIC && use3dBackground) {
-                // Already rendered in 3D inside GsViewer
-            } else {
-                val modifier = if (!editorUiState.isImageLocked) {
-                    Modifier.pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, rotation ->
-                            onStart()
-                            onScale(zoom)
-                            onOffset(pan)
-                            onRotZ(rotation)
-                        }
-                    }
-                } else Modifier
-
-                Box(modifier = modifier.fillMaxSize()) {
-                    LayersOverlay(layers = editorUiState.layers)
-                }
             }
         }
     }

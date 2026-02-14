@@ -25,6 +25,10 @@ import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 import com.hereliesaz.graffitixr.feature.editor.rendering.WarpableImage
 import com.hereliesaz.graffitixr.common.model.EditorMode
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+
 /**
  * Composable screen for the Mockup Mode.
  * Allows users to composite image layers over a static background image.
@@ -41,11 +45,22 @@ fun MockupScreen(
     val activeLayer = remember(uiState.layers, uiState.activeLayerId) {
         uiState.layers.find { it.id == uiState.activeLayerId }
     }
+    val haptic = LocalHapticFeedback.current
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        if (!uiState.isImageLocked) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.onCycleRotationAxis()
+                        }
+                    }
+                )
+            }
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, rotation ->
                     if (uiState.isEditingBackground) {
@@ -54,13 +69,15 @@ fun MockupScreen(
                         viewModel.onGestureStart()
                         val newScale = activeLayer.scale * zoom
                         val newOffset = activeLayer.offset + pan
-                        val newRotationZ = activeLayer.rotationZ + rotation
+                        
+                        // Apply rotation to the active axis
+                        viewModel.onRotationChanged(rotation)
                         viewModel.setLayerTransform(
                             scale = newScale,
                             offset = newOffset,
                             rx = activeLayer.rotationX,
                             ry = activeLayer.rotationY,
-                            rz = newRotationZ
+                            rz = activeLayer.rotationZ
                         )
                     }
                 }

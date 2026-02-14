@@ -49,8 +49,66 @@ class EditorViewModel @Inject constructor(
     private val _exportTrigger = MutableStateFlow(false)
     val exportTrigger: StateFlow<Boolean> = _exportTrigger.asStateFlow()
 
+    private val undoStack = ArrayDeque<EditorUiState>()
+    private val redoStack = ArrayDeque<EditorUiState>()
+    private val maxStackSize = 20
+    private var isAdjusting = false
+
     fun setEditorMode(mode: EditorMode) {
         _uiState.update { it.copy(editorMode = mode) }
+    }
+
+    private fun saveState() {
+        if (undoStack.size >= maxStackSize) {
+            undoStack.removeFirst()
+        }
+        undoStack.addLast(_uiState.value)
+        redoStack.clear()
+        _uiState.update { it.copy(canUndo = true, canRedo = false) }
+    }
+
+    fun onUndoClicked() {
+        if (undoStack.isNotEmpty()) {
+            val previousState = undoStack.removeLast()
+            redoStack.addLast(_uiState.value)
+            _uiState.value = previousState.copy(
+                canUndo = undoStack.isNotEmpty(),
+                canRedo = true
+            )
+        }
+    }
+
+    fun onRedoClicked() {
+        if (redoStack.isNotEmpty()) {
+            val nextState = redoStack.removeLast()
+            undoStack.addLast(_uiState.value)
+            _uiState.value = nextState.copy(
+                canUndo = true,
+                canRedo = redoStack.isNotEmpty()
+            )
+        }
+    }
+
+    fun onMagicClicked() {
+        saveState()
+        updateActiveLayer {
+            it.copy(
+                contrast = 1.2f,
+                saturation = 1.3f,
+                brightness = 0.1f
+            )
+        }
+    }
+
+    fun onAdjustmentStart() {
+        if (!isAdjusting) {
+            saveState()
+            isAdjusting = true
+        }
+    }
+
+    fun onAdjustmentEnd() {
+        isAdjusting = false
     }
 
     fun setBackgroundImage(uri: Uri?) {
@@ -64,6 +122,34 @@ class EditorViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun onOpacityChanged(v: Float) {
+        updateActiveLayer { it.copy(opacity = v) }
+    }
+
+    fun onBrightnessChanged(v: Float) {
+        updateActiveLayer { it.copy(brightness = v) }
+    }
+
+    fun onContrastChanged(v: Float) {
+        updateActiveLayer { it.copy(contrast = v) }
+    }
+
+    fun onSaturationChanged(v: Float) {
+        updateActiveLayer { it.copy(saturation = v) }
+    }
+
+    fun onColorBalanceRChanged(v: Float) {
+        updateActiveLayer { it.copy(colorBalanceR = v) }
+    }
+
+    fun onColorBalanceGChanged(v: Float) {
+        updateActiveLayer { it.copy(colorBalanceG = v) }
+    }
+
+    fun onColorBalanceBChanged(v: Float) {
+        updateActiveLayer { it.copy(colorBalanceB = v) }
     }
 
     fun setMapPath(path: String) {
@@ -147,7 +233,17 @@ class EditorViewModel @Inject constructor(
     }
 
     fun onRotationZChanged(rotation: Float) {
-        updateActiveLayer { it.copy(rotationZ = it.rotationZ + rotation) }
+        onRotationChanged(rotation)
+    }
+
+    fun onRotationChanged(rotation: Float) {
+        updateActiveLayer { layer ->
+            when (_uiState.value.activeRotationAxis) {
+                RotationAxis.X -> layer.copy(rotationX = layer.rotationX + rotation)
+                RotationAxis.Y -> layer.copy(rotationY = layer.rotationY + rotation)
+                RotationAxis.Z -> layer.copy(rotationZ = layer.rotationZ + rotation)
+            }
+        }
     }
 
     fun onCycleRotationAxis() {
@@ -157,17 +253,28 @@ class EditorViewModel @Inject constructor(
                 RotationAxis.Y -> RotationAxis.Z
                 RotationAxis.Z -> RotationAxis.X
             }
-            it.copy(activeRotationAxis = nextAxis)
+            it.copy(
+                activeRotationAxis = nextAxis,
+                showRotationAxisFeedback = true
+            )
         }
+    }
+
+    fun onFeedbackShown() {
+        _uiState.update { it.copy(showRotationAxisFeedback = false) }
     }
 
     fun onGestureStart() {
         _uiState.update { it.copy(gestureInProgress = true) }
     }
 
+    fun onGestureEnd() {
+        _uiState.update { it.copy(gestureInProgress = false) }
+    }
+
     fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
         updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
-        _uiState.update { it.copy(gestureInProgress = false) }
+        onGestureEnd()
     }
 
     fun onLayerWarpChanged(layerId: String, newMesh: List<Float>) {
@@ -205,6 +312,7 @@ class EditorViewModel @Inject constructor(
 
         viewModelScope.launch(dispatchers.default) {
             // Use SlamManager for JNI edge detection
+            // This now returns black lines on transparent background
             val edged = slamManager.detectEdges(activeLayer.bitmap)
 
             _uiState.update { state ->
@@ -221,11 +329,21 @@ class EditorViewModel @Inject constructor(
     // --- Panels ---
 
     fun onAdjustClicked() {
-        _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) }
+        _uiState.update { 
+            val nextPanel = if (it.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST
+            it.copy(activePanel = nextPanel)
+        }
     }
 
     fun onColorClicked() {
-        _uiState.update { it.copy(activePanel = EditorPanel.COLOR) }
+        _uiState.update { 
+            val nextPanel = if (it.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR
+            it.copy(activePanel = nextPanel)
+        }
+    }
+
+    fun onDismissPanel() {
+        _uiState.update { it.copy(activePanel = EditorPanel.NONE) }
     }
 
     fun onCycleBlendMode() {
@@ -248,7 +366,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(hideUiForCapture = false) }
     }
 
-    fun saveProject() {
+    fun saveProject(name: String? = null) {
         viewModelScope.launch(dispatchers.io) {
             val currentState = _uiState.value
             val currentProject = projectRepository.currentProject.value
@@ -279,6 +397,7 @@ class EditorViewModel @Inject constructor(
 
             if (currentProject != null) {
                 val updatedProject = currentProject.copy(
+                    name = name ?: currentProject.name,
                     layers = overlayLayers,
                     backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
                     mapPath = currentState.mapPath,
@@ -288,7 +407,7 @@ class EditorViewModel @Inject constructor(
             } else {
                 // Create new if none exists
                 val newProject = com.hereliesaz.graffitixr.common.model.GraffitiProject(
-                    name = "New Project ${System.currentTimeMillis()}",
+                    name = name ?: "New Project ${System.currentTimeMillis()}",
                     layers = overlayLayers,
                     backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
                     mapPath = currentState.mapPath

@@ -58,7 +58,7 @@ extern "C" {
 // --- Engine Lifecycle ---
 
 JNIEXPORT jlong JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_createNativeInstance(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initNativeJni(JNIEnv *env, jobject thiz) {
     auto *engine = new MobileGS();
     engine->initialize();
     return reinterpret_cast<jlong>(engine);
@@ -243,19 +243,30 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_extractFeaturesMeta(JNIE
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_detectEdgesJni(JNIEnv *env, jobject thiz, jobject srcBitmap, jobject dstBitmap) {
+Java_com_hereliesaz.graffitixr_nativebridge_SlamManager_detectEdgesJni(JNIEnv *env, jobject thiz, jobject srcBitmap, jobject dstBitmap) {
     cv::Mat gray;
     if (!bitmapToMat(env, srcBitmap, gray, true)) return;
 
     cv::Mat edges;
-    // Canny constants: 50, 150 are standard "reasonable" defaults.
     cv::Canny(gray, edges, 50, 150);
 
-    // Invert: Edges (white) become black, Background (black) becomes white.
-    // Better for "sketching" on walls.
-    cv::bitwise_not(edges, edges);
+    // Create a 4-channel BGRA/RGBA matrix
+    cv::Mat rgba(edges.rows, edges.cols, CV_8UC4);
 
-    matToBitmap(env, edges, dstBitmap);
+    for (int y = 0; y < edges.rows; ++y) {
+        for (int x = 0; x < edges.cols; ++x) {
+            uchar val = edges.at<uchar>(y, x);
+            if (val > 0) {
+                // Edge: White and Opaque
+                rgba.at<cv::Vec4b>(y, x) = cv::Vec4b(255, 255, 255, 255);
+            } else {
+                // Background: Transparent
+                rgba.at<cv::Vec4b>(y, x) = cv::Vec4b(0, 0, 0, 0);
+            }
+        }
+    }
+
+    matToBitmap(env, rgba, dstBitmap);
 }
 
 } // extern "C"

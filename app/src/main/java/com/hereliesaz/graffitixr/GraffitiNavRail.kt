@@ -35,7 +35,8 @@ fun AzNavHostScope.GraffitiNavRail(
     has3dModel: Boolean,
     use3dBackground: Boolean,
     onToggle3dBackground: () -> Unit,
-    onShowInfoScreen: () -> Unit
+    onShowInfoScreen: () -> Unit,
+    onSaveProject: () -> Unit
 ) {
     val activeHighlightColor = when (editorUiState.activeRotationAxis) {
         com.hereliesaz.graffitixr.common.model.RotationAxis.X -> Color.Red
@@ -187,7 +188,7 @@ fun AzNavHostScope.GraffitiNavRail(
     azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
     azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
         performHaptic()
-        editorViewModel.saveProject()
+        onSaveProject()
         resetDialogs()
     }
     azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {

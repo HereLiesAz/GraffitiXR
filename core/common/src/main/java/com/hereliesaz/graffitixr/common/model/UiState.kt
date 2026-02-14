@@ -79,7 +79,9 @@ data class EditorUiState(
     val gestureInProgress: Boolean = false,
     val showRotationAxisFeedback: Boolean = false,
     val showDoubleTapHint: Boolean = false,
-    val progressPercentage: Float = 0f
+    val progressPercentage: Float = 0f,
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false
 )
 
 /**

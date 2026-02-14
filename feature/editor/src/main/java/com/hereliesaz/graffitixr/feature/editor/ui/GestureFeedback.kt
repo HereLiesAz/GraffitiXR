@@ -19,7 +19,10 @@ fun GestureFeedback(
     uiState: EditorUiState,
     modifier: Modifier = Modifier
 ) {
-    if (uiState.gestureInProgress || uiState.showRotationAxisFeedback) {
+    // Show feedback if gesture is in progress, axis change was requested, OR editing is unlocked
+    val isVisible = uiState.gestureInProgress || uiState.showRotationAxisFeedback || !uiState.isImageLocked
+
+    if (isVisible) {
         Box(
             modifier = modifier
                 .padding(16.dp)
@@ -31,13 +34,18 @@ fun GestureFeedback(
 
             if (activeLayer != null) {
                 val text = when {
-                    uiState.showRotationAxisFeedback -> {
+                    uiState.showRotationAxisFeedback || !uiState.isImageLocked -> {
                         val axisName = when(uiState.activeRotationAxis) {
                             RotationAxis.X -> "X-Axis"
                             RotationAxis.Y -> "Y-Axis"
                             RotationAxis.Z -> "Z-Axis"
                         }
-                        "Rotation Axis: $axisName"
+                        if (uiState.gestureInProgress) {
+                             val scalePct = (activeLayer.scale * 100).toInt()
+                             "Axis: $axisName | Scale: ${scalePct}%"
+                        } else {
+                             "Rotation Axis: $axisName"
+                        }
                     }
                     else -> {
                         val scalePct = (activeLayer.scale * 100).toInt()

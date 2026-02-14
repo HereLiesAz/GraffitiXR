@@ -12,7 +12,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -26,8 +35,40 @@ fun OverlayScreen(
     val activeLayer = remember(uiState.layers, uiState.activeLayerId) {
         uiState.layers.find { it.id == uiState.activeLayerId }
     }
+    val haptic = LocalHapticFeedback.current
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        if (!uiState.isImageLocked) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.onCycleRotationAxis()
+                        }
+                    }
+                )
+            }
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, rotation ->
+                    if (activeLayer != null && !activeLayer.isImageLocked) {
+                        viewModel.onGestureStart()
+                        val newScale = activeLayer.scale * zoom
+                        val newOffset = activeLayer.offset + pan
+                        
+                        viewModel.onRotationChanged(rotation)
+                        viewModel.setLayerTransform(
+                            scale = newScale,
+                            offset = newOffset,
+                            rx = activeLayer.rotationX,
+                            ry = activeLayer.rotationY,
+                            rz = activeLayer.rotationZ
+                        )
+                    }
+                }
+            }
+    ) {
         uiState.layers.forEach { layer ->
             if (layer.isVisible) {
                 Image(
