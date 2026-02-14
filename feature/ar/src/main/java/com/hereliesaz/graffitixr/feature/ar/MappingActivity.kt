@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
+import javax.inject.Inject 
 
 @AndroidEntryPoint
 class MappingActivity : ComponentActivity() {
@@ -20,8 +20,8 @@ class MappingActivity : ComponentActivity() {
             GraffitiXRTheme {
                 MappingScreen(
                     onBackClick = { finish() },
-                    onScanComplete = { finish() }, // Simplified nav
-                    slamManager = slamManager, // FIXED: Passed injected instance
+                    onScanComplete = { finish() },
+                    slamManager = slamManager,
                     projectRepository = projectRepository
                 )
             }

@@ -51,7 +51,6 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingScreen
-import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
@@ -315,11 +314,13 @@ fun MainScreen(
                             actions = editorViewModel,
                             uiState = editorUiState,
                             isTouchLocked = uiState.isTouchLocked,
-                            showUnlockInstructions = uiState.showUnlockInstructions
+                            showUnlockInstructions = uiState.showUnlockInstructions,
+                            isCapturingTarget = uiState.isCapturingTarget
                         )
                     }
                     composable("surveyor") {
                         com.hereliesaz.graffitixr.feature.ar.MappingUi(
+                            onBackClick = { localNavController.popBackStack() },
                             onScanComplete = { localNavController.popBackStack() }
                         )
                     }

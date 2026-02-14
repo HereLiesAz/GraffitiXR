@@ -23,6 +23,7 @@ data class AdjustmentsState(
     val isArMode: Boolean = false,
     val hasHistory: Boolean = false,
     val isRightHanded: Boolean = true,
+    val isCapturingTarget: Boolean = false,
     val activeLayer: OverlayLayer? = null
 )
 
@@ -62,7 +63,9 @@ fun AdjustmentsPanel(
     // The panel should be visible if we are adjusting an image, or if we have an image active,
     // or if we are in AR mode (to provide access to the Magic Wand for anchoring),
     // or if there's any history to undo/redo.
-    val isVisible = showKnobs || showColorBalance || hasImage || isArMode || hasHistory
+    // HOWEVER, we hide the action row (Undo/Redo/Magic) during Target Creation.
+    val canShowActionRow = !state.isCapturingTarget
+    val isVisible = showKnobs || showColorBalance || (canShowActionRow && (hasImage || isArMode || hasHistory))
 
     if (!isVisible) return
 
@@ -137,17 +140,36 @@ fun AdjustmentsPanel(
             }
         }
 
-        // Persistent Action Row: Undo, Redo, and Magic Wand (Magic Align)
-        // These are visible as long as the panel itself is visible.
-        UndoRedoRow(
-            canUndo = true, // Simplified: Assume true or passed in state if we want fine-grained
-            canRedo = true,
-            onUndo = onUndo,
-            onRedo = onRedo,
-            onMagicClicked = onMagicAlign,
-            modifier = Modifier
-                .padding(start = startPadding, end = endPadding)
-                .fillMaxWidth()
-        )
-    }
-}
+                // Persistent Action Row: Undo, Redo, and Magic Wand (Magic Align)
+
+                // These are visible as long as the panel itself is visible.
+
+                if (!state.isCapturingTarget) {
+
+                    UndoRedoRow(
+
+                        canUndo = true, // Simplified: Assume true or passed in state if we want fine-grained
+
+                        canRedo = true,
+
+                        onUndo = onUndo,
+
+                        onRedo = onRedo,
+
+                        onMagicClicked = onMagicAlign,
+
+                        modifier = Modifier
+
+                            .padding(start = startPadding, end = endPadding)
+
+                            .fillMaxWidth()
+
+                    )
+
+                }
+
+            }
+
+        }
+
+        

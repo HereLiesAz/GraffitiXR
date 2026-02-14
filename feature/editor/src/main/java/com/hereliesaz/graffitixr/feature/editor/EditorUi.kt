@@ -24,7 +24,8 @@ fun EditorUi(
     actions: EditorViewModel,
     uiState: EditorUiState,
     isTouchLocked: Boolean,
-    showUnlockInstructions: Boolean
+    showUnlockInstructions: Boolean,
+    isCapturingTarget: Boolean = false
 ) {
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -83,6 +84,7 @@ fun EditorUi(
                 isArMode = uiState.editorMode == EditorMode.AR,
                 hasHistory = uiState.canUndo || uiState.canRedo,
                 isRightHanded = uiState.isRightHanded,
+                isCapturingTarget = isCapturingTarget,
                 activeLayer = overlayLayer
             ),
             showKnobs = uiState.activePanel == EditorPanel.ADJUST,
