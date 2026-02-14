@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -115,34 +116,27 @@ fun TargetCreationBackground(
 }
 
 @Composable
-fun TargetCreationFlow(
+fun TargetCreationUi(
     uiState: ArUiState,
     isRightHanded: Boolean,
     captureStep: CaptureStep,
-    context: Context,
+    state: TargetCreationState,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
-    onPhotoCaptured: (Bitmap) -> Unit,
-    onCalibrationPointCaptured: (Offset) -> Unit,
-    onUnwarpImage: (List<Offset>) -> Unit,
+    onUnwarpConfirm: (List<Offset>) -> Unit,
     onMaskConfirmed: (Bitmap) -> Unit
 ) {
-    val cameraController = rememberCameraController()
+    val scope = rememberCoroutineScope()
+    var isProcessingMask by remember { mutableStateOf(false) }
 
     when (captureStep) {
         CaptureStep.CAPTURE -> {
             Box(Modifier.fillMaxSize()) {
-                // Background Camera Preview
-                CameraPreview(
-                    controller = cameraController,
-                    onPhotoCaptured = onPhotoCaptured
-                )
-
-                TargetCreationOverlay(
+                TargetCreationOverlayUi(
                     uiState = uiState,
                     step = CaptureStep.CAPTURE,
-                    onPrimaryAction = { cameraController.takePicture() },
+                    onPrimaryAction = { state.cameraController.takePicture() },
                     onCancel = onCancel
                 )
             }

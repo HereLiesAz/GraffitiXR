@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr
 
 import android.view.PixelCopy
+import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -292,7 +293,7 @@ fun MainScreen(
                         },
                         onRetake = viewModel::onRetakeCapture,
                         onCancel = viewModel::onCancelCaptureClicked,
-                        onUnwarpConfirm = { points ->
+                        onUnwarpConfirm = { points: List<Offset> ->
                             arUiState.tempCaptureBitmap?.let { src ->
                                 ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
                                     arViewModel.setTempCapture(unwarped)
@@ -300,7 +301,7 @@ fun MainScreen(
                                 }
                             }
                         },
-                        onMaskConfirmed = { maskedBitmap ->
+                        onMaskConfirmed = { maskedBitmap: Bitmap ->
                             val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
                             arViewModel.setTempCapture(extracted)
                             viewModel.setCaptureStep(CaptureStep.REVIEW)
