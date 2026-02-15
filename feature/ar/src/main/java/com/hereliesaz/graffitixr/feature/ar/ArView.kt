@@ -20,7 +20,9 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.feature.ar.util.LightEstimationAnalyzer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @Composable
@@ -38,8 +40,55 @@ fun ArView(
 
     val renderer = remember(slamManager) { ArRenderer(slamManager) }
 
+    // State for estimated ambient light (0.0 - 1.0)
+    var ambientLight by remember { mutableFloatStateOf(0.5f) }
+
+    // Pre-create PreviewView to manage its lifecycle outside AndroidView update loop
+    val previewView = remember {
+        PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+
+    // Executor for image analysis (must be shut down)
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    // We need to keep track of the camera provider to unbind on dispose
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProvider?.unbindAll()
+            cameraExecutor.shutdown()
+        }
+    }
+
     LaunchedEffect(renderer) {
         onRendererCreated(renderer)
+    }
+
+    // Bind camera use cases only when permission changes or lifecycle changes
+    LaunchedEffect(hasCameraPermission, lifecycleOwner) {
+        if (hasCameraPermission) {
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+            cameraProviderFuture.addListener({
+                try {
+                    val provider = cameraProviderFuture.get()
+                    cameraProvider = provider
+                    bindCameraUseCases(
+                        provider,
+                        lifecycleOwner,
+                        previewView,
+                        cameraExecutor
+                    ) { intensity ->
+                        ambientLight = intensity
+                    }
+                } catch (e: Exception) {
+                    Log.e("ArView", "Camera binding failed", e)
+                }
+            }, ContextCompat.getMainExecutor(context))
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -49,29 +98,8 @@ fun ArView(
         // GLSurfaceView (Layer 2) to sit correctly on top with ZOrderMediaOverlay.
         if (hasCameraPermission) {
             AndroidView(
-                factory = { ctx ->
-                    PreviewView(ctx).apply {
-                        implementationMode = PreviewView.ImplementationMode.PERFORMANCE
-                        scaleType = PreviewView.ScaleType.FILL_CENTER
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-                update = { previewView ->
-                    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                    cameraProviderFuture.addListener({
-                        try {
-                            val cameraProvider = cameraProviderFuture.get()
-                            bindCameraUseCases(
-                                cameraProvider,
-                                lifecycleOwner,
-                                previewView,
-                                slamManager
-                            )
-                        } catch (e: Exception) {
-                            Log.e("ArView", "Camera binding failed", e)
-                        }
-                    }, ContextCompat.getMainExecutor(context))
-                }
+                factory = { previewView },
+                modifier = Modifier.fillMaxSize()
             )
         }
 
@@ -96,8 +124,11 @@ fun ArView(
         )
     }
 
-    LaunchedEffect(uiState.isFlashlightOn) {
-        renderer.updateLightEstimate(if (uiState.isFlashlightOn) 1.0f else 0.5f)
+    // Update renderer with real light estimation or flashlight override
+    LaunchedEffect(ambientLight, uiState.isFlashlightOn) {
+        val intensity = if (uiState.isFlashlightOn) 1.0f else ambientLight
+        // Default white color for now
+        renderer.updateLightEstimate(intensity, floatArrayOf(1f, 1f, 1f))
     }
 
     LaunchedEffect(activeLayer) {
@@ -111,7 +142,8 @@ private fun bindCameraUseCases(
     cameraProvider: ProcessCameraProvider,
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     previewView: PreviewView,
-    slamManager: SlamManager
+    executor: ExecutorService,
+    onLightUpdate: (Float) -> Unit
 ) {
     val preview = Preview.Builder().build()
     val selector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -119,9 +151,10 @@ private fun bindCameraUseCases(
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .build()
         .also {
-            it.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
-                imageProxy.close()
-            }
+            it.setAnalyzer(
+                executor,
+                LightEstimationAnalyzer(onLightUpdate)
+            )
         }
 
     preview.setSurfaceProvider(previewView.surfaceProvider)
