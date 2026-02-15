@@ -47,8 +47,8 @@ void MobileGS::draw() {
     if (!isInitialized) return;
 
     if (vulkanRenderer) {
-        // Pass lighting data to renderer if supported
-        // vulkanRenderer->setLighting(lightIntensity, lightColor);
+        // Pass lighting data to renderer
+        vulkanRenderer->setLighting(lightIntensity, lightColor);
         vulkanRenderer->renderFrame();
     }
 }

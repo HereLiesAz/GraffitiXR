@@ -36,6 +36,7 @@ void VulkanBackend::resize(int w, int h) {
 
 void VulkanBackend::renderFrame() {
     // Stub: Vulkan draw commands would go here
+    // In a real implementation, we would update the UBO with lightIntensity and lightColor here
 }
 
 void VulkanBackend::updateCamera(float* viewMatrix, float* projectionMatrix) {
@@ -44,6 +45,15 @@ void VulkanBackend::updateCamera(float* viewMatrix, float* projectionMatrix) {
 
 void VulkanBackend::updateModel(float* modelMatrix) {
     // Stub
+}
+
+void VulkanBackend::setLighting(float intensity, float* color) {
+    lightIntensity = intensity;
+    if (color) {
+        lightColor[0] = color[0];
+        lightColor[1] = color[1];
+        lightColor[2] = color[2];
+    }
 }
 
 void VulkanBackend::destroy() {

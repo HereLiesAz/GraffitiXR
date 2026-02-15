@@ -22,6 +22,7 @@ public:
     // Data Updates
     void updateCamera(float* viewMatrix, float* projectionMatrix);
     void updateModel(float* modelMatrix);
+    void setLighting(float intensity, float* color);
 
 private:
     // Internal Setup Helpers
@@ -45,6 +46,10 @@ private:
     AAssetManager* assetManager = nullptr;
     int width = 0;
     int height = 0;
+
+    // Lighting State
+    float lightIntensity = 1.0f;
+    float lightColor[3] = {1.0f, 1.0f, 1.0f};
 
     // Vulkan Handles
     VkInstance instance = VK_NULL_HANDLE;
