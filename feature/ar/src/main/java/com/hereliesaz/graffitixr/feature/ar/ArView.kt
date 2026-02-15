@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.PixelFormat
 import android.util.Log
-import android.view.Surface
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -31,34 +30,24 @@ fun ArView(
     slamManager: SlamManager,
     projectRepository: ProjectRepository,
     activeLayer: Layer?,
-    onRendererCreated: (ArRenderer) -> Unit
+    onRendererCreated: (ArRenderer) -> Unit,
+    hasCameraPermission: Boolean // FIX: Controlled by parent
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 1. Initialize the Renderer
+    // 1. Initialize Renderer
     val renderer = remember(slamManager) { ArRenderer(slamManager) }
 
     LaunchedEffect(renderer) {
         onRendererCreated(renderer)
     }
 
-    // 2. State to hold the camera provider
-    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-
-    // 3. Request CameraProvider on launch
-    LaunchedEffect(Unit) {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        cameraProviderFuture.addListener({
-            cameraProvider = cameraProviderFuture.get()
-        }, ContextCompat.getMainExecutor(context))
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
 
         // --- LAYER 1: The Reality (Camera Preview) ---
-        // This MUST be behind the GLSurfaceView
-        if (cameraProvider != null) {
+        // FIX: Now reacts dynamically to the permission boolean changing
+        if (hasCameraPermission) {
             AndroidView(
                 factory = { ctx ->
                     PreviewView(ctx).apply {
@@ -68,40 +57,43 @@ fun ArView(
                 },
                 modifier = Modifier.fillMaxSize(),
                 update = { previewView ->
-                    bindCameraUseCases(
-                        cameraProvider!!,
-                        lifecycleOwner,
-                        previewView,
-                        slamManager
-                    )
+                    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+                    cameraProviderFuture.addListener({
+                        try {
+                            val cameraProvider = cameraProviderFuture.get()
+                            bindCameraUseCases(
+                                cameraProvider,
+                                lifecycleOwner,
+                                previewView,
+                                slamManager
+                            )
+                        } catch (e: Exception) {
+                            Log.e("ArView", "Camera binding failed", e)
+                        }
+                    }, ContextCompat.getMainExecutor(context))
                 }
             )
         }
 
         // --- LAYER 2: The Hallucination (AR Graphics) ---
-        // We set this to transparent so the camera shows through
         AndroidView(
             factory = { ctx ->
                 GLSurfaceView(ctx).apply {
                     setEGLContextClientVersion(3)
-                    setEGLConfigChooser(8, 8, 8, 8, 16, 0) // Alpha channel required
-                    holder.setFormat(PixelFormat.TRANSLUCENT) // Make background transparent
+                    setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                    holder.setFormat(PixelFormat.TRANSLUCENT)
+                    setZOrderMediaOverlay(true)
                     setRenderer(renderer)
                     renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                    setZOrderOnTop(true) // Ensure it sits physically on top of the SurfaceView
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
     }
 
-    // Effect Updates
+    // React to UI State changes
     LaunchedEffect(uiState.isFlashlightOn) {
         renderer.updateLightEstimate(if (uiState.isFlashlightOn) 1.0f else 0.5f)
-    }
-
-    LaunchedEffect(uiState.showPointCloud) {
-        slamManager.setVisualizationMode(if (uiState.showPointCloud) 1 else 0)
     }
 
     LaunchedEffect(activeLayer) {
@@ -117,38 +109,23 @@ private fun bindCameraUseCases(
     previewView: PreviewView,
     slamManager: SlamManager
 ) {
-    // 1. Preview: The visual feed for the user
-    val preview = Preview.Builder()
-        .build()
-        .also {
-            it.setSurfaceProvider(previewView.surfaceProvider)
-        }
-
-    // 2. Analysis: The data feed for the Native Engine
-    val imageAnalysis = ImageAnalysis.Builder()
+    val preview = Preview.Builder().build()
+    val selector = CameraSelector.DEFAULT_BACK_CAMERA
+    val analysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .build()
-        .also {
-            it.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
-                // Feed the image to the native engine for tracking
-                // Note: slamManager.feedDepthData expects an android.media.Image
-                imageProxy.image?.let { image ->
-                    // slamManager.feedDepthData(image) // Uncomment if your native side is ready
-                }
-                imageProxy.close() // CRITICAL: Must close to get next frame
-            }
-        }
 
-    // 3. Bind to Lifecycle
+    preview.setSurfaceProvider(previewView.surfaceProvider)
+
     try {
         cameraProvider.unbindAll()
         cameraProvider.bindToLifecycle(
             lifecycleOwner,
-            CameraSelector.DEFAULT_BACK_CAMERA,
+            selector,
             preview,
-            imageAnalysis
+            analysis
         )
-    } catch (exc: Exception) {
-        Log.e("ArView", "Use case binding failed", exc)
+    } catch (e: Exception) {
+        Log.e("ArView", "Camera binding failed", e)
     }
 }

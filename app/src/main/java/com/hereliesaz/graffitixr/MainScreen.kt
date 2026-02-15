@@ -72,9 +72,6 @@ import java.io.File
 import kotlin.math.min
 import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 
-
-
-
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -134,6 +131,7 @@ fun MainScreen(
         }
     }
 
+    // FIX: Fully constructed NavStrings to prevent 'No value passed' errors
     val navStrings = remember {
         NavStrings(
             modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
@@ -237,7 +235,6 @@ fun MainScreen(
                         state = targetCreationState,
                         onPhotoCaptured = { bitmap ->
                             arViewModel.setTempCapture(bitmap)
-                            // Route directly to evolution, bypassing the archaic Rectify step
                             localNavController.navigate("target_evolution")
                         }
                     )
@@ -257,11 +254,9 @@ fun MainScreen(
                         editorViewModel = editorViewModel,
                         arViewModel = arViewModel,
                         onRendererCreated = onRendererCreatedWrapper,
-                        onPickBackground = {
-                            backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        },
                         slamManager = slamManager,
                         projectRepository = projectRepository,
+                        hasCameraPermission = hasCameraPermission,
                         use3dBackground = use3dBackground
                     )
                 }
@@ -330,7 +325,6 @@ fun MainScreen(
 
                     // --- TARGET EVOLUTION ---
                     composable(route = "target_evolution") {
-                        // Bypass URI restrictions and grab the bitmap directly from the VM
                         val evolutionBitmap = arUiState.tempCaptureBitmap
 
                         if (evolutionBitmap != null) {
@@ -433,9 +427,9 @@ fun MainContentLayer(
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     onRendererCreated: (ArRenderer) -> Unit,
-    onPickBackground: () -> Unit,
     slamManager: SlamManager,
     projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
+    hasCameraPermission: Boolean,
     use3dBackground: Boolean = false
 ) {
     Box(Modifier.fillMaxSize().zIndex(1f), contentAlignment = Alignment.Center) {
@@ -449,7 +443,8 @@ fun MainContentLayer(
                     slamManager = slamManager,
                     projectRepository = projectRepository,
                     activeLayer = activeLayer,
-                    onRendererCreated = onRendererCreated
+                    onRendererCreated = onRendererCreated,
+                    hasCameraPermission = hasCameraPermission
                 )
                 if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
                     OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
@@ -478,7 +473,8 @@ fun MainContentLayer(
                         slamManager = slamManager,
                         projectRepository = projectRepository,
                         activeLayer = activeLayer,
-                        onRendererCreated = onRendererCreated
+                        onRendererCreated = onRendererCreated,
+                        hasCameraPermission = hasCameraPermission
                     )
                     OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
                 }

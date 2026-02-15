@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.android.application)
-    // REMOVED: alias(libs.plugins.kotlin.android) -- It is built-in to AGP 9.0
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -48,12 +48,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // Configure the built-in Kotlin support
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-    }
+    // FIX: Removed the failing top-level 'kotlin {}' block.
+    // We configure JVM target via tasks below.
 
     buildFeatures {
         compose = true
@@ -67,6 +63,13 @@ android {
     }
 }
 
+// FIX: Configure Kotlin JVM target safely using tasks
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
     implementation(project(":core:nativebridge"))
     implementation(project(":feature:ar"))
@@ -74,8 +77,6 @@ dependencies {
     implementation(project(":feature:dashboard"))
     implementation(project(":core:common"))
     implementation(project(":core:design"))
-    implementation(project(":core:data"))
-    implementation(project(":core:domain"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -83,6 +84,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
 
     implementation(libs.androidx.compose.material3)
+
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -108,7 +110,9 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
+    // FIX: Corrected reference to match TOML 'compose-ui-test-junit4'
     androidTestImplementation(libs.compose.ui.test.junit4)
+    // FIX: Corrected reference to match TOML 'compose-ui-test-manifest'
     debugImplementation(libs.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
