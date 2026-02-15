@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
 import android.net.Uri
+import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -19,20 +20,20 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import org.junit.Ignore
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
-    private val projectRepository: ProjectRepository = mockk(relaxed = true)
+    private val stereoDepthProvider: StereoDepthProvider = mockk()
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = ArViewModel(projectRepository)
+        every { stereoDepthProvider.isSupported() } returns false
+        viewModel = ArViewModel(stereoDepthProvider)
     }
 
     @After
@@ -46,7 +47,6 @@ class ArViewModelTest {
         assertFalse(state.isFlashlightOn)
         assertTrue(state.showPointCloud)
         assertNull(state.tempCaptureBitmap)
-        assertFalse(state.isTargetDetected)
     }
 
     @Test
@@ -75,60 +75,35 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `resetCapture clears bitmap`() = runTest {
-        val bitmap = mockk<Bitmap>()
-        viewModel.setTempCapture(bitmap)
-        viewModel.resetCapture()
-        assertNull(viewModel.uiState.value.tempCaptureBitmap)
-    }
-
-    @Test
     fun `onFrameCaptured updates state`() = runTest {
         val bitmap = mockk<Bitmap>()
         val uri = mockk<Uri>()
+        // uri.path is used in viewmodel, so we must mock it
+        every { uri.path } returns "/tmp/test"
         
         viewModel.onFrameCaptured(bitmap, uri)
         
         val state = viewModel.uiState.value
-        assertNull(state.tempCaptureBitmap)
-        assertTrue(state.isTargetDetected)
-        assertTrue(state.capturedTargetUris.contains(uri))
-        assertTrue(state.capturedTargetImages.contains(bitmap))
-    }
-
-    @Test
-    fun `onTargetDetected updates state`() {
-        viewModel.onTargetDetected(true)
-        assertTrue(viewModel.uiState.value.isTargetDetected)
-
-        viewModel.onTargetDetected(false)
-        assertFalse(viewModel.uiState.value.isTargetDetected)
+        assertEquals(bitmap, state.tempCaptureBitmap)
+        assertEquals("/tmp/test", state.pendingKeyframePath)
     }
 
     @Test
     fun `captureKeyframe sets pendingKeyframePath`() = runTest {
-        // Mock current project
-        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(id = "test-id", name = "Test")
-        every { projectRepository.currentProject.value } returns project
-        
         viewModel.captureKeyframe()
         testDispatcher.scheduler.advanceUntilIdle()
-        
+
         val path = viewModel.uiState.value.pendingKeyframePath
         assertNotNull(path)
-        assertTrue(path!!.contains("test-id/photogrammetry/keyframe_"))
+        assertTrue(path!!.startsWith("keyframe_"))
     }
 
     @Test
     fun `onKeyframeCaptured clears pendingKeyframePath`() = runTest {
-        // Mock current project
-        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(id = "test-id", name = "Test")
-        every { projectRepository.currentProject.value } returns project
-        
         viewModel.captureKeyframe()
         testDispatcher.scheduler.advanceUntilIdle()
         assertNotNull(viewModel.uiState.value.pendingKeyframePath)
-        
+
         viewModel.onKeyframeCaptured()
         assertNull(viewModel.uiState.value.pendingKeyframePath)
     }

@@ -28,6 +28,16 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
 }
 
 dependencies {
@@ -37,4 +47,6 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(libs.arcore.client)
     implementation(project(":opencv"))
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
 }

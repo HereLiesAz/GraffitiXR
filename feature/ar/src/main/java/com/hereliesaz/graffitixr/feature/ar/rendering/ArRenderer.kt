@@ -23,8 +23,8 @@ class ArRenderer(
         slamManager.draw()
     }
 
-    fun updateLightEstimate(intensity: Float) {
-        slamManager.updateLight(intensity)
+    fun updateLightEstimate(intensity: Float, colorCorrection: FloatArray = floatArrayOf(1f, 1f, 1f)) {
+        slamManager.updateLight(intensity, colorCorrection)
     }
 
     fun setOverlay(bitmap: Bitmap?) {
@@ -32,6 +32,6 @@ class ArRenderer(
     }
 
     fun saveKeyframe(path: String) {
-        slamManager.saveWorld(path)
+        slamManager.saveKeyframe(path)
     }
 }
