@@ -53,8 +53,13 @@ fun ArView(
 
     // Executor for image analysis (must be shut down)
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    // We need to keep track of the camera provider to unbind on dispose
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
     DisposableEffect(Unit) {
         onDispose {
+            cameraProvider?.unbindAll()
             cameraExecutor.shutdown()
         }
     }
@@ -69,9 +74,10 @@ fun ArView(
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
             cameraProviderFuture.addListener({
                 try {
-                    val cameraProvider = cameraProviderFuture.get()
+                    val provider = cameraProviderFuture.get()
+                    cameraProvider = provider
                     bindCameraUseCases(
-                        cameraProvider,
+                        provider,
                         lifecycleOwner,
                         previewView,
                         cameraExecutor

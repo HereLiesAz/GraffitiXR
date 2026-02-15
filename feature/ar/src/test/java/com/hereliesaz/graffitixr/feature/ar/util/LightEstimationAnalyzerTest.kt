@@ -21,11 +21,18 @@ class LightEstimationAnalyzerTest {
 
         // Create a buffer with known values (e.g. all 128 = ~0.5 intensity)
         // 128 is 0x80.
-        val data = ByteArray(200) { 128.toByte() }
+        // Assuming width=10, height=20, stride=1
+        val width = 10
+        val height = 20
+        val data = ByteArray(width * height) { 128.toByte() }
         val buffer = ByteBuffer.wrap(data)
 
         every { image.planes } returns arrayOf(plane)
+        every { image.width } returns width
+        every { image.height } returns height
         every { plane.buffer } returns buffer
+        every { plane.pixelStride } returns 1
+        every { plane.rowStride } returns width // Tight packing
 
         // Act
         analyzer.analyze(image)
@@ -45,12 +52,18 @@ class LightEstimationAnalyzerTest {
         val image = mockk<ImageProxy>(relaxed = true)
         val plane = mockk<ImageProxy.PlaneProxy>()
 
+        val width = 10
+        val height = 20
         // All 255
-        val data = ByteArray(200) { 255.toByte() }
+        val data = ByteArray(width * height) { 255.toByte() }
         val buffer = ByteBuffer.wrap(data)
 
         every { image.planes } returns arrayOf(plane)
+        every { image.width } returns width
+        every { image.height } returns height
         every { plane.buffer } returns buffer
+        every { plane.pixelStride } returns 1
+        every { plane.rowStride } returns width
 
         // Act
         analyzer.analyze(image)
@@ -69,12 +82,18 @@ class LightEstimationAnalyzerTest {
         val image = mockk<ImageProxy>(relaxed = true)
         val plane = mockk<ImageProxy.PlaneProxy>()
 
+        val width = 10
+        val height = 20
         // All 0
-        val data = ByteArray(200) { 0.toByte() }
+        val data = ByteArray(width * height) { 0.toByte() }
         val buffer = ByteBuffer.wrap(data)
 
         every { image.planes } returns arrayOf(plane)
+        every { image.width } returns width
+        every { image.height } returns height
         every { plane.buffer } returns buffer
+        every { plane.pixelStride } returns 1
+        every { plane.rowStride } returns width
 
         // Act
         analyzer.analyze(image)

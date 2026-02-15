@@ -23,19 +23,32 @@ class LightEstimationAnalyzer(private val listener: (Float) -> Unit) : ImageAnal
 
         lastAnalyzedTimestamp = currentTimestamp
 
-        val buffer = image.planes[0].buffer
+        val plane = image.planes[0]
+        val buffer = plane.buffer
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+        val width = image.width
+        val height = image.height
 
-        // Compute average pixel value
-        // We subsample for performance (skip every 50 pixels)
         var sum = 0L
-        val pixelStride = 50
         var count = 0
 
-        // Direct buffer access without allocation
-        val limit = buffer.limit()
-        for (i in 0 until limit step pixelStride) {
-            sum += (buffer.get(i).toInt() and 0xFF)
-            count++
+        // Iterate through rows
+        // We skip pixels for performance (every 20th pixel)
+        val skip = 20
+
+        for (row in 0 until height step skip) {
+            val rowStart = row * rowStride
+            for (col in 0 until width step skip) {
+                // Calculate index for the pixel
+                val index = rowStart + (col * pixelStride)
+
+                // Ensure we don't go out of bounds (though strides should prevent this)
+                if (index < buffer.limit()) {
+                    sum += (buffer.get(index).toInt() and 0xFF)
+                    count++
+                }
+            }
         }
 
         val average = if (count > 0) sum.toDouble() / count else 0.0
