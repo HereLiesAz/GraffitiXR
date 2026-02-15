@@ -6,6 +6,7 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 VulkanBackend::VulkanBackend() {
+    // Constructor
 }
 
 VulkanBackend::~VulkanBackend() {
@@ -17,8 +18,12 @@ bool VulkanBackend::initialize(ANativeWindow* nativeWindow, AAssetManager* mgr) 
     this->assetManager = mgr;
     LOGI("Initializing Vulkan Backend...");
 
-    // In a real implementation, you would call createInstance(), createSurface(), etc.
-    // For now, we return true to satisfy the contract without crashing.
+    if (!createInstance()) return false;
+    if (!createSurface()) return false;
+    if (!selectPhysicalDevice()) return false;
+    if (!createLogicalDevice()) return false;
+    if (!createSwapchain()) return false;
+
     return true;
 }
 
@@ -29,17 +34,12 @@ void VulkanBackend::resize(int w, int h) {
     recreateSwapchain();
 }
 
-// FIX: Implemented the missing method required by the linker
 void VulkanBackend::renderFrame() {
-    // Stub: Actual Vulkan draw calls would go here.
-    // e.g., vkAcquireNextImageKHR, vkQueueSubmit, vkQueuePresentKHR
-    // LOGI("Vulkan Frame Rendered");
+    // Stub: Vulkan draw commands would go here
 }
 
-// FIX: Implemented the missing method required by the linker
 void VulkanBackend::updateCamera(float* viewMatrix, float* projectionMatrix) {
-    // Stub: Upload uniform buffers to GPU
-    // This is where you would memcpy the matrices to your uniform buffer mapped memory
+    // Stub: Update uniform buffers
 }
 
 void VulkanBackend::updateModel(float* modelMatrix) {
@@ -49,10 +49,14 @@ void VulkanBackend::updateModel(float* modelMatrix) {
 void VulkanBackend::destroy() {
     LOGI("Destroying Vulkan Backend...");
     cleanupSwapchain();
-    // Destroy Device, Instance, Surface here
+    // In a real app, destroy device, instance, surface here.
+    if (device != VK_NULL_HANDLE) {
+        // vkDestroyDevice(device, nullptr);
+        device = VK_NULL_HANDLE;
+    }
 }
 
-// --- Internal Helpers (Stubs to prevent linking errors if called internally) ---
+// --- Internal Helper Stubs (Returning true to satisfy logic) ---
 
 bool VulkanBackend::createInstance() { return true; }
 bool VulkanBackend::createSurface() { return true; }
@@ -67,7 +71,7 @@ bool VulkanBackend::createCommandBuffers() { return true; }
 bool VulkanBackend::createSyncObjects() { return true; }
 
 void VulkanBackend::cleanupSwapchain() {
-    // vkDestroySwapchainKHR, etc.
+    // Stub: vkDestroySwapchainKHR, etc.
 }
 
 void VulkanBackend::recreateSwapchain() {
