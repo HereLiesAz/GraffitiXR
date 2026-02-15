@@ -8,6 +8,7 @@ import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.MatOfPoint
 import org.opencv.core.Point
 import org.opencv.core.Rect
 import org.opencv.core.Scalar
@@ -21,6 +22,21 @@ import javax.inject.Singleton
  */
 @Singleton
 class TargetEvolutionEngine @Inject constructor() {
+
+    /**
+     * Generates an initial mask guess for the image.
+     */
+    suspend fun initialGuess(image: Bitmap): Bitmap = withContext(Dispatchers.IO) {
+        // Simple initial guess: center 50% of the image
+        val maskMat = Mat.zeros(image.height, image.width, CvType.CV_8UC1)
+        val rect = Rect(image.width / 4, image.height / 4, image.width / 2, image.height / 2)
+        Imgproc.rectangle(maskMat, rect, Scalar(255.0), -1)
+
+        val resultBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(maskMat, resultBitmap)
+        maskMat.release()
+        resultBitmap
+    }
 
     /**
      * Refines an existing mask based on a touch point using the FloodFill algorithm.
@@ -110,5 +126,37 @@ class TargetEvolutionEngine @Inject constructor() {
         newRegion.release()
 
         resultBitmap
+    }
+
+    /**
+     * Extracts corners from a mask.
+     */
+    suspend fun extractCorners(mask: Bitmap): List<Offset> = withContext(Dispatchers.IO) {
+        val maskMat = Mat()
+        Utils.bitmapToMat(mask, maskMat)
+        Imgproc.cvtColor(maskMat, maskMat, Imgproc.COLOR_RGBA2GRAY)
+        
+        val contours = mutableListOf<MatOfPoint>()
+        val hierarchy = Mat()
+        Imgproc.findContours(maskMat, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+        
+        if (contours.isEmpty()) {
+            return@withContext emptyList()
+        }
+        
+        // Find the largest contour
+        val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return@withContext emptyList()
+        
+        // Approximate to a polygon
+        val peri = Imgproc.arcLength(org.opencv.core.MatOfPoint2f(*largestContour.toArray()), true)
+        val approx = org.opencv.core.MatOfPoint2f()
+        Imgproc.approxPolyDP(org.opencv.core.MatOfPoint2f(*largestContour.toArray()), approx, 0.02 * peri, true)
+        
+        val corners = approx.toArray().map { Offset(it.x.toFloat(), it.y.toFloat()) }
+        
+        maskMat.release()
+        hierarchy.release()
+        
+        corners
     }
 }

@@ -71,6 +71,9 @@ dependencies {
     implementation(libs.mlkit.subject.segmentation)
     implementation(libs.kotlinx.coroutines.play.services)
 
+    // Logging
+    implementation(libs.timber)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
