@@ -126,7 +126,8 @@ fun ArView(
     // Update renderer with real light estimation or flashlight override
     LaunchedEffect(ambientLight, uiState.isFlashlightOn) {
         val intensity = if (uiState.isFlashlightOn) 1.0f else ambientLight
-        renderer.updateLightEstimate(intensity)
+        // Default white color for now
+        renderer.updateLightEstimate(intensity, floatArrayOf(1f, 1f, 1f))
     }
 
     LaunchedEffect(activeLayer) {
