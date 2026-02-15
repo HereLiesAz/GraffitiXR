@@ -19,8 +19,8 @@ Camera view is blocked in AR and Overlay modes.
 ## Action Plan
 - [x] 1.  Verify `MobileGS.cpp` definitely clears to `0,0,0,0`.
     *   *Verification:* Confirmed in `core/nativebridge/src/main/cpp/MobileGS.cpp`. `draw()` calls `glClearColor(0.0f, 0.0f, 0.0f, 0.0f)` and `glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)` unconditionally.
-- [ ] 2.  Verify `ArRenderer.kt` doesn't draw a full-screen opaque quad (e.g. `BackgroundRenderer` might be drawing black if the texture isn't ready).
-- [ ] 3.  Check `BackgroundRenderer` usage. In standard ARCore, `BackgroundRenderer` draws the camera feed *onto* the GLSurfaceView.
+2.  Verify `ArRenderer.kt` doesn't draw a full-screen opaque quad (e.g. `BackgroundRenderer` might be drawing black if the texture isn't ready).
+3.  Check `BackgroundRenderer` usage. In standard ARCore, `BackgroundRenderer` draws the camera feed *onto* the GLSurfaceView.
     *   *Wait:* `ArView.kt` creates a *separate* `PreviewView` for the camera (Layer 1) and a `GLSurfaceView` for AR (Layer 2).
     *   *Conflict:* Standard ARCore samples use `BackgroundRenderer` to draw camera feed *inside* the GL context.
     *   *Our Setup:* We are trying to mix `CameraX` (PreviewView) + `ARCore/OpenGL` (Transparent Overlay).
