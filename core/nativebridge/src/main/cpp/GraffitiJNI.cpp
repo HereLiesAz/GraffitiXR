@@ -78,6 +78,11 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject image) {}
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedStereoDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject left, jobject right) {
+    // TODO: Implement Stereo processing here using OpenCV StereoSGBM
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateMeshJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray vertices) {}
 
 JNIEXPORT void JNICALL

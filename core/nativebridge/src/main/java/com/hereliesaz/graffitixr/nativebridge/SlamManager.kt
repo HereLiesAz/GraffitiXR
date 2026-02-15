@@ -66,6 +66,14 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) feedDepthDataJni(nativeHandle, image) }
     }
 
+    fun feedStereoData(leftImage: Image, rightImage: Image) {
+        lock.withLock {
+            if (!isDestroyed.get()) {
+                feedStereoDataJni(nativeHandle, leftImage, rightImage)
+            }
+        }
+    }
+
     fun updateMesh(vertices: FloatArray) {
         lock.withLock { if (!isDestroyed.get()) updateMeshJni(nativeHandle, vertices) }
     }
@@ -138,6 +146,7 @@ class SlamManager @Inject constructor() {
     private external fun updateCameraJni(handle: Long, view: FloatArray, proj: FloatArray)
     private external fun updateLightJni(handle: Long, intensity: Float)
     private external fun feedDepthDataJni(handle: Long, image: Image)
+    private external fun feedStereoDataJni(handle: Long, left: Image, right: Image)
     private external fun updateMeshJni(handle: Long, vertices: FloatArray)
     private external fun alignMapJni(handle: Long, transform: FloatArray)
     private external fun saveKeyframeJni(handle: Long)
