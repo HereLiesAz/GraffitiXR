@@ -3,7 +3,10 @@
 
 #include <string>
 #include <vector>
+#include <mutex>
 #include <opencv2/core.hpp>
+#include <android/native_window.h>
+#include <android/asset_manager.h>
 #include "VulkanBackend.h"
 
 /**
@@ -17,15 +20,25 @@ public:
 
     // Lifecycle
     void initialize();
+    void reset();
     void onSurfaceChanged(int width, int height);
     void draw();
 
+    // Vulkan Lifecycle
+    bool initVulkan(ANativeWindow* window, AAssetManager* mgr);
+    void resizeVulkan(int width, int height);
+    void destroyVulkan();
+
     // Camera & Tracking
     void updateCamera(float* viewMatrix, float* projectionMatrix);
+    void updateLight(float intensity, float* colorCorrection);
+    void alignMap(float* transform);
 
     // I/O (The missing methods)
     bool saveMap(const char* path);
     bool loadMap(const char* path);
+    bool importModel3D(const char* path);
+    bool saveKeyframe(const char* path);
 
     // CV Utils
     void detectEdges(cv::Mat& input, cv::Mat& output);
@@ -36,6 +49,10 @@ private:
     int viewportWidth = 0;
     int viewportHeight = 0;
 
+    // Lighting
+    float lightIntensity = 1.0f;
+    float lightColor[3] = {1.0f, 1.0f, 1.0f};
+
     // Rendering Subsystem
     VulkanBackend* vulkanRenderer = nullptr;
 
@@ -45,6 +62,8 @@ private:
     // Matrix storage
     float viewMtx[16];
     float projMtx[16];
+    float alignmentMtx[16];
+    std::mutex alignMutex;
 };
 
 #endif // GRAFFITIXR_MOBILEGS_H

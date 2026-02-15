@@ -14,7 +14,7 @@
 The project is built with a strictly decoupled multi-module architecture:
 *   `:app`: Dependency injection (Hilt) and navigation.
 *   `:feature:ar`: ARCore integration, camera handling, and sensor fusion.
-*   `:feature:editor`: Image manipulation, mesh warp, and layer management.> Task :app:kspDebugKotlin
+*   `:feature:editor`: Image manipulation, mesh warp, and layer management.
 *   `:core:nativebridge`: JNI interface and native engine management.
 *   `:core:cpp`: C++17 engine source code.
 
