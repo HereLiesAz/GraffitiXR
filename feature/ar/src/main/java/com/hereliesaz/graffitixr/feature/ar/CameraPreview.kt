@@ -21,8 +21,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import java.nio.ByteBuffer
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -48,9 +46,6 @@ fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     
-    // Executor for camera operations
-    val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
-    
     val previewView = remember { PreviewView(context) }
     
     // Use case: ImageCapture. We intentionally don't set OUTPUT_FORMAT_JPEG explicitly 
@@ -65,34 +60,31 @@ fun CameraPreview(
     // Connect controller
     DisposableEffect(controller) {
         controller.onCaptureRequested = {
-            if (!cameraExecutor.isShutdown) {
-                // We use the main executor for the callback itself to simplify UI interaction
-                // The actual image capture work happens on the camera thread + background IO
-                imageCapture.takePicture(
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageCapturedCallback() {
-                        override fun onCaptureSuccess(image: ImageProxy) {
-                            try {
-                                // Convert ImageProxy to Bitmap
-                                val bitmap = imageProxyToBitmap(image)
-                                onPhotoCaptured(bitmap)
-                            } catch (e: Exception) {
-                                Log.e("CameraPreview", "Failed to process image: ${e.message}", e)
-                            } finally {
-                                image.close()
-                            }
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            Log.e("CameraPreview", "Photo capture failed: ${exception.message}", exception)
+            // We use the main executor for the callback itself to simplify UI interaction
+            // The actual image capture work happens on the camera thread + background IO
+            imageCapture.takePicture(
+                ContextCompat.getMainExecutor(context),
+                object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+                        try {
+                            // Convert ImageProxy to Bitmap
+                            val bitmap = imageProxyToBitmap(image)
+                            onPhotoCaptured(bitmap)
+                        } catch (e: Exception) {
+                            Log.e("CameraPreview", "Failed to process image: ${e.message}", e)
+                        } finally {
+                            image.close()
                         }
                     }
-                )
-            }
+
+                    override fun onError(exception: ImageCaptureException) {
+                        Log.e("CameraPreview", "Photo capture failed: ${exception.message}", exception)
+                    }
+                }
+            )
         }
         onDispose {
             controller.onCaptureRequested = null
-            cameraExecutor.shutdown()
         }
     }
 

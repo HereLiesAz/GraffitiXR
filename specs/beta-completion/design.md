@@ -124,8 +124,9 @@ The system remains a **Multi-Module Android Application** with a heavy reliance 
 ```kotlin
 external fun initStereoDepth(width: Int, height: Int)
 external fun updateStereoFrame(left: ByteBuffer, right: ByteBuffer)
-external fun processInpaint(bitmapPixels: IntArray, maskPixels: IntArray, width: Int, height: Int)
-external fun processLiquify(bitmapPixels: IntArray, meshData: FloatArray, width: Int, height: Int)
+external fun processHeal(handle: Long, bitmap: Bitmap, mask: Bitmap)
+external fun processLiquify(handle: Long, bitmap: Bitmap, meshData: FloatArray)
+external fun processBurnDodge(handle: Long, bitmap: Bitmap, map: Bitmap)
 ```
 
 ## 8. Testing Strategy
