@@ -39,8 +39,9 @@ void MobileGS::onSurfaceChanged(int width, int height) {
 }
 
 void MobileGS::draw() {
-    // FIX: Always clear to transparent (0,0,0,0) BEFORE checking initialization.
-    // This prevents a black frame from blocking the camera during startup.
+    // FIX(Camera Blocking): Always clear to transparent (0,0,0,0) BEFORE checking initialization.
+    // This prevents a black frame from blocking the camera during startup and ensures
+    // the AR overlay remains transparent over the CameraX PreviewView.
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

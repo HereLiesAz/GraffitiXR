@@ -24,3 +24,8 @@ Camera view is blocked in AR and Overlay modes.
     *   *Conflict:* Standard ARCore samples use `BackgroundRenderer` to draw camera feed *inside* the GL context.
     *   *Our Setup:* We are trying to mix `CameraX` (PreviewView) + `ARCore/OpenGL` (Transparent Overlay).
     *   *Hypothesis:* The `ArRenderer` might be drawing the "Background" (black/empty) over the transparent surface, effectively hiding the `PreviewView` behind it. Or `BackgroundRenderer` is being used when it shouldn't be (if we rely on `PreviewView`).
+
+## Verification Results
+1.  **MobileGS Clear Color:** Verified `MobileGS.cpp` calls `glClearColor(0.0f, 0.0f, 0.0f, 0.0f)` before any drawing operations.
+2.  **ArRenderer Implementation:** Verified `ArRenderer.kt` only delegates to `SlamManager.draw()`. It does not use `BackgroundRenderer` or draw any opaque geometry itself.
+3.  **ArView Layout:** Verified `ArView.kt` initializes `GLSurfaceView` with `PixelFormat.TRANSLUCENT` and `setZOrderMediaOverlay(true)`, ensuring it layers correctly over the `PreviewView`.
