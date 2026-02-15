@@ -24,7 +24,17 @@ class SlamManager @Inject constructor() {
             try {
                 System.loadLibrary("graffitixr")
             } catch (e: UnsatisfiedLinkError) {
-                Log.e("SlamManager", "Failed to load native library 'graffitixr'", e)
+                try {
+                    Log.e("SlamManager", "Failed to load native library 'graffitixr'", e)
+                } catch (ignored: RuntimeException) {
+                    // Log.e might fail in unit tests
+                }
+            } catch (e: SecurityException) {
+                try {
+                    Log.e("SlamManager", "SecurityException loading library", e)
+                } catch (ignored: RuntimeException) {
+                     // Log.e might fail in unit tests
+                }
             }
         }
     }

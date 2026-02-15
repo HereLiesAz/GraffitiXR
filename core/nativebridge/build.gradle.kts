@@ -47,4 +47,6 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(libs.arcore.client)
     implementation(project(":opencv"))
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
 }

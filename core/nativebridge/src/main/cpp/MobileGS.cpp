@@ -14,7 +14,7 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 #endif
 
-static void multiplyMatrices(const float* a, const float* b, float* result) {
+static void multiplyMatricesInternal(const float* a, const float* b, float* result) {
     // Column-major multiplication: result = a * b
     for (int col = 0; col < 4; ++col) {
         for (int row = 0; row < 4; ++row) {
@@ -123,7 +123,7 @@ void MobileGS::updateCamera(float* view, float* proj) {
         float finalView[16];
         {
             std::lock_guard<std::mutex> lock(alignMutex);
-            multiplyMatrices(view, alignmentMtx, finalView);
+            multiplyMatricesInternal(view, alignmentMtx, finalView);
         }
 
         std::copy(finalView, finalView + 16, viewMtx);
