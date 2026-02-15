@@ -5,17 +5,12 @@ import android.graphics.Bitmap
 import android.media.Image
 import android.util.Log
 import android.view.Surface
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.concurrent.withLock
 
-/**
- * Manages the native MobileGS engine.
- * Handles JNI communication, thread safety, and lifecycle management.
- */
 @Singleton
 class SlamManager @Inject constructor() {
 
@@ -23,20 +18,33 @@ class SlamManager @Inject constructor() {
     private val isDestroyed = AtomicBoolean(true)
     private val lock = ReentrantLock()
 
-    /**
-     * Resurrects the native engine if it was destroyed or hasn't started.
-     */
-    fun ensureInitialized() {
-        lock.withLock {
-            if (isDestroyed.get() || nativeHandle == 0L) {
-                Log.d("SlamManager", "Initializing Native Engine...")
-                nativeHandle = create()
-                isDestroyed.set(false)
+    companion object {
+        init {
+            try {
+                System.loadLibrary("graffitixr")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.e("SlamManager", "Failed to load native library 'graffitixr'", e)
             }
         }
     }
 
-    // --- AR / SLAM Methods ---
+    fun ensureInitialized() {
+        lock.withLock {
+            if (isDestroyed.get() || nativeHandle == 0L) {
+                Log.d("SlamManager", "Initializing Native Engine...")
+                try {
+                    nativeHandle = create()
+                    if (nativeHandle != 0L) {
+                        isDestroyed.set(false)
+                    } else {
+                        Log.e("SlamManager", "Failed to create native engine instance.")
+                    }
+                } catch (e: UnsatisfiedLinkError) {
+                    Log.e("SlamManager", "Native method 'create' not found. Library might not be loaded.", e)
+                }
+            }
+        }
+    }
 
     fun initialize() {
         lock.withLock { if (!isDestroyed.get()) initializeJni(nativeHandle) }
@@ -54,17 +62,8 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity) }
     }
 
-    /**
-     * Feeds camera image data to the native SLAM engine.
-     * Assumes YUV_420_888 or similar format.
-     */
     fun feedDepthData(image: Image) {
-        lock.withLock {
-            if (!isDestroyed.get()) {
-                // Pass the Image object directly to JNI for buffer access
-                feedDepthDataJni(nativeHandle, image)
-            }
-        }
+        lock.withLock { if (!isDestroyed.get()) feedDepthDataJni(nativeHandle, image) }
     }
 
     fun updateMesh(vertices: FloatArray) {
@@ -91,33 +90,17 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) drawJni(nativeHandle) }
     }
 
-    // --- Vulkan Integration ---
-
     fun initVulkan(surface: Surface, assetManager: AssetManager) {
-        lock.withLock {
-            if (!isDestroyed.get()) {
-                initVulkanJni(nativeHandle, surface, assetManager)
-            }
-        }
+        lock.withLock { if (!isDestroyed.get()) initVulkanJni(nativeHandle, surface, assetManager) }
     }
 
     fun resizeVulkan(width: Int, height: Int) {
-        lock.withLock {
-            if (!isDestroyed.get()) {
-                resizeVulkanJni(nativeHandle, width, height)
-            }
-        }
+        lock.withLock { if (!isDestroyed.get()) resizeVulkanJni(nativeHandle, width, height) }
     }
 
     fun destroyVulkan() {
-        lock.withLock {
-            if (!isDestroyed.get()) {
-                destroyVulkanJni(nativeHandle)
-            }
-        }
+        lock.withLock { if (!isDestroyed.get()) destroyVulkanJni(nativeHandle) }
     }
-
-    // --- Storage & Utils ---
 
     fun loadWorld(path: String): Boolean {
         return lock.withLock {
@@ -140,7 +123,6 @@ class SlamManager @Inject constructor() {
     fun destroy() {
         lock.withLock {
             if (!isDestroyed.getAndSet(true)) {
-                Log.d("SlamManager", "Destroying Native Engine...")
                 if (nativeHandle != 0L) {
                     destroyJni(nativeHandle)
                     nativeHandle = 0
@@ -149,7 +131,6 @@ class SlamManager @Inject constructor() {
         }
     }
 
-    // --- Native Signatures ---
     private external fun create(): Long
     private external fun destroyJni(handle: Long)
     private external fun initializeJni(handle: Long)
