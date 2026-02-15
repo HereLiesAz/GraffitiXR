@@ -4,6 +4,7 @@ import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
+import timber.log.Timber
 
 object CameraCapabilities {
 
@@ -14,21 +15,16 @@ object CameraCapabilities {
      * @return true if at least one camera supports logical multi-camera, false otherwise.
      */
     fun hasLogicalMultiCameraSupport(context: Context): Boolean {
-        try {
+        return try {
             val manager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager ?: return false
-            for (cameraId in manager.cameraIdList) {
+            manager.cameraIdList.any { cameraId ->
                 val chars = manager.getCameraCharacteristics(cameraId)
                 val capabilities = chars.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
-                if (capabilities != null && capabilities.contains(
-                        CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA
-                    )
-                ) {
-                    return true
-                }
+                capabilities?.contains(CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) ?: false
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "Failed to check for logical multi-camera support.")
+            false
         }
-        return false
     }
 }
