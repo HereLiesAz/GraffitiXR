@@ -42,6 +42,20 @@ static void multiplyMatrices(const float* a, const float* b, float* result) {
     }
 }
 
+static void multiplyMatrices(const float* a, const float* b, float* result) {
+    // Column-major multiplication: result = a * b
+    for (int col = 0; col < 4; ++col) {
+        for (int row = 0; row < 4; ++row) {
+            float sum = 0.0f;
+            for (int k = 0; k < 4; ++k) {
+                // a[row + k*4] * b[k + col*4]
+                sum += a[row + k * 4] * b[k + col * 4];
+            }
+            result[row + col * 4] = sum;
+        }
+    }
+}
+
 MobileGS::MobileGS() {
     vulkanRenderer = new VulkanBackend();
     std::fill(std::begin(viewMtx), std::end(viewMtx), 0.0f);
@@ -123,6 +137,7 @@ void MobileGS::updateCamera(float* view, float* proj) {
         float finalView[16];
         {
             std::lock_guard<std::mutex> lock(alignMutex);
+            multiplyMatrices(view, alignmentMtx, finalView);
             multiplyMatricesInternal(view, alignmentMtx, finalView);
         }
 
@@ -138,6 +153,7 @@ void MobileGS::alignMap(float* transform) {
     if (transform) {
         std::lock_guard<std::mutex> lock(alignMutex);
         std::copy(transform, transform + 16, alignmentMtx);
+        // LOGI("Map alignment updated."); // Commented out to prevent log spam
         LOGI("Map alignment updated.");
     }
 }
