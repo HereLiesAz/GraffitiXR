@@ -81,7 +81,14 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateMeshJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray vertices) {}
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transform) {}
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transform) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        jfloat *t = env->GetFloatArrayElements(transform, nullptr);
+        engine->alignMap(t);
+        env->ReleaseFloatArrayElements(transform, t, 0);
+    }
+}
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *env, jobject thiz, jlong handle) {}
