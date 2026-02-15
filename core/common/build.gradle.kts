@@ -1,45 +1,63 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlinx.serialization)
-    alias(libs.plugins.kotlin.parcelize)
+    // Using the compose plugin here is safe even if no UI is present, 
+    // as it bundles the necessary Kotlin Android support without the conflicting legacy plugin.
+    alias(libs.plugins.jetbrains.kotlin.compose)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
 }
 
 android {
-    namespace = "com.hereliesaz.graffitixr.common"
+    namespace = "com.hereliesaz.graffitixr.core.common"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 29
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
+// FIX: Configure Kotlin JVM target via tasks instead of the top-level extension
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    // Compose BOM only if needed for UI code in common
-    implementation(libs.androidx.compose.material3)
-    
-    implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.serialization.json)
-    api(libs.androidx.compose.ui.geometry)
-    api(libs.androidx.compose.ui.graphics)
-    testImplementation(libs.junit)
-    
-    implementation(project(":opencv"))
-    implementation(libs.play.services.location)
+    implementation(libs.androidx.compose.material3) // Common UI components often live here
 
-    testImplementation(libs.mockk)
-    testImplementation(libs.kotlinx.coroutines.test)
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.android)
+
+    // Logging
+    implementation(libs.timber)
+
+    // Hilt / DI
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }
