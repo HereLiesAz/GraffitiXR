@@ -38,6 +38,7 @@ uiGeometry = "1.10.3"
 accompanistPermissions = "0.37.3"
 datastore = "1.2.0"
 material3 = "1.4.0"
+roomExternalAntlr = "2.8.4"
 
 [libraries]
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
@@ -93,6 +94,7 @@ play-services-base = { group = "com.google.android.gms", name = "play-services-b
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+androidx-room-external-antlr = { group = "androidx.room", name = "room-external-antlr", version.ref = "roomExternalAntlr" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

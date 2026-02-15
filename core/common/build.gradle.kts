@@ -3,15 +3,15 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.library)
-    // Using the compose plugin here is safe even if no UI is present, 
-    // as it bundles the necessary Kotlin Android support without the conflicting legacy plugin.
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.parcelize) // Required for @Parcelize
+    alias(libs.plugins.kotlinx.serialization) // Required for @Serializable
 }
 
 android {
-    namespace = "com.hereliesaz.graffitixr.core.common"
+    namespace = "com.hereliesaz.graffitixr.common"
     compileSdk = 36
 
     defaultConfig {
@@ -35,7 +35,6 @@ android {
     }
 }
 
-// FIX: Configure Kotlin JVM target via tasks instead of the top-level extension
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
@@ -43,12 +42,22 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 dependencies {
+    // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.compose.material3) // Common UI components often live here
+    implementation(libs.androidx.compose.material3)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+
+    // Location (Fixes Unresolved reference 'FusedLocationProviderClient')
+    implementation(libs.play.services.location)
+
+    // OpenCV (Fixes Unresolved reference 'opencv', 'Mat', 'Imgproc')
+    implementation(project(":opencv"))
+
+    // Serialization (Fixes Unresolved reference 'serializer')
+    implementation(libs.kotlinx.serialization.json)
 
     // Logging
     implementation(libs.timber)
