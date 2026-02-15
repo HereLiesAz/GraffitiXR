@@ -89,7 +89,7 @@ class ArViewModelTest {
     fun `captureKeyframe sets pendingKeyframePath`() = runTest {
         viewModel.captureKeyframe()
         testDispatcher.scheduler.advanceUntilIdle()
-        
+
         val path = viewModel.uiState.value.pendingKeyframePath
         assertNotNull(path)
         assertTrue(path!!.startsWith("keyframe_"))
@@ -100,7 +100,7 @@ class ArViewModelTest {
         viewModel.captureKeyframe()
         testDispatcher.scheduler.advanceUntilIdle()
         assertNotNull(viewModel.uiState.value.pendingKeyframePath)
-        
+
         viewModel.onKeyframeCaptured()
         assertNull(viewModel.uiState.value.pendingKeyframePath)
     }

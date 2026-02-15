@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.media.Image
 import android.util.Log
 import android.view.Surface
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
@@ -66,6 +67,26 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) feedDepthDataJni(nativeHandle, image) }
     }
 
+    fun feedStereoData(leftImage: Image, rightImage: Image) {
+        lock.withLock {
+            if (!isDestroyed.get()) {
+                val leftPlane = leftImage.planes[0]
+                val rightPlane = rightImage.planes[0]
+                feedStereoDataJni(
+                    nativeHandle,
+                    leftPlane.buffer,
+                    leftImage.width,
+                    leftImage.height,
+                    leftPlane.rowStride,
+                    rightPlane.buffer,
+                    rightImage.width,
+                    rightImage.height,
+                    rightPlane.rowStride
+                )
+            }
+        }
+    }
+
     fun updateMesh(vertices: FloatArray) {
         lock.withLock { if (!isDestroyed.get()) updateMeshJni(nativeHandle, vertices) }
     }
@@ -74,8 +95,10 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) alignMapJni(nativeHandle, transform) }
     }
 
-    fun saveKeyframe() {
-        lock.withLock { if (!isDestroyed.get()) saveKeyframeJni(nativeHandle) }
+    fun saveKeyframe(path: String): Boolean {
+        return lock.withLock {
+            if (!isDestroyed.get()) saveKeyframeJni(nativeHandle, path) else false
+        }
     }
 
     fun setVisualizationMode(mode: Int) {
@@ -114,6 +137,12 @@ class SlamManager @Inject constructor() {
         }
     }
 
+    fun importModel3D(path: String): Boolean {
+        return lock.withLock {
+            if (!isDestroyed.get()) importModel3DJni(nativeHandle, path) else false
+        }
+    }
+
     fun detectEdges(bitmap: Bitmap): Bitmap? {
         return lock.withLock {
             if (!isDestroyed.get()) detectEdgesJni(nativeHandle, bitmap) else null
@@ -138,14 +167,26 @@ class SlamManager @Inject constructor() {
     private external fun updateCameraJni(handle: Long, view: FloatArray, proj: FloatArray)
     private external fun updateLightJni(handle: Long, intensity: Float, color: FloatArray)
     private external fun feedDepthDataJni(handle: Long, image: Image)
+    private external fun feedStereoDataJni(
+        handle: Long,
+        leftBuffer: ByteBuffer,
+        leftWidth: Int,
+        leftHeight: Int,
+        leftStride: Int,
+        rightBuffer: ByteBuffer,
+        rightWidth: Int,
+        rightHeight: Int,
+        rightStride: Int
+    )
     private external fun updateMeshJni(handle: Long, vertices: FloatArray)
     private external fun alignMapJni(handle: Long, transform: FloatArray)
-    private external fun saveKeyframeJni(handle: Long)
+    private external fun saveKeyframeJni(handle: Long, path: String): Boolean
     private external fun setVisualizationModeJni(handle: Long, mode: Int)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun drawJni(handle: Long)
     private external fun loadWorldJni(handle: Long, path: String): Boolean
     private external fun saveWorldJni(handle: Long, path: String): Boolean
+    private external fun importModel3DJni(handle: Long, path: String): Boolean
     private external fun detectEdgesJni(handle: Long, bitmap: Bitmap): Bitmap?
     private external fun initVulkanJni(handle: Long, surface: Surface, assetManager: AssetManager)
     private external fun resizeVulkanJni(handle: Long, width: Int, height: Int)

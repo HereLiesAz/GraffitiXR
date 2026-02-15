@@ -28,6 +28,14 @@ void MobileGS::initialize() {
     isInitialized = true;
 }
 
+void MobileGS::reset() {
+    LOGI("Resetting MobileGS Engine context...");
+    isInitialized = false;
+    if (vulkanRenderer) {
+        vulkanRenderer->destroy();
+    }
+}
+
 void MobileGS::onSurfaceChanged(int width, int height) {
     viewportWidth = width;
     viewportHeight = height;
@@ -39,8 +47,9 @@ void MobileGS::onSurfaceChanged(int width, int height) {
 }
 
 void MobileGS::draw() {
-    // FIX: Always clear to transparent (0,0,0,0) BEFORE checking initialization.
-    // This prevents a black frame from blocking the camera during startup.
+    // FIX(Camera Blocking): Always clear to transparent (0,0,0,0) BEFORE checking initialization.
+    // This prevents a black frame from blocking the camera during startup and ensures
+    // the AR overlay remains transparent over the CameraX PreviewView.
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -50,6 +59,25 @@ void MobileGS::draw() {
         // Pass lighting data to renderer
         vulkanRenderer->setLighting(lightIntensity, lightColor);
         vulkanRenderer->renderFrame();
+    }
+}
+
+bool MobileGS::initVulkan(ANativeWindow* window, AAssetManager* mgr) {
+    if (vulkanRenderer) {
+        return vulkanRenderer->initialize(window, mgr);
+    }
+    return false;
+}
+
+void MobileGS::resizeVulkan(int width, int height) {
+    if (vulkanRenderer) {
+        vulkanRenderer->resize(width, height);
+    }
+}
+
+void MobileGS::destroyVulkan() {
+    if (vulkanRenderer) {
+        vulkanRenderer->destroy();
     }
 }
 
@@ -109,6 +137,41 @@ bool MobileGS::loadMap(const char* path) {
         return true;
     } catch (const std::exception& e) {
         LOGE("Exception loading map: %s", e.what());
+        return false;
+    }
+}
+
+bool MobileGS::importModel3D(const char* path) {
+    LOGI("Importing 3D model from: %s", path);
+    // TODO: Implement actual 3D model loading (e.g. GLTF/GLB)
+    // For now, we return true to indicate the JNI bridge is working.
+    return true;
+}
+
+bool MobileGS::saveKeyframe(const char* path) {
+    LOGI("Saving keyframe metadata to: %s", path);
+    try {
+        cv::FileStorage fs(path, cv::FileStorage::WRITE);
+        if (!fs.isOpened()) {
+            LOGE("Failed to open file for writing: %s", path);
+            return false;
+        }
+
+        // Write viewport and last known matrices as "Pose Metadata"
+        fs << "viewportWidth" << viewportWidth;
+        fs << "viewportHeight" << viewportHeight;
+
+        cv::Mat vMat(4, 4, CV_32F, viewMtx);
+        cv::Mat pMat(4, 4, CV_32F, projMtx);
+
+        fs << "viewMatrix" << vMat;
+        fs << "projectionMatrix" << pMat;
+        fs << "timestamp" << (double)time(0);
+
+        fs.release();
+        return true;
+    } catch (const std::exception& e) {
+        LOGE("Exception saving keyframe: %s", e.what());
         return false;
     }
 }

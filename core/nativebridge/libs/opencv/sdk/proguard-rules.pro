@@ -1,0 +1,2 @@
+-keep class org.opencv.** { *; }
+-keep interface org.opencv.** { *; }
