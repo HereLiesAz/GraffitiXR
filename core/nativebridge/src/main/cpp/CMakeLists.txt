@@ -6,15 +6,19 @@ project("graffitixr")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Define the OpenCV SDK path
-set(OPENCV_ROOT_PATH "${CMAKE_SOURCE_DIR}/../../../libs/opencv/sdk/native")
+# Define paths relative to this CMakeLists.txt
+set(NATIVE_BRIDGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+set(OPENCV_ROOT_PATH "${NATIVE_BRIDGE_ROOT}/libs/opencv/sdk/native")
+set(GLM_INCLUDE_DIR "${NATIVE_BRIDGE_ROOT}/libs/glm")
+
+# Include GLM
+include_directories(${GLM_INCLUDE_DIR})
 
 # Include OpenCV
 set(OpenCV_DIR ${OPENCV_ROOT_PATH}/jni)
 find_package(OpenCV REQUIRED)
 
-# FIX: Add the specific 'include' folder to the path
-# This allows #include "MobileGS.h" to work when the file is in src/main/cpp/include
+# Include directories for our own headers
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -24,12 +28,13 @@ add_library(graffitixr SHARED
         MobileGS.cpp
         VulkanBackend.cpp)
 
-# Find Log and Android libs
+# Find Android system libraries
 find_library(log-lib log)
 find_library(android-lib android)
 find_library(jnigraphics-lib jnigraphics)
 find_library(vulkan-lib vulkan)
 find_library(egl-lib EGL)
+find_library(gles3-lib GLESv3)
 
 # --- Manual Link 3rd Party Dependencies for Static OpenCV ---
 macro(find_opencv_3rdparty name)
@@ -67,4 +72,5 @@ target_link_libraries(graffitixr
         ${android-lib}
         ${jnigraphics-lib}
         ${vulkan-lib}
-        ${egl-lib})
+        ${egl-lib}
+        ${gles3-lib})
