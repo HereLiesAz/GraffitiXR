@@ -8,7 +8,11 @@
 #include <android/asset_manager_jni.h>
 
 #define TAG "GraffitiJNI"
+#if defined(NDEBUG)
+#define LOGE(...)
+#else
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+#endif
 
 extern "C" {
 
