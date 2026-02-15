@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,10 +13,21 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 @HiltViewModel
-class ArViewModel @Inject constructor() : ViewModel() {
+class ArViewModel @Inject constructor(
+    private val stereoDepthProvider: StereoDepthProvider
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
+
+    init {
+        // Log capability status for debugging
+        if (stereoDepthProvider.isSupported()) {
+            println("ArViewModel: Stereo Depth is SUPPORTED on this device.")
+        } else {
+            println("ArViewModel: Stereo Depth is NOT supported.")
+        }
+    }
 
     fun setTempCapture(bitmap: Bitmap) {
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }

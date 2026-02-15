@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.media.Image
 import android.util.Log
 import android.view.Surface
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
@@ -64,6 +65,26 @@ class SlamManager @Inject constructor() {
 
     fun feedDepthData(image: Image) {
         lock.withLock { if (!isDestroyed.get()) feedDepthDataJni(nativeHandle, image) }
+    }
+
+    fun feedStereoData(leftImage: Image, rightImage: Image) {
+        lock.withLock {
+            if (!isDestroyed.get()) {
+                val leftPlane = leftImage.planes[0]
+                val rightPlane = rightImage.planes[0]
+                feedStereoDataJni(
+                    nativeHandle,
+                    leftPlane.buffer,
+                    leftImage.width,
+                    leftImage.height,
+                    leftPlane.rowStride,
+                    rightPlane.buffer,
+                    rightImage.width,
+                    rightImage.height,
+                    rightPlane.rowStride
+                )
+            }
+        }
     }
 
     fun updateMesh(vertices: FloatArray) {
@@ -138,6 +159,17 @@ class SlamManager @Inject constructor() {
     private external fun updateCameraJni(handle: Long, view: FloatArray, proj: FloatArray)
     private external fun updateLightJni(handle: Long, intensity: Float)
     private external fun feedDepthDataJni(handle: Long, image: Image)
+    private external fun feedStereoDataJni(
+        handle: Long,
+        leftBuffer: ByteBuffer,
+        leftWidth: Int,
+        leftHeight: Int,
+        leftStride: Int,
+        rightBuffer: ByteBuffer,
+        rightWidth: Int,
+        rightHeight: Int,
+        rightStride: Int
+    )
     private external fun updateMeshJni(handle: Long, vertices: FloatArray)
     private external fun alignMapJni(handle: Long, transform: FloatArray)
     private external fun saveKeyframeJni(handle: Long)
