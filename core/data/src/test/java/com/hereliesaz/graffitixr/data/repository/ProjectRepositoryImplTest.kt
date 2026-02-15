@@ -1,13 +1,14 @@
 package com.hereliesaz.graffitixr.data.repository
 
 import android.content.Context
+import android.net.Uri
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.data.ProjectManager
+import com.hereliesaz.graffitixr.data.UriProvider
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -30,6 +31,7 @@ class ProjectRepositoryImplTest {
     val tempFolder = TemporaryFolder()
 
     private lateinit var context: Context
+    private lateinit var uriProvider: UriProvider
     private lateinit var repository: ProjectRepositoryImpl
     private val testDispatcher = StandardTestDispatcher()
 
@@ -37,8 +39,11 @@ class ProjectRepositoryImplTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         context = mockk()
+        uriProvider = mockk()
         every { context.filesDir } returns tempFolder.root
-        val projectManager = ProjectManager(context)
+        every { uriProvider.getUriForFile(any()) } returns mockk<Uri>()
+        
+        val projectManager = ProjectManager(context, uriProvider)
         repository = ProjectRepositoryImpl(context, projectManager)
     }
 
