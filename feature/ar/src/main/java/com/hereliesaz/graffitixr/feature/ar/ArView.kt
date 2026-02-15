@@ -84,7 +84,8 @@ fun ArView(
                     holder.setFormat(PixelFormat.TRANSLUCENT)
 
                     // Places this surface ON TOP of the Camera SurfaceView,
-                    // but BELOW the window (UI) layer.
+                    // but BELOW the window (UI) layer. This is critical for preventing
+                    // the camera view from being blocked by the opaque surface.
                     setZOrderMediaOverlay(true)
 
                     setRenderer(renderer)
