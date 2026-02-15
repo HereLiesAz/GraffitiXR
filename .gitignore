@@ -61,4 +61,3 @@ refactor*.sh
 
 build_output*.txt
 /changes.diff
-.ralph/
