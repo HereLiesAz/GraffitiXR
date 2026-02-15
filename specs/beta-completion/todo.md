@@ -5,5 +5,5 @@
 - [ ] **Implement Basic Drawing Tools (Brush/Eraser)** <!-- id: 2 -->
 - [ ] **Implement Advanced Drawing Tools (Liquify/Heal/Burn)** <!-- id: 3 -->
 - [ ] **Implement Export Manager (Single/Layer)** <!-- id: 4 -->
-- [ ] **Implement Teleological SLAM (solvePnP Loop)** <!-- id: 5 -->
+- [x] **Implement Teleological SLAM (solvePnP Loop)** <!-- id: 5 -->
 - [ ] **Implement Passive Triangulation (Stereo Depth)** <!-- id: 6 -->
