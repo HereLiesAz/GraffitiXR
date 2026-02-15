@@ -6,15 +6,17 @@ project("graffitixr")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Define the OpenCV SDK path relative to this file
-# Assuming structure: core/nativebridge/src/main/cpp/CMakeLists.txt
-# SDK at: core/nativebridge/libs/opencv/sdk
+# Define the OpenCV SDK path
 set(OPENCV_ROOT_PATH "${CMAKE_SOURCE_DIR}/../../../libs/opencv/sdk/native")
 
 # Include OpenCV
-# We use STATIC libs to avoid managing the separate libopencv_java4.so loader
 set(OpenCV_DIR ${OPENCV_ROOT_PATH}/jni)
 find_package(OpenCV REQUIRED)
+
+# FIX: Add the specific 'include' folder to the path
+# This allows #include "MobileGS.h" to work when the file is in src/main/cpp/include
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Define the Native Bridge library
 add_library(graffitixr SHARED
@@ -25,15 +27,11 @@ add_library(graffitixr SHARED
 # Find Log and Android libs
 find_library(log-lib log)
 find_library(android-lib android)
-find_library(jnigraphics-lib jnigraphics) # Bitmap access
-find_library(vulkan-lib vulkan) # Vulkan support
-find_library(egl-lib EGL) # EGL support for GL context management
+find_library(jnigraphics-lib jnigraphics)
+find_library(vulkan-lib vulkan)
+find_library(egl-lib EGL)
 
-# --- FIX: Manually Link 3rd Party Dependencies for Static OpenCV ---
-# Static OpenCV requires linking all its internal dependencies explicitly if not handled by the config.
-# KleidiCV is the critical missing piece causing linker errors on ARM64.
-
-# Helper to find 3rdparty libs
+# --- Manual Link 3rd Party Dependencies for Static OpenCV ---
 macro(find_opencv_3rdparty name)
     find_library(LIB_${name}
         NAMES ${name}
@@ -45,8 +43,7 @@ macro(find_opencv_3rdparty name)
     endif()
 endmacro()
 
-# Search for common OpenCV dependencies including the missing KleidiCV
-# The error `undefined symbol: kleidicv::...` means this is REQUIRED.
+# Link all static dependencies explicitly
 find_opencv_3rdparty(kleidicv)
 find_opencv_3rdparty(cpufeatures)
 find_opencv_3rdparty(tegra_hal)
@@ -64,8 +61,8 @@ find_opencv_3rdparty(libprotobuf)
 
 # Link everything
 target_link_libraries(graffitixr
-        ${OpenCV_LIBS}           # Main OpenCV modules (core, imgproc, etc.)
-        ${OPENCV_3RDPARTY_LIBS}  # The missing static dependencies (KleidiCV, etc.)
+        ${OpenCV_LIBS}
+        ${OPENCV_3RDPARTY_LIBS}
         ${log-lib}
         ${android-lib}
         ${jnigraphics-lib}

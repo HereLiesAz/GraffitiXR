@@ -48,7 +48,7 @@ androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycl
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 androidx-compose-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "materialIconsCore" }
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version = "1.7.8" }
-androidx-compose-material3 = { module = "androidx.compose.material3:material3", version = "1.5.0-alpha14" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3", version = "1.4.0" }
 androidx-compose-ui = { module = "androidx.compose.ui:ui", version = "1.10.3" }
 androidx-compose-ui-geometry = { group = "androidx.compose.ui", name = "ui-geometry", version.ref = "uiGeometry" }
 androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
