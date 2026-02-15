@@ -1,6 +1,7 @@
 #include "MobileGS.h"
 #include <android/log.h>
 #include <fstream>
+#include <ctime>
 #include <opencv2/imgproc.hpp>
 #include <GLES3/gl3.h>
 

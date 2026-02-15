@@ -11,7 +11,8 @@ plugins {
 
 allprojects {
     apply(plugin = "checkstyle")
-    checkstyle {
+
+    configure<CheckstyleExtension> {
         toolVersion = "10.12.0"
         configFile = rootProject.file("config/checkstyle/checkstyle.xml")
     }
