@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // REMOVED: alias(libs.plugins.kotlin.android) -- It is built-in to AGP 9.0
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -48,6 +48,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Configure the built-in Kotlin support
     kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
@@ -90,8 +91,6 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-
-    // FIX: This now resolves correctly due to the TOML update
     implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.timber)
@@ -109,7 +108,6 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.material3))
 
-    // Correctly aliased test dependencies
     androidTestImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
 

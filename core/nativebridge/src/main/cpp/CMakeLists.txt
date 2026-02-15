@@ -2,68 +2,72 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project("graffitixr")
 
-# --- OPTIMIZATIONS ---
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++17 -ffast-math -fopenmp")
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# --- DEPENDENCY PATHS ---
-if(NOT DEFINED LIBS_DIR)
-    get_filename_component(LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../libs" ABSOLUTE)
-endif()
+# Define the OpenCV SDK path relative to this file
+# Assuming structure: core/nativebridge/src/main/cpp/CMakeLists.txt
+# SDK at: core/nativebridge/libs/opencv/sdk
+set(OPENCV_ROOT_PATH "${CMAKE_SOURCE_DIR}/../../../libs/opencv/sdk/native")
 
-message(STATUS "Native build looking for libs in: ${LIBS_DIR}")
+# Include OpenCV
+# We use STATIC libs to avoid managing the separate libopencv_java4.so loader
+set(OpenCV_DIR ${OPENCV_ROOT_PATH}/jni)
+find_package(OpenCV REQUIRED)
 
-# --- OPENCV CONFIGURATION ---
-set(OpenCV_DIR "${LIBS_DIR}/opencv/sdk/native/jni")
-
-if(EXISTS "${OpenCV_DIR}/OpenCVConfig.cmake")
-    find_package(OpenCV REQUIRED)
-    message(STATUS "OpenCV found: ${OpenCV_LIBS}")
-else()
-    message(FATAL_ERROR "OpenCVConfig.cmake not found at ${OpenCV_DIR}. Run setup_libs.sh")
-endif()
-
-# --- OPENMP ---
-find_package(OpenMP REQUIRED)
-
-# --- SOURCE FILES ---
-# CRITICAL: Target name MUST match System.loadLibrary("graffitixr")
-add_library(
-        graffitixr
-        SHARED
+# Define the Native Bridge library
+add_library(graffitixr SHARED
         GraffitiJNI.cpp
         MobileGS.cpp
-        VulkanBackend.cpp
-)
+        VulkanBackend.cpp)
 
-# --- INCLUDE DIRECTORIES ---
-target_include_directories(
-    graffitixr PRIVATE
-    include
-    ${OpenCV_INCLUDE_DIRS}
-    ${LIBS_DIR}/glm
-)
-
-# --- SYSTEM LIBRARIES ---
+# Find Log and Android libs
 find_library(log-lib log)
 find_library(android-lib android)
-find_library(gles3-lib GLESv3)
-find_library(vulkan-lib vulkan)
+find_library(jnigraphics-lib jnigraphics) # Bitmap access
+find_library(vulkan-lib vulkan) # Vulkan support
+find_library(egl-lib EGL) # EGL support for GL context management
 
-# --- LINKING ---
-target_link_libraries(
-        graffitixr
+# --- FIX: Manually Link 3rd Party Dependencies for Static OpenCV ---
+# Static OpenCV requires linking all its internal dependencies explicitly if not handled by the config.
+# KleidiCV is the critical missing piece causing linker errors on ARM64.
 
-        # External
-        ${OpenCV_LIBS}
-        OpenMP::OpenMP_CXX
+# Helper to find 3rdparty libs
+macro(find_opencv_3rdparty name)
+    find_library(LIB_${name}
+        NAMES ${name}
+        PATHS "${OPENCV_ROOT_PATH}/3rdparty/libs/${ANDROID_ABI}"
+        NO_CMAKE_FIND_ROOT_PATH)
 
-        # System
+    if(LIB_${name})
+        list(APPEND OPENCV_3RDPARTY_LIBS ${LIB_${name}})
+    endif()
+endmacro()
+
+# Search for common OpenCV dependencies including the missing KleidiCV
+# The error `undefined symbol: kleidicv::...` means this is REQUIRED.
+find_opencv_3rdparty(kleidicv)
+find_opencv_3rdparty(cpufeatures)
+find_opencv_3rdparty(tegra_hal)
+find_opencv_3rdparty(ittnotify)
+find_opencv_3rdparty(ade)
+find_opencv_3rdparty(libjpeg-turbo)
+find_opencv_3rdparty(libpng)
+find_opencv_3rdparty(libtiff)
+find_opencv_3rdparty(libwebp)
+find_opencv_3rdparty(libopenjp2)
+find_opencv_3rdparty(IlmImf)
+find_opencv_3rdparty(quirc)
+find_opencv_3rdparty(tbb)
+find_opencv_3rdparty(libprotobuf)
+
+# Link everything
+target_link_libraries(graffitixr
+        ${OpenCV_LIBS}           # Main OpenCV modules (core, imgproc, etc.)
+        ${OPENCV_3RDPARTY_LIBS}  # The missing static dependencies (KleidiCV, etc.)
         ${log-lib}
         ${android-lib}
-        ${gles3-lib}
+        ${jnigraphics-lib}
         ${vulkan-lib}
-        jnigraphics
-        EGL
-)
+        ${egl-lib})
