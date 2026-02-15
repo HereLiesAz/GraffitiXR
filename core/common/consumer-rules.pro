@@ -1,1 +1,2 @@
-# Consumer rules for core:common
+# Consumer ProGuard Rules
+# This file is intentionally left empty.

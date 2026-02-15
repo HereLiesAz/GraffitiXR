@@ -1,2 +1,2 @@
-# Proguard rules for OpenCV
-# This file is intentionally left blank for now.
+# OpenCV ProGuard Rules
+# This file is intentionally left empty as the default rules are sufficient.

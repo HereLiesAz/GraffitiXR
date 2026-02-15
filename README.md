@@ -15,6 +15,29 @@ The project is built with a strictly decoupled multi-module architecture:
 *   `:app`: Dependency injection (Hilt) and navigation.
 *   `:feature:ar`: ARCore integration, camera handling, and sensor fusion.
 *   `:feature:editor`: Image manipulation, mesh warp, and layer management.> Task :app:kspDebugKotlin
+    e: [ksp] InjectProcessingStep was unable to process 'slamManager' because 'com.hereliesaz.graffitixr.domain.repository.ProjectRepository' could not be resolved.
+
+Dependency trace:
+=> element (CLASS): com.hereliesaz.graffitixr.MainActivity
+=> element (FIELD): projectRepository
+=> type (ERROR field type): com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+
+If type 'com.hereliesaz.graffitixr.domain.repository.ProjectRepository' is a generated type, check above for compilation errors that may have prevented the type from being generated. Otherwise, ensure that type 'com.hereliesaz.graffitixr.domain.repository.ProjectRepository' is on your classpath.
+e: [ksp] InjectProcessingStep was unable to process 'projectRepository' because 'com.hereliesaz.graffitixr.domain.repository.ProjectRepository' could not be resolved.
+
+Dependency trace:
+=> element (CLASS): com.hereliesaz.graffitixr.MainActivity
+=> element (FIELD): projectRepository
+=> type (ERROR field type): com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+
+If type 'com.hereliesaz.graffitixr.domain.repository.ProjectRepository' is a generated type, check above for compilation errors that may have prevented the type from being generated. Otherwise, ensure that type 'com.hereliesaz.graffitixr.domain.repository.ProjectRepository' is on your classpath.
+
+> Task :app:kspDebugKotlin FAILED
+
+Execution failed for task ':app:kspDebugKotlin'.
+> A failure occurred while executing com.google.devtools.ksp.gradle.KspAAWorkerAction
+> KSP failed with exit code: PROCESSING_ERROR
+
 *   `:core:nativebridge`: JNI interface and native engine management.
 *   `:core:cpp`: C++17 engine source code.
 
