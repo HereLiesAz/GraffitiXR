@@ -22,6 +22,7 @@ public:
 
     // Camera & Tracking
     void updateCamera(float* viewMatrix, float* projectionMatrix);
+    void updateLight(float intensity, float* colorCorrection);
 
     // I/O (The missing methods)
     bool saveMap(const char* path);
@@ -35,6 +36,10 @@ private:
     bool isInitialized = false;
     int viewportWidth = 0;
     int viewportHeight = 0;
+
+    // Lighting
+    float lightIntensity = 1.0f;
+    float lightColor[3] = {1.0f, 1.0f, 1.0f};
 
     // Rendering Subsystem
     VulkanBackend* vulkanRenderer = nullptr;
