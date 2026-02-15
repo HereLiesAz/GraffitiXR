@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <opencv2/core.hpp>
+#include <android/native_window.h>
+#include <android/asset_manager.h>
 #include "VulkanBackend.h"
 
 /**
@@ -20,6 +22,11 @@ public:
     void reset();
     void onSurfaceChanged(int width, int height);
     void draw();
+
+    // Vulkan Lifecycle
+    bool initVulkan(ANativeWindow* window, AAssetManager* mgr);
+    void resizeVulkan(int width, int height);
+    void destroyVulkan();
 
     // Camera & Tracking
     void updateCamera(float* viewMatrix, float* projectionMatrix);

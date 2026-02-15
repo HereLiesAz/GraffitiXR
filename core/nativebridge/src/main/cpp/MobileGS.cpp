@@ -59,6 +59,25 @@ void MobileGS::draw() {
     }
 }
 
+bool MobileGS::initVulkan(ANativeWindow* window, AAssetManager* mgr) {
+    if (vulkanRenderer) {
+        return vulkanRenderer->initialize(window, mgr);
+    }
+    return false;
+}
+
+void MobileGS::resizeVulkan(int width, int height) {
+    if (vulkanRenderer) {
+        vulkanRenderer->resize(width, height);
+    }
+}
+
+void MobileGS::destroyVulkan() {
+    if (vulkanRenderer) {
+        vulkanRenderer->destroy();
+    }
+}
+
 void MobileGS::updateCamera(float* view, float* proj) {
     if (view && proj) {
         std::copy(view, view + 16, viewMtx);
