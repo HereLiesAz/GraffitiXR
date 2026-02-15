@@ -8,3 +8,11 @@ plugins {
     alias(libs.plugins.kotlinx.serialization) apply false
     alias(libs.plugins.kotlin.parcelize) apply false
 }
+
+allprojects {
+    apply(plugin = "checkstyle")
+    checkstyle {
+        toolVersion = "10.12.0"
+        configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+    }
+}
