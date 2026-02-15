@@ -1,10 +1,10 @@
 # Plan: Beta Completion
 
 ## Phase 1: Core Stability & Bug Fixes
-- [ ] **Fix Camera Blocking Bug:**
-    - [ ] Verify `ArView.kt` layout order (PreviewView vs GLSurfaceView).
-    - [ ] Ensure `ArRenderer` clears to transparent (0,0,0,0) and does *not* draw an opaque background.
-    - [ ] Verify `setZOrderMediaOverlay(true)` on `GLSurfaceView`.
+- [x] **Fix Camera Blocking Bug:**
+    - [x] Verify `ArView.kt` layout order (PreviewView vs GLSurfaceView).
+    - [x] Ensure `ArRenderer` clears to transparent (0,0,0,0) and does *not* draw an opaque background.
+    - [x] Verify `setZOrderMediaOverlay(true)` on `GLSurfaceView`.
 - [ ] **Refine Target Evolution:**
     - [ ] Update `TargetEvolutionEngine` to use `approxPolyDP` for automatic contour simplification.
     - [ ] Implement "Snap to Target" interaction in `MaskingScreen`.
