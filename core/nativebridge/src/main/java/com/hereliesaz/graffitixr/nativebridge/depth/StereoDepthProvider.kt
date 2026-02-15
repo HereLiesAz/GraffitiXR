@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.Image
 import com.hereliesaz.graffitixr.common.util.CameraCapabilities
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 interface DepthProvider {
@@ -13,7 +14,7 @@ interface DepthProvider {
 }
 
 class StereoDepthProvider @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
     private val slamManager: SlamManager
 ) : DepthProvider {
 
