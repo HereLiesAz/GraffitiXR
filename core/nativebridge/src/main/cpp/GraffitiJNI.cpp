@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string>
 #include "MobileGS.h"
+#include "StereoProcessor.h"
 #include "VulkanBackend.h"
 #include <android/log.h>
 #include <android/native_window_jni.h>
@@ -11,10 +12,16 @@
 
 extern "C" {
 
+// GLOBAL
+static StereoProcessor* g_stereoProcessor = nullptr;
+
 // LIFECYCLE
 JNIEXPORT jlong JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_create(JNIEnv *env, jobject thiz) {
     auto *engine = new MobileGS();
+    if (!g_stereoProcessor) {
+        g_stereoProcessor = new StereoProcessor();
+    }
     return reinterpret_cast<jlong>(engine);
 }
 
@@ -23,6 +30,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyJni(JNIEnv *env, 
     if (handle != 0) {
         auto *engine = reinterpret_cast<MobileGS *>(handle);
         delete engine;
+    }
+    if (g_stereoProcessor) {
+        delete g_stereoProcessor;
+        g_stereoProcessor = nullptr;
     }
 }
 
@@ -90,6 +101,25 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLightJni(JNIEnv *e
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject image) {}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedStereoDataJni(
+    JNIEnv *env, jobject thiz, jlong handle,
+    jobject leftBuffer, jint leftWidth, jint leftHeight, jint leftStride,
+    jobject rightBuffer, jint rightWidth, jint rightHeight, jint rightStride
+) {
+    if (g_stereoProcessor) {
+        uint8_t* leftPtr = (uint8_t*)env->GetDirectBufferAddress(leftBuffer);
+        uint8_t* rightPtr = (uint8_t*)env->GetDirectBufferAddress(rightBuffer);
+
+        if (leftPtr && rightPtr) {
+            g_stereoProcessor->process(
+                leftPtr, leftWidth, leftHeight, leftStride,
+                rightPtr, rightWidth, rightHeight, rightStride
+            );
+        }
+    }
+}
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateMeshJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray vertices) {}
