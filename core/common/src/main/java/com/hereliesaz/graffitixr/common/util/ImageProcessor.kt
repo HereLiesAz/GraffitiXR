@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.common.util
 
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
-import androidx.room.jarjarred.org.antlr.v4.misc.Utils
 import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
