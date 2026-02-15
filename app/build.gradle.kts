@@ -26,7 +26,6 @@ android {
             useSupportLibrary = true
         }
 
-        // Native Bridge (C++)
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
@@ -49,7 +48,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // FIX: Replaced deprecated kotlinOptions with compilerOptions
     kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
@@ -69,21 +67,18 @@ android {
 }
 
 dependencies {
-    // Project Modules
     implementation(project(":core:nativebridge"))
     implementation(project(":feature:ar"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:dashboard"))
-    implementation(project(":common"))
-    implementation(project(":design"))
+    implementation(project(":core:common"))
+    implementation(project(":core:design"))
 
-    // Android X / Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
 
-    // Compose
     implementation(platform(libs.androidx.compose.material3))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
@@ -92,33 +87,29 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.constraintlayout)
 
-    // Navigation & Hilt
     implementation(libs.navigation.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // FIX: This now resolves correctly due to the TOML update
     implementation(libs.androidx.hilt.navigation.compose)
 
-    // Logging
     implementation(libs.timber)
-
-    // Camera & Vision
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(project(":opencv"))
 
-    // Third Party
     implementation(libs.az.nav.rail)
     implementation(libs.coil.compose)
 
-    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.material3))
 
-    // FIX: Using new alias to avoid 'test' collision
+    // Correctly aliased test dependencies
     androidTestImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
 
