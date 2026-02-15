@@ -22,6 +22,7 @@ import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.util.LightEstimationAnalyzer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @Composable
@@ -50,6 +51,14 @@ fun ArView(
         }
     }
 
+    // Executor for image analysis (must be shut down)
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraExecutor.shutdown()
+        }
+    }
+
     LaunchedEffect(renderer) {
         onRendererCreated(renderer)
     }
@@ -65,7 +74,7 @@ fun ArView(
                         cameraProvider,
                         lifecycleOwner,
                         previewView,
-                        slamManager
+                        cameraExecutor
                     ) { intensity ->
                         ambientLight = intensity
                     }
@@ -125,7 +134,7 @@ private fun bindCameraUseCases(
     cameraProvider: ProcessCameraProvider,
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     previewView: PreviewView,
-    slamManager: SlamManager,
+    executor: ExecutorService,
     onLightUpdate: (Float) -> Unit
 ) {
     val preview = Preview.Builder().build()
@@ -135,7 +144,7 @@ private fun bindCameraUseCases(
         .build()
         .also {
             it.setAnalyzer(
-                Executors.newSingleThreadExecutor(),
+                executor,
                 LightEstimationAnalyzer(onLightUpdate)
             )
         }
