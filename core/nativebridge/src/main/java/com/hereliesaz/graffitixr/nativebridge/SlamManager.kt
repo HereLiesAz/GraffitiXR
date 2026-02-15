@@ -74,8 +74,10 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) alignMapJni(nativeHandle, transform) }
     }
 
-    fun saveKeyframe() {
-        lock.withLock { if (!isDestroyed.get()) saveKeyframeJni(nativeHandle) }
+    fun saveKeyframe(path: String): Boolean {
+        return lock.withLock {
+            if (!isDestroyed.get()) saveKeyframeJni(nativeHandle, path) else false
+        }
     }
 
     fun setVisualizationMode(mode: Int) {
@@ -146,7 +148,7 @@ class SlamManager @Inject constructor() {
     private external fun feedDepthDataJni(handle: Long, image: Image)
     private external fun updateMeshJni(handle: Long, vertices: FloatArray)
     private external fun alignMapJni(handle: Long, transform: FloatArray)
-    private external fun saveKeyframeJni(handle: Long)
+    private external fun saveKeyframeJni(handle: Long, path: String): Boolean
     private external fun setVisualizationModeJni(handle: Long, mode: Int)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun drawJni(handle: Long)

@@ -109,6 +109,34 @@ bool MobileGS::importModel3D(const char* path) {
     return true;
 }
 
+bool MobileGS::saveKeyframe(const char* path) {
+    LOGI("Saving keyframe metadata to: %s", path);
+    try {
+        cv::FileStorage fs(path, cv::FileStorage::WRITE);
+        if (!fs.isOpened()) {
+            LOGE("Failed to open file for writing: %s", path);
+            return false;
+        }
+
+        // Write viewport and last known matrices as "Pose Metadata"
+        fs << "viewportWidth" << viewportWidth;
+        fs << "viewportHeight" << viewportHeight;
+
+        cv::Mat vMat(4, 4, CV_32F, viewMtx);
+        cv::Mat pMat(4, 4, CV_32F, projMtx);
+
+        fs << "viewMatrix" << vMat;
+        fs << "projectionMatrix" << pMat;
+        fs << "timestamp" << (double)time(0);
+
+        fs.release();
+        return true;
+    } catch (const std::exception& e) {
+        LOGE("Exception saving keyframe: %s", e.what());
+        return false;
+    }
+}
+
 void MobileGS::detectEdges(cv::Mat& input, cv::Mat& output) {
     if (input.empty()) return;
     cv::Mat gray, blur;
