@@ -15,8 +15,8 @@ class LightEstimationAnalyzer(private val listener: (Float) -> Unit) : ImageAnal
     private val frameIntervalMs = 200L
 
     override fun analyze(image: ImageProxy) {
-        val currentTimestamp = System.currentTimeMillis()
-        if (currentTimestamp - lastAnalyzedTimestamp < frameIntervalMs) {
+        val currentTimestamp = image.imageInfo.timestamp
+        if (lastAnalyzedTimestamp != 0L && (currentTimestamp - lastAnalyzedTimestamp < frameIntervalMs * 1_000_000)) {
             image.close()
             return
         }
