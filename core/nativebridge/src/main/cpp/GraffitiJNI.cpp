@@ -7,7 +7,11 @@
 #include <android/asset_manager_jni.h>
 
 #define TAG "GraffitiJNI"
+#if defined(NDEBUG)
+#define LOGE(...)
+#else
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+#endif
 
 extern "C" {
 
@@ -36,7 +40,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initializeJni(JNIEnv *en
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLStateJni(JNIEnv *env, jobject thiz, jlong handle) {
-    // Stub
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        engine->reset();
+    }
 }
 
 // RENDERING
@@ -83,21 +90,47 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateMeshJni(JNIEnv *en
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transform) {}
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *env, jobject thiz, jlong handle) {}
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        const char *nativePath = env->GetStringUTFChars(path, 0);
+        bool result = engine->saveKeyframe(nativePath);
+        env->ReleaseStringUTFChars(path, nativePath);
+        return result;
+    }
+    return false;
+}
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setVisualizationModeJni(JNIEnv *env, jobject thiz, jlong handle, jint mode) {}
 
-// VULKAN STUBS
+// VULKAN
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initVulkanJni(JNIEnv *env, jobject thiz, jlong handle, jobject surface, jobject assetManager) {}
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initVulkanJni(JNIEnv *env, jobject thiz, jlong handle, jobject surface, jobject assetManager) {
+    if (handle != 0 && surface != nullptr) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
+        AAssetManager *mgr = AAssetManager_fromJava(env, assetManager);
+        engine->initVulkan(window, mgr);
+    }
+}
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resizeVulkanJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {}
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resizeVulkanJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        engine->resizeVulkan(width, height);
+    }
+}
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyVulkanJni(JNIEnv *env, jobject thiz, jlong handle) {}
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyVulkanJni(JNIEnv *env, jobject thiz, jlong handle) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        engine->destroyVulkan();
+    }
+}
 
 // I/O
 JNIEXPORT jboolean JNICALL
@@ -106,6 +139,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorldJni(JNIEnv *env
         auto *engine = reinterpret_cast<MobileGS *>(handle);
         const char *nativePath = env->GetStringUTFChars(path, 0);
         bool result = engine->saveMap(nativePath);
+        env->ReleaseStringUTFChars(path, nativePath);
+        return result;
+    }
+    return false;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_importModel3DJni(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        const char *nativePath = env->GetStringUTFChars(path, 0);
+        bool result = engine->importModel3D(nativePath);
         env->ReleaseStringUTFChars(path, nativePath);
         return result;
     }

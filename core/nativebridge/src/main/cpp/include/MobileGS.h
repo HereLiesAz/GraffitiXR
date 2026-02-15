@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <opencv2/core.hpp>
+#include <android/native_window.h>
+#include <android/asset_manager.h>
 #include "VulkanBackend.h"
 
 /**
@@ -17,8 +19,14 @@ public:
 
     // Lifecycle
     void initialize();
+    void reset();
     void onSurfaceChanged(int width, int height);
     void draw();
+
+    // Vulkan Lifecycle
+    bool initVulkan(ANativeWindow* window, AAssetManager* mgr);
+    void resizeVulkan(int width, int height);
+    void destroyVulkan();
 
     // Camera & Tracking
     void updateCamera(float* viewMatrix, float* projectionMatrix);
@@ -26,6 +34,8 @@ public:
     // I/O (The missing methods)
     bool saveMap(const char* path);
     bool loadMap(const char* path);
+    bool importModel3D(const char* path);
+    bool saveKeyframe(const char* path);
 
     // CV Utils
     void detectEdges(cv::Mat& input, cv::Mat& output);
