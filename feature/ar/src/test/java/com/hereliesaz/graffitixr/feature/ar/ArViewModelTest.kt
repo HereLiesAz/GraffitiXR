@@ -77,9 +77,9 @@ class ArViewModelTest {
         val uri = mockk<Uri>()
         // uri.path is used in viewmodel, so we must mock it
         every { uri.path } returns "/tmp/test"
-
+        
         viewModel.onFrameCaptured(bitmap, uri)
-
+        
         val state = viewModel.uiState.value
         assertEquals(bitmap, state.tempCaptureBitmap)
         assertEquals("/tmp/test", state.pendingKeyframePath)
