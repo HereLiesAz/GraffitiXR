@@ -1,3 +1,5 @@
+import org.gradle.api.plugins.quality.CheckstyleExtension
+
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
@@ -11,7 +13,6 @@ plugins {
 
 allprojects {
     apply(plugin = "checkstyle")
-
     configure<CheckstyleExtension> {
         toolVersion = "10.12.0"
         configFile = rootProject.file("config/checkstyle/checkstyle.xml")
