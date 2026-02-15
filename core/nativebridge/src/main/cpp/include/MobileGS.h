@@ -17,6 +17,7 @@ public:
 
     // Lifecycle
     void initialize();
+    void reset();
     void onSurfaceChanged(int width, int height);
     void draw();
 

@@ -36,7 +36,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initializeJni(JNIEnv *en
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLStateJni(JNIEnv *env, jobject thiz, jlong handle) {
-    // Stub
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        engine->reset();
+    }
 }
 
 // RENDERING

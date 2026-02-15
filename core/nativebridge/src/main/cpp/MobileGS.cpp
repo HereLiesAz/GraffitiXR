@@ -28,6 +28,14 @@ void MobileGS::initialize() {
     isInitialized = true;
 }
 
+void MobileGS::reset() {
+    LOGI("Resetting MobileGS Engine context...");
+    isInitialized = false;
+    if (vulkanRenderer) {
+        vulkanRenderer->destroy();
+    }
+}
+
 void MobileGS::onSurfaceChanged(int width, int height) {
     viewportWidth = width;
     viewportHeight = height;
