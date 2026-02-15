@@ -59,8 +59,8 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) updateCameraJni(nativeHandle, viewMatrix, projectionMatrix) }
     }
 
-    fun updateLight(intensity: Float) {
-        lock.withLock { if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity) }
+    fun updateLight(intensity: Float, colorCorrection: FloatArray = floatArrayOf(1f, 1f, 1f)) {
+        lock.withLock { if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity, colorCorrection) }
     }
 
     fun feedDepthData(image: Image) {
@@ -95,8 +95,10 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) alignMapJni(nativeHandle, transform) }
     }
 
-    fun saveKeyframe() {
-        lock.withLock { if (!isDestroyed.get()) saveKeyframeJni(nativeHandle) }
+    fun saveKeyframe(path: String): Boolean {
+        return lock.withLock {
+            if (!isDestroyed.get()) saveKeyframeJni(nativeHandle, path) else false
+        }
     }
 
     fun setVisualizationMode(mode: Int) {
@@ -135,6 +137,12 @@ class SlamManager @Inject constructor() {
         }
     }
 
+    fun importModel3D(path: String): Boolean {
+        return lock.withLock {
+            if (!isDestroyed.get()) importModel3DJni(nativeHandle, path) else false
+        }
+    }
+
     fun detectEdges(bitmap: Bitmap): Bitmap? {
         return lock.withLock {
             if (!isDestroyed.get()) detectEdgesJni(nativeHandle, bitmap) else null
@@ -157,7 +165,7 @@ class SlamManager @Inject constructor() {
     private external fun initializeJni(handle: Long)
     private external fun resetGLStateJni(handle: Long)
     private external fun updateCameraJni(handle: Long, view: FloatArray, proj: FloatArray)
-    private external fun updateLightJni(handle: Long, intensity: Float)
+    private external fun updateLightJni(handle: Long, intensity: Float, color: FloatArray)
     private external fun feedDepthDataJni(handle: Long, image: Image)
     private external fun feedStereoDataJni(
         handle: Long,
@@ -172,12 +180,13 @@ class SlamManager @Inject constructor() {
     )
     private external fun updateMeshJni(handle: Long, vertices: FloatArray)
     private external fun alignMapJni(handle: Long, transform: FloatArray)
-    private external fun saveKeyframeJni(handle: Long)
+    private external fun saveKeyframeJni(handle: Long, path: String): Boolean
     private external fun setVisualizationModeJni(handle: Long, mode: Int)
     private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
     private external fun drawJni(handle: Long)
     private external fun loadWorldJni(handle: Long, path: String): Boolean
     private external fun saveWorldJni(handle: Long, path: String): Boolean
+    private external fun importModel3DJni(handle: Long, path: String): Boolean
     private external fun detectEdgesJni(handle: Long, bitmap: Bitmap): Bitmap?
     private external fun initVulkanJni(handle: Long, surface: Surface, assetManager: AssetManager)
     private external fun resizeVulkanJni(handle: Long, width: Int, height: Int)
