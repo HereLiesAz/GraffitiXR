@@ -138,6 +138,32 @@ public class QRCodeDetector extends GraphicalCodeDetector {
     }
 
 
+    //
+    // C++:  QRCodeEncoder_ECIEncodings cv::QRCodeDetector::getEncoding(int codeIdx = 0)
+    //
+
+    /**
+     * Returns a kind of encoding for the decoded info from the latest REF: decode or REF: detectAndDecode call
+     *     @param codeIdx an index of the previously decoded QR code.
+     *                    When REF: decode or REF: detectAndDecode is used, valid value is zero.
+     *                    For REF: decodeMulti or REF: detectAndDecodeMulti use indices corresponding to the output order.
+     * @return automatically generated
+     */
+    public int getEncoding(int codeIdx) {
+        return getEncoding_0(nativeObj, codeIdx);
+    }
+
+    /**
+     * Returns a kind of encoding for the decoded info from the latest REF: decode or REF: detectAndDecode call
+     *                    When REF: decode or REF: detectAndDecode is used, valid value is zero.
+     *                    For REF: decodeMulti or REF: detectAndDecodeMulti use indices corresponding to the output order.
+     * @return automatically generated
+     */
+    public int getEncoding() {
+        return getEncoding_1(nativeObj);
+    }
+
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
@@ -166,7 +192,11 @@ public class QRCodeDetector extends GraphicalCodeDetector {
     private static native String detectAndDecodeCurved_1(long nativeObj, long img_nativeObj, long points_nativeObj);
     private static native String detectAndDecodeCurved_2(long nativeObj, long img_nativeObj);
 
-    // native support for java finalize()
+    // C++:  QRCodeEncoder_ECIEncodings cv::QRCodeDetector::getEncoding(int codeIdx = 0)
+    private static native int getEncoding_0(long nativeObj, int codeIdx);
+    private static native int getEncoding_1(long nativeObj);
+
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

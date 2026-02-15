@@ -10,7 +10,10 @@ import org.opencv.core.Mat;
 public class CharucoParameters {
 
     protected final long nativeObj;
-    protected CharucoParameters(long addr) { nativeObj = addr; }
+    protected CharucoParameters(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -98,6 +101,24 @@ public class CharucoParameters {
     }
 
 
+    //
+    // C++: bool CharucoParameters::checkMarkers
+    //
+
+    public boolean get_checkMarkers() {
+        return get_checkMarkers_0(nativeObj);
+    }
+
+
+    //
+    // C++: void CharucoParameters::checkMarkers
+    //
+
+    public void set_checkMarkers(boolean checkMarkers) {
+        set_checkMarkers_0(nativeObj, checkMarkers);
+    }
+
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
@@ -132,7 +153,13 @@ public class CharucoParameters {
     // C++: void CharucoParameters::tryRefineMarkers
     private static native void set_tryRefineMarkers_0(long nativeObj, boolean tryRefineMarkers);
 
-    // native support for java finalize()
+    // C++: bool CharucoParameters::checkMarkers
+    private static native boolean get_checkMarkers_0(long nativeObj);
+
+    // C++: void CharucoParameters::checkMarkers
+    private static native void set_checkMarkers_0(long nativeObj, boolean checkMarkers);
+
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

@@ -51,19 +51,19 @@ public class GFTTDetector extends Feature2D {
 
 
     //
-    // C++: static Ptr_GFTTDetector cv::GFTTDetector::create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradiantSize, bool useHarrisDetector = false, double k = 0.04)
+    // C++: static Ptr_GFTTDetector cv::GFTTDetector::create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradientSize, bool useHarrisDetector = false, double k = 0.04)
     //
 
-    public static GFTTDetector create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradiantSize, boolean useHarrisDetector, double k) {
-        return GFTTDetector.__fromPtr__(create_7(maxCorners, qualityLevel, minDistance, blockSize, gradiantSize, useHarrisDetector, k));
+    public static GFTTDetector create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradientSize, boolean useHarrisDetector, double k) {
+        return GFTTDetector.__fromPtr__(create_7(maxCorners, qualityLevel, minDistance, blockSize, gradientSize, useHarrisDetector, k));
     }
 
-    public static GFTTDetector create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradiantSize, boolean useHarrisDetector) {
-        return GFTTDetector.__fromPtr__(create_8(maxCorners, qualityLevel, minDistance, blockSize, gradiantSize, useHarrisDetector));
+    public static GFTTDetector create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradientSize, boolean useHarrisDetector) {
+        return GFTTDetector.__fromPtr__(create_8(maxCorners, qualityLevel, minDistance, blockSize, gradientSize, useHarrisDetector));
     }
 
-    public static GFTTDetector create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradiantSize) {
-        return GFTTDetector.__fromPtr__(create_9(maxCorners, qualityLevel, minDistance, blockSize, gradiantSize));
+    public static GFTTDetector create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradientSize) {
+        return GFTTDetector.__fromPtr__(create_9(maxCorners, qualityLevel, minDistance, blockSize, gradientSize));
     }
 
 
@@ -218,10 +218,10 @@ public class GFTTDetector extends Feature2D {
     private static native long create_5(int maxCorners);
     private static native long create_6();
 
-    // C++: static Ptr_GFTTDetector cv::GFTTDetector::create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradiantSize, bool useHarrisDetector = false, double k = 0.04)
-    private static native long create_7(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradiantSize, boolean useHarrisDetector, double k);
-    private static native long create_8(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradiantSize, boolean useHarrisDetector);
-    private static native long create_9(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradiantSize);
+    // C++: static Ptr_GFTTDetector cv::GFTTDetector::create(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradientSize, bool useHarrisDetector = false, double k = 0.04)
+    private static native long create_7(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradientSize, boolean useHarrisDetector, double k);
+    private static native long create_8(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradientSize, boolean useHarrisDetector);
+    private static native long create_9(int maxCorners, double qualityLevel, double minDistance, int blockSize, int gradientSize);
 
     // C++:  void cv::GFTTDetector::setMaxFeatures(int maxFeatures)
     private static native void setMaxFeatures_0(long nativeObj, int maxFeatures);
@@ -268,7 +268,7 @@ public class GFTTDetector extends Feature2D {
     // C++:  String cv::GFTTDetector::getDefaultName()
     private static native String getDefaultName_0(long nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

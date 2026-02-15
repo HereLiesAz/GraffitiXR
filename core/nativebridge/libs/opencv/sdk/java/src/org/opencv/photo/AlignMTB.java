@@ -199,7 +199,7 @@ public class AlignMTB extends AlignExposures {
     // C++:  void cv::AlignMTB::setCut(bool value)
     private static native void setCut_0(long nativeObj, boolean value);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

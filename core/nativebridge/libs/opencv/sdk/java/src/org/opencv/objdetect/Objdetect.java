@@ -164,7 +164,7 @@ public class Objdetect {
      * This function returns a marker image in its canonical form (i.e. ready to be printed)
      */
     public static void generateImageMarker(Dictionary dictionary, int id, int sidePixels, Mat img, int borderBits) {
-        generateImageMarker_0(dictionary.nativeObj, id, sidePixels, img.nativeObj, borderBits);
+        generateImageMarker_0(dictionary.getNativeObjAddr(), id, sidePixels, img.nativeObj, borderBits);
     }
 
     /**
@@ -178,7 +178,7 @@ public class Objdetect {
      * This function returns a marker image in its canonical form (i.e. ready to be printed)
      */
     public static void generateImageMarker(Dictionary dictionary, int id, int sidePixels, Mat img) {
-        generateImageMarker_1(dictionary.nativeObj, id, sidePixels, img.nativeObj);
+        generateImageMarker_1(dictionary.getNativeObjAddr(), id, sidePixels, img.nativeObj);
     }
 
 
@@ -333,7 +333,7 @@ public class Objdetect {
      * @return automatically generated
      */
     public static Dictionary extendDictionary(int nMarkers, int markerSize, Dictionary baseDictionary, int randomSeed) {
-        return new Dictionary(extendDictionary_0(nMarkers, markerSize, baseDictionary.nativeObj, randomSeed));
+        return new Dictionary(extendDictionary_0(nMarkers, markerSize, baseDictionary.getNativeObjAddr(), randomSeed));
     }
 
     /**
@@ -350,7 +350,7 @@ public class Objdetect {
      * @return automatically generated
      */
     public static Dictionary extendDictionary(int nMarkers, int markerSize, Dictionary baseDictionary) {
-        return new Dictionary(extendDictionary_1(nMarkers, markerSize, baseDictionary.nativeObj));
+        return new Dictionary(extendDictionary_1(nMarkers, markerSize, baseDictionary.getNativeObjAddr()));
     }
 
     /**

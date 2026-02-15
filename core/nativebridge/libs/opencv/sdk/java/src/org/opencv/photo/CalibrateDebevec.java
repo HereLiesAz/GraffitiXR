@@ -99,7 +99,7 @@ public class CalibrateDebevec extends CalibrateCRF {
     // C++:  void cv::CalibrateDebevec::setRandom(bool random)
     private static native void setRandom_0(long nativeObj, boolean random);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

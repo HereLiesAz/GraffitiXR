@@ -195,7 +195,7 @@ public class StereoMatcher extends Algorithm {
     // C++:  void cv::StereoMatcher::setDisp12MaxDiff(int disp12MaxDiff)
     private static native void setDisp12MaxDiff_0(long nativeObj, int disp12MaxDiff);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

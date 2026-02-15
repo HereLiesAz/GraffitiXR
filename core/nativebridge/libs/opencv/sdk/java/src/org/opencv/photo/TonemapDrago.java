@@ -79,7 +79,7 @@ public class TonemapDrago extends Tonemap {
     // C++:  void cv::TonemapDrago::setBias(float bias)
     private static native void setBias_0(long nativeObj, float bias);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

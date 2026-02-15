@@ -13,7 +13,10 @@ import org.opencv.core.Rect;
 public class Tracker {
 
     protected final long nativeObj;
-    protected Tracker(long addr) { nativeObj = addr; }
+    protected Tracker(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -69,7 +72,7 @@ public class Tracker {
     // C++:  bool cv::Tracker::update(Mat image, Rect& boundingBox)
     private static native boolean update_0(long nativeObj, long image_nativeObj, double[] boundingBox_out);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

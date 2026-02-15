@@ -38,12 +38,8 @@ include ':video-recorder'
 
 include ':tutorial-1-camerapreview'
 
-if (gradle.opencv_source == 'sdk_path') {
-    include ':tutorial-2-mixedprocessing'
-}
+include ':tutorial-2-mixedprocessing'
 
 include ':tutorial-3-cameracontrol'
 
-if (gradle.opencv_source == 'sdk_path') {
-    include ':tutorial-4-opencl'
-}
+include ':tutorial-4-opencl'

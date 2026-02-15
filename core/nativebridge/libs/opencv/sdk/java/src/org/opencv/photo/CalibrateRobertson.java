@@ -87,7 +87,7 @@ public class CalibrateRobertson extends CalibrateCRF {
     // C++:  Mat cv::CalibrateRobertson::getRadiance()
     private static native long getRadiance_0(long nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

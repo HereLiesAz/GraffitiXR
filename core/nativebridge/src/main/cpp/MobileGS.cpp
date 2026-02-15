@@ -21,10 +21,10 @@ const int MAX_SPLATS = 500000;
 const float VOXEL_SIZE = 0.02f; // 2cm
 
 const float QUAD_VERTICES[] = {
-    -1.0f, -1.0f,
-     1.0f, -1.0f,
-    -1.0f,  1.0f,
-     1.0f,  1.0f
+        -1.0f, -1.0f,
+        1.0f, -1.0f,
+        -1.0f,  1.0f,
+        1.0f,  1.0f
 };
 
 // Shaders
@@ -185,7 +185,7 @@ MobileGS::~MobileGS() {
     if (mVBO_Quad != 0) glDeleteBuffers(1, &mVBO_Quad);
     if (mVBO_Instance != 0) glDeleteBuffers(1, &mVBO_Instance);
     if (mProgram != 0) glDeleteProgram(mProgram);
-    
+
     delete mVulkanBackend;
 }
 
@@ -204,7 +204,8 @@ void MobileGS::initialize() {
     }
 
     if (mVulkanBackend != nullptr) {
-        mVulkanBackend->initialize();
+        // Disabled to reduce startup complexity
+        // mVulkanBackend->initialize();
     }
 }
 
@@ -311,7 +312,7 @@ void MobileGS::draw() {
         glStencilMask(0xFF);
         glClearStencil(0);
         glClear(GL_STENCIL_BUFFER_BIT);
-        
+
         // Render splats into stencil ONLY
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
@@ -343,13 +344,13 @@ void MobileGS::draw() {
     if (mMeshVBO != 0 && mMeshVertexCount > 0) {
         if (!useFog) glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE); // Don't draw color
         glDepthMask(GL_TRUE); // Write to depth
-        
+
         glBindBuffer(GL_ARRAY_BUFFER, mMeshVBO);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, pos));
-        
+
         glDrawArrays(GL_TRIANGLES, 0, mMeshVertexCount);
-        
+
         glDisableVertexAttribArray(0);
         if (!useFog) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // Re-enable color
     }
@@ -388,20 +389,20 @@ void MobileGS::draw() {
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
+
         glStencilFunc(GL_EQUAL, 0, 0xFF); // Draw where splats ARE NOT
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-        
+
         glUseProgram(mFogProgram);
         glUniform4f(mLocFogColor, 0.0f, 0.0f, 0.0f, 0.7f); // Dark transparent layer
-        
+
         glBindBuffer(GL_ARRAY_BUFFER, mVBO_Quad);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
         glVertexAttribDivisor(0, 0);
-        
+
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        
+
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_BLEND);
     }
@@ -435,26 +436,22 @@ void MobileGS::setTargetDescriptors(const cv::Mat& descriptors) {
 
 void MobileGS::trainStep() {
     std::lock_guard<std::mutex> lock(mChunkMutex);
-    
+
     // Simple "Training" / Refinement Loop
     // 1. Densify: Already handled in feedDepthData by adding new points in empty voxels.
     // 2. Prune: Remove points with low opacity (confidence).
-    
+
     // We iterate backwards to safely erase
     for (int i = mSplats.size() - 1; i >= 0; i--) {
         Splat& s = mSplats[i];
-        
+
         // Decay opacity slightly every frame to simulate "forgetting" if not re-observed
         // But only if we are actively training (this method called)
-        s.opacity *= 0.99f; 
+        s.opacity *= 0.99f;
 
         // Pruning threshold
         if (s.opacity < 0.1f) {
-            // Remove from vector (swap with last and pop)
-            // Note: This breaks the voxel grid indices! We need to rebuild voxel grid or handle it.
-            // For performance, we might batch prune or rebuild grid periodically.
-            // Here we do a swap-remove, but we MUST invalidate the VoxelGrid.
-            
+            // Swap with last and pop
             if (i != mSplats.size() - 1) {
                 mSplats[i] = mSplats.back();
             }
@@ -462,9 +459,8 @@ void MobileGS::trainStep() {
             mGlDirty = true;
         }
     }
-    
-    // If we pruned significantly, rebuild the grid
-    // For now, simpler to just clear grid and rebuild if we change structure
+
+    // If we pruned, invalidate/rebuild the grid
     if (mGlDirty) {
         mVoxelGrid.clear();
         for(int i=0; i<mSplats.size(); i++) {
@@ -481,8 +477,40 @@ void MobileGS::trainStep() {
 
 void MobileGS::pruneMap(int ageThresholdFrames) {
     std::lock_guard<std::mutex> lock(mChunkMutex);
-    // Placeholder for pruning logic
-    // Implementation would iterate mSplats and remove low confidence ones
+
+    // Implementation: Culling based on max count
+    // If we exceed MAX_SPLATS, we indiscriminately remove random points
+    // (or ideally oldest/lowest confidence) to fit.
+
+    if (mSplats.size() > MAX_SPLATS) {
+        LOGI("Pruning Map: Count %zu exceeds MAX %d", mSplats.size(), MAX_SPLATS);
+
+        // Target: Remove 10%
+        int targetCount = MAX_SPLATS * 0.9;
+
+        // Naive sort by opacity (confidence) ascending
+        // We want to keep HIGH opacity, so remove lowest opacity first.
+        std::sort(mSplats.begin(), mSplats.end(), [](const Splat& a, const Splat& b) {
+            return a.opacity > b.opacity; // Descending: High opacity first
+        });
+
+        // Resize to target, dropping the end (low opacity)
+        mSplats.resize(targetCount);
+
+        // Rebuild Spatial Hash
+        mVoxelGrid.clear();
+        for(int i=0; i<mSplats.size(); i++) {
+            const Splat& s = mSplats[i];
+            VoxelKey key = {
+                    (int)floor(s.pos.x / VOXEL_SIZE),
+                    (int)floor(s.pos.y / VOXEL_SIZE),
+                    (int)floor(s.pos.z / VOXEL_SIZE)
+            };
+            mVoxelGrid[key] = i;
+        }
+
+        mGlDirty = true;
+    }
 }
 
 void MobileGS::clear() {
@@ -575,9 +603,9 @@ void MobileGS::feedDepthData(uint16_t* depthData, uint8_t* colorData, int width,
                     // Assuming RGBA buffer from JNI
                     int pIdx = (y * colorStride) + (x * 4);
                     s.color = glm::vec3(
-                        colorData[pIdx] / 255.0f,
-                        colorData[pIdx + 1] / 255.0f,
-                        colorData[pIdx + 2] / 255.0f
+                            colorData[pIdx] / 255.0f,
+                            colorData[pIdx + 1] / 255.0f,
+                            colorData[pIdx + 2] / 255.0f
                     );
                 } else {
                     s.color = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -599,9 +627,9 @@ void MobileGS::feedDepthData(uint16_t* depthData, uint8_t* colorData, int width,
                 if (colorData) {
                     int pIdx = (y * colorStride) + (x * 4);
                     glm::vec3 newColor(
-                        colorData[pIdx] / 255.0f,
-                        colorData[pIdx + 1] / 255.0f,
-                        colorData[pIdx + 2] / 255.0f
+                            colorData[pIdx] / 255.0f,
+                            colorData[pIdx + 1] / 255.0f,
+                            colorData[pIdx + 2] / 255.0f
                     );
                     s.color = glm::mix(s.color, newColor, 0.1f);
                 }
@@ -699,7 +727,7 @@ bool MobileGS::loadModel(const std::string& path) {
 
 void MobileGS::alignMap(float* transformMtx) {
     std::lock_guard<std::mutex> lock(mChunkMutex);
-    
+
     glm::mat4 T = glm::make_mat4(transformMtx);
     glm::mat3 R = glm::mat3(T);
     glm::vec3 t = glm::vec3(T[3]);
@@ -708,7 +736,7 @@ void MobileGS::alignMap(float* transformMtx) {
     for (auto& s : mSplats) {
         // 1. Position: P' = R*P + t
         s.pos = R * s.pos + t;
-        
+
         // 2. Rotation: q' = q_align * q_old
         s.rot = q * s.rot;
     }
@@ -731,7 +759,7 @@ void MobileGS::alignMap(float* transformMtx) {
 
 bool MobileGS::importModel3D(const std::string& path) {
     LOGI("Importing 3D model from %s", path.c_str());
-    
+
     std::ifstream f(path.c_str());
     if (!f.good()) {
         LOGE("3D Model file not found: %s", path.c_str());

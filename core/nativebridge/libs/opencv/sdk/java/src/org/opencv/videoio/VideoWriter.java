@@ -19,7 +19,10 @@ import org.opencv.utils.Converters;
 public class VideoWriter {
 
     protected final long nativeObj;
-    protected VideoWriter(long addr) { nativeObj = addr; }
+    protected VideoWriter(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -454,7 +457,7 @@ public class VideoWriter {
     // C++:  String cv::VideoWriter::getBackendName()
     private static native String getBackendName_0(long nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

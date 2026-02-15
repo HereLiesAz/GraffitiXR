@@ -53,7 +53,7 @@ public class FlannBasedMatcher extends DescriptorMatcher {
     // C++: static Ptr_FlannBasedMatcher cv::FlannBasedMatcher::create()
     private static native long create_0();
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

@@ -63,7 +63,7 @@ public class DetectionModel extends Model {
      * @param network Net object.
      */
     public DetectionModel(Net network) {
-        super(DetectionModel_2(network.nativeObj));
+        super(DetectionModel_2(network.getNativeObjAddr()));
     }
 
 
@@ -172,7 +172,7 @@ public class DetectionModel extends Model {
     private static native void detect_1(long nativeObj, long frame_nativeObj, long classIds_mat_nativeObj, long confidences_mat_nativeObj, long boxes_mat_nativeObj, float confThreshold);
     private static native void detect_2(long nativeObj, long frame_nativeObj, long classIds_mat_nativeObj, long confidences_mat_nativeObj, long boxes_mat_nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

@@ -8,6 +8,7 @@ import java.util.List;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfInt;
 import org.opencv.utils.Converters;
+import org.opencv.videoio.IStreamReader;
 
 // C++: class VideoCapture
 /**
@@ -42,7 +43,10 @@ import org.opencv.utils.Converters;
 public class VideoCapture {
 
     protected final long nativeObj;
-    protected VideoCapture(long addr) { nativeObj = addr; }
+    protected VideoCapture(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -203,6 +207,26 @@ public class VideoCapture {
 
 
     //
+    // C++:   cv::VideoCapture::VideoCapture(Ptr_IStreamReader source, int apiPreference, vector_int params)
+    //
+
+    /**
+     *
+     *     Opens a video using data stream.
+     *
+     *     The {@code params} parameter allows to specify extra parameters encoded as pairs {@code (paramId_1, paramValue_1, paramId_2, paramValue_2, ...)}.
+     *     See cv::VideoCaptureProperties
+     * @param source automatically generated
+     * @param apiPreference automatically generated
+     * @param params automatically generated
+     */
+    public VideoCapture(IStreamReader source, int apiPreference, MatOfInt params) {
+        Mat params_mat = params;
+        nativeObj = VideoCapture_7(source, apiPreference, params_mat.nativeObj);
+    }
+
+
+    //
     // C++:  bool cv::VideoCapture::open(String filename, int apiPreference = CAP_ANY)
     //
 
@@ -321,6 +345,31 @@ public class VideoCapture {
     public boolean open(int index, int apiPreference, MatOfInt params) {
         Mat params_mat = params;
         return open_5(nativeObj, index, apiPreference, params_mat.nativeObj);
+    }
+
+
+    //
+    // C++:  bool cv::VideoCapture::open(Ptr_IStreamReader source, int apiPreference, vector_int params)
+    //
+
+    /**
+     * Opens a video using data stream.
+     *
+     *     
+     *
+     *     The {@code params} parameter allows to specify extra parameters encoded as pairs {@code (paramId_1, paramValue_1, paramId_2, paramValue_2, ...)}.
+     *     See cv::VideoCaptureProperties
+     *
+     *     @return {@code true} if the file has been successfully opened
+     *
+     *     The method first calls VideoCapture::release to close the already opened file or camera.
+     * @param source automatically generated
+     * @param apiPreference automatically generated
+     * @param params automatically generated
+     */
+    public boolean open(IStreamReader source, int apiPreference, MatOfInt params) {
+        Mat params_mat = params;
+        return open_6(nativeObj, source, apiPreference, params_mat.nativeObj);
     }
 
 
@@ -571,6 +620,9 @@ public class VideoCapture {
     // C++:   cv::VideoCapture::VideoCapture(int index, int apiPreference, vector_int params)
     private static native long VideoCapture_6(int index, int apiPreference, long params_mat_nativeObj);
 
+    // C++:   cv::VideoCapture::VideoCapture(Ptr_IStreamReader source, int apiPreference, vector_int params)
+    private static native long VideoCapture_7(IStreamReader source, int apiPreference, long params_mat_nativeObj);
+
     // C++:  bool cv::VideoCapture::open(String filename, int apiPreference = CAP_ANY)
     private static native boolean open_0(long nativeObj, String filename, int apiPreference);
     private static native boolean open_1(long nativeObj, String filename);
@@ -584,6 +636,9 @@ public class VideoCapture {
 
     // C++:  bool cv::VideoCapture::open(int index, int apiPreference, vector_int params)
     private static native boolean open_5(long nativeObj, int index, int apiPreference, long params_mat_nativeObj);
+
+    // C++:  bool cv::VideoCapture::open(Ptr_IStreamReader source, int apiPreference, vector_int params)
+    private static native boolean open_6(long nativeObj, IStreamReader source, int apiPreference, long params_mat_nativeObj);
 
     // C++:  bool cv::VideoCapture::isOpened()
     private static native boolean isOpened_0(long nativeObj);
@@ -616,7 +671,7 @@ public class VideoCapture {
     // C++:  bool cv::VideoCapture::getExceptionMode()
     private static native boolean getExceptionMode_0(long nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

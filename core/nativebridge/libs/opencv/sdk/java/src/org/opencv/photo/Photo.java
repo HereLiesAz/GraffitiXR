@@ -29,11 +29,18 @@ public class Photo {
             INPAINT_NS = 0,
             INPAINT_TELEA = 1,
             LDR_SIZE = 256,
+            RECURS_FILTER = 1,
+            NORMCONV_FILTER = 2;
+
+
+    // C++: enum SeamlessCloneFlags (cv.SeamlessCloneFlags)
+    public static final int
             NORMAL_CLONE = 1,
             MIXED_CLONE = 2,
             MONOCHROME_TRANSFER = 3,
-            RECURS_FILTER = 1,
-            NORMCONV_FILTER = 2;
+            NORMAL_CLONE_WIDE = 9,
+            MIXED_CLONE_WIDE = 10,
+            MONOCHROME_TRANSFER_WIDE = 11;
 
 
     //
@@ -416,7 +423,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * @param templateWindowSize Size in pixels of the template patch that is used to compute weights.
@@ -445,7 +452,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * @param templateWindowSize Size in pixels of the template patch that is used to compute weights.
@@ -473,7 +480,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * Should be odd. Recommended value 7 pixels
@@ -500,7 +507,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * Should be odd. Recommended value 7 pixels
@@ -531,7 +538,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * @param templateWindowSize Size in pixels of the template patch that is used to compute weights.
@@ -563,7 +570,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * @param templateWindowSize Size in pixels of the template patch that is used to compute weights.
@@ -594,7 +601,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * @param templateWindowSize Size in pixels of the template patch that is used to compute weights.
@@ -624,7 +631,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * Should be odd. Recommended value 7 pixels
@@ -654,7 +661,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * @param templateWindowSize Size in pixels of the template patch that is used to compute weights.
@@ -683,7 +690,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * @param templateWindowSize Size in pixels of the template patch that is used to compute weights.
@@ -711,7 +718,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * Should be odd. Recommended value 7 pixels
@@ -738,7 +745,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * Should be odd. Recommended value 7 pixels
@@ -764,7 +771,7 @@ public class Photo {
      * @param imgToDenoiseIndex Target image to denoise index in srcImgs sequence
      * @param temporalWindowSize Number of surrounding images to use for target image denoising. Should
      * be odd. Images from imgToDenoiseIndex - temporalWindowSize / 2 to
-     * imgToDenoiseIndex - temporalWindowSize / 2 from srcImgs will be used to denoise
+     * imgToDenoiseIndex + temporalWindowSize / 2 from srcImgs will be used to denoise
      * srcImgs[imgToDenoiseIndex] image.
      * @param dst Output image with the same size and type as srcImgs images.
      * Should be odd. Recommended value 7 pixels
@@ -1360,18 +1367,19 @@ public class Photo {
     //
 
     /**
-     * Image editing tasks concern either global changes (color/intensity corrections, filters,
-     * deformations) or local changes concerned to a selection. Here we are interested in achieving local
-     * changes, ones that are restricted to a region manually selected (ROI), in a seamless and effortless
-     * manner. The extent of the changes ranges from slight distortions to complete replacement by novel
-     * content CITE: PM03 .
+     * Performs seamless cloning to blend a region from a source image into a destination image.
+     * This function is designed for local image editing, allowing changes restricted to a region
+     * (manually selected as the ROI) to be applied effortlessly and seamlessly. These changes can
+     * range from slight distortions to complete replacement by novel content CITE: PM03.
      *
-     * @param src Input 8-bit 3-channel image.
-     * @param dst Input 8-bit 3-channel image.
-     * @param mask Input 8-bit 1 or 3-channel image.
-     * @param p Point in dst image where object is placed.
-     * @param blend Output image with the same size and type as dst.
-     * @param flags Cloning method that could be cv::NORMAL_CLONE, cv::MIXED_CLONE or cv::MONOCHROME_TRANSFER
+     * @param src The source image (8-bit 3-channel), from which a region will be blended into the destination.
+     * @param dst The destination image (8-bit 3-channel), where the src image will be blended.
+     * @param mask A binary mask (8-bit, 1, 3, or 4-channel) specifying the region in the source image to blend.
+     * Non-zero pixels indicate the region to be blended. If an empty Mat is provided, a mask with
+     * all non-zero pixels is created internally.
+     * @param p The point where the center of the src image is placed in the dst image.
+     * @param blend The output image that stores the result of the seamless cloning. It has the same size and type as {@code dst}.
+     * @param flags Flags that control the type of cloning method, can take values of {@code cv::SeamlessCloneFlags}.
      */
     public static void seamlessClone(Mat src, Mat dst, Mat mask, Point p, Mat blend, int flags) {
         seamlessClone_0(src.nativeObj, dst.nativeObj, mask.nativeObj, p.x, p.y, blend.nativeObj, flags);

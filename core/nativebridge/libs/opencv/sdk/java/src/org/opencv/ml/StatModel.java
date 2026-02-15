@@ -217,7 +217,7 @@ public class StatModel extends Algorithm {
     private static native float predict_1(long nativeObj, long samples_nativeObj, long results_nativeObj);
     private static native float predict_2(long nativeObj, long samples_nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

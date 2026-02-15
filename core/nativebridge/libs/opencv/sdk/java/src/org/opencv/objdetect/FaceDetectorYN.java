@@ -20,7 +20,10 @@ import org.opencv.utils.Converters;
 public class FaceDetectorYN {
 
     protected final long nativeObj;
-    protected FaceDetectorYN(long addr) { nativeObj = addr; }
+    protected FaceDetectorYN(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -397,7 +400,7 @@ public class FaceDetectorYN {
     private static native long create_10(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, double input_size_width, double input_size_height, float score_threshold);
     private static native long create_11(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, double input_size_width, double input_size_height);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

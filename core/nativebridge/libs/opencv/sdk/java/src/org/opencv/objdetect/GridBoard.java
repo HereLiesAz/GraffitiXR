@@ -36,7 +36,7 @@ public class GridBoard extends Board {
      * @param ids set of marker ids in dictionary to use on board.
      */
     public GridBoard(Size size, float markerLength, float markerSeparation, Dictionary dictionary, Mat ids) {
-        super(GridBoard_0(size.width, size.height, markerLength, markerSeparation, dictionary.nativeObj, ids.nativeObj));
+        super(GridBoard_0(size.width, size.height, markerLength, markerSeparation, dictionary.getNativeObjAddr(), ids.nativeObj));
     }
 
     /**
@@ -48,7 +48,7 @@ public class GridBoard extends Board {
      * @param dictionary dictionary of markers indicating the type of markers
      */
     public GridBoard(Size size, float markerLength, float markerSeparation, Dictionary dictionary) {
-        super(GridBoard_1(size.width, size.height, markerLength, markerSeparation, dictionary.nativeObj));
+        super(GridBoard_1(size.width, size.height, markerLength, markerSeparation, dictionary.getNativeObjAddr()));
     }
 
 
@@ -99,7 +99,7 @@ public class GridBoard extends Board {
     // C++:  float cv::aruco::GridBoard::getMarkerSeparation()
     private static native float getMarkerSeparation_0(long nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

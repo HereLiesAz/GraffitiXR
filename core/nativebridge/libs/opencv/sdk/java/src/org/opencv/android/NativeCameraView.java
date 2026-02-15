@@ -2,6 +2,7 @@ package org.opencv.android;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
+import org.opencv.core.MatOfInt;
 
 import org.opencv.imgproc.Imgproc;
 
@@ -10,6 +11,7 @@ import org.opencv.videoio.VideoCapture;
 import org.opencv.videoio.VideoWriter;
 
 import android.content.Context;
+import android.hardware.Camera;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.ViewGroup.LayoutParams;
@@ -25,7 +27,7 @@ public class NativeCameraView extends CameraBridgeViewBase {
     private Thread mThread;
 
     protected VideoCapture mCamera;
-    protected NativeCameraFrame mFrame;
+    protected RotatedCameraFrame mFrame;
 
     public NativeCameraView(Context context, int cameraId) {
         super(context, cameraId);
@@ -89,28 +91,65 @@ public class NativeCameraView extends CameraBridgeViewBase {
 
     private boolean initializeCamera(int width, int height) {
         synchronized (this) {
-
-            if (mCameraIndex == -1) {
+            Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
+            int localCameraIndex = mCameraIndex;
+            if (mCameraIndex == CAMERA_ID_ANY) {
                 Log.d(TAG, "Try to open default camera");
-                mCamera = new VideoCapture(0, Videoio.CAP_ANDROID);
-            } else {
-                Log.d(TAG, "Try to open camera with index " + mCameraIndex);
-                mCamera = new VideoCapture(mCameraIndex, Videoio.CAP_ANDROID);
+                localCameraIndex = 0;
+            } else if (mCameraIndex == CAMERA_ID_BACK) {
+                Log.i(TAG, "Trying to open back camera");
+                for (int camIdx = 0; camIdx < Camera.getNumberOfCameras(); ++camIdx) {
+                    Camera.getCameraInfo( camIdx, cameraInfo );
+                    if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_BACK) {
+                        localCameraIndex = camIdx;
+                        break;
+                    }
+                }
+            } else if (mCameraIndex == CAMERA_ID_FRONT) {
+                Log.i(TAG, "Trying to open front camera");
+                for (int camIdx = 0; camIdx < Camera.getNumberOfCameras(); ++camIdx) {
+                    Camera.getCameraInfo( camIdx, cameraInfo );
+                    if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+                        localCameraIndex = camIdx;
+                        break;
+                    }
+                }
             }
+
+            if (localCameraIndex == CAMERA_ID_BACK) {
+                Log.e(TAG, "Back camera not found!");
+                return false;
+            } else if (localCameraIndex == CAMERA_ID_FRONT) {
+                Log.e(TAG, "Front camera not found!");
+                return false;
+            }
+
+            MatOfInt params = new MatOfInt(Videoio.CAP_PROP_FRAME_WIDTH, width,
+                                           Videoio.CAP_PROP_FRAME_HEIGHT, height);
+
+            Log.d(TAG, "Try to open camera with index " + localCameraIndex);
+            mCamera = new VideoCapture(localCameraIndex, Videoio.CAP_ANDROID, params);
 
             if (mCamera == null)
                 return false;
-
             if (mCamera.isOpened() == false)
                 return false;
 
-            mFrame = new NativeCameraFrame(mCamera);
+            if (mCameraIndex != CAMERA_ID_BACK && mCameraIndex != CAMERA_ID_FRONT)
+                Camera.getCameraInfo(localCameraIndex, cameraInfo);
+            int frameRotation = getFrameRotation(
+                    cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT,
+                    cameraInfo.orientation);
 
-            mCamera.set(Videoio.CAP_PROP_FRAME_WIDTH, width);
-            mCamera.set(Videoio.CAP_PROP_FRAME_HEIGHT, height);
+            mFrame = new RotatedCameraFrame(new NativeCameraFrame(mCamera), frameRotation);
 
-            mFrameWidth = (int)mCamera.get(Videoio.CAP_PROP_FRAME_WIDTH);
-            mFrameHeight = (int)mCamera.get(Videoio.CAP_PROP_FRAME_HEIGHT);
+            if (frameRotation % 180 == 0) {
+                mFrameWidth = (int) mCamera.get(Videoio.CAP_PROP_FRAME_WIDTH);
+                mFrameHeight = (int) mCamera.get(Videoio.CAP_PROP_FRAME_HEIGHT);
+            } else {
+                mFrameWidth = (int) mCamera.get(Videoio.CAP_PROP_FRAME_HEIGHT);
+                mFrameHeight = (int) mCamera.get(Videoio.CAP_PROP_FRAME_WIDTH);
+            }
 
             if ((getLayoutParams().width == LayoutParams.MATCH_PARENT) && (getLayoutParams().height == LayoutParams.MATCH_PARENT))
                 mScale = Math.min(((float)height)/mFrameHeight, ((float)width)/mFrameWidth);
@@ -131,7 +170,10 @@ public class NativeCameraView extends CameraBridgeViewBase {
 
     private void releaseCamera() {
         synchronized (this) {
-            if (mFrame != null) mFrame.release();
+            if (mFrame != null) {
+                mFrame.mFrame.release();
+                mFrame.release();
+            }
             if (mCamera != null) mCamera.release();
         }
     }
@@ -140,10 +182,9 @@ public class NativeCameraView extends CameraBridgeViewBase {
 
         @Override
         public Mat rgba() {
-            mCapture.set(Videoio.CAP_PROP_FOURCC, VideoWriter.fourcc('R','G','B','3'));
-            mCapture.retrieve(mBgr);
-            Log.d(TAG, "Retrived frame with size " + mBgr.cols() + "x" + mBgr.rows() + " and channels: " + mBgr.channels());
-            Imgproc.cvtColor(mBgr, mRgba, Imgproc.COLOR_RGB2RGBA);
+            mCapture.set(Videoio.CAP_PROP_FOURCC, VideoWriter.fourcc('R','G','B','4'));
+            mCapture.retrieve(mRgba);
+            Log.d(TAG, "Retrieved frame with size " + mRgba.cols() + "x" + mRgba.rows() + " and channels: " + mRgba.channels());
             return mRgba;
         }
 
@@ -151,7 +192,7 @@ public class NativeCameraView extends CameraBridgeViewBase {
         public Mat gray() {
             mCapture.set(Videoio.CAP_PROP_FOURCC, VideoWriter.fourcc('G','R','E','Y'));
             mCapture.retrieve(mGray);
-            Log.d(TAG, "Retrived frame with size " + mGray.cols() + "x" + mGray.rows() + " and channels: " + mGray.channels());
+            Log.d(TAG, "Retrieved frame with size " + mGray.cols() + "x" + mGray.rows() + " and channels: " + mGray.channels());
             return mGray;
         }
 
@@ -159,19 +200,17 @@ public class NativeCameraView extends CameraBridgeViewBase {
             mCapture = capture;
             mGray = new Mat();
             mRgba = new Mat();
-            mBgr = new Mat();
         }
 
+        @Override
         public void release() {
             if (mGray != null) mGray.release();
             if (mRgba != null) mRgba.release();
-            if (mBgr != null) mBgr.release();
         }
 
         private VideoCapture mCapture;
         private Mat mRgba;
         private Mat mGray;
-        private Mat mBgr;
     };
 
     private class CameraWorker implements Runnable {

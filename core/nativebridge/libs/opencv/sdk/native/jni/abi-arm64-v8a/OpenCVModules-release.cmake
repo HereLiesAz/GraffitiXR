@@ -58,7 +58,7 @@ list(APPEND _IMPORT_CHECK_FILES_FOR_libopenjp2 "${_IMPORT_PREFIX}/sdk/native/3rd
 # Import target "libpng" for configuration "Release"
 set_property(TARGET libpng APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(libpng PROPERTIES
-  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "C"
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "ASM;C"
   IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/arm64-v8a/liblibpng.a"
   )
 
@@ -104,6 +104,36 @@ set_target_properties(tegra_hal PROPERTIES
 
 list(APPEND _IMPORT_CHECK_TARGETS tegra_hal )
 list(APPEND _IMPORT_CHECK_FILES_FOR_tegra_hal "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/arm64-v8a/libtegra_hal.a" )
+
+# Import target "kleidicv" for configuration "Release"
+set_property(TARGET kleidicv APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(kleidicv PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/arm64-v8a/libkleidicv.a"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS kleidicv )
+list(APPEND _IMPORT_CHECK_FILES_FOR_kleidicv "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/arm64-v8a/libkleidicv.a" )
+
+# Import target "kleidicv_thread" for configuration "Release"
+set_property(TARGET kleidicv_thread APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(kleidicv_thread PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/arm64-v8a/libkleidicv_thread.a"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS kleidicv_thread )
+list(APPEND _IMPORT_CHECK_FILES_FOR_kleidicv_thread "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/arm64-v8a/libkleidicv_thread.a" )
+
+# Import target "kleidicv_hal" for configuration "Release"
+set_property(TARGET kleidicv_hal APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(kleidicv_hal PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/arm64-v8a/libkleidicv_hal.a"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS kleidicv_hal )
+list(APPEND _IMPORT_CHECK_FILES_FOR_kleidicv_hal "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/arm64-v8a/libkleidicv_hal.a" )
 
 # Import target "ittnotify" for configuration "Release"
 set_property(TARGET ittnotify APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)

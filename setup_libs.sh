@@ -4,7 +4,7 @@
 # TARGET: core/nativebridge/libs
 
 # Configuration
-OPENCV_VERSION="4.9.0"
+OPENCV_VERSION="4.13.0"
 OPENCV_ZIP="opencv-${OPENCV_VERSION}-android-sdk.zip"
 OPENCV_URL="https://github.com/opencv/opencv/releases/download/${OPENCV_VERSION}/${OPENCV_ZIP}"
 TARGET_BASE="core/nativebridge/libs"

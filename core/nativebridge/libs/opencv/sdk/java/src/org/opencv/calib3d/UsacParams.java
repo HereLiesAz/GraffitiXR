@@ -10,7 +10,10 @@ package org.opencv.calib3d;
 public class UsacParams {
 
     protected final long nativeObj;
-    protected UsacParams(long addr) { nativeObj = addr; }
+    protected UsacParams(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -348,7 +351,7 @@ public class UsacParams {
     // C++: void UsacParams::final_polisher_iterations
     private static native void set_final_polisher_iterations_0(long nativeObj, int final_polisher_iterations);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

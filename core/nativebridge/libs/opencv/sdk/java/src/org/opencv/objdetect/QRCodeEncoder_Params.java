@@ -12,7 +12,10 @@ package org.opencv.objdetect;
 public class QRCodeEncoder_Params {
 
     protected final long nativeObj;
-    protected QRCodeEncoder_Params(long addr) { nativeObj = addr; }
+    protected QRCodeEncoder_Params(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -47,31 +50,39 @@ public class QRCodeEncoder_Params {
 
 
     //
-    // C++: CorrectionLevel QRCodeEncoder_Params::correction_level
+    // C++: QRCodeEncoder_CorrectionLevel QRCodeEncoder_Params::correction_level
     //
 
-    // Return type 'CorrectionLevel' is not supported, skipping the function
+    public int get_correction_level() {
+        return get_correction_level_0(nativeObj);
+    }
 
 
     //
     // C++: void QRCodeEncoder_Params::correction_level
     //
 
-    // Unknown type 'CorrectionLevel' (I), skipping the function
+    public void set_correction_level(int correction_level) {
+        set_correction_level_0(nativeObj, correction_level);
+    }
 
 
     //
-    // C++: EncodeMode QRCodeEncoder_Params::mode
+    // C++: QRCodeEncoder_EncodeMode QRCodeEncoder_Params::mode
     //
 
-    // Return type 'EncodeMode' is not supported, skipping the function
+    public int get_mode() {
+        return get_mode_0(nativeObj);
+    }
 
 
     //
     // C++: void QRCodeEncoder_Params::mode
     //
 
-    // Unknown type 'EncodeMode' (I), skipping the function
+    public void set_mode(int mode) {
+        set_mode_0(nativeObj, mode);
+    }
 
 
     //
@@ -108,13 +119,25 @@ public class QRCodeEncoder_Params {
     // C++: void QRCodeEncoder_Params::version
     private static native void set_version_0(long nativeObj, int version);
 
+    // C++: QRCodeEncoder_CorrectionLevel QRCodeEncoder_Params::correction_level
+    private static native int get_correction_level_0(long nativeObj);
+
+    // C++: void QRCodeEncoder_Params::correction_level
+    private static native void set_correction_level_0(long nativeObj, int correction_level);
+
+    // C++: QRCodeEncoder_EncodeMode QRCodeEncoder_Params::mode
+    private static native int get_mode_0(long nativeObj);
+
+    // C++: void QRCodeEncoder_Params::mode
+    private static native void set_mode_0(long nativeObj, int mode);
+
     // C++: int QRCodeEncoder_Params::structure_number
     private static native int get_structure_number_0(long nativeObj);
 
     // C++: void QRCodeEncoder_Params::structure_number
     private static native void set_structure_number_0(long nativeObj, int structure_number);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

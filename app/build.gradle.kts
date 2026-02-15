@@ -1,4 +1,4 @@
-import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -6,21 +6,14 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.parcelize)
+    alias(libs.plugins.kotlinx.serialization)
 }
-
-
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) {
-        file.inputStream().use { load(it) }
-    }
-}
-
-val arcoreApiKey = localProperties.getProperty("ARCORE_API_KEY") ?: ""
 
 android {
     namespace = "com.hereliesaz.graffitixr"
     compileSdk = 36
+
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
         minSdk = 29
@@ -28,7 +21,27 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        resValue("string", "arcore_api_key", arcoreApiKey)
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+
+        // Native Bridge (C++)
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
 
     compileOptions {
@@ -36,58 +49,78 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "/META-INF/LICENSE*"
-            excludes += "/META-INF/NOTICE*"
-            excludes += "/META-INF/DEPENDENCIES"
-        }
-        jniLibs {
-            pickFirsts += "**/libc++_shared.so"
-            // FIX: OpenCV is included both via AAR (libs.opencv) and project module (:opencv)
-            // Pick first to resolve duplication
-            pickFirsts += "**/libopencv_java4.so"
+    // FIX: Replaced deprecated kotlinOptions with compilerOptions
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
     buildFeatures {
         compose = true
-        resValues = true
         buildConfig = true
     }
-    ndkVersion = "28.2.13676358"
-    buildToolsVersion = "36.1.0"
-    compileSdkMinor = 1
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:domain"))
-    implementation(project(":core:data"))
-    implementation(project(":core:design"))
+    // Project Modules
     implementation(project(":core:nativebridge"))
     implementation(project(":feature:ar"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:dashboard"))
+    implementation(project(":common"))
+    implementation(project(":design"))
 
-    implementation(project(":opencv"))
-    
-    // UI & Compose
+    // Android X / Core
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.appcompat)
+
+    // Compose
+    implementation(platform(libs.androidx.compose.material3))
     implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.navigation.compose)
-    implementation(libs.az.nav.rail)
     implementation(libs.androidx.compose.material.icons.extended)
-    
-    // Hilt
+    implementation(libs.androidx.constraintlayout)
+
+    // Navigation & Hilt
+    implementation(libs.navigation.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
 
+    // Logging
+    implementation(libs.timber)
+
+    // Camera & Vision
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(project(":opencv"))
+
+    // Third Party
+    implementation(libs.az.nav.rail)
+    implementation(libs.coil.compose)
+
+    // Testing
     testImplementation(libs.junit)
-    testImplementation(libs.mockk)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.kotlinx.serialization.json)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.material3))
+
+    // FIX: Using new alias to avoid 'test' collision
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
+
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -23,8 +23,11 @@ import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
@@ -56,6 +59,10 @@ class EditorViewModel @Inject constructor(
 
     private val _exportTrigger = MutableStateFlow(false)
     val exportTrigger: StateFlow<Boolean> = _exportTrigger.asStateFlow()
+
+    // Side effects (Toasts, Snackbars)
+    private val _message = MutableSharedFlow<String>()
+    val message: SharedFlow<String> = _message.asSharedFlow()
 
     private val undoStack = ArrayDeque<EditorUiState>()
     private val redoStack = ArrayDeque<EditorUiState>()
@@ -537,13 +544,13 @@ class EditorViewModel @Inject constructor(
             }
 
             // 1. Save Native World Map
-            // FIX: Transactional saving. If native map fails to save, abort to prevent metadata desync.
             val mapPath = currentState.mapPath
             if (mapPath != null) {
+                // LOCKING: SlamManager is now thread-safe, but we still handle the return value.
                 val success = slamManager.saveWorld(mapPath)
                 if (!success) {
                     Log.e("EditorViewModel", "Failed to save native world map. Aborting project save to prevent corruption.")
-                    // In a real scenario, emit a side effect here to show a Toast
+                    _message.emit("Failed to save 3D Map. Check disk space.")
                     return@launch
                 }
             }

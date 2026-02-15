@@ -1,12 +1,16 @@
 package com.hereliesaz.graffitixr
 
-import android.view.PixelCopy
+import android.content.ContentValues
 import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.provider.MediaStore
+import android.view.PixelCopy
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,57 +19,58 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import kotlin.math.min
-import com.hereliesaz.graffitixr.common.model.Layer
-import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.geometry.Offset
 import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import com.hereliesaz.graffitixr.design.theme.NavStrings
-import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingScreen
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.feature.ar.ui.TargetEvolutionScreen
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.*
 import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
-
-import androidx.compose.foundation.gestures.detectTapGestures
-import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
+import kotlin.math.min
+import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 
 /**
  * The main screen composable that orchestrates the entire application UI.
@@ -162,9 +167,9 @@ fun MainScreen(
         )
     }
 
+    var showInfoScreen by remember { mutableStateOf(false) }
     var showSliderDialog by remember { mutableStateOf<String?>(null) }
     var showColorBalanceDialog by remember { mutableStateOf(false) }
-    var showInfoScreen by remember { mutableStateOf(false) }
 
     val resetDialogs = remember { { showSliderDialog = null; showColorBalanceDialog = false } }
 
@@ -237,6 +242,8 @@ fun MainScreen(
                         state = targetCreationState,
                         onPhotoCaptured = { bitmap ->
                             arViewModel.setTempCapture(bitmap)
+                            // NEW: Go to teleological evolution instead of rectify?
+                            // For now, we keep original flow unless triggered manually
                             viewModel.setCaptureStep(CaptureStep.RECTIFY)
                         }
                     )
@@ -272,50 +279,6 @@ fun MainScreen(
         // --- 3. ONSCREEN OVERLAYS ---
         onscreen(alignment = Alignment.Center) {
             Box(modifier = Modifier.fillMaxSize()) {
-                if (uiState.isCapturingTarget) {
-                    com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
-                        uiState = arUiState,
-                        isRightHanded = editorUiState.isRightHanded,
-                        captureStep = uiState.captureStep,
-                        state = targetCreationState,
-                        onConfirm = {
-                            val bitmapToSave = arUiState.tempCaptureBitmap
-                            if (bitmapToSave != null) {
-                                scope.launch(Dispatchers.IO) {
-                                    val uri = saveBitmapToCache(context, bitmapToSave)
-                                    if (uri != null) {
-                                        withContext(Dispatchers.Main) {
-                                            arViewModel.onFrameCaptured(bitmapToSave, uri)
-                                            viewModel.onConfirmTargetCreation()
-                                        }
-                                    } else {
-                                        withContext(Dispatchers.Main) {
-                                            android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
-                                            viewModel.onConfirmTargetCreation()
-                                        }
-                                    }
-                                }
-                            } else {
-                                viewModel.onConfirmTargetCreation()
-                            }
-                        },
-                        onRetake = viewModel::onRetakeCapture,
-                        onCancel = viewModel::onCancelCaptureClicked,
-                        onUnwarpConfirm = { points: List<Offset> ->
-                            arUiState.tempCaptureBitmap?.let { src ->
-                                ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                                    arViewModel.setTempCapture(unwarped)
-                                    viewModel.setCaptureStep(CaptureStep.MASK)
-                                }
-                            }
-                        },
-                        onMaskConfirmed = { maskedBitmap: Bitmap ->
-                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
-                            arViewModel.setTempCapture(extracted)
-                            viewModel.setCaptureStep(CaptureStep.REVIEW)
-                        }
-                    )
-                }
 
                 AzNavHost(startDestination = "project_library") {
                     composable("editor") {
@@ -370,6 +333,99 @@ fun MainScreen(
                             )
                         }
                     }
+
+                    // --- NEW ROUTE: Target Evolution (Teleological Refinement) ---
+                    composable(
+                        route = "target_evolution/{imageUri}",
+                        arguments = listOf(navArgument("imageUri") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val uriString = backStackEntry.arguments?.getString("imageUri") ?: return@composable
+                        val uri = android.net.Uri.parse(uriString)
+
+                        val evolutionBitmap = remember(uri) {
+                            try {
+                                if (android.os.Build.VERSION.SDK_INT < 28) {
+                                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                                } else {
+                                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                                        decoder.isMutableRequired = true
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Timber.e(e, "Failed to load evolution bitmap")
+                                null
+                            }
+                        }
+
+                        if (evolutionBitmap != null) {
+                            TargetEvolutionScreen(
+                                image = evolutionBitmap,
+                                onCornersConfirmed = { corners ->
+                                    // 1. Unwarp utilizing refined corners
+                                    val unwarped = ImageProcessor.unwarpImage(evolutionBitmap, corners)
+                                    if (unwarped != null) {
+                                        arViewModel.setTempCapture(unwarped)
+                                        // 2. Go back to main flow (Mask or Review)
+                                        viewModel.setCaptureStep(CaptureStep.MASK)
+                                        localNavController.popBackStack()
+                                    }
+                                }
+                            )
+                        } else {
+                            Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                                Text("Failed to load image", color = Color.White)
+                            }
+                        }
+                    }
+                }
+
+                // Global Overlay: Target Creation Wizard (Standard Flow)
+                // This displays over the AzNavHost when active
+                if (uiState.isCapturingTarget) {
+                    com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
+                        uiState = arUiState,
+                        isRightHanded = editorUiState.isRightHanded,
+                        captureStep = uiState.captureStep,
+                        state = targetCreationState,
+                        onConfirm = {
+                            val bitmapToSave = arUiState.tempCaptureBitmap
+                            if (bitmapToSave != null) {
+                                scope.launch(Dispatchers.IO) {
+                                    val uri = saveBitmapToCache(context, bitmapToSave)
+                                    if (uri != null) {
+                                        withContext(Dispatchers.Main) {
+                                            arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                            viewModel.onConfirmTargetCreation()
+                                        }
+                                    } else {
+                                        withContext(Dispatchers.Main) {
+                                            android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
+                                            viewModel.onConfirmTargetCreation()
+                                        }
+                                    }
+                                }
+                            } else {
+                                viewModel.onConfirmTargetCreation()
+                            }
+                        },
+                        onRetake = viewModel::onRetakeCapture,
+                        onCancel = viewModel::onCancelCaptureClicked,
+                        onUnwarpConfirm = { points: List<Offset> ->
+                            arUiState.tempCaptureBitmap?.let { src ->
+                                ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                                    arViewModel.setTempCapture(unwarped)
+                                    viewModel.setCaptureStep(CaptureStep.MASK)
+                                }
+                            }
+                        },
+                        onMaskConfirmed = { maskedBitmap: Bitmap ->
+                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+                            arViewModel.setTempCapture(extracted)
+                            viewModel.setCaptureStep(CaptureStep.REVIEW)
+                        }
+                    )
                 }
 
                 TouchLockOverlay(uiState.isTouchLocked) {

@@ -352,7 +352,7 @@ public class SVMSGD extends StatModel {
     // C++:  void cv::ml::SVMSGD::setTermCriteria(TermCriteria val)
     private static native void setTermCriteria_0(long nativeObj, int val_type, int val_maxCount, double val_epsilon);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

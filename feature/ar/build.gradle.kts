@@ -44,10 +44,9 @@ dependencies {
 
     // Hilt
     implementation(libs.hilt.android)
-    implementation(libs.androidx.databinding.compiler)
     ksp(libs.hilt.compiler)
     // FIX: Added for hiltViewModel()
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.arcore.client)
     implementation(project(":opencv"))

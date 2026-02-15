@@ -35,7 +35,6 @@ timber = "5.0.1"
 uiGeometry = "1.10.3"
 accompanistPermissions = "0.37.3"
 datastore = "1.2.0"
-databindingCompiler = "9.0.0"
 
 [libraries]
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
@@ -53,6 +52,11 @@ androidx-compose-ui = { module = "androidx.compose.ui:ui", version = "1.10.3" }
 androidx-compose-ui-geometry = { group = "androidx.compose.ui", name = "ui-geometry", version.ref = "uiGeometry" }
 androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
 androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version = "1.10.3" }
+
+# FIX: Added missing test libraries with non-colliding aliases
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version = "1.10.3" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version = "1.10.3" }
+
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.17.0" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -84,7 +88,6 @@ play-services-base = { group = "com.google.android.gms", name = "play-services-b
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
-androidx-databinding-compiler = { group = "androidx.databinding", name = "databinding-compiler", version.ref = "databindingCompiler" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

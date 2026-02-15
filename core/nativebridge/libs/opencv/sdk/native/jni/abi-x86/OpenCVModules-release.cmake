@@ -105,6 +105,16 @@ set_target_properties(libprotobuf PROPERTIES
 list(APPEND _IMPORT_CHECK_TARGETS libprotobuf )
 list(APPEND _IMPORT_CHECK_FILES_FOR_libprotobuf "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/x86/liblibprotobuf.a" )
 
+# Import target "ipphal" for configuration "Release"
+set_property(TARGET ipphal APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+set_target_properties(ipphal PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+  IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/x86/libipphal.a"
+  )
+
+list(APPEND _IMPORT_CHECK_TARGETS ipphal )
+list(APPEND _IMPORT_CHECK_FILES_FOR_ipphal "${_IMPORT_PREFIX}/sdk/native/3rdparty/libs/x86/libipphal.a" )
+
 # Import target "ittnotify" for configuration "Release"
 set_property(TARGET ittnotify APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(ittnotify PROPERTIES

@@ -1,169 +1,172 @@
 package com.hereliesaz.graffitixr.nativebridge
 
+import android.content.res.AssetManager
 import android.graphics.Bitmap
+import android.media.Image
+import android.util.Log
+import android.view.Surface
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.concurrent.withLock
 
+/**
+ * Manages the native MobileGS engine.
+ * Handles JNI communication, thread safety, and lifecycle management.
+ */
 @Singleton
 class SlamManager @Inject constructor() {
 
     private var nativeHandle: Long = 0
+    private val isDestroyed = AtomicBoolean(true)
+    private val lock = ReentrantLock()
 
-    companion object {
-        init {
-            try {
-                System.loadLibrary("graffitixr")
-            } catch (e: UnsatisfiedLinkError) {
-                // Ignore in tests or if lib isn't found
-            } catch (e: SecurityException) {
-                // Ignore
+    /**
+     * Resurrects the native engine if it was destroyed or hasn't started.
+     */
+    fun ensureInitialized() {
+        lock.withLock {
+            if (isDestroyed.get() || nativeHandle == 0L) {
+                Log.d("SlamManager", "Initializing Native Engine...")
+                nativeHandle = create()
+                isDestroyed.set(false)
             }
         }
     }
 
-    /**
-     * Initializes the native engine.
-     * Safe to call multiple times; internally checks if already initialized.
-     */
+    // --- AR / SLAM Methods ---
+
     fun initialize() {
-        if (nativeHandle == 0L) {
-            nativeHandle = initNativeJni()
-        }
+        lock.withLock { if (!isDestroyed.get()) initializeJni(nativeHandle) }
+    }
+
+    fun resetGLState() {
+        lock.withLock { if (!isDestroyed.get()) resetGLStateJni(nativeHandle) }
+    }
+
+    fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
+        lock.withLock { if (!isDestroyed.get()) updateCameraJni(nativeHandle, viewMatrix, projectionMatrix) }
+    }
+
+    fun updateLight(intensity: Float) {
+        lock.withLock { if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity) }
     }
 
     /**
-     * CRITICAL: Resets the OpenGL state (Program, VBOs) without deleting the map data.
-     * Must be called when the GLSurfaceView context changes (e.g. switching screens).
+     * Feeds camera image data to the native SLAM engine.
+     * Assumes YUV_420_888 or similar format.
      */
-    fun resetGLState() {
-        if (nativeHandle != 0L) {
-            resetGLJni(nativeHandle)
+    fun feedDepthData(image: Image) {
+        lock.withLock {
+            if (!isDestroyed.get()) {
+                // Pass the Image object directly to JNI for buffer access
+                feedDepthDataJni(nativeHandle, image)
+            }
+        }
+    }
+
+    fun updateMesh(vertices: FloatArray) {
+        lock.withLock { if (!isDestroyed.get()) updateMeshJni(nativeHandle, vertices) }
+    }
+
+    fun alignMap(transform: FloatArray) {
+        lock.withLock { if (!isDestroyed.get()) alignMapJni(nativeHandle, transform) }
+    }
+
+    fun saveKeyframe() {
+        lock.withLock { if (!isDestroyed.get()) saveKeyframeJni(nativeHandle) }
+    }
+
+    fun setVisualizationMode(mode: Int) {
+        lock.withLock { if (!isDestroyed.get()) setVisualizationModeJni(nativeHandle, mode) }
+    }
+
+    fun onSurfaceChanged(width: Int, height: Int) {
+        lock.withLock { if (!isDestroyed.get()) onSurfaceChangedJni(nativeHandle, width, height) }
+    }
+
+    fun draw() {
+        lock.withLock { if (!isDestroyed.get()) drawJni(nativeHandle) }
+    }
+
+    // --- Vulkan Integration ---
+
+    fun initVulkan(surface: Surface, assetManager: AssetManager) {
+        lock.withLock {
+            if (!isDestroyed.get()) {
+                initVulkanJni(nativeHandle, surface, assetManager)
+            }
+        }
+    }
+
+    fun resizeVulkan(width: Int, height: Int) {
+        lock.withLock {
+            if (!isDestroyed.get()) {
+                resizeVulkanJni(nativeHandle, width, height)
+            }
+        }
+    }
+
+    fun destroyVulkan() {
+        lock.withLock {
+            if (!isDestroyed.get()) {
+                destroyVulkanJni(nativeHandle)
+            }
+        }
+    }
+
+    // --- Storage & Utils ---
+
+    fun loadWorld(path: String): Boolean {
+        return lock.withLock {
+            if (!isDestroyed.get()) loadWorldJni(nativeHandle, path) else false
+        }
+    }
+
+    fun saveWorld(path: String): Boolean {
+        return lock.withLock {
+            if (!isDestroyed.get()) saveWorldJni(nativeHandle, path) else false
+        }
+    }
+
+    fun detectEdges(bitmap: Bitmap): Bitmap? {
+        return lock.withLock {
+            if (!isDestroyed.get()) detectEdgesJni(nativeHandle, bitmap) else null
         }
     }
 
     fun destroy() {
-        if (nativeHandle != 0L) {
-            destroyNativeJni(nativeHandle)
-            nativeHandle = 0
-        }
-    }
-
-    fun onSurfaceChanged(width: Int, height: Int) {
-        if (nativeHandle != 0L) onSurfaceChangedJni(nativeHandle, width, height)
-    }
-
-    fun updateCamera(viewMtx: FloatArray, projMtx: FloatArray) {
-        if (nativeHandle != 0L) updateCameraJni(nativeHandle, viewMtx, projMtx)
-    }
-
-    fun updateLight(intensity: Float, r: Float, g: Float, b: Float) {
-        if (nativeHandle != 0L) updateLightJni(nativeHandle, intensity, r, g, b)
-    }
-
-    fun setVisualizationMode(mode: Int) {
-        if (nativeHandle != 0L) setVisualizationModeJni(nativeHandle, mode)
-    }
-
-    fun feedDepthData(depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float) {
-        if (nativeHandle != 0L) feedDepthDataJni(nativeHandle, depthBuffer, colorBuffer, width, height, depthStride, colorStride, poseMtx, fov)
-    }
-
-    fun draw() {
-        if (nativeHandle != 0L) drawJni(nativeHandle)
-    }
-
-    fun saveWorld(path: String): Boolean {
-        return if (nativeHandle != 0L) saveWorld(nativeHandle, path) else false
-    }
-
-    fun loadWorld(path: String): Boolean {
-        return if (nativeHandle != 0L) loadWorld(nativeHandle, path) else false
-    }
-
-    fun importModel3D(path: String): Boolean {
-        return if (nativeHandle != 0L) importModel3DJni(nativeHandle, path) else false
-    }
-
-    fun clearMap() {
-        if (nativeHandle != 0L) clearMapJni(nativeHandle)
-    }
-
-    fun alignMap(transformMtx: FloatArray) {
-        if (nativeHandle != 0L) alignMapJni(nativeHandle, transformMtx)
-    }
-
-    fun trainStep() {
-        if (nativeHandle != 0L) trainStepJni(nativeHandle)
-    }
-
-    fun getPointCount(): Int {
-        return if (nativeHandle != 0L) getPointCountJni(nativeHandle) else 0
-    }
-
-    // MISSING FUNCTION RESTORED
-    fun saveKeyframe(image: Bitmap, pose: FloatArray, path: String): Boolean {
-        return if (nativeHandle != 0L) saveKeyframeJni(nativeHandle, image, pose, path) else false
-    }
-
-    fun updateMesh(vertices: FloatArray) {
-        if (nativeHandle != 0L) updateMeshJni(nativeHandle, vertices)
-    }
-
-    fun initVulkan(surface: android.view.Surface) {
-        if (nativeHandle != 0L) initVulkanJni(nativeHandle, surface)
-    }
-
-    fun resizeVulkan(width: Int, height: Int) {
-        if (nativeHandle != 0L) resizeVulkanJni(nativeHandle, width, height)
-    }
-
-    // NEW: Property to satisfy UI binding
-    val mappingQuality: String
-        get() {
-            val count = getPointCount()
-            return when {
-                count < 100 -> "POOR"
-                count < 1000 -> "FAIR"
-                count < 5000 -> "GOOD"
-                else -> "EXCELLENT"
+        lock.withLock {
+            if (!isDestroyed.getAndSet(true)) {
+                Log.d("SlamManager", "Destroying Native Engine...")
+                if (nativeHandle != 0L) {
+                    destroyJni(nativeHandle)
+                    nativeHandle = 0
+                }
             }
         }
-
-    // --- OpenCV Utils ---
-    fun detectEdges(bitmap: Bitmap): Bitmap? {
-        val result = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-        detectEdgesJni(bitmap, result)
-        return result
     }
 
-    // --- Native Interface ---
-    private external fun initNativeJni(): Long
-    private external fun resetGLJni(handle: Long)
-    private external fun destroyNativeJni(handle: Long)
-    private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
-    private external fun updateCameraJni(handle: Long, viewMtx: FloatArray, projMtx: FloatArray)
-    private external fun updateLightJni(handle: Long, intensity: Float, r: Float, g: Float, b: Float)
-    private external fun setVisualizationModeJni(handle: Long, mode: Int)
-    private external fun feedDepthDataJni(handle: Long, depthBuffer: ByteBuffer, colorBuffer: ByteBuffer?, width: Int, height: Int, depthStride: Int, colorStride: Int, poseMtx: FloatArray, fov: Float)
-    private external fun drawJni(handle: Long)
-    private external fun saveWorld(handle: Long, path: String): Boolean
-    private external fun loadWorld(handle: Long, path: String): Boolean
-    private external fun importModel3DJni(handle: Long, path: String): Boolean
-    private external fun clearMapJni(handle: Long)
-    private external fun pruneMapJni(handle: Long, ageThreshold: Int)
-    private external fun getPointCountJni(handle: Long): Int
-    private external fun alignMapJni(handle: Long, transformMtx: FloatArray)
-    // MISSING JNI DEF RESTORED
-    private external fun saveKeyframeJni(handle: Long, image: Bitmap, pose: FloatArray, path: String): Boolean
-    private external fun setTargetDescriptorsJni(handle: Long, descriptorBytes: ByteArray, rows: Int, cols: Int, type: Int)
-    private external fun trainStepJni(handle: Long)
+    // --- Native Signatures ---
+    private external fun create(): Long
+    private external fun destroyJni(handle: Long)
+    private external fun initializeJni(handle: Long)
+    private external fun resetGLStateJni(handle: Long)
+    private external fun updateCameraJni(handle: Long, view: FloatArray, proj: FloatArray)
+    private external fun updateLightJni(handle: Long, intensity: Float)
+    private external fun feedDepthDataJni(handle: Long, image: Image)
     private external fun updateMeshJni(handle: Long, vertices: FloatArray)
-    private external fun initVulkanJni(handle: Long, surface: android.view.Surface)
+    private external fun alignMapJni(handle: Long, transform: FloatArray)
+    private external fun saveKeyframeJni(handle: Long)
+    private external fun setVisualizationModeJni(handle: Long, mode: Int)
+    private external fun onSurfaceChangedJni(handle: Long, width: Int, height: Int)
+    private external fun drawJni(handle: Long)
+    private external fun loadWorldJni(handle: Long, path: String): Boolean
+    private external fun saveWorldJni(handle: Long, path: String): Boolean
+    private external fun detectEdgesJni(handle: Long, bitmap: Bitmap): Bitmap?
+    private external fun initVulkanJni(handle: Long, surface: Surface, assetManager: AssetManager)
     private external fun resizeVulkanJni(handle: Long, width: Int, height: Int)
-
-    // OpenCV
-    private external fun extractFeaturesFromBitmap(bitmap: Bitmap): ByteArray?
-    private external fun extractFeaturesMeta(bitmap: Bitmap): IntArray?
-    private external fun detectEdgesJni(srcBitmap: Bitmap, dstBitmap: Bitmap)
+    private external fun destroyVulkanJni(handle: Long)
 }

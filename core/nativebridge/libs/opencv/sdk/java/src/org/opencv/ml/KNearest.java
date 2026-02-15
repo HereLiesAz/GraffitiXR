@@ -303,7 +303,7 @@ public class KNearest extends StatModel {
     // C++: static Ptr_KNearest cv::ml::KNearest::load(String filepath)
     private static native long load_0(String filepath);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

@@ -3,8 +3,12 @@
 //
 package org.opencv.objdetect;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
 import org.opencv.objdetect.FaceRecognizerSF;
+import org.opencv.utils.Converters;
 
 // C++: class FaceRecognizerSF
 /**
@@ -15,7 +19,10 @@ import org.opencv.objdetect.FaceRecognizerSF;
 public class FaceRecognizerSF {
 
     protected final long nativeObj;
-    protected FaceRecognizerSF(long addr) { nativeObj = addr; }
+    protected FaceRecognizerSF(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -33,9 +40,9 @@ public class FaceRecognizerSF {
     //
 
     /**
-     * Aligning image to put face on the standard position
+     * Aligns detected face with the source input image and crops it
      * @param src_img input image
-     * @param face_box the detection result used for indicate face in input image
+     * @param face_box the detected face result from the input image
      * @param aligned_img output aligned image
      */
     public void alignCrop(Mat src_img, Mat face_box, Mat aligned_img) {
@@ -48,7 +55,7 @@ public class FaceRecognizerSF {
     //
 
     /**
-     * Extracting face feature from aligned image
+     * Extracts face feature from aligned image
      * @param aligned_img input aligned image
      * @param face_feature output face feature
      */
@@ -62,10 +69,10 @@ public class FaceRecognizerSF {
     //
 
     /**
-     * Calculating the distance between two face features
+     * Calculates the distance between two face features
      * @param face_feature1 the first input feature
      * @param face_feature2 the second input feature of the same size and the same type as face_feature1
-     * @param dis_type defining the similarity with optional values "FR_OSINE" or "FR_NORM_L2"
+     * @param dis_type defines how to calculate the distance between two face features with optional values "FR_COSINE" or "FR_NORM_L2"
      * @return automatically generated
      */
     public double match(Mat face_feature1, Mat face_feature2, int dis_type) {
@@ -73,7 +80,7 @@ public class FaceRecognizerSF {
     }
 
     /**
-     * Calculating the distance between two face features
+     * Calculates the distance between two face features
      * @param face_feature1 the first input feature
      * @param face_feature2 the second input feature of the same size and the same type as face_feature1
      * @return automatically generated
@@ -121,6 +128,56 @@ public class FaceRecognizerSF {
     }
 
 
+    //
+    // C++: static Ptr_FaceRecognizerSF cv::FaceRecognizerSF::create(String framework, vector_uchar bufferModel, vector_uchar bufferConfig, int backend_id = 0, int target_id = 0)
+    //
+
+    /**
+     * Creates an instance of this class from a buffer containing the model weights and configuration.
+     * @param framework Name of the framework (ONNX, etc.)
+     * @param bufferModel A buffer containing the binary model weights.
+     * @param bufferConfig A buffer containing the network configuration.
+     * @param backend_id The id of the backend.
+     * @param target_id The id of the target device.
+     *
+     * @return A pointer to the created instance of FaceRecognizerSF.
+     */
+    public static FaceRecognizerSF create(String framework, MatOfByte bufferModel, MatOfByte bufferConfig, int backend_id, int target_id) {
+        Mat bufferModel_mat = bufferModel;
+        Mat bufferConfig_mat = bufferConfig;
+        return FaceRecognizerSF.__fromPtr__(create_3(framework, bufferModel_mat.nativeObj, bufferConfig_mat.nativeObj, backend_id, target_id));
+    }
+
+    /**
+     * Creates an instance of this class from a buffer containing the model weights and configuration.
+     * @param framework Name of the framework (ONNX, etc.)
+     * @param bufferModel A buffer containing the binary model weights.
+     * @param bufferConfig A buffer containing the network configuration.
+     * @param backend_id The id of the backend.
+     *
+     * @return A pointer to the created instance of FaceRecognizerSF.
+     */
+    public static FaceRecognizerSF create(String framework, MatOfByte bufferModel, MatOfByte bufferConfig, int backend_id) {
+        Mat bufferModel_mat = bufferModel;
+        Mat bufferConfig_mat = bufferConfig;
+        return FaceRecognizerSF.__fromPtr__(create_4(framework, bufferModel_mat.nativeObj, bufferConfig_mat.nativeObj, backend_id));
+    }
+
+    /**
+     * Creates an instance of this class from a buffer containing the model weights and configuration.
+     * @param framework Name of the framework (ONNX, etc.)
+     * @param bufferModel A buffer containing the binary model weights.
+     * @param bufferConfig A buffer containing the network configuration.
+     *
+     * @return A pointer to the created instance of FaceRecognizerSF.
+     */
+    public static FaceRecognizerSF create(String framework, MatOfByte bufferModel, MatOfByte bufferConfig) {
+        Mat bufferModel_mat = bufferModel;
+        Mat bufferConfig_mat = bufferConfig;
+        return FaceRecognizerSF.__fromPtr__(create_5(framework, bufferModel_mat.nativeObj, bufferConfig_mat.nativeObj));
+    }
+
+
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
@@ -143,7 +200,12 @@ public class FaceRecognizerSF {
     private static native long create_1(String model, String config, int backend_id);
     private static native long create_2(String model, String config);
 
-    // native support for java finalize()
+    // C++: static Ptr_FaceRecognizerSF cv::FaceRecognizerSF::create(String framework, vector_uchar bufferModel, vector_uchar bufferConfig, int backend_id = 0, int target_id = 0)
+    private static native long create_3(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, int backend_id, int target_id);
+    private static native long create_4(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj, int backend_id);
+    private static native long create_5(String framework, long bufferModel_mat_nativeObj, long bufferConfig_mat_nativeObj);
+
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

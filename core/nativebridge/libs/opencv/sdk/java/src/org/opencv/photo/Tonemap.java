@@ -66,7 +66,7 @@ public class Tonemap extends Algorithm {
     // C++:  void cv::Tonemap::setGamma(float gamma)
     private static native void setGamma_0(long nativeObj, float gamma);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

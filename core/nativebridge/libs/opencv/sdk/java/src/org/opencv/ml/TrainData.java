@@ -23,7 +23,10 @@ import org.opencv.utils.Converters;
 public class TrainData {
 
     protected final long nativeObj;
-    protected TrainData(long addr) { nativeObj = addr; }
+    protected TrainData(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -769,7 +772,7 @@ public class TrainData {
     private static native long create_3(long samples_nativeObj, int layout, long responses_nativeObj, long varIdx_nativeObj);
     private static native long create_4(long samples_nativeObj, int layout, long responses_nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

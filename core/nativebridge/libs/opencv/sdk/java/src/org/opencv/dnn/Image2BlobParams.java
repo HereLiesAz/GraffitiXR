@@ -28,7 +28,10 @@ import org.opencv.utils.Converters;
 public class Image2BlobParams {
 
     protected final long nativeObj;
-    protected Image2BlobParams(long addr) { nativeObj = addr; }
+    protected Image2BlobParams(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -45,15 +48,19 @@ public class Image2BlobParams {
 
 
     //
-    // C++:   cv::dnn::Image2BlobParams::Image2BlobParams(Scalar scalefactor, Size size = Size(), Scalar mean = Scalar(), bool swapRB = false, int ddepth = CV_32F, DataLayout datalayout = DNN_LAYOUT_NCHW, ImagePaddingMode mode = DNN_PMODE_NULL, Scalar borderValue = 0.0)
+    // C++:   cv::dnn::Image2BlobParams::Image2BlobParams(Scalar scalefactor, Size size = Size(), Scalar mean = Scalar(), bool swapRB = false, int ddepth = CV_32F, dnn_DataLayout datalayout = DNN_LAYOUT_NCHW, ImagePaddingMode mode = dnn::DNN_PMODE_NULL, Scalar borderValue = 0.0)
     //
 
-    public Image2BlobParams(Scalar scalefactor, Size size, Scalar mean, boolean swapRB, int ddepth, Scalar borderValue) {
-        nativeObj = Image2BlobParams_1(scalefactor.val[0], scalefactor.val[1], scalefactor.val[2], scalefactor.val[3], size.width, size.height, mean.val[0], mean.val[1], mean.val[2], mean.val[3], swapRB, ddepth, borderValue.val[0], borderValue.val[1], borderValue.val[2], borderValue.val[3]);
+    public Image2BlobParams(Scalar scalefactor, Size size, Scalar mean, boolean swapRB, int ddepth, int datalayout, Scalar borderValue) {
+        nativeObj = Image2BlobParams_1(scalefactor.val[0], scalefactor.val[1], scalefactor.val[2], scalefactor.val[3], size.width, size.height, mean.val[0], mean.val[1], mean.val[2], mean.val[3], swapRB, ddepth, datalayout, borderValue.val[0], borderValue.val[1], borderValue.val[2], borderValue.val[3]);
+    }
+
+    public Image2BlobParams(Scalar scalefactor, Size size, Scalar mean, boolean swapRB, int ddepth, int datalayout) {
+        nativeObj = Image2BlobParams_2(scalefactor.val[0], scalefactor.val[1], scalefactor.val[2], scalefactor.val[3], size.width, size.height, mean.val[0], mean.val[1], mean.val[2], mean.val[3], swapRB, ddepth, datalayout);
     }
 
     public Image2BlobParams(Scalar scalefactor, Size size, Scalar mean, boolean swapRB, int ddepth) {
-        nativeObj = Image2BlobParams_2(scalefactor.val[0], scalefactor.val[1], scalefactor.val[2], scalefactor.val[3], size.width, size.height, mean.val[0], mean.val[1], mean.val[2], mean.val[3], swapRB, ddepth);
+        nativeObj = Image2BlobParams_4(scalefactor.val[0], scalefactor.val[1], scalefactor.val[2], scalefactor.val[3], size.width, size.height, mean.val[0], mean.val[1], mean.val[2], mean.val[3], swapRB, ddepth);
     }
 
     public Image2BlobParams(Scalar scalefactor, Size size, Scalar mean, boolean swapRB) {
@@ -196,31 +203,39 @@ public class Image2BlobParams {
 
 
     //
-    // C++: DataLayout Image2BlobParams::datalayout
+    // C++: dnn_DataLayout Image2BlobParams::datalayout
     //
 
-    // Return type 'DataLayout' is not supported, skipping the function
+    public int get_datalayout() {
+        return get_datalayout_0(nativeObj);
+    }
 
 
     //
     // C++: void Image2BlobParams::datalayout
     //
 
-    // Unknown type 'DataLayout' (I), skipping the function
+    public void set_datalayout(int datalayout) {
+        set_datalayout_0(nativeObj, datalayout);
+    }
 
 
     //
-    // C++: ImagePaddingMode Image2BlobParams::paddingmode
+    // C++: dnn_ImagePaddingMode Image2BlobParams::paddingmode
     //
 
-    // Return type 'ImagePaddingMode' is not supported, skipping the function
+    public int get_paddingmode() {
+        return get_paddingmode_0(nativeObj);
+    }
 
 
     //
     // C++: void Image2BlobParams::paddingmode
     //
 
-    // Unknown type 'ImagePaddingMode' (I), skipping the function
+    public void set_paddingmode(int paddingmode) {
+        set_paddingmode_0(nativeObj, paddingmode);
+    }
 
 
     //
@@ -251,9 +266,10 @@ public class Image2BlobParams {
     // C++:   cv::dnn::Image2BlobParams::Image2BlobParams()
     private static native long Image2BlobParams_0();
 
-    // C++:   cv::dnn::Image2BlobParams::Image2BlobParams(Scalar scalefactor, Size size = Size(), Scalar mean = Scalar(), bool swapRB = false, int ddepth = CV_32F, DataLayout datalayout = DNN_LAYOUT_NCHW, ImagePaddingMode mode = DNN_PMODE_NULL, Scalar borderValue = 0.0)
-    private static native long Image2BlobParams_1(double scalefactor_val0, double scalefactor_val1, double scalefactor_val2, double scalefactor_val3, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB, int ddepth, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
-    private static native long Image2BlobParams_2(double scalefactor_val0, double scalefactor_val1, double scalefactor_val2, double scalefactor_val3, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB, int ddepth);
+    // C++:   cv::dnn::Image2BlobParams::Image2BlobParams(Scalar scalefactor, Size size = Size(), Scalar mean = Scalar(), bool swapRB = false, int ddepth = CV_32F, dnn_DataLayout datalayout = DNN_LAYOUT_NCHW, ImagePaddingMode mode = dnn::DNN_PMODE_NULL, Scalar borderValue = 0.0)
+    private static native long Image2BlobParams_1(double scalefactor_val0, double scalefactor_val1, double scalefactor_val2, double scalefactor_val3, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB, int ddepth, int datalayout, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
+    private static native long Image2BlobParams_2(double scalefactor_val0, double scalefactor_val1, double scalefactor_val2, double scalefactor_val3, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB, int ddepth, int datalayout);
+    private static native long Image2BlobParams_4(double scalefactor_val0, double scalefactor_val1, double scalefactor_val2, double scalefactor_val3, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB, int ddepth);
     private static native long Image2BlobParams_5(double scalefactor_val0, double scalefactor_val1, double scalefactor_val2, double scalefactor_val3, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB);
     private static native long Image2BlobParams_6(double scalefactor_val0, double scalefactor_val1, double scalefactor_val2, double scalefactor_val3, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3);
     private static native long Image2BlobParams_7(double scalefactor_val0, double scalefactor_val1, double scalefactor_val2, double scalefactor_val3, double size_width, double size_height);
@@ -295,13 +311,25 @@ public class Image2BlobParams {
     // C++: void Image2BlobParams::ddepth
     private static native void set_ddepth_0(long nativeObj, int ddepth);
 
+    // C++: dnn_DataLayout Image2BlobParams::datalayout
+    private static native int get_datalayout_0(long nativeObj);
+
+    // C++: void Image2BlobParams::datalayout
+    private static native void set_datalayout_0(long nativeObj, int datalayout);
+
+    // C++: dnn_ImagePaddingMode Image2BlobParams::paddingmode
+    private static native int get_paddingmode_0(long nativeObj);
+
+    // C++: void Image2BlobParams::paddingmode
+    private static native void set_paddingmode_0(long nativeObj, int paddingmode);
+
     // C++: Scalar Image2BlobParams::borderValue
     private static native double[] get_borderValue_0(long nativeObj);
 
     // C++: void Image2BlobParams::borderValue
     private static native void set_borderValue_0(long nativeObj, double borderValue_val0, double borderValue_val1, double borderValue_val2, double borderValue_val3);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

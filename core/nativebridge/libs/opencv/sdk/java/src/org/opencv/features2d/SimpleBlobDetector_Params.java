@@ -10,7 +10,10 @@ package org.opencv.features2d;
 public class SimpleBlobDetector_Params {
 
     protected final long nativeObj;
-    protected SimpleBlobDetector_Params(long addr) { nativeObj = addr; }
+    protected SimpleBlobDetector_Params(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -138,14 +141,18 @@ public class SimpleBlobDetector_Params {
     // C++: uchar SimpleBlobDetector_Params::blobColor
     //
 
-    // Return type 'uchar' is not supported, skipping the function
+    public byte get_blobColor() {
+        return get_blobColor_0(nativeObj);
+    }
 
 
     //
     // C++: void SimpleBlobDetector_Params::blobColor
     //
 
-    // Unknown type 'uchar' (I), skipping the function
+    public void set_blobColor(byte blobColor) {
+        set_blobColor_0(nativeObj, blobColor);
+    }
 
 
     //
@@ -428,6 +435,12 @@ public class SimpleBlobDetector_Params {
     // C++: void SimpleBlobDetector_Params::filterByColor
     private static native void set_filterByColor_0(long nativeObj, boolean filterByColor);
 
+    // C++: uchar SimpleBlobDetector_Params::blobColor
+    private static native byte get_blobColor_0(long nativeObj);
+
+    // C++: void SimpleBlobDetector_Params::blobColor
+    private static native void set_blobColor_0(long nativeObj, byte blobColor);
+
     // C++: bool SimpleBlobDetector_Params::filterByArea
     private static native boolean get_filterByArea_0(long nativeObj);
 
@@ -506,7 +519,7 @@ public class SimpleBlobDetector_Params {
     // C++: void SimpleBlobDetector_Params::collectContours
     private static native void set_collectContours_0(long nativeObj, boolean collectContours);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

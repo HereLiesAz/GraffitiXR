@@ -126,7 +126,7 @@ public class NormalBayesClassifier extends StatModel {
     private static native long load_0(String filepath, String nodeName);
     private static native long load_1(String filepath);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

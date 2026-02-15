@@ -41,7 +41,7 @@ public class ArucoDetector extends Algorithm {
      * @param refineParams marker refine detection parameters
      */
     public ArucoDetector(Dictionary dictionary, DetectorParameters detectorParams, RefineParameters refineParams) {
-        super(ArucoDetector_0(dictionary.nativeObj, detectorParams.nativeObj, refineParams.nativeObj));
+        super(ArucoDetector_0(dictionary.getNativeObjAddr(), detectorParams.getNativeObjAddr(), refineParams.getNativeObjAddr()));
     }
 
     /**
@@ -51,7 +51,7 @@ public class ArucoDetector extends Algorithm {
      * @param detectorParams marker detection parameters
      */
     public ArucoDetector(Dictionary dictionary, DetectorParameters detectorParams) {
-        super(ArucoDetector_1(dictionary.nativeObj, detectorParams.nativeObj));
+        super(ArucoDetector_1(dictionary.getNativeObjAddr(), detectorParams.getNativeObjAddr()));
     }
 
     /**
@@ -60,7 +60,7 @@ public class ArucoDetector extends Algorithm {
      * @param dictionary indicates the type of markers that will be searched
      */
     public ArucoDetector(Dictionary dictionary) {
-        super(ArucoDetector_2(dictionary.nativeObj));
+        super(ArucoDetector_2(dictionary.getNativeObjAddr()));
     }
 
     /**
@@ -70,6 +70,13 @@ public class ArucoDetector extends Algorithm {
     public ArucoDetector() {
         super(ArucoDetector_3());
     }
+
+
+    //
+    // C++:   cv::aruco::ArucoDetector::ArucoDetector(vector_Dictionary dictionaries, DetectorParameters detectorParams = DetectorParameters(), RefineParameters refineParams = RefineParameters())
+    //
+
+    // Unknown type 'vector_Dictionary' (I), skipping the function
 
 
     //
@@ -89,7 +96,7 @@ public class ArucoDetector extends Algorithm {
      * @param rejectedImgPoints contains the imgPoints of those squares whose inner code has not a
      * correct codification. Useful for debugging purposes.
      *
-     * Performs marker detection in the input image. Only markers included in the specific dictionary
+     * Performs marker detection in the input image. Only markers included in the first specified dictionary
      * are searched. For each detected marker, it returns the 2D position of its corner in the image
      * and its corresponding identifier.
      * Note that this function does not perform pose estimation.
@@ -119,7 +126,7 @@ public class ArucoDetector extends Algorithm {
      * The identifiers have the same order than the markers in the imgPoints array.
      * correct codification. Useful for debugging purposes.
      *
-     * Performs marker detection in the input image. Only markers included in the specific dictionary
+     * Performs marker detection in the input image. Only markers included in the first specified dictionary
      * are searched. For each detected marker, it returns the 2D position of its corner in the image
      * and its corresponding identifier.
      * Note that this function does not perform pose estimation.
@@ -130,6 +137,77 @@ public class ArucoDetector extends Algorithm {
     public void detectMarkers(Mat image, List<Mat> corners, Mat ids) {
         Mat corners_mat = new Mat();
         detectMarkers_1(nativeObj, image.nativeObj, corners_mat.nativeObj, ids.nativeObj);
+        Converters.Mat_to_vector_Mat(corners_mat, corners);
+        corners_mat.release();
+    }
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::detectMarkersWithConfidence(Mat image, vector_Mat& corners, Mat& ids, Mat& markersConfidence, vector_Mat& rejectedImgPoints = vector_Mat())
+    //
+
+    /**
+     * Marker detection with confidence computation
+     *
+     * @param image input image
+     * @param corners vector of detected marker corners. For each marker, its four corners
+     * are provided, (e.g std::vector&lt;std::vector&lt;cv::Point2f&gt; &gt; ). For N detected markers,
+     * the dimensions of this array is Nx4. The order of the corners is clockwise.
+     * @param ids vector of identifiers of the detected markers. The identifier is of type int
+     * (e.g. std::vector&lt;int&gt;). For N detected markers, the size of ids is also N.
+     * The identifiers have the same order than the markers in the imgPoints array.
+     * @param markersConfidence contains the normalized confidence [0;1] of the markers' detection,
+     * defined as 1 minus the normalized uncertainty (percentage of incorrect pixel detections),
+     * with 1 describing a pixel perfect detection. The confidence values are of type float
+     * (e.g. std::vector&lt;float&gt;)
+     * @param rejectedImgPoints contains the imgPoints of those squares whose inner code has not a
+     * correct codification. Useful for debugging purposes.
+     *
+     * Performs marker detection in the input image. Only markers included in the first specified dictionary
+     * are searched. For each detected marker, it returns the 2D position of its corner in the image
+     * and its corresponding identifier.
+     * Note that this function does not perform pose estimation.
+     * <b>Note:</b> The function does not correct lens distortion or takes it into account. It's recommended to undistort
+     * input image with corresponding camera model, if camera parameters are known
+     * SEE: undistort, estimatePoseSingleMarkers,  estimatePoseBoard
+     */
+    public void detectMarkersWithConfidence(Mat image, List<Mat> corners, Mat ids, Mat markersConfidence, List<Mat> rejectedImgPoints) {
+        Mat corners_mat = new Mat();
+        Mat rejectedImgPoints_mat = new Mat();
+        detectMarkersWithConfidence_0(nativeObj, image.nativeObj, corners_mat.nativeObj, ids.nativeObj, markersConfidence.nativeObj, rejectedImgPoints_mat.nativeObj);
+        Converters.Mat_to_vector_Mat(corners_mat, corners);
+        corners_mat.release();
+        Converters.Mat_to_vector_Mat(rejectedImgPoints_mat, rejectedImgPoints);
+        rejectedImgPoints_mat.release();
+    }
+
+    /**
+     * Marker detection with confidence computation
+     *
+     * @param image input image
+     * @param corners vector of detected marker corners. For each marker, its four corners
+     * are provided, (e.g std::vector&lt;std::vector&lt;cv::Point2f&gt; &gt; ). For N detected markers,
+     * the dimensions of this array is Nx4. The order of the corners is clockwise.
+     * @param ids vector of identifiers of the detected markers. The identifier is of type int
+     * (e.g. std::vector&lt;int&gt;). For N detected markers, the size of ids is also N.
+     * The identifiers have the same order than the markers in the imgPoints array.
+     * @param markersConfidence contains the normalized confidence [0;1] of the markers' detection,
+     * defined as 1 minus the normalized uncertainty (percentage of incorrect pixel detections),
+     * with 1 describing a pixel perfect detection. The confidence values are of type float
+     * (e.g. std::vector&lt;float&gt;)
+     * correct codification. Useful for debugging purposes.
+     *
+     * Performs marker detection in the input image. Only markers included in the first specified dictionary
+     * are searched. For each detected marker, it returns the 2D position of its corner in the image
+     * and its corresponding identifier.
+     * Note that this function does not perform pose estimation.
+     * <b>Note:</b> The function does not correct lens distortion or takes it into account. It's recommended to undistort
+     * input image with corresponding camera model, if camera parameters are known
+     * SEE: undistort, estimatePoseSingleMarkers,  estimatePoseBoard
+     */
+    public void detectMarkersWithConfidence(Mat image, List<Mat> corners, Mat ids, Mat markersConfidence) {
+        Mat corners_mat = new Mat();
+        detectMarkersWithConfidence_1(nativeObj, image.nativeObj, corners_mat.nativeObj, ids.nativeObj, markersConfidence.nativeObj);
         Converters.Mat_to_vector_Mat(corners_mat, corners);
         corners_mat.release();
     }
@@ -161,11 +239,13 @@ public class ArucoDetector extends Algorithm {
      * If camera parameters and distortion coefficients are provided, missing markers are reprojected
      * using projectPoint function. If not, missing marker projections are interpolated using global
      * homography, and all the marker corners in the board must have the same Z coordinate.
+     * <b>Note:</b> This function assumes that the board only contains markers from one dictionary, so only the
+     * first configured dictionary is used. It has to match the dictionary of the board to work properly.
      */
     public void refineDetectedMarkers(Mat image, Board board, List<Mat> detectedCorners, Mat detectedIds, List<Mat> rejectedCorners, Mat cameraMatrix, Mat distCoeffs, Mat recoveredIdxs) {
         Mat detectedCorners_mat = Converters.vector_Mat_to_Mat(detectedCorners);
         Mat rejectedCorners_mat = Converters.vector_Mat_to_Mat(rejectedCorners);
-        refineDetectedMarkers_0(nativeObj, image.nativeObj, board.nativeObj, detectedCorners_mat.nativeObj, detectedIds.nativeObj, rejectedCorners_mat.nativeObj, cameraMatrix.nativeObj, distCoeffs.nativeObj, recoveredIdxs.nativeObj);
+        refineDetectedMarkers_0(nativeObj, image.nativeObj, board.getNativeObjAddr(), detectedCorners_mat.nativeObj, detectedIds.nativeObj, rejectedCorners_mat.nativeObj, cameraMatrix.nativeObj, distCoeffs.nativeObj, recoveredIdxs.nativeObj);
         Converters.Mat_to_vector_Mat(detectedCorners_mat, detectedCorners);
         detectedCorners_mat.release();
         Converters.Mat_to_vector_Mat(rejectedCorners_mat, rejectedCorners);
@@ -193,11 +273,13 @@ public class ArucoDetector extends Algorithm {
      * If camera parameters and distortion coefficients are provided, missing markers are reprojected
      * using projectPoint function. If not, missing marker projections are interpolated using global
      * homography, and all the marker corners in the board must have the same Z coordinate.
+     * <b>Note:</b> This function assumes that the board only contains markers from one dictionary, so only the
+     * first configured dictionary is used. It has to match the dictionary of the board to work properly.
      */
     public void refineDetectedMarkers(Mat image, Board board, List<Mat> detectedCorners, Mat detectedIds, List<Mat> rejectedCorners, Mat cameraMatrix, Mat distCoeffs) {
         Mat detectedCorners_mat = Converters.vector_Mat_to_Mat(detectedCorners);
         Mat rejectedCorners_mat = Converters.vector_Mat_to_Mat(rejectedCorners);
-        refineDetectedMarkers_1(nativeObj, image.nativeObj, board.nativeObj, detectedCorners_mat.nativeObj, detectedIds.nativeObj, rejectedCorners_mat.nativeObj, cameraMatrix.nativeObj, distCoeffs.nativeObj);
+        refineDetectedMarkers_1(nativeObj, image.nativeObj, board.getNativeObjAddr(), detectedCorners_mat.nativeObj, detectedIds.nativeObj, rejectedCorners_mat.nativeObj, cameraMatrix.nativeObj, distCoeffs.nativeObj);
         Converters.Mat_to_vector_Mat(detectedCorners_mat, detectedCorners);
         detectedCorners_mat.release();
         Converters.Mat_to_vector_Mat(rejectedCorners_mat, rejectedCorners);
@@ -224,11 +306,13 @@ public class ArucoDetector extends Algorithm {
      * If camera parameters and distortion coefficients are provided, missing markers are reprojected
      * using projectPoint function. If not, missing marker projections are interpolated using global
      * homography, and all the marker corners in the board must have the same Z coordinate.
+     * <b>Note:</b> This function assumes that the board only contains markers from one dictionary, so only the
+     * first configured dictionary is used. It has to match the dictionary of the board to work properly.
      */
     public void refineDetectedMarkers(Mat image, Board board, List<Mat> detectedCorners, Mat detectedIds, List<Mat> rejectedCorners, Mat cameraMatrix) {
         Mat detectedCorners_mat = Converters.vector_Mat_to_Mat(detectedCorners);
         Mat rejectedCorners_mat = Converters.vector_Mat_to_Mat(rejectedCorners);
-        refineDetectedMarkers_2(nativeObj, image.nativeObj, board.nativeObj, detectedCorners_mat.nativeObj, detectedIds.nativeObj, rejectedCorners_mat.nativeObj, cameraMatrix.nativeObj);
+        refineDetectedMarkers_2(nativeObj, image.nativeObj, board.getNativeObjAddr(), detectedCorners_mat.nativeObj, detectedIds.nativeObj, rejectedCorners_mat.nativeObj, cameraMatrix.nativeObj);
         Converters.Mat_to_vector_Mat(detectedCorners_mat, detectedCorners);
         detectedCorners_mat.release();
         Converters.Mat_to_vector_Mat(rejectedCorners_mat, rejectedCorners);
@@ -254,11 +338,13 @@ public class ArucoDetector extends Algorithm {
      * If camera parameters and distortion coefficients are provided, missing markers are reprojected
      * using projectPoint function. If not, missing marker projections are interpolated using global
      * homography, and all the marker corners in the board must have the same Z coordinate.
+     * <b>Note:</b> This function assumes that the board only contains markers from one dictionary, so only the
+     * first configured dictionary is used. It has to match the dictionary of the board to work properly.
      */
     public void refineDetectedMarkers(Mat image, Board board, List<Mat> detectedCorners, Mat detectedIds, List<Mat> rejectedCorners) {
         Mat detectedCorners_mat = Converters.vector_Mat_to_Mat(detectedCorners);
         Mat rejectedCorners_mat = Converters.vector_Mat_to_Mat(rejectedCorners);
-        refineDetectedMarkers_3(nativeObj, image.nativeObj, board.nativeObj, detectedCorners_mat.nativeObj, detectedIds.nativeObj, rejectedCorners_mat.nativeObj);
+        refineDetectedMarkers_3(nativeObj, image.nativeObj, board.getNativeObjAddr(), detectedCorners_mat.nativeObj, detectedIds.nativeObj, rejectedCorners_mat.nativeObj);
         Converters.Mat_to_vector_Mat(detectedCorners_mat, detectedCorners);
         detectedCorners_mat.release();
         Converters.Mat_to_vector_Mat(rejectedCorners_mat, rejectedCorners);
@@ -267,9 +353,112 @@ public class ArucoDetector extends Algorithm {
 
 
     //
+    // C++:  void cv::aruco::ArucoDetector::detectMarkersMultiDict(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat(), Mat& dictIndices = Mat())
+    //
+
+    /**
+     * Basic marker detection
+     *
+     * @param image input image
+     * @param corners vector of detected marker corners. For each marker, its four corners
+     * are provided, (e.g std::vector&lt;std::vector&lt;cv::Point2f&gt; &gt; ). For N detected markers,
+     * the dimensions of this array is Nx4. The order of the corners is clockwise.
+     * @param ids vector of identifiers of the detected markers. The identifier is of type int
+     * (e.g. std::vector&lt;int&gt;). For N detected markers, the size of ids is also N.
+     * The identifiers have the same order than the markers in the imgPoints array.
+     * @param rejectedImgPoints contains the imgPoints of those squares whose inner code has not a
+     * correct codification. Useful for debugging purposes.
+     * @param dictIndices vector of dictionary indices for each detected marker. Use getDictionaries() to get the
+     * list of corresponding dictionaries.
+     *
+     * Performs marker detection in the input image. Only markers included in the specific dictionaries
+     * are searched. For each detected marker, it returns the 2D position of its corner in the image
+     * and its corresponding identifier.
+     * Note that this function does not perform pose estimation.
+     * <b>Note:</b> The function does not correct lens distortion or takes it into account. It's recommended to undistort
+     * input image with corresponding camera model, if camera parameters are known
+     * SEE: undistort, estimatePoseSingleMarkers,  estimatePoseBoard
+     */
+    public void detectMarkersMultiDict(Mat image, List<Mat> corners, Mat ids, List<Mat> rejectedImgPoints, Mat dictIndices) {
+        Mat corners_mat = new Mat();
+        Mat rejectedImgPoints_mat = new Mat();
+        detectMarkersMultiDict_0(nativeObj, image.nativeObj, corners_mat.nativeObj, ids.nativeObj, rejectedImgPoints_mat.nativeObj, dictIndices.nativeObj);
+        Converters.Mat_to_vector_Mat(corners_mat, corners);
+        corners_mat.release();
+        Converters.Mat_to_vector_Mat(rejectedImgPoints_mat, rejectedImgPoints);
+        rejectedImgPoints_mat.release();
+    }
+
+    /**
+     * Basic marker detection
+     *
+     * @param image input image
+     * @param corners vector of detected marker corners. For each marker, its four corners
+     * are provided, (e.g std::vector&lt;std::vector&lt;cv::Point2f&gt; &gt; ). For N detected markers,
+     * the dimensions of this array is Nx4. The order of the corners is clockwise.
+     * @param ids vector of identifiers of the detected markers. The identifier is of type int
+     * (e.g. std::vector&lt;int&gt;). For N detected markers, the size of ids is also N.
+     * The identifiers have the same order than the markers in the imgPoints array.
+     * @param rejectedImgPoints contains the imgPoints of those squares whose inner code has not a
+     * correct codification. Useful for debugging purposes.
+     * list of corresponding dictionaries.
+     *
+     * Performs marker detection in the input image. Only markers included in the specific dictionaries
+     * are searched. For each detected marker, it returns the 2D position of its corner in the image
+     * and its corresponding identifier.
+     * Note that this function does not perform pose estimation.
+     * <b>Note:</b> The function does not correct lens distortion or takes it into account. It's recommended to undistort
+     * input image with corresponding camera model, if camera parameters are known
+     * SEE: undistort, estimatePoseSingleMarkers,  estimatePoseBoard
+     */
+    public void detectMarkersMultiDict(Mat image, List<Mat> corners, Mat ids, List<Mat> rejectedImgPoints) {
+        Mat corners_mat = new Mat();
+        Mat rejectedImgPoints_mat = new Mat();
+        detectMarkersMultiDict_1(nativeObj, image.nativeObj, corners_mat.nativeObj, ids.nativeObj, rejectedImgPoints_mat.nativeObj);
+        Converters.Mat_to_vector_Mat(corners_mat, corners);
+        corners_mat.release();
+        Converters.Mat_to_vector_Mat(rejectedImgPoints_mat, rejectedImgPoints);
+        rejectedImgPoints_mat.release();
+    }
+
+    /**
+     * Basic marker detection
+     *
+     * @param image input image
+     * @param corners vector of detected marker corners. For each marker, its four corners
+     * are provided, (e.g std::vector&lt;std::vector&lt;cv::Point2f&gt; &gt; ). For N detected markers,
+     * the dimensions of this array is Nx4. The order of the corners is clockwise.
+     * @param ids vector of identifiers of the detected markers. The identifier is of type int
+     * (e.g. std::vector&lt;int&gt;). For N detected markers, the size of ids is also N.
+     * The identifiers have the same order than the markers in the imgPoints array.
+     * correct codification. Useful for debugging purposes.
+     * list of corresponding dictionaries.
+     *
+     * Performs marker detection in the input image. Only markers included in the specific dictionaries
+     * are searched. For each detected marker, it returns the 2D position of its corner in the image
+     * and its corresponding identifier.
+     * Note that this function does not perform pose estimation.
+     * <b>Note:</b> The function does not correct lens distortion or takes it into account. It's recommended to undistort
+     * input image with corresponding camera model, if camera parameters are known
+     * SEE: undistort, estimatePoseSingleMarkers,  estimatePoseBoard
+     */
+    public void detectMarkersMultiDict(Mat image, List<Mat> corners, Mat ids) {
+        Mat corners_mat = new Mat();
+        detectMarkersMultiDict_2(nativeObj, image.nativeObj, corners_mat.nativeObj, ids.nativeObj);
+        Converters.Mat_to_vector_Mat(corners_mat, corners);
+        corners_mat.release();
+    }
+
+
+    //
     // C++:  Dictionary cv::aruco::ArucoDetector::getDictionary()
     //
 
+    /**
+     * Returns first dictionary from internal list used for marker detection.
+     *
+     * @return The first dictionary from the configured ArucoDetector.
+     */
     public Dictionary getDictionary() {
         return new Dictionary(getDictionary_0(nativeObj));
     }
@@ -279,9 +468,28 @@ public class ArucoDetector extends Algorithm {
     // C++:  void cv::aruco::ArucoDetector::setDictionary(Dictionary dictionary)
     //
 
+    /**
+     * Sets and replaces the first dictionary in internal list to be used for marker detection.
+     *
+     * @param dictionary The new dictionary that will replace the first dictionary in the internal list.
+     */
     public void setDictionary(Dictionary dictionary) {
-        setDictionary_0(nativeObj, dictionary.nativeObj);
+        setDictionary_0(nativeObj, dictionary.getNativeObjAddr());
     }
+
+
+    //
+    // C++:  vector_Dictionary cv::aruco::ArucoDetector::getDictionaries()
+    //
+
+    // Return type 'vector_Dictionary' is not supported, skipping the function
+
+
+    //
+    // C++:  void cv::aruco::ArucoDetector::setDictionaries(vector_Dictionary dictionaries)
+    //
+
+    // Unknown type 'vector_Dictionary' (I), skipping the function
 
 
     //
@@ -298,7 +506,7 @@ public class ArucoDetector extends Algorithm {
     //
 
     public void setDetectorParameters(DetectorParameters detectorParameters) {
-        setDetectorParameters_0(nativeObj, detectorParameters.nativeObj);
+        setDetectorParameters_0(nativeObj, detectorParameters.getNativeObjAddr());
     }
 
 
@@ -316,7 +524,7 @@ public class ArucoDetector extends Algorithm {
     //
 
     public void setRefineParameters(RefineParameters refineParameters) {
-        setRefineParameters_0(nativeObj, refineParameters.nativeObj);
+        setRefineParameters_0(nativeObj, refineParameters.getNativeObjAddr());
     }
 
 
@@ -351,11 +559,20 @@ public class ArucoDetector extends Algorithm {
     private static native void detectMarkers_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj);
     private static native void detectMarkers_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj);
 
+    // C++:  void cv::aruco::ArucoDetector::detectMarkersWithConfidence(Mat image, vector_Mat& corners, Mat& ids, Mat& markersConfidence, vector_Mat& rejectedImgPoints = vector_Mat())
+    private static native void detectMarkersWithConfidence_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long markersConfidence_nativeObj, long rejectedImgPoints_mat_nativeObj);
+    private static native void detectMarkersWithConfidence_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long markersConfidence_nativeObj);
+
     // C++:  void cv::aruco::ArucoDetector::refineDetectedMarkers(Mat image, Board board, vector_Mat& detectedCorners, Mat& detectedIds, vector_Mat& rejectedCorners, Mat cameraMatrix = Mat(), Mat distCoeffs = Mat(), Mat& recoveredIdxs = Mat())
     private static native void refineDetectedMarkers_0(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj, long recoveredIdxs_nativeObj);
     private static native void refineDetectedMarkers_1(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj, long distCoeffs_nativeObj);
     private static native void refineDetectedMarkers_2(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj, long cameraMatrix_nativeObj);
     private static native void refineDetectedMarkers_3(long nativeObj, long image_nativeObj, long board_nativeObj, long detectedCorners_mat_nativeObj, long detectedIds_nativeObj, long rejectedCorners_mat_nativeObj);
+
+    // C++:  void cv::aruco::ArucoDetector::detectMarkersMultiDict(Mat image, vector_Mat& corners, Mat& ids, vector_Mat& rejectedImgPoints = vector_Mat(), Mat& dictIndices = Mat())
+    private static native void detectMarkersMultiDict_0(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj, long dictIndices_nativeObj);
+    private static native void detectMarkersMultiDict_1(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj, long rejectedImgPoints_mat_nativeObj);
+    private static native void detectMarkersMultiDict_2(long nativeObj, long image_nativeObj, long corners_mat_nativeObj, long ids_nativeObj);
 
     // C++:  Dictionary cv::aruco::ArucoDetector::getDictionary()
     private static native long getDictionary_0(long nativeObj);
@@ -375,7 +592,7 @@ public class ArucoDetector extends Algorithm {
     // C++:  void cv::aruco::ArucoDetector::setRefineParameters(RefineParameters refineParameters)
     private static native void setRefineParameters_0(long nativeObj, long refineParameters_nativeObj);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

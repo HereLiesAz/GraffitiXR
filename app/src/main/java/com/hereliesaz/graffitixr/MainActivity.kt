@@ -36,6 +36,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // RESURRECTION: Ensure native engine is alive even if the Process survived
+        // but the Activity was previously destroyed.
+        slamManager.ensureInitialized()
+
         setContent {
             GraffitiXRTheme {
                 val navController = rememberNavController()
@@ -48,7 +52,7 @@ class MainActivity : ComponentActivity() {
                     dashboardViewModel = dashboardViewModel,
                     navController = navController,
                     slamManager = slamManager,
-                    projectRepository = projectRepository, // ADDED
+                    projectRepository = projectRepository,
                     onRendererCreated = { renderer ->
                         arRenderer = renderer
                     }
@@ -57,15 +61,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-    }
-
-    override fun onPause() {
-        super.onPause()
-    }
-
     override fun onDestroy() {
         super.onDestroy()
+        // Only release native resources if the Activity is actually finishing (not rotating)
+        // This prevents the Native Engine from being killed and recreated on configuration changes.
+        if (isFinishing) {
+            slamManager.destroy()
+        }
     }
 }

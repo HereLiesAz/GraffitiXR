@@ -100,7 +100,7 @@ public class TonemapReinhard extends Tonemap {
     // C++:  void cv::TonemapReinhard::setColorAdaptation(float color_adapt)
     private static native void setColorAdaptation_0(long nativeObj, float color_adapt);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

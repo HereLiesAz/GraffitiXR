@@ -129,7 +129,7 @@ public class BFMatcher extends DescriptorMatcher {
     private static native long create_1(int normType);
     private static native long create_2();
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }

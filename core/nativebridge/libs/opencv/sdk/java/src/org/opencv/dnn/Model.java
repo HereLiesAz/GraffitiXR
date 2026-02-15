@@ -23,7 +23,10 @@ import org.opencv.utils.Converters;
 public class Model {
 
     protected final long nativeObj;
-    protected Model(long addr) { nativeObj = addr; }
+    protected Model(long addr) {
+      nativeObj = addr;
+      
+    }
 
     public long getNativeObjAddr() { return nativeObj; }
 
@@ -63,7 +66,7 @@ public class Model {
      * @param network Net object.
      */
     public Model(Net network) {
-        nativeObj = Model_2(network.nativeObj);
+        nativeObj = Model_2(network.getNativeObjAddr());
     }
 
 
@@ -150,6 +153,20 @@ public class Model {
      */
     public Model setInputSwapRB(boolean swapRB) {
         return new Model(setInputSwapRB_0(nativeObj, swapRB));
+    }
+
+
+    //
+    // C++:  Model cv::dnn::Model::setOutputNames(vector_String outNames)
+    //
+
+    /**
+     * Set output names for frame.
+     * @param outNames Names for output layers.
+     * @return automatically generated
+     */
+    public Model setOutputNames(List<String> outNames) {
+        return new Model(setOutputNames_0(nativeObj, outNames));
     }
 
 
@@ -297,6 +314,9 @@ public class Model {
     // C++:  Model cv::dnn::Model::setInputSwapRB(bool swapRB)
     private static native long setInputSwapRB_0(long nativeObj, boolean swapRB);
 
+    // C++:  Model cv::dnn::Model::setOutputNames(vector_String outNames)
+    private static native long setOutputNames_0(long nativeObj, List<String> outNames);
+
     // C++:  void cv::dnn::Model::setInputParams(double scale = 1.0, Size size = Size(), Scalar mean = Scalar(), bool swapRB = false, bool crop = false)
     private static native void setInputParams_0(long nativeObj, double scale, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB, boolean crop);
     private static native void setInputParams_1(long nativeObj, double scale, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB);
@@ -317,7 +337,7 @@ public class Model {
     // C++:  Model cv::dnn::Model::enableWinograd(bool useWinograd)
     private static native long enableWinograd_0(long nativeObj, boolean useWinograd);
 
-    // native support for java finalize()
+    // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);
 
 }
