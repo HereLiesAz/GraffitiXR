@@ -72,12 +72,9 @@ import java.io.File
 import kotlin.math.min
 import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 
-/**
- * The main screen composable that orchestrates the entire application UI.
- *
- * It composes the [GraffitiNavRail] (navigation side-bar), the main content area
- * (switching between [ArView], [GsViewer], etc.), and overlay dialogs/panels.
- */
+
+
+
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -85,7 +82,7 @@ fun MainScreen(
     arViewModel: ArViewModel,
     dashboardViewModel: DashboardViewModel,
     navController: NavController,
-    slamManager: SlamManager, // Injected dependency
+    slamManager: SlamManager,
     projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
@@ -120,7 +117,6 @@ fun MainScreen(
         onRendererCreated(renderer)
     }
 
-    // Effect: Handle Export Trigger
     LaunchedEffect(exportTrigger) {
         if (exportTrigger && window != null) {
             delay(300)
@@ -131,7 +127,6 @@ fun MainScreen(
         }
     }
 
-    // Effect: Handle Photogrammetry Keyframe Capture
     LaunchedEffect(arUiState.pendingKeyframePath) {
         arUiState.pendingKeyframePath?.let { path ->
             renderRef?.saveKeyframe(path)
@@ -228,7 +223,7 @@ fun MainScreen(
                 use3dBackground = use3dBackground,
                 onToggle3dBackground = { use3dBackground = !use3dBackground },
                 onShowInfoScreen = { showInfoScreen = true },
-                onSaveProject = { showSaveDialog = true } // Use the dialog
+                onSaveProject = { showSaveDialog = true }
             )
         }
 
@@ -242,9 +237,8 @@ fun MainScreen(
                         state = targetCreationState,
                         onPhotoCaptured = { bitmap ->
                             arViewModel.setTempCapture(bitmap)
-                            // NEW: Go to teleological evolution instead of rectify?
-                            // For now, we keep original flow unless triggered manually
-                            viewModel.setCaptureStep(CaptureStep.RECTIFY)
+                            // Route directly to evolution, bypassing the archaic Rectify step
+                            localNavController.navigate("target_evolution")
                         }
                     )
                 }
@@ -266,7 +260,7 @@ fun MainScreen(
                         onPickBackground = {
                             backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
-                        slamManager = slamManager, // FIXED: Passing Shared Engine
+                        slamManager = slamManager,
                         projectRepository = projectRepository,
                         use3dBackground = use3dBackground
                     )
@@ -334,40 +328,18 @@ fun MainScreen(
                         }
                     }
 
-                    // --- NEW ROUTE: Target Evolution (Teleological Refinement) ---
-                    composable(
-                        route = "target_evolution/{imageUri}",
-                        arguments = listOf(navArgument("imageUri") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val uriString = backStackEntry.arguments?.getString("imageUri") ?: return@composable
-                        val uri = android.net.Uri.parse(uriString)
-
-                        val evolutionBitmap = remember(uri) {
-                            try {
-                                if (android.os.Build.VERSION.SDK_INT < 28) {
-                                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                                } else {
-                                    val source = ImageDecoder.createSource(context.contentResolver, uri)
-                                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                                        decoder.isMutableRequired = true
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                Timber.e(e, "Failed to load evolution bitmap")
-                                null
-                            }
-                        }
+                    // --- TARGET EVOLUTION ---
+                    composable(route = "target_evolution") {
+                        // Bypass URI restrictions and grab the bitmap directly from the VM
+                        val evolutionBitmap = arUiState.tempCaptureBitmap
 
                         if (evolutionBitmap != null) {
                             TargetEvolutionScreen(
                                 image = evolutionBitmap,
                                 onCornersConfirmed = { corners ->
-                                    // 1. Unwarp utilizing refined corners
                                     val unwarped = ImageProcessor.unwarpImage(evolutionBitmap, corners)
                                     if (unwarped != null) {
                                         arViewModel.setTempCapture(unwarped)
-                                        // 2. Go back to main flow (Mask or Review)
                                         viewModel.setCaptureStep(CaptureStep.MASK)
                                         localNavController.popBackStack()
                                     }
@@ -375,14 +347,12 @@ fun MainScreen(
                             )
                         } else {
                             Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-                                Text("Failed to load image", color = Color.White)
+                                Text("Reality failed to load.", color = Color.White)
                             }
                         }
                     }
                 }
 
-                // Global Overlay: Target Creation Wizard (Standard Flow)
-                // This displays over the AzNavHost when active
                 if (uiState.isCapturingTarget) {
                     com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
                         uiState = arUiState,
@@ -481,7 +451,6 @@ fun MainContentLayer(
                     activeLayer = activeLayer,
                     onRendererCreated = onRendererCreated
                 )
-                // If no target detected, allow manual placement overlay
                 if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
                     OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
                 }
@@ -533,7 +502,6 @@ private fun LayersOverlay(
                 val srcWidth = imageBitmap.width.toFloat()
                 val srcHeight = imageBitmap.height.toFloat()
 
-                // ContentScale.Fit logic
                 val scaleFactor = min(size.width / srcWidth, size.height / srcHeight)
                 val drawnWidth = srcWidth * scaleFactor
                 val drawnHeight = srcHeight * scaleFactor
@@ -543,7 +511,6 @@ private fun LayersOverlay(
                 val centerX = size.width / 2
                 val centerY = size.height / 2
 
-                // Transforms
                 withTransform({
                     translate(layer.offset.x, layer.offset.y)
                     rotate(layer.rotationZ, pivot = Offset(centerX, centerY))
