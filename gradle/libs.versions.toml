@@ -26,7 +26,6 @@ kotlinxSerialization = "1.10.0"
 lifecycle = "2.10.0"
 litert = "2.1.1"
 mlkitSubjectSegmentation = "16.0.0-beta1"
-# FIX: Downgraded from the non-existent 2.9.7 to stable 2.8.0
 navigation = "2.9.7"
 opencv = "4.13.0"
 playServicesBase = "18.10.0"
