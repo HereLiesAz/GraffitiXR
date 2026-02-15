@@ -32,6 +32,6 @@ class ArRenderer(
     }
 
     fun saveKeyframe(path: String) {
-        slamManager.saveWorld(path)
+        slamManager.saveKeyframe(path)
     }
 }
