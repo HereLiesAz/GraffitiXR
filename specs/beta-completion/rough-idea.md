@@ -12,7 +12,7 @@ The project is nearing beta. Critical bugs must be fixed, and features must be c
     *   Robust Save/Load (saveworld) with Mandatory Autosave.
 3.  **New Features:**
     *   **Sketching Tools:** Brush, Eraser, Blur, Blend, Liquify, Burn, Dodge, Heal.
-    *   **UI Additions:** 
+    *   **UI Additions:**
         *   "Blank Sketch Layer" on Add screen.
         *   "Solid Color" on Background selection.
     *   **Export:**
