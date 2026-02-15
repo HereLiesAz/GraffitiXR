@@ -83,7 +83,21 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(JNIEnv *
 
 // AR STUBS
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLightJni(JNIEnv *env, jobject thiz, jlong handle, jfloat intensity) {}
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLightJni(JNIEnv *env, jobject thiz, jlong handle, jfloat intensity, jfloatArray color) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        jfloat *c = nullptr;
+        if (color != nullptr) {
+            c = env->GetFloatArrayElements(color, nullptr);
+        }
+
+        engine->updateLight(intensity, c);
+
+        if (c != nullptr) {
+            env->ReleaseFloatArrayElements(color, c, 0);
+        }
+    }
+}
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject image) {}

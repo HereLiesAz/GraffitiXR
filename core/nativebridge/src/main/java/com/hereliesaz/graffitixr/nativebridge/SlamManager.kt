@@ -59,8 +59,8 @@ class SlamManager @Inject constructor() {
         lock.withLock { if (!isDestroyed.get()) updateCameraJni(nativeHandle, viewMatrix, projectionMatrix) }
     }
 
-    fun updateLight(intensity: Float) {
-        lock.withLock { if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity) }
+    fun updateLight(intensity: Float, colorCorrection: FloatArray = floatArrayOf(1f, 1f, 1f)) {
+        lock.withLock { if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity, colorCorrection) }
     }
 
     fun feedDepthData(image: Image) {
@@ -157,7 +157,7 @@ class SlamManager @Inject constructor() {
     private external fun initializeJni(handle: Long)
     private external fun resetGLStateJni(handle: Long)
     private external fun updateCameraJni(handle: Long, view: FloatArray, proj: FloatArray)
-    private external fun updateLightJni(handle: Long, intensity: Float)
+    private external fun updateLightJni(handle: Long, intensity: Float, color: FloatArray)
     private external fun feedDepthDataJni(handle: Long, image: Image)
     private external fun feedStereoDataJni(
         handle: Long,
