@@ -77,6 +77,7 @@ dependencies {
     implementation(project(":feature:dashboard"))
     implementation(project(":core:common"))
     implementation(project(":core:design"))
+    implementation(project(":core:domain"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
