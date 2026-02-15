@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -16,6 +17,8 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Interface for providing URIs for files. Abstraction allows for easier testing.
@@ -27,7 +30,7 @@ interface UriProvider {
 /**
  * Default implementation using [Uri.fromFile].
  */
-class DefaultUriProvider : UriProvider {
+class DefaultUriProvider @Inject constructor() : UriProvider {
     override fun getUriForFile(file: File): Uri {
         return Uri.fromFile(file)
     }
@@ -44,9 +47,10 @@ class DefaultUriProvider : UriProvider {
  *   - target_0.png (Target images)
  *   - map.bin (SLAM map)
  */
-class ProjectManager(
-    private val context: Context,
-    private val uriProvider: UriProvider = DefaultUriProvider()
+@Singleton
+class ProjectManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val uriProvider: UriProvider
 ) {
 
     private val json = Json {

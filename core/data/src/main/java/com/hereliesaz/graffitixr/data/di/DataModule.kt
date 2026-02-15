@@ -1,32 +1,28 @@
 package com.hereliesaz.graffitixr.data.di
 
-import android.content.Context
-import com.hereliesaz.graffitixr.data.ProjectManager
+import com.hereliesaz.graffitixr.data.DefaultUriProvider
+import com.hereliesaz.graffitixr.data.UriProvider
 import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object DataModule {
+abstract class DataModule {
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideProjectManager(@ApplicationContext context: Context): ProjectManager {
-        return ProjectManager(context)
-    }
+    abstract fun bindProjectRepository(
+        projectRepositoryImpl: ProjectRepositoryImpl
+    ): ProjectRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideProjectRepository(
-        @ApplicationContext context: Context,
-        projectManager: ProjectManager
-    ): ProjectRepository {
-        return ProjectRepositoryImpl(context, projectManager)
-    }
+    abstract fun bindUriProvider(
+        defaultUriProvider: DefaultUriProvider
+    ): UriProvider
 }
