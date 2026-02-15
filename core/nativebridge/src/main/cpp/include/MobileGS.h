@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <mutex>
 #include <opencv2/core.hpp>
 #include <android/native_window.h>
 #include <android/asset_manager.h>
@@ -31,6 +32,7 @@ public:
     // Camera & Tracking
     void updateCamera(float* viewMatrix, float* projectionMatrix);
     void updateLight(float intensity, float* colorCorrection);
+    void alignMap(float* transform);
 
     // I/O (The missing methods)
     bool saveMap(const char* path);
@@ -60,6 +62,8 @@ private:
     // Matrix storage
     float viewMtx[16];
     float projMtx[16];
+    float alignmentMtx[16];
+    std::mutex alignMutex;
 };
 
 #endif // GRAFFITIXR_MOBILEGS_H
