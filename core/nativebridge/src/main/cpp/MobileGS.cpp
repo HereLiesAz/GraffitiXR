@@ -8,12 +8,28 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
+static void multiplyMatrices(const float* a, const float* b, float* result) {
+    // Column-major multiplication: result = a * b
+    for (int col = 0; col < 4; ++col) {
+        for (int row = 0; row < 4; ++row) {
+            float sum = 0.0f;
+            for (int k = 0; k < 4; ++k) {
+                // a[row + k*4] * b[k + col*4]
+                sum += a[row + k * 4] * b[k + col * 4];
+            }
+            result[row + col * 4] = sum;
+        }
+    }
+}
+
 MobileGS::MobileGS() {
     vulkanRenderer = new VulkanBackend();
     std::fill(std::begin(viewMtx), std::end(viewMtx), 0.0f);
     std::fill(std::begin(projMtx), std::end(projMtx), 0.0f);
+    std::fill(std::begin(alignmentMtx), std::end(alignmentMtx), 0.0f);
     viewMtx[0] = viewMtx[5] = viewMtx[10] = viewMtx[15] = 1.0f;
     projMtx[0] = projMtx[5] = projMtx[10] = projMtx[15] = 1.0f;
+    alignmentMtx[0] = alignmentMtx[5] = alignmentMtx[10] = alignmentMtx[15] = 1.0f;
 }
 
 MobileGS::~MobileGS() {
@@ -53,11 +69,26 @@ void MobileGS::draw() {
 
 void MobileGS::updateCamera(float* view, float* proj) {
     if (view && proj) {
-        std::copy(view, view + 16, viewMtx);
+        // Apply alignment: finalView = view * alignmentMtx
+        float finalView[16];
+        {
+            std::lock_guard<std::mutex> lock(alignMutex);
+            multiplyMatrices(view, alignmentMtx, finalView);
+        }
+
+        std::copy(finalView, finalView + 16, viewMtx);
         std::copy(proj, proj + 16, projMtx);
         if (vulkanRenderer) {
             vulkanRenderer->updateCamera(viewMtx, projMtx);
         }
+    }
+}
+
+void MobileGS::alignMap(float* transform) {
+    if (transform) {
+        std::lock_guard<std::mutex> lock(alignMutex);
+        std::copy(transform, transform + 16, alignmentMtx);
+        // LOGI("Map alignment updated."); // Commented out to prevent log spam
     }
 }
 

@@ -13,9 +13,9 @@ Effortless target creation via segmentation. Perfect Teleological SLAM.
 
 ## Teleological SLAM
 *   **Current:** `solvePnP` mentioned in docs.
-*   **Missing:** I need to find where `solvePnP` is actually called. `MobileGS.cpp` doesn't show it in the snippet I read. It might be in a separate class or not implemented yet.
-*   **Action:** Find the `TeleologicalLoop` implementation code.
+*   **Status:** Implemented in `feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/computervision/TeleologicalTracker.kt`.
+*   **Action:** Verify the loop in field tests.
 
 ## Action Plan
-1.  Locate `TeleologicalLoop` code.
+1.  [x] Locate `TeleologicalLoop` code. (Implemented as `TeleologicalTracker.kt`)
 2.  Optimize `TargetEvolutionEngine` parameters (epsilon for poly approx).
