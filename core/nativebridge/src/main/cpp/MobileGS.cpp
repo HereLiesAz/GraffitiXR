@@ -2,8 +2,6 @@
 #include <android/log.h>
 #include <fstream>
 #include <opencv2/imgproc.hpp>
-
-// Include GLES for the overlay rendering
 #include <GLES3/gl3.h>
 
 #define TAG "MobileGS"
@@ -34,29 +32,25 @@ void MobileGS::onSurfaceChanged(int width, int height) {
     viewportWidth = width;
     viewportHeight = height;
     LOGI("Surface changed: %dx%d", width, height);
-    glViewport(0, 0, width, height); // Update GLES viewport
-
+    glViewport(0, 0, width, height);
     if (vulkanRenderer) {
         vulkanRenderer->resize(width, height);
     }
 }
 
 void MobileGS::draw() {
-    if (!isInitialized) return;
-
-    // CRITICAL: Clear the screen to transparent so the CameraX preview shows through!
-    // Alpha must be 0.0f
+    // FIX: Always clear to transparent (0,0,0,0) BEFORE checking initialization.
+    // This prevents a black frame from blocking the camera during startup.
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // If you have Vulkan content to overlay, handle interop here.
-    // For now, we keep the overlay clear.
+    if (!isInitialized) return;
+
     if (vulkanRenderer) {
         vulkanRenderer->renderFrame();
     }
 }
 
-// ... (Rest of the file remains unchanged: updateCamera, saveMap, loadMap, detectEdges) ...
 void MobileGS::updateCamera(float* view, float* proj) {
     if (view && proj) {
         std::copy(view, view + 16, viewMtx);

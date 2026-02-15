@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.PixelFormat
 import android.util.Log
+import android.opengl.GLSurfaceView
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -21,7 +22,6 @@ import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.util.concurrent.Executors
-import android.opengl.GLSurfaceView
 
 @Composable
 fun ArView(
@@ -31,12 +31,11 @@ fun ArView(
     projectRepository: ProjectRepository,
     activeLayer: Layer?,
     onRendererCreated: (ArRenderer) -> Unit,
-    hasCameraPermission: Boolean // FIX: Controlled by parent
+    hasCameraPermission: Boolean
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 1. Initialize Renderer
     val renderer = remember(slamManager) { ArRenderer(slamManager) }
 
     LaunchedEffect(renderer) {
@@ -46,12 +45,13 @@ fun ArView(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // --- LAYER 1: The Reality (Camera Preview) ---
-        // FIX: Now reacts dynamically to the permission boolean changing
+        // We use PERFORMANCE mode to force a SurfaceView, which allows the
+        // GLSurfaceView (Layer 2) to sit correctly on top with ZOrderMediaOverlay.
         if (hasCameraPermission) {
             AndroidView(
                 factory = { ctx ->
                     PreviewView(ctx).apply {
-                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                        implementationMode = PreviewView.ImplementationMode.PERFORMANCE
                         scaleType = PreviewView.ScaleType.FILL_CENTER
                     }
                 },
@@ -82,7 +82,11 @@ fun ArView(
                     setEGLContextClientVersion(3)
                     setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                     holder.setFormat(PixelFormat.TRANSLUCENT)
+
+                    // Places this surface ON TOP of the Camera SurfaceView,
+                    // but BELOW the window (UI) layer.
                     setZOrderMediaOverlay(true)
+
                     setRenderer(renderer)
                     renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                 }
@@ -91,7 +95,6 @@ fun ArView(
         )
     }
 
-    // React to UI State changes
     LaunchedEffect(uiState.isFlashlightOn) {
         renderer.updateLightEstimate(if (uiState.isFlashlightOn) 1.0f else 0.5f)
     }
@@ -114,6 +117,11 @@ private fun bindCameraUseCases(
     val analysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .build()
+        .also {
+            it.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
+                imageProxy.close()
+            }
+        }
 
     preview.setSurfaceProvider(previewView.surfaceProvider)
 
