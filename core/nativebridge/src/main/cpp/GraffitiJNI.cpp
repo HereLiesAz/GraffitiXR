@@ -113,6 +113,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorldJni(JNIEnv *env
 }
 
 JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_importModel3DJni(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        const char *nativePath = env->GetStringUTFChars(path, 0);
+        bool result = engine->importModel3D(nativePath);
+        env->ReleaseStringUTFChars(path, nativePath);
+        return result;
+    }
+    return false;
+}
+
+JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorldJni(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
     if (handle != 0) {
         auto *engine = reinterpret_cast<MobileGS *>(handle);

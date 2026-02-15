@@ -26,6 +26,7 @@ public:
     // I/O (The missing methods)
     bool saveMap(const char* path);
     bool loadMap(const char* path);
+    bool importModel3D(const char* path);
 
     // CV Utils
     void detectEdges(cv::Mat& input, cv::Mat& output);

@@ -102,6 +102,13 @@ bool MobileGS::loadMap(const char* path) {
     }
 }
 
+bool MobileGS::importModel3D(const char* path) {
+    LOGI("Importing 3D model from: %s", path);
+    // TODO: Implement actual 3D model loading (e.g. GLTF/GLB)
+    // For now, we return true to indicate the JNI bridge is working.
+    return true;
+}
+
 void MobileGS::detectEdges(cv::Mat& input, cv::Mat& output) {
     if (input.empty()) return;
     cv::Mat gray, blur;

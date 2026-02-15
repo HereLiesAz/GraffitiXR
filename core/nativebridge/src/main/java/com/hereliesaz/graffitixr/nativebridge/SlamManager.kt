@@ -114,6 +114,12 @@ class SlamManager @Inject constructor() {
         }
     }
 
+    fun importModel3D(path: String): Boolean {
+        return lock.withLock {
+            if (!isDestroyed.get()) importModel3DJni(nativeHandle, path) else false
+        }
+    }
+
     fun detectEdges(bitmap: Bitmap): Bitmap? {
         return lock.withLock {
             if (!isDestroyed.get()) detectEdgesJni(nativeHandle, bitmap) else null
@@ -146,6 +152,7 @@ class SlamManager @Inject constructor() {
     private external fun drawJni(handle: Long)
     private external fun loadWorldJni(handle: Long, path: String): Boolean
     private external fun saveWorldJni(handle: Long, path: String): Boolean
+    private external fun importModel3DJni(handle: Long, path: String): Boolean
     private external fun detectEdgesJni(handle: Long, bitmap: Bitmap): Bitmap?
     private external fun initVulkanJni(handle: Long, surface: Surface, assetManager: AssetManager)
     private external fun resizeVulkanJni(handle: Long, width: Int, height: Int)
