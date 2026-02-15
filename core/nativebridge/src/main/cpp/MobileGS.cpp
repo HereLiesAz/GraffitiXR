@@ -39,14 +39,17 @@ void MobileGS::onSurfaceChanged(int width, int height) {
 }
 
 void MobileGS::draw() {
-    // FIX: Always clear to transparent (0,0,0,0) BEFORE checking initialization.
-    // This prevents a black frame from blocking the camera during startup.
+    // FIX(Camera Blocking): Always clear to transparent (0,0,0,0) BEFORE checking initialization.
+    // This prevents a black frame from blocking the camera during startup and ensures
+    // the AR overlay remains transparent over the CameraX PreviewView.
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (!isInitialized) return;
 
     if (vulkanRenderer) {
+        // Pass lighting data to renderer
+        vulkanRenderer->setLighting(lightIntensity, lightColor);
         vulkanRenderer->renderFrame();
     }
 }
@@ -58,6 +61,15 @@ void MobileGS::updateCamera(float* view, float* proj) {
         if (vulkanRenderer) {
             vulkanRenderer->updateCamera(viewMtx, projMtx);
         }
+    }
+}
+
+void MobileGS::updateLight(float intensity, float* colorCorrection) {
+    lightIntensity = intensity;
+    if (colorCorrection) {
+        lightColor[0] = colorCorrection[0];
+        lightColor[1] = colorCorrection[1];
+        lightColor[2] = colorCorrection[2];
     }
 }
 
