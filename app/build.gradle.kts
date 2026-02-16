@@ -118,4 +118,6 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation("com.github.HereLiesAz.AzNavRail:aznavrail-annotation:7.1")
+    ksp("com.github.HereLiesAz.AzNavRail:aznavrail-processor:7.1")
 }
