@@ -106,9 +106,7 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(project(":opencv"))
 
-    implementation(libs.aznavrail)
     implementation(libs.coil.compose)
-    implementation(libs.aznavrail)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

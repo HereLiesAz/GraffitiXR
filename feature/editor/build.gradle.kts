@@ -54,7 +54,6 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     // AZ Nav Rail (Ensure this is available if used in Editor, though usually in App)
-    implementation(libs.aznavrail)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
