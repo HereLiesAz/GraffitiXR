@@ -11,6 +11,12 @@ plugins {
     alias(libs.plugins.kotlin.parcelize) apply false
 }
 
+subprojects {
+    configurations.all {
+        exclude(group = "com.github.HereLiesAz", module = "aznavrail-annotation")
+    }
+}
+
 allprojects {
     apply(plugin = "checkstyle")
     configure<CheckstyleExtension> {
@@ -21,6 +27,9 @@ allprojects {
 
 subprojects {
     configurations.all {
-        exclude(group = "com.github.HereLiesAz", module = "aznavrail-annotation")
+        resolutionStrategy.dependencySubstitution {
+            substitute(module("com.github.HereLiesAz:aznavrail-annotation"))
+                .using(module("com.github.HereLiesAz.AzNavRail:aznavrail-annotation:7.0"))
+        }
     }
 }

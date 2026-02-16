@@ -120,6 +120,7 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
 tasks.register("updateAzNavDocs") {
     group = "documentation"
     description = "Extracts AzNavRail documentation from the dependency."
