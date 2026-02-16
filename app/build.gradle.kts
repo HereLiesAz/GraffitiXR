@@ -107,10 +107,11 @@ dependencies {
 
     implementation(libs.az.nav.rail)
     implementation(libs.az.nav.rail.annotation)
-    ksp(libs.az.nav.rail.processor)
+    // ksp(libs.az.nav.rail.processor)
     implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
