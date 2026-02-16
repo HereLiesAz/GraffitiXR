@@ -1,8 +1,17 @@
 package com.hereliesaz.graffitixr.migrated
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.material3.Text
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.aznavrail.annotation.*
+import com.hereliesaz.graffitixr.feature.ar.ArView
+import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import javax.inject.Inject
 
 // AUTO-GENERATED MIGRATION FILE
 // Copy these functions to your project and delete the old DSL setup.
@@ -15,157 +24,160 @@ fun HelpScreen() {
 }
 
 // Original ID: light
-@Az(rail = RailItem(id = "light", text = "navStrings.light"))
+@Az(rail = RailItem(id = "light", text = "Light"))
 @Composable
 fun LightScreen() {
-    Text("Migrated Screen: navStrings.light")
+    Text("Migrated Screen: Light")
 }
 
 // Original ID: lock_trace
-@Az(rail = RailItem(id = "lock_trace", text = "navStrings.lock"))
+@Az(rail = RailItem(id = "lock_trace", text = "Lock"))
 @Composable
 fun LockTraceScreen() {
-    Text("Migrated Screen: navStrings.lock")
+    Text("Migrated Screen: Lock")
 }
 
 // Original ID: mode_host
-@Az(railHost = RailHost(id = "mode_host", text = "navStrings.modes"))
+@Az(railHost = RailHost(id = "mode_host", text = "Modes"))
 val ModeHostHost = null
 
 // Original ID: target_host
-@Az(railHost = RailHost(id = "target_host", text = "navStrings.grid"))
+@Az(railHost = RailHost(id = "target_host", text = "Target"))
 val TargetHostHost = null
 
 // Original ID: design_host
-@Az(railHost = RailHost(id = "design_host", text = "navStrings.design"))
+@Az(railHost = RailHost(id = "design_host", text = "Design"))
 val DesignHostHost = null
 
 // Original ID: project_host
-@Az(railHost = RailHost(id = "project_host", text = "navStrings.project"))
+@Az(railHost = RailHost(id = "project_host", text = "Project"))
 val ProjectHostHost = null
 
 // Original ID: ar
-@Az(rail = RailItem(id = "ar", text = "navStrings.arMode", parent = "mode_host"))
+@Az(rail = RailItem(id = "ar", text = "AR", parent = "mode_host", home = true))
 @Composable
 fun ArScreen() {
-    Text("Migrated Screen: navStrings.arMode")
+    // Note: This requires SlamManager and ProjectRepository to be available.
+    // In a real migration, we should inject them or retrieve them from the Activity via CompositionLocal.
+    // For now, we use placeholders to ensure compilation.
+    Text("AR Mode Active")
 }
 
 // Original ID: overlay
-@Az(rail = RailItem(id = "overlay", text = "navStrings.overlay", parent = "mode_host"))
+@Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "mode_host"))
 @Composable
 fun OverlayScreen() {
-    Text("Migrated Screen: navStrings.overlay")
+    Text("Overlay Mode Active")
 }
 
 // Original ID: mockup
-@Az(rail = RailItem(id = "mockup", text = "navStrings.mockup", parent = "mode_host"))
+@Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "mode_host"))
 @Composable
 fun MockupScreen() {
-    Text("Migrated Screen: navStrings.mockup")
+    Text("Mockup Mode Active")
 }
 
 // Original ID: trace
-@Az(rail = RailItem(id = "trace", text = "navStrings.trace", parent = "mode_host"))
+@Az(rail = RailItem(id = "trace", text = "Trace", parent = "mode_host"))
 @Composable
 fun TraceScreen() {
-    Text("Migrated Screen: navStrings.trace")
+    Text("Trace Mode Active")
 }
 
 // Original ID: create
-@Az(rail = RailItem(id = "create", text = "navStrings.create", parent = "target_host"))
+@Az(rail = RailItem(id = "create", text = "Create", parent = "target_host"))
 @Composable
 fun CreateScreen() {
-    Text("Migrated Screen: navStrings.create")
+    Text("Create Target")
 }
 
 // Original ID: surveyor
-@Az(rail = RailItem(id = "surveyor", text = "navStrings.surveyor", parent = "target_host"))
+@Az(rail = RailItem(id = "surveyor", text = "Survey", parent = "target_host"))
 @Composable
 fun SurveyorScreen() {
-    Text("Migrated Screen: navStrings.surveyor")
+    Text("Surveyor Mode")
 }
 
 // Original ID: capture_keyframe
 @Az(rail = RailItem(id = "capture_keyframe", text = "Keyframe", parent = "target_host"))
 @Composable
 fun CaptureKeyframeScreen() {
-    Text("Migrated Screen: Keyframe")
+    Text("Capture Keyframe")
 }
 
 // Original ID: wall
-@Az(rail = RailItem(id = "wall", text = "navStrings.wall", parent = "design_host"))
+@Az(rail = RailItem(id = "wall", text = "Wall", parent = "design_host"))
 @Composable
 fun WallScreen() {
-    Text("Migrated Screen: navStrings.wall")
+    Text("Change Wall")
 }
 
 // Original ID: openButtonId
-@Az(rail = RailItem(id = "openButtonId", text = "openButtonText", parent = "design_host"))
+@Az(rail = RailItem(id = "openButtonId", text = "Add Image", parent = "design_host"))
 @Composable
 fun OpenbuttonidScreen() {
-    Text("Migrated Screen: openButtonText")
+    Text("Add Image")
 }
 
 // Original ID: isolate
-@Az(rail = RailItem(id = "isolate", text = "navStrings.isolate", parent = "design_host"))
+@Az(rail = RailItem(id = "isolate", text = "Isolate", parent = "design_host"))
 @Composable
 fun IsolateScreen() {
-    Text("Migrated Screen: navStrings.isolate")
+    Text("Remove Background")
 }
 
 // Original ID: outline
-@Az(rail = RailItem(id = "outline", text = "navStrings.outline", parent = "design_host"))
+@Az(rail = RailItem(id = "outline", text = "Outline", parent = "design_host"))
 @Composable
 fun OutlineScreen() {
-    Text("Migrated Screen: navStrings.outline")
+    Text("Outline Mode")
 }
 
 // Original ID: adjust
-@Az(rail = RailItem(id = "adjust", text = "navStrings.adjust", parent = "design_host"))
+@Az(rail = RailItem(id = "adjust", text = "Adjust", parent = "design_host"))
 @Composable
 fun AdjustScreen() {
-    Text("Migrated Screen: navStrings.adjust")
+    Text("Adjust Colors")
 }
 
 // Original ID: balance
-@Az(rail = RailItem(id = "balance", text = "navStrings.balance", parent = "design_host"))
+@Az(rail = RailItem(id = "balance", text = "Color", parent = "design_host"))
 @Composable
 fun BalanceScreen() {
-    Text("Migrated Screen: navStrings.balance")
+    Text("Color Balance")
 }
 
 // Original ID: blending
-@Az(rail = RailItem(id = "blending", text = "navStrings.build", parent = "design_host"))
+@Az(rail = RailItem(id = "blending", text = "Blend", parent = "design_host"))
 @Composable
 fun BlendingScreen() {
-    Text("Migrated Screen: navStrings.build")
+    Text("Blend Mode")
 }
 
 // Original ID: save_project
-@Az(rail = RailItem(id = "save_project", text = "navStrings.save", parent = "project_host"))
+@Az(rail = RailItem(id = "save_project", text = "Save", parent = "project_host"))
 @Composable
 fun SaveProjectScreen() {
-    Text("Migrated Screen: navStrings.save")
+    Text("Save Project")
 }
 
 // Original ID: load_project
-@Az(rail = RailItem(id = "load_project", text = "navStrings.load", parent = "project_host"))
+@Az(rail = RailItem(id = "load_project", text = "Load", parent = "project_host"))
 @Composable
 fun LoadProjectScreen() {
-    Text("Migrated Screen: navStrings.load")
+    Text("Load Project")
 }
 
 // Original ID: export_project
-@Az(rail = RailItem(id = "export_project", text = "navStrings.export", parent = "project_host"))
+@Az(rail = RailItem(id = "export_project", text = "Export", parent = "project_host"))
 @Composable
 fun ExportProjectScreen() {
-    Text("Migrated Screen: navStrings.export")
+    Text("Export Project")
 }
 
 // Original ID: settings_sub
-@Az(rail = RailItem(id = "settings_sub", text = "navStrings.settings", parent = "project_host"))
+@Az(rail = RailItem(id = "settings_sub", text = "Settings", parent = "project_host"))
 @Composable
 fun SettingsSubScreen() {
-    Text("Migrated Screen: navStrings.settings")
+    Text("Settings")
 }
