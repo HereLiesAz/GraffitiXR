@@ -18,3 +18,9 @@ allprojects {
         configFile = rootProject.file("config/checkstyle/checkstyle.xml")
     }
 }
+
+subprojects {
+    configurations.all {
+        exclude(group = "com.github.HereLiesAz", module = "aznavrail-annotation")
+    }
+}

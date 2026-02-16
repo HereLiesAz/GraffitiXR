@@ -109,6 +109,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
@@ -118,4 +119,30 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+tasks.register("updateAzNavDocs") {
+    group = "documentation"
+    description = "Extracts AzNavRail documentation from the dependency."
+
+    doLast {
+        // Find the AzNavRail AAR in the runtime classpath
+        val artifact = configurations.getByName("debugRuntimeClasspath").files
+            .find { it.name.contains("AzNavRail") && it.extension == "aar" }
+
+        if (artifact != null) {
+            copy {
+                from(zipTree(artifact))
+                include("assets/AZNAVRAIL_COMPLETE_GUIDE.md")
+                into(layout.projectDirectory.dir("docs"))
+                // Remove the 'assets/' prefix from the output file
+                eachFile {
+                    path = name
+                }
+                includeEmptyDirs = false
+            }
+            println("AzNavRail documentation updated: docs/AZNAVRAIL_COMPLETE_GUIDE.md")
+        } else {
+            println("AzNavRail AAR not found. Make sure the dependency is added.")
+        }
+    }
 }
