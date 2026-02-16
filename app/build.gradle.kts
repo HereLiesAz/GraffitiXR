@@ -106,6 +106,8 @@ dependencies {
     implementation(project(":opencv"))
 
     implementation(libs.az.nav.rail)
+    implementation(libs.az.nav.rail.annotation)
+    ksp(libs.az.nav.rail.processor)
     implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
