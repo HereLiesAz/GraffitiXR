@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.aznavrail.annotation.*
@@ -108,7 +110,7 @@ fun HelpScreen() {
 @Az(rail = RailItem(id = "light", text = "Light"))
 @Composable
 fun LightScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity  = LocalActivity.current as ComponentActivity
     val arViewModel: ArViewModel = hiltViewModel(activity)
 
     // Trigger the toggle only once when this screen is composed
@@ -122,7 +124,7 @@ fun LightScreen() {
 @Az(rail = RailItem(id = "lock_trace", text = "Lock"))
 @Composable
 fun LockTraceScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val mainViewModel: MainViewModel = hiltViewModel(activity)
 
     LaunchedEffect(Unit) {
@@ -185,7 +187,7 @@ fun ArScreen() {
 @Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "mode_host"))
 @Composable
 fun OverlayScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
 
@@ -217,7 +219,7 @@ fun OverlayScreen() {
 @Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "mode_host"))
 @Composable
 fun MockupScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
 
@@ -228,7 +230,7 @@ fun MockupScreen() {
 @Az(rail = RailItem(id = "trace", text = "Trace", parent = "mode_host"))
 @Composable
 fun TraceScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
 
@@ -319,7 +321,7 @@ fun SurveyorScreen() {
 @Az(rail = RailItem(id = "capture_keyframe", text = "Keyframe", parent = "target_host"))
 @Composable
 fun CaptureKeyframeScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val arViewModel: ArViewModel = hiltViewModel(activity)
 
     LaunchedEffect(Unit) {
@@ -332,7 +334,7 @@ fun CaptureKeyframeScreen() {
 @Az(rail = RailItem(id = "wall", text = "Wall", parent = "design_host"))
 @Composable
 fun WallScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -349,7 +351,7 @@ fun WallScreen() {
 @Az(rail = RailItem(id = "openButtonId", text = "Add Image", parent = "design_host"))
 @Composable
 fun OpenbuttonidScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -366,7 +368,7 @@ fun OpenbuttonidScreen() {
 @Az(rail = RailItem(id = "isolate", text = "Isolate", parent = "design_host"))
 @Composable
 fun IsolateScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     LaunchedEffect(Unit) {
         editorViewModel.onRemoveBackgroundClicked()
@@ -378,7 +380,7 @@ fun IsolateScreen() {
 @Az(rail = RailItem(id = "outline", text = "Outline", parent = "design_host"))
 @Composable
 fun OutlineScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     LaunchedEffect(Unit) {
         editorViewModel.onLineDrawingClicked()
@@ -390,7 +392,7 @@ fun OutlineScreen() {
 @Az(rail = RailItem(id = "adjust", text = "Adjust", parent = "design_host"))
 @Composable
 fun AdjustScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     LaunchedEffect(Unit) {
         editorViewModel.onAdjustClicked()
@@ -402,7 +404,7 @@ fun AdjustScreen() {
 @Az(rail = RailItem(id = "balance", text = "Color", parent = "design_host"))
 @Composable
 fun BalanceScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     LaunchedEffect(Unit) {
         editorViewModel.onColorClicked()
@@ -414,7 +416,7 @@ fun BalanceScreen() {
 @Az(rail = RailItem(id = "blending", text = "Blend", parent = "design_host"))
 @Composable
 fun BlendingScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     LaunchedEffect(Unit) {
         editorViewModel.onCycleBlendMode()
@@ -426,7 +428,7 @@ fun BlendingScreen() {
 @Az(rail = RailItem(id = "save_project", text = "Save", parent = "project_host"))
 @Composable
 fun SaveProjectScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     LaunchedEffect(Unit) {
         editorViewModel.saveProject()
@@ -447,7 +449,7 @@ fun LoadProjectScreen() {
 @Az(rail = RailItem(id = "export_project", text = "Export", parent = "project_host"))
 @Composable
 fun ExportProjectScreen() {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     LaunchedEffect(Unit) {
         editorViewModel.exportProject()
