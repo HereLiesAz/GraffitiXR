@@ -51,7 +51,7 @@ dependencies {
     implementation(libs.arcore.client)
     implementation(project(":opencv"))
 
-    implementation(libs.az.nav.rail)
+    implementation(libs.aznavrail)
     implementation(libs.androidx.activity.compose)
     implementation(libs.navigation.compose)
 
