@@ -108,7 +108,7 @@ dependencies {
 
     implementation(libs.aznavrail)
     implementation(libs.coil.compose)
-    implementation(libs.hereliesaz.aznavrail)
+    implementation(libs.aznavrail)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
