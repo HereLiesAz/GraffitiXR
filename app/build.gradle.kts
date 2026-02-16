@@ -108,7 +108,7 @@ dependencies {
 
     implementation(libs.aznavrail)
     implementation(libs.coil.compose)
-    implementation("com.github.HereLiesAz:AzNavRail:main-SNAPSHOT")
+    implementation(libs.hereliesaz.aznavrail)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
