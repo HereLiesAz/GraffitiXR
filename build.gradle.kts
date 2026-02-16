@@ -17,4 +17,8 @@ allprojects {
         toolVersion = "10.12.0"
         configFile = rootProject.file("config/checkstyle/checkstyle.xml")
     }
+
+    configurations.all {
+        exclude(group = "com.github.HereLiesAz.AzNavRail", module = "aznavrail-annotation")
+    }
 }
