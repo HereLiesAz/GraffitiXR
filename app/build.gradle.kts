@@ -61,6 +61,7 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    ndkVersion = "28.2.13676358"
 }
 
 // FIX: Configure Kotlin JVM target safely using tasks
@@ -106,10 +107,8 @@ dependencies {
     implementation(project(":opencv"))
 
     implementation(libs.aznavrail)
-    implementation(libs.aznavrail.annotation)
-    ksp(libs.aznavrail.processor)
     implementation(libs.coil.compose)
-
+    implementation("com.github.HereLiesAz:AzNavRail:main-SNAPSHOT")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -120,6 +119,6 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
-    implementation(libs.aznavrail.annotation)
-    ksp(libs.aznavrail.processor)
+
+
 }

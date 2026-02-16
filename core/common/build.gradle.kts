@@ -33,6 +33,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    ndkVersion = "28.2.13676358"
 }
 
 tasks.withType<KotlinCompile>().configureEach {
