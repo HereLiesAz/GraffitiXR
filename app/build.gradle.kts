@@ -105,9 +105,9 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(project(":opencv"))
 
-    implementation(libs.az.nav.rail)
-    // implementation(libs.az.nav.rail.annotation)
-    // ksp(libs.az.nav.rail.processor)
+    implementation(libs.aznavrail)
+    implementation(libs.aznavrail.annotation)
+    ksp(libs.aznavrail.processor)
     implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
