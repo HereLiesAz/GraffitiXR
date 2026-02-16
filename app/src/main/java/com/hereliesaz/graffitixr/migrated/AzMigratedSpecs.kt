@@ -1,29 +1,47 @@
 package com.hereliesaz.graffitixr.migrated
 
+import android.Manifest
+import android.content.Context
+import android.graphics.Bitmap
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.aznavrail.annotation.*
+import com.hereliesaz.graffitixr.MainViewModel
 import com.hereliesaz.graffitixr.common.model.ArUiState
-import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingUi
+import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
+import com.hereliesaz.graffitixr.feature.ar.rememberTargetCreationState
+import com.hereliesaz.graffitixr.feature.ar.ui.TargetEvolutionScreen
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.feature.editor.MockupScreen
 import com.hereliesaz.graffitixr.feature.editor.OverlayScreen
 import com.hereliesaz.graffitixr.feature.editor.TraceScreen
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.saveBitmapToCache
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // AUTO-GENERATED MIGRATION FILE - INTEGRATED WITH APP LOGIC
 
@@ -32,6 +50,47 @@ import dagger.hilt.components.SingletonComponent
 interface MigratedEntryPoint {
     fun slamManager(): SlamManager
     fun projectRepository(): com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+}
+
+/**
+ * Wrapper to ensure permissions are granted before showing content.
+ */
+@Composable
+fun PermissionWrapper(
+    content: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+    var hasPermissions by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        hasPermissions = perms[Manifest.permission.CAMERA] == true
+    }
+
+    if (hasPermissions) {
+        content()
+    } else {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.Button(onClick = {
+                launcher.launch(
+                    arrayOf(
+                        Manifest.permission.CAMERA,
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            }) {
+                Text("Grant Permissions")
+            }
+        }
+    }
 }
 
 // Original ID: help
@@ -49,13 +108,13 @@ fun HelpScreen() {
 @Az(rail = RailItem(id = "light", text = "Light"))
 @Composable
 fun LightScreen() {
-    val arViewModel: ArViewModel = hiltViewModel()
+    val activity = LocalContext.current as ComponentActivity
+    val arViewModel: ArViewModel = hiltViewModel(activity)
 
     // Trigger the toggle only once when this screen is composed
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         arViewModel.toggleFlashlight()
     }
-
     Box(Modifier.fillMaxSize())
 }
 
@@ -63,9 +122,12 @@ fun LightScreen() {
 @Az(rail = RailItem(id = "lock_trace", text = "Lock"))
 @Composable
 fun LockTraceScreen() {
-    // Logic to lock trace mode.
-    // This typically interacted with MainViewModel in the old code.
-    // We might need to inject MainViewModel here if possible.
+    val activity = LocalContext.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        mainViewModel.setTouchLocked(true)
+    }
     Text("Trace Locked")
 }
 
@@ -89,45 +151,74 @@ val ProjectHostHost = null
 @Az(rail = RailItem(id = "ar", text = "AR", parent = "mode_host", home = true))
 @Composable
 fun ArScreen() {
-    val context = LocalContext.current
-    val entryPoint = EntryPointAccessors.fromApplication(context, MigratedEntryPoint::class.java)
-    val slamManager = entryPoint.slamManager()
-    val projectRepository = entryPoint.projectRepository()
+    PermissionWrapper {
+        val context = LocalContext.current
+        val entryPoint = EntryPointAccessors.fromApplication(context, MigratedEntryPoint::class.java)
+        val slamManager = entryPoint.slamManager()
+        val projectRepository = entryPoint.projectRepository()
 
-    val arViewModel: ArViewModel = hiltViewModel()
-    val arUiState by arViewModel.uiState.collectAsState()
-    val editorViewModel: EditorViewModel = hiltViewModel()
-    val editorUiState by editorViewModel.uiState.collectAsState()
+        val activity = context as ComponentActivity
+        val arViewModel: ArViewModel = hiltViewModel(activity)
+        val arUiState by arViewModel.uiState.collectAsState()
+        val editorViewModel: EditorViewModel = hiltViewModel(activity)
+        val editorUiState by editorViewModel.uiState.collectAsState()
 
-    // We need the active layer from EditorViewModel
-    val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
+        val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
 
-    ArView(
-        viewModel = arViewModel,
-        uiState = arUiState,
-        slamManager = slamManager,
-        projectRepository = projectRepository,
-        activeLayer = activeLayer,
-        onRendererCreated = { /* Handle renderer creation if needed */ },
-        hasCameraPermission = true // Assuming permission is handled by AzNavRail or wrapper
-    )
+        ArView(
+            viewModel = arViewModel,
+            uiState = arUiState,
+            slamManager = slamManager,
+            projectRepository = projectRepository,
+            activeLayer = activeLayer,
+            onRendererCreated = { /* Handle renderer creation if needed */ },
+            hasCameraPermission = true
+        )
+
+        if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
+            OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+        }
+    }
 }
 
 // Original ID: overlay
 @Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "mode_host"))
 @Composable
 fun OverlayScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
 
-    OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+    PermissionWrapper {
+        val context = LocalContext.current
+        val entryPoint = EntryPointAccessors.fromApplication(context, MigratedEntryPoint::class.java)
+        val slamManager = entryPoint.slamManager()
+        val projectRepository = entryPoint.projectRepository()
+        val arViewModel: ArViewModel = hiltViewModel(activity)
+        val arUiState by arViewModel.uiState.collectAsState()
+        val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
+
+        Box(Modifier.fillMaxSize()) {
+            ArView(
+                viewModel = arViewModel,
+                uiState = arUiState.copy(showPointCloud = false),
+                slamManager = slamManager,
+                projectRepository = projectRepository,
+                activeLayer = activeLayer,
+                onRendererCreated = { },
+                hasCameraPermission = true
+            )
+            OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+        }
+    }
 }
 
 // Original ID: mockup
 @Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "mode_host"))
 @Composable
 fun MockupScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
 
     MockupScreen(uiState = editorUiState, viewModel = editorViewModel)
@@ -137,7 +228,8 @@ fun MockupScreen() {
 @Az(rail = RailItem(id = "trace", text = "Trace", parent = "mode_host"))
 @Composable
 fun TraceScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
 
     TraceScreen(uiState = editorUiState, viewModel = editorViewModel)
@@ -147,29 +239,92 @@ fun TraceScreen() {
 @Az(rail = RailItem(id = "create", text = "Create", parent = "target_host"))
 @Composable
 fun CreateScreen() {
-    // Target creation flow
-    // This was previously handled by MainViewModel state.
-    // For migration, we might need to invoke a specialized screen.
-    // Assuming we can trigger it here.
-    Text("Create Target Flow")
+    PermissionWrapper {
+        val context = LocalContext.current
+        val activity = context as ComponentActivity
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
+        val arViewModel: ArViewModel = hiltViewModel(activity)
+        val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
+        val mainUiState by mainViewModel.uiState.collectAsState()
+        val arUiState by arViewModel.uiState.collectAsState()
+        val editorUiState by editorViewModel.uiState.collectAsState()
+
+        val targetCreationState = rememberTargetCreationState()
+        val scope = rememberCoroutineScope()
+
+        // Ensure we are in capture mode
+        LaunchedEffect(Unit) {
+            mainViewModel.startTargetCapture()
+        }
+
+        if (mainUiState.captureStep == CaptureStep.NONE) {
+            // Flow finished
+            Text("Target Created.")
+        } else {
+            TargetCreationUi(
+                uiState = arUiState,
+                isRightHanded = editorUiState.isRightHanded,
+                captureStep = mainUiState.captureStep,
+                state = targetCreationState,
+                onConfirm = {
+                    val bitmapToSave = arUiState.tempCaptureBitmap
+                    if (bitmapToSave != null) {
+                        scope.launch(Dispatchers.IO) {
+                            val uri = saveBitmapToCache(context, bitmapToSave)
+                            if (uri != null) {
+                                withContext(Dispatchers.Main) {
+                                    arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                    mainViewModel.onConfirmTargetCreation()
+                                }
+                            }
+                        }
+                    } else {
+                        mainViewModel.onConfirmTargetCreation()
+                    }
+                },
+                onRetake = mainViewModel::onRetakeCapture,
+                onCancel = mainViewModel::onCancelCaptureClicked,
+                onUnwarpConfirm = { points: List<Offset> ->
+                    arUiState.tempCaptureBitmap?.let { src ->
+                        ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                            arViewModel.setTempCapture(unwarped)
+                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                        }
+                    }
+                },
+                onMaskConfirmed = { maskedBitmap: Bitmap ->
+                    val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+                    arViewModel.setTempCapture(extracted)
+                    mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                }
+            )
+        }
+    }
 }
 
 // Original ID: surveyor
 @Az(rail = RailItem(id = "surveyor", text = "Survey", parent = "target_host"))
 @Composable
 fun SurveyorScreen() {
-    MappingUi(
-        onBackClick = { /* Handle back */ },
-        onScanComplete = { /* Handle complete */ }
-    )
+    PermissionWrapper {
+        MappingUi(
+            onBackClick = { /* Handle via rail */ },
+            onScanComplete = { /* Handle complete */ }
+        )
+    }
 }
 
 // Original ID: capture_keyframe
 @Az(rail = RailItem(id = "capture_keyframe", text = "Keyframe", parent = "target_host"))
 @Composable
 fun CaptureKeyframeScreen() {
-    val arViewModel: ArViewModel = hiltViewModel()
-    arViewModel.captureKeyframe()
+    val activity = LocalContext.current as ComponentActivity
+    val arViewModel: ArViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        arViewModel.captureKeyframe()
+    }
     Text("Capturing Keyframe...")
 }
 
@@ -177,24 +332,45 @@ fun CaptureKeyframeScreen() {
 @Az(rail = RailItem(id = "wall", text = "Wall", parent = "design_host"))
 @Composable
 fun WallScreen() {
-    // Logic to pick background image
-    Text("Pick Wall Image")
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    LaunchedEffect(Unit) {
+        launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+    Text("Picking Wall Image...")
 }
 
 // Original ID: openButtonId
 @Az(rail = RailItem(id = "openButtonId", text = "Add Image", parent = "design_host"))
 @Composable
 fun OpenbuttonidScreen() {
-    // Logic to pick overlay layer
-    Text("Add Layer Image")
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
+    LaunchedEffect(Unit) {
+        launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+    Text("Adding Layer...")
 }
 
 // Original ID: isolate
 @Az(rail = RailItem(id = "isolate", text = "Isolate", parent = "design_host"))
 @Composable
 fun IsolateScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
-    editorViewModel.onRemoveBackgroundClicked()
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        editorViewModel.onRemoveBackgroundClicked()
+    }
     Text("Removing Background...")
 }
 
@@ -202,8 +378,11 @@ fun IsolateScreen() {
 @Az(rail = RailItem(id = "outline", text = "Outline", parent = "design_host"))
 @Composable
 fun OutlineScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
-    editorViewModel.onLineDrawingClicked()
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        editorViewModel.onLineDrawingClicked()
+    }
     Text("Generating Outline...")
 }
 
@@ -211,27 +390,35 @@ fun OutlineScreen() {
 @Az(rail = RailItem(id = "adjust", text = "Adjust", parent = "design_host"))
 @Composable
 fun AdjustScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
-    editorViewModel.onAdjustClicked()
-    // The panel logic needs to be adapted to AzNavRail's view if not using overlays
-    Text("Adjust Panel")
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        editorViewModel.onAdjustClicked()
+    }
+    Text("Adjust Panel Active")
 }
 
 // Original ID: balance
 @Az(rail = RailItem(id = "balance", text = "Color", parent = "design_host"))
 @Composable
 fun BalanceScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
-    editorViewModel.onColorClicked()
-    Text("Color Balance Panel")
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        editorViewModel.onColorClicked()
+    }
+    Text("Color Balance Panel Active")
 }
 
 // Original ID: blending
 @Az(rail = RailItem(id = "blending", text = "Blend", parent = "design_host"))
 @Composable
 fun BlendingScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
-    editorViewModel.onCycleBlendMode()
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        editorViewModel.onCycleBlendMode()
+    }
     Text("Cycling Blend Mode")
 }
 
@@ -239,8 +426,11 @@ fun BlendingScreen() {
 @Az(rail = RailItem(id = "save_project", text = "Save", parent = "project_host"))
 @Composable
 fun SaveProjectScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
-    editorViewModel.saveProject()
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        editorViewModel.saveProject()
+    }
     Text("Saving Project...")
 }
 
@@ -248,11 +438,8 @@ fun SaveProjectScreen() {
 @Az(rail = RailItem(id = "load_project", text = "Load", parent = "project_host"))
 @Composable
 fun LoadProjectScreen() {
-    // Navigate to project library
-    // This logic relies on navigation controller which AzNavRail handles.
-    // If we want to show the library here:
-    // val dashboardViewModel: DashboardViewModel = hiltViewModel()
-    // ProjectLibraryScreen(...)
+    // Note: Project loading usually involves navigation.
+    // Ensure you handle navigation events here if needed.
     Text("Load Project Library")
 }
 
@@ -260,8 +447,11 @@ fun LoadProjectScreen() {
 @Az(rail = RailItem(id = "export_project", text = "Export", parent = "project_host"))
 @Composable
 fun ExportProjectScreen() {
-    val editorViewModel: EditorViewModel = hiltViewModel()
-    editorViewModel.exportProject()
+    val activity = LocalContext.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        editorViewModel.exportProject()
+    }
     Text("Exporting Project...")
 }
 
@@ -269,6 +459,5 @@ fun ExportProjectScreen() {
 @Az(rail = RailItem(id = "settings_sub", text = "Settings", parent = "project_host"))
 @Composable
 fun SettingsSubScreen() {
-    // SettingsScreen(...)
     Text("Settings Screen")
 }
