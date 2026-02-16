@@ -117,6 +117,7 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
-
-
+    implementation(libs.aznavrail)
+    implementation(libs.aznavrail.annotation)
+    implementation(libs.aznavrail.processor)
 }
