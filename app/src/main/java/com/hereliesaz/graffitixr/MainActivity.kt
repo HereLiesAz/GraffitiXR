@@ -16,7 +16,6 @@ import javax.inject.Inject
  */
 @Az(app = App(
     dock = AzDockingSide.LEFT,
-    theme = AzTheme.GlitchNoir
 ))
 @AndroidEntryPoint
 class MainActivity : AzActivity() {
