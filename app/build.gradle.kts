@@ -119,5 +119,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.aznavrail)
     implementation(libs.aznavrail.annotation)
-    implementation(libs.aznavrail.processor)
+    ksp(libs.aznavrail.processor)
 }
