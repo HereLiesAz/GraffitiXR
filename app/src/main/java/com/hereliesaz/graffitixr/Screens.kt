@@ -1,14 +1,11 @@
-package com.hereliesaz.graffitixr.migrated
+package com.hereliesaz.graffitixr
 
 import android.Manifest
-import android.content.Context
 import android.graphics.Bitmap
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
@@ -16,13 +13,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import com.hereliesaz.aznavrail.annotation.*
-import com.hereliesaz.graffitixr.MainViewModel
-import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.feature.ar.ArView
@@ -30,13 +24,15 @@ import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingUi
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberTargetCreationState
-import com.hereliesaz.graffitixr.feature.ar.ui.TargetEvolutionScreen
+import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
+import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
+import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
-import com.hereliesaz.graffitixr.feature.editor.MockupScreen
-import com.hereliesaz.graffitixr.feature.editor.OverlayScreen
-import com.hereliesaz.graffitixr.feature.editor.TraceScreen
+import com.hereliesaz.graffitixr.feature.editor.MockupScreen as EditorMockupScreen
+import com.hereliesaz.graffitixr.feature.editor.OverlayScreen as EditorOverlayScreen
+import com.hereliesaz.graffitixr.feature.editor.TraceScreen as EditorTraceScreen
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import com.hereliesaz.graffitixr.saveBitmapToCache
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -45,11 +41,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// AUTO-GENERATED MIGRATION FILE - INTEGRATED WITH APP LOGIC
-
 @EntryPoint
 @InstallIn(SingletonComponent::class)
-interface MigratedEntryPoint {
+interface ScreensEntryPoint {
     fun slamManager(): SlamManager
     fun projectRepository(): com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 }
@@ -95,8 +89,8 @@ fun PermissionWrapper(
     }
 }
 
-// Original ID: help
-@Az(rail = RailItem(id = "help", text = "Help"))
+// Help Screen
+@Az(rail = RailItem(id = "help", text = "Help", parent = "hidden_host"))
 @Composable
 fun HelpScreen() {
     com.hereliesaz.graffitixr.design.components.InfoDialog(
@@ -106,22 +100,21 @@ fun HelpScreen() {
     )
 }
 
-// Original ID: light
-@Az(rail = RailItem(id = "light", text = "Light"))
+// Light Screen (Toggle)
+@Az(rail = RailItem(id = "light", text = "Light", parent = "hidden_host"))
 @Composable
 fun LightScreen() {
     val activity  = LocalActivity.current as ComponentActivity
     val arViewModel: ArViewModel = hiltViewModel(activity)
 
-    // Trigger the toggle only once when this screen is composed
     LaunchedEffect(Unit) {
         arViewModel.toggleFlashlight()
     }
     Box(Modifier.fillMaxSize())
 }
 
-// Original ID: lock_trace
-@Az(rail = RailItem(id = "lock_trace", text = "Lock"))
+// Lock Trace Screen
+@Az(rail = RailItem(id = "lock_trace", text = "Lock", parent = "hidden_host"))
 @Composable
 fun LockTraceScreen() {
     val activity = LocalActivity.current as ComponentActivity
@@ -133,71 +126,81 @@ fun LockTraceScreen() {
     Text("Trace Locked")
 }
 
-// Original ID: mode_host
-@Az(host = RailHost(id = "mode_host", text = "Modes"))
-val ModeHostHost = null
-
-// Original ID: target_host
-@Az(host = RailHost(id = "target_host", text = "Target"))
-val TargetHostHost = null
-
-// Original ID: design_host
-@Az(host = RailHost(id = "design_host", text = "Design"))
-val DesignHostHost = null
-
-// Original ID: project_host
-@Az(host = RailHost(id = "project_host", text = "Project"))
-val ProjectHostHost = null
-
-// Original ID: ar
-@Az(rail = RailItem(id = "ar", text = "AR", parent = "mode_host", home = true))
+// AR Screen (Default/Home)
+// Marked as home=true, but parent=hidden_host so it's not in the generated rail.
+@Az(rail = RailItem(id = "ar", text = "AR", parent = "hidden_host", home = true))
 @Composable
 fun ArScreen() {
     PermissionWrapper {
         val context = LocalContext.current
-        val entryPoint = EntryPointAccessors.fromApplication(context, MigratedEntryPoint::class.java)
+        val entryPoint = EntryPointAccessors.fromApplication(context, ScreensEntryPoint::class.java)
         val slamManager = entryPoint.slamManager()
         val projectRepository = entryPoint.projectRepository()
 
         val activity = context as ComponentActivity
         val arViewModel: ArViewModel = hiltViewModel(activity)
-        val arUiState by arViewModel.uiState.collectAsState()
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
         val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
+        val arUiState by arViewModel.uiState.collectAsState()
+        val mainUiState by mainViewModel.uiState.collectAsState()
         val editorUiState by editorViewModel.uiState.collectAsState()
+
+        LaunchedEffect(Unit) {
+            editorViewModel.setEditorMode(com.hereliesaz.graffitixr.common.model.EditorMode.AR)
+        }
 
         val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
 
-        ArView(
-            viewModel = arViewModel,
-            uiState = arUiState,
-            slamManager = slamManager,
-            projectRepository = projectRepository,
-            activeLayer = activeLayer,
-            onRendererCreated = { /* Handle renderer creation if needed */ },
-            hasCameraPermission = true
-        )
+        Box(Modifier.fillMaxSize()) {
+            ArView(
+                viewModel = arViewModel,
+                uiState = arUiState,
+                slamManager = slamManager,
+                projectRepository = projectRepository,
+                activeLayer = activeLayer,
+                onRendererCreated = { /* Handle renderer creation if needed */ },
+                hasCameraPermission = true
+            )
 
-        if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
-            OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+            if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
+                EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+            }
+
+            EditorUi(
+                actions = editorViewModel,
+                uiState = editorUiState,
+                isTouchLocked = mainUiState.isTouchLocked,
+                showUnlockInstructions = mainUiState.showUnlockInstructions,
+                isCapturingTarget = mainUiState.isCapturingTarget
+            )
         }
     }
 }
 
-// Original ID: overlay
-@Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "mode_host"))
+// Overlay Screen
+@Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "hidden_host"))
 @Composable
 fun OverlayScreen() {
     val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val arViewModel: ArViewModel = hiltViewModel(activity)
+
     val editorUiState by editorViewModel.uiState.collectAsState()
+    val mainUiState by mainViewModel.uiState.collectAsState()
+    val arUiState by arViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        editorViewModel.setEditorMode(com.hereliesaz.graffitixr.common.model.EditorMode.OVERLAY)
+    }
 
     PermissionWrapper {
         val context = LocalContext.current
-        val entryPoint = EntryPointAccessors.fromApplication(context, MigratedEntryPoint::class.java)
+        val entryPoint = EntryPointAccessors.fromApplication(context, ScreensEntryPoint::class.java)
         val slamManager = entryPoint.slamManager()
         val projectRepository = entryPoint.projectRepository()
-        val arViewModel: ArViewModel = hiltViewModel(activity)
-        val arUiState by arViewModel.uiState.collectAsState()
+
         val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
 
         Box(Modifier.fillMaxSize()) {
@@ -210,35 +213,75 @@ fun OverlayScreen() {
                 onRendererCreated = { },
                 hasCameraPermission = true
             )
-            OverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+            EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+
+            EditorUi(
+                actions = editorViewModel,
+                uiState = editorUiState,
+                isTouchLocked = mainUiState.isTouchLocked,
+                showUnlockInstructions = mainUiState.showUnlockInstructions,
+                isCapturingTarget = mainUiState.isCapturingTarget
+            )
         }
     }
 }
 
-// Original ID: mockup
-@Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "mode_host"))
+// Mockup Screen
+@Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "hidden_host"))
 @Composable
 fun MockupScreen() {
     val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    val editorUiState by editorViewModel.uiState.collectAsState()
 
-    MockupScreen(uiState = editorUiState, viewModel = editorViewModel)
+    val editorUiState by editorViewModel.uiState.collectAsState()
+    val mainUiState by mainViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        editorViewModel.setEditorMode(com.hereliesaz.graffitixr.common.model.EditorMode.STATIC)
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        EditorMockupScreen(uiState = editorUiState, viewModel = editorViewModel)
+        EditorUi(
+            actions = editorViewModel,
+            uiState = editorUiState,
+            isTouchLocked = mainUiState.isTouchLocked,
+            showUnlockInstructions = mainUiState.showUnlockInstructions,
+            isCapturingTarget = mainUiState.isCapturingTarget
+        )
+    }
 }
 
-// Original ID: trace
-@Az(rail = RailItem(id = "trace", text = "Trace", parent = "mode_host"))
+// Trace Screen
+@Az(rail = RailItem(id = "trace", text = "Trace", parent = "hidden_host"))
 @Composable
 fun TraceScreen() {
     val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    val editorUiState by editorViewModel.uiState.collectAsState()
 
-    TraceScreen(uiState = editorUiState, viewModel = editorViewModel)
+    val editorUiState by editorViewModel.uiState.collectAsState()
+    val mainUiState by mainViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        editorViewModel.setEditorMode(com.hereliesaz.graffitixr.common.model.EditorMode.TRACE)
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        EditorTraceScreen(uiState = editorUiState, viewModel = editorViewModel)
+        EditorUi(
+            actions = editorViewModel,
+            uiState = editorUiState,
+            isTouchLocked = mainUiState.isTouchLocked,
+            showUnlockInstructions = mainUiState.showUnlockInstructions,
+            isCapturingTarget = mainUiState.isCapturingTarget
+        )
+    }
 }
 
-// Original ID: create
-@Az(rail = RailItem(id = "create", text = "Create", parent = "target_host"))
+// Create Screen
+@Az(rail = RailItem(id = "create", text = "Create", parent = "hidden_host"))
 @Composable
 fun CreateScreen() {
     PermissionWrapper {
@@ -291,6 +334,10 @@ fun CreateScreen() {
                     arUiState.tempCaptureBitmap?.let { src ->
                         ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
                             arViewModel.setTempCapture(unwarped)
+                            // Navigate to target_evolution flow logic (handled by state in simple version)
+                            // But original MainScreen navigated to "target_evolution" composable.
+                            // We need to either replicate that navigation or handle it inline.
+                            // Assuming inline state management for now as navigation is restricted in this context.
                             mainViewModel.setCaptureStep(CaptureStep.MASK)
                         }
                     }
@@ -305,8 +352,8 @@ fun CreateScreen() {
     }
 }
 
-// Original ID: surveyor
-@Az(rail = RailItem(id = "surveyor", text = "Survey", parent = "target_host"))
+// Surveyor Screen
+@Az(rail = RailItem(id = "surveyor", text = "Survey", parent = "hidden_host"))
 @Composable
 fun SurveyorScreen() {
     PermissionWrapper {
@@ -317,8 +364,8 @@ fun SurveyorScreen() {
     }
 }
 
-// Original ID: capture_keyframe
-@Az(rail = RailItem(id = "capture_keyframe", text = "Keyframe", parent = "target_host"))
+// Capture Keyframe Screen
+@Az(rail = RailItem(id = "capture_keyframe", text = "Keyframe", parent = "hidden_host"))
 @Composable
 fun CaptureKeyframeScreen() {
     val activity = LocalActivity.current as ComponentActivity
@@ -330,8 +377,8 @@ fun CaptureKeyframeScreen() {
     Text("Capturing Keyframe...")
 }
 
-// Original ID: wall
-@Az(rail = RailItem(id = "wall", text = "Wall", parent = "design_host"))
+// Wall Screen
+@Az(rail = RailItem(id = "wall", text = "Wall", parent = "hidden_host"))
 @Composable
 fun WallScreen() {
     val activity = LocalActivity.current as ComponentActivity
@@ -343,5 +390,62 @@ fun WallScreen() {
 
     LaunchedEffect(Unit) {
         launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+}
+
+// Project Library Screen
+@Az(rail = RailItem(id = "project_library", text = "Library", parent = "hidden_host"))
+@Composable
+fun ProjectLibraryWrapper(navController: NavController) {
+    val activity = LocalActivity.current as ComponentActivity
+    val dashboardViewModel: DashboardViewModel = hiltViewModel(activity)
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val dashboardUiState by dashboardViewModel.uiState.collectAsState()
+    val editorUiState by editorViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
+
+    Box(Modifier.fillMaxSize()) {
+        ProjectLibraryScreen(
+            projects = dashboardUiState.availableProjects,
+            onLoadProject = {
+                dashboardViewModel.openProject(it)
+                // Navigate to default editor screen (AR)
+                navController.navigate("ar") {
+                    popUpTo("project_library") { inclusive = true }
+                }
+            },
+            onDeleteProject = { projectId ->
+                dashboardViewModel.deleteProject(projectId)
+            },
+            onNewProject = {
+                dashboardViewModel.onNewProject(editorUiState.isRightHanded)
+                navController.navigate("ar") {
+                    popUpTo("project_library") { inclusive = true }
+                }
+            }
+        )
+    }
+}
+
+// Settings Screen
+@Az(rail = RailItem(id = "settings", text = "Settings", parent = "hidden_host"))
+@Composable
+fun SettingsWrapper(navController: NavController) {
+    val activity = LocalActivity.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val editorUiState by editorViewModel.uiState.collectAsState()
+
+    Box(Modifier.fillMaxSize()) {
+        SettingsScreen(
+            currentVersion = "1.0.0",
+            updateStatus = "Up to date",
+            isCheckingForUpdate = false,
+            isRightHanded = editorUiState.isRightHanded,
+            onHandednessChanged = { editorViewModel.toggleHandedness() },
+            onCheckForUpdates = { },
+            onInstallUpdate = { },
+            onClose = { navController.popBackStack() }
+        )
     }
 }
