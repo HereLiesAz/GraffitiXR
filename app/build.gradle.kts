@@ -67,7 +67,7 @@ android {
 // FIX: Configure Kotlin JVM target safely using tasks
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_21)
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -108,6 +108,7 @@ dependencies {
 
     implementation(libs.coil.compose)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
@@ -118,7 +119,6 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.aznavrail)
-    implementation(libs.aznavrail.model)
     implementation(libs.aznavrail.annotation)
     ksp(libs.aznavrail.processor)
 }
