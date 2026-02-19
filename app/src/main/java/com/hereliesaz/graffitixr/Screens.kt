@@ -18,13 +18,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.hereliesaz.aznavrail.annotation.*
 import com.hereliesaz.graffitixr.common.model.CaptureStep
-import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingUi
-import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberTargetCreationState
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
@@ -103,39 +100,34 @@ fun HelpScreen() {
     )
 }
 
-/**
- * Shared wrapper for Editor Screens to reduce duplication.
- */
+// Light Screen (Toggle)
+@Az(rail = RailItem(id = "light", text = "Light", parent = "hidden_host"))
 @Composable
-fun BaseEditorScreen(
-    editorMode: EditorMode,
-    content: @Composable (EditorViewModel, EditorUiState) -> Unit
-) {
+fun LightScreen() {
+    val activity  = LocalActivity.current as ComponentActivity
+    val arViewModel: ArViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        arViewModel.toggleFlashlight()
+    }
+    Box(Modifier.fillMaxSize())
+}
+
+// Lock Trace Screen
+@Az(rail = RailItem(id = "lock_trace", text = "Lock", parent = "hidden_host"))
+@Composable
+fun LockTraceScreen() {
     val activity = LocalActivity.current as ComponentActivity
     val mainViewModel: MainViewModel = hiltViewModel(activity)
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
 
-    val editorUiState by editorViewModel.uiState.collectAsState()
-    val mainUiState by mainViewModel.uiState.collectAsState()
-
-    LaunchedEffect(editorMode) {
-        editorViewModel.setEditorMode(editorMode)
+    LaunchedEffect(Unit) {
+        mainViewModel.setTouchLocked(true)
     }
-
-    Box(Modifier.fillMaxSize()) {
-        content(editorViewModel, editorUiState)
-
-        EditorUi(
-            actions = editorViewModel,
-            uiState = editorUiState,
-            isTouchLocked = mainUiState.isTouchLocked,
-            showUnlockInstructions = mainUiState.showUnlockInstructions,
-            isCapturingTarget = mainUiState.isCapturingTarget
-        )
-    }
+    Text("Trace Locked")
 }
 
 // AR Screen (Default/Home)
+// Marked as home=true, but parent=hidden_host so it's not in the generated rail.
 @Az(rail = RailItem(id = "ar", text = "AR", parent = "hidden_host", home = true))
 @Composable
 fun ArScreen() {
@@ -144,13 +136,23 @@ fun ArScreen() {
         val entryPoint = EntryPointAccessors.fromApplication(context, ScreensEntryPoint::class.java)
         val slamManager = entryPoint.slamManager()
         val projectRepository = entryPoint.projectRepository()
+
         val activity = context as ComponentActivity
         val arViewModel: ArViewModel = hiltViewModel(activity)
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
+        val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
         val arUiState by arViewModel.uiState.collectAsState()
+        val mainUiState by mainViewModel.uiState.collectAsState()
+        val editorUiState by editorViewModel.uiState.collectAsState()
 
-        BaseEditorScreen(EditorMode.AR) { editorViewModel, editorUiState ->
-            val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
+        LaunchedEffect(Unit) {
+            editorViewModel.setEditorMode(com.hereliesaz.graffitixr.common.model.EditorMode.AR)
+        }
 
+        val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
+
+        Box(Modifier.fillMaxSize()) {
             ArView(
                 viewModel = arViewModel,
                 uiState = arUiState,
@@ -164,6 +166,14 @@ fun ArScreen() {
             if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
                 EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
             }
+
+            EditorUi(
+                actions = editorViewModel,
+                uiState = editorUiState,
+                isTouchLocked = mainUiState.isTouchLocked,
+                showUnlockInstructions = mainUiState.showUnlockInstructions,
+                isCapturingTarget = mainUiState.isCapturingTarget
+            )
         }
     }
 }
@@ -172,18 +182,28 @@ fun ArScreen() {
 @Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "hidden_host"))
 @Composable
 fun OverlayScreen() {
+    val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val arViewModel: ArViewModel = hiltViewModel(activity)
+
+    val editorUiState by editorViewModel.uiState.collectAsState()
+    val mainUiState by mainViewModel.uiState.collectAsState()
+    val arUiState by arViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        editorViewModel.setEditorMode(com.hereliesaz.graffitixr.common.model.EditorMode.OVERLAY)
+    }
+
     PermissionWrapper {
         val context = LocalContext.current
         val entryPoint = EntryPointAccessors.fromApplication(context, ScreensEntryPoint::class.java)
         val slamManager = entryPoint.slamManager()
         val projectRepository = entryPoint.projectRepository()
-        val activity = context as ComponentActivity
-        val arViewModel: ArViewModel = hiltViewModel(activity)
-        val arUiState by arViewModel.uiState.collectAsState()
 
-        BaseEditorScreen(EditorMode.OVERLAY) { editorViewModel, editorUiState ->
-            val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
+        val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
 
+        Box(Modifier.fillMaxSize()) {
             ArView(
                 viewModel = arViewModel,
                 uiState = arUiState.copy(showPointCloud = false),
@@ -194,6 +214,14 @@ fun OverlayScreen() {
                 hasCameraPermission = true
             )
             EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+
+            EditorUi(
+                actions = editorViewModel,
+                uiState = editorUiState,
+                isTouchLocked = mainUiState.isTouchLocked,
+                showUnlockInstructions = mainUiState.showUnlockInstructions,
+                isCapturingTarget = mainUiState.isCapturingTarget
+            )
         }
     }
 }
@@ -202,8 +230,26 @@ fun OverlayScreen() {
 @Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "hidden_host"))
 @Composable
 fun MockupScreen() {
-    BaseEditorScreen(EditorMode.STATIC) { editorViewModel, editorUiState ->
+    val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
+    val editorUiState by editorViewModel.uiState.collectAsState()
+    val mainUiState by mainViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        editorViewModel.setEditorMode(com.hereliesaz.graffitixr.common.model.EditorMode.STATIC)
+    }
+
+    Box(Modifier.fillMaxSize()) {
         EditorMockupScreen(uiState = editorUiState, viewModel = editorViewModel)
+        EditorUi(
+            actions = editorViewModel,
+            uiState = editorUiState,
+            isTouchLocked = mainUiState.isTouchLocked,
+            showUnlockInstructions = mainUiState.showUnlockInstructions,
+            isCapturingTarget = mainUiState.isCapturingTarget
+        )
     }
 }
 
@@ -211,8 +257,26 @@ fun MockupScreen() {
 @Az(rail = RailItem(id = "trace", text = "Trace", parent = "hidden_host"))
 @Composable
 fun TraceScreen() {
-    BaseEditorScreen(EditorMode.TRACE) { editorViewModel, editorUiState ->
+    val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
+    val editorUiState by editorViewModel.uiState.collectAsState()
+    val mainUiState by mainViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        editorViewModel.setEditorMode(com.hereliesaz.graffitixr.common.model.EditorMode.TRACE)
+    }
+
+    Box(Modifier.fillMaxSize()) {
         EditorTraceScreen(uiState = editorUiState, viewModel = editorViewModel)
+        EditorUi(
+            actions = editorViewModel,
+            uiState = editorUiState,
+            isTouchLocked = mainUiState.isTouchLocked,
+            showUnlockInstructions = mainUiState.showUnlockInstructions,
+            isCapturingTarget = mainUiState.isCapturingTarget
+        )
     }
 }
 
@@ -243,58 +307,47 @@ fun CreateScreen() {
             // Flow finished
             Text("Target Created.")
         } else {
-            Box(Modifier.fillMaxSize()) {
-                // 1. Background (Camera / Unwarp Preview)
-                TargetCreationBackground(
-                    uiState = arUiState,
-                    captureStep = mainUiState.captureStep,
-                    state = targetCreationState,
-                    onPhotoCaptured = { bitmap ->
-                        arViewModel.setTempCapture(bitmap)
-                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
-                    }
-                )
-
-                // 2. UI Overlay (Buttons, Guides)
-                TargetCreationUi(
-                    uiState = arUiState,
-                    isRightHanded = editorUiState.isRightHanded,
-                    captureStep = mainUiState.captureStep,
-                    state = targetCreationState,
-                    onConfirm = {
-                        val bitmapToSave = arUiState.tempCaptureBitmap
-                        if (bitmapToSave != null) {
-                            scope.launch(Dispatchers.IO) {
-                                val uri = saveBitmapToCache(context, bitmapToSave)
-                                if (uri != null) {
-                                    withContext(Dispatchers.Main) {
-                                        arViewModel.onFrameCaptured(bitmapToSave, uri)
-                                        mainViewModel.onConfirmTargetCreation()
-                                    }
+            TargetCreationUi(
+                uiState = arUiState,
+                isRightHanded = editorUiState.isRightHanded,
+                captureStep = mainUiState.captureStep,
+                state = targetCreationState,
+                onConfirm = {
+                    val bitmapToSave = arUiState.tempCaptureBitmap
+                    if (bitmapToSave != null) {
+                        scope.launch(Dispatchers.IO) {
+                            val uri = saveBitmapToCache(context, bitmapToSave)
+                            if (uri != null) {
+                                withContext(Dispatchers.Main) {
+                                    arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                    mainViewModel.onConfirmTargetCreation()
                                 }
                             }
-                        } else {
-                            mainViewModel.onConfirmTargetCreation()
                         }
-                    },
-                    onRetake = mainViewModel::onRetakeCapture,
-                    onCancel = mainViewModel::onCancelCaptureClicked,
-                    onUnwarpConfirm = { points: List<Offset> ->
-                        arUiState.tempCaptureBitmap?.let { src ->
-                            ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                                arViewModel.setTempCapture(unwarped)
-                                // Inline state transition to MASK, keeping flow self-contained
-                                mainViewModel.setCaptureStep(CaptureStep.MASK)
-                            }
-                        }
-                    },
-                    onMaskConfirmed = { maskedBitmap: Bitmap ->
-                        val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
-                        arViewModel.setTempCapture(extracted)
-                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                    } else {
+                        mainViewModel.onConfirmTargetCreation()
                     }
-                )
-            }
+                },
+                onRetake = mainViewModel::onRetakeCapture,
+                onCancel = mainViewModel::onCancelCaptureClicked,
+                onUnwarpConfirm = { points: List<Offset> ->
+                    arUiState.tempCaptureBitmap?.let { src ->
+                        ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                            arViewModel.setTempCapture(unwarped)
+                            // Navigate to target_evolution flow logic (handled by state in simple version)
+                            // But original MainScreen navigated to "target_evolution" composable.
+                            // We need to either replicate that navigation or handle it inline.
+                            // Assuming inline state management for now as navigation is restricted in this context.
+                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                        }
+                    }
+                },
+                onMaskConfirmed = { maskedBitmap: Bitmap ->
+                    val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+                    arViewModel.setTempCapture(extracted)
+                    mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                }
+            )
         }
     }
 }
@@ -308,6 +361,35 @@ fun SurveyorScreen() {
             onBackClick = { /* Handle via rail */ },
             onScanComplete = { /* Handle complete */ }
         )
+    }
+}
+
+// Capture Keyframe Screen
+@Az(rail = RailItem(id = "capture_keyframe", text = "Keyframe", parent = "hidden_host"))
+@Composable
+fun CaptureKeyframeScreen() {
+    val activity = LocalActivity.current as ComponentActivity
+    val arViewModel: ArViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        arViewModel.captureKeyframe()
+    }
+    Text("Capturing Keyframe...")
+}
+
+// Wall Screen
+@Az(rail = RailItem(id = "wall", text = "Wall", parent = "hidden_host"))
+@Composable
+fun WallScreen() {
+    val activity = LocalActivity.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    LaunchedEffect(Unit) {
+        launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 }
 
@@ -356,7 +438,7 @@ fun SettingsWrapper(navController: NavController) {
 
     Box(Modifier.fillMaxSize()) {
         SettingsScreen(
-            currentVersion = BuildConfig.VERSION_NAME,
+            currentVersion = "1.0.0",
             updateStatus = "Up to date",
             isCheckingForUpdate = false,
             isRightHanded = editorUiState.isRightHanded,

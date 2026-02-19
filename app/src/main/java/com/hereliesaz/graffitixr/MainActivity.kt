@@ -21,7 +21,6 @@ import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
-import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -36,6 +35,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var slamManager: SlamManager
+    @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 
     private val editorViewModel: EditorViewModel by viewModels()
     private val mainViewModel: MainViewModel by viewModels()
@@ -43,9 +43,7 @@ class MainActivity : ComponentActivity() {
 
     // Mutable state proxies for dynamic rail configuration
     private var editorUiState by mutableStateOf(EditorUiState())
-
-    // Dialog state
-    private var showSaveDialog by mutableStateOf(false)
+    private var mainUiState by mutableStateOf(MainUiState())
 
     private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { editorViewModel.setBackgroundImage(it) }
@@ -64,6 +62,9 @@ class MainActivity : ComponentActivity() {
         // Observe ViewModels
         lifecycleScope.launch {
             editorViewModel.uiState.collect { editorUiState = it }
+        }
+        lifecycleScope.launch {
+            mainViewModel.uiState.collect { mainUiState = it }
         }
 
         setContent {
@@ -102,9 +103,7 @@ class MainActivity : ComponentActivity() {
                     azRailHostItem(id = "target_host", text = "Grid", onClick = {})
                     azRailSubItem(id = "create", hostId = "target_host", text = "Create", info = "New Target", route = "create")
                     azRailSubItem(id = "surveyor", hostId = "target_host", text = "Surveyor", info = "Map Environment", route = "surveyor")
-                    azRailSubItem(id = "capture_keyframe", hostId = "target_host", text = "Keyframe", info = "Save for reconstruction") {
-                        arViewModel.captureKeyframe()
-                    }
+                    azRailSubItem(id = "capture_keyframe", hostId = "target_host", text = "Keyframe", info = "Save for reconstruction", route = "capture_keyframe")
                     azDivider()
                 }
 
@@ -112,9 +111,7 @@ class MainActivity : ComponentActivity() {
                 azRailHostItem(id = "design_host", text = "Design", onClick = {})
 
                 if (editorUiState.editorMode == EditorMode.STATIC) {
-                    azRailSubItem(id = "wall", hostId = "design_host", text = "Wall", info = "Background Image") {
-                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
+                    azRailSubItem(id = "wall", hostId = "design_host", text = "Wall", info = "Background Image", route = "wall")
                 }
 
                 val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else "Open"
@@ -164,7 +161,7 @@ class MainActivity : ComponentActivity() {
                 // PROJECT HOST
                 azRailHostItem(id = "project_host", text = "Project", onClick = {})
                 azRailSubItem(id = "save_project", hostId = "project_host", text = "Save", info = "Save Project") {
-                    showSaveDialog = true
+                     editorViewModel.saveProject()
                 }
                 azRailSubItem(id = "load_project", hostId = "project_host", text = "Load", info = "Load Project", route = "project_library")
 
@@ -177,40 +174,29 @@ class MainActivity : ComponentActivity() {
                 azRailItem(id = "help", text = "Help", info = "Show Help", route = "help")
 
                 if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
-                    azRailItem(id = "light", text = "Light", info = "Toggle Flashlight") {
-                        arViewModel.toggleFlashlight()
-                    }
+                    azRailItem(id = "light", text = "Light", info = "Toggle Flashlight", route = "light")
                 }
 
                 if (editorUiState.editorMode == EditorMode.TRACE) {
-                    azRailItem(id = "lock_trace", text = "Lock", info = "Lock Touch") {
-                        mainViewModel.setTouchLocked(true)
-                    }
+                    azRailItem(id = "lock_trace", text = "Lock", info = "Lock Touch", route = "lock_trace")
                 }
 
                 // --- CONTENT GRAPH ---
                 onscreen {
                   AzNavHost(startDestination = "ar") {
                     composable("help") { HelpScreen() }
+                    composable("light") { LightScreen() }
+                    composable("lock_trace") { LockTraceScreen() }
                     composable("ar") { ArScreen() }
                     composable("overlay") { OverlayScreen() }
                     composable("mockup") { MockupScreen() }
                     composable("trace") { TraceScreen() }
                     composable("create") { CreateScreen() }
                     composable("surveyor") { SurveyorScreen() }
+                    composable("capture_keyframe") { CaptureKeyframeScreen() }
+                    composable("wall") { WallScreen() }
                     composable("project_library") { ProjectLibraryWrapper(navController) }
                     composable("settings") { SettingsWrapper(navController) }
-                  }
-
-                  if (showSaveDialog) {
-                      SaveProjectDialog(
-                          initialName = "New Project",
-                          onDismissRequest = { showSaveDialog = false },
-                          onSaveRequest = { name ->
-                              editorViewModel.saveProject(name)
-                              showSaveDialog = false
-                          }
-                      )
                   }
                 }
             }
