@@ -10,7 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
@@ -108,6 +110,24 @@ class MainActivity : ComponentActivity() {
         uri?.let { editorViewModel.onAddLayer(it) }
     }
 
+    private val editorViewModel: EditorViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
+    private val arViewModel: ArViewModel by viewModels()
+
+    // Mutable state proxies for dynamic rail configuration
+    private var editorUiState by mutableStateOf(EditorUiState())
+
+    // Dialog state
+    private var showSaveDialog by mutableStateOf(false)
+
+    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -116,7 +136,9 @@ class MainActivity : ComponentActivity() {
 
         // Observe ViewModels
         lifecycleScope.launch {
-            editorViewModel.uiState.collect { editorUiState = it }
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                editorViewModel.uiState.collect { editorUiState = it }
+            }
         }
 
         setContent {
