@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.composable
@@ -128,6 +129,24 @@ class MainActivity : ComponentActivity() {
         uri?.let { editorViewModel.onAddLayer(it) }
     }
 
+    private val editorViewModel: EditorViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
+    private val arViewModel: ArViewModel by viewModels()
+
+    // Mutable state proxies for dynamic rail configuration
+    private var editorUiState by mutableStateOf(EditorUiState())
+
+    // Dialog state
+    private var showSaveDialog by mutableStateOf(false)
+
+    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -143,11 +162,15 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val navController = rememberNavController()
+            val currentEditorUiState = editorUiState // Capture local value for stability
+            val currentProjectName by editorViewModel.currentProjectName.collectAsStateWithLifecycle()
+            val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+
             AzHostActivityLayout(
                 navController = navController,
             ) {
                 // --- RAIL CONFIGURATION ---
-                val activeHighlightColor = when (editorUiState.activeRotationAxis) {
+                val activeHighlightColor = when (currentEditorUiState.activeRotationAxis) {
                     com.hereliesaz.graffitixr.common.model.RotationAxis.X -> Color.Red
                     com.hereliesaz.graffitixr.common.model.RotationAxis.Y -> Color.Green
                     com.hereliesaz.graffitixr.common.model.RotationAxis.Z -> Color.Blue
@@ -160,7 +183,7 @@ class MainActivity : ComponentActivity() {
                 )
                 azConfig(
                     packButtons = true,
-                    dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+                    dockingSide = if (currentEditorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
                 )
 
                 // MODES HOST
@@ -173,7 +196,7 @@ class MainActivity : ComponentActivity() {
                 azDivider()
 
                 // TARGET / GRID HOST (Only in AR)
-                if (editorUiState.editorMode == EditorMode.AR) {
+                if (currentEditorUiState.editorMode == EditorMode.AR) {
                     azRailHostItem(id = "target_host", text = "Grid", onClick = {})
                     azRailSubItem(id = "create", hostId = "target_host", text = "Create", info = "New Target", route = "create")
                     azRailSubItem(id = "surveyor", hostId = "target_host", text = "Surveyor", info = "Map Environment", route = "surveyor")
@@ -186,25 +209,25 @@ class MainActivity : ComponentActivity() {
                 // DESIGN HOST
                 azRailHostItem(id = "design_host", text = "Design", onClick = {})
 
-                if (editorUiState.editorMode == EditorMode.STATIC) {
+                if (currentEditorUiState.editorMode == EditorMode.STATIC) {
                     azRailSubItem(id = "wall", hostId = "design_host", text = "Wall", info = "Background Image") {
                         backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                 }
 
-                val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else "Open"
-                val openButtonId = if (editorUiState.layers.isNotEmpty()) "add_layer" else "image"
+                val openButtonText = if (currentEditorUiState.layers.isNotEmpty()) "Add" else "Open"
+                val openButtonId = if (currentEditorUiState.layers.isNotEmpty()) "add_layer" else "image"
 
                 azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = "Import Image") {
                     overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
 
                 // Dynamic Layers
-                editorUiState.layers.reversed().forEach { layer ->
+                currentEditorUiState.layers.reversed().forEach { layer ->
                     azRailRelocItem(
                         id = "layer_${layer.id}", hostId = "design_host", text = layer.name,
                         onClick = {
-                            if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
+                            if (currentEditorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
                         },
                         onRelocate = { _, _, newOrder -> editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed()) }
                     ) {
@@ -213,7 +236,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                if (editorUiState.layers.isNotEmpty()) {
+                if (currentEditorUiState.layers.isNotEmpty()) {
                     azRailSubItem(id = "isolate", hostId = "design_host", text = "Isolate", info = "Remove Background", onClick = {
                         editorViewModel.onRemoveBackgroundClicked()
                     })
@@ -230,7 +253,7 @@ class MainActivity : ComponentActivity() {
                     azRailSubItem(id = "blending", hostId = "design_host", text = "Blend", info = "Blend Mode", onClick = {
                         editorViewModel.onCycleBlendMode()
                     })
-                    azRailSubToggle(id = "lock_image", hostId = "design_host", isChecked = editorUiState.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Prevent accidental moves", onClick = {
+                    azRailSubToggle(id = "lock_image", hostId = "design_host", isChecked = currentEditorUiState.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Prevent accidental moves", onClick = {
                         editorViewModel.toggleImageLock()
                     })
                 }
@@ -251,13 +274,13 @@ class MainActivity : ComponentActivity() {
 
                 azRailItem(id = "help", text = "Help", info = "Show Help", route = "help")
 
-                if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
+                if (currentEditorUiState.editorMode == EditorMode.AR || currentEditorUiState.editorMode == EditorMode.OVERLAY) {
                     azRailItem(id = "light", text = "Light", info = "Toggle Flashlight") {
                         arViewModel.toggleFlashlight()
                     }
                 }
 
-                if (editorUiState.editorMode == EditorMode.TRACE) {
+                if (currentEditorUiState.editorMode == EditorMode.TRACE) {
                     azRailItem(id = "lock_trace", text = "Lock", info = "Lock Touch") {
                         mainViewModel.setTouchLocked(true)
                     }
@@ -277,9 +300,15 @@ class MainActivity : ComponentActivity() {
                     composable("settings") { SettingsWrapper(navController) }
                   }
 
+                  // Overlays
+                  com.hereliesaz.graffitixr.design.components.TouchLockOverlay(
+                      isLocked = mainUiState.isTouchLocked,
+                      onUnlockRequested = { mainViewModel.setTouchLocked(false) }
+                  )
+
                   if (showSaveDialog) {
                       SaveProjectDialog(
-                          initialName = "New Project",
+                          initialName = currentProjectName,
                           onDismissRequest = { showSaveDialog = false },
                           onSaveRequest = { name ->
                               editorViewModel.saveProject(name)
