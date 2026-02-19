@@ -38,6 +38,77 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var slamManager: SlamManager
+    @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+
+    private val editorViewModel: EditorViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
+    private val arViewModel: ArViewModel by viewModels()
+
+    // Mutable state proxies for dynamic rail configuration
+    private var editorUiState by mutableStateOf(EditorUiState())
+    private var mainUiState by mutableStateOf(MainUiState())
+
+    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
+    private val editorViewModel: EditorViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
+    private val arViewModel: ArViewModel by viewModels()
+
+    // Mutable state proxies for dynamic rail configuration
+    private var editorUiState by mutableStateOf(EditorUiState())
+
+    // Dialog state
+    private var showSaveDialog by mutableStateOf(false)
+
+    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
+    private val editorViewModel: EditorViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
+    private val arViewModel: ArViewModel by viewModels()
+
+    // Mutable state proxies for dynamic rail configuration
+    private var editorUiState by mutableStateOf(EditorUiState())
+
+    // Dialog state
+    private var showSaveDialog by mutableStateOf(false)
+
+    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
+    private val editorViewModel: EditorViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
+    private val arViewModel: ArViewModel by viewModels()
+
+    // Mutable state proxies for dynamic rail configuration
+    private var editorUiState by mutableStateOf(EditorUiState())
+
+    // Dialog state
+    private var showSaveDialog by mutableStateOf(false)
+
+    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
 
     private val editorViewModel: EditorViewModel by viewModels()
     private val mainViewModel: MainViewModel by viewModels()
