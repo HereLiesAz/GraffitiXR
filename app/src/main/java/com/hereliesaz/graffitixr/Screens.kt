@@ -63,22 +63,14 @@ fun PermissionWrapper(
         mutableStateOf(
             androidx.core.content.ContextCompat.checkSelfPermission(
                 context, Manifest.permission.CAMERA
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
-                    (androidx.core.content.ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
-                            androidx.core.content.ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.ACCESS_COARSE_LOCATION
-                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED)
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
         )
     }
 
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
-        hasPermissions = perms[Manifest.permission.CAMERA] == true &&
-                (perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                        perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true)
+        hasPermissions = perms[Manifest.permission.CAMERA] == true
     }
 
     if (hasPermissions) {
@@ -297,13 +289,9 @@ fun CreateScreen() {
                         }
                     },
                     onMaskConfirmed = { maskedBitmap: Bitmap ->
-                        scope.launch(Dispatchers.IO) {
-                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
-                            withContext(Dispatchers.Main) {
-                                arViewModel.setTempCapture(extracted)
-                                mainViewModel.setCaptureStep(CaptureStep.REVIEW)
-                            }
-                        }
+                        val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+                        arViewModel.setTempCapture(extracted)
+                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                     }
                 )
             }

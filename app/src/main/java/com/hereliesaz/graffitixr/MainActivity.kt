@@ -10,9 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
@@ -65,9 +63,7 @@ class MainActivity : ComponentActivity() {
 
         // Observe ViewModels
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                editorViewModel.uiState.collect { editorUiState = it }
-            }
+            editorViewModel.uiState.collect { editorUiState = it }
         }
 
         setContent {
