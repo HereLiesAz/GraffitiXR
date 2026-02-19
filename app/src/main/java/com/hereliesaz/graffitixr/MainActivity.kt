@@ -4,8 +4,7 @@ import android.os.Bundle
 import com.hereliesaz.aznavrail.AzActivity
 import com.hereliesaz.aznavrail.annotation.App
 import com.hereliesaz.aznavrail.annotation.Az
-import com.hereliesaz.aznavrail.annotation.AzDockingSide
-import com.hereliesaz.aznavrail.annotation.AzTheme
+import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
