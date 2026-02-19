@@ -72,6 +72,24 @@ class MainActivity : ComponentActivity() {
         uri?.let { editorViewModel.onAddLayer(it) }
     }
 
+    private val editorViewModel: EditorViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
+    private val arViewModel: ArViewModel by viewModels()
+
+    // Mutable state proxies for dynamic rail configuration
+    private var editorUiState by mutableStateOf(EditorUiState())
+
+    // Dialog state
+    private var showSaveDialog by mutableStateOf(false)
+
+    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
