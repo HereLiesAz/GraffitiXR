@@ -44,8 +44,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     // FIX: Removed the failing top-level 'kotlin {}' block.
@@ -118,5 +118,7 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.aznavrail)
+    implementation(libs.aznavrail.model)
     implementation(libs.aznavrail.annotation)
-ksp(libs.aznavrail.processor)}
+    ksp(libs.aznavrail.processor)
+}
