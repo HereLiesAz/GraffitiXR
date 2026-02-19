@@ -67,6 +67,9 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // AzNavRail Annotations
+    implementation(libs.aznavrail.annotation)
+
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     androidTestImplementation(libs.androidx.junit)

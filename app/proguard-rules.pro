@@ -2,6 +2,11 @@
 # By default, the flags in this file are appended to flags specified
 # in 'proguard-android-optimize.txt' (part of the SDK).
 
+# --- AzNavRail ---
+# Keep all classes in the aznavrail model package to prevent NoClassDefFoundError
+-keep class com.hereliesaz.aznavrail.model.** { *; }
+-keep class com.hereliesaz.aznavrail.annotation.** { *; }
+
 # --- OpenCV ---
 -keep class org.opencv.** { *; }
 -keepclassmembers class org.opencv.** {

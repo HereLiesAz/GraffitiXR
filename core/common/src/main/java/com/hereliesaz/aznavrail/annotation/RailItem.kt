@@ -1,9 +1,10 @@
-package com.hereliesaz.aznavrail.annotation
+/*
+package com.hereliesaz.graffitixr.common.legacy.aznavrail.annotation
 
 annotation class RailItem(
-    val id: String = "",
-    val text: String = "",
+    val id: String,
+    val text: String,
     val parent: String = "",
-    val home: Boolean = false,
-    val info: String = ""
+    val home: Boolean = false
 )
+*/

@@ -134,19 +134,19 @@ fun LockTraceScreen() {
 }
 
 // Original ID: mode_host
-@Az(railHost = RailHost(id = "mode_host", text = "Modes"))
+@Az(host = RailHost(id = "mode_host", text = "Modes"))
 val ModeHostHost = null
 
 // Original ID: target_host
-@Az(railHost = RailHost(id = "target_host", text = "Target"))
+@Az(host = RailHost(id = "target_host", text = "Target"))
 val TargetHostHost = null
 
 // Original ID: design_host
-@Az(railHost = RailHost(id = "design_host", text = "Design"))
+@Az(host = RailHost(id = "design_host", text = "Design"))
 val DesignHostHost = null
 
 // Original ID: project_host
-@Az(railHost = RailHost(id = "project_host", text = "Project"))
+@Az(host = RailHost(id = "project_host", text = "Project"))
 val ProjectHostHost = null
 
 // Original ID: ar
@@ -344,122 +344,4 @@ fun WallScreen() {
     LaunchedEffect(Unit) {
         launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
-    Text("Picking Wall Image...")
-}
-
-// Original ID: openButtonId
-@Az(rail = RailItem(id = "openButtonId", text = "Add Image", parent = "design_host"))
-@Composable
-fun OpenbuttonidScreen() {
-    val activity = LocalActivity.current as ComponentActivity
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
-
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let { editorViewModel.onAddLayer(it) }
-    }
-
-    LaunchedEffect(Unit) {
-        launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-    }
-    Text("Adding Layer...")
-}
-
-// Original ID: isolate
-@Az(rail = RailItem(id = "isolate", text = "Isolate", parent = "design_host"))
-@Composable
-fun IsolateScreen() {
-    val activity = LocalActivity.current as ComponentActivity
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    LaunchedEffect(Unit) {
-        editorViewModel.onRemoveBackgroundClicked()
-    }
-    Text("Removing Background...")
-}
-
-// Original ID: outline
-@Az(rail = RailItem(id = "outline", text = "Outline", parent = "design_host"))
-@Composable
-fun OutlineScreen() {
-    val activity = LocalActivity.current as ComponentActivity
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    LaunchedEffect(Unit) {
-        editorViewModel.onLineDrawingClicked()
-    }
-    Text("Generating Outline...")
-}
-
-// Original ID: adjust
-@Az(rail = RailItem(id = "adjust", text = "Adjust", parent = "design_host"))
-@Composable
-fun AdjustScreen() {
-    val activity = LocalActivity.current as ComponentActivity
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    LaunchedEffect(Unit) {
-        editorViewModel.onAdjustClicked()
-    }
-    Text("Adjust Panel Active")
-}
-
-// Original ID: balance
-@Az(rail = RailItem(id = "balance", text = "Color", parent = "design_host"))
-@Composable
-fun BalanceScreen() {
-    val activity = LocalActivity.current as ComponentActivity
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    LaunchedEffect(Unit) {
-        editorViewModel.onColorClicked()
-    }
-    Text("Color Balance Panel Active")
-}
-
-// Original ID: blending
-@Az(rail = RailItem(id = "blending", text = "Blend", parent = "design_host"))
-@Composable
-fun BlendingScreen() {
-    val activity = LocalActivity.current as ComponentActivity
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    LaunchedEffect(Unit) {
-        editorViewModel.onCycleBlendMode()
-    }
-    Text("Cycling Blend Mode")
-}
-
-// Original ID: save_project
-@Az(rail = RailItem(id = "save_project", text = "Save", parent = "project_host"))
-@Composable
-fun SaveProjectScreen() {
-    val activity = LocalActivity.current as ComponentActivity
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    LaunchedEffect(Unit) {
-        editorViewModel.saveProject()
-    }
-    Text("Saving Project...")
-}
-
-// Original ID: load_project
-@Az(rail = RailItem(id = "load_project", text = "Load", parent = "project_host"))
-@Composable
-fun LoadProjectScreen() {
-    // Note: Project loading usually involves navigation.
-    // Ensure you handle navigation events here if needed.
-    Text("Load Project Library")
-}
-
-// Original ID: export_project
-@Az(rail = RailItem(id = "export_project", text = "Export", parent = "project_host"))
-@Composable
-fun ExportProjectScreen() {
-    val activity = LocalActivity.current as ComponentActivity
-    val editorViewModel: EditorViewModel = hiltViewModel(activity)
-    LaunchedEffect(Unit) {
-        editorViewModel.exportProject()
-    }
-    Text("Exporting Project...")
-}
-
-// Original ID: settings_sub
-@Az(rail = RailItem(id = "settings_sub", text = "Settings", parent = "project_host"))
-@Composable
-fun SettingsSubScreen() {
-    Text("Settings Screen")
 }
