@@ -67,7 +67,8 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-    // AzNavRail Annotations
+    // AzNavRail
+    api(libs.aznavrail)
     implementation(libs.aznavrail.annotation)
 
     testImplementation(libs.junit)
