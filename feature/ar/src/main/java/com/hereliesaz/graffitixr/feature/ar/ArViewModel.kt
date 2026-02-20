@@ -62,4 +62,30 @@ class ArViewModel @Inject constructor(
     fun togglePointCloud() {
         _uiState.update { it.copy(showPointCloud = !it.showPointCloud) }
     }
+
+    // Target Creation State Updates
+
+    fun updateUnwarpPoints(points: List<androidx.compose.ui.geometry.Offset>) {
+        _uiState.update { it.copy(unwarpPoints = points) }
+    }
+
+    fun setActiveUnwarpPointIndex(index: Int) {
+        _uiState.update { it.copy(activeUnwarpPointIndex = index) }
+    }
+
+    fun setMagnifierPosition(position: androidx.compose.ui.geometry.Offset) {
+        _uiState.update { it.copy(magnifierPosition = position) }
+    }
+
+    fun setMaskPath(path: android.graphics.Path?) {
+        _uiState.update { it.copy(maskPath = path) }
+    }
+
+    fun requestCapture() {
+        _uiState.update { it.copy(isCaptureRequested = true) }
+    }
+
+    fun onCaptureConsumed() {
+        _uiState.update { it.copy(isCaptureRequested = false) }
+    }
 }
