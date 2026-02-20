@@ -46,7 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.*
+import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.annotation.*
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -621,6 +621,7 @@ fun LayersScreen() {
                          // Actually, standard list: 0 is bottom, last is top.
                          // We are displaying reversed (top first).
                          // If we move this item "Up" in display (index - 1), it means moving it later in the original list.
+                         // Note: List is displayed reversed, so "Up" in UI corresponds to moving to a higher index (later) in the source list.
                          val layers = editorUiState.layers
                          val currentIdx = layers.indexOfFirst { it.id == layer.id }
                          if (currentIdx < layers.size - 1) {
