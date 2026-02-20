@@ -35,7 +35,14 @@ data class ArUiState(
     val sensorData: SensorData? = null,
 
     // NEW: Photogrammetry
-    val pendingKeyframePath: String? = null
+    val pendingKeyframePath: String? = null,
+
+    // NEW: Target Creation State
+    val unwarpPoints: List<Offset> = emptyList(),
+    val activeUnwarpPointIndex: Int = -1,
+    val magnifierPosition: Offset = Offset.Zero,
+    val maskPath: android.graphics.Path? = null,
+    val isCaptureRequested: Boolean = false
 )
 
 /**

@@ -59,7 +59,6 @@ import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingUi
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
-import com.hereliesaz.graffitixr.feature.ar.rememberTargetCreationState
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
@@ -299,26 +298,17 @@ fun BaseEditorScreen(
 @Composable
 fun ArScreen() {
     PermissionWrapper {
-        val context = LocalContext.current
-        val entryPoint = EntryPointAccessors.fromApplication(context, ScreensEntryPoint::class.java)
-        val slamManager = entryPoint.slamManager()
-        val projectRepository = entryPoint.projectRepository()
-        val activity = context as ComponentActivity
+        val activity = LocalActivity.current as ComponentActivity
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
         val arViewModel: ArViewModel = hiltViewModel(activity)
         val arUiState by arViewModel.uiState.collectAsState()
 
-        BaseEditorScreen(EditorMode.AR) { editorViewModel, editorUiState ->
-            val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
+        LaunchedEffect(Unit) {
+            mainViewModel.setCurrentScreen("ar")
+        }
 
-            ArView(
-                viewModel = arViewModel,
-                uiState = arUiState,
-                slamManager = slamManager,
-                projectRepository = projectRepository,
-                activeLayer = activeLayer,
-                onRendererCreated = { /* Handle renderer creation if needed */ },
-                hasCameraPermission = true
-            )
+        BaseEditorScreen(EditorMode.AR) { editorViewModel, editorUiState ->
+            // ArView is now in GlobalBackground
 
             if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
                 EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
@@ -332,26 +322,17 @@ fun ArScreen() {
 @Composable
 fun OverlayScreen() {
     PermissionWrapper {
-        val context = LocalContext.current
-        val entryPoint = EntryPointAccessors.fromApplication(context, ScreensEntryPoint::class.java)
-        val slamManager = entryPoint.slamManager()
-        val projectRepository = entryPoint.projectRepository()
-        val activity = context as ComponentActivity
+        val activity = LocalActivity.current as ComponentActivity
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
         val arViewModel: ArViewModel = hiltViewModel(activity)
         val arUiState by arViewModel.uiState.collectAsState()
 
-        BaseEditorScreen(EditorMode.OVERLAY) { editorViewModel, editorUiState ->
-            val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
+        LaunchedEffect(Unit) {
+            mainViewModel.setCurrentScreen("overlay")
+        }
 
-            ArView(
-                viewModel = arViewModel,
-                uiState = arUiState.copy(showPointCloud = false),
-                slamManager = slamManager,
-                projectRepository = projectRepository,
-                activeLayer = activeLayer,
-                onRendererCreated = { },
-                hasCameraPermission = true
-            )
+        BaseEditorScreen(EditorMode.OVERLAY) { editorViewModel, editorUiState ->
+            // ArView is now in GlobalBackground
             EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
         }
     }
@@ -361,6 +342,13 @@ fun OverlayScreen() {
 @Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "modes"))
 @Composable
 fun MockupScreen() {
+    val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("mockup")
+    }
+
     BaseEditorScreen(EditorMode.STATIC) { editorViewModel, editorUiState ->
         EditorMockupScreen(uiState = editorUiState, viewModel = editorViewModel)
     }
@@ -370,6 +358,13 @@ fun MockupScreen() {
 @Az(rail = RailItem(id = "trace", text = "Trace", parent = "modes"))
 @Composable
 fun TraceScreen() {
+    val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("trace")
+    }
+
     BaseEditorScreen(EditorMode.TRACE) { editorViewModel, editorUiState ->
         EditorTraceScreen(uiState = editorUiState, viewModel = editorViewModel)
     }
@@ -390,11 +385,10 @@ fun CreateScreen() {
         val arUiState by arViewModel.uiState.collectAsState()
         val editorUiState by editorViewModel.uiState.collectAsState()
 
-        val targetCreationState = rememberTargetCreationState()
         val scope = rememberCoroutineScope()
 
-        // Ensure we are in capture mode
         LaunchedEffect(Unit) {
+            mainViewModel.setCurrentScreen("create")
             mainViewModel.startTargetCapture()
         }
 
@@ -403,23 +397,13 @@ fun CreateScreen() {
             Text("Target Created.")
         } else {
             Box(Modifier.fillMaxSize()) {
-                // 1. Background (Camera / Unwarp Preview)
-                TargetCreationBackground(
-                    uiState = arUiState,
-                    captureStep = mainUiState.captureStep,
-                    state = targetCreationState,
-                    onPhotoCaptured = { bitmap ->
-                        arViewModel.setTempCapture(bitmap)
-                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
-                    }
-                )
+                // Background (Camera) is now in GlobalBackground
 
-                // 2. UI Overlay (Buttons, Guides)
+                // UI Overlay (Buttons, Guides)
                 TargetCreationUi(
                     uiState = arUiState,
                     isRightHanded = editorUiState.isRightHanded,
                     captureStep = mainUiState.captureStep,
-                    state = targetCreationState,
                     onConfirm = {
                         val bitmapToSave = arUiState.tempCaptureBitmap
                         if (bitmapToSave != null) {
@@ -455,7 +439,12 @@ fun CreateScreen() {
                                 mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                             }
                         }
-                    }
+                    },
+                    onRequestCapture = { arViewModel.requestCapture() },
+                    onUpdateUnwarpPoints = { arViewModel.updateUnwarpPoints(it) },
+                    onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPointIndex(it) },
+                    onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
+                    onUpdateMaskPath = { arViewModel.setMaskPath(it) }
                 )
             }
         }
@@ -467,6 +456,13 @@ fun CreateScreen() {
 @Composable
 fun SurveyorScreen() {
     PermissionWrapper {
+        val activity = LocalActivity.current as ComponentActivity
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
+
+        LaunchedEffect(Unit) {
+            mainViewModel.setCurrentScreen("surveyor")
+        }
+
         MappingUi(
             onBackClick = { /* Handle via rail */ },
             onScanComplete = { /* Handle complete */ }
@@ -485,7 +481,11 @@ fun ProjectLibraryWrapper() {
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
     val editorUiState by editorViewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("project_library")
+        dashboardViewModel.loadAvailableProjects()
+    }
 
     Box(Modifier.fillMaxSize()) {
         ProjectLibraryScreen(
@@ -519,6 +519,11 @@ fun SettingsWrapper() {
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
 
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("settings")
+    }
+
     Box(Modifier.fillMaxSize()) {
         SettingsScreen(
             currentVersion = BuildConfig.VERSION_NAME,
@@ -541,6 +546,11 @@ fun LayersScreen() {
     val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
+
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("layers")
+    }
 
     val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { editorViewModel.onAddLayer(it) }
