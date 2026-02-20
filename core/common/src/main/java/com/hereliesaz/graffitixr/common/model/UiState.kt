@@ -41,7 +41,7 @@ data class ArUiState(
     val unwarpPoints: List<Offset> = emptyList(),
     val activeUnwarpPointIndex: Int = -1,
     val magnifierPosition: Offset = Offset.Zero,
-    val maskPath: android.graphics.Path? = null,
+    val maskPath: androidx.compose.ui.graphics.Path? = null,
     val isCaptureRequested: Boolean = false
 )
 

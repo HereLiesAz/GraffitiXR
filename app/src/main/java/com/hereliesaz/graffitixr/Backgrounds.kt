@@ -45,8 +45,8 @@ fun rememberHasCameraPermission(): Boolean {
 @Az(background = Background(weight = 0))
 @Composable
 fun GlobalBackground() {
-    val activity = LocalContext.current as? ComponentActivity
-    if (activity == null) return
+    val context = LocalContext.current
+    val activity = context as ComponentActivity
     val mainViewModel: MainViewModel = hiltViewModel(activity)
     val arViewModel: ArViewModel = hiltViewModel(activity)
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
@@ -66,7 +66,7 @@ fun GlobalBackground() {
     // Decide what to render
     // Priority: Target Creation (if active) > Specific Screens
 
-    if (currentScreen == "create" || mainUiState.isCapturingTarget) {
+    if (currentScreen == AppScreens.CREATE || mainUiState.isCapturingTarget) {
         if (hasPermission) {
             TargetCreationBackground(
                 uiState = arUiState,
@@ -83,7 +83,7 @@ fun GlobalBackground() {
                 }
             )
         }
-    } else if (currentScreen == "surveyor") {
+    } else if (currentScreen == AppScreens.SURVEYOR) {
         if (hasPermission) {
             MappingBackground(
                 slamManager = slamManager,
@@ -95,7 +95,7 @@ fun GlobalBackground() {
         // Default to ArView for "ar", "overlay", "trace"
         val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
 
-        if (currentScreen == "ar" || currentScreen == "overlay" || currentScreen == "trace") {
+        if (currentScreen == AppScreens.AR || currentScreen == AppScreens.OVERLAY || currentScreen == AppScreens.TRACE) {
             ArView(
                 viewModel = arViewModel,
                 uiState = arUiState,
