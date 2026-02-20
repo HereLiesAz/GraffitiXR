@@ -45,8 +45,8 @@ fun rememberHasCameraPermission(): Boolean {
 @Az(background = Background(weight = 0))
 @Composable
 fun GlobalBackground() {
-    val context = LocalContext.current
-    val activity = context as ComponentActivity
+    val activity = LocalContext.current as? ComponentActivity
+    if (activity == null) return
     val mainViewModel: MainViewModel = hiltViewModel(activity)
     val arViewModel: ArViewModel = hiltViewModel(activity)
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
