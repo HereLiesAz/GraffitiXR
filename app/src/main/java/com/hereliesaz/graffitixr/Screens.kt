@@ -5,17 +5,48 @@ import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.annotation.*
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -29,6 +60,7 @@ import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberTargetCreationState
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
@@ -100,8 +132,119 @@ fun PermissionWrapper(
     }
 }
 
+// Keyframe Screen (Action)
+@Az(rail = RailItem(id = "capture_keyframe", text = "Keyframe", parent = "target"))
+@Composable
+fun KeyframeScreen() {
+    val navController = rememberNavController()
+    val activity = LocalActivity.current as ComponentActivity
+    val arViewModel: ArViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        arViewModel.captureKeyframe()
+        navController.popBackStack()
+    }
+
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Capturing Keyframe...")
+    }
+}
+
+// Light Screen (Toggle Action)
+@Az(rail = RailItem(id = "light", text = "Light"))
+@Composable
+fun LightScreen() {
+    val navController = rememberNavController()
+    val activity = LocalActivity.current as ComponentActivity
+    val arViewModel: ArViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        arViewModel.toggleFlashlight()
+        navController.popBackStack()
+    }
+
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Toggling Light...")
+    }
+}
+
+// Lock Trace Screen (Action)
+@Az(rail = RailItem(id = "lock_trace", text = "Lock Trace", parent = "modes"))
+@Composable
+fun LockTraceScreen() {
+    val navController = rememberNavController()
+    val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        mainViewModel.setTouchLocked(true)
+        navController.popBackStack()
+    }
+
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Locking Touch...")
+    }
+}
+
+// Save Project Screen
+@Az(rail = RailItem(id = "save_project", text = "Save", parent = "project"))
+@Composable
+fun SaveProjectScreen() {
+    val navController = rememberNavController()
+    val activity = LocalActivity.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val currentProjectName by editorViewModel.currentProjectName.collectAsState()
+
+    SaveProjectDialog(
+        initialName = currentProjectName,
+        onDismissRequest = { navController.popBackStack() },
+        onSaveRequest = { name ->
+            editorViewModel.saveProject(name)
+            navController.popBackStack()
+        }
+    )
+}
+
+// Export Project Screen
+@Az(rail = RailItem(id = "export_project", text = "Export", parent = "project"))
+@Composable
+fun ExportProjectScreen() {
+    val navController = rememberNavController()
+    val activity = LocalActivity.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Export Project", style = MaterialTheme.typography.headlineMedium)
+            Button(onClick = {
+                editorViewModel.exportProject()
+                navController.popBackStack()
+            }) {
+                Text("Confirm Export")
+            }
+            Button(onClick = { navController.popBackStack() }) {
+                Text("Cancel")
+            }
+        }
+    }
+}
+
+// Define Hosts
+// Trying 'host' parameter instead of 'railHost'
+@Az(host = RailHost(id = "modes", text = "Modes"))
+val ModesHost = null
+
+@Az(host = RailHost(id = "target", text = "Target"))
+val TargetHost = null
+
+@Az(host = RailHost(id = "design", text = "Design"))
+val DesignHost = null
+
+@Az(host = RailHost(id = "project", text = "Project"))
+val ProjectHost = null
+
 // Help Screen
-@Az(rail = RailItem(id = "help", text = "Help", parent = "hidden_host"))
+@Az(rail = RailItem(id = "help", text = "Help"))
 @Composable
 fun HelpScreen() {
     com.hereliesaz.graffitixr.design.components.InfoDialog(
@@ -140,11 +283,17 @@ fun BaseEditorScreen(
             showUnlockInstructions = mainUiState.showUnlockInstructions,
             isCapturingTarget = mainUiState.isCapturingTarget
         )
+
+        // Overlays
+        com.hereliesaz.graffitixr.design.components.TouchLockOverlay(
+            isLocked = mainUiState.isTouchLocked,
+            onUnlockRequested = { mainViewModel.setTouchLocked(false) }
+        )
     }
 }
 
 // AR Screen (Default/Home)
-@Az(rail = RailItem(id = "ar", text = "AR", parent = "hidden_host", home = true))
+@Az(rail = RailItem(id = "ar", text = "AR", parent = "modes", home = true))
 @Composable
 fun ArScreen() {
     PermissionWrapper {
@@ -177,7 +326,7 @@ fun ArScreen() {
 }
 
 // Overlay Screen
-@Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "hidden_host"))
+@Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "modes"))
 @Composable
 fun OverlayScreen() {
     PermissionWrapper {
@@ -207,7 +356,7 @@ fun OverlayScreen() {
 }
 
 // Mockup Screen
-@Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "hidden_host"))
+@Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "modes"))
 @Composable
 fun MockupScreen() {
     BaseEditorScreen(EditorMode.STATIC) { editorViewModel, editorUiState ->
@@ -216,7 +365,7 @@ fun MockupScreen() {
 }
 
 // Trace Screen
-@Az(rail = RailItem(id = "trace", text = "Trace", parent = "hidden_host"))
+@Az(rail = RailItem(id = "trace", text = "Trace", parent = "modes"))
 @Composable
 fun TraceScreen() {
     BaseEditorScreen(EditorMode.TRACE) { editorViewModel, editorUiState ->
@@ -225,7 +374,7 @@ fun TraceScreen() {
 }
 
 // Create Screen
-@Az(rail = RailItem(id = "create", text = "Create", parent = "hidden_host"))
+@Az(rail = RailItem(id = "create", text = "Create", parent = "target"))
 @Composable
 fun CreateScreen() {
     PermissionWrapper {
@@ -312,7 +461,7 @@ fun CreateScreen() {
 }
 
 // Surveyor Screen
-@Az(rail = RailItem(id = "surveyor", text = "Survey", parent = "hidden_host"))
+@Az(rail = RailItem(id = "surveyor", text = "Survey", parent = "target"))
 @Composable
 fun SurveyorScreen() {
     PermissionWrapper {
@@ -324,9 +473,10 @@ fun SurveyorScreen() {
 }
 
 // Project Library Screen
-@Az(rail = RailItem(id = "project_library", text = "Library", parent = "hidden_host"))
+@Az(rail = RailItem(id = "project_library", text = "Library", parent = "project"))
 @Composable
-fun ProjectLibraryWrapper(navController: NavController) {
+fun ProjectLibraryWrapper() {
+    val actualNavController = rememberNavController()
     val activity = LocalActivity.current as ComponentActivity
     val dashboardViewModel: DashboardViewModel = hiltViewModel(activity)
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
@@ -341,7 +491,7 @@ fun ProjectLibraryWrapper(navController: NavController) {
             onLoadProject = {
                 dashboardViewModel.openProject(it)
                 // Navigate to default editor screen (AR)
-                navController.navigate("ar") {
+                actualNavController.navigate("ar") {
                     popUpTo("project_library") { inclusive = true }
                 }
             },
@@ -350,7 +500,7 @@ fun ProjectLibraryWrapper(navController: NavController) {
             },
             onNewProject = {
                 dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-                navController.navigate("ar") {
+                actualNavController.navigate("ar") {
                     popUpTo("project_library") { inclusive = true }
                 }
             }
@@ -359,9 +509,10 @@ fun ProjectLibraryWrapper(navController: NavController) {
 }
 
 // Settings Screen
-@Az(rail = RailItem(id = "settings", text = "Settings", parent = "hidden_host"))
+@Az(rail = RailItem(id = "settings", text = "Settings", parent = "project"))
 @Composable
-fun SettingsWrapper(navController: NavController) {
+fun SettingsWrapper() {
+    val navController = rememberNavController()
     val activity = LocalActivity.current as ComponentActivity
     val editorViewModel: EditorViewModel = hiltViewModel(activity)
     val editorUiState by editorViewModel.uiState.collectAsState()
@@ -377,5 +528,159 @@ fun SettingsWrapper(navController: NavController) {
             onInstallUpdate = { },
             onClose = { navController.popBackStack() }
         )
+    }
+}
+
+// Layers Screen
+@Az(rail = RailItem(id = "layers", text = "Layers", parent = "design"))
+@Composable
+fun LayersScreen() {
+    val activity = LocalActivity.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val editorUiState by editorViewModel.uiState.collectAsState()
+
+    val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
+    val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Layers", style = MaterialTheme.typography.headlineMedium)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Add Layer")
+            }
+            if (editorUiState.editorMode == EditorMode.STATIC) {
+                Button(
+                    onClick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Wallpaper, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Background")
+                }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            itemsIndexed(editorUiState.layers.reversed()) { index, layer ->
+                val isSelected = layer.id == editorUiState.activeLayerId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { editorViewModel.onLayerActivated(layer.id) }
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    var isEditing by remember { mutableStateOf(false) }
+                    var editedName by remember { mutableStateOf(layer.name) }
+
+                    if (isEditing) {
+                        OutlinedTextField(
+                            value = editedName,
+                            onValueChange = { editedName = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        IconButton(onClick = {
+                            editorViewModel.onLayerRenamed(layer.id, editedName)
+                            isEditing = false
+                        }) {
+                            Text("OK")
+                        }
+                    } else {
+                        Text(
+                            text = layer.name,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { isEditing = true },
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+
+                    IconButton(onClick = {
+                         // Move Up (which means earlier in the list, since reversed)
+                         // Actually, standard list: 0 is bottom, last is top.
+                         // We are displaying reversed (top first).
+                         // If we move this item "Up" in display (index - 1), it means moving it later in the original list.
+                         // Note: List is displayed reversed, so "Up" in UI corresponds to moving to a higher index (later) in the source list.
+                         val layers = editorUiState.layers
+                         val currentIdx = layers.indexOfFirst { it.id == layer.id }
+                         if (currentIdx < layers.size - 1) {
+                             val newLayers = layers.toMutableList()
+                             java.util.Collections.swap(newLayers, currentIdx, currentIdx + 1)
+                             editorViewModel.onLayerReordered(newLayers.map { it.id })
+                         }
+                    }) {
+                        Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
+                    }
+
+                    IconButton(onClick = {
+                        // Move Down
+                         val layers = editorUiState.layers
+                         val currentIdx = layers.indexOfFirst { it.id == layer.id }
+                         if (currentIdx > 0) {
+                             val newLayers = layers.toMutableList()
+                             java.util.Collections.swap(newLayers, currentIdx, currentIdx - 1)
+                             editorViewModel.onLayerReordered(newLayers.map { it.id })
+                         }
+                    }) {
+                        Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
+                    }
+
+                    IconButton(onClick = { editorViewModel.onLayerRemoved(layer.id) }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Remove")
+                    }
+                }
+            }
+        }
+
+        if (editorUiState.layers.isNotEmpty()) {
+            Text("Actions", style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                 // We can use a FlowRow or horizontal scroll if too many items
+                 // For now, simple buttons
+                 Button(onClick = { editorViewModel.onRemoveBackgroundClicked() }) { Text("Isolate") }
+                 Button(onClick = { editorViewModel.onLineDrawingClicked() }) { Text("Outline") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                 Button(onClick = { editorViewModel.onAdjustClicked() }) { Text("Adjust") }
+                 Button(onClick = { editorViewModel.onColorClicked() }) { Text("Balance") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                 Button(onClick = { editorViewModel.onCycleBlendMode() }) { Text("Blend") }
+                 Button(onClick = { editorViewModel.toggleImageLock() }) {
+                     Icon(if (editorUiState.isImageLocked) Icons.Default.Lock else Icons.Default.LockOpen, contentDescription = null)
+                     Text(if (editorUiState.isImageLocked) "Unlock" else "Lock")
+                 }
+            }
+        }
     }
 }
