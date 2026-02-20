@@ -626,7 +626,7 @@ fun LayersScreen() {
                          val currentIdx = layers.indexOfFirst { it.id == layer.id }
                          if (currentIdx < layers.size - 1) {
                              val newLayers = layers.toMutableList()
-                             java.util.Collections.swap(newLayers, currentIdx, currentIdx + 1)
+                             newLayers.swap(currentIdx, currentIdx + 1)
                              editorViewModel.onLayerReordered(newLayers.map { it.id })
                          }
                     }) {
