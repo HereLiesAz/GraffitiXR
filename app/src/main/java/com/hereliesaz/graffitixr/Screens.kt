@@ -12,8 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,7 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.*
 import com.hereliesaz.aznavrail.annotation.*
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -534,7 +532,6 @@ fun SettingsWrapper() {
 }
 
 // Layers Screen
-@OptIn(ExperimentalLayoutApi::class)
 @Az(rail = RailItem(id = "layers", text = "Layers", parent = "design"))
 @Composable
 fun LayersScreen() {
@@ -593,17 +590,19 @@ fun LayersScreen() {
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val isEditing = editorUiState.editingLayerId == layer.id
+                    var isEditing by remember { mutableStateOf(false) }
+                    var editedName by remember { mutableStateOf(layer.name) }
 
                     if (isEditing) {
                         OutlinedTextField(
-                            value = editorUiState.editingLayerName,
-                            onValueChange = { editorViewModel.onUpdateLayerRenaming(it) },
+                            value = editedName,
+                            onValueChange = { editedName = it },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
                         IconButton(onClick = {
-                            editorViewModel.onConfirmLayerRenaming()
+                            editorViewModel.onLayerRenamed(layer.id, editedName)
+                            isEditing = false
                         }) {
                             Text("OK")
                         }
@@ -612,7 +611,7 @@ fun LayersScreen() {
                             text = layer.name,
                             modifier = Modifier
                                 .weight(1f)
-                                .clickable { editorViewModel.onStartLayerRenaming(layer.id, layer.name) },
+                                .clickable { isEditing = true },
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
@@ -622,7 +621,6 @@ fun LayersScreen() {
                          // Actually, standard list: 0 is bottom, last is top.
                          // We are displaying reversed (top first).
                          // If we move this item "Up" in display (index - 1), it means moving it later in the original list.
-                         // Note: List is displayed reversed, so "Up" in UI corresponds to moving to a higher index (later) in the source list.
                          val layers = editorUiState.layers
                          val currentIdx = layers.indexOfFirst { it.id == layer.id }
                          if (currentIdx < layers.size - 1) {
@@ -656,15 +654,26 @@ fun LayersScreen() {
 
         if (editorUiState.layers.isNotEmpty()) {
             Text("Actions", style = MaterialTheme.typography.titleMedium)
-            FlowRow(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                 // We can use a FlowRow or horizontal scroll if too many items
+                 // For now, simple buttons
                  Button(onClick = { editorViewModel.onRemoveBackgroundClicked() }) { Text("Isolate") }
                  Button(onClick = { editorViewModel.onLineDrawingClicked() }) { Text("Outline") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                  Button(onClick = { editorViewModel.onAdjustClicked() }) { Text("Adjust") }
                  Button(onClick = { editorViewModel.onColorClicked() }) { Text("Balance") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                  Button(onClick = { editorViewModel.onCycleBlendMode() }) { Text("Blend") }
                  Button(onClick = { editorViewModel.toggleImageLock() }) {
                      Icon(if (editorUiState.isImageLocked) Icons.Default.Lock else Icons.Default.LockOpen, contentDescription = null)
