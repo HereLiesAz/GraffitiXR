@@ -77,7 +77,7 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(magnifierPosition = position) }
     }
 
-    fun setMaskPath(path: androidx.compose.ui.graphics.Path?) {
+    fun setMaskPath(path: android.graphics.Path?) {
         _uiState.update { it.copy(maskPath = path) }
     }
 

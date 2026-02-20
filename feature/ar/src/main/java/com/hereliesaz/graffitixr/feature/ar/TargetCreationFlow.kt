@@ -150,9 +150,7 @@ fun TargetCreationUi(
                     currentMaskPath = Path().apply { moveTo(it.x, it.y) }
                 },
                 onPathFinished = {
-                    val src = uiState.maskPath ?: Path()
-                    val newPath = Path()
-                    newPath.addPath(src)
+                    val newPath = Path(uiState.maskPath ?: Path())
                     currentMaskPath?.let { newPath.addPath(it) }
                     currentMaskPath = null
                     onUpdateMaskPath(newPath)

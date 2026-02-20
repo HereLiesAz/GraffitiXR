@@ -66,7 +66,7 @@ fun GlobalBackground() {
     // Decide what to render
     // Priority: Target Creation (if active) > Specific Screens
 
-    if (currentScreen == AppScreens.CREATE || mainUiState.isCapturingTarget) {
+    if (currentScreen == "create" || mainUiState.isCapturingTarget) {
         if (hasPermission) {
             TargetCreationBackground(
                 uiState = arUiState,
@@ -83,7 +83,7 @@ fun GlobalBackground() {
                 }
             )
         }
-    } else if (currentScreen == AppScreens.SURVEYOR) {
+    } else if (currentScreen == "surveyor") {
         if (hasPermission) {
             MappingBackground(
                 slamManager = slamManager,
@@ -95,7 +95,7 @@ fun GlobalBackground() {
         // Default to ArView for "ar", "overlay", "trace"
         val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId } ?: editorUiState.layers.firstOrNull()
 
-        if (currentScreen == AppScreens.AR || currentScreen == AppScreens.OVERLAY || currentScreen == AppScreens.TRACE) {
+        if (currentScreen == "ar" || currentScreen == "overlay" || currentScreen == "trace") {
             ArView(
                 viewModel = arViewModel,
                 uiState = arUiState,

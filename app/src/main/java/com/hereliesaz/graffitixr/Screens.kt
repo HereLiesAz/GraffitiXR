@@ -59,7 +59,6 @@ import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.MappingUi
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
-import com.hereliesaz.graffitixr.feature.ar.rememberTargetCreationState
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
@@ -83,21 +82,6 @@ import kotlinx.coroutines.withContext
 interface ScreensEntryPoint {
     fun slamManager(): SlamManager
     fun projectRepository(): com.hereliesaz.graffitixr.domain.repository.ProjectRepository
-}
-
-/**
- * Helper to update current screen state.
- */
-@Composable
-private fun TrackedScreen(screenId: String, content: @Composable () -> Unit) {
-    val activity = LocalActivity.current as? ComponentActivity ?: return
-    val mainViewModel: MainViewModel = hiltViewModel(activity)
-
-    LaunchedEffect(screenId) {
-        mainViewModel.setCurrentScreen(screenId)
-    }
-
-    content()
 }
 
 /**
@@ -310,368 +294,392 @@ fun BaseEditorScreen(
 }
 
 // AR Screen (Default/Home)
-@Az(rail = RailItem(id = AppScreens.AR, text = "AR", parent = "modes", home = true))
+@Az(rail = RailItem(id = "ar", text = "AR", parent = "modes", home = true))
 @Composable
 fun ArScreen() {
-    TrackedScreen(AppScreens.AR) {
-        PermissionWrapper {
-            val activity = LocalActivity.current as ComponentActivity
-            val editorViewModel: EditorViewModel = hiltViewModel(activity)
-            val arViewModel: ArViewModel = hiltViewModel(activity)
-            val arUiState by arViewModel.uiState.collectAsState()
-            val editorUiState by editorViewModel.uiState.collectAsState()
+    PermissionWrapper {
+        val activity = LocalActivity.current as ComponentActivity
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
+        val arViewModel: ArViewModel = hiltViewModel(activity)
+        val arUiState by arViewModel.uiState.collectAsState()
 
-            BaseEditorScreen(EditorMode.AR) { _, _ ->
-                // ArView is now in GlobalBackground
-
-                if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
-                    EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
-                }
-            }
+        LaunchedEffect(Unit) {
+            mainViewModel.setCurrentScreen("ar")
         }
-    }
-}
 
-// Overlay Screen
-@Az(rail = RailItem(id = AppScreens.OVERLAY, text = "Overlay", parent = "modes"))
-@Composable
-fun OverlayScreen() {
-    TrackedScreen(AppScreens.OVERLAY) {
-        PermissionWrapper {
-            val activity = LocalActivity.current as ComponentActivity
-            val editorViewModel: EditorViewModel = hiltViewModel(activity)
-            val editorUiState by editorViewModel.uiState.collectAsState()
+        BaseEditorScreen(EditorMode.AR) { editorViewModel, editorUiState ->
+            // ArView is now in GlobalBackground
 
-            BaseEditorScreen(EditorMode.OVERLAY) { _, _ ->
-                // ArView is now in GlobalBackground
+            if (!arUiState.isTargetDetected && editorUiState.layers.isNotEmpty()) {
                 EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
             }
         }
     }
 }
 
+// Overlay Screen
+@Az(rail = RailItem(id = "overlay", text = "Overlay", parent = "modes"))
+@Composable
+fun OverlayScreen() {
+    PermissionWrapper {
+        val activity = LocalActivity.current as ComponentActivity
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
+        val arViewModel: ArViewModel = hiltViewModel(activity)
+        val arUiState by arViewModel.uiState.collectAsState()
+
+        LaunchedEffect(Unit) {
+            mainViewModel.setCurrentScreen("overlay")
+        }
+
+        BaseEditorScreen(EditorMode.OVERLAY) { editorViewModel, editorUiState ->
+            // ArView is now in GlobalBackground
+            EditorOverlayScreen(uiState = editorUiState, viewModel = editorViewModel)
+        }
+    }
+}
+
 // Mockup Screen
-@Az(rail = RailItem(id = AppScreens.MOCKUP, text = "Mockup", parent = "modes"))
+@Az(rail = RailItem(id = "mockup", text = "Mockup", parent = "modes"))
 @Composable
 fun MockupScreen() {
-    TrackedScreen(AppScreens.MOCKUP) {
-        BaseEditorScreen(EditorMode.STATIC) { editorViewModel, editorUiState ->
-            EditorMockupScreen(uiState = editorUiState, viewModel = editorViewModel)
-        }
+    val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("mockup")
+    }
+
+    BaseEditorScreen(EditorMode.STATIC) { editorViewModel, editorUiState ->
+        EditorMockupScreen(uiState = editorUiState, viewModel = editorViewModel)
     }
 }
 
 // Trace Screen
-@Az(rail = RailItem(id = AppScreens.TRACE, text = "Trace", parent = "modes"))
+@Az(rail = RailItem(id = "trace", text = "Trace", parent = "modes"))
 @Composable
 fun TraceScreen() {
-    TrackedScreen(AppScreens.TRACE) {
-        BaseEditorScreen(EditorMode.TRACE) { editorViewModel, editorUiState ->
-            EditorTraceScreen(uiState = editorUiState, viewModel = editorViewModel)
-        }
+    val activity = LocalActivity.current as ComponentActivity
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("trace")
+    }
+
+    BaseEditorScreen(EditorMode.TRACE) { editorViewModel, editorUiState ->
+        EditorTraceScreen(uiState = editorUiState, viewModel = editorViewModel)
     }
 }
 
 // Create Screen
-@Az(rail = RailItem(id = AppScreens.CREATE, text = "Create", parent = "target"))
+@Az(rail = RailItem(id = "create", text = "Create", parent = "target"))
 @Composable
 fun CreateScreen() {
-    TrackedScreen(AppScreens.CREATE) {
-        PermissionWrapper {
-            val context = LocalContext.current
-            val activity = context as ComponentActivity
-            val mainViewModel: MainViewModel = hiltViewModel(activity)
-            val arViewModel: ArViewModel = hiltViewModel(activity)
-            val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    PermissionWrapper {
+        val context = LocalContext.current
+        val activity = context as ComponentActivity
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
+        val arViewModel: ArViewModel = hiltViewModel(activity)
+        val editorViewModel: EditorViewModel = hiltViewModel(activity)
 
-            val mainUiState by mainViewModel.uiState.collectAsState()
-            val arUiState by arViewModel.uiState.collectAsState()
-            val editorUiState by editorViewModel.uiState.collectAsState()
+        val mainUiState by mainViewModel.uiState.collectAsState()
+        val arUiState by arViewModel.uiState.collectAsState()
+        val editorUiState by editorViewModel.uiState.collectAsState()
 
-            val scope = rememberCoroutineScope()
+        val scope = rememberCoroutineScope()
 
-            LaunchedEffect(Unit) {
-                mainViewModel.startTargetCapture()
-            }
+        LaunchedEffect(Unit) {
+            mainViewModel.setCurrentScreen("create")
+            mainViewModel.startTargetCapture()
+        }
 
-            if (mainUiState.captureStep == CaptureStep.NONE) {
-                // Flow finished
-                Text("Target Created.")
-            } else {
-                Box(Modifier.fillMaxSize()) {
-                    // Background (Camera) is now in GlobalBackground
+        if (mainUiState.captureStep == CaptureStep.NONE) {
+            // Flow finished
+            Text("Target Created.")
+        } else {
+            Box(Modifier.fillMaxSize()) {
+                // Background (Camera) is now in GlobalBackground
 
-                    // UI Overlay (Buttons, Guides)
-                    TargetCreationUi(
-                        uiState = arUiState,
-                        isRightHanded = editorUiState.isRightHanded,
-                        captureStep = mainUiState.captureStep,
-                        onConfirm = {
-                            val bitmapToSave = arUiState.tempCaptureBitmap
-                            if (bitmapToSave != null) {
-                                scope.launch(Dispatchers.IO) {
-                                    val uri = saveBitmapToCache(context, bitmapToSave)
-                                    if (uri != null) {
-                                        withContext(Dispatchers.Main) {
-                                            arViewModel.onFrameCaptured(bitmapToSave, uri)
-                                            mainViewModel.onConfirmTargetCreation()
-                                        }
+                // UI Overlay (Buttons, Guides)
+                TargetCreationUi(
+                    uiState = arUiState,
+                    isRightHanded = editorUiState.isRightHanded,
+                    captureStep = mainUiState.captureStep,
+                    onConfirm = {
+                        val bitmapToSave = arUiState.tempCaptureBitmap
+                        if (bitmapToSave != null) {
+                            scope.launch(Dispatchers.IO) {
+                                val uri = saveBitmapToCache(context, bitmapToSave)
+                                if (uri != null) {
+                                    withContext(Dispatchers.Main) {
+                                        arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                        mainViewModel.onConfirmTargetCreation()
                                     }
                                 }
-                            } else {
-                                mainViewModel.onConfirmTargetCreation()
                             }
-                        },
-                        onRetake = mainViewModel::onRetakeCapture,
-                        onCancel = mainViewModel::onCancelCaptureClicked,
-                        onUnwarpConfirm = { points: List<Offset> ->
-                            arUiState.tempCaptureBitmap?.let { src ->
-                                ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                                    arViewModel.setTempCapture(unwarped)
-                                    // Inline state transition to MASK, keeping flow self-contained
-                                    mainViewModel.setCaptureStep(CaptureStep.MASK)
-                                }
+                        } else {
+                            mainViewModel.onConfirmTargetCreation()
+                        }
+                    },
+                    onRetake = mainViewModel::onRetakeCapture,
+                    onCancel = mainViewModel::onCancelCaptureClicked,
+                    onUnwarpConfirm = { points: List<Offset> ->
+                        arUiState.tempCaptureBitmap?.let { src ->
+                            ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                                arViewModel.setTempCapture(unwarped)
+                                // Inline state transition to MASK, keeping flow self-contained
+                                mainViewModel.setCaptureStep(CaptureStep.MASK)
                             }
-                        },
-                        onMaskConfirmed = { maskedBitmap: Bitmap ->
-                            scope.launch(Dispatchers.IO) {
-                                val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
-                                withContext(Dispatchers.Main) {
-                                    arViewModel.setTempCapture(extracted)
-                                    mainViewModel.setCaptureStep(CaptureStep.REVIEW)
-                                }
+                        }
+                    },
+                    onMaskConfirmed = { maskedBitmap: Bitmap ->
+                        scope.launch(Dispatchers.IO) {
+                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+                            withContext(Dispatchers.Main) {
+                                arViewModel.setTempCapture(extracted)
+                                mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                             }
-                        },
-                        onRequestCapture = { arViewModel.requestCapture() },
-                        onUpdateUnwarpPoints = { arViewModel.updateUnwarpPoints(it) },
-                        onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPointIndex(it) },
-                        onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
-                        onUpdateMaskPath = { arViewModel.setMaskPath(it) }
-                    )
-                }
+                        }
+                    },
+                    onRequestCapture = { arViewModel.requestCapture() },
+                    onUpdateUnwarpPoints = { arViewModel.updateUnwarpPoints(it) },
+                    onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPointIndex(it) },
+                    onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
+                    onUpdateMaskPath = { arViewModel.setMaskPath(it) }
+                )
             }
         }
     }
 }
 
 // Surveyor Screen
-@Az(rail = RailItem(id = AppScreens.SURVEYOR, text = "Survey", parent = "target"))
+@Az(rail = RailItem(id = "surveyor", text = "Survey", parent = "target"))
 @Composable
 fun SurveyorScreen() {
-    TrackedScreen(AppScreens.SURVEYOR) {
-        PermissionWrapper {
-            MappingUi(
-                onBackClick = { /* Handle via rail */ },
-                onScanComplete = { /* Handle complete */ }
-            )
+    PermissionWrapper {
+        val activity = LocalActivity.current as ComponentActivity
+        val mainViewModel: MainViewModel = hiltViewModel(activity)
+
+        LaunchedEffect(Unit) {
+            mainViewModel.setCurrentScreen("surveyor")
         }
+
+        MappingUi(
+            onBackClick = { /* Handle via rail */ },
+            onScanComplete = { /* Handle complete */ }
+        )
     }
 }
 
 // Project Library Screen
-@Az(rail = RailItem(id = AppScreens.PROJECT_LIBRARY, text = "Library", parent = "project"))
+@Az(rail = RailItem(id = "project_library", text = "Library", parent = "project"))
 @Composable
 fun ProjectLibraryWrapper() {
-    TrackedScreen(AppScreens.PROJECT_LIBRARY) {
-        val actualNavController = rememberNavController()
-        val activity = LocalActivity.current as ComponentActivity
-        val dashboardViewModel: DashboardViewModel = hiltViewModel(activity)
-        val editorViewModel: EditorViewModel = hiltViewModel(activity)
-        val dashboardUiState by dashboardViewModel.uiState.collectAsState()
-        val editorUiState by editorViewModel.uiState.collectAsState()
+    val actualNavController = rememberNavController()
+    val activity = LocalActivity.current as ComponentActivity
+    val dashboardViewModel: DashboardViewModel = hiltViewModel(activity)
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val dashboardUiState by dashboardViewModel.uiState.collectAsState()
+    val editorUiState by editorViewModel.uiState.collectAsState()
 
-        LaunchedEffect(Unit) {
-            dashboardViewModel.loadAvailableProjects()
-        }
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("project_library")
+        dashboardViewModel.loadAvailableProjects()
+    }
 
-        Box(Modifier.fillMaxSize()) {
-            ProjectLibraryScreen(
-                projects = dashboardUiState.availableProjects,
-                onLoadProject = {
-                    dashboardViewModel.openProject(it)
-                    // Navigate to default editor screen (AR)
-                    actualNavController.navigate(AppScreens.AR) {
-                        popUpTo(AppScreens.PROJECT_LIBRARY) { inclusive = true }
-                    }
-                },
-                onDeleteProject = { projectId ->
-                    dashboardViewModel.deleteProject(projectId)
-                },
-                onNewProject = {
-                    dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-                    actualNavController.navigate(AppScreens.AR) {
-                        popUpTo(AppScreens.PROJECT_LIBRARY) { inclusive = true }
-                    }
+    Box(Modifier.fillMaxSize()) {
+        ProjectLibraryScreen(
+            projects = dashboardUiState.availableProjects,
+            onLoadProject = {
+                dashboardViewModel.openProject(it)
+                // Navigate to default editor screen (AR)
+                actualNavController.navigate("ar") {
+                    popUpTo("project_library") { inclusive = true }
                 }
-            )
-        }
+            },
+            onDeleteProject = { projectId ->
+                dashboardViewModel.deleteProject(projectId)
+            },
+            onNewProject = {
+                dashboardViewModel.onNewProject(editorUiState.isRightHanded)
+                actualNavController.navigate("ar") {
+                    popUpTo("project_library") { inclusive = true }
+                }
+            }
+        )
     }
 }
 
 // Settings Screen
-@Az(rail = RailItem(id = AppScreens.SETTINGS, text = "Settings", parent = "project"))
+@Az(rail = RailItem(id = "settings", text = "Settings", parent = "project"))
 @Composable
 fun SettingsWrapper() {
-    TrackedScreen(AppScreens.SETTINGS) {
-        val navController = rememberNavController()
-        val activity = LocalActivity.current as ComponentActivity
-        val editorViewModel: EditorViewModel = hiltViewModel(activity)
-        val editorUiState by editorViewModel.uiState.collectAsState()
+    val navController = rememberNavController()
+    val activity = LocalActivity.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val editorUiState by editorViewModel.uiState.collectAsState()
 
-        Box(Modifier.fillMaxSize()) {
-            SettingsScreen(
-                currentVersion = BuildConfig.VERSION_NAME,
-                updateStatus = "Up to date",
-                isCheckingForUpdate = false,
-                isRightHanded = editorUiState.isRightHanded,
-                onHandednessChanged = { editorViewModel.toggleHandedness() },
-                onCheckForUpdates = { },
-                onInstallUpdate = { },
-                onClose = { navController.popBackStack() }
-            )
-        }
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("settings")
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        SettingsScreen(
+            currentVersion = BuildConfig.VERSION_NAME,
+            updateStatus = "Up to date",
+            isCheckingForUpdate = false,
+            isRightHanded = editorUiState.isRightHanded,
+            onHandednessChanged = { editorViewModel.toggleHandedness() },
+            onCheckForUpdates = { },
+            onInstallUpdate = { },
+            onClose = { navController.popBackStack() }
+        )
     }
 }
 
 // Layers Screen
 @OptIn(ExperimentalLayoutApi::class)
-@Az(rail = RailItem(id = AppScreens.LAYERS, text = "Layers", parent = "design"))
+@Az(rail = RailItem(id = "layers", text = "Layers", parent = "design"))
 @Composable
 fun LayersScreen() {
-    TrackedScreen(AppScreens.LAYERS) {
-        val activity = LocalActivity.current as ComponentActivity
-        val editorViewModel: EditorViewModel = hiltViewModel(activity)
-        val editorUiState by editorViewModel.uiState.collectAsState()
+    val activity = LocalActivity.current as ComponentActivity
+    val editorViewModel: EditorViewModel = hiltViewModel(activity)
+    val editorUiState by editorViewModel.uiState.collectAsState()
 
-        val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            uri?.let { editorViewModel.onAddLayer(it) }
-        }
+    val mainViewModel: MainViewModel = hiltViewModel(activity)
+    LaunchedEffect(Unit) {
+        mainViewModel.setCurrentScreen("layers")
+    }
 
-        val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            uri?.let { editorViewModel.setBackgroundImage(it) }
-        }
+    val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("Layers", style = MaterialTheme.typography.headlineMedium)
+    val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Layers", style = MaterialTheme.typography.headlineMedium)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Add Layer")
+            }
+            if (editorUiState.editorMode == EditorMode.STATIC) {
                 Button(
-                    onClick = { overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    onClick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
+                    Icon(Icons.Default.Wallpaper, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add Layer")
-                }
-                if (editorUiState.editorMode == EditorMode.STATIC) {
-                    Button(
-                        onClick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Wallpaper, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Background")
-                    }
+                    Text("Background")
                 }
             }
+        }
 
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                itemsIndexed(editorUiState.layers.reversed()) { index, layer ->
-                    val isSelected = layer.id == editorUiState.activeLayerId
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { editorViewModel.onLayerActivated(layer.id) }
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val isEditing = editorUiState.editingLayerId == layer.id
-
-                        if (isEditing) {
-                            OutlinedTextField(
-                                value = editorUiState.editingLayerName,
-                                onValueChange = { editorViewModel.onUpdateLayerRenaming(it) },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                            IconButton(onClick = {
-                                editorViewModel.onConfirmLayerRenaming()
-                            }) {
-                                Text("OK")
-                            }
-                        } else {
-                            Text(
-                                text = layer.name,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { editorViewModel.onStartLayerRenaming(layer.id, layer.name) },
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
-
-                        IconButton(onClick = {
-                             // Move Up (which means earlier in the list, since reversed)
-                             // Actually, standard list: 0 is bottom, last is top.
-                             // We are displaying reversed (top first).
-                             // If we move this item "Up" in display (index - 1), it means moving it later in the original list.
-                             // Note: List is displayed reversed, so "Up" in UI corresponds to moving to a higher index (later) in the source list.
-                             val layers = editorUiState.layers
-                             val currentIdx = layers.indexOfFirst { it.id == layer.id }
-                             if (currentIdx < layers.size - 1) {
-                                 val newLayers = layers.toMutableList()
-                                 java.util.Collections.swap(newLayers, currentIdx, currentIdx + 1)
-                                 editorViewModel.onLayerReordered(newLayers.map { it.id })
-                             }
-                        }) {
-                            Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
-                        }
-
-                        IconButton(onClick = {
-                            // Move Down
-                             val layers = editorUiState.layers
-                             val currentIdx = layers.indexOfFirst { it.id == layer.id }
-                             if (currentIdx > 0) {
-                                 val newLayers = layers.toMutableList()
-                                 java.util.Collections.swap(newLayers, currentIdx, currentIdx - 1)
-                                 editorViewModel.onLayerReordered(newLayers.map { it.id })
-                             }
-                        }) {
-                            Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
-                        }
-
-                        IconButton(onClick = { editorViewModel.onLayerRemoved(layer.id) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Remove")
-                        }
-                    }
-                }
-            }
-
-            if (editorUiState.layers.isNotEmpty()) {
-                Text("Actions", style = MaterialTheme.typography.titleMedium)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            itemsIndexed(editorUiState.layers.reversed()) { index, layer ->
+                val isSelected = layer.id == editorUiState.activeLayerId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { editorViewModel.onLayerActivated(layer.id) }
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                     Button(onClick = { editorViewModel.onRemoveBackgroundClicked() }) { Text("Isolate") }
-                     Button(onClick = { editorViewModel.onLineDrawingClicked() }) { Text("Outline") }
-                     Button(onClick = { editorViewModel.onAdjustClicked() }) { Text("Adjust") }
-                     Button(onClick = { editorViewModel.onColorClicked() }) { Text("Balance") }
-                     Button(onClick = { editorViewModel.onCycleBlendMode() }) { Text("Blend") }
-                     Button(onClick = { editorViewModel.toggleImageLock() }) {
-                         Icon(if (editorUiState.isImageLocked) Icons.Default.Lock else Icons.Default.LockOpen, contentDescription = null)
-                         Text(if (editorUiState.isImageLocked) "Unlock" else "Lock")
-                     }
+                    val isEditing = editorUiState.editingLayerId == layer.id
+
+                    if (isEditing) {
+                        OutlinedTextField(
+                            value = editorUiState.editingLayerName,
+                            onValueChange = { editorViewModel.onUpdateLayerRenaming(it) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        IconButton(onClick = {
+                            editorViewModel.onConfirmLayerRenaming()
+                        }) {
+                            Text("OK")
+                        }
+                    } else {
+                        Text(
+                            text = layer.name,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { editorViewModel.onStartLayerRenaming(layer.id, layer.name) },
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+
+                    IconButton(onClick = {
+                         // Move Up (which means earlier in the list, since reversed)
+                         // Actually, standard list: 0 is bottom, last is top.
+                         // We are displaying reversed (top first).
+                         // If we move this item "Up" in display (index - 1), it means moving it later in the original list.
+                         // Note: List is displayed reversed, so "Up" in UI corresponds to moving to a higher index (later) in the source list.
+                         val layers = editorUiState.layers
+                         val currentIdx = layers.indexOfFirst { it.id == layer.id }
+                         if (currentIdx < layers.size - 1) {
+                             val newLayers = layers.toMutableList()
+                             java.util.Collections.swap(newLayers, currentIdx, currentIdx + 1)
+                             editorViewModel.onLayerReordered(newLayers.map { it.id })
+                         }
+                    }) {
+                        Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
+                    }
+
+                    IconButton(onClick = {
+                        // Move Down
+                         val layers = editorUiState.layers
+                         val currentIdx = layers.indexOfFirst { it.id == layer.id }
+                         if (currentIdx > 0) {
+                             val newLayers = layers.toMutableList()
+                             java.util.Collections.swap(newLayers, currentIdx, currentIdx - 1)
+                             editorViewModel.onLayerReordered(newLayers.map { it.id })
+                         }
+                    }) {
+                        Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
+                    }
+
+                    IconButton(onClick = { editorViewModel.onLayerRemoved(layer.id) }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Remove")
+                    }
                 }
+            }
+        }
+
+        if (editorUiState.layers.isNotEmpty()) {
+            Text("Actions", style = MaterialTheme.typography.titleMedium)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                 Button(onClick = { editorViewModel.onRemoveBackgroundClicked() }) { Text("Isolate") }
+                 Button(onClick = { editorViewModel.onLineDrawingClicked() }) { Text("Outline") }
+                 Button(onClick = { editorViewModel.onAdjustClicked() }) { Text("Adjust") }
+                 Button(onClick = { editorViewModel.onColorClicked() }) { Text("Balance") }
+                 Button(onClick = { editorViewModel.onCycleBlendMode() }) { Text("Blend") }
+                 Button(onClick = { editorViewModel.toggleImageLock() }) {
+                     Icon(if (editorUiState.isImageLocked) Icons.Default.Lock else Icons.Default.LockOpen, contentDescription = null)
+                     Text(if (editorUiState.isImageLocked) "Unlock" else "Lock")
+                 }
             }
         }
     }

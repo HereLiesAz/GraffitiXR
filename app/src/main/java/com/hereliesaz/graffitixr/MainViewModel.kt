@@ -22,7 +22,7 @@ data class MainUiState(
     val showUnlockInstructions: Boolean = false,
     val isCapturingTarget: Boolean = false,
     val captureStep: CaptureStep = CaptureStep.NONE,
-    val currentScreen: String = AppScreens.AR
+    val currentScreen: String = "ar"
 )
 
 /**
