@@ -298,7 +298,7 @@ fun BaseEditorScreen(
 @Composable
 fun ArScreen() {
     PermissionWrapper {
-        val activity = LocalActivity.current as ComponentActivity
+        val activity = LocalActivity.current as? ComponentActivity ?: return
         val mainViewModel: MainViewModel = hiltViewModel(activity)
         val arViewModel: ArViewModel = hiltViewModel(activity)
         val arUiState by arViewModel.uiState.collectAsState()
