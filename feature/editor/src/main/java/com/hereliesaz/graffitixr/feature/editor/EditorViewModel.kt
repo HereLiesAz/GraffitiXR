@@ -319,6 +319,31 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    // --- Layer Renaming State Management ---
+
+    fun onStartLayerRenaming(layerId: String, currentName: String) {
+        _uiState.update { it.copy(editingLayerId = layerId, editingLayerName = currentName) }
+    }
+
+    fun onUpdateLayerRenaming(newName: String) {
+        _uiState.update { it.copy(editingLayerName = newName) }
+    }
+
+    fun onConfirmLayerRenaming() {
+        val state = _uiState.value
+        val layerId = state.editingLayerId ?: return
+        val newName = state.editingLayerName
+
+        if (newName.isNotBlank()) {
+            onLayerRenamed(layerId, newName)
+        }
+        onCancelLayerRenaming() // Clear state
+    }
+
+    fun onCancelLayerRenaming() {
+        _uiState.update { it.copy(editingLayerId = null, editingLayerName = "") }
+    }
+
     fun onLayerRemoved(layerId: String) {
         _uiState.update { state ->
             val newLayers = state.layers.filter { it.id != layerId }
