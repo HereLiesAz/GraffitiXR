@@ -88,7 +88,11 @@ data class EditorUiState(
     val showDoubleTapHint: Boolean = false,
     val progressPercentage: Float = 0f,
     val canUndo: Boolean = false,
-    val canRedo: Boolean = false
+    val canRedo: Boolean = false,
+
+    // Layer Renaming State
+    val editingLayerId: String? = null,
+    val editingLayerName: String = ""
 )
 
 /**
