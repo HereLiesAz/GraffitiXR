@@ -199,7 +199,6 @@ fun MainScreen(
     }
 
     val isRailVisible = !editorUiState.hideUiForCapture && !uiState.isTouchLocked
-    val targetCreationState = com.hereliesaz.graffitixr.feature.ar.rememberTargetCreationState()
 
     AzHostActivityLayout(navController = localNavController) {
         // --- 1. THE RAIL ---
@@ -232,11 +231,12 @@ fun MainScreen(
                     com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground(
                         uiState = arUiState,
                         captureStep = uiState.captureStep,
-                        state = targetCreationState,
                         onPhotoCaptured = { bitmap ->
                             arViewModel.setTempCapture(bitmap)
                             localNavController.navigate("target_evolution")
-                        }
+                        },
+                        onCaptureConsumed = arViewModel::onCaptureConsumed,
+                        onInitUnwarpPoints = arViewModel::updateUnwarpPoints
                     )
                 }
             } else if (currentNavRoute == "surveyor") {
@@ -352,7 +352,6 @@ fun MainScreen(
                         uiState = arUiState,
                         isRightHanded = editorUiState.isRightHanded,
                         captureStep = uiState.captureStep,
-                        state = targetCreationState,
                         onConfirm = {
                             val bitmapToSave = arUiState.tempCaptureBitmap
                             if (bitmapToSave != null) {
@@ -388,7 +387,12 @@ fun MainScreen(
                             val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
                             arViewModel.setTempCapture(extracted)
                             viewModel.setCaptureStep(CaptureStep.REVIEW)
-                        }
+                        },
+                        onRequestCapture = arViewModel::requestCapture,
+                        onUpdateUnwarpPoints = arViewModel::updateUnwarpPoints,
+                        onSetActiveUnwarpPoint = arViewModel::setActiveUnwarpPointIndex,
+                        onSetMagnifierPosition = arViewModel::setMagnifierPosition,
+                        onUpdateMaskPath = arViewModel::setMaskPath
                     )
                 }
 
