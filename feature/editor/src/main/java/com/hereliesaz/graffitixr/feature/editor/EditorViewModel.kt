@@ -446,7 +446,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(dispatchers.default) {
-            val edged = slamManager.detectEdges(activeLayer.bitmap)
+            val edged = com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(activeLayer.bitmap)
 
             if (edged != null) {
                 try {
