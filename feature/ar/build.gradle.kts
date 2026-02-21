@@ -26,7 +26,6 @@ android {
     buildFeatures {
         compose = true
     }
-    ndkVersion = "28.2.13676358"
 }
 
 dependencies {
@@ -52,6 +51,7 @@ dependencies {
     implementation(libs.arcore.client)
     implementation(project(":opencv"))
 
+    implementation(libs.az.nav.rail)
     implementation(libs.androidx.activity.compose)
     implementation(libs.navigation.compose)
 
@@ -78,8 +78,4 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
-    implementation(libs.aznavrail)
-
-
-
 }

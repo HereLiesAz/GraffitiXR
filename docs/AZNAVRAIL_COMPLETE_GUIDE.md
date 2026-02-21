@@ -1,29 +1,27 @@
 # AzNavRail Complete Guide
 
-Welcome to the comprehensive guide for **AzNavRail**. This document details the **High-Inference System**, which is the only supported method for configuring the rail architecture.
-
-**Dictatorial Design:** You do not build the graph. You do not configure the layout. You annotate your intentions, and the Compiler enforces the strict rules of the AzNavRail system.
+Welcome to the comprehensive guide for **AzNavRail**. This document contains everything you need to know to use the library, including setup instructions, a full API and DSL reference, layout rules, and complete sample code.
 
 ---
 
 ## Table of Contents
 
 1.  [Getting Started](#getting-started)
-2.  [The Az Protocol (Architecture)](#the-az-protocol-architecture)
-3.  [Strict Layout Rules](#strict-layout-rules)
-4.  [Annotation Reference (@Az)](#annotation-reference-az)
-5.  [Component Reference](#component-reference)
+2.  [AzHostActivityLayout Layout Rules](#azhostactivitylayout-layout-rules)
+3.  [Smart Transitions with AzNavHost](#smart-transitions-with-aznavhost)
+4.  [DSL Reference](#dsl-reference)
+5.  [API Reference](#api-reference)
 6.  [Sample Application Source Code](#sample-application-source-code)
 
 ---
 
 ## Getting Started
 
-### 1. Installation
+### Installation
 
-Add JitPack to your project's `settings.gradle.kts`:
+To use AzNavRail, add JitPack to your project's `settings.gradle.kts`:
 
-~~~kotlin
+```kotlin
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -31,230 +29,403 @@ dependencyResolutionManagement {
         maven { url = uri("https://jitpack.io") }
     }
 }
-~~~
+```
 
-Add the **KSP Plugin** and dependencies to your app's `build.gradle.kts`.
-**Crucial:** The KSP version must match your Kotlin version.
+Add the dependency to your app's `build.gradle.kts`:
 
-~~~kotlin
-plugins {
-    id("com.google.devtools.ksp") version "2.0.0-1.0.21" // Verify version matches Kotlin
-}
-
+```kotlin
 dependencies {
-    // The Core Library
-    implementation("com.github.HereLiesAz.AzNavRail:aznavrail:VERSION")
-
-    // The Annotation Processor (The Brains)
-    implementation("com.github.HereLiesAz.AzNavRail:aznavrail-annotation:VERSION")
-    ksp("com.github.HereLiesAz.AzNavRail:aznavrail-processor:VERSION")
+    implementation("com.github.HereLiesAz:AzNavRail:VERSION") // Replace VERSION with the latest release
 }
-~~~
+```
 
-### 2. The Constitution (App Setup)
+### Basic Usage
 
-You do not write `onCreate`. You do not write `setContent`. You extend `AzActivity` and point it to the generated graph.
+**IMPORTANT:** `AzNavRail` **MUST** be used within an `AzHostActivityLayout` container.
 
-~~~kotlin
-// 1. Define Global Rules (Theme, Docking)
-@Az(app = App(
-    dock = AzDockingSide.LEFT,
-    theme = AzTheme.GlitchNoir
-))
-class MainActivity : AzActivity() {
-    // 2. Link the Generated Graph
-    override val graph = AzGraph
+```kotlin
+AzHostActivityLayout(navController = navController) {
+    // 1. Theme (Visuals)
+    azTheme(
+        activeColor = Color.Red,
+        defaultShape = AzButtonShape.CIRCLE
+    )
+
+    // 2. Config (Behavior)
+    azConfig(
+        displayAppName = true,
+        dockingSide = AzDockingSide.LEFT,
+        packButtons = true
+    )
+
+    // 3. Advanced (Optional)
+    azAdvanced(
+        infoScreen = false 
+    )
+
+    // Define Rail Items (Visible on collapsed rail)
+    azRailItem(id = "home", text = "Home", route = "home", onClick = { /* navigate */ })
+
+    // Define Menu Items (Visible only when expanded)
+    azMenuItem(id = "settings", text = "Settings", route = "settings", onClick = { /* navigate */ })
+
+    // Define Content
+    onscreen(Alignment.Center) {
+        // AzNavHost automatically links to the outer AzHostActivityLayout
+        AzNavHost(startDestination = "home") {
+             composable("home") { Text("Home Screen") }
+             // ...
+        }
+    }
 }
-~~~
+```
 
-### 3. The Stations (Screens)
+---
 
-You do not manually add items to a rail. You annotate `@Composable` functions.
+## AzHostActivityLayout Layout Rules
 
-~~~kotlin
-// Inferred ID: "home", Title: "Home"
-@Az(rail = RailItem(home = true))
+`AzHostActivityLayout` enforces a "Strict Mode" layout system to ensure consistent UX and prevent overlap.
+
+1.  **Rail Avoidance**: Content in the `onscreen` block is automatically padded to avoid the rail.
+2.  **Safe Zones**: Content is restricted from the **Top 20%** and **Bottom 10%** of the screen.
+3.  **Automatic Flipping**: Alignments passed to `onscreen` (e.g., `TopStart`) are mirrored if the rail is docked to the Right.
+4.  **Backgrounds**: Use the `background(weight)` DSL to place full-screen content (e.g., maps) behind the UI. Backgrounds **ignore safe zones**.
+
+**Example:**
+
+```kotlin
+AzHostActivityLayout(navController = navController) {
+    // Full screen background
+    background(weight = 0) {
+        GoogleMap(...)
+    }
+
+    // Safe UI content
+    onscreen(Alignment.TopEnd) {
+        Text("Overlay")
+    }
+}
+```
+
+---
+
+## Smart Transitions with AzNavHost
+
+The `AzNavHost` wrapper provides seamless integration with the `AzHostActivityLayout`:
+
+1.  **Automatic Navigation Controller**: It automatically retrieves the `navController` provided to `AzHostActivityLayout`, eliminating the need to pass it again.
+2.  **Directional Transitions**: It automatically configures entry and exit animations based on the rail's docking side:
+    *   **Left Dock**: New screens slide in from the **Right**; old screens slide out to the **Left** (towards the rail).
+    *   **Right Dock**: New screens slide in from the **Left**; old screens slide out to the **Right** (towards the rail).
+
+---
+
+## DSL Reference
+
+The DSL is used inside `AzHostActivityLayout` to configure the rail and items.
+
+### AzHostActivityLayout Scope
+
+-   `background(weight: Int, content: @Composable () -> Unit)`: Adds a background layer ignoring safe zones.
+-   `onscreen(alignment: Alignment, content: @Composable () -> Unit)`: Adds content to the safe area.
+
+### AzNavRail Scope
+
+**Sectors:**
+
+1.  **`azTheme(...)`** (Visuals):
+    -   `expandedRailWidth`: Dp
+    -   `collapsedRailWidth`: Dp
+    -   `defaultShape`: AzButtonShape
+    -   `headerIconShape`: AzHeaderIconShape
+    -   `activeColor`: Color?
+    -   `showFooter`: Boolean
+
+2.  **`azConfig(...)`** (Behavior):
+    -   `displayAppName`: Boolean
+    -   `packButtons`: Boolean
+    -   `dockingSide`: AzDockingSide (LEFT/RIGHT)
+    -   `noMenu`: Boolean
+    -   `vibrate`: Boolean
+    -   `activeClassifiers`: Set<String>
+
+3.  **`azAdvanced(...)`** (Special Ops):
+    -   `isLoading`: Boolean
+    -   `enableRailDragging`: Boolean
+    -   `onUndock`: (() -> Unit)?
+    -   `overlayService`: Class<out Service>?
+    -   `onOverlayDrag`: ((Float, Float) -> Unit)?
+    -   `onItemGloballyPositioned`: ((String, Rect) -> Unit)?
+    -   `infoScreen`: Boolean
+    -   `onDismissInfoScreen`: (() -> Unit)?
+
+**Items:**
+-   `azMenuItem(...)`: Item visible only in expanded menu.
+-   `azRailItem(...)`: Item visible in rail and menu.
+-   `azMenuToggle(...)` / `azRailToggle(...)`: Toggle buttons.
+-   `azMenuCycler(...)` / `azRailCycler(...)`: Cycle through options.
+-   `azDivider()`: Horizontal divider.
+-   `azMenuHostItem(...)` / `azRailHostItem(...)`: Parent items for nested menus.
+-   `azMenuSubItem(...)` / `azRailSubItem(...)`: Child items.
+-   `azRailRelocItem(...)`: Reorderable drag-and-drop items.
+
+**Common Parameters:**
+-   `id`: Unique identifier.
+-   `text`: Display label.
+-   `route`: Navigation route (optional).
+-   `icon`: (Implicitly handled by shapes/text in this library).
+-   `disabled`: Boolean state.
+-   `info`: Help text for Info Screen mode.
+-   `onClick`: Lambda action.
+
+---
+
+## API Reference
+
+### `AzHostActivityLayout`
+```kotlin
 @Composable
-fun Home() {
-    Text("Strict Mode Active")
-}
+fun AzHostActivityLayout(
+    modifier: Modifier = Modifier,
+    navController: NavHostController, // Mandatory
+    currentDestination: String? = null,
+    isLandscape: Boolean? = null,
+    initiallyExpanded: Boolean = false,
+    disableSwipeToOpen: Boolean = false,
+    content: AzNavHostScope.() -> Unit
+)
+```
 
-// Inferred ID: "profile", Title: "Profile"
-@Az(rail = RailItem(icon = R.drawable.ic_user))
+### `AzNavHost`
+```kotlin
 @Composable
-fun Profile() {
-    Text("User Settings")
-}
-~~~
-
----
-
-## The Az Protocol (Architecture)
-
-The KSP Processor enforces the following architecture:
-
-1.  **Zero-Talk Inference**: If you do not provide an `id` or `text` in the annotation, it is derived from the function name (e.g., `fun WiFiSettings` -> ID: `wifi_settings`, Text: "WiFi Settings").
-2.  **The Tax**: Every function annotated with `@Az` **MUST** also be annotated with `@Composable`. If you forget, the build fails.
-3.  **Hierarchy**: To create sub-menus, you define a **Host** (using a property) and link children to it using `parent`.
-
-~~~kotlin
-// Define a Host (Expands in Rail)
-@Az(railHost = RailHost(icon = R.drawable.ic_settings))
-val System = null // Placeholder property
-
-// Link a Child to the Host
-@Az(rail = RailItem(parent = "system"))
-@Composable
-fun Wifi() { ... }
-~~~
-
----
-
-## Strict Layout Rules
-
-The generated `AzGraph` automatically wraps your content in `AzHostActivityLayout`. This enforces:
-
-1.  **Safe Zones**: Your UI content is strictly forbidden from the **Top 20%** and **Bottom 10%** of the screen.
-2.  **Rail Avoidance**: Content is automatically padded to avoid the rail.
-3.  **Smart Transitions**:
-    * **Left Dock**: Screens slide in from Right.
-    * **Right Dock**: Screens slide in from Left.
-
-### Backgrounds (Bypassing Safe Zones)
-To place content (like Maps) behind the safe zones, use the `background` scope in the layout (requires manual overrides or overlay components).
-
----
-
-## Annotation Reference (@Az)
-
-The `@Az` annotation is the single point of entry. It contains contexts for different component types.
-
-### `app = App(...)`
-Used on `MainActivity`.
-* `dock`: `AzDockingSide.LEFT` or `RIGHT`.
-* `theme`: `AzTheme` preset (e.g., `GlitchNoir`).
-* `secure`: `Boolean`. If true, enforces strict safe zone clipping.
-
-### `rail = RailItem(...)`
-Defines a standard navigation screen.
-* `id`: Unique String ID. (Default: Function Name).
-* `text`: Display label. (Default: Function Name).
-* `icon`: Drawable Resource ID.
-* `parent`: ID of the Host item (if this is a sub-item).
-* `home`: `Boolean`. Set to `true` for the start destination.
-
-### `railHost = RailHost(...)`
-Defines a parent item that expands to show children.
-* `id`: Unique String ID.
-* `text`: Display label.
-* `icon`: Drawable Resource ID.
-
-### `nested = NestedRail(...)`
-Defines a generic "Nested Rail" popup menu.
-* `parent`: ID of the item that opens this popup.
-* `align`: `AzNestedRailAlignment.VERTICAL` or `HORIZONTAL`.
-
-### `toggle = Toggle(...)`
-Defines a state toggle button (swaps text ON/OFF).
-* `onText`: Text to display when True.
-* `offText`: Text to display when False.
-* `slot`: `AzSlot.RAIL` or `AzSlot.MENU`.
-
----
-
-## Component Reference
-
-While the navigation structure is generated, you use these components within your screens.
+fun AzNavHost(
+    startDestination: String,
+    modifier: Modifier = Modifier,
+    // navController derived from context if omitted
+    contentAlignment: Alignment = Alignment.Center,
+    route: String? = null,
+    // ... transition params (smart defaults)
+    builder: NavGraphBuilder.() -> Unit
+)
+```
 
 ### `AzTextBox`
-A versatile text input with autocomplete, multiline, and "Secret" modes.
-
-~~~kotlin
-AzTextBox(
-    hint = "Password",
-    secret = true, // Masks input
-    onSubmit = { text -> ... }
+A versatile text input component.
+```kotlin
+@Composable
+fun AzTextBox(
+    modifier: Modifier = Modifier,
+    value: String? = null,
+    onValueChange: ((String) -> Unit)? = null,
+    hint: String = "",
+    outlined: Boolean = true,
+    multiline: Boolean = false,
+    secret: Boolean = false,
+    isError: Boolean = false,
+    historyContext: String? = null,
+    submitButtonContent: (@Composable () -> Unit)? = null,
+    onSubmit: (String) -> Unit
 )
-~~~
+```
 
-### `AzRoller`
-A slot-machine style dropdown with split-click interaction (Left: Type, Right: Scroll).
-
-~~~kotlin
-AzRoller(
-    options = listOf("A", "B", "C"),
-    selectedOption = "A",
-    onOptionSelected = { ... }
+### `AzForm`
+Groups `AzTextBox` fields.
+```kotlin
+@Composable
+fun AzForm(
+    formName: String,
+    onSubmit: (Map<String, String>) -> Unit,
+    content: AzFormScope.() -> Unit
 )
-~~~
+```
 
-### `AzButton`
-A circular, text-only button that adheres to the Glitch-Noir aesthetic.
+### `AzButton`, `AzToggle`, `AzCycler`
+Standalone versions of the rail components are available for general UI use.
 
 ---
 
 ## Sample Application Source Code
 
-This is the **High-Inference** reference implementation.
+Below is the complete source code for a functional Sample App demonstrating all features.
 
 ### `MainActivity.kt`
 
-~~~kotlin
+```kotlin
 package com.example.sampleapp
 
-import com.hereliesaz.aznavrail.annotation.*
-import com.hereliesaz.aznavrail.AzActivity
-
-// 1. Configure the App
-@Az(app = App(dock = AzDockingSide.RIGHT, theme = AzTheme.GlitchNoir))
-class MainActivity : AzActivity() {
-    // 2. Ignite the Engine
-    override val graph = AzGraph
-}
-~~~
-
-### `Screens.kt`
-
-~~~kotlin
-package com.example.sampleapp
-
-import androidx.compose.material3.Text
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import com.hereliesaz.aznavrail.annotation.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 
-// 1. Home Screen
-@Az(rail = RailItem(home = true))
-@Composable
-fun Home() {
-    Text("Welcome to the Dictatorship.")
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MyApplicationTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    val context = LocalContext.current
+
+                    // Request Notification Permission for Android 13+
+                    val permissionLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestPermission()
+                    ) { isGranted ->
+                         Log.d("MainActivity", "Notification permission granted: $isGranted")
+                    }
+
+                    LaunchedEffect(Unit) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+
+                    val startOverlay = {
+                        if (Settings.canDrawOverlays(context)) {
+                            val intent = Intent(context, SampleOverlayService::class.java)
+                            ContextCompat.startForegroundService(context, intent)
+                        } else {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:${context.packageName}")
+                            )
+                            context.startActivity(intent)
+                        }
+                    }
+
+                    SampleScreen(
+                        onUndockOverride = {
+                            startOverlay()
+                        }
+                    )
+                }
+            }
+        }
+    }
 }
+```
 
-// 2. Defining a Host (System Settings)
-@Az(railHost = RailHost)
-val System = null
+### `SampleScreen.kt`
 
-// 3. Sub-Items (Linked to System)
-@Az(rail = RailItem(parent = "system"))
+```kotlin
+package com.example.sampleapp
+
+import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.model.AzButtonShape
+import com.hereliesaz.aznavrail.model.AzDockingSide
+
 @Composable
-fun Wifi() {
-    Text("Searching for networks...")
-}
+fun SampleScreen(
+    enableRailDragging: Boolean = true,
+    initiallyExpanded: Boolean = false,
+    onUndockOverride: (() -> Unit)? = null,
+    onRailDrag: ((Float, Float) -> Unit)? = null,
+    showContent: Boolean = true
+) {
+    val TAG = "SampleApp"
+    val navController = rememberNavController()
+    val currentDestination by navController.currentBackStackEntryAsState()
+    var isOnline by remember { mutableStateOf(true) }
+    var isDarkMode by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var packButtons by remember { mutableStateOf(false) }
+    val railCycleOptions = remember { listOf("A", "B", "C", "D") }
+    var railSelectedOption by remember { mutableStateOf(railCycleOptions.first()) }
+    val menuCycleOptions = remember { listOf("X", "Y", "Z") }
+    var menuSelectedOption by remember { mutableStateOf(menuCycleOptions.first()) }
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-@Az(rail = RailItem(parent = "system"))
-@Composable
-fun Bluetooth() {
-    Text("Pairing devices...")
-}
+    // Set the global suggestion limit for all AzTextBox instances
+    AzTextBoxDefaults.setSuggestionLimit(3)
 
-// 4. A Menu Toggle (Dark Mode)
-@Az(toggle = Toggle(
-    id = "dark_mode",
-    onText = "LIGHTS OFF",
-    offText = "LIGHTS ON",
-    slot = AzSlot.MENU
-))
-@Composable
-fun DarkModeHandler() {
-    // Logic to handle theme switching
+    var useBasicOverlay by remember { mutableStateOf(false) }
+    var isDockingRight by remember { mutableStateOf(false) }
+    var noMenu by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
+
+    AzHostActivityLayout(
+        navController = navController,
+        modifier = Modifier.fillMaxSize(),
+        currentDestination = currentDestination?.destination?.route,
+        isLandscape = isLandscape,
+        initiallyExpanded = initiallyExpanded
+    ) {
+        azTheme(
+            defaultShape = AzButtonShape.RECTANGLE
+        )
+
+        azConfig(
+            packButtons = packButtons,
+            dockingSide = if (isDockingRight) AzDockingSide.RIGHT else AzDockingSide.LEFT,
+            noMenu = noMenu
+        )
+
+        azAdvanced(
+            isLoading = isLoading,
+            enableRailDragging = enableRailDragging,
+            onUndock = onUndockOverride,
+            onRailDrag = onRailDrag,
+            overlayService = if (useBasicOverlay) SampleBasicOverlayService::class.java else SampleOverlayService::class.java,
+            infoScreen = showHelp,
+            onDismissInfoScreen = { showHelp = false }
+        )
+
+        // RAIL ITEMS ... (same as previous examples)
+        azMenuItem(id = "home", text = "Home", route = "home", onClick = { Log.d(TAG, "Home menu item clicked") })
+        // ...
+
+        // BACKGROUNDS
+        background(weight = 0) {
+            Box(Modifier.fillMaxSize().background(Color(0xFFEEEEEE)))
+        }
+
+        // ONSCREEN COMPONENTS
+        if (showContent) {
+            onscreen(alignment = Alignment.Center) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // ... AzTextBox examples ...
+
+                    AzNavHost(startDestination = "home") {
+                        composable("home") { Text("Home Screen") }
+                        // ...
+                    }
+                }
+            }
+        }
+    }
 }
-~~~
+```

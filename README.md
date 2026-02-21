@@ -1,11 +1,6 @@
 # GraffitiXR
-GraffitiXR is an android app for street artists. There are plenty of apps that overlay an image on your camera view so you can trace it, but when I'm painting a mural based on a sketch I have saved on my phone, using a tripod can really ebb my flow. I'm all over the damn place. Me, I put my phone in my pocket. Even the apps that use AR to keep the image steady and in one place can't deal with abysmal darkness of my pocket.
 
-So I'm making something better by repurposing the grid method. I was always thinking, "Why can't these specific doodles be saved, like a persistent anchor, so the overlay is always just plain in the right spot?" So, now, that's what those doodles do. Progress tracking replaces those marks with the piece itself as you go, like an ever-evolving fingerprinted target.
-
-Just for shits and giggles, I included the non-AR version for image tracing just like you get with those other apps, too. Just in case you cray like that. Or if you cray-cray, there's Mockup mode. Nab a picture of the wall, cuz I got some quick tools for a quick mockup. And if you've got nothing to prove, you just want something copied onto paper perfectly, Trace mode allows you to use your phone as a lightbox, keeping your screen on with the brightness turned up, locking your image into place and blocking all touches until you're finished.
-
-GraffitiXR is an advanced augmented reality application for Android, designed to assist artists in visualizing and planning large-scale artworks such as murals. The app provides a suite of tools to project a digital image onto a real-world surface, offering a seamless workflow from concept to creation. It leverages Augmented Reality (AR) and a custom C++ engine to project sketches onto walls using a confidence-based voxel mapping system.
+**GraffitiXR** is a local-first, offline-capable Android application for street artists. It leverages Augmented Reality (AR) and a custom C++ engine to project sketches onto walls using a confidence-based voxel mapping system.
 
 ## Key Features
 *   **Offline-First:** No cloud dependencies; zero data collected.
@@ -19,7 +14,7 @@ GraffitiXR is an advanced augmented reality application for Android, designed to
 The project is built with a strictly decoupled multi-module architecture:
 *   `:app`: Dependency injection (Hilt) and navigation.
 *   `:feature:ar`: ARCore integration, camera handling, and sensor fusion.
-*   `:feature:editor`: Image manipulation, mesh warp, and layer management.> Task :app:kspDebugKotlin
+*   `:feature:editor`: Image manipulation, mesh warp, and layer management.
 *   `:core:nativebridge`: JNI interface and native engine management.
 *   `:core:cpp`: C++17 engine source code.
 
