@@ -21,7 +21,8 @@ data class MainUiState(
     val isTouchLocked: Boolean = false,
     val showUnlockInstructions: Boolean = false,
     val isCapturingTarget: Boolean = false,
-    val captureStep: CaptureStep = CaptureStep.NONE
+    val captureStep: CaptureStep = CaptureStep.NONE,
+    val currentScreen: String = AppScreens.AR
 )
 
 /**
@@ -51,6 +52,14 @@ class MainViewModel @Inject constructor() : ViewModel() {
      */
     fun showUnlockInstructions(show: Boolean) {
         _uiState.update { it.copy(showUnlockInstructions = show) }
+    }
+
+    /**
+     * Updates the currently active screen ID.
+     * Used by the Global Background to decide which content to render.
+     */
+    fun setCurrentScreen(screenId: String) {
+        _uiState.update { it.copy(currentScreen = screenId) }
     }
 
     /**

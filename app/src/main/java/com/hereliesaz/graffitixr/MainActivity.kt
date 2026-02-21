@@ -1,70 +1,42 @@
 package com.hereliesaz.graffitixr
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
+import com.hereliesaz.aznavrail.AzActivity
+import com.hereliesaz.aznavrail.annotation.App
 import androidx.activity.viewModels
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.navigation.compose.rememberNavController
-import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
+import com.hereliesaz.aznavrail.annotation.Az
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
-import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
-import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
-import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
  * The Single Activity for the application.
- * Sets up the Compose content, Hilt injection, and the top-level Navigation Graph.
+ * Extends AzActivity to use the generated AzNavRail graph.
  */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+@Az(app = App())
+class MainActivity : AzActivity() {
 
     @Inject lateinit var slamManager: SlamManager
     @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 
-    private val mainViewModel: MainViewModel by viewModels()
-    private val editorViewModel: EditorViewModel by viewModels()
-    private val arViewModel: ArViewModel by viewModels()
-    private val dashboardViewModel: DashboardViewModel by viewModels()
+    override val graph = AzGraph
 
-    private var arRenderer: ArRenderer? = null
+    private val mainViewModel: MainViewModel by viewModels()
+    private val arViewModel: ArViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // RESURRECTION: Ensure native engine is alive even if the Process survived
-        // but the Activity was previously destroyed.
+        // RESURRECTION: Ensure native engine is alive
         slamManager.ensureInitialized()
 
-        setContent {
-            GraffitiXRTheme {
-                val navController = rememberNavController()
-                val mainState by mainViewModel.uiState.collectAsState()
-
-                MainScreen(
-                    viewModel = mainViewModel,
-                    editorViewModel = editorViewModel,
-                    arViewModel = arViewModel,
-                    dashboardViewModel = dashboardViewModel,
-                    navController = navController,
-                    slamManager = slamManager,
-                    projectRepository = projectRepository,
-                    onRendererCreated = { renderer ->
-                        arRenderer = renderer
-                    }
-                )
-            }
-        }
+        // Initialize Action Dispatcher for pure-function rail items
+        ActionDispatcher.setViewModels(arViewModel, mainViewModel)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Only release native resources if the Activity is actually finishing (not rotating)
-        // This prevents the Native Engine from being killed and recreated on configuration changes.
         if (isFinishing) {
             slamManager.destroy()
         }
