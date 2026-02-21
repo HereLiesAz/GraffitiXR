@@ -99,11 +99,10 @@ fun UnwarpBackground(
 fun UnwarpUi(
     isRightHanded: Boolean,
     targetImage: Bitmap?,
-    points: List<Offset>,
+    points: MutableList<Offset>,
     activePointIndex: Int,
     magnifierPosition: Offset,
     onPointIndexChanged: (Int) -> Unit,
-    onPointMoved: (Int, Offset) -> Unit,
     onMagnifierPositionChanged: (Offset) -> Unit,
     onConfirm: (List<Offset>) -> Unit,
     onRetake: () -> Unit
@@ -114,9 +113,7 @@ fun UnwarpUi(
 
     // CRITICAL FIX: Use rememberUpdatedState so the gesture lambda always calls the latest function instance
     val currentOnPointIndexChanged by rememberUpdatedState(onPointIndexChanged)
-    val currentOnPointMoved by rememberUpdatedState(onPointMoved)
     val currentOnMagnifierPositionChanged by rememberUpdatedState(onMagnifierPositionChanged)
-    val currentPoints by rememberUpdatedState(points)
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val screenWidth = maxWidth
@@ -156,7 +153,7 @@ fun UnwarpUi(
                             var minDst = Float.MAX_VALUE
                             val threshold = 100f // Touch slop/radius
 
-                            currentPoints.forEachIndexed { index, normalizedPoint ->
+                            points.forEachIndexed { index, normalizedPoint ->
                                 val px = renderOffsetX + normalizedPoint.x * renderWidth
                                 val py = renderOffsetY + normalizedPoint.y * renderHeight
                                 val dst = (touchPos - Offset(px, py)).getDistance()
@@ -178,7 +175,7 @@ fun UnwarpUi(
                             if (draggedPointIndex != -1) {
                                 change.consume()
 
-                                val currentPoint = currentPoints[draggedPointIndex]
+                                val currentPoint = points[draggedPointIndex]
 
                                 // Convert drag pixels to normalized UV space (0..1)
                                 val dx = dragAmount.x / renderWidth
@@ -187,8 +184,8 @@ fun UnwarpUi(
                                 val newX = (currentPoint.x + dx).coerceIn(0f, 1f)
                                 val newY = (currentPoint.y + dy).coerceIn(0f, 1f)
 
-                                // Update via callback
-                                currentOnPointMoved(draggedPointIndex, Offset(newX, newY))
+                                // Update the mutable list state (triggers recomposition)
+                                points[draggedPointIndex] = Offset(newX, newY)
 
                                 // Calculate magnifier position (Screen space)
                                 val magX = renderOffsetX + newX * renderWidth

@@ -35,14 +35,7 @@ data class ArUiState(
     val sensorData: SensorData? = null,
 
     // NEW: Photogrammetry
-    val pendingKeyframePath: String? = null,
-
-    // NEW: Target Creation State
-    val unwarpPoints: List<Offset> = emptyList(),
-    val activeUnwarpPointIndex: Int = -1,
-    val magnifierPosition: Offset = Offset.Zero,
-    val maskPath: android.graphics.Path? = null,
-    val isCaptureRequested: Boolean = false
+    val pendingKeyframePath: String? = null
 )
 
 /**
@@ -95,11 +88,7 @@ data class EditorUiState(
     val showDoubleTapHint: Boolean = false,
     val progressPercentage: Float = 0f,
     val canUndo: Boolean = false,
-    val canRedo: Boolean = false,
-
-    // Layer Renaming State
-    val editingLayerId: String? = null,
-    val editingLayerName: String = ""
+    val canRedo: Boolean = false
 )
 
 /**

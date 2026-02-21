@@ -17,11 +17,4 @@ allprojects {
         toolVersion = "10.12.0"
         configFile = rootProject.file("config/checkstyle/checkstyle.xml")
     }
-
-    // FIX: Removed global exclusion of aznavrail-annotation. 
-    // This was preventing the library's annotations from being included, 
-    // forcing the use of local (and incomplete) shadow files.
-    configurations.all {
-        // exclude(group = "com.github.HereLiesAz.AzNavRail", module = "aznavrail-annotation")
-    }
 }

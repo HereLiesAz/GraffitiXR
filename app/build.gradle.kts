@@ -61,7 +61,6 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    ndkVersion = "28.2.13676358"
 }
 
 // FIX: Configure Kotlin JVM target safely using tasks
@@ -106,9 +105,10 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(project(":opencv"))
 
+    implementation(libs.az.nav.rail)
     implementation(libs.coil.compose)
+
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
@@ -118,7 +118,4 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
-    implementation(libs.aznavrail)
-    implementation(libs.aznavrail.annotation)
-    ksp(libs.aznavrail.processor)
 }

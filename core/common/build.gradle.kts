@@ -33,7 +33,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    ndkVersion = "28.2.13676358"
 }
 
 tasks.withType<KotlinCompile>().configureEach {
@@ -66,10 +65,6 @@ dependencies {
     // Hilt / DI
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-
-    // AzNavRail
-    api(libs.aznavrail)
-    implementation(libs.aznavrail.annotation)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
