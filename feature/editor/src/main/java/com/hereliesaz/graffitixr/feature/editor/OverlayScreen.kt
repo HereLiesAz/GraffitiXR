@@ -19,6 +19,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.ColorFilter
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -59,6 +60,20 @@ fun OverlayScreen(
     ) {
         uiState.layers.forEach { layer ->
             if (layer.isVisible) {
+                val colorMatrix = remember(
+                    layer.saturation, layer.contrast, layer.brightness,
+                    layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB
+                ) {
+                    createColorMatrix(
+                        saturation = layer.saturation,
+                        contrast = layer.contrast,
+                        brightness = layer.brightness,
+                        colorBalanceR = layer.colorBalanceR,
+                        colorBalanceG = layer.colorBalanceG,
+                        colorBalanceB = layer.colorBalanceB
+                    )
+                }
+
                 Image(
                     bitmap = layer.bitmap.asImageBitmap(),
                     contentDescription = layer.name,
@@ -74,10 +89,10 @@ fun OverlayScreen(
                             rotationZ = layer.rotationZ
                             alpha = layer.opacity
                         },
-                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
-                        Color.Transparent,
-                        blendMode = mapBlendMode(layer.blendMode)
-                    ),
+                    // Note: We prioritize image adjustments (ColorMatrix) over BlendMode here because
+                    // standard Image composable only accepts one ColorFilter.
+                    // Ideally, we would apply both, but ColorMatrix is critical for the "Adjust" and "Color" panels.
+                    colorFilter = ColorFilter.colorMatrix(colorMatrix),
                     contentScale = ContentScale.Fit
                 )
             }

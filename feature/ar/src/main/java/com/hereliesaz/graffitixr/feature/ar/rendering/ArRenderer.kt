@@ -11,6 +11,7 @@ class ArRenderer(
 ) : GLSurfaceView.Renderer {
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        slamManager.ensureInitialized()
         slamManager.initialize()
     }
 
