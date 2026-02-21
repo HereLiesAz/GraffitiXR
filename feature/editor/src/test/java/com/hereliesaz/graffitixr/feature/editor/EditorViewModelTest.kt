@@ -187,7 +187,7 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `onLineDrawingClicked calls slamManager and saves artifact`() = runTest {
+    fun `onLineDrawingClicked calls ImageProcessor and saves artifact`() = runTest {
         // Mock current project for ID
         val project = GraffitiProject(id = "test-proj", name = "Test")
         currentProjectFlow.value = project
@@ -198,19 +198,23 @@ class EditorViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
         
         // Mock successful edge detection
+        mockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
         val resultBitmap = mockk<Bitmap>(relaxed = true)
-        coEvery { slamManager.detectEdges(any<Bitmap>()) } returns resultBitmap
+        every { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any<Bitmap>()) } returns resultBitmap
+
         coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/line.png"
         
         viewModel.onLineDrawingClicked()
         testDispatcher.scheduler.advanceUntilIdle()
         
-        coVerify { slamManager.detectEdges(any<Bitmap>()) }
+        verify { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any<Bitmap>()) }
         coVerify { projectRepository.saveArtifact("test-proj", any(), any()) }
         assertFalse(viewModel.uiState.value.isLoading)
         // Verify URI was updated
         val actualUri = viewModel.uiState.value.layers.first().uri.toString()
         assertEquals("file:///path/to/line.png", actualUri)
+
+        unmockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
     }
     
     @Test
