@@ -26,6 +26,9 @@ class DashboardViewModel @Inject constructor(
      */
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    private val _navigationTrigger = MutableStateFlow<String?>(null)
+    val navigationTrigger: StateFlow<String?> = _navigationTrigger.asStateFlow()
+
     /**
      * Fetches the list of all available projects from the repository.
      * Updates [uiState] with the result.
@@ -72,4 +75,9 @@ class DashboardViewModel @Inject constructor(
             }
         }
     }
+
+    fun navigateToSurveyor() { _navigationTrigger.value = "surveyor" }
+    fun navigateToLibrary() { _navigationTrigger.value = "project_library" }
+    fun navigateToSettings() { _navigationTrigger.value = "settings" }
+    fun onNavigationConsumed() { _navigationTrigger.value = null }
 }

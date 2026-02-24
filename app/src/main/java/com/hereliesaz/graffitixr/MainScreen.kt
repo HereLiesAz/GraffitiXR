@@ -1,47 +1,30 @@
 package com.hereliesaz.graffitixr
 
-import android.content.ContentValues
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.provider.MediaStore
-import android.view.PixelCopy
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
-import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
-import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.* // Keep just in case, though likely unused if explicit deps removed
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -50,10 +33,8 @@ import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
-import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArView
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
-import com.hereliesaz.graffitixr.feature.ar.MappingScreen
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.ui.TargetEvolutionScreen
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
@@ -61,16 +42,13 @@ import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.*
-import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import timber.log.Timber
 import java.io.File
 import kotlin.math.min
-import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 
 @Composable
 fun MainScreen(
@@ -81,9 +59,20 @@ fun MainScreen(
     navController: NavController,
     slamManager: SlamManager,
     projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
-    onRendererCreated: (ArRenderer) -> Unit
+    onRendererCreated: (ArRenderer) -> Unit,
+    // Hoisted State
+    hoistedUse3dBackground: Boolean,
+    hoistedShowSaveDialog: Boolean,
+    hoistedShowInfoScreen: Boolean,
+    onUse3dBackgroundChange: (Boolean) -> Unit,
+    onShowSaveDialogChange: (Boolean) -> Unit,
+    onShowInfoScreenChange: (Boolean) -> Unit,
+    hasCameraPermission: Boolean,
+    requestPermissions: () -> Unit,
+    onOverlayImagePick: () -> Unit,
+    onBackgroundImagePick: () -> Unit
 ) {
-    val localNavController = rememberNavController()
+    val localNavController = navController // Use the passed controller which is likely local to AppContent
     val navBackStackEntry by localNavController.currentBackStackEntryAsState()
     val currentNavRoute = navBackStackEntry?.destination?.route
 
@@ -98,12 +87,7 @@ fun MainScreen(
     val context = LocalContext.current
     val window = (view.context as? android.app.Activity)?.window
 
-    val haptic = LocalHapticFeedback.current
-    val performHaptic = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
-
-    var use3dBackground by remember { mutableStateOf(false) }
-    var showSaveDialog by remember { mutableStateOf(false) }
-
+    // derived states
     val has3dModel = remember(editorUiState.mapPath) {
         !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
     }
@@ -131,102 +115,17 @@ fun MainScreen(
         }
     }
 
-    // FIX: Fully constructed NavStrings to prevent 'No value passed' errors
-    val navStrings = remember {
-        NavStrings(
-            modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
-            overlay = "Overlay", overlayInfo = "Overlay Mode",
-            mockup = "Mockup", mockupInfo = "Mockup Mode",
-            trace = "Trace", traceInfo = "Trace Mode",
-            grid = "Target", surveyor = "Survey", surveyorInfo = "Map Wall",
-            create = "Create", createInfo = "New Target",
-            refine = "Refine", refineInfo = "Adjust Target",
-            update = "Progress", updateInfo = "Mark Work",
-            design = "Design", open = "Open", openInfo = "Add Image",
-            wall = "Wall", wallInfo = "Change Wall",
-            isolate = "Isolate", isolateInfo = "Remove BG",
-            outline = "Outline", outlineInfo = "Line Art",
-            adjust = "Adjust", adjustInfo = "Colors",
-            balance = "Color", balanceInfo = "Color Tint",
-            build = "Blend", blendingInfo = "Blend Mode",
-            settings = "Settings", project = "Project",
-            new = "New", newInfo = "Clear Canvas",
-            save = "Save", saveInfo = "Save to File",
-            load = "Load", loadInfo = "Open Project",
-            export = "Export", exportInfo = "Export Image",
-            help = "Help", helpInfo = "Guide",
-            light = "Light", lightInfo = "Flashlight",
-            lock = "Lock", lockInfo = "Touch Lock"
-        )
-    }
+    // NavStrings removed (hoisted)
 
-    var showInfoScreen by remember { mutableStateOf(false) }
-    var showSliderDialog by remember { mutableStateOf<String?>(null) }
-    var showColorBalanceDialog by remember { mutableStateOf(false) }
+    // Dialogs using hoisted state
 
-    val resetDialogs = remember { { showSliderDialog = null; showColorBalanceDialog = false } }
+    // Structure: Box replacing AzHostActivityLayout
+    Box(modifier = Modifier.fillMaxSize()) {
 
-    val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let { editorViewModel.onAddLayer(it) }
-    }
-    val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let { editorViewModel.setBackgroundImage(it) }
-    }
-
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            androidx.core.content.ContextCompat.checkSelfPermission(
-                context,
-                android.Manifest.permission.CAMERA
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        hasCameraPermission = permissions[android.Manifest.permission.CAMERA] ?: false
-    }
-
-    val requestPermissions = {
-        permissionLauncher.launch(
-            arrayOf(
-                android.Manifest.permission.CAMERA,
-                android.Manifest.permission.ACCESS_FINE_LOCATION,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
-    }
-
-    val isRailVisible = !editorUiState.hideUiForCapture && !uiState.isTouchLocked
-
-    AzHostActivityLayout(navController = localNavController) {
-        // --- 1. THE RAIL ---
-        if (isRailVisible) {
-            GraffitiNavRail(
-                navStrings = navStrings,
-                editorUiState = editorUiState,
-                editorViewModel = editorViewModel,
-                viewModel = viewModel,
-                arViewModel = arViewModel,
-                navController = localNavController,
-                hasCameraPermission = hasCameraPermission,
-                requestPermissions = requestPermissions,
-                performHaptic = performHaptic,
-                resetDialogs = resetDialogs,
-                backgroundImagePicker = backgroundImagePicker,
-                overlayImagePicker = overlayImagePicker,
-                has3dModel = has3dModel,
-                use3dBackground = use3dBackground,
-                onToggle3dBackground = { use3dBackground = !use3dBackground },
-                onShowInfoScreen = { showInfoScreen = true },
-                onSaveProject = { showSaveDialog = true }
-            )
-        }
-
-        // --- 2. MAIN BACKGROUND / CONTENT ---
-        background(weight = 0) {
-            if (uiState.isCapturingTarget) {
+        // --- 1. BACKGROUND / CONTENT ---
+        // Replacing background(weight=0) { ... }
+        Box(modifier = Modifier.fillMaxSize()) {
+             if (uiState.isCapturingTarget) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                     com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground(
                         uiState = arUiState,
@@ -245,7 +144,9 @@ fun MainScreen(
                     projectRepository = projectRepository,
                     onRendererCreated = onRendererCreatedWrapper
                 )
-            } else if (currentNavRoute == "editor" || currentNavRoute == null) {
+            } else if (currentNavRoute == "editor" || currentNavRoute == null || currentNavRoute == "project_library" || currentNavRoute == "settings") {
+                 // Note: project_library and settings usually cover full screen, so background might be irrelevant
+                 // but for Editor mode, we need this.
                 val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
                 Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
                     MainContentLayer(
@@ -257,7 +158,7 @@ fun MainScreen(
                         slamManager = slamManager,
                         projectRepository = projectRepository,
                         hasCameraPermission = hasCameraPermission,
-                        use3dBackground = use3dBackground
+                        use3dBackground = hoistedUse3dBackground
                     )
                 }
             } else {
@@ -265,165 +166,167 @@ fun MainScreen(
             }
         }
 
-        // --- 3. ONSCREEN OVERLAYS ---
-        onscreen(alignment = Alignment.Center) {
-            Box(modifier = Modifier.fillMaxSize()) {
+        // --- 2. ONSCREEN OVERLAYS ---
+        // Replacing onscreen(Alignment.Center) { ... }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
 
-                AzNavHost(startDestination = "project_library") {
-                    composable("editor") {
-                        EditorUi(
-                            actions = editorViewModel,
-                            uiState = editorUiState,
-                            isTouchLocked = uiState.isTouchLocked,
-                            showUnlockInstructions = uiState.showUnlockInstructions,
-                            isCapturingTarget = uiState.isCapturingTarget
-                        )
-                    }
-                    composable("surveyor") {
-                        com.hereliesaz.graffitixr.feature.ar.MappingUi(
-                            onBackClick = { localNavController.popBackStack() },
-                            onScanComplete = { localNavController.popBackStack() }
-                        )
-                    }
-                    composable("project_library") {
-                        LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
-                        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                            ProjectLibraryScreen(
-                                projects = dashboardUiState.availableProjects,
-                                onLoadProject = {
-                                    dashboardViewModel.openProject(it)
-                                    localNavController.navigate("editor") {
-                                        popUpTo("project_library") { inclusive = false }
-                                    }
-                                },
-                                onDeleteProject = { projectId ->
-                                    dashboardViewModel.deleteProject(projectId)
-                                },
-                                onNewProject = {
-                                    dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-                                    localNavController.navigate("editor") {
-                                        popUpTo("project_library") { inclusive = false }
-                                    }
+            // Using standard NavHost (implicit NavHost inside Composable)
+            // Note: AzNavHost wrapper removed.
+            androidx.navigation.compose.NavHost(navController = localNavController as androidx.navigation.NavHostController, startDestination = "project_library") {
+                 composable("editor") {
+                    EditorUi(
+                        actions = editorViewModel,
+                        uiState = editorUiState,
+                        isTouchLocked = uiState.isTouchLocked,
+                        showUnlockInstructions = uiState.showUnlockInstructions,
+                        isCapturingTarget = uiState.isCapturingTarget
+                    )
+                }
+                composable("surveyor") {
+                    com.hereliesaz.graffitixr.feature.ar.MappingUi(
+                        onBackClick = { localNavController.popBackStack() },
+                        onScanComplete = { localNavController.popBackStack() }
+                    )
+                }
+                composable("project_library") {
+                    LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                        ProjectLibraryScreen(
+                            projects = dashboardUiState.availableProjects,
+                            onLoadProject = {
+                                dashboardViewModel.openProject(it)
+                                localNavController.navigate("editor") {
+                                    popUpTo("project_library") { inclusive = false }
                                 }
-                            )
-                        }
-                    }
-                    composable("settings") {
-                        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                            SettingsScreen(
-                                currentVersion = "1.0.0",
-                                updateStatus = "Up to date",
-                                isCheckingForUpdate = false,
-                                isRightHanded = editorUiState.isRightHanded,
-                                onHandednessChanged = { editorViewModel.toggleHandedness() },
-                                onCheckForUpdates = { },
-                                onInstallUpdate = { },
-                                onClose = { localNavController.popBackStack() }
-                            )
-                        }
-                    }
-
-                    // --- TARGET EVOLUTION ---
-                    composable(route = "target_evolution") {
-                        val evolutionBitmap = arUiState.tempCaptureBitmap
-
-                        if (evolutionBitmap != null) {
-                            TargetEvolutionScreen(
-                                image = evolutionBitmap,
-                                onCornersConfirmed = { corners ->
-                                    val unwarped = ImageProcessor.unwarpImage(evolutionBitmap, corners)
-                                    if (unwarped != null) {
-                                        arViewModel.setTempCapture(unwarped)
-                                        viewModel.setCaptureStep(CaptureStep.MASK)
-                                        localNavController.popBackStack()
-                                    }
+                            },
+                            onDeleteProject = { projectId ->
+                                dashboardViewModel.deleteProject(projectId)
+                            },
+                            onNewProject = {
+                                dashboardViewModel.onNewProject(editorUiState.isRightHanded)
+                                localNavController.navigate("editor") {
+                                    popUpTo("project_library") { inclusive = false }
                                 }
-                            )
-                        } else {
-                            Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-                                Text("Reality failed to load.", color = Color.White)
                             }
-                        }
+                        )
+                    }
+                }
+                composable("settings") {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                        SettingsScreen(
+                            currentVersion = "1.0.0",
+                            updateStatus = "Up to date",
+                            isCheckingForUpdate = false,
+                            isRightHanded = editorUiState.isRightHanded,
+                            onHandednessChanged = { editorViewModel.toggleHandedness() },
+                            onCheckForUpdates = { },
+                            onInstallUpdate = { },
+                            onClose = { localNavController.popBackStack() }
+                        )
                     }
                 }
 
-                if (uiState.isCapturingTarget) {
-                    com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
-                        uiState = arUiState,
-                        isRightHanded = editorUiState.isRightHanded,
-                        captureStep = uiState.captureStep,
-                        onConfirm = {
-                            val bitmapToSave = arUiState.tempCaptureBitmap
-                            if (bitmapToSave != null) {
-                                scope.launch(Dispatchers.IO) {
-                                    val uri = saveBitmapToCache(context, bitmapToSave)
-                                    if (uri != null) {
-                                        withContext(Dispatchers.Main) {
-                                            arViewModel.onFrameCaptured(bitmapToSave, uri)
-                                            viewModel.onConfirmTargetCreation()
-                                        }
-                                    } else {
-                                        withContext(Dispatchers.Main) {
-                                            android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
-                                            viewModel.onConfirmTargetCreation()
-                                        }
-                                    }
-                                }
-                            } else {
-                                viewModel.onConfirmTargetCreation()
-                            }
-                        },
-                        onRetake = viewModel::onRetakeCapture,
-                        onCancel = viewModel::onCancelCaptureClicked,
-                        onUnwarpConfirm = { points: List<Offset> ->
-                            arUiState.tempCaptureBitmap?.let { src ->
-                                ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                // --- TARGET EVOLUTION ---
+                composable(route = "target_evolution") {
+                    val evolutionBitmap = arUiState.tempCaptureBitmap
+
+                    if (evolutionBitmap != null) {
+                        TargetEvolutionScreen(
+                            image = evolutionBitmap,
+                            onCornersConfirmed = { corners ->
+                                val unwarped = ImageProcessor.unwarpImage(evolutionBitmap, corners)
+                                if (unwarped != null) {
                                     arViewModel.setTempCapture(unwarped)
                                     viewModel.setCaptureStep(CaptureStep.MASK)
+                                    localNavController.popBackStack()
                                 }
                             }
-                        },
-                        onMaskConfirmed = { maskedBitmap: Bitmap ->
-                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
-                            arViewModel.setTempCapture(extracted)
-                            viewModel.setCaptureStep(CaptureStep.REVIEW)
-                        },
-                        onRequestCapture = arViewModel::requestCapture,
-                        onUpdateUnwarpPoints = arViewModel::updateUnwarpPoints,
-                        onSetActiveUnwarpPoint = arViewModel::setActiveUnwarpPointIndex,
-                        onSetMagnifierPosition = arViewModel::setMagnifierPosition,
-                        onUpdateMaskPath = arViewModel::setMaskPath
-                    )
-                }
-
-                TouchLockOverlay(uiState.isTouchLocked) {
-                    viewModel.showUnlockInstructions(true)
-                }
-                UnlockInstructionsPopup(uiState.showUnlockInstructions)
-
-                if (showInfoScreen) {
-                    com.hereliesaz.graffitixr.design.components.InfoDialog(
-                        title = "GraffitiXR Help",
-                        content = "Design and project graffiti onto physical walls using AR.",
-                        onDismiss = { showInfoScreen = false }
-                    )
-                }
-
-                if (showSaveDialog) {
-                    SaveProjectDialog(
-                        initialName = projectRepository.currentProject.value?.name ?: "",
-                        onDismissRequest = { showSaveDialog = false },
-                        onSaveRequest = { name ->
-                            editorViewModel.saveProject(name)
-                            showSaveDialog = false
+                        )
+                    } else {
+                        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                            Text("Reality failed to load.", color = Color.White)
                         }
-                    )
+                    }
                 }
+            }
+
+            if (uiState.isCapturingTarget) {
+                com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
+                    uiState = arUiState,
+                    isRightHanded = editorUiState.isRightHanded,
+                    captureStep = uiState.captureStep,
+                    onConfirm = {
+                        val bitmapToSave = arUiState.tempCaptureBitmap
+                        if (bitmapToSave != null) {
+                            scope.launch(Dispatchers.IO) {
+                                val uri = saveBitmapToCache(context, bitmapToSave)
+                                if (uri != null) {
+                                    withContext(Dispatchers.Main) {
+                                        arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                        viewModel.onConfirmTargetCreation()
+                                    }
+                                } else {
+                                    withContext(Dispatchers.Main) {
+                                        android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
+                                        viewModel.onConfirmTargetCreation()
+                                    }
+                                }
+                            }
+                        } else {
+                            viewModel.onConfirmTargetCreation()
+                        }
+                    },
+                    onRetake = viewModel::onRetakeCapture,
+                    onCancel = viewModel::onCancelCaptureClicked,
+                    onUnwarpConfirm = { points: List<Offset> ->
+                        arUiState.tempCaptureBitmap?.let { src ->
+                            ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                                arViewModel.setTempCapture(unwarped)
+                                viewModel.setCaptureStep(CaptureStep.MASK)
+                            }
+                        }
+                    },
+                    onMaskConfirmed = { maskedBitmap: Bitmap ->
+                        val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+                        arViewModel.setTempCapture(extracted)
+                        viewModel.setCaptureStep(CaptureStep.REVIEW)
+                    },
+                    onRequestCapture = arViewModel::requestCapture,
+                    onUpdateUnwarpPoints = arViewModel::updateUnwarpPoints,
+                    onSetActiveUnwarpPoint = arViewModel::setActiveUnwarpPointIndex,
+                    onSetMagnifierPosition = arViewModel::setMagnifierPosition,
+                    onUpdateMaskPath = arViewModel::setMaskPath
+                )
+            }
+
+            TouchLockOverlay(uiState.isTouchLocked) {
+                viewModel.showUnlockInstructions(true)
+            }
+            UnlockInstructionsPopup(uiState.showUnlockInstructions)
+
+            if (hoistedShowInfoScreen) {
+                com.hereliesaz.graffitixr.design.components.InfoDialog(
+                    title = "GraffitiXR Help",
+                    content = "Design and project graffiti onto physical walls using AR.",
+                    onDismiss = { onShowInfoScreenChange(false) }
+                )
+            }
+
+            if (hoistedShowSaveDialog) {
+                SaveProjectDialog(
+                    initialName = projectRepository.currentProject.value?.name ?: "",
+                    onDismissRequest = { onShowSaveDialogChange(false) },
+                    onSaveRequest = { name ->
+                        editorViewModel.saveProject(name)
+                        onShowSaveDialogChange(false)
+                    }
+                )
             }
         }
     }
 }
 
+// MainContentLayer and LayersOverlay kept as is
 @Composable
 fun MainContentLayer(
     editorUiState: EditorUiState,
