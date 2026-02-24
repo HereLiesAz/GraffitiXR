@@ -295,7 +295,7 @@ class MainActivity : AzActivity() {
             resetDialogs()
         }
         azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
-            dashboardViewModel.navigateToLibrary() // Need to implement
+            dashboardViewModel.navigateToLibrary()
             resetDialogs()
         }
         azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo) {
