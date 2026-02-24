@@ -162,8 +162,8 @@ class MainActivity : AzActivity() {
         }
 
         val resetDialogs = {
-            showSaveDialog = false
-            showInfoScreen = false
+            // Reset dialogs if managed here, but MainScreen manages most dialogs locally (slider, color).
+            // We can only reset what we lifted.
         }
 
         // --- Rail Items ---
@@ -323,7 +323,7 @@ class MainActivity : AzActivity() {
     }
 
     @Composable
-    fun AppContent(navController: NavHostController) {
+    fun AppContent(navController: NavHostController, dockingSide: AzDockingSide) {
         GraffitiXRTheme {
             val navTrigger by dashboardViewModel.navigationTrigger.collectAsState()
 
@@ -361,7 +361,8 @@ class MainActivity : AzActivity() {
                     )
                 )},
                 onOverlayImagePick = { overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                onBackgroundImagePick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                onBackgroundImagePick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                dockingSide = dockingSide
             )
         }
     }

@@ -20,11 +20,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
-import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.hereliesaz.aznavrail.* // Keep just in case, though likely unused if explicit deps removed
+import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -70,7 +70,8 @@ fun MainScreen(
     hasCameraPermission: Boolean,
     requestPermissions: () -> Unit,
     onOverlayImagePick: () -> Unit,
-    onBackgroundImagePick: () -> Unit
+    onBackgroundImagePick: () -> Unit,
+    dockingSide: AzDockingSide
 ) {
     val localNavController = navController // Use the passed controller which is likely local to AppContent
     val navBackStackEntry by localNavController.currentBackStackEntryAsState()
@@ -114,10 +115,6 @@ fun MainScreen(
             arViewModel.onKeyframeCaptured()
         }
     }
-
-    // NavStrings removed (hoisted)
-
-    // Dialogs using hoisted state
 
     // Structure: Box replacing AzHostActivityLayout
     Box(modifier = Modifier.fillMaxSize()) {
@@ -170,81 +167,88 @@ fun MainScreen(
         // Replacing onscreen(Alignment.Center) { ... }
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
 
-            // Using standard NavHost (implicit NavHost inside Composable)
-            // Note: AzNavHost wrapper removed.
-            androidx.navigation.compose.NavHost(navController = localNavController as androidx.navigation.NavHostController, startDestination = "project_library") {
-                 composable("editor") {
-                    EditorUi(
-                        actions = editorViewModel,
-                        uiState = editorUiState,
-                        isTouchLocked = uiState.isTouchLocked,
-                        showUnlockInstructions = uiState.showUnlockInstructions,
-                        isCapturingTarget = uiState.isCapturingTarget
-                    )
-                }
-                composable("surveyor") {
-                    com.hereliesaz.graffitixr.feature.ar.MappingUi(
-                        onBackClick = { localNavController.popBackStack() },
-                        onScanComplete = { localNavController.popBackStack() }
-                    )
-                }
-                composable("project_library") {
-                    LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                        ProjectLibraryScreen(
-                            projects = dashboardUiState.availableProjects,
-                            onLoadProject = {
-                                dashboardViewModel.openProject(it)
-                                localNavController.navigate("editor") {
-                                    popUpTo("project_library") { inclusive = false }
-                                }
-                            },
-                            onDeleteProject = { projectId ->
-                                dashboardViewModel.deleteProject(projectId)
-                            },
-                            onNewProject = {
-                                dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-                                localNavController.navigate("editor") {
-                                    popUpTo("project_library") { inclusive = false }
-                                }
-                            }
+            // Create a fake scope to provide dockingSide to AzNavHost
+            // Note: We use a simple remember because dockingSide update will trigger recomposition of MainScreen
+            // and recreate the scope.
+            val navHostScope = remember(dockingSide) {
+                AzNavHostScopeImpl(AzNavRailScopeImpl().apply { azConfig(dockingSide = dockingSide) })
+            }
+
+            CompositionLocalProvider(LocalAzNavHostScope provides navHostScope) {
+                AzNavHost(navController = localNavController as androidx.navigation.NavHostController, startDestination = "project_library") {
+                     composable("editor") {
+                        EditorUi(
+                            actions = editorViewModel,
+                            uiState = editorUiState,
+                            isTouchLocked = uiState.isTouchLocked,
+                            showUnlockInstructions = uiState.showUnlockInstructions,
+                            isCapturingTarget = uiState.isCapturingTarget
                         )
                     }
-                }
-                composable("settings") {
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                        SettingsScreen(
-                            currentVersion = "1.0.0",
-                            updateStatus = "Up to date",
-                            isCheckingForUpdate = false,
-                            isRightHanded = editorUiState.isRightHanded,
-                            onHandednessChanged = { editorViewModel.toggleHandedness() },
-                            onCheckForUpdates = { },
-                            onInstallUpdate = { },
-                            onClose = { localNavController.popBackStack() }
+                    composable("surveyor") {
+                        com.hereliesaz.graffitixr.feature.ar.MappingUi(
+                            onBackClick = { localNavController.popBackStack() },
+                            onScanComplete = { localNavController.popBackStack() }
                         )
                     }
-                }
-
-                // --- TARGET EVOLUTION ---
-                composable(route = "target_evolution") {
-                    val evolutionBitmap = arUiState.tempCaptureBitmap
-
-                    if (evolutionBitmap != null) {
-                        TargetEvolutionScreen(
-                            image = evolutionBitmap,
-                            onCornersConfirmed = { corners ->
-                                val unwarped = ImageProcessor.unwarpImage(evolutionBitmap, corners)
-                                if (unwarped != null) {
-                                    arViewModel.setTempCapture(unwarped)
-                                    viewModel.setCaptureStep(CaptureStep.MASK)
-                                    localNavController.popBackStack()
+                    composable("project_library") {
+                        LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
+                        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                            ProjectLibraryScreen(
+                                projects = dashboardUiState.availableProjects,
+                                onLoadProject = {
+                                    dashboardViewModel.openProject(it)
+                                    localNavController.navigate("editor") {
+                                        popUpTo("project_library") { inclusive = false }
+                                    }
+                                },
+                                onDeleteProject = { projectId ->
+                                    dashboardViewModel.deleteProject(projectId)
+                                },
+                                onNewProject = {
+                                    dashboardViewModel.onNewProject(editorUiState.isRightHanded)
+                                    localNavController.navigate("editor") {
+                                        popUpTo("project_library") { inclusive = false }
+                                    }
                                 }
+                            )
+                        }
+                    }
+                    composable("settings") {
+                        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                            SettingsScreen(
+                                currentVersion = "1.0.0",
+                                updateStatus = "Up to date",
+                                isCheckingForUpdate = false,
+                                isRightHanded = editorUiState.isRightHanded,
+                                onHandednessChanged = { editorViewModel.toggleHandedness() },
+                                onCheckForUpdates = { },
+                                onInstallUpdate = { },
+                                onClose = { localNavController.popBackStack() }
+                            )
+                        }
+                    }
+
+                    // --- TARGET EVOLUTION ---
+                    composable(route = "target_evolution") {
+                        val evolutionBitmap = arUiState.tempCaptureBitmap
+
+                        if (evolutionBitmap != null) {
+                            TargetEvolutionScreen(
+                                image = evolutionBitmap,
+                                onCornersConfirmed = { corners ->
+                                    val unwarped = ImageProcessor.unwarpImage(evolutionBitmap, corners)
+                                    if (unwarped != null) {
+                                        arViewModel.setTempCapture(unwarped)
+                                        viewModel.setCaptureStep(CaptureStep.MASK)
+                                        localNavController.popBackStack()
+                                    }
+                                }
+                            )
+                        } else {
+                            Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                                Text("Reality failed to load.", color = Color.White)
                             }
-                        )
-                    } else {
-                        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-                            Text("Reality failed to load.", color = Color.White)
                         }
                     }
                 }

@@ -23,6 +23,9 @@ object AzGraph : AzGraphInterface {
 
                 val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked
 
+                // Calculate docking side here to pass down
+                val dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+
                 AzHostActivityLayout(
                     navController = navController,
                     initiallyExpanded = false,
@@ -34,7 +37,7 @@ object AzGraph : AzGraphInterface {
                     }
 
                     background(weight = 0) {
-                        mainActivity.AppContent(navController)
+                        mainActivity.AppContent(navController, dockingSide)
                     }
                 }
             }
