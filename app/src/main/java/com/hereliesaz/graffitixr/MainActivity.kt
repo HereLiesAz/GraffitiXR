@@ -162,8 +162,8 @@ class MainActivity : AzActivity() {
         }
 
         val resetDialogs = {
-            // Reset dialogs if managed here, but MainScreen manages most dialogs locally (slider, color).
-            // We can only reset what we lifted.
+            showSaveDialog = false
+            showInfoScreen = false
         }
 
         // --- Rail Items ---
