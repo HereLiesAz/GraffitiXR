@@ -22,7 +22,6 @@ import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.common.model.ArUiState
@@ -30,7 +29,6 @@ import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.Layer
-import com.hereliesaz.graffitixr.common.model.BlendMode
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
@@ -52,11 +50,13 @@ import java.io.File
 import kotlin.math.min
 
 @Composable
-fun GraffitiBackground(
+fun MainScreen(
+    navHostScope: AzNavHostScope,
     viewModel: MainViewModel,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     dashboardViewModel: DashboardViewModel,
+    navController: NavController,
     slamManager: SlamManager,
     projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
     onRendererCreated: (ArRenderer) -> Unit,
@@ -72,10 +72,6 @@ fun GraffitiBackground(
     onOverlayImagePick: () -> Unit,
     onBackgroundImagePick: () -> Unit,
     dockingSide: AzDockingSide
-    onRendererCreated: (ArRenderer) -> Unit,
-    hasCameraPermission: Boolean,
-    use3dBackground: Boolean,
-    navController: NavController
 ) {
     val localNavController = navController // Use the passed controller which is likely local to AppContent
     val navBackStackEntry by localNavController.currentBackStackEntryAsState()
@@ -120,130 +116,60 @@ fun GraffitiBackground(
         }
     }
 
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentNavRoute = navBackStackEntry?.destination?.route
-
-    if (uiState.isCapturingTarget) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-            com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground(
-                uiState = arUiState,
-                captureStep = uiState.captureStep,
-                onPhotoCaptured = { bitmap ->
-                    arViewModel.setTempCapture(bitmap)
-                    navController.navigate("target_evolution")
-                },
-                onCaptureConsumed = arViewModel::onCaptureConsumed,
-                onInitUnwarpPoints = arViewModel::updateUnwarpPoints
-            )
-        }
-    } else if (currentNavRoute == "surveyor") {
-        com.hereliesaz.graffitixr.feature.ar.MappingBackground(
-            slamManager = slamManager,
-            projectRepository = projectRepository,
-            onRendererCreated = onRendererCreated
-        )
-    } else if (currentNavRoute == "editor" || currentNavRoute == null || currentNavRoute == "project_library" || currentNavRoute == "settings") {
-        val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
-        Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
-            MainContentLayer(
-                editorUiState = editorUiState,
-                arUiState = arUiState,
-                editorViewModel = editorViewModel,
-                arViewModel = arViewModel,
-                onRendererCreated = onRendererCreated,
-                slamManager = slamManager,
-                projectRepository = projectRepository,
-                hasCameraPermission = hasCameraPermission,
-                use3dBackground = use3dBackground
-            )
-        }
-    } else {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-    }
-}
-    // Structure: Box replacing AzHostActivityLayout
-    Box(modifier = Modifier.fillMaxSize()) {
-
+    // Apply the AzNavRail Safe Zones and constraints by calling methods on the navHostScope
+    with(navHostScope) {
         // --- 1. BACKGROUND / CONTENT ---
-        // Replacing background(weight=0) { ... }
-        Box(modifier = Modifier.fillMaxSize()) {
-             if (uiState.isCapturingTarget) {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                    com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground(
-                        uiState = arUiState,
-                        captureStep = uiState.captureStep,
-                        onPhotoCaptured = { bitmap ->
-                            arViewModel.setTempCapture(bitmap)
-                            localNavController.navigate("target_evolution")
-                        },
-                        onCaptureConsumed = arViewModel::onCaptureConsumed,
-                        onInitUnwarpPoints = arViewModel::updateUnwarpPoints
-                    )
-                }
-            } else if (currentNavRoute == "surveyor") {
-                com.hereliesaz.graffitixr.feature.ar.MappingBackground(
-                    slamManager = slamManager,
-                    projectRepository = projectRepository,
-                    onRendererCreated = onRendererCreatedWrapper
-                )
-            } else if (currentNavRoute == "editor" || currentNavRoute == null || currentNavRoute == "project_library" || currentNavRoute == "settings") {
-                 // Note: project_library and settings usually cover full screen, so background might be irrelevant
-                 // but for Editor mode, we need this.
-                val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
-                Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
-                    MainContentLayer(
-                        editorUiState = editorUiState,
-                        arUiState = arUiState,
-                        editorViewModel = editorViewModel,
-                        arViewModel = arViewModel,
-                        onRendererCreated = onRendererCreatedWrapper,
+        // background(weight = 0) tells AzNavRail to render this without padding, behind the UI overlays.
+        background(weight = 0) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (uiState.isCapturingTarget) {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                        com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground(
+                            uiState = arUiState,
+                            captureStep = uiState.captureStep,
+                            onPhotoCaptured = { bitmap ->
+                                arViewModel.setTempCapture(bitmap)
+                                localNavController.navigate("target_evolution")
+                            },
+                            onCaptureConsumed = arViewModel::onCaptureConsumed,
+                            onInitUnwarpPoints = arViewModel::updateUnwarpPoints
+                        )
+                    }
+                } else if (currentNavRoute == "surveyor") {
+                    com.hereliesaz.graffitixr.feature.ar.MappingBackground(
                         slamManager = slamManager,
                         projectRepository = projectRepository,
-                        hasCameraPermission = hasCameraPermission,
-                        use3dBackground = hoistedUse3dBackground
+                        onRendererCreated = onRendererCreatedWrapper
                     )
+                } else if (currentNavRoute == "editor" || currentNavRoute == null || currentNavRoute == "project_library" || currentNavRoute == "settings") {
+                    // Note: project_library and settings usually cover full screen, so background might be irrelevant
+                    // but for Editor mode, we need this.
+                    val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
+                    Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
+                        MainContentLayer(
+                            editorUiState = editorUiState,
+                            arUiState = arUiState,
+                            editorViewModel = editorViewModel,
+                            arViewModel = arViewModel,
+                            onRendererCreated = onRendererCreatedWrapper,
+                            slamManager = slamManager,
+                            projectRepository = projectRepository,
+                            hasCameraPermission = hasCameraPermission,
+                            use3dBackground = hoistedUse3dBackground
+                        )
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
                 }
-            } else {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black))
             }
         }
 
-@Composable
-fun GraffitiOverlay(
-    viewModel: MainViewModel,
-    editorViewModel: EditorViewModel,
-    arViewModel: ArViewModel,
-    dashboardViewModel: DashboardViewModel,
-    navController: NavController,
-    projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
-    dockingSide: AzDockingSide,
-    // Hoisted State
-    hoistedShowSaveDialog: Boolean,
-    hoistedShowInfoScreen: Boolean,
-    onShowSaveDialogChange: (Boolean) -> Unit,
-    onShowInfoScreenChange: (Boolean) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-
-    val uiState by viewModel.uiState.collectAsState()
-    val arUiState by arViewModel.uiState.collectAsState()
-    val editorUiState by editorViewModel.uiState.collectAsState()
-    val dashboardUiState by dashboardViewModel.uiState.collectAsState()
         // --- 2. ONSCREEN OVERLAYS ---
-        // Replacing onscreen(Alignment.Center) { ... }
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-
-            // Create a fake scope to provide dockingSide to AzNavHost
-            // Note: We use a simple remember because dockingSide update will trigger recomposition of MainScreen
-            // and recreate the scope.
-            val navHostScope = remember(dockingSide) {
-                AzNavHostScopeImpl(AzNavRailScopeImpl().apply { azConfig(dockingSide = dockingSide) })
-            }
-
-            CompositionLocalProvider(LocalAzNavHostScope provides navHostScope) {
+        // onscreen() automatically applies the required padding so UI elements never overlap the rail or OS gesture zones.
+        onscreen(Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AzNavHost(navController = localNavController as androidx.navigation.NavHostController, startDestination = "project_library") {
-                     composable("editor") {
+                    composable("editor") {
                         EditorUi(
                             actions = editorViewModel,
                             uiState = editorUiState,
@@ -295,90 +221,11 @@ fun GraffitiOverlay(
                             )
                         }
                     }
-    // Fake scope for AzNavHost to inject dockingSide
-    val navHostScope = remember(dockingSide) {
-        AzNavHostScopeImpl(AzNavRailScopeImpl().apply { azConfig(dockingSide = dockingSide) })
-    }
 
-    CompositionLocalProvider(LocalAzNavHostScope provides navHostScope) {
-        AzNavHost(navController = navController as androidx.navigation.NavHostController, startDestination = "project_library") {
-            composable("editor") {
-                EditorUi(
-                    actions = editorViewModel,
-                    uiState = editorUiState,
-                    isTouchLocked = uiState.isTouchLocked,
-                    showUnlockInstructions = uiState.showUnlockInstructions,
-                    isCapturingTarget = uiState.isCapturingTarget
-                )
-            }
-            composable("surveyor") {
-                com.hereliesaz.graffitixr.feature.ar.MappingUi(
-                    onBackClick = { navController.popBackStack() },
-                    onScanComplete = { navController.popBackStack() }
-                )
-            }
-            composable("project_library") {
-                LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                    ProjectLibraryScreen(
-                        projects = dashboardUiState.availableProjects,
-                        onLoadProject = {
-                            dashboardViewModel.openProject(it)
-                            navController.navigate("editor") {
-                                popUpTo("project_library") { inclusive = false }
-                            }
-                        },
-                        onDeleteProject = { projectId ->
-                            dashboardViewModel.deleteProject(projectId)
-                        },
-                        onNewProject = {
-                            dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-                            navController.navigate("editor") {
-                                popUpTo("project_library") { inclusive = false }
-                            }
-                        }
-                    )
-                }
-            }
-            composable("settings") {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                    SettingsScreen(
-                        currentVersion = "1.0.0",
-                        updateStatus = "Up to date",
-                        isCheckingForUpdate = false,
-                        isRightHanded = editorUiState.isRightHanded,
-                        onHandednessChanged = { editorViewModel.toggleHandedness() },
-                        onCheckForUpdates = { },
-                        onInstallUpdate = { },
-                        onClose = { navController.popBackStack() }
-                    )
-                }
-            }
+                    // --- TARGET EVOLUTION ---
+                    composable(route = "target_evolution") {
+                        val evolutionBitmap = arUiState.tempCaptureBitmap
 
-            // --- TARGET EVOLUTION ---
-            composable(route = "target_evolution") {
-                val evolutionBitmap = arUiState.tempCaptureBitmap
-
-                if (evolutionBitmap != null) {
-                    TargetEvolutionScreen(
-                        image = evolutionBitmap,
-                        onCornersConfirmed = { corners ->
-                            val unwarped = ImageProcessor.unwarpImage(evolutionBitmap, corners)
-                            if (unwarped != null) {
-                                arViewModel.setTempCapture(unwarped)
-                                viewModel.setCaptureStep(CaptureStep.MASK)
-                                navController.popBackStack()
-                            }
-                        }
-                    )
-                } else {
-                    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-                        Text("Reality failed to load.", color = Color.White)
-                    }
-                }
-            }
-        }
-    }
                         if (evolutionBitmap != null) {
                             TargetEvolutionScreen(
                                 image = evolutionBitmap,
@@ -398,154 +245,85 @@ fun GraffitiOverlay(
                         }
                     }
                 }
-            }
 
-    if (uiState.isCapturingTarget) {
-        com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
-            uiState = arUiState,
-            isRightHanded = editorUiState.isRightHanded,
-            captureStep = uiState.captureStep,
-            onConfirm = {
-                val bitmapToSave = arUiState.tempCaptureBitmap
-                if (bitmapToSave != null) {
-                    scope.launch(Dispatchers.IO) {
-                        val uri = saveBitmapToCache(context, bitmapToSave)
-                        if (uri != null) {
-                            withContext(Dispatchers.Main) {
-                                arViewModel.onFrameCaptured(bitmapToSave, uri)
-                                viewModel.onConfirmTargetCreation()
-                            }
-                        } else {
-                            withContext(Dispatchers.Main) {
-                                android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
-                                viewModel.onConfirmTargetCreation()
-                            }
-                        }
-                    }
-                } else {
-                    viewModel.onConfirmTargetCreation()
-                }
-            },
-            onRetake = viewModel::onRetakeCapture,
-            onCancel = viewModel::onCancelCaptureClicked,
-            onUnwarpConfirm = { points: List<Offset> ->
-                arUiState.tempCaptureBitmap?.let { src ->
-                    ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                        arViewModel.setTempCapture(unwarped)
-                        viewModel.setCaptureStep(CaptureStep.MASK)
-                    }
-                }
-            },
-            onMaskConfirmed = { maskedBitmap: Bitmap ->
-                val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
-                arViewModel.setTempCapture(extracted)
-                viewModel.setCaptureStep(CaptureStep.REVIEW)
-            },
-            onRequestCapture = arViewModel::requestCapture,
-            onUpdateUnwarpPoints = arViewModel::updateUnwarpPoints,
-            onSetActiveUnwarpPoint = arViewModel::setActiveUnwarpPointIndex,
-            onSetMagnifierPosition = arViewModel::setMagnifierPosition,
-            onUpdateMaskPath = arViewModel::setMaskPath
-        )
-    }
-            if (uiState.isCapturingTarget) {
-                com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
-                    uiState = arUiState,
-                    isRightHanded = editorUiState.isRightHanded,
-                    captureStep = uiState.captureStep,
-                    onConfirm = {
-                        val bitmapToSave = arUiState.tempCaptureBitmap
-                        if (bitmapToSave != null) {
-                            scope.launch(Dispatchers.IO) {
-                                val uri = saveBitmapToCache(context, bitmapToSave)
-                                if (uri != null) {
-                                    withContext(Dispatchers.Main) {
-                                        arViewModel.onFrameCaptured(bitmapToSave, uri)
-                                        viewModel.onConfirmTargetCreation()
-                                    }
-                                } else {
-                                    withContext(Dispatchers.Main) {
-                                        android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
-                                        viewModel.onConfirmTargetCreation()
+                if (uiState.isCapturingTarget) {
+                    com.hereliesaz.graffitixr.feature.ar.TargetCreationUi(
+                        uiState = arUiState,
+                        isRightHanded = editorUiState.isRightHanded,
+                        captureStep = uiState.captureStep,
+                        onConfirm = {
+                            val bitmapToSave = arUiState.tempCaptureBitmap
+                            if (bitmapToSave != null) {
+                                scope.launch(Dispatchers.IO) {
+                                    val uri = saveBitmapToCache(context, bitmapToSave)
+                                    if (uri != null) {
+                                        withContext(Dispatchers.Main) {
+                                            arViewModel.onFrameCaptured(bitmapToSave, uri)
+                                            viewModel.onConfirmTargetCreation()
+                                        }
+                                    } else {
+                                        withContext(Dispatchers.Main) {
+                                            android.widget.Toast.makeText(context, "Failed to save target", android.widget.Toast.LENGTH_SHORT).show()
+                                            viewModel.onConfirmTargetCreation()
+                                        }
                                     }
                                 }
+                            } else {
+                                viewModel.onConfirmTargetCreation()
                             }
-                        } else {
-                            viewModel.onConfirmTargetCreation()
-                        }
-                    },
-                    onRetake = viewModel::onRetakeCapture,
-                    onCancel = viewModel::onCancelCaptureClicked,
-                    onUnwarpConfirm = { points: List<Offset> ->
-                        arUiState.tempCaptureBitmap?.let { src ->
-                            ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
-                                arViewModel.setTempCapture(unwarped)
-                                viewModel.setCaptureStep(CaptureStep.MASK)
+                        },
+                        onRetake = viewModel::onRetakeCapture,
+                        onCancel = viewModel::onCancelCaptureClicked,
+                        onUnwarpConfirm = { points: List<Offset> ->
+                            arUiState.tempCaptureBitmap?.let { src ->
+                                ImageProcessor.unwarpImage(src, points)?.let { unwarped ->
+                                    arViewModel.setTempCapture(unwarped)
+                                    viewModel.setCaptureStep(CaptureStep.MASK)
+                                }
                             }
+                        },
+                        onMaskConfirmed = { maskedBitmap: Bitmap ->
+                            val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
+                            arViewModel.setTempCapture(extracted)
+                            viewModel.setCaptureStep(CaptureStep.REVIEW)
+                        },
+                        onRequestCapture = arViewModel::requestCapture,
+                        onUpdateUnwarpPoints = arViewModel::updateUnwarpPoints,
+                        onSetActiveUnwarpPoint = arViewModel::setActiveUnwarpPointIndex,
+                        onSetMagnifierPosition = arViewModel::setMagnifierPosition,
+                        onUpdateMaskPath = arViewModel::setMaskPath
+                    )
+                }
+
+                TouchLockOverlay(uiState.isTouchLocked) {
+                    viewModel.showUnlockInstructions(true)
+                }
+                UnlockInstructionsPopup(uiState.showUnlockInstructions)
+
+                if (hoistedShowInfoScreen) {
+                    com.hereliesaz.graffitixr.design.components.InfoDialog(
+                        title = "GraffitiXR Help",
+                        content = "Design and project graffiti onto physical walls using AR.",
+                        onDismiss = { onShowInfoScreenChange(false) }
+                    )
+                }
+
+                if (hoistedShowSaveDialog) {
+                    SaveProjectDialog(
+                        initialName = projectRepository.currentProject.value?.name ?: "",
+                        onDismissRequest = { onShowSaveDialogChange(false) },
+                        onSaveRequest = { name ->
+                            editorViewModel.saveProject(name)
+                            onShowSaveDialogChange(false)
                         }
-                    },
-                    onMaskConfirmed = { maskedBitmap: Bitmap ->
-                        val extracted = ImageProcessor.detectEdges(maskedBitmap) ?: maskedBitmap
-                        arViewModel.setTempCapture(extracted)
-                        viewModel.setCaptureStep(CaptureStep.REVIEW)
-                    },
-                    onRequestCapture = arViewModel::requestCapture,
-                    onUpdateUnwarpPoints = arViewModel::updateUnwarpPoints,
-                    onSetActiveUnwarpPoint = arViewModel::setActiveUnwarpPointIndex,
-                    onSetMagnifierPosition = arViewModel::setMagnifierPosition,
-                    onUpdateMaskPath = arViewModel::setMaskPath
-                )
-            }
-
-            TouchLockOverlay(uiState.isTouchLocked) {
-                viewModel.showUnlockInstructions(true)
-            }
-            UnlockInstructionsPopup(uiState.showUnlockInstructions)
-    TouchLockOverlay(uiState.isTouchLocked) {
-        viewModel.showUnlockInstructions(true)
-    }
-    UnlockInstructionsPopup(uiState.showUnlockInstructions)
-
-            if (hoistedShowInfoScreen) {
-                com.hereliesaz.graffitixr.design.components.InfoDialog(
-                    title = "GraffitiXR Help",
-                    content = "Design and project graffiti onto physical walls using AR.",
-                    onDismiss = { onShowInfoScreenChange(false) }
-                )
-            }
-    if (hoistedShowInfoScreen) {
-        com.hereliesaz.graffitixr.design.components.InfoDialog(
-            title = "GraffitiXR Help",
-            content = "Design and project graffiti onto physical walls using AR.",
-            onDismiss = { onShowInfoScreenChange(false) }
-        )
-    }
-
-    if (hoistedShowSaveDialog) {
-        SaveProjectDialog(
-            initialName = projectRepository.currentProject.value?.name ?: "",
-            onDismissRequest = { onShowSaveDialogChange(false) },
-            onSaveRequest = { name ->
-                editorViewModel.saveProject(name)
-                onShowSaveDialogChange(false)
-            }
-        )
-            if (hoistedShowSaveDialog) {
-                SaveProjectDialog(
-                    initialName = projectRepository.currentProject.value?.name ?: "",
-                    onDismissRequest = { onShowSaveDialogChange(false) },
-                    onSaveRequest = { name ->
-                        editorViewModel.saveProject(name)
-                        onShowSaveDialogChange(false)
-                    }
-                )
+                    )
+                }
             }
         }
     }
 }
 
 // MainContentLayer and LayersOverlay kept as is
-// MainContentLayer kept as is
 @Composable
 fun MainContentLayer(
     editorUiState: EditorUiState,
