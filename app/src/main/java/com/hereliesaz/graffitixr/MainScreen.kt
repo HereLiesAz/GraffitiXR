@@ -314,14 +314,6 @@ fun MainScreen(
                 }
                 UnlockInstructionsPopup(uiState.showUnlockInstructions)
 
-                if (showInfoScreen) {
-                    com.hereliesaz.graffitixr.design.components.InfoDialog(
-                        title = "GraffitiXR Help",
-                        content = "Design and project graffiti onto physical walls using AR.",
-                        onDismiss = { onShowInfoScreenChange(false) }
-                    )
-                }
-
                 if (showSaveDialog) {
                     SaveProjectDialog(
                         initialName = projectRepository.currentProject.value?.name ?: "",

@@ -1,8 +1,16 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.Context
 import android.graphics.PixelFormat
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.util.Log
+import android.view.Surface
+import android.view.WindowManager
 import android.opengl.GLSurfaceView
+import android.opengl.Matrix
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -52,8 +60,51 @@ fun ArView(
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
-    DisposableEffect(Unit) {
+    val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+
+    val listener = remember(renderer) {
+        object : SensorEventListener {
+            private val rotationMatrix = FloatArray(16)
+            private val remappedMatrix = FloatArray(16)
+            private val viewMatrix = FloatArray(16)
+
+            override fun onSensorChanged(event: SensorEvent?) {
+                event?.let {
+                    SensorManager.getRotationMatrixFromVector(rotationMatrix, it.values)
+
+                    val display = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+                    when(display.rotation) {
+                        Surface.ROTATION_0 -> {
+                            SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Y, remappedMatrix)
+                        }
+                        Surface.ROTATION_90 -> {
+                            SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X, remappedMatrix)
+                        }
+                        Surface.ROTATION_180 -> {
+                            SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Y, remappedMatrix)
+                        }
+                        Surface.ROTATION_270 -> {
+                            SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X, remappedMatrix)
+                        }
+                        else -> System.arraycopy(rotationMatrix, 0, remappedMatrix, 0, 16)
+                    }
+
+                    // Convert Device->World to World->Device (View Matrix) by transposing
+                    Matrix.transposeM(viewMatrix, 0, remappedMatrix, 0)
+                    renderer.updateViewMatrix(viewMatrix)
+                }
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+    }
+
+    DisposableEffect(sensorManager, rotationSensor) {
+        if (rotationSensor != null) {
+            sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+        }
         onDispose {
+            sensorManager.unregisterListener(listener)
             cameraProvider?.unbindAll()
             cameraExecutor.shutdown()
         }

@@ -123,6 +123,10 @@ class MainActivity : AzActivity() {
             packButtons = true,
             dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
         )
+        azAdvanced(
+            infoScreen = showInfoScreen,
+            onDismissInfoScreen = { showInfoScreen = false }
+        )
 
         // Navigation Strings
         val navStrings = NavStrings(
@@ -169,24 +173,24 @@ class MainActivity : AzActivity() {
         // --- Rail Items ---
 
         azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
-        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
+        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, shape = AzButtonShape.NONE, onClick = {
             if (hasCameraPermission) {
                 editorViewModel.setEditorMode(EditorMode.AR)
             } else {
                 requestPermissions()
             }
         })
-        azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
+        azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, shape = AzButtonShape.NONE, onClick = {
             if (hasCameraPermission) {
                 editorViewModel.setEditorMode(EditorMode.OVERLAY)
             } else {
                 requestPermissions()
             }
         })
-        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
+        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, shape = AzButtonShape.NONE, onClick = {
             editorViewModel.setEditorMode(EditorMode.STATIC)
         })
-        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
+        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, shape = AzButtonShape.NONE, onClick = {
             editorViewModel.setEditorMode(EditorMode.TRACE)
         })
 
@@ -194,7 +198,7 @@ class MainActivity : AzActivity() {
 
         if (editorUiState.editorMode == EditorMode.AR) {
             azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
-            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
+            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, shape = AzButtonShape.NONE, onClick = {
                 if (hasCameraPermission) {
                     viewModel.startTargetCapture()
                     resetDialogs()
@@ -203,7 +207,7 @@ class MainActivity : AzActivity() {
                 }
             })
 
-            azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
+            azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, shape = AzButtonShape.NONE, onClick = {
                 if (hasCameraPermission) {
                     dashboardViewModel.navigateToSurveyor()
                     resetDialogs()
@@ -211,7 +215,7 @@ class MainActivity : AzActivity() {
                     requestPermissions()
                 }
             })
-            azRailSubItem(id = "capture_keyframe", hostId = "target_host", text = "Keyframe", info = "Save for reconstruction", onClick = {
+            azRailSubItem(id = "capture_keyframe", hostId = "target_host", text = "Keyframe", info = "Save for reconstruction", shape = AzButtonShape.NONE, onClick = {
                 arViewModel.captureKeyframe()
             })
             azDivider()
@@ -220,7 +224,7 @@ class MainActivity : AzActivity() {
         azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
 
         if (editorUiState.editorMode == EditorMode.STATIC) {
-            azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
+            azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo, shape = AzButtonShape.NONE) {
                 resetDialogs()
                 backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
@@ -244,7 +248,7 @@ class MainActivity : AzActivity() {
 
         val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else navStrings.open
         val openButtonId = if (editorUiState.layers.isNotEmpty()) "add_layer" else "image"
-        azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
+        azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo, shape = AzButtonShape.NONE) {
             resetDialogs()
             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
@@ -263,24 +267,24 @@ class MainActivity : AzActivity() {
         }
 
         if (editorUiState.layers.isNotEmpty()) {
-            azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
+            azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, shape = AzButtonShape.NONE, onClick = {
                 editorViewModel.onRemoveBackgroundClicked()
                 resetDialogs()
             })
-            azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
+            azRailSubItem(id = "outline", hostId = "design_host", text = navStrings.outline, info = navStrings.outlineInfo, shape = AzButtonShape.NONE, onClick = {
                 editorViewModel.onLineDrawingClicked()
                 resetDialogs()
             })
             azDivider()
-            azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
+            azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo, shape = AzButtonShape.NONE) {
                 editorViewModel.onAdjustClicked()
                 resetDialogs()
             }
-            azRailSubItem(id = "balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
+            azRailSubItem(id = "balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo, shape = AzButtonShape.NONE) {
                 editorViewModel.onColorClicked()
                 resetDialogs()
             }
-            azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
+            azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, shape = AzButtonShape.NONE, onClick = {
                 editorViewModel.onCycleBlendMode()
                 resetDialogs()
             })
@@ -290,19 +294,19 @@ class MainActivity : AzActivity() {
         }
         azDivider()
         azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
-        azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
+        azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo, shape = AzButtonShape.NONE) {
             showSaveDialog = true
             resetDialogs()
         }
-        azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
+        azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo, shape = AzButtonShape.NONE) {
             dashboardViewModel.navigateToLibrary()
             resetDialogs()
         }
-        azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo) {
+        azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo, shape = AzButtonShape.NONE) {
             editorViewModel.exportProject()
             resetDialogs()
         }
-        azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
+        azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings", shape = AzButtonShape.NONE) {
             dashboardViewModel.navigateToSettings() // Need to implement
             resetDialogs()
         }
