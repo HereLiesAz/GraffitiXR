@@ -53,6 +53,8 @@ data class EditorUiState(
     val progressPercentage: Float = 0f,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
+    val undoCount: Int = 0,
+    val redoCount: Int = 0,
     val editingLayerId: String? = null,
     val editingLayerName: String = "",
 

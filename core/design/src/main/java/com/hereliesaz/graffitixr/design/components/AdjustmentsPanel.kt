@@ -22,6 +22,8 @@ data class AdjustmentsState(
     val hasImage: Boolean = false,
     val isArMode: Boolean = false,
     val hasHistory: Boolean = false,
+    val undoCount: Int = 0,
+    val redoCount: Int = 0,
     val isRightHanded: Boolean = true,
     val isCapturingTarget: Boolean = false,
     val activeLayer: OverlayLayer? = null
@@ -63,7 +65,7 @@ fun AdjustmentsPanel(
     // The panel should be visible if we are adjusting an image, or if we have an image active,
     // or if we are in AR mode (to provide access to the Magic Wand for anchoring),
     // or if there's any history to undo/redo.
-    // HOWEVER, we hide the action row (Undo/Redo/Magic) during Target Creation.
+    // HOWEVER, we hide the action row (Undo, Redo, Magic) during Target Creation.
     val canShowActionRow = !state.isCapturingTarget
     val isVisible = showKnobs || showColorBalance || (canShowActionRow && (hasImage || isArMode || hasHistory))
 
@@ -134,32 +136,19 @@ fun AdjustmentsPanel(
             }
         }
 
-                // Persistent Action Row: Undo, Redo, and Magic Wand (Magic Align)
-
-                // These are visible as long as the panel itself is visible.
-
-                if (!state.isCapturingTarget) {
-
-                    UndoRedoRow(
-
-                        canUndo = true, // Simplified: Assume true or passed in state if we want fine-grained
-
-                        canRedo = true,
-
-                        onUndo = onUndo,
-
-                        onRedo = onRedo,
-
-                        onMagicClicked = onMagicAlign,
-
-                        modifier = Modifier.fillMaxWidth()
-
-                    )
-
-                }
-
-            }
-
+        // Persistent Action Row: Undo, Redo, and Magic Wand (Magic Align)
+        // These are visible as long as the panel itself is visible.
+        if (canShowActionRow) {
+            UndoRedoRow(
+                canUndo = true, // Logic handled by ViewModel, but we can pass state if needed
+                canRedo = true, // Logic handled by ViewModel
+                undoCount = state.undoCount,
+                redoCount = state.redoCount,
+                onUndo = onUndo,
+                onRedo = onRedo,
+                onMagicClicked = onMagicAlign,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
-
-        
+    }
+}
