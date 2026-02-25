@@ -41,7 +41,12 @@ object AzGraph : AzGraphInterface {
                     }
 
                     // Pass the AzNavHostScope (this) down so AppContent can enforce the rail's UI boundaries
-                    mainActivity.AppContent(this, navController, dockingSide, renderRefState)
+                    mainActivity.AppContent(
+                        navHostScope = this,
+                        navController = navController,
+                        dockingSide = dockingSide,
+                        renderRefState = renderRefState
+                    )
                 }
             }
         }

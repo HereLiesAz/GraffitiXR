@@ -324,12 +324,14 @@ class MainActivity : AzActivity() {
         })
     }
 
+    // Removed @Composable because AzHostActivityLayout content is a configuration block
     fun AppContent(
         navHostScope: AzNavHostScope,
         navController: NavHostController,
         dockingSide: AzDockingSide,
         renderRefState: MutableState<ArRenderer?>
     ) {
+        // Pass providers for hoisted state to allow observation inside MainScreen's Composable scopes
         MainScreen(
             navHostScope = navHostScope,
             viewModel = mainViewModel,
@@ -344,14 +346,13 @@ class MainActivity : AzActivity() {
                 arRenderer = renderer
                 renderRefState.value = renderer
             },
-            // Pass hoisted state via providers to allow Composable observation
-            hoistedUse3dBackground = { use3dBackground },
-            hoistedShowSaveDialog = { showSaveDialog },
-            hoistedShowInfoScreen = { showInfoScreen },
+            hoistedUse3dBackgroundProvider = { use3dBackground },
+            hoistedShowSaveDialogProvider = { showSaveDialog },
+            hoistedShowInfoScreenProvider = { showInfoScreen },
             onUse3dBackgroundChange = { use3dBackground = it },
             onShowSaveDialogChange = { showSaveDialog = it },
             onShowInfoScreenChange = { showInfoScreen = it },
-            hasCameraPermission = { hasCameraPermission },
+            hasCameraPermissionProvider = { hasCameraPermission },
             requestPermissions = { permissionLauncher.launch(
                 arrayOf(
                     android.Manifest.permission.CAMERA,
