@@ -21,6 +21,17 @@ import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzActivity
 import com.hereliesaz.aznavrail.AzGraphInterface
 import com.hereliesaz.aznavrail.AzNavRailScope
+import com.hereliesaz.aznavrail.AzNavHostScope
+import com.hereliesaz.aznavrail.AzHostActivityLayout
+import com.hereliesaz.aznavrail.model.AzButtonShape
+import com.hereliesaz.aznavrail.model.AzDockingSide
+import com.hereliesaz.aznavrail.model.AzHeaderIconShape
+import com.hereliesaz.aznavrail.model.AzNestedRailAlignment
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.aznavrail.AzActivity
+import com.hereliesaz.aznavrail.AzGraphInterface
+import com.hereliesaz.aznavrail.AzNavRailScope
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
@@ -35,6 +46,8 @@ import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import androidx.compose.ui.Alignment
+import java.io.File
 
 /**
  * The Single Activity for the application.
@@ -76,6 +89,57 @@ class MainActivity : AzActivity() {
 
     private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    // Hoisted state for Rail and Screen
+    var use3dBackground by mutableStateOf(false)
+    var showSaveDialog by mutableStateOf(false)
+    var showInfoScreen by mutableStateOf(false)
+
+    // Permissions and Launchers
+    var hasCameraPermission by mutableStateOf(false)
+
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasCameraPermission = permissions[android.Manifest.permission.CAMERA] ?: false
+    }
+
+    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.onAddLayer(it) }
+    }
+
+    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { editorViewModel.setBackgroundImage(it) }
+    }
+
+    // Initialize NavStrings once
+    private val navStrings by lazy {
+        NavStrings(
+            modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
+            overlay = "Overlay", overlayInfo = "Overlay Mode",
+            mockup = "Mockup", mockupInfo = "Mockup Mode",
+            trace = "Trace", traceInfo = "Trace Mode",
+            grid = "Target", surveyor = "Survey", surveyorInfo = "Map Wall",
+            create = "Create", createInfo = "New Target",
+            refine = "Refine", refineInfo = "Adjust Target",
+            update = "Progress", updateInfo = "Mark Work",
+            design = "Design", open = "Open", openInfo = "Add Image",
+            wall = "Wall", wallInfo = "Change Wall",
+            isolate = "Isolate", isolateInfo = "Remove BG",
+            outline = "Outline", outlineInfo = "Line Art",
+            adjust = "Adjust", adjustInfo = "Colors",
+            balance = "Color", balanceInfo = "Color Tint",
+            build = "Blend", blendingInfo = "Blend Mode",
+            settings = "Settings", project = "Project",
+            new = "New", newInfo = "Clear Canvas",
+            save = "Save", saveInfo = "Save to File",
+            load = "Load", loadInfo = "Open Project",
+            export = "Export", exportInfo = "Export Image",
+            help = "Help", helpInfo = "Guide",
+            light = "Light", lightInfo = "Flashlight",
+            lock = "Lock", lockInfo = "Touch Lock"
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -333,7 +397,270 @@ class MainActivity : AzActivity() {
                     dashboardViewModel.onNavigationConsumed()
                 }
             }
+        // AzActivity calls graph.Run(this) which sets up the layout.
+    }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+            slamManager.destroy()
+        }
+    }
+
+    private fun resetUiState() {
+        showSaveDialog = false
+        showInfoScreen = false
+        editorViewModel.onDismissPanel()
+    }
+
+    // Dynamic Rail Configuration
+    override fun AzNavRailScope.configureRail() {
+        val editorUiState = editorViewModel.uiState.value
+        val isRightHanded = editorUiState.isRightHanded
+        val viewModel = mainViewModel // Access member
+
+        // Theme and Config
+        val activeHighlightColor = when (editorUiState.activeRotationAxis) {
+            RotationAxis.X -> Color.Red
+            RotationAxis.Y -> Color.Green
+            RotationAxis.Z -> Color.Blue
+        }
+
+        azTheme(
+            activeColor = activeHighlightColor,
+            defaultShape = AzButtonShape.RECTANGLE,
+            headerIconShape = AzHeaderIconShape.ROUNDED
+        )
+        azConfig(
+            packButtons = true,
+            dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+        )
+
+        val requestPermissions = {
+            permissionLauncher.launch(
+                arrayOf(
+                    android.Manifest.permission.CAMERA,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+
+        // --- Rail Items ---
+
+        azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
+        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = navStrings.arModeInfo, onClick = {
+            if (hasCameraPermission) {
+                editorViewModel.setEditorMode(EditorMode.AR)
+            } else {
+                requestPermissions()
+            }
+        })
+        azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = navStrings.overlayInfo, onClick = {
+            if (hasCameraPermission) {
+                editorViewModel.setEditorMode(EditorMode.OVERLAY)
+            } else {
+                requestPermissions()
+            }
+        })
+        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = navStrings.mockupInfo, onClick = {
+            editorViewModel.setEditorMode(EditorMode.STATIC)
+        })
+        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = navStrings.traceInfo, onClick = {
+            editorViewModel.setEditorMode(EditorMode.TRACE)
+        })
+
+        azDivider()
+
+        if (editorUiState.editorMode == EditorMode.AR) {
+            azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
+            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
+                if (hasCameraPermission) {
+                    viewModel.startTargetCapture()
+                    resetUiState()
+                } else {
+                    requestPermissions()
+                }
+            })
+
+            azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
+                if (hasCameraPermission) {
+                    dashboardViewModel.navigateToSurveyor()
+                    resetUiState()
+                } else {
+                    requestPermissions()
+                }
+            })
+            azRailSubItem(id = "capture_keyframe", hostId = "target_host", text = "Keyframe", info = "Save for reconstruction", onClick = {
+                arViewModel.captureKeyframe()
+            })
+            azDivider()
+        }
+
+        azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
+
+        if (editorUiState.editorMode == EditorMode.STATIC) {
+            azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
+                resetUiState()
+                backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }
+
+            // has3dModel check
+            val has3dModel = !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
+            if (has3dModel) {
+                azRailSubToggle(
+                    id = "toggle_3d",
+                    hostId = "design_host",
+                    isChecked = use3dBackground,
+                    toggleOnText = "3D View",
+                    toggleOffText = "2D View",
+                    info = "Switch Mockup",
+                    onClick = {
+                        use3dBackground = !use3dBackground
+                    }
+                )
+            }
+        }
+
+        val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else navStrings.open
+        val openButtonId = if (editorUiState.layers.isNotEmpty()) "add_layer" else "image"
+        azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
+            resetUiState()
+            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+
+        editorUiState.layers.reversed().forEach { layer ->
+            azRailRelocItem(
+                id = "layer_${layer.id}", hostId = "design_host", text = layer.name,
+                onClick = {
+                    if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
+                },
+                onRelocate = { _, _, newOrder -> editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed()) }
+            ) {
+                inputItem(hint = "Rename") { editorViewModel.onLayerRenamed(layer.id, it) }
+                listItem(text = "Remove") { editorViewModel.onLayerRemoved(layer.id) }
+            }
+        }
+
+        if (editorUiState.layers.isNotEmpty()) {
+            azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
+                editorViewModel.onRemoveBackgroundClicked()
+                resetUiState()
+            })
+
+            // Replaced "outline" with Nested Rail for "Draw"
+            azNestedRail(
+                id = "drawing_tools",
+                text = "Draw",
+                info = "Drawing Tools",
+                alignment = AzNestedRailAlignment.VERTICAL // Default, explicit for clarity
+            ) {
+                azRailItem(id = "outline", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
+                    editorViewModel.onLineDrawingClicked()
+                    resetUiState()
+                })
+            }
+
+            azDivider()
+            azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
+                editorViewModel.onAdjustClicked()
+                resetUiState()
+            }
+            azRailSubItem(id = "balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
+                editorViewModel.onColorClicked()
+                resetUiState()
+            }
+            azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
+                editorViewModel.onCycleBlendMode()
+                resetUiState()
+            })
+            azRailSubToggle(id = "lock_image", hostId = "design_host", isChecked = editorUiState.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Prevent accidental moves", onClick = {
+                editorViewModel.toggleImageLock()
+            })
+        }
+        azDivider()
+        azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
+        azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
+            showSaveDialog = true
+            resetUiState()
+        }
+        azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
+            dashboardViewModel.navigateToLibrary() // Need to implement
+            resetUiState()
+        }
+        azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo) {
+            editorViewModel.exportProject()
+            resetUiState()
+        }
+        azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
+            dashboardViewModel.navigateToSettings() // Need to implement
+            resetUiState()
+        }
+        azDivider()
+
+        azRailItem(id = "help", text = "Help", info = "Show Help") {
+            showInfoScreen = true
+            resetUiState()
+        }
+        if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
+            arViewModel.toggleFlashlight()
+            resetUiState()
+        })
+        if (editorUiState.editorMode == EditorMode.TRACE) azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
+            mainViewModel.setTouchLocked(true)
+            resetUiState()
+        })
+    }
+
+    @Composable
+    fun AppContent() {
+        GraffitiXRTheme {
+            val navController = rememberNavController()
+
+            // Collect state
+            val editorUiState by editorViewModel.uiState.collectAsState()
+            val mainUiState by mainViewModel.uiState.collectAsState()
+
+            val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked
+            val dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+
+            // Main UI composition
+            AzHostActivityLayout(
+                navController = navController,
+                initiallyExpanded = false,
+            ) {
+                if (isRailVisible) {
+                    // Scope is AzNavRailScope
+                    with(this@MainActivity) {
+                        configureRail()
+                    }
+                }
+
+                // Content Blocks
+                background(weight = 0) {
+                    GraffitiBackground(
+                        viewModel = mainViewModel,
+                        editorViewModel = editorViewModel,
+                        arViewModel = arViewModel,
+                        dashboardViewModel = dashboardViewModel,
+                        slamManager = slamManager,
+                        projectRepository = projectRepository,
+                        onRendererCreated = { arRenderer = it }, // Update state
+                        hasCameraPermission = hasCameraPermission,
+                        use3dBackground = use3dBackground,
+                        navController = navController
+                    )
+                }
+
+                onscreen(Alignment.Center) {
+                    val navTrigger by dashboardViewModel.navigationTrigger.collectAsState()
+
+                    LaunchedEffect(navTrigger) {
+                        navTrigger?.let { dest ->
+                            navController.navigate(dest)
+                            dashboardViewModel.onNavigationConsumed()
+                        }
+                    }
             MainScreen(
                 viewModel = mainViewModel,
                 editorViewModel = editorViewModel,
@@ -364,6 +691,25 @@ class MainActivity : AzActivity() {
                 onBackgroundImagePick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 dockingSide = dockingSide
             )
+        }
+    }
+}
+
+                    GraffitiOverlay(
+                        viewModel = mainViewModel,
+                        editorViewModel = editorViewModel,
+                        arViewModel = arViewModel,
+                        dashboardViewModel = dashboardViewModel,
+                        navController = navController,
+                        projectRepository = projectRepository,
+                        dockingSide = dockingSide, // From AzNavHostScope via outer capture
+                        hoistedShowSaveDialog = showSaveDialog,
+                        hoistedShowInfoScreen = showInfoScreen,
+                        onShowSaveDialogChange = { showSaveDialog = it },
+                        onShowInfoScreenChange = { showInfoScreen = it }
+                    )
+                }
+            }
         }
     }
 }
