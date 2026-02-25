@@ -88,10 +88,8 @@ fun OverlayScreen(
                             rotationY = layer.rotationY
                             rotationZ = layer.rotationZ
                             alpha = layer.opacity
+                            this.blendMode = mapBlendMode(layer.blendMode)
                         },
-                    // Note: We prioritize image adjustments (ColorMatrix) over BlendMode here because
-                    // standard Image composable only accepts one ColorFilter.
-                    // Ideally, we would apply both, but ColorMatrix is critical for the "Adjust" and "Color" panels.
                     colorFilter = ColorFilter.colorMatrix(colorMatrix),
                     contentScale = ContentScale.Fit
                 )
