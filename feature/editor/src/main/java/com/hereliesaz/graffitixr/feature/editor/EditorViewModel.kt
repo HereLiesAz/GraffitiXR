@@ -540,7 +540,7 @@ class EditorViewModel @Inject constructor(
                 RotationAxis.Y -> RotationAxis.Z
                 RotationAxis.Z -> RotationAxis.X
             }
-            it.copy(activeRotationAxis = nextAxis, showRotationFeedback = true)
+            it.copy(activeRotationAxis = nextAxis)
         }
     }
 
@@ -551,7 +551,26 @@ class EditorViewModel @Inject constructor(
         updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
     }
 
-    fun onFeedbackShown() { _uiState.update { it.copy(showRotationFeedback = false) } }
+    fun onTransformGesture(pan: Offset, zoom: Float, rotation: Float) {
+        updateActiveLayer {
+            it.copy(
+                scale = it.scale * zoom,
+                rotationZ = it.rotationZ + rotation,
+                offset = it.offset + pan
+            )
+        }
+    }
+
+    fun onLayerWarpChanged(layerId: String, mesh: List<Float>) {
+        _uiState.update { state ->
+            val newLayers = state.layers.map {
+                if (it.id == layerId) it.copy(warpMesh = mesh) else it
+            }
+            state.copy(layers = newLayers)
+        }
+    }
+
+    fun onFeedbackShown() {}
     fun onDoubleTapHintDismissed() { _uiState.update { it.copy(showDoubleTapHint = false) } }
     fun onOnboardingComplete(mode: Any) {}
     fun onAdjustClicked() { _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) } }
