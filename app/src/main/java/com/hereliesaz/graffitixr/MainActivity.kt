@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavHostController
@@ -323,49 +324,44 @@ class MainActivity : AzActivity() {
         })
     }
 
-    @Composable
-    fun AppContent(navHostScope: AzNavHostScope, navController: NavHostController, dockingSide: AzDockingSide) {
-        GraffitiXRTheme {
-            val navTrigger by dashboardViewModel.navigationTrigger.collectAsState()
-
-            LaunchedEffect(navTrigger) {
-                navTrigger?.let { dest ->
-                    navController.navigate(dest)
-                    dashboardViewModel.onNavigationConsumed()
-                }
-            }
-
-            MainScreen(
-                navHostScope = navHostScope,
-                viewModel = mainViewModel,
-                editorViewModel = editorViewModel,
-                arViewModel = arViewModel,
-                dashboardViewModel = dashboardViewModel,
-                navController = navController,
-                slamManager = slamManager,
-                projectRepository = projectRepository,
-                onRendererCreated = { renderer ->
-                    arRenderer = renderer
-                },
-                // Pass hoisted state
-                hoistedUse3dBackground = use3dBackground,
-                hoistedShowSaveDialog = showSaveDialog,
-                hoistedShowInfoScreen = showInfoScreen,
-                onUse3dBackgroundChange = { use3dBackground = it },
-                onShowSaveDialogChange = { showSaveDialog = it },
-                onShowInfoScreenChange = { showInfoScreen = it },
-                hasCameraPermission = hasCameraPermission,
-                requestPermissions = { permissionLauncher.launch(
-                    arrayOf(
-                        android.Manifest.permission.CAMERA,
-                        android.Manifest.permission.ACCESS_FINE_LOCATION,
-                        android.Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                )},
-                onOverlayImagePick = { overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                onBackgroundImagePick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                dockingSide = dockingSide
-            )
-        }
+    fun AppContent(
+        navHostScope: AzNavHostScope,
+        navController: NavHostController,
+        dockingSide: AzDockingSide,
+        renderRefState: MutableState<ArRenderer?>
+    ) {
+        MainScreen(
+            navHostScope = navHostScope,
+            viewModel = mainViewModel,
+            editorViewModel = editorViewModel,
+            arViewModel = arViewModel,
+            dashboardViewModel = dashboardViewModel,
+            navController = navController,
+            slamManager = slamManager,
+            projectRepository = projectRepository,
+            renderRefState = renderRefState,
+            onRendererCreated = { renderer ->
+                arRenderer = renderer
+                renderRefState.value = renderer
+            },
+            // Pass hoisted state via providers to allow Composable observation
+            hoistedUse3dBackground = { use3dBackground },
+            hoistedShowSaveDialog = { showSaveDialog },
+            hoistedShowInfoScreen = { showInfoScreen },
+            onUse3dBackgroundChange = { use3dBackground = it },
+            onShowSaveDialogChange = { showSaveDialog = it },
+            onShowInfoScreenChange = { showInfoScreen = it },
+            hasCameraPermission = { hasCameraPermission },
+            requestPermissions = { permissionLauncher.launch(
+                arrayOf(
+                    android.Manifest.permission.CAMERA,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )},
+            onOverlayImagePick = { overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            onBackgroundImagePick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            dockingSide = dockingSide
+        )
     }
 }

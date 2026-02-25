@@ -2,6 +2,8 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
 import android.net.Uri
+import com.hereliesaz.graffitixr.feature.ar.computervision.TeleologicalTracker
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import io.mockk.every
 import io.mockk.mockk
@@ -26,14 +28,16 @@ import org.junit.Ignore
 class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
-    private val stereoDepthProvider: StereoDepthProvider = mockk()
+    private val stereoDepthProvider: StereoDepthProvider = mockk(relaxed = true)
+    private val teleologicalTracker: TeleologicalTracker = mockk(relaxed = true)
+    private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         every { stereoDepthProvider.isSupported() } returns false
-        viewModel = ArViewModel(stereoDepthProvider)
+        viewModel = ArViewModel(stereoDepthProvider, teleologicalTracker, projectRepository)
     }
 
     @After
