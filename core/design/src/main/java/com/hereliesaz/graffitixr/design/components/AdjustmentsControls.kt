@@ -13,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +25,8 @@ import kotlin.math.roundToInt
 fun UndoRedoRow(
     canUndo: Boolean,
     canRedo: Boolean,
+    undoCount: Int,
+    redoCount: Int,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onMagicClicked: () -> Unit,
@@ -37,13 +40,28 @@ fun UndoRedoRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Aligned with the first knob (Red/Opacity)
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-            shadowElevation = 4.dp
-        ) {
-            IconButton(onClick = onUndo, enabled = canUndo) {
-                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = CircleShape,
+                // Light background when enabled, dark when disabled
+                color = if (canUndo) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+                shadowElevation = 4.dp
+            ) {
+                IconButton(onClick = onUndo, enabled = canUndo) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = "Undo",
+                        tint = if (canUndo) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                }
+            }
+            if (undoCount > 0) {
+                Text(
+                    text = undoCount.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
             }
         }
 
@@ -59,13 +77,28 @@ fun UndoRedoRow(
         }
 
         // Aligned with the third knob (Blue/Contrast)
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-            shadowElevation = 4.dp
-        ) {
-            IconButton(onClick = onRedo, enabled = canRedo) {
-                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (redoCount > 0) {
+                Text(
+                    text = redoCount.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+            }
+            Surface(
+                shape = CircleShape,
+                // Light background when enabled, dark when disabled
+                color = if (canRedo) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+                shadowElevation = 4.dp
+            ) {
+                IconButton(onClick = onRedo, enabled = canRedo) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = "Redo",
+                        tint = if (canRedo) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                }
             }
         }
     }

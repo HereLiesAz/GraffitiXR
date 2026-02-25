@@ -200,6 +200,10 @@ class MainActivity : ComponentActivity() {
                     azRailItem(id = "burn_global", text = "Burn") { editorViewModel.setActiveTool(Tool.BURN) }
                     azRailItem(id = "dodge_global", text = "Dodge") { editorViewModel.setActiveTool(Tool.DODGE) }
                     azRailItem(id = "liquify_global", text = "Liquify") { editorViewModel.setActiveTool(Tool.LIQUIFY) }
+
+                    azDivider()
+                    azRailItem(id = "flip_h_sketch", text = "Flip Horiz") { editorViewModel.onFlipLayer(true) }
+                    azRailItem(id = "flip_v_sketch", text = "Flip Vert") { editorViewModel.onFlipLayer(false) }
                     azDivider()
 
                     val hexColor = "#%06X".format(0xFFFFFF and editorUiState.activeColor.toArgb())
@@ -213,7 +217,12 @@ class MainActivity : ComponentActivity() {
                     azRailItem(id = "heal_img_global", text = "Heal") { editorViewModel.setActiveTool(Tool.HEAL) }
                     azRailItem(id = "burn_img_global", text = "Burn") { editorViewModel.setActiveTool(Tool.BURN) }
                     azRailItem(id = "dodge_img_global", text = "Dodge") { editorViewModel.setActiveTool(Tool.DODGE) }
+
                     azDivider()
+                    azRailItem(id = "flip_h_img", text = "Flip Horiz") { editorViewModel.onFlipLayer(true) }
+                    azRailItem(id = "flip_v_img", text = "Flip Vert") { editorViewModel.onFlipLayer(false) }
+                    azDivider()
+
                     azRailItem(id = "color_bal_global", text = "Color Bal") { editorViewModel.onColorClicked() }
                     azRailItem(id = "adjust_global", text = "Adjust") { editorViewModel.onAdjustClicked() }
                     azDivider()
@@ -239,11 +248,14 @@ class MainActivity : ComponentActivity() {
                 onRelocate = { _, _, newOrder ->
                     editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed())
                 }
-                // REMOVED nestedContent (tools moved to global rail)
+                // Nested content removed (tools in global rail)
             ) {
-                // HIDDEN CONTEXT MENU (Keep admin actions)
+                // HIDDEN CONTEXT MENU (Admin Actions)
                 val activate = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) }
                 inputItem(hint = "Rename") { activate(); editorViewModel.onLayerRenamed(layer.id, it) }
+                listItem(text = "Duplicate") { activate(); editorViewModel.onDuplicateLayer(layer.id) }
+                listItem(text = "Copy Edits") { activate(); editorViewModel.onCopyLayerEdits(layer.id) }
+                listItem(text = "Paste Edits") { activate(); editorViewModel.onPasteLayerEdits(layer.id) }
                 listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
             }
         }
