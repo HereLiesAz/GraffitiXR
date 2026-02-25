@@ -74,6 +74,10 @@ private:
     float alignmentMtx[16];
     std::mutex alignMutex;
     std::mutex pointMutex;
+
+    // GLES Rendering (Fallback)
+    unsigned int pointProgram = 0;
+    unsigned int pointVBO = 0;
 };
 
 #endif // GRAFFITIXR_MOBILEGS_H
