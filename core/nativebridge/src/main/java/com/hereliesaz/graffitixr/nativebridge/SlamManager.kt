@@ -50,6 +50,7 @@ class SlamManager @Inject constructor() {
     fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray) = lock.withLock { if (!isDestroyed.get()) updateCameraJni(nativeHandle, viewMatrix, projectionMatrix) }
     fun updateLight(intensity: Float, colorCorrection: FloatArray = floatArrayOf(1f, 1f, 1f)) = lock.withLock { if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity, colorCorrection) }
     fun feedDepthData(image: Image) = lock.withLock { if (!isDestroyed.get()) feedDepthDataJni(nativeHandle, image.planes[0].buffer, image.width, image.height) }
+    fun feedMonocularData(buffer: ByteBuffer, width: Int, height: Int) = lock.withLock { if (!isDestroyed.get()) feedMonocularDataJni(nativeHandle, buffer, width, height) }
     fun feedStereoData(leftImage: Image, rightImage: Image) = lock.withLock {
         if (!isDestroyed.get()) feedStereoDataJni(nativeHandle, leftImage.planes[0].buffer, leftImage.width, leftImage.height, leftImage.planes[0].rowStride, rightImage.planes[0].buffer, rightImage.width, rightImage.height, rightImage.planes[0].rowStride)
     }
@@ -87,6 +88,7 @@ class SlamManager @Inject constructor() {
     private external fun updateCameraJni(handle: Long, view: FloatArray, proj: FloatArray)
     private external fun updateLightJni(handle: Long, intensity: Float, color: FloatArray)
     private external fun feedDepthDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int)
+    private external fun feedMonocularDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int)
     private external fun feedStereoDataJni(handle: Long, leftBuffer: ByteBuffer, leftWidth: Int, leftHeight: Int, leftStride: Int, rightBuffer: ByteBuffer, rightWidth: Int, rightHeight: Int, rightStride: Int)
     private external fun alignMapJni(handle: Long, transform: FloatArray)
     private external fun saveKeyframeJni(handle: Long, path: String): Boolean

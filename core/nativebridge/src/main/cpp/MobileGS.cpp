@@ -3,6 +3,7 @@
 #include <fstream>
 #include <ctime>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/features2d.hpp>
 #include <GLES3/gl3.h>
 
 #define TAG "MobileGS"
@@ -237,6 +238,48 @@ void MobileGS::processDepthData(uint8_t* depthBuffer, int width, int height) {
             } else {
                 mVoxelGrid[key].confidence = std::min(1.0f, mVoxelGrid[key].confidence + 0.05f);
             }
+        }
+    }
+}
+
+// Implement basic feature detection to simulate "Cloud Points" for monocular setup
+void MobileGS::processMonocularData(uint8_t* imageData, int width, int height) {
+    if (!imageData || width <= 0 || height <= 0) return;
+
+    // Use OpenCV to detect features
+    cv::Mat img(height, width, CV_8UC1, imageData);
+    std::vector<cv::KeyPoint> keypoints;
+    // Fast feature detector for performance
+    cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(40);
+    detector->detect(img, keypoints);
+
+    if (keypoints.empty()) return;
+
+    std::lock_guard<std::mutex> lock(pointMutex);
+
+    // Approximate intrinsics
+    float fx = projMtx[0] * (width / 2.0f);
+    float fy = projMtx[5] * (height / 2.0f);
+    float cx = width / 2.0f;
+    float cy = height / 2.0f;
+
+    // Project features to a fixed depth (e.g., 1.5m) to visualize them as a "cloud"
+    float z = 1.5f;
+
+    for (const auto& kp : keypoints) {
+        float px = (kp.pt.x - cx) * z / fx;
+        float py = (kp.pt.y - cy) * z / fy;
+
+        // Camera space to World Space
+        float wx = px * viewMtx[0] + py * viewMtx[1] + z * viewMtx[2] + viewMtx[3];
+        float wy = px * viewMtx[4] + py * viewMtx[5] + z * viewMtx[6] + viewMtx[7];
+        float wz = px * viewMtx[8] + py * viewMtx[9] + z * viewMtx[10] + viewMtx[11];
+
+        VoxelKey key = { (int)(wx / VOXEL_SIZE), (int)(wy / VOXEL_SIZE), (int)(wz / VOXEL_SIZE) };
+
+        // Add point (Greenish color for monocular features)
+        if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
+            mVoxelGrid[key] = { wx, wy, wz, 0.0f, 1.0f, 0.0f, 1.0f, 0.1f };
         }
     }
 }

@@ -147,6 +147,9 @@ fun ArView(
                                             0f, 0f, 0f, 1f
                                         )
                                         viewModel.processTeleologicalFrame(bitmap, dummyViewMatrix)
+                                    },
+                                    onSlamFrame = { buffer, width, height ->
+                                        slamManager.feedMonocularData(buffer, width, height)
                                     }
                                 )
                             )

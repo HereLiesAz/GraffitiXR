@@ -13,7 +13,8 @@ import java.nio.ByteBuffer
  */
 class DualAnalyzer(
     private val onLightUpdate: (Float) -> Unit,
-    private val onTeleologicalFrame: (Bitmap) -> Unit
+    private val onTeleologicalFrame: (Bitmap) -> Unit,
+    private val onSlamFrame: ((ByteBuffer, Int, Int) -> Unit)? = null
 ) : ImageAnalysis.Analyzer {
 
     private var lastLightUpdate = 0L
@@ -25,6 +26,13 @@ class DualAnalyzer(
 
     override fun analyze(image: ImageProxy) {
         val now = System.currentTimeMillis()
+
+        // 0. SLAM Tracking (Every Frame)
+        if (onSlamFrame != null && image.planes.isNotEmpty()) {
+            val yBuffer = image.planes[0].buffer
+            // Provide raw Y-buffer to native SLAM
+            onSlamFrame.invoke(yBuffer, image.width, image.height)
+        }
 
         // 1. Light Estimation
         if (now - lastLightUpdate >= lightIntervalMs) {
