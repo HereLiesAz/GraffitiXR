@@ -187,11 +187,50 @@ class MainActivity : ComponentActivity() {
         }
         azDivider()
 
+        // --- GLOBAL TOOLS NESTED RAIL (Context-Aware) ---
+        azNestedRail(id = "tools_global", text = "Tools", alignment = AzNestedRailAlignment.VERTICAL) {
+            val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId }
+
+            if (activeLayer != null) {
+                if (activeLayer.isSketch) {
+                    azRailItem(id = "brush_global", text = "Brush") { editorViewModel.setActiveTool(Tool.BRUSH) }
+                    azRailItem(id = "eraser_global", text = "Eraser") { editorViewModel.setActiveTool(Tool.ERASER) }
+                    azRailItem(id = "blur_global", text = "Blur") { editorViewModel.setActiveTool(Tool.BLUR) }
+                    azRailItem(id = "heal_global", text = "Heal") { editorViewModel.setActiveTool(Tool.HEAL) }
+                    azRailItem(id = "burn_global", text = "Burn") { editorViewModel.setActiveTool(Tool.BURN) }
+                    azRailItem(id = "dodge_global", text = "Dodge") { editorViewModel.setActiveTool(Tool.DODGE) }
+                    azRailItem(id = "liquify_global", text = "Liquify") { editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                    azDivider()
+
+                    val hexColor = "#%06X".format(0xFFFFFF and editorUiState.activeColor.toArgb())
+                    azRailItem(id = "color_global", text = hexColor) { editorViewModel.setShowColorPicker(true) }
+                    azRailItem(id = "size_global", text = "Size: ${editorUiState.brushSize.toInt()}") { editorViewModel.setShowSizePicker(true) }
+                } else {
+                    azRailItem(id = "isolate_global", text = "Isolate") { editorViewModel.onRemoveBackgroundClicked() }
+                    azRailItem(id = "outline_global", text = "Outline") { editorViewModel.onLineDrawingClicked() }
+                    azRailItem(id = "liquify_img_global", text = "Liquify") { editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                    azRailItem(id = "eraser_img_global", text = "Eraser") { editorViewModel.setActiveTool(Tool.ERASER) }
+                    azRailItem(id = "heal_img_global", text = "Heal") { editorViewModel.setActiveTool(Tool.HEAL) }
+                    azRailItem(id = "burn_img_global", text = "Burn") { editorViewModel.setActiveTool(Tool.BURN) }
+                    azRailItem(id = "dodge_img_global", text = "Dodge") { editorViewModel.setActiveTool(Tool.DODGE) }
+                    azDivider()
+                    azRailItem(id = "color_bal_global", text = "Color Bal") { editorViewModel.onColorClicked() }
+                    azRailItem(id = "adjust_global", text = "Adjust") { editorViewModel.onAdjustClicked() }
+                    azDivider()
+                    azRailItem(id = "blending_global", text = "Blend Mode") { editorViewModel.onCycleBlendMode() }
+                    azRailToggle(id = "lock_img_global", isChecked = activeLayer.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked") { editorViewModel.toggleImageLock() }
+                }
+            } else {
+                azRailItem(id = "no_layer", text = "No Active Layer", disabled = true) { }
+            }
+        }
+
+        azDivider()
+
         // DYNAMIC LAYERS (Relocatable)
         editorUiState.layers.reversed().forEach { layer ->
 
             // 1. The Layer as a Reorderable Item
-            // Use 'nestedContent' to host the tools rail for this item, avoiding separate 'azNestedRail' with invalid hostId.
             azRailRelocItem(
                 id = "layer_${layer.id}",
                 hostId = "design_host",
@@ -199,41 +238,10 @@ class MainActivity : ComponentActivity() {
                 onClick = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) },
                 onRelocate = { _, _, newOrder ->
                     editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed())
-                },
-                nestedContent = {
-                    val activate = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) }
-
-                    if (layer.isSketch) {
-                        azRailItem(id = "brush_${layer.id}", text = "Brush") { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
-                        azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                        azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                        azRailItem(id = "heal_${layer.id}", text = "Heal") { activate(); editorViewModel.setActiveTool(Tool.HEAL) }
-                        azRailItem(id = "burn_${layer.id}", text = "Burn") { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-                        azRailItem(id = "dodge_${layer.id}", text = "Dodge") { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                        azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                        azDivider()
-
-                        val hexColor = "#%06X".format(0xFFFFFF and editorUiState.activeColor.toArgb())
-                        azRailItem(id = "color_${layer.id}", text = hexColor) { activate(); editorViewModel.setShowColorPicker(true) }
-                        azRailItem(id = "size_${layer.id}", text = "Size: ${editorUiState.brushSize.toInt()}") { activate(); editorViewModel.setShowSizePicker(true) }
-                    } else {
-                        azRailItem(id = "isolate_${layer.id}", text = "Isolate") { activate(); editorViewModel.onRemoveBackgroundClicked() }
-                        azRailItem(id = "outline_${layer.id}", text = "Outline") { activate(); editorViewModel.onLineDrawingClicked() }
-                        azRailItem(id = "liquify_img_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                        azRailItem(id = "eraser_img_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                        azRailItem(id = "heal_img_${layer.id}", text = "Heal") { activate(); editorViewModel.setActiveTool(Tool.HEAL) }
-                        azRailItem(id = "burn_img_${layer.id}", text = "Burn") { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-                        azRailItem(id = "dodge_img_${layer.id}", text = "Dodge") { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                        azDivider()
-                        azRailItem(id = "color_bal_${layer.id}", text = "Color Bal") { activate(); editorViewModel.onColorClicked() }
-                        azRailItem(id = "adjust_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
-                        azDivider()
-                        azRailItem(id = "blending_${layer.id}", text = "Blend Mode") { activate(); editorViewModel.onCycleBlendMode() }
-                        azRailToggle(id = "lock_img_${layer.id}", isChecked = layer.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked") { activate(); editorViewModel.toggleImageLock() }
-                    }
                 }
+                // REMOVED nestedContent (tools moved to global rail)
             ) {
-                // HIDDEN CONTEXT MENU
+                // HIDDEN CONTEXT MENU (Keep admin actions)
                 val activate = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) }
                 inputItem(hint = "Rename") { activate(); editorViewModel.onLayerRenamed(layer.id, it) }
                 listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
