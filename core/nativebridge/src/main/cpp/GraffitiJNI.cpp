@@ -19,7 +19,7 @@ extern "C" {
 static StereoProcessor* g_stereoProcessor = nullptr;
 
 JNIEXPORT jlong JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_create(JNIEnv *env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_createNativeInstance(JNIEnv *env, jobject thiz) {
     auto *engine = new MobileGS();
     if (!g_stereoProcessor) {
         g_stereoProcessor = new StereoProcessor();

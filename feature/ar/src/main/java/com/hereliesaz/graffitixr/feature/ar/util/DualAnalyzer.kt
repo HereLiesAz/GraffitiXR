@@ -107,7 +107,7 @@ class DualAnalyzer(
                 bitmap
             }
         } catch (e: Exception) {
-            Log.e("DualAnalyzer", "Failed to process image", e)
+            e.printStackTrace()
             null
         }
     }
