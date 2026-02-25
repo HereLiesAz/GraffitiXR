@@ -72,14 +72,8 @@ fun AdjustmentsPanel(
     // Layout Constants matching the project's UI design system
     val portraitBottomKeepoutPercentage = 0.0f
     val landscapeBottomPadding = 16.dp
-    val landscapeStartPadding = 80.dp
-    val portraitStartPadding = 0.dp
     
     val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
-
-    val isRightHanded = state.isRightHanded
-    val startPadding = if (isLandscape && isRightHanded) landscapeStartPadding else portraitStartPadding
-    val endPadding = if (isLandscape && !isRightHanded) landscapeStartPadding else 0.dp
 
     // Resolve active layer properties
     val activeLayer = state.activeLayer
@@ -158,11 +152,7 @@ fun AdjustmentsPanel(
 
                         onMagicClicked = onMagicAlign,
 
-                        modifier = Modifier
-
-                            .padding(start = startPadding, end = endPadding)
-
-                            .fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth()
 
                     )
 

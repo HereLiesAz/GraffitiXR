@@ -38,73 +38,75 @@ fun EditorUi(
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 32.dp)
         )
 
-        // 1. Layer List Panel (Conditional)
-        if (uiState.activePanel == EditorPanel.LAYERS) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 120.dp) // Offset above the adjustments panel
-                    .padding(horizontal = 16.dp)
-                    .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                LayersPanel(
-                    layers = uiState.layers,
-                    activeLayerId = uiState.activeLayerId,
-                    onSelectLayer = actions::onLayerActivated,
-                    onToggleVisibility = { },
-                    onClose = { actions.onDismissPanel() }
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // 1. Layer List Panel (Conditional)
+            if (uiState.activePanel == EditorPanel.LAYERS) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
+                        .padding(16.dp)
+                ) {
+                    LayersPanel(
+                        layers = uiState.layers,
+                        activeLayerId = uiState.activeLayerId,
+                        onSelectLayer = actions::onLayerActivated,
+                        onToggleVisibility = { },
+                        onClose = { actions.onDismissPanel() }
+                    )
+                }
+            }
+
+            // 2. Integrated Adjustments Panel (Knobs + Undo/Redo/Magic)
+            val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+            val overlayLayer = activeLayer?.let {
+                OverlayLayer(
+                    id = it.id,
+                    name = it.name,
+                    uri = it.uri,
+                    opacity = it.opacity,
+                    brightness = it.brightness,
+                    contrast = it.contrast,
+                    saturation = it.saturation,
+                    colorBalanceR = it.colorBalanceR,
+                    colorBalanceG = it.colorBalanceG,
+                    colorBalanceB = it.colorBalanceB,
+                    isImageLocked = it.isImageLocked
                 )
             }
-        }
 
-        // 2. Integrated Adjustments Panel (Knobs + Undo/Redo/Magic)
-        val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
-        val overlayLayer = activeLayer?.let {
-            OverlayLayer(
-                id = it.id,
-                name = it.name,
-                uri = it.uri,
-                opacity = it.opacity,
-                brightness = it.brightness,
-                contrast = it.contrast,
-                saturation = it.saturation,
-                colorBalanceR = it.colorBalanceR,
-                colorBalanceG = it.colorBalanceG,
-                colorBalanceB = it.colorBalanceB,
-                isImageLocked = it.isImageLocked
+            AdjustmentsPanel(
+                state = AdjustmentsState(
+                    hideUiForCapture = uiState.hideUiForCapture,
+                    isTouchLocked = isTouchLocked,
+                    hasImage = uiState.layers.isNotEmpty(),
+                    isArMode = uiState.editorMode == EditorMode.AR,
+                    hasHistory = uiState.canUndo || uiState.canRedo,
+                    isRightHanded = uiState.isRightHanded,
+                    isCapturingTarget = isCapturingTarget,
+                    activeLayer = overlayLayer
+                ),
+                showKnobs = uiState.activePanel == EditorPanel.ADJUST,
+                showColorBalance = uiState.activePanel == EditorPanel.COLOR,
+                isLandscape = isLandscape,
+                screenHeight = screenHeight,
+                onOpacityChange = actions::onOpacityChanged,
+                onBrightnessChange = actions::onBrightnessChanged,
+                onContrastChange = actions::onContrastChanged,
+                onSaturationChange = actions::onSaturationChanged,
+                onColorBalanceRChange = actions::onColorBalanceRChanged,
+                onColorBalanceGChange = actions::onColorBalanceGChanged,
+                onColorBalanceBChange = actions::onColorBalanceBChanged,
+                onUndo = actions::onUndoClicked,
+                onRedo = actions::onRedoClicked,
+                onMagicAlign = actions::onMagicClicked,
+                onAdjustmentStart = actions::onAdjustmentStart,
+                onAdjustmentEnd = actions::onAdjustmentEnd
             )
         }
-
-        AdjustmentsPanel(
-            state = AdjustmentsState(
-                hideUiForCapture = uiState.hideUiForCapture,
-                isTouchLocked = isTouchLocked,
-                hasImage = uiState.layers.isNotEmpty(),
-                isArMode = uiState.editorMode == EditorMode.AR,
-                hasHistory = uiState.canUndo || uiState.canRedo,
-                isRightHanded = uiState.isRightHanded,
-                isCapturingTarget = isCapturingTarget,
-                activeLayer = overlayLayer
-            ),
-            showKnobs = uiState.activePanel == EditorPanel.ADJUST,
-            showColorBalance = uiState.activePanel == EditorPanel.COLOR,
-            isLandscape = isLandscape,
-            screenHeight = screenHeight,
-            onOpacityChange = actions::onOpacityChanged,
-            onBrightnessChange = actions::onBrightnessChanged,
-            onContrastChange = actions::onContrastChanged,
-            onSaturationChange = actions::onSaturationChanged,
-            onColorBalanceRChange = actions::onColorBalanceRChanged,
-            onColorBalanceGChange = actions::onColorBalanceGChanged,
-            onColorBalanceBChange = actions::onColorBalanceBChanged,
-            onUndo = actions::onUndoClicked,
-            onRedo = actions::onRedoClicked,
-            onMagicAlign = actions::onMagicClicked,
-            onAdjustmentStart = actions::onAdjustmentStart,
-            onAdjustmentEnd = actions::onAdjustmentEnd,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
     }
 }
 

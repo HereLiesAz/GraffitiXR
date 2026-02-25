@@ -56,6 +56,9 @@ dependencies {
     // OpenCV (Fixes Unresolved reference 'opencv', 'Mat', 'Imgproc')
     implementation(project(":opencv"))
 
+    // AzNavRail (Fixes NoClassDefFoundError for AzOrientation)
+    api(libs.az.nav.rail)
+
     // Serialization (Fixes Unresolved reference 'serializer')
     implementation(libs.kotlinx.serialization.json)
 

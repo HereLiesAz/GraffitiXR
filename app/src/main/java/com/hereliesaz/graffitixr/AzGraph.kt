@@ -5,10 +5,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzGraphInterface
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.model.AzDockingSide
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 
 object AzGraph : AzGraphInterface {
     override fun Run(activity: ComponentActivity) {
@@ -16,6 +19,7 @@ object AzGraph : AzGraphInterface {
         activity.setContent {
             com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme {
                 val navController = rememberNavController()
+                val renderRefState = remember { mutableStateOf<ArRenderer?>(null) }
 
                 // Collect states to force recomposition when they change
                 val editorUiState by mainActivity.editorViewModel.uiState.collectAsState()
@@ -37,7 +41,7 @@ object AzGraph : AzGraphInterface {
                     }
 
                     // Pass the AzNavHostScope (this) down so AppContent can enforce the rail's UI boundaries
-                    mainActivity.AppContent(this, navController, dockingSide)
+                    mainActivity.AppContent(this, navController, dockingSide, renderRefState)
                 }
             }
         }

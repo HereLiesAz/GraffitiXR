@@ -49,7 +49,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.min
 
-@Composable
+// Removed @Composable annotation as this is now a configuration function called from non-composable scope
 fun MainScreen(
     navHostScope: AzNavHostScope,
     viewModel: MainViewModel,
@@ -59,68 +59,40 @@ fun MainScreen(
     navController: NavController,
     slamManager: SlamManager,
     projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
+    renderRefState: MutableState<ArRenderer?>,
     onRendererCreated: (ArRenderer) -> Unit,
-    // Hoisted State
-    hoistedUse3dBackground: Boolean,
-    hoistedShowSaveDialog: Boolean,
-    hoistedShowInfoScreen: Boolean,
+    // Hoisted State Providers
+    hoistedUse3dBackground: () -> Boolean,
+    hoistedShowSaveDialog: () -> Boolean,
+    hoistedShowInfoScreen: () -> Boolean,
     onUse3dBackgroundChange: (Boolean) -> Unit,
     onShowSaveDialogChange: (Boolean) -> Unit,
     onShowInfoScreenChange: (Boolean) -> Unit,
-    hasCameraPermission: Boolean,
+    hasCameraPermission: () -> Boolean,
     requestPermissions: () -> Unit,
     onOverlayImagePick: () -> Unit,
     onBackgroundImagePick: () -> Unit,
     dockingSide: AzDockingSide
 ) {
-    val localNavController = navController // Use the passed controller which is likely local to AppContent
-    val navBackStackEntry by localNavController.currentBackStackEntryAsState()
-    val currentNavRoute = navBackStackEntry?.destination?.route
+    val localNavController = navController
 
-    val uiState by viewModel.uiState.collectAsState()
-    val arUiState by arViewModel.uiState.collectAsState()
-    val editorUiState by editorViewModel.uiState.collectAsState()
-    val dashboardUiState by dashboardViewModel.uiState.collectAsState()
-    val exportTrigger by editorViewModel.exportTrigger.collectAsState()
-
-    val scope = rememberCoroutineScope()
-    val view = LocalView.current
-    val context = LocalContext.current
-    val window = (view.context as? android.app.Activity)?.window
-
-    // derived states
-    val has3dModel = remember(editorUiState.mapPath) {
-        !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
-    }
-
-    var renderRef by remember { mutableStateOf<ArRenderer?>(null) }
-    val onRendererCreatedWrapper: (ArRenderer) -> Unit = { renderer ->
-        renderRef = renderer
-        onRendererCreated(renderer)
-    }
-
-    LaunchedEffect(exportTrigger) {
-        if (exportTrigger && window != null) {
-            delay(300)
-            captureScreenshot(window) { bitmap ->
-                saveExportedImage(context, bitmap)
-                editorViewModel.onExportComplete()
-            }
-        }
-    }
-
-    LaunchedEffect(arUiState.pendingKeyframePath) {
-        arUiState.pendingKeyframePath?.let { path ->
-            renderRef?.saveKeyframe(path)
-            arViewModel.onKeyframeCaptured()
-        }
-    }
-
-    // Apply the AzNavRail Safe Zones and constraints by calling methods on the navHostScope
     with(navHostScope) {
         // --- 1. BACKGROUND / CONTENT ---
-        // background(weight = 0) tells AzNavRail to render this without padding, behind the UI overlays.
         background(weight = 0) {
+            val uiState by viewModel.uiState.collectAsState()
+            val arUiState by arViewModel.uiState.collectAsState()
+            val editorUiState by editorViewModel.uiState.collectAsState()
+
+            val navBackStackEntry by localNavController.currentBackStackEntryAsState()
+            val currentNavRoute = navBackStackEntry?.destination?.route
+
+            val use3dBackground = hoistedUse3dBackground()
+            val hasPermission = hasCameraPermission()
+
+            val has3dModel = remember(editorUiState.mapPath) {
+                !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
+            }
+
             Box(modifier = Modifier.fillMaxSize()) {
                 if (uiState.isCapturingTarget) {
                     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -139,11 +111,9 @@ fun MainScreen(
                     com.hereliesaz.graffitixr.feature.ar.MappingBackground(
                         slamManager = slamManager,
                         projectRepository = projectRepository,
-                        onRendererCreated = onRendererCreatedWrapper
+                        onRendererCreated = onRendererCreated
                     )
                 } else if (currentNavRoute == "editor" || currentNavRoute == null || currentNavRoute == "project_library" || currentNavRoute == "settings") {
-                    // Note: project_library and settings usually cover full screen, so background might be irrelevant
-                    // but for Editor mode, we need this.
                     val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
                     Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
                         MainContentLayer(
@@ -151,11 +121,11 @@ fun MainScreen(
                             arUiState = arUiState,
                             editorViewModel = editorViewModel,
                             arViewModel = arViewModel,
-                            onRendererCreated = onRendererCreatedWrapper,
+                            onRendererCreated = onRendererCreated,
                             slamManager = slamManager,
                             projectRepository = projectRepository,
-                            hasCameraPermission = hasCameraPermission,
-                            use3dBackground = hoistedUse3dBackground
+                            hasCameraPermission = hasPermission,
+                            use3dBackground = use3dBackground
                         )
                     }
                 } else {
@@ -165,10 +135,50 @@ fun MainScreen(
         }
 
         // --- 2. ONSCREEN OVERLAYS ---
-        // onscreen() automatically applies the required padding so UI elements never overlap the rail or OS gesture zones.
         onscreen(Alignment.Center) {
+            val uiState by viewModel.uiState.collectAsState()
+            val arUiState by arViewModel.uiState.collectAsState()
+            val editorUiState by editorViewModel.uiState.collectAsState()
+            val dashboardUiState by dashboardViewModel.uiState.collectAsState()
+            val exportTrigger by editorViewModel.exportTrigger.collectAsState()
+            val navTrigger by dashboardViewModel.navigationTrigger.collectAsState()
+
+            val scope = rememberCoroutineScope()
+            val view = LocalView.current
+            val context = LocalContext.current
+            val window = (view.context as? android.app.Activity)?.window
+
+            val renderRef by renderRefState
+
+            val showSaveDialog = hoistedShowSaveDialog()
+            val showInfoScreen = hoistedShowInfoScreen()
+
+            LaunchedEffect(exportTrigger) {
+                if (exportTrigger && window != null) {
+                    delay(300)
+                    captureScreenshot(window) { bitmap ->
+                        saveExportedImage(context, bitmap)
+                        editorViewModel.onExportComplete()
+                    }
+                }
+            }
+
+            LaunchedEffect(navTrigger) {
+                navTrigger?.let { dest ->
+                    localNavController.navigate(dest)
+                    dashboardViewModel.onNavigationConsumed()
+                }
+            }
+
+            LaunchedEffect(arUiState.pendingKeyframePath) {
+                arUiState.pendingKeyframePath?.let { path ->
+                    renderRef?.saveKeyframe(path)
+                    arViewModel.onKeyframeCaptured()
+                }
+            }
+
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                AzNavHost(navController = localNavController as androidx.navigation.NavHostController, startDestination = "project_library") {
+                AzNavHost(startDestination = "project_library") {
                     composable("editor") {
                         EditorUi(
                             actions = editorViewModel,
@@ -300,7 +310,7 @@ fun MainScreen(
                 }
                 UnlockInstructionsPopup(uiState.showUnlockInstructions)
 
-                if (hoistedShowInfoScreen) {
+                if (showInfoScreen) {
                     com.hereliesaz.graffitixr.design.components.InfoDialog(
                         title = "GraffitiXR Help",
                         content = "Design and project graffiti onto physical walls using AR.",
@@ -308,7 +318,7 @@ fun MainScreen(
                     )
                 }
 
-                if (hoistedShowSaveDialog) {
+                if (showSaveDialog) {
                     SaveProjectDialog(
                         initialName = projectRepository.currentProject.value?.name ?: "",
                         onDismissRequest = { onShowSaveDialogChange(false) },
