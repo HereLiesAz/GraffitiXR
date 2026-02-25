@@ -1,3 +1,4 @@
+// ~~~ FILE: ./app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt ~~~
 package com.hereliesaz.graffitixr
 
 import android.os.Bundle
@@ -7,6 +8,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.material3.MaterialTheme
 import androidx.navigation.NavHostController
 import com.hereliesaz.aznavrail.AzActivity
 import com.hereliesaz.aznavrail.AzGraphInterface
@@ -15,7 +17,6 @@ import com.hereliesaz.aznavrail.AzNavRailScope
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.aznavrail.model.AzNestedRailAlignment
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.Tool
@@ -92,105 +93,101 @@ class MainActivity : AzActivity() {
 
         val requestPermissions = { permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.ACCESS_FINE_LOCATION)) }
 
-        // Core Modes (Nested Rail)
-        azNestedRail(id = "mode_host", text = navStrings.modes, alignment = AzNestedRailAlignment.VERTICAL) {
-            azRailItem(id = "ar", text = navStrings.arMode) { if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.AR) else requestPermissions() }
-            azRailItem(id = "overlay", text = navStrings.overlay) { if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.OVERLAY) else requestPermissions() }
-            azRailItem(id = "mockup", text = navStrings.mockup) { editorViewModel.setEditorMode(EditorMode.STATIC) }
-            azRailItem(id = "trace", text = navStrings.trace) { editorViewModel.setEditorMode(EditorMode.TRACE) }
-        }
-
+        // Core Modes
+        azRailHostItem(id = "mode_host", text = navStrings.modes, onClick = {})
+        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode) { if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.AR) else requestPermissions() }
+        azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay) { if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.OVERLAY) else requestPermissions() }
+        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup) { editorViewModel.setEditorMode(EditorMode.STATIC) }
+        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace) { editorViewModel.setEditorMode(EditorMode.TRACE) }
         azDivider()
 
         if (editorUiState.editorMode == EditorMode.AR) {
-            azNestedRail(id = "target_host", text = navStrings.grid, alignment = AzNestedRailAlignment.VERTICAL) {
-                azRailItem(id = "create", text = navStrings.create) { if (hasCameraPermission) viewModel.startTargetCapture() else requestPermissions() }
-                azRailItem(id = "surveyor", text = navStrings.surveyor) { if (hasCameraPermission) dashboardViewModel.navigateToSurveyor() else requestPermissions() }
-                azRailItem(id = "capture_keyframe", text = "Keyframe") { arViewModel.captureKeyframe() }
-            }
+            azRailHostItem(id = "target_host", text = navStrings.grid, onClick = {})
+            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create) { if (hasCameraPermission) viewModel.startTargetCapture() else requestPermissions() }
+            azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor) { if (hasCameraPermission) dashboardViewModel.navigateToSurveyor() else requestPermissions() }
+            azRailSubItem(id = "capture_keyframe", hostId = "target_host", text = "Keyframe") { arViewModel.captureKeyframe() }
             azDivider()
         }
 
-        // Design Actions (Nested Rail)
-        azNestedRail(id = "design_host", text = navStrings.design, alignment = AzNestedRailAlignment.VERTICAL) {
-            azRailItem(id = "add_image", text = "Image", info = navStrings.openInfo) {
-                overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        // Design Actions (Global)
+        azRailHostItem(id = "design_host", text = navStrings.design, onClick = {})
+        azRailSubItem(id = "add_image", text = "Image", hostId = "design_host", info = navStrings.openInfo) {
+            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+        azRailSubItem(id = "add_draw", text = "Draw", hostId = "design_host", info = "New Blank Sketch") {
+            editorViewModel.onAddBlankLayer()
+        }
+        if (editorUiState.editorMode == EditorMode.STATIC) {
+            azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall) {
+                backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
-            azRailItem(id = "add_draw", text = "Draw", info = "New Blank Sketch") {
-                editorViewModel.onAddBlankLayer()
-            }
-
-            if (editorUiState.editorMode == EditorMode.STATIC) {
-                azRailItem(id = "wall", text = navStrings.wall) {
-                    backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-                if (!editorUiState.mapPath.isNullOrEmpty()) {
-                    azRailToggle(
-                        id = "toggle_3d", isChecked = use3dBackground,
-                        toggleOnText = "3D View", toggleOffText = "2D View",
-                        onClick = { use3dBackground = !use3dBackground }
-                    )
-                }
+            if (!editorUiState.mapPath.isNullOrEmpty()) {
+                azRailSubToggle(
+                    id = "toggle_3d", hostId = "design_host", isChecked = use3dBackground,
+                    toggleOnText = "3D View", toggleOffText = "2D View",
+                    onClick = { use3dBackground = !use3dBackground }
+                )
             }
         }
         azDivider()
 
-        // DYNAMIC LAYERS AS NESTED RAILS
+        // DYNAMIC LAYERS AS RELOC ITEMS (Reorderable with nested menus via trailing lambda)
         editorUiState.layers.reversed().forEach { layer ->
 
-            azNestedRail(
+            azRailRelocItem(
                 id = "layer_${layer.id}",
+                hostId = "design_host",
                 text = layer.name,
-                alignment = AzNestedRailAlignment.VERTICAL
+                onClick = {
+                    if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id)
+                },
+                onRelocate = { _, _, newOrder ->
+                    editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed())
+                }
             ) {
-                // Ensure layer is activated when any tool inside it is clicked
                 val activate = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) }
+
+                inputItem(hint = "Rename") { activate(); editorViewModel.onLayerRenamed(layer.id, it) }
 
                 // Dynamic Tool Injection based on layer type
                 if (layer.isSketch) {
-                    azRailItem(id = "brush_${layer.id}", text = "Brush") { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
-                    azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                    azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                    azRailItem(id = "heal_${layer.id}", text = "Heal") { activate(); editorViewModel.setActiveTool(Tool.HEAL) }
-                    azRailItem(id = "burn_${layer.id}", text = "Burn") { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-                    azRailItem(id = "dodge_${layer.id}", text = "Dodge") { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                    azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                    azDivider()
+                    listItem(text = "Brush") { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
+                    listItem(text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                    listItem(text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                    listItem(text = "Heal") { activate(); editorViewModel.setActiveTool(Tool.HEAL) }
+                    listItem(text = "Burn") { activate(); editorViewModel.setActiveTool(Tool.BURN) }
+                    listItem(text = "Dodge") { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
+                    listItem(text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
 
                     val hexColor = "#%06X".format(0xFFFFFF and editorUiState.activeColor.toArgb())
-                    azRailItem(id = "color_${layer.id}", text = hexColor) { activate(); editorViewModel.setShowColorPicker(true) }
-                    azRailItem(id = "size_${layer.id}", text = "Size: ${editorUiState.brushSize.toInt()}") { activate(); editorViewModel.setShowSizePicker(true) }
+                    listItem(text = hexColor) { activate(); editorViewModel.setShowColorPicker(true) }
+                    listItem(text = "Size: ${editorUiState.brushSize.toInt()}") { activate(); editorViewModel.setShowSizePicker(true) }
                 } else {
-                    azRailItem(id = "isolate_${layer.id}", text = "Isolate") { activate(); editorViewModel.onRemoveBackgroundClicked() }
-                    azRailItem(id = "outline_${layer.id}", text = "Outline") { activate(); editorViewModel.onLineDrawingClicked() }
-                    azRailItem(id = "liquify_img_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                    azRailItem(id = "eraser_img_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                    azRailItem(id = "heal_img_${layer.id}", text = "Heal") { activate(); editorViewModel.setActiveTool(Tool.HEAL) }
-                    azRailItem(id = "burn_img_${layer.id}", text = "Burn") { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-                    azRailItem(id = "dodge_img_${layer.id}", text = "Dodge") { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                    azDivider()
-                    azRailItem(id = "color_bal_${layer.id}", text = "Color Bal") { activate(); editorViewModel.onColorClicked() }
-                    azRailItem(id = "adjust_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
+                    listItem(text = "Isolate") { activate(); editorViewModel.onRemoveBackgroundClicked() }
+                    listItem(text = "Outline") { activate(); editorViewModel.onLineDrawingClicked() }
+                    listItem(text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                    listItem(text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                    listItem(text = "Heal") { activate(); editorViewModel.setActiveTool(Tool.HEAL) }
+                    listItem(text = "Burn") { activate(); editorViewModel.setActiveTool(Tool.BURN) }
+                    listItem(text = "Dodge") { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
+                    listItem(text = "Color Bal") { activate(); editorViewModel.onColorClicked() }
+                    listItem(text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
+
+                    listItem(text = "Blend Mode") { activate(); editorViewModel.onCycleBlendMode() }
+                    listItem(text = if (layer.isImageLocked) "Unlock" else "Lock") { activate(); editorViewModel.toggleImageLock() }
                 }
 
-                azDivider()
-
-                if (!layer.isSketch) {
-                    azRailItem(id = "blending_${layer.id}", text = "Blend Mode") { activate(); editorViewModel.onCycleBlendMode() }
-                    azRailToggle(id = "lock_img_${layer.id}", isChecked = layer.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked") { activate(); editorViewModel.toggleImageLock() }
-                }
-                azRailItem(id = "remove_${layer.id}", text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
+                listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
             }
         }
 
-        // Project / Admin (Nested Rail)
+        // Project / Admin
         azDivider()
-        azNestedRail(id = "project_host", text = navStrings.project, alignment = AzNestedRailAlignment.VERTICAL) {
-            azRailItem(id = "save_project", text = navStrings.save) { showSaveDialog = true }
-            azRailItem(id = "load_project", text = navStrings.load) { dashboardViewModel.navigateToLibrary() }
-            azRailItem(id = "export_project", text = navStrings.export) { editorViewModel.exportProject() }
-            azRailItem(id = "settings_sub", text = navStrings.settings) { dashboardViewModel.navigateToSettings() }
-        }
+        azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
+        azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save) { showSaveDialog = true }
+        azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load) { dashboardViewModel.navigateToLibrary() }
+        azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export) { editorViewModel.exportProject() }
+        azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings) { dashboardViewModel.navigateToSettings() }
 
         azDivider()
 
