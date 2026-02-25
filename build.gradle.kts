@@ -2,9 +2,13 @@ buildscript {
     val commonForcedDependencies = listOf(
         "commons-beanutils:commons-beanutils:1.11.0",
         "org.jdom:jdom2:2.0.6.1",
-        "io.netty:netty-codec-http2:4.1.124.Final",
-        "io.netty:netty-handler:4.1.124.Final",
-        "org.bitbucket.b_c:jose4j:0.9.6"
+        "io.netty:netty-codec:4.1.131.Final",
+        "io.netty:netty-codec-http2:4.1.131.Final",
+        "io.netty:netty-handler:4.1.131.Final",
+        "org.bitbucket.b_c:jose4j:0.9.6",
+        "org.apache.commons:commons-lang3:3.20.0",
+        "org.apache.httpcomponents:httpclient:4.5.14",
+        "com.google.guava:guava:33.4.0-jre"
     )
     val protobufModules = listOf(
         "com.google.protobuf:protobuf-java",
@@ -46,9 +50,13 @@ plugins {
 val commonForcedDependencies = listOf(
     "commons-beanutils:commons-beanutils:1.11.0",
     "org.jdom:jdom2:2.0.6.1",
-    "io.netty:netty-codec-http2:4.1.124.Final",
-    "io.netty:netty-handler:4.1.124.Final",
-    "org.bitbucket.b_c:jose4j:0.9.6"
+    "io.netty:netty-codec:4.1.131.Final",
+    "io.netty:netty-codec-http2:4.1.131.Final",
+    "io.netty:netty-handler:4.1.131.Final",
+    "org.bitbucket.b_c:jose4j:0.9.6",
+    "org.apache.commons:commons-lang3:3.20.0",
+    "org.apache.httpcomponents:httpclient:4.5.14",
+    "com.google.guava:guava:33.4.0-jre"
 )
 
 val protobufModules = listOf(
