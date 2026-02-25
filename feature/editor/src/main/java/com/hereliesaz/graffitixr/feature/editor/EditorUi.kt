@@ -85,6 +85,8 @@ fun EditorUi(
                     hasImage = uiState.layers.isNotEmpty(),
                     isArMode = uiState.editorMode == EditorMode.AR,
                     hasHistory = uiState.canUndo || uiState.canRedo,
+                    undoCount = uiState.undoCount,
+                    redoCount = uiState.redoCount,
                     isRightHanded = uiState.isRightHanded,
                     isCapturingTarget = isCapturingTarget,
                     activeLayer = overlayLayer

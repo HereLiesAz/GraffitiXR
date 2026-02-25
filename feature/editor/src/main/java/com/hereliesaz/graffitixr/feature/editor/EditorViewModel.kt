@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Matrix
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
@@ -62,6 +63,9 @@ class EditorViewModel @Inject constructor(
 
     private val _message = MutableSharedFlow<String>()
     val message: SharedFlow<String> = _message.asSharedFlow()
+
+    // Clipboard for copying edits
+    private var copiedLayerAttributes: Layer? = null
 
     private val undoStack = ArrayDeque<EditorUiState>()
     private val redoStack = ArrayDeque<EditorUiState>()
@@ -204,6 +208,74 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun onDuplicateLayer(layerId: String) {
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        saveState()
+        val newBitmap = layer.bitmap.copy(layer.bitmap.config ?: Bitmap.Config.ARGB_8888, true)
+        val newLayer = layer.copy(
+            id = UUID.randomUUID().toString(),
+            name = "${layer.name} Copy",
+            bitmap = newBitmap
+        )
+        _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
+    }
+
+    fun onCopyLayerEdits(layerId: String) {
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        copiedLayerAttributes = layer
+        viewModelScope.launch { _message.emit("Edits copied") }
+    }
+
+    fun onPasteLayerEdits(layerId: String) {
+        val source = copiedLayerAttributes
+        if (source == null) {
+            viewModelScope.launch { _message.emit("No edits copied") }
+            return
+        }
+
+        saveState()
+        _uiState.update { state ->
+            val updatedLayers = state.layers.map { target ->
+                if (target.id == layerId) {
+                    target.copy(
+                        opacity = source.opacity,
+                        blendMode = source.blendMode,
+                        brightness = source.brightness,
+                        contrast = source.contrast,
+                        saturation = source.saturation,
+                        colorBalanceR = source.colorBalanceR,
+                        colorBalanceG = source.colorBalanceG,
+                        colorBalanceB = source.colorBalanceB,
+                        scale = source.scale,
+                        rotationX = source.rotationX,
+                        rotationY = source.rotationY,
+                        rotationZ = source.rotationZ
+                        // We do NOT copy offset, name, id, or content
+                    )
+                } else target
+            }
+            state.copy(layers = updatedLayers)
+        }
+    }
+
+    fun onFlipLayer(horizontal: Boolean) {
+        val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
+        saveDestructiveState() // Flipping bitmap is destructive
+
+        val matrix = Matrix().apply {
+            if (horizontal) preScale(-1f, 1f) else preScale(1f, -1f)
+        }
+
+        try {
+            val flippedBitmap = Bitmap.createBitmap(
+                activeLayer.bitmap, 0, 0, activeLayer.bitmap.width, activeLayer.bitmap.height, matrix, true
+            )
+            updateActiveLayer { it.copy(bitmap = flippedBitmap) }
+        } catch (e: Exception) {
+            Log.e("EditorViewModel", "Error flipping layer", e)
+        }
+    }
+
     private fun getFileName(uri: Uri): String {
         var name = "Layer"
         if (uri.scheme == "content") {
@@ -289,7 +361,7 @@ class EditorViewModel @Inject constructor(
         if (undoStack.size >= maxStackSize) undoStack.removeFirst()
         undoStack.addLast(_uiState.value)
         redoStack.clear()
-        _uiState.update { it.copy(canUndo = true, canRedo = false) }
+        _uiState.update { it.copy(canUndo = true, canRedo = false, undoCount = undoStack.size, redoCount = 0) }
     }
 
     fun saveDestructiveState() {
@@ -305,14 +377,14 @@ class EditorViewModel @Inject constructor(
         }
         undoStack.addLast(currentState.copy(layers = clonedLayers))
         redoStack.clear()
-        _uiState.update { it.copy(canUndo = true, canRedo = false) }
+        _uiState.update { it.copy(canUndo = true, canRedo = false, undoCount = undoStack.size, redoCount = 0) }
     }
 
     fun onUndoClicked() {
         if (undoStack.isNotEmpty()) {
             val previousState = undoStack.removeLast()
             redoStack.addLast(_uiState.value)
-            _uiState.value = previousState.copy(canUndo = undoStack.isNotEmpty(), canRedo = true)
+            _uiState.value = previousState.copy(canUndo = undoStack.isNotEmpty(), canRedo = true, undoCount = undoStack.size, redoCount = redoStack.size)
         }
     }
 
@@ -320,7 +392,7 @@ class EditorViewModel @Inject constructor(
         if (redoStack.isNotEmpty()) {
             val nextState = redoStack.removeLast()
             undoStack.addLast(_uiState.value)
-            _uiState.value = nextState.copy(canUndo = true, canRedo = redoStack.isNotEmpty())
+            _uiState.value = nextState.copy(canUndo = true, canRedo = redoStack.isNotEmpty(), undoCount = undoStack.size, redoCount = redoStack.size)
         }
     }
 
