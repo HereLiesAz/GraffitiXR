@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -160,6 +162,33 @@ fun ArView(
         }
     }
 
+    val glSurfaceView = remember {
+        GLSurfaceView(context).apply {
+            setEGLContextClientVersion(3)
+            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            holder.setFormat(PixelFormat.TRANSLUCENT)
+            setZOrderMediaOverlay(true)
+            setRenderer(renderer)
+            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                glSurfaceView.onResume()
+            } else if (event == Lifecycle.Event.ON_PAUSE) {
+                glSurfaceView.onPause()
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (hasCameraPermission) {
             AndroidView(
@@ -169,16 +198,7 @@ fun ArView(
         }
 
         AndroidView(
-            factory = { ctx ->
-                GLSurfaceView(ctx).apply {
-                    setEGLContextClientVersion(3)
-                    setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                    holder.setFormat(PixelFormat.TRANSLUCENT)
-                    setZOrderMediaOverlay(true)
-                    setRenderer(renderer)
-                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                }
-            },
+            factory = { glSurfaceView },
             modifier = Modifier.fillMaxSize()
         )
     }
