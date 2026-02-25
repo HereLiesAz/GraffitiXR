@@ -105,6 +105,8 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(project(":opencv"))
 
+    implementation(libs.play.services.base)
+
     implementation(libs.az.nav.rail)
     implementation(libs.coil.compose)
 
