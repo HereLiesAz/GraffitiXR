@@ -279,6 +279,10 @@ void MobileGS::processMonocularData(uint8_t* imageData, int width, int height) {
 
         // Add point (Greenish color for monocular features)
         if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
+            if (mVoxelGrid.size() >= MAX_VOXELS) {
+                // Simple reset strategy to prevent indefinite growth and lag
+                mVoxelGrid.clear();
+            }
             mVoxelGrid[key] = { wx, wy, wz, 0.0f, 1.0f, 0.0f, 1.0f, 0.1f };
         }
     }

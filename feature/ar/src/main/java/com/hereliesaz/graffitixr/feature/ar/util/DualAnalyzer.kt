@@ -62,7 +62,9 @@ class DualAnalyzer(
         val rowStride = image.planes[0].rowStride
         var sum = 0L
         var count = 0
-        val skip = 20
+        // Increase skip to reduce CPU load (was 20)
+        // 1200 / 100 = 12 rows. 1600 / 100 = 16 cols. Total 192 samples. Sufficient for ambient light.
+        val skip = 100
 
         for (row in 0 until image.height step skip) {
             val rowStart = row * rowStride

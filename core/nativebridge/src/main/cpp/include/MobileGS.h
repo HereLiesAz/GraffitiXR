@@ -69,6 +69,7 @@ private:
     // Voxel storage system
     std::unordered_map<VoxelKey, SplatPoint, VoxelHash> mVoxelGrid;
     const float VOXEL_SIZE = 0.02f; // 2cm resolution
+    const size_t MAX_VOXELS = 4000; // Limit for performance/stability
 
     float viewMtx[16];
     float projMtx[16];
