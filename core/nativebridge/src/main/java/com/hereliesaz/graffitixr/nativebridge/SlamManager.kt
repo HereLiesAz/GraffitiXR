@@ -40,14 +40,14 @@ class SlamManager @Inject constructor() {
             if (isDestroyed.get() || nativeHandle == 0L) {
                 Log.d("SlamManager", "Initializing Native Engine...")
                 try {
-                    nativeHandle = create()
+                    nativeHandle = createNativeInstance()
                     if (nativeHandle != 0L) {
                         isDestroyed.set(false)
                     } else {
                         Log.e("SlamManager", "Failed to create native engine instance.")
                     }
                 } catch (e: UnsatisfiedLinkError) {
-                    Log.e("SlamManager", "Native method 'create' not found. Library might not be loaded.", e)
+                    Log.e("SlamManager", "Native method 'createNativeInstance' not found. Library might not be loaded.", e)
                 }
             }
         }
@@ -159,7 +159,7 @@ class SlamManager @Inject constructor() {
         }
     }
 
-    private external fun create(): Long
+    private external fun createNativeInstance(): Long
     private external fun destroyJni(handle: Long)
     private external fun initializeJni(handle: Long)
     private external fun resetGLStateJni(handle: Long)

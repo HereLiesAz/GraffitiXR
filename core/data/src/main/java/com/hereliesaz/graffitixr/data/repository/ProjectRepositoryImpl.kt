@@ -32,11 +32,13 @@ class ProjectRepositoryImpl @Inject constructor(
     override suspend fun createProject(name: String): GraffitiProject {
         val newProject = GraffitiProject(name = name)
         projectManager.saveProject(context, newProject)
+        _currentProject.value = newProject
         return newProject
     }
 
     override suspend fun createProject(project: GraffitiProject) {
         projectManager.saveProject(context, project)
+        _currentProject.value = project
     }
 
     override suspend fun getProject(id: String): GraffitiProject? {
