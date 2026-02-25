@@ -174,6 +174,7 @@ fun ArView(
     }
 
     DisposableEffect(lifecycleOwner) {
+        // Manage GLSurfaceView lifecycle to prevent context loss and black screens
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 glSurfaceView.onResume()
