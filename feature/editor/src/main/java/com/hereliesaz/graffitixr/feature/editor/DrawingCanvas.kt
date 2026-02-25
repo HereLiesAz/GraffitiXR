@@ -1,4 +1,3 @@
-// ~~~ FILE: ./feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/DrawingCanvas.kt ~~~
 package com.hereliesaz.graffitixr.feature.editor
 
 import androidx.compose.foundation.Canvas
@@ -7,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -46,7 +46,6 @@ fun DrawingCanvas(
                 )
             }
     ) {
-        // Draw the live transient stroke. Final baking happens in ViewModel Native JNI hook.
         if (currentPoints.isNotEmpty() && (activeTool == Tool.BRUSH || activeTool == Tool.ERASER)) {
             val path = Path()
             path.moveTo(currentPoints.first().x, currentPoints.first().y)
@@ -54,13 +53,11 @@ fun DrawingCanvas(
                 path.lineTo(currentPoints[i].x, currentPoints[i].y)
             }
 
-            // For Eraser, we can visualize the stroke with a semi-transparent gray
-            val strokeColor = if (activeTool == Tool.ERASER) Color.Gray.copy(alpha = 0.5f) else activeColor
-
             drawPath(
                 path = path,
-                color = strokeColor,
-                style = Stroke(width = brushSize, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                color = if (activeTool == Tool.ERASER) Color.Transparent else activeColor,
+                style = Stroke(width = brushSize, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                blendMode = if (activeTool == Tool.ERASER) BlendMode.Clear else BlendMode.SrcOver
             )
         }
     }

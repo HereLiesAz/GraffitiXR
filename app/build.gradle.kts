@@ -44,12 +44,9 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
-
-    // FIX: Removed the failing top-level 'kotlin {}' block.
-    // We configure JVM target via tasks below.
 
     buildFeatures {
         compose = true
@@ -63,10 +60,9 @@ android {
     }
 }
 
-// FIX: Configure Kotlin JVM target safely using tasks
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 
@@ -115,9 +111,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    // FIX: Corrected reference to match TOML 'compose-ui-test-junit4'
     androidTestImplementation(libs.compose.ui.test.junit4)
-    // FIX: Corrected reference to match TOML 'compose-ui-test-manifest'
     debugImplementation(libs.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)

@@ -1,135 +1,90 @@
 package com.hereliesaz.graffitixr.feature.editor
 
-import android.net.Uri
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.background
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.graphics.ColorFilter
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import com.hereliesaz.graffitixr.common.model.EditorUiState
-import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
+import kotlin.math.min
 
 @Composable
 fun OverlayScreen(
     uiState: EditorUiState,
     viewModel: EditorViewModel
 ) {
-    val activeLayer = remember(uiState.layers, uiState.activeLayerId) {
-        uiState.layers.find { it.id == uiState.activeLayerId }
-    }
-    val haptic = LocalHapticFeedback.current
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = {
-                        if (!uiState.isImageLocked) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            viewModel.onCycleRotationAxis()
-                        }
-                    }
-                )
-            }
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, rotation ->
-                    if (activeLayer != null && !activeLayer.isImageLocked) {
-                        viewModel.onGestureStart()
-                        viewModel.onTransformGesture(pan, zoom, rotation)
-                    }
-                }
-                viewModel.onGestureEnd()
-            }
-    ) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
         uiState.layers.forEach { layer ->
             if (layer.isVisible) {
-                val colorMatrix = remember(
-                    layer.saturation, layer.contrast, layer.brightness,
-                    layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB
-                ) {
-                    createColorMatrix(
-                        saturation = layer.saturation,
-                        contrast = layer.contrast,
-                        brightness = layer.brightness,
-                        colorBalanceR = layer.colorBalanceR,
-                        colorBalanceG = layer.colorBalanceG,
-                        colorBalanceB = layer.colorBalanceB
+                val imageBitmap = layer.bitmap.asImageBitmap()
+                val srcWidth = imageBitmap.width.toFloat()
+                val srcHeight = imageBitmap.height.toFloat()
+
+                val scaleFactor = min(size.width / srcWidth, size.height / srcHeight)
+                val drawnWidth = srcWidth * scaleFactor
+                val drawnHeight = srcHeight * scaleFactor
+                val topLeftX = (size.width - drawnWidth) / 2
+                val topLeftY = (size.height - drawnHeight) / 2
+
+                val centerX = size.width / 2
+                val centerY = size.height / 2
+
+                withTransform({
+                    translate(layer.offset.x, layer.offset.y)
+                    rotate(layer.rotationZ, pivot = Offset(centerX, centerY))
+                    scale(layer.scale, layer.scale, pivot = Offset(centerX, centerY))
+                }) {
+                    drawImage(
+                        image = imageBitmap,
+                        dstOffset = IntOffset(topLeftX.toInt(), topLeftY.toInt()),
+                        dstSize = IntSize(drawnWidth.toInt(), drawnHeight.toInt()),
+                        alpha = layer.opacity,
+                        blendMode = mapComposeBlendMode(layer.blendMode)
                     )
                 }
-
-                Image(
-                    bitmap = layer.bitmap.asImageBitmap(),
-                    contentDescription = layer.name,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = layer.scale
-                            scaleY = layer.scale
-                            translationX = layer.offset.x
-                            translationY = layer.offset.y
-                            rotationX = layer.rotationX
-                            rotationY = layer.rotationY
-                            rotationZ = layer.rotationZ
-                            alpha = layer.opacity
-                            this.blendMode = mapBlendMode(layer.blendMode)
-                        },
-                    colorFilter = ColorFilter.colorMatrix(colorMatrix),
-                    contentScale = ContentScale.Fit
-                )
             }
         }
     }
 }
 
-private fun mapBlendMode(mode: ModelBlendMode): BlendMode {
+// Maps our domain BlendMode to Android's compose BlendMode.
+// Unlike the original lie of omission, Hardlight and Softlight exist natively.
+fun mapComposeBlendMode(mode: com.hereliesaz.graffitixr.common.model.BlendMode): BlendMode {
     return when(mode) {
-        ModelBlendMode.SrcOver -> BlendMode.SrcOver
-        ModelBlendMode.Multiply -> BlendMode.Multiply
-        ModelBlendMode.Screen -> BlendMode.Screen
-        ModelBlendMode.Overlay -> BlendMode.Overlay
-        ModelBlendMode.Darken -> BlendMode.Darken
-        ModelBlendMode.Lighten -> BlendMode.Lighten
-        ModelBlendMode.ColorDodge -> BlendMode.ColorDodge
-        ModelBlendMode.ColorBurn -> BlendMode.ColorBurn
-        // Mapping HardLight/SoftLight to SrcOver (or Overlay) for safety if specific mode is missing in Compose
-        ModelBlendMode.HardLight -> BlendMode.Overlay
-        ModelBlendMode.SoftLight -> BlendMode.Overlay
-        ModelBlendMode.Difference -> BlendMode.Difference
-        ModelBlendMode.Exclusion -> BlendMode.Exclusion
-        ModelBlendMode.Hue -> BlendMode.Hue
-        ModelBlendMode.Saturation -> BlendMode.Saturation
-        ModelBlendMode.Color -> BlendMode.Color
-        ModelBlendMode.Luminosity -> BlendMode.Luminosity
-        ModelBlendMode.Clear -> BlendMode.Clear
-        ModelBlendMode.Src -> BlendMode.Src
-        ModelBlendMode.Dst -> BlendMode.Dst
-        ModelBlendMode.DstOver -> BlendMode.DstOver
-        ModelBlendMode.SrcIn -> BlendMode.SrcIn
-        ModelBlendMode.DstIn -> BlendMode.DstIn
-        ModelBlendMode.SrcOut -> BlendMode.SrcOut
-        ModelBlendMode.DstOut -> BlendMode.DstOut
-        ModelBlendMode.SrcAtop -> BlendMode.SrcAtop
-        ModelBlendMode.DstAtop -> BlendMode.DstAtop
-        ModelBlendMode.Xor -> BlendMode.Xor
-        ModelBlendMode.Plus -> BlendMode.Plus
-        ModelBlendMode.Modulate -> BlendMode.Modulate
+        com.hereliesaz.graffitixr.common.model.BlendMode.SrcOver -> BlendMode.SrcOver
+        com.hereliesaz.graffitixr.common.model.BlendMode.Multiply -> BlendMode.Multiply
+        com.hereliesaz.graffitixr.common.model.BlendMode.Screen -> BlendMode.Screen
+        com.hereliesaz.graffitixr.common.model.BlendMode.Overlay -> BlendMode.Overlay
+        com.hereliesaz.graffitixr.common.model.BlendMode.Darken -> BlendMode.Darken
+        com.hereliesaz.graffitixr.common.model.BlendMode.Lighten -> BlendMode.Lighten
+        com.hereliesaz.graffitixr.common.model.BlendMode.ColorDodge -> BlendMode.ColorDodge
+        com.hereliesaz.graffitixr.common.model.BlendMode.ColorBurn -> BlendMode.ColorBurn
+        com.hereliesaz.graffitixr.common.model.BlendMode.Difference -> BlendMode.Difference
+        com.hereliesaz.graffitixr.common.model.BlendMode.Exclusion -> BlendMode.Exclusion
+        com.hereliesaz.graffitixr.common.model.BlendMode.Hue -> BlendMode.Hue
+        com.hereliesaz.graffitixr.common.model.BlendMode.Saturation -> BlendMode.Saturation
+        com.hereliesaz.graffitixr.common.model.BlendMode.Color -> BlendMode.Color
+        com.hereliesaz.graffitixr.common.model.BlendMode.Luminosity -> BlendMode.Luminosity
+        com.hereliesaz.graffitixr.common.model.BlendMode.Clear -> BlendMode.Clear
+        com.hereliesaz.graffitixr.common.model.BlendMode.Src -> BlendMode.Src
+        com.hereliesaz.graffitixr.common.model.BlendMode.Dst -> BlendMode.Dst
+        com.hereliesaz.graffitixr.common.model.BlendMode.DstOver -> BlendMode.DstOver
+        com.hereliesaz.graffitixr.common.model.BlendMode.SrcIn -> BlendMode.SrcIn
+        com.hereliesaz.graffitixr.common.model.BlendMode.DstIn -> BlendMode.DstIn
+        com.hereliesaz.graffitixr.common.model.BlendMode.SrcOut -> BlendMode.SrcOut
+        com.hereliesaz.graffitixr.common.model.BlendMode.DstOut -> BlendMode.DstOut
+        com.hereliesaz.graffitixr.common.model.BlendMode.SrcAtop -> BlendMode.SrcAtop
+        com.hereliesaz.graffitixr.common.model.BlendMode.DstAtop -> BlendMode.DstAtop
+        com.hereliesaz.graffitixr.common.model.BlendMode.Xor -> BlendMode.Xor
+        com.hereliesaz.graffitixr.common.model.BlendMode.Plus -> BlendMode.Plus
+        com.hereliesaz.graffitixr.common.model.BlendMode.Modulate -> BlendMode.Modulate
+        com.hereliesaz.graffitixr.common.model.BlendMode.HardLight -> BlendMode.Hardlight
+        com.hereliesaz.graffitixr.common.model.BlendMode.SoftLight -> BlendMode.Softlight
         else -> BlendMode.SrcOver
     }
 }

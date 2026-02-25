@@ -8,19 +8,20 @@ plugins {
 android {
     namespace = "com.hereliesaz.graffitixr.feature.dashboard"
     compileSdk = 36
+
     defaultConfig {
         minSdk = 29
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     kotlin {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
 
@@ -36,11 +37,14 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:design"))
     implementation(project(":core:data"))
+
     implementation(libs.az.nav.rail)
+
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material.icons.extended)
+
     implementation(libs.coil.compose)
 
     implementation(libs.hilt.android)

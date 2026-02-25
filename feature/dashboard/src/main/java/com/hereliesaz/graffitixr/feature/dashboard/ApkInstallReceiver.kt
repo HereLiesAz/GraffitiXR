@@ -21,13 +21,13 @@ class ApkInstallReceiver : BroadcastReceiver() {
             return
         }
 
-        // Clear the ID to prevent reuse
-        prefs.edit().remove("update_download_id").apply()
-
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val uri = downloadManager.getUriForDownloadedFile(downloadId)
 
         if (uri != null) {
+            // Confirming reality before torching the bridge.
+            prefs.edit().remove("update_download_id").apply()
+
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

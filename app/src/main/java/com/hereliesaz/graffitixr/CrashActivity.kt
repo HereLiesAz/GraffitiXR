@@ -163,13 +163,9 @@ class CrashActivity : ComponentActivity() {
     }
 
     private fun reportIssue(body: String) {
-        // FIXED: Hardcoded URL removed.
-        // We now construct the URL dynamically to avoid maintenance rot.
-        // Ideally, REPO_OWNER and REPO_NAME should be in BuildConfig.
-
-        // For now, we fallback to a safe constant, but the structure is cleaner.
-        val repoOwner = "HereLiesAz"
-        val repoName = "GraffitiXR"
+        // Safe access to BuildConfig dynamically linked properties.
+        val repoOwner = BuildConfig.REPO_OWNER
+        val repoName = BuildConfig.REPO_NAME
 
         val encodedBody = URLEncoder.encode(body, StandardCharsets.UTF_8.toString())
         val url = "https://github.com/$repoOwner/$repoName/issues/new?labels=crash&body=$encodedBody"

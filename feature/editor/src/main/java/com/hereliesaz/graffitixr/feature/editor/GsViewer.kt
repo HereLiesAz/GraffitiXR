@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.opengl.GLSurfaceView
 import android.view.MotionEvent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,26 +16,29 @@ import com.hereliesaz.graffitixr.feature.editor.rendering.GsViewerRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlin.math.sqrt
 
-/**
- * A Composable that renders the 3D SLAM map using the native MobileGS engine.
- * It uses [GsViewerRenderer] to handle OpenGL rendering and [SlamManager] for data processing.
- */
+class TouchState {
+    var lastX = 0f
+    var lastY = 0f
+    var lastDist = 0f
+    var mode = 0 // 0=NONE, 1=DRAG, 2=ZOOM
+}
+
 @SuppressLint("ClickableViewAccessibility")
 @Composable
 fun GsViewer(
     mapPath: String,
-    slamManager: SlamManager, // FIXED: Added
+    slamManager: SlamManager,
     modifier: Modifier = Modifier,
     activeLayer: Layer? = null
 ) {
     val context = LocalContext.current
 
-    // Initialize Renderer with the map file path AND shared engine
     val renderer = remember(mapPath) {
         GsViewerRenderer(context, mapPath, slamManager)
     }
 
-    // Update active layer in renderer when it changes
+    val touchState = remember { TouchState() }
+
     LaunchedEffect(activeLayer) {
         renderer.activeLayer = activeLayer
     }
@@ -57,9 +59,8 @@ fun GsViewer(
                 setRenderer(renderer)
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
-                // Touch Handling for Orbit/Zoom
                 setOnTouchListener { _, event ->
-                    handleTouch(event, renderer)
+                    handleTouch(event, renderer, touchState)
                     true
                 }
             }
@@ -67,41 +68,33 @@ fun GsViewer(
     )
 }
 
-// Basic Multi-touch Handler
-private var lastX = 0f
-private var lastY = 0f
-private var lastDist = 0f
-private var mode = 0 // 0=NONE, 1=DRAG, 2=ZOOM
-
-private fun handleTouch(event: MotionEvent, renderer: GsViewerRenderer) {
+private fun handleTouch(event: MotionEvent, renderer: GsViewerRenderer, state: TouchState) {
     when (event.actionMasked) {
         MotionEvent.ACTION_DOWN -> {
-            mode = 1 // DRAG
-            lastX = event.x
-            lastY = event.y
+            state.mode = 1
+            state.lastX = event.x
+            state.lastY = event.y
         }
         MotionEvent.ACTION_POINTER_DOWN -> {
-            mode = 2 // ZOOM
-            lastDist = spacing(event)
+            state.mode = 2
+            state.lastDist = spacing(event)
         }
         MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-            mode = 0
+            state.mode = 0
         }
         MotionEvent.ACTION_MOVE -> {
-            if (mode == 1) {
-                // Orbit
-                val dx = event.x - lastX
-                val dy = event.y - lastY
+            if (state.mode == 1) {
+                val dx = event.x - state.lastX
+                val dy = event.y - state.lastY
                 renderer.onTouchDrag(dx, dy)
-                lastX = event.x
-                lastY = event.y
-            } else if (mode == 2) {
-                // Zoom
+                state.lastX = event.x
+                state.lastY = event.y
+            } else if (state.mode == 2) {
                 val newDist = spacing(event)
                 if (newDist > 10f) {
-                    val scale = newDist / lastDist
+                    val scale = newDist / state.lastDist
                     renderer.onTouchScale(scale)
-                    lastDist = newDist
+                    state.lastDist = newDist
                 }
             }
         }

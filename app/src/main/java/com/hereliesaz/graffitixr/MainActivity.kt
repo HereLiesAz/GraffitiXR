@@ -5,13 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.viewModels
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.lifecycleScope
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHostScope
 import com.hereliesaz.aznavrail.AzNavRailScope
@@ -43,11 +43,6 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
     @Inject lateinit var securityProviderManager: SecurityProviderManager
 
-    internal val mainViewModel: MainViewModel by viewModels()
-    internal val editorViewModel: EditorViewModel by viewModels()
-    internal val arViewModel: ArViewModel by viewModels()
-    internal val dashboardViewModel: DashboardViewModel by viewModels()
-
     var use3dBackground by mutableStateOf(false)
     var showSaveDialog by mutableStateOf(false)
     var showInfoScreen by mutableStateOf(false)
@@ -57,27 +52,18 @@ class MainActivity : ComponentActivity() {
         hasCameraPermission = p[android.Manifest.permission.CAMERA] ?: false
     }
 
-    private val overlayImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let { editorViewModel.onAddLayer(it) }
-    }
-
-    private val backgroundImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let { editorViewModel.setBackgroundImage(it) }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
         slamManager.ensureInitialized()
 
-        // Monitor Security Provider installation for recoverable errors
         lifecycleScope.launch {
             securityProviderManager.securityProviderState.collect { state ->
                 if (state is SecurityProviderState.RecoverableError) {
                     GoogleApiAvailability.getInstance().getErrorDialog(
                         this@MainActivity,
                         state.errorCode,
-                        9000 // Request code for Play Services resolution
+                        9000
                     )?.show()
                 }
             }
@@ -88,29 +74,45 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val renderRefState = remember { mutableStateOf<ArRenderer?>(null) }
 
-                // Collect states to force recomposition when they change
+                // Scoped via Compose hierarchy rather than the Activity class.
+                val mainViewModel: MainViewModel = hiltViewModel()
+                val editorViewModel: EditorViewModel = hiltViewModel()
+                val arViewModel: ArViewModel = hiltViewModel()
+                val dashboardViewModel: DashboardViewModel = hiltViewModel()
+
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
 
                 val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked
-
-                // Calculate docking side here to pass down
                 val dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+
+                val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    uri?.let { editorViewModel.onAddLayer(it) }
+                }
+
+                val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    uri?.let { editorViewModel.setBackgroundImage(it) }
+                }
 
                 AzHostActivityLayout(
                     navController = navController,
                     initiallyExpanded = false,
                 ) {
                     if (isRailVisible) {
-                        configureRail()
+                        configureRail(mainViewModel, editorViewModel, arViewModel, dashboardViewModel, overlayImagePicker, backgroundImagePicker)
                     }
 
-                    // Pass the AzNavHostScope (this) down so AppContent can enforce the rail's UI boundaries
                     AppContent(
                         navHostScope = this,
                         navController = navController,
+                        mainViewModel = mainViewModel,
+                        editorViewModel = editorViewModel,
+                        arViewModel = arViewModel,
+                        dashboardViewModel = dashboardViewModel,
                         dockingSide = dockingSide,
-                        renderRefState = renderRefState
+                        renderRefState = renderRefState,
+                        overlayImagePicker = overlayImagePicker,
+                        backgroundImagePicker = backgroundImagePicker
                     )
                 }
             }
@@ -122,10 +124,16 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    private fun AzNavRailScope.configureRail() {
+    private fun AzNavRailScope.configureRail(
+        mainViewModel: MainViewModel,
+        editorViewModel: EditorViewModel,
+        arViewModel: ArViewModel,
+        dashboardViewModel: DashboardViewModel,
+        overlayImagePicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
+        backgroundImagePicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>
+    ) {
         val editorUiState = editorViewModel.uiState.value
         val isRightHanded = editorUiState.isRightHanded
-        val viewModel = mainViewModel
         val navStrings = NavStrings()
 
         val activeHighlightColor = when (editorUiState.activeRotationAxis) {
@@ -144,7 +152,6 @@ class MainActivity : ComponentActivity() {
 
         val requestPermissions = { permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.ACCESS_FINE_LOCATION)) }
 
-        // Core Modes (Hosted Rail)
         azRailHostItem(id = "mode_host", text = navStrings.modes, info = "Switch editor modes")
         azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = "Augmented Reality", shape = AzButtonShape.NONE) { if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.AR) else requestPermissions() }
         azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = "AR Overlay", shape = AzButtonShape.NONE) { if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.OVERLAY) else requestPermissions() }
@@ -154,15 +161,13 @@ class MainActivity : ComponentActivity() {
         azDivider()
 
         if (editorUiState.editorMode == EditorMode.AR) {
-            // Target/Grid (Hosted Rail)
             azRailHostItem(id = "target_host", text = navStrings.grid, info = "Scanning tools")
-            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = "Create Target", shape = AzButtonShape.NONE) { if (hasCameraPermission) viewModel.startTargetCapture() else requestPermissions() }
+            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = "Create Target", shape = AzButtonShape.NONE) { if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions() }
             azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = "Surveyor", shape = AzButtonShape.NONE) { if (hasCameraPermission) dashboardViewModel.navigateToSurveyor() else requestPermissions() }
             azRailSubItem(id = "capture_keyframe", hostId = "target_host", text = "Keyframe", info = "Capture Keyframe", shape = AzButtonShape.NONE) { arViewModel.captureKeyframe() }
             azDivider()
         }
 
-        // Design Actions (Hosted Rail)
         azRailHostItem(id = "design_host", text = navStrings.design, info = "Design tools")
         azRailSubItem(id = "add_image", hostId = "design_host", text = "Image", info = navStrings.openInfo, shape = AzButtonShape.NONE) {
             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -189,20 +194,20 @@ class MainActivity : ComponentActivity() {
         }
         azDivider()
 
-        // DYNAMIC LAYERS (Relocatable)
-        // These are children of the Design host, but they themselves have a Nested Rail for tools.
+        // --- DYNAMIC LAYERS (Nested Rail Parents) ---
+        // Each layer item is a parent to a Nested Rail (Popup) containing its specific tools.
         editorUiState.layers.reversed().forEach { layer ->
-
             azRailRelocItem(
                 id = "layer_${layer.id}",
                 hostId = "design_host",
                 text = layer.name,
                 info = "Open Layer Tools",
+                nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL, // Force popup style
                 onClick = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) },
                 onRelocate = { _, _, newOrder ->
                     editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed())
                 },
-                // The Tools are defined HERE, creating a Nested Rail attached to this item.
+                // NESTED CONTENT: The Tools (Brush, Eraser, etc.) appear in the Nested Rail
                 nestedContent = {
                     val activate = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) }
 
@@ -244,9 +249,8 @@ class MainActivity : ComponentActivity() {
                         azRailToggle(id = "lock_img_${layer.id}", isChecked = layer.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Lock Layer") { activate(); editorViewModel.toggleImageLock() }
                     }
                 }
-                // Nested content removed (tools in global rail)
             ) {
-                // HIDDEN CONTEXT MENU (Admin Actions)
+                // TRAILING CONTENT: Context Menu (Admin actions)
                 val activate = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) }
                 inputItem(hint = "Rename") { activate(); editorViewModel.onLayerRenamed(layer.id, it) }
                 listItem(text = "Duplicate") { activate(); editorViewModel.onDuplicateLayer(layer.id) }
@@ -256,7 +260,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Project / Admin (Hosted Rail)
         azDivider()
         azRailHostItem(id = "project_host", text = navStrings.project, info = "Project Actions")
         azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = "Save Project", shape = AzButtonShape.NONE) { showSaveDialog = true }
@@ -275,11 +278,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Composable
     fun AppContent(
         navHostScope: AzNavHostScope,
         navController: NavHostController,
+        mainViewModel: MainViewModel,
+        editorViewModel: EditorViewModel,
+        arViewModel: ArViewModel,
+        dashboardViewModel: DashboardViewModel,
         dockingSide: AzDockingSide,
-        renderRefState: MutableState<ArRenderer?>
+        renderRefState: MutableState<ArRenderer?>,
+        overlayImagePicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
+        backgroundImagePicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>
     ) {
         MainScreen(
             navHostScope = navHostScope,

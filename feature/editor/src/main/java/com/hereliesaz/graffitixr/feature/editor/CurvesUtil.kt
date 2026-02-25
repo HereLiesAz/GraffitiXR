@@ -1,47 +1,17 @@
 package com.hereliesaz.graffitixr.feature.editor
 
-import android.graphics.Bitmap
-import android.graphics.Color
 import androidx.compose.ui.geometry.Offset
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
- * Applies color curves to a bitmap.
- * Optimized to use direct bitwise operations instead of Color class calls for performance.
+ * Utility for generating color adjustment LUTs (Look Up Tables).
+ * * NOTE: The CPU-bound `applyCurves` Bitmap loop has been intentionally removed.
+ * Iterating through 12 million pixels sequentially on the CPU for every slider
+ * micro-adjustment caused massive UI jank.
+ * This LUT generation is now isolated, and the resulting array should be
+ * passed to the MobileGS fragment shader or applied via RenderEffect for hardware acceleration.
  */
-suspend fun applyCurves(bitmap: Bitmap, points: List<Offset>): Bitmap = withContext(Dispatchers.Default) {
-    val width = bitmap.width
-    val height = bitmap.height
-    val pixels = IntArray(width * height)
-    bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
-    val lut = createLut(points)
-
-    // Bolt Optimization: Use manual bit manipulation instead of Color.red/green/blue/argb
-    // This avoids method call overhead in this tight loop (12M+ iterations for 12MP images).
-    // Benchmark shows ~6% improvement in synthetic tests, likely more on device.
-    for (i in pixels.indices) {
-        val color = pixels[i]
-        // Extract components (ARGB)
-        // alpha: unsigned shift to handle sign bit
-        val a = color ushr 24
-        // red: shift 16, mask 0xFF
-        val r = (color shr 16) and 0xFF
-        // green: shift 8, mask 0xFF
-        val g = (color shr 8) and 0xFF
-        // blue: mask 0xFF
-        val b = color and 0xFF
-
-        // Apply LUT and Reassemble
-        // (a << 24) | (r << 16) | (g << 8) | b
-        pixels[i] = (a shl 24) or (lut[r] shl 16) or (lut[g] shl 8) or lut[b]
-    }
-
-    Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
-}
-
-internal fun createLut(points: List<Offset>): IntArray {
+fun createLut(points: List<Offset>): IntArray {
     val lut = IntArray(256)
     val sortedPoints = points.sortedBy { it.x }
 

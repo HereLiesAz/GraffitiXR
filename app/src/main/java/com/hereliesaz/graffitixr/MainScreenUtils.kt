@@ -11,19 +11,25 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.min
+import android.os.Handler
+import android.os.HandlerThread
 
 fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
     val view = window.decorView
     val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+    val handlerThread = HandlerThread("PixelCopyThread").apply { start() }
+    val handler = Handler(handlerThread.looper)
+
     try {
         PixelCopy.request(window, android.graphics.Rect(0, 0, view.width, view.height), bitmap, { copyResult ->
             if (copyResult == PixelCopy.SUCCESS) {
                 onCaptured(bitmap)
             }
-        }, android.os.Handler(android.os.Looper.getMainLooper()))
+            handlerThread.quitSafely()
+        }, handler)
     } catch (e: IllegalArgumentException) {
         e.printStackTrace()
+        handlerThread.quitSafely()
     }
 }
 
