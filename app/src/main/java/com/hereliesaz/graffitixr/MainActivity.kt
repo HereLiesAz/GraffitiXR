@@ -241,6 +241,7 @@ class MainActivity : ComponentActivity() {
                         azRailToggle(id = "lock_img_${layer.id}", isChecked = layer.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked") { activate(); editorViewModel.toggleImageLock() }
                     }
                 }
+                // Nested content removed (tools in global rail)
             ) {
                 // HIDDEN CONTEXT MENU (Admin Actions)
                 val activate = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) }
