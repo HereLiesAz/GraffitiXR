@@ -21,6 +21,8 @@ import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.aznavrail.AzActivity
 import com.hereliesaz.aznavrail.AzGraphInterface
 import com.hereliesaz.aznavrail.AzNavRailScope
+import com.hereliesaz.aznavrail.AzNavHostScope
+import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
@@ -36,6 +38,8 @@ import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import androidx.compose.ui.Alignment
+import java.io.File
 
 /**
  * The Single Activity for the application.
@@ -79,6 +83,35 @@ class MainActivity : AzActivity() {
         uri?.let { editorViewModel.setBackgroundImage(it) }
     }
 
+    // Initialize NavStrings once
+    private val navStrings by lazy {
+        NavStrings(
+            modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
+            overlay = "Overlay", overlayInfo = "Overlay Mode",
+            mockup = "Mockup", mockupInfo = "Mockup Mode",
+            trace = "Trace", traceInfo = "Trace Mode",
+            grid = "Target", surveyor = "Survey", surveyorInfo = "Map Wall",
+            create = "Create", createInfo = "New Target",
+            refine = "Refine", refineInfo = "Adjust Target",
+            update = "Progress", updateInfo = "Mark Work",
+            design = "Design", open = "Open", openInfo = "Add Image",
+            wall = "Wall", wallInfo = "Change Wall",
+            isolate = "Isolate", isolateInfo = "Remove BG",
+            outline = "Outline", outlineInfo = "Line Art",
+            adjust = "Adjust", adjustInfo = "Colors",
+            balance = "Color", balanceInfo = "Color Tint",
+            build = "Blend", blendingInfo = "Blend Mode",
+            settings = "Settings", project = "Project",
+            new = "New", newInfo = "Clear Canvas",
+            save = "Save", saveInfo = "Save to File",
+            load = "Load", loadInfo = "Open Project",
+            export = "Export", exportInfo = "Export Image",
+            help = "Help", helpInfo = "Guide",
+            light = "Light", lightInfo = "Flashlight",
+            lock = "Lock", lockInfo = "Touch Lock"
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -100,6 +133,12 @@ class MainActivity : AzActivity() {
         if (isFinishing) {
             slamManager.destroy()
         }
+    }
+
+    private fun resetUiState() {
+        showSaveDialog = false
+        showInfoScreen = false
+        editorViewModel.onDismissPanel()
     }
 
     // Dynamic Rail Configuration
@@ -125,33 +164,6 @@ class MainActivity : AzActivity() {
             dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
         )
 
-        // Navigation Strings
-        val navStrings = NavStrings(
-            modes = "Modes", arMode = "AR", arModeInfo = "AR Projection",
-            overlay = "Overlay", overlayInfo = "Overlay Mode",
-            mockup = "Mockup", mockupInfo = "Mockup Mode",
-            trace = "Trace", traceInfo = "Trace Mode",
-            grid = "Target", surveyor = "Survey", surveyorInfo = "Map Wall",
-            create = "Create", createInfo = "New Target",
-            refine = "Refine", refineInfo = "Adjust Target",
-            update = "Progress", updateInfo = "Mark Work",
-            design = "Design", open = "Open", openInfo = "Add Image",
-            wall = "Wall", wallInfo = "Change Wall",
-            isolate = "Isolate", isolateInfo = "Remove BG",
-            outline = "Outline", outlineInfo = "Line Art",
-            adjust = "Adjust", adjustInfo = "Colors",
-            balance = "Color", balanceInfo = "Color Tint",
-            build = "Blend", blendingInfo = "Blend Mode",
-            settings = "Settings", project = "Project",
-            new = "New", newInfo = "Clear Canvas",
-            save = "Save", saveInfo = "Save to File",
-            load = "Load", loadInfo = "Open Project",
-            export = "Export", exportInfo = "Export Image",
-            help = "Help", helpInfo = "Guide",
-            light = "Light", lightInfo = "Flashlight",
-            lock = "Lock", lockInfo = "Touch Lock"
-        )
-
         val requestPermissions = {
             permissionLauncher.launch(
                 arrayOf(
@@ -160,11 +172,6 @@ class MainActivity : AzActivity() {
                     android.Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
-        }
-
-        val resetDialogs = {
-            // Reset dialogs if managed here, but MainScreen manages most dialogs locally (slider, color).
-            // We can only reset what we lifted.
         }
 
         // --- Rail Items ---
@@ -198,7 +205,7 @@ class MainActivity : AzActivity() {
             azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, info = navStrings.createInfo, onClick = {
                 if (hasCameraPermission) {
                     viewModel.startTargetCapture()
-                    resetDialogs()
+                    resetUiState()
                 } else {
                     requestPermissions()
                 }
@@ -207,7 +214,7 @@ class MainActivity : AzActivity() {
             azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, info = navStrings.surveyorInfo, onClick = {
                 if (hasCameraPermission) {
                     dashboardViewModel.navigateToSurveyor()
-                    resetDialogs()
+                    resetUiState()
                 } else {
                     requestPermissions()
                 }
@@ -222,12 +229,12 @@ class MainActivity : AzActivity() {
 
         if (editorUiState.editorMode == EditorMode.STATIC) {
             azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, info = navStrings.wallInfo) {
-                resetDialogs()
+                resetUiState()
                 backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
 
             // has3dModel check
-            val has3dModel = !editorUiState.mapPath.isNullOrEmpty()
+            val has3dModel = !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
             if (has3dModel) {
                 azRailSubToggle(
                     id = "toggle_3d",
@@ -246,7 +253,7 @@ class MainActivity : AzActivity() {
         val openButtonText = if (editorUiState.layers.isNotEmpty()) "Add" else navStrings.open
         val openButtonId = if (editorUiState.layers.isNotEmpty()) "add_layer" else "image"
         azRailSubItem(id = openButtonId, text = openButtonText, hostId = "design_host", info = navStrings.openInfo) {
-            resetDialogs()
+            resetUiState()
             overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
 
@@ -266,7 +273,7 @@ class MainActivity : AzActivity() {
         if (editorUiState.layers.isNotEmpty()) {
             azRailSubItem(id = "isolate", hostId = "design_host", text = navStrings.isolate, info = navStrings.isolateInfo, onClick = {
                 editorViewModel.onRemoveBackgroundClicked()
-                resetDialogs()
+                resetUiState()
             })
 
             // Replaced "outline" with Nested Rail for "Draw"
@@ -278,22 +285,22 @@ class MainActivity : AzActivity() {
             ) {
                 azRailItem(id = "outline", text = navStrings.outline, info = navStrings.outlineInfo, onClick = {
                     editorViewModel.onLineDrawingClicked()
-                    resetDialogs()
+                    resetUiState()
                 })
             }
 
             azDivider()
             azRailSubItem(id = "adjust", hostId = "design_host", text = navStrings.adjust, info = navStrings.adjustInfo) {
                 editorViewModel.onAdjustClicked()
-                resetDialogs()
+                resetUiState()
             }
             azRailSubItem(id = "balance", hostId = "design_host", text = navStrings.balance, info = navStrings.balanceInfo) {
                 editorViewModel.onColorClicked()
-                resetDialogs()
+                resetUiState()
             }
             azRailSubItem(id = "blending", hostId = "design_host", text = navStrings.build, info = navStrings.blendingInfo, onClick = {
                 editorViewModel.onCycleBlendMode()
-                resetDialogs()
+                resetUiState()
             })
             azRailSubToggle(id = "lock_image", hostId = "design_host", isChecked = editorUiState.isImageLocked, toggleOnText = "Locked", toggleOffText = "Unlocked", info = "Prevent accidental moves", onClick = {
                 editorViewModel.toggleImageLock()
@@ -303,78 +310,101 @@ class MainActivity : AzActivity() {
         azRailHostItem(id = "project_host", text = navStrings.project, onClick = {})
         azRailSubItem(id = "save_project", hostId = "project_host", text = navStrings.save, info = navStrings.saveInfo) {
             showSaveDialog = true
-            resetDialogs()
+            resetUiState()
         }
         azRailSubItem(id = "load_project", hostId = "project_host", text = navStrings.load, info = navStrings.loadInfo) {
             dashboardViewModel.navigateToLibrary() // Need to implement
-            resetDialogs()
+            resetUiState()
         }
         azRailSubItem(id = "export_project", hostId = "project_host", text = navStrings.export, info = navStrings.exportInfo) {
             editorViewModel.exportProject()
-            resetDialogs()
+            resetUiState()
         }
         azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, info = "App Settings") {
             dashboardViewModel.navigateToSettings() // Need to implement
-            resetDialogs()
+            resetUiState()
         }
         azDivider()
 
         azRailItem(id = "help", text = "Help", info = "Show Help") {
             showInfoScreen = true
-            resetDialogs()
+            resetUiState()
         }
         if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) azRailItem(id = "light", text = navStrings.light, info = navStrings.lightInfo, onClick = {
             arViewModel.toggleFlashlight()
-            resetDialogs()
+            resetUiState()
         })
         if (editorUiState.editorMode == EditorMode.TRACE) azRailItem(id = "lock_trace", text = navStrings.lock, info = navStrings.lockInfo, onClick = {
             mainViewModel.setTouchLocked(true)
-            resetDialogs()
+            resetUiState()
         })
     }
 
     @Composable
-    fun AppContent(navController: NavHostController, dockingSide: AzDockingSide) {
+    fun AppContent() {
         GraffitiXRTheme {
-            val navTrigger by dashboardViewModel.navigationTrigger.collectAsState()
+            val navController = rememberNavController()
 
-            LaunchedEffect(navTrigger) {
-                navTrigger?.let { dest ->
-                    navController.navigate(dest)
-                    dashboardViewModel.onNavigationConsumed()
+            // Collect state
+            val editorUiState by editorViewModel.uiState.collectAsState()
+            val mainUiState by mainViewModel.uiState.collectAsState()
+
+            val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked
+            val dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+
+            // Main UI composition
+            AzHostActivityLayout(
+                navController = navController,
+                initiallyExpanded = false,
+            ) {
+                if (isRailVisible) {
+                    // Scope is AzNavRailScope
+                    with(this@MainActivity) {
+                        configureRail()
+                    }
+                }
+
+                // Content Blocks
+                background(weight = 0) {
+                    GraffitiBackground(
+                        viewModel = mainViewModel,
+                        editorViewModel = editorViewModel,
+                        arViewModel = arViewModel,
+                        dashboardViewModel = dashboardViewModel,
+                        slamManager = slamManager,
+                        projectRepository = projectRepository,
+                        onRendererCreated = { arRenderer = it }, // Update state
+                        hasCameraPermission = hasCameraPermission,
+                        use3dBackground = use3dBackground,
+                        navController = navController
+                    )
+                }
+
+                onscreen(Alignment.Center) {
+                    val navTrigger by dashboardViewModel.navigationTrigger.collectAsState()
+
+                    LaunchedEffect(navTrigger) {
+                        navTrigger?.let { dest ->
+                            navController.navigate(dest)
+                            dashboardViewModel.onNavigationConsumed()
+                        }
+                    }
+
+                    GraffitiOverlay(
+                        viewModel = mainViewModel,
+                        editorViewModel = editorViewModel,
+                        arViewModel = arViewModel,
+                        dashboardViewModel = dashboardViewModel,
+                        navController = navController,
+                        projectRepository = projectRepository,
+                        dockingSide = dockingSide, // From AzNavHostScope via outer capture
+                        hoistedShowSaveDialog = showSaveDialog,
+                        hoistedShowInfoScreen = showInfoScreen,
+                        onShowSaveDialogChange = { showSaveDialog = it },
+                        onShowInfoScreenChange = { showInfoScreen = it }
+                    )
                 }
             }
-
-            MainScreen(
-                viewModel = mainViewModel,
-                editorViewModel = editorViewModel,
-                arViewModel = arViewModel,
-                dashboardViewModel = dashboardViewModel,
-                navController = navController,
-                slamManager = slamManager,
-                projectRepository = projectRepository,
-                onRendererCreated = { renderer ->
-                    arRenderer = renderer
-                },
-                // Pass hoisted state
-                hoistedUse3dBackground = use3dBackground,
-                hoistedShowSaveDialog = showSaveDialog,
-                hoistedShowInfoScreen = showInfoScreen,
-                onUse3dBackgroundChange = { use3dBackground = it },
-                onShowSaveDialogChange = { showSaveDialog = it },
-                onShowInfoScreenChange = { showInfoScreen = it },
-                hasCameraPermission = hasCameraPermission,
-                requestPermissions = { permissionLauncher.launch(
-                    arrayOf(
-                        android.Manifest.permission.CAMERA,
-                        android.Manifest.permission.ACCESS_FINE_LOCATION,
-                        android.Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                )},
-                onOverlayImagePick = { overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                onBackgroundImagePick = { backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                dockingSide = dockingSide
-            )
         }
     }
 }
