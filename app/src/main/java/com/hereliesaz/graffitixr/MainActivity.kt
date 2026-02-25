@@ -56,8 +56,6 @@ class MainActivity : AzActivity() {
     internal val arViewModel: ArViewModel by viewModels()
     internal val dashboardViewModel: DashboardViewModel by viewModels()
 
-    private var arRenderer: ArRenderer? = null
-
     // Hoisted state for Rail and Screen
     var use3dBackground by mutableStateOf(false)
     var showSaveDialog by mutableStateOf(false)
@@ -342,10 +340,7 @@ class MainActivity : AzActivity() {
             slamManager = slamManager,
             projectRepository = projectRepository,
             renderRefState = renderRefState,
-            onRendererCreated = { renderer ->
-                arRenderer = renderer
-                renderRefState.value = renderer
-            },
+            onRendererCreated = { renderRefState.value = it },
             hoistedUse3dBackgroundProvider = { use3dBackground },
             hoistedShowSaveDialogProvider = { showSaveDialog },
             hoistedShowInfoScreenProvider = { showInfoScreen },
