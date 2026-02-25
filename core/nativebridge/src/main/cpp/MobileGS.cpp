@@ -3,6 +3,7 @@
 #include <fstream>
 #include <ctime>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/features2d.hpp>
 #include <GLES3/gl3.h>
 
 #define TAG "MobileGS"
@@ -24,6 +25,47 @@ static void multiplyMatricesInternal(const float* a, const float* b, float* resu
             result[row + col * 4] = sum;
         }
     }
+}
+
+static GLuint compileShader(GLenum type, const char* source) {
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, NULL);
+    glCompileShader(shader);
+    GLint compiled;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    if (!compiled) {
+        GLint infoLen = 0;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
+        if (infoLen > 1) {
+            char* infoLog = new char[infoLen];
+            glGetShaderInfoLog(shader, infoLen, NULL, infoLog);
+            LOGE("Error compiling shader:\n%s", infoLog);
+            delete[] infoLog;
+        }
+        glDeleteShader(shader);
+        return 0;
+    }
+    return shader;
+}
+
+static GLuint createProgram(const char* vertSrc, const char* fragSrc) {
+    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertSrc);
+    if (!vertexShader) return 0;
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragSrc);
+    if (!fragmentShader) return 0;
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+    glLinkProgram(program);
+    GLint linked;
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    if (!linked) {
+        LOGE("Error linking program");
+        glDeleteProgram(program);
+        return 0;
+    }
+    return program;
 }
 
 MobileGS::MobileGS() {
@@ -62,6 +104,70 @@ void MobileGS::draw() {
     if (vulkanRenderer) {
         vulkanRenderer->setLighting(lightIntensity, lightColor);
         vulkanRenderer->renderFrame();
+    }
+
+    if (visMode == 1) { // Point Cloud
+        if (pointProgram == 0) {
+            const char* vShaderStr =
+                "#version 300 es\n"
+                "layout(location = 0) in vec3 a_Position;\n"
+                "layout(location = 1) in vec4 a_Color;\n"
+                "uniform mat4 u_MvpMatrix;\n"
+                "out vec4 v_Color;\n"
+                "void main() {\n"
+                "  gl_Position = u_MvpMatrix * vec4(a_Position, 1.0);\n"
+                "  gl_PointSize = 10.0;\n"
+                "  v_Color = a_Color;\n"
+                "}\n";
+            const char* fShaderStr =
+                "#version 300 es\n"
+                "precision mediump float;\n"
+                "in vec4 v_Color;\n"
+                "out vec4 o_FragColor;\n"
+                "void main() {\n"
+                "  o_FragColor = v_Color;\n"
+                "}\n";
+            pointProgram = createProgram(vShaderStr, fShaderStr);
+            if (pointProgram == 0) { LOGE("Failed to create point program"); return; }
+        }
+
+        glUseProgram(pointProgram);
+
+        float mvp[16];
+        multiplyMatricesInternal(projMtx, viewMtx, mvp);
+
+        GLint mvpLoc = glGetUniformLocation(pointProgram, "u_MvpMatrix");
+        glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp);
+
+        std::vector<float> pointData;
+        {
+            std::lock_guard<std::mutex> lock(pointMutex);
+            if (!mVoxelGrid.empty()) {
+                pointData.reserve(mVoxelGrid.size() * 7);
+                for (const auto& pair : mVoxelGrid) {
+                    const auto& p = pair.second;
+                    pointData.push_back(p.x); pointData.push_back(p.y); pointData.push_back(p.z);
+                    pointData.push_back(p.r); pointData.push_back(p.g); pointData.push_back(p.b); pointData.push_back(p.a);
+                }
+            }
+        }
+
+        if (!pointData.empty()) {
+            if (pointVBO == 0) glGenBuffers(1, &pointVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, pointVBO);
+            glBufferData(GL_ARRAY_BUFFER, pointData.size() * sizeof(float), pointData.data(), GL_DYNAMIC_DRAW);
+
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
+            glEnableVertexAttribArray(1);
+
+            glDrawArrays(GL_POINTS, 0, pointData.size() / 7);
+
+            glDisableVertexAttribArray(0);
+            glDisableVertexAttribArray(1);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
     }
 }
 
@@ -132,6 +238,48 @@ void MobileGS::processDepthData(uint8_t* depthBuffer, int width, int height) {
             } else {
                 mVoxelGrid[key].confidence = std::min(1.0f, mVoxelGrid[key].confidence + 0.05f);
             }
+        }
+    }
+}
+
+// Implement basic feature detection to simulate "Cloud Points" for monocular setup
+void MobileGS::processMonocularData(uint8_t* imageData, int width, int height) {
+    if (!imageData || width <= 0 || height <= 0) return;
+
+    // Use OpenCV to detect features
+    cv::Mat img(height, width, CV_8UC1, imageData);
+    std::vector<cv::KeyPoint> keypoints;
+    // Fast feature detector for performance
+    cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(40);
+    detector->detect(img, keypoints);
+
+    if (keypoints.empty()) return;
+
+    std::lock_guard<std::mutex> lock(pointMutex);
+
+    // Approximate intrinsics
+    float fx = projMtx[0] * (width / 2.0f);
+    float fy = projMtx[5] * (height / 2.0f);
+    float cx = width / 2.0f;
+    float cy = height / 2.0f;
+
+    // Project features to a fixed depth (e.g., 1.5m) to visualize them as a "cloud"
+    float z = 1.5f;
+
+    for (const auto& kp : keypoints) {
+        float px = (kp.pt.x - cx) * z / fx;
+        float py = (kp.pt.y - cy) * z / fy;
+
+        // Camera space to World Space
+        float wx = px * viewMtx[0] + py * viewMtx[1] + z * viewMtx[2] + viewMtx[3];
+        float wy = px * viewMtx[4] + py * viewMtx[5] + z * viewMtx[6] + viewMtx[7];
+        float wz = px * viewMtx[8] + py * viewMtx[9] + z * viewMtx[10] + viewMtx[11];
+
+        VoxelKey key = { (int)(wx / VOXEL_SIZE), (int)(wy / VOXEL_SIZE), (int)(wz / VOXEL_SIZE) };
+
+        // Add point (Greenish color for monocular features)
+        if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
+            mVoxelGrid[key] = { wx, wy, wz, 0.0f, 1.0f, 0.0f, 1.0f, 0.1f };
         }
     }
 }

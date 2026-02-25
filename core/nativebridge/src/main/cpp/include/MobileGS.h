@@ -47,6 +47,7 @@ public:
     void alignMap(float* transform);
 
     void processDepthData(uint8_t* depthBuffer, int width, int height);
+    void processMonocularData(uint8_t* imageData, int width, int height);
     void addStereoPoints(const std::vector<cv::Point3f>& points);
     void setVisualizationMode(int mode);
 
@@ -74,6 +75,10 @@ private:
     float alignmentMtx[16];
     std::mutex alignMutex;
     std::mutex pointMutex;
+
+    // GLES Rendering (Fallback)
+    unsigned int pointProgram = 0;
+    unsigned int pointVBO = 0;
 };
 
 #endif // GRAFFITIXR_MOBILEGS_H
