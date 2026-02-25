@@ -1,9 +1,9 @@
-// ~~~ FILE: ./app/src/main/java/com/hereliesaz/graffitixr/GraffitiApplication.kt ~~~
 package com.hereliesaz.graffitixr
 
 import android.app.Application
 import android.util.Log
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
+import com.google.android.gms.security.ProviderInstaller
 import dagger.hilt.android.HiltAndroidApp
 import org.opencv.android.OpenCVLoader
 import timber.log.Timber
@@ -38,10 +38,7 @@ class GraffitiApplication : Application() {
         }
 
         // 3. Update Security Provider (Fix for SSLHandshakeException)
-        securityProviderManager.installAsync(this)
-    }
-
-        // 3. Update Security Provider (Fix for SSLHandshakeException)
+        // Using explicit listener implementation instead of lambda for clarity/compatibility if needed
         ProviderInstaller.installIfNeededAsync(this, object : ProviderInstaller.ProviderInstallListener {
             override fun onProviderInstalled() {
                 Timber.d("GraffitiXR: Security Provider installed successfully.")
