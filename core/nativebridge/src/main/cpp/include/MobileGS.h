@@ -3,11 +3,30 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <mutex>
 #include <opencv2/core.hpp>
 #include <android/native_window.h>
 #include <android/asset_manager.h>
 #include "VulkanBackend.h"
+
+// Voxel hashing structure for Sparse SLAM map
+struct VoxelKey {
+    int x, y, z;
+    bool operator==(const VoxelKey& o) const { return x == o.x && y == o.y && z == o.z; }
+};
+
+struct VoxelHash {
+    std::size_t operator()(const VoxelKey& k) const {
+        return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1) ^ (std::hash<int>()(k.z) << 2);
+    }
+};
+
+struct SplatPoint {
+    float x, y, z;
+    float r, g, b, a;
+    float confidence;
+};
 
 class MobileGS {
 public:
@@ -27,7 +46,6 @@ public:
     void updateLight(float intensity, float* colorCorrection);
     void alignMap(float* transform);
 
-    // FIX: Core Engine Function Declarations
     void processDepthData(uint8_t* depthBuffer, int width, int height);
     void addStereoPoints(const std::vector<cv::Point3f>& points);
     void setVisualizationMode(int mode);
@@ -46,7 +64,10 @@ private:
     float lightColor[3] = {1.0f, 1.0f, 1.0f};
 
     VulkanBackend* vulkanRenderer = nullptr;
-    std::vector<cv::Point3f> mapPoints;
+
+    // Voxel storage system
+    std::unordered_map<VoxelKey, SplatPoint, VoxelHash> mVoxelGrid;
+    const float VOXEL_SIZE = 0.02f; // 2cm resolution
 
     float viewMtx[16];
     float projMtx[16];
