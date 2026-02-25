@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,7 +50,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.min
 
-// Removed @Composable annotation as this is now a configuration function called from non-composable scope
+// NOT A COMPOSABLE - This is a configuration function executed in the AzNavRail DSL scope.
 fun MainScreen(
     navHostScope: AzNavHostScope,
     viewModel: MainViewModel,
@@ -61,14 +62,14 @@ fun MainScreen(
     projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository,
     renderRefState: MutableState<ArRenderer?>,
     onRendererCreated: (ArRenderer) -> Unit,
-    // Hoisted State Providers
-    hoistedUse3dBackground: () -> Boolean,
-    hoistedShowSaveDialog: () -> Boolean,
-    hoistedShowInfoScreen: () -> Boolean,
+    // Hoisted State Providers (Lambdas to allow observation within Composable scopes)
+    hoistedUse3dBackgroundProvider: () -> Boolean,
+    hoistedShowSaveDialogProvider: () -> Boolean,
+    hoistedShowInfoScreenProvider: () -> Boolean,
     onUse3dBackgroundChange: (Boolean) -> Unit,
     onShowSaveDialogChange: (Boolean) -> Unit,
     onShowInfoScreenChange: (Boolean) -> Unit,
-    hasCameraPermission: () -> Boolean,
+    hasCameraPermissionProvider: () -> Boolean,
     requestPermissions: () -> Unit,
     onOverlayImagePick: () -> Unit,
     onBackgroundImagePick: () -> Unit,
@@ -86,8 +87,9 @@ fun MainScreen(
             val navBackStackEntry by localNavController.currentBackStackEntryAsState()
             val currentNavRoute = navBackStackEntry?.destination?.route
 
-            val use3dBackground = hoistedUse3dBackground()
-            val hasPermission = hasCameraPermission()
+            // Read hoisted state providers here
+            val use3dBackground = hoistedUse3dBackgroundProvider()
+            val hasPermission = hasCameraPermissionProvider()
 
             val has3dModel = remember(editorUiState.mapPath) {
                 !editorUiState.mapPath.isNullOrEmpty() && File(editorUiState.mapPath!!).exists()
@@ -114,7 +116,8 @@ fun MainScreen(
                         onRendererCreated = onRendererCreated
                     )
                 } else if (currentNavRoute == "editor" || currentNavRoute == null || currentNavRoute == "project_library" || currentNavRoute == "settings") {
-                    val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
+                    // Make background transparent for AR/OVERLAY modes
+                    val backgroundColor = if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) Color.Transparent else Color.Black
                     Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
                         MainContentLayer(
                             editorUiState = editorUiState,
@@ -150,8 +153,9 @@ fun MainScreen(
 
             val renderRef by renderRefState
 
-            val showSaveDialog = hoistedShowSaveDialog()
-            val showInfoScreen = hoistedShowInfoScreen()
+            // Read hoisted state providers
+            val showSaveDialog = hoistedShowSaveDialogProvider()
+            val showInfoScreen = hoistedShowInfoScreenProvider()
 
             LaunchedEffect(exportTrigger) {
                 if (exportTrigger && window != null) {
@@ -178,7 +182,7 @@ fun MainScreen(
             }
 
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                AzNavHost(startDestination = "project_library") {
+                AzNavHost(navController = localNavController as androidx.navigation.NavHostController, startDestination = "project_library") {
                     composable("editor") {
                         EditorUi(
                             actions = editorViewModel,
