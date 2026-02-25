@@ -1,4 +1,17 @@
 buildscript {
+    val commonForcedDependencies = listOf(
+        "commons-beanutils:commons-beanutils:1.11.0",
+        "org.jdom:jdom2:2.0.6.1",
+        "io.netty:netty-codec-http2:4.1.124.Final",
+        "io.netty:netty-handler:4.1.124.Final",
+        "org.bitbucket.b_c:jose4j:0.9.6"
+    )
+    val protobufModules = listOf(
+        "com.google.protobuf:protobuf-java",
+        "com.google.protobuf:protobuf-javalite",
+        "com.google.protobuf:protobuf-kotlin",
+        "com.google.protobuf:protobuf-kotlin-lite"
+    )
     repositories {
         google()
         mavenCentral()
@@ -8,16 +21,10 @@ buildscript {
     }
     configurations.all {
         resolutionStrategy {
-            force("commons-beanutils:commons-beanutils:1.11.0")
-            // Protobuf 3.25.5 is the patched version compatible with AGP 9.0.1 (which uses 3.x)
-            force("com.google.protobuf:protobuf-java:3.25.5")
-            force("com.google.protobuf:protobuf-javalite:3.25.5")
-            force("com.google.protobuf:protobuf-kotlin:3.25.5")
-            force("com.google.protobuf:protobuf-kotlin-lite:3.25.5")
-            force("org.jdom:jdom2:2.0.6.1")
-            force("io.netty:netty-codec-http2:4.1.124.Final")
-            force("io.netty:netty-handler:4.1.124.Final")
-            force("org.bitbucket.b_c:jose4j:0.9.6")
+            // Force common dependencies
+            commonForcedDependencies.forEach { force(it) }
+            // Force Protobuf 3.25.5 for buildscript compatibility with AGP 9.0.1
+            protobufModules.forEach { force("$it:3.25.5") }
         }
     }
 }
@@ -35,6 +42,22 @@ plugins {
     alias(libs.plugins.kotlin.parcelize) apply false
 }
 
+// Define common forced dependencies again for application/library scope
+val commonForcedDependencies = listOf(
+    "commons-beanutils:commons-beanutils:1.11.0",
+    "org.jdom:jdom2:2.0.6.1",
+    "io.netty:netty-codec-http2:4.1.124.Final",
+    "io.netty:netty-handler:4.1.124.Final",
+    "org.bitbucket.b_c:jose4j:0.9.6"
+)
+
+val protobufModules = listOf(
+    "com.google.protobuf:protobuf-java",
+    "com.google.protobuf:protobuf-javalite",
+    "com.google.protobuf:protobuf-kotlin",
+    "com.google.protobuf:protobuf-kotlin-lite"
+)
+
 allprojects {
     apply(plugin = "checkstyle")
     configure<CheckstyleExtension> {
@@ -44,16 +67,10 @@ allprojects {
 
     configurations.all {
         resolutionStrategy {
-            force("commons-beanutils:commons-beanutils:1.11.0")
-            // For app dependencies, we can use the latest patched version 4.28.2
-            force("com.google.protobuf:protobuf-java:4.28.2")
-            force("com.google.protobuf:protobuf-javalite:4.28.2")
-            force("com.google.protobuf:protobuf-kotlin:4.28.2")
-            force("com.google.protobuf:protobuf-kotlin-lite:4.28.2")
-            force("org.jdom:jdom2:2.0.6.1")
-            force("io.netty:netty-codec-http2:4.1.124.Final")
-            force("io.netty:netty-handler:4.1.124.Final")
-            force("org.bitbucket.b_c:jose4j:0.9.6")
+            // Force common dependencies
+            commonForcedDependencies.forEach { force(it) }
+            // Force Protobuf 4.28.2 for application runtime security
+            protobufModules.forEach { force("$it:4.28.2") }
         }
     }
 }
