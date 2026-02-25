@@ -33,10 +33,15 @@ import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
+import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
+import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.google.android.gms.common.GoogleApiAvailability
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 /**
  * The Single Activity for the application.
@@ -47,6 +52,7 @@ class MainActivity : AzActivity() {
 
     @Inject lateinit var slamManager: SlamManager
     @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+    @Inject lateinit var securityProviderManager: SecurityProviderManager
 
     // Override graph to point to the manually implemented AzGraph.
     override val graph: AzGraphInterface = AzGraph
@@ -90,6 +96,19 @@ class MainActivity : AzActivity() {
         // RESURRECTION: Ensure native engine is alive even if the Process survived
         // but the Activity was previously destroyed.
         slamManager.ensureInitialized()
+
+        // Monitor Security Provider installation for recoverable errors
+        lifecycleScope.launch {
+            securityProviderManager.securityProviderState.collect { state ->
+                if (state is SecurityProviderState.RecoverableError) {
+                    GoogleApiAvailability.getInstance().getErrorDialog(
+                        this@MainActivity,
+                        state.errorCode,
+                        9000 // Request code for Play Services resolution
+                    )?.show()
+                }
+            }
+        }
 
         // AzActivity calls graph.Run(this) which sets up the layout.
     }
