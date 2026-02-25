@@ -53,6 +53,9 @@ dependencies {
     // Location (Fixes Unresolved reference 'FusedLocationProviderClient')
     implementation(libs.play.services.location)
 
+    // Provider Installer (Fixes SSLHandshakeException)
+    implementation(libs.play.services.base)
+
     // OpenCV (Fixes Unresolved reference 'opencv', 'Mat', 'Imgproc')
     implementation(project(":opencv"))
 

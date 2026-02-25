@@ -3,10 +3,11 @@ package com.hereliesaz.graffitixr
 
 import android.app.Application
 import android.util.Log
-import com.google.android.gms.security.ProviderInstaller
+import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import dagger.hilt.android.HiltAndroidApp
 import org.opencv.android.OpenCVLoader
 import timber.log.Timber
+import javax.inject.Inject
 
 /**
  * The Application class.
@@ -15,6 +16,9 @@ import timber.log.Timber
  */
 @HiltAndroidApp
 class GraffitiApplication : Application() {
+
+    @Inject
+    lateinit var securityProviderManager: SecurityProviderManager
 
     override fun onCreate() {
         super.onCreate()
@@ -32,6 +36,10 @@ class GraffitiApplication : Application() {
         } else {
             Timber.e("GraffitiXR: Could not load OpenCV!")
         }
+
+        // 3. Update Security Provider (Fix for SSLHandshakeException)
+        securityProviderManager.installAsync(this)
+    }
 
         // 3. Update Security Provider (Fix for SSLHandshakeException)
         ProviderInstaller.installIfNeededAsync(this, object : ProviderInstaller.ProviderInstallListener {
