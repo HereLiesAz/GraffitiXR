@@ -74,23 +74,40 @@ class DualAnalyzer(
         return try {
             val yPlane = image.planes[0]
             val yBuffer = yPlane.buffer
-            val bytes = ByteArray(yBuffer.remaining())
-            yBuffer.get(bytes)
+            val rowStride = yPlane.rowStride
+            val pixelStride = yPlane.pixelStride
+            val width = image.width
+            val height = image.height
+
+            val cleanBytes: ByteArray
+            if (pixelStride == 1 && rowStride == width) {
+                // Fast path: direct copy
+                cleanBytes = ByteArray(yBuffer.remaining())
+                yBuffer.get(cleanBytes)
+            } else {
+                // Handle stride padding
+                cleanBytes = ByteArray(width * height)
+                for (row in 0 until height) {
+                    yBuffer.position(row * rowStride)
+                    yBuffer.get(cleanBytes, row * width, width)
+                }
+            }
 
             // Create a grayscale bitmap directly from the Y channel
-            val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ALPHA_8)
-            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(bytes))
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
+            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(cleanBytes))
 
             // Apply rotation
             val rotation = image.imageInfo.rotationDegrees
             if (rotation != 0) {
                 val matrix = Matrix()
                 matrix.postRotate(rotation.toFloat())
-                Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true)
             } else {
                 bitmap
             }
         } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }
