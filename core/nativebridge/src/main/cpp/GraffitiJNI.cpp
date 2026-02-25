@@ -98,6 +98,13 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_f
     }
 }
 
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedMonocularDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject buffer, jint width, jint height) {
+    if (handle != 0 && buffer) {
+        uint8_t* data = (uint8_t*)env->GetDirectBufferAddress(buffer);
+        if (data) reinterpret_cast<MobileGS *>(handle)->processMonocularData(data, width, height);
+    }
+}
+
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedStereoDataJni(
         JNIEnv *env, jobject thiz, jlong handle, jobject leftBuffer, jint leftWidth, jint leftHeight, jint leftStride, jobject rightBuffer, jint rightWidth, jint rightHeight, jint rightStride) {
     if (g_stereoProcessor && handle != 0) {

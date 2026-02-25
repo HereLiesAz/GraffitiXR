@@ -61,6 +61,7 @@ fun ArView(
 
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var camera by remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
 
     val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
@@ -146,6 +147,9 @@ fun ArView(
                                             0f, 0f, 0f, 1f
                                         )
                                         viewModel.processTeleologicalFrame(bitmap, dummyViewMatrix)
+                                    },
+                                    onSlamFrame = { buffer, width, height ->
+                                        slamManager.feedMonocularData(buffer, width, height)
                                     }
                                 )
                             )
@@ -153,7 +157,7 @@ fun ArView(
 
                     preview.setSurfaceProvider(previewView.surfaceProvider)
                     provider.unbindAll()
-                    provider.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
+                    camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
 
                 } catch (e: Exception) {
                     Log.e("ArView", "Camera binding failed", e)
@@ -207,6 +211,7 @@ fun ArView(
     LaunchedEffect(ambientLight, uiState.isFlashlightOn) {
         val intensity = if (uiState.isFlashlightOn) 1.0f else ambientLight
         renderer.updateLightEstimate(intensity, floatArrayOf(1f, 1f, 1f))
+        camera?.cameraControl?.enableTorch(uiState.isFlashlightOn)
     }
 
     LaunchedEffect(activeLayer) {

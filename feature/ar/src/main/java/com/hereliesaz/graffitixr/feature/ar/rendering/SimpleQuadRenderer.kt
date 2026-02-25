@@ -29,6 +29,8 @@ class SimpleQuadRenderer {
     private var quadTexCoord: FloatBuffer? = null
     private val textures = IntArray(1)
 
+    fun getTextureId() = textures[0]
+
     fun createOnGlThread() {
         GLES30.glGenTextures(1, textures, 0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textures[0])
@@ -121,6 +123,13 @@ class SimpleQuadRenderer {
         GLES30.glDisableVertexAttribArray(quadPositionParam)
         GLES30.glDisableVertexAttribArray(quadTexCoordParam)
         GLES30.glDisable(GLES30.GL_BLEND)
+    }
+
+    fun updateTexture(bitmap: Bitmap) {
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textures[0])
+        GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, bitmap, 0)
+        GLES30.glGenerateMipmap(GLES30.GL_TEXTURE_2D)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {

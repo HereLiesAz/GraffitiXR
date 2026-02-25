@@ -47,6 +47,7 @@ public:
     void alignMap(float* transform);
 
     void processDepthData(uint8_t* depthBuffer, int width, int height);
+    void processMonocularData(uint8_t* imageData, int width, int height);
     void addStereoPoints(const std::vector<cv::Point3f>& points);
     void setVisualizationMode(int mode);
 
@@ -68,12 +69,17 @@ private:
     // Voxel storage system
     std::unordered_map<VoxelKey, SplatPoint, VoxelHash> mVoxelGrid;
     const float VOXEL_SIZE = 0.02f; // 2cm resolution
+    const size_t MAX_VOXELS = 4000; // Limit for performance/stability
 
     float viewMtx[16];
     float projMtx[16];
     float alignmentMtx[16];
     std::mutex alignMutex;
     std::mutex pointMutex;
+
+    // GLES Rendering (Fallback)
+    unsigned int pointProgram = 0;
+    unsigned int pointVBO = 0;
 };
 
 #endif // GRAFFITIXR_MOBILEGS_H
