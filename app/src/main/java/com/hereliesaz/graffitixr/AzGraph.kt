@@ -14,7 +14,7 @@ import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 
 object AzGraph : AzGraphInterface {
-    override fun Run(activity: ComponentActivity) {
+    override fun run(activity: ComponentActivity) {
         val mainActivity = activity as MainActivity
         activity.setContent {
             com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme {
