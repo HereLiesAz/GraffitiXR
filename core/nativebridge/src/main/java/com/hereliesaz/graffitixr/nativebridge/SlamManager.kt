@@ -26,15 +26,11 @@ class SlamManager @Inject constructor() {
             } catch (e: UnsatisfiedLinkError) {
                 try {
                     Log.e("SlamManager", "Failed to load native library 'graffitixr'", e)
-                } catch (ignored: RuntimeException) {
-                    // Log.e might fail in unit tests
-                }
+                } catch (ignored: RuntimeException) {}
             } catch (e: SecurityException) {
                 try {
                     Log.e("SlamManager", "SecurityException loading library", e)
-                } catch (ignored: RuntimeException) {
-                     // Log.e might fail in unit tests
-                }
+                } catch (ignored: RuntimeException) {}
             }
         }
     }
@@ -74,7 +70,12 @@ class SlamManager @Inject constructor() {
     }
 
     fun feedDepthData(image: Image) {
-        lock.withLock { if (!isDestroyed.get()) feedDepthDataJni(nativeHandle, image) }
+        lock.withLock {
+            if (!isDestroyed.get()) {
+                val plane = image.planes[0]
+                feedDepthDataJni(nativeHandle, plane.buffer, image.width, image.height)
+            }
+        }
     }
 
     fun feedStereoData(leftImage: Image, rightImage: Image) {
@@ -147,18 +148,6 @@ class SlamManager @Inject constructor() {
         }
     }
 
-    fun importModel3D(path: String): Boolean {
-        return lock.withLock {
-            if (!isDestroyed.get()) importModel3DJni(nativeHandle, path) else false
-        }
-    }
-
-    fun detectEdges(bitmap: Bitmap): Bitmap? {
-        return lock.withLock {
-            if (!isDestroyed.get()) detectEdgesJni(nativeHandle, bitmap) else null
-        }
-    }
-
     fun destroy() {
         lock.withLock {
             if (!isDestroyed.getAndSet(true)) {
@@ -176,7 +165,7 @@ class SlamManager @Inject constructor() {
     private external fun resetGLStateJni(handle: Long)
     private external fun updateCameraJni(handle: Long, view: FloatArray, proj: FloatArray)
     private external fun updateLightJni(handle: Long, intensity: Float, color: FloatArray)
-    private external fun feedDepthDataJni(handle: Long, image: Image)
+    private external fun feedDepthDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int)
     private external fun feedStereoDataJni(
         handle: Long,
         leftBuffer: ByteBuffer,
@@ -196,8 +185,6 @@ class SlamManager @Inject constructor() {
     private external fun drawJni(handle: Long)
     private external fun loadWorldJni(handle: Long, path: String): Boolean
     private external fun saveWorldJni(handle: Long, path: String): Boolean
-    private external fun importModel3DJni(handle: Long, path: String): Boolean
-    private external fun detectEdgesJni(handle: Long, bitmap: Bitmap): Bitmap?
     private external fun initVulkanJni(handle: Long, surface: Surface, assetManager: AssetManager)
     private external fun resizeVulkanJni(handle: Long, width: Int, height: Int)
     private external fun destroyVulkanJni(handle: Long)

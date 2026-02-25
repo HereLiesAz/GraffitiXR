@@ -5,19 +5,23 @@
 #include <opencv2/calib3d.hpp>
 #include <vector>
 
+// Forward declaration
+class MobileGS;
+
 class StereoProcessor {
 public:
     StereoProcessor();
     ~StereoProcessor();
 
+    // FIX: Added engine reference to allow data pushback
     void process(
-        const unsigned char* leftData, int leftWidth, int leftHeight, int leftStride,
-        const unsigned char* rightData, int rightWidth, int rightHeight, int rightStride
+            MobileGS* engine,
+            const unsigned char* leftData, int leftWidth, int leftHeight, int leftStride,
+            const unsigned char* rightData, int rightWidth, int rightHeight, int rightStride
     );
 
 private:
     cv::Ptr<cv::StereoSGBM> stereoSgbm;
-    // Intrinsics (placeholder for now, would typically be passed or calibrated)
     cv::Mat Q;
 };
 

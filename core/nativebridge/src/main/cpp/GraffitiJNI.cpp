@@ -16,10 +16,8 @@
 
 extern "C" {
 
-// GLOBAL
 static StereoProcessor* g_stereoProcessor = nullptr;
 
-// LIFECYCLE
 JNIEXPORT jlong JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_create(JNIEnv *env, jobject thiz) {
     auto *engine = new MobileGS();
@@ -57,7 +55,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLStateJni(JNIEnv *
     }
 }
 
-// RENDERING
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChangedJni(JNIEnv *env, jobject thiz, jlong handle, jint width, jint height) {
     if (handle != 0) {
@@ -88,7 +85,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCameraJni(JNIEnv *
     }
 }
 
-// AR STUBS
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLightJni(JNIEnv *env, jobject thiz, jlong handle, jfloat intensity, jfloatArray color) {
     if (handle != 0) {
@@ -106,23 +102,35 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLightJni(JNIEnv *e
     }
 }
 
+// FIX: Safely parse depth buffer.
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject image) {}
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedDepthDataJni(JNIEnv *env, jobject thiz, jlong handle, jobject buffer, jint width, jint height) {
+    if (handle != 0 && buffer != nullptr) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        uint8_t* data = (uint8_t*)env->GetDirectBufferAddress(buffer);
+        if (data != nullptr) {
+            engine->processDepthData(data, width, height);
+        }
+    }
+}
 
+// FIX: Complete the stereo depth handoff to the engine.
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedStereoDataJni(
-    JNIEnv *env, jobject thiz, jlong handle,
-    jobject leftBuffer, jint leftWidth, jint leftHeight, jint leftStride,
-    jobject rightBuffer, jint rightWidth, jint rightHeight, jint rightStride
+        JNIEnv *env, jobject thiz, jlong handle,
+        jobject leftBuffer, jint leftWidth, jint leftHeight, jint leftStride,
+        jobject rightBuffer, jint rightWidth, jint rightHeight, jint rightStride
 ) {
-    if (g_stereoProcessor) {
+    if (g_stereoProcessor && handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
         uint8_t* leftPtr = (uint8_t*)env->GetDirectBufferAddress(leftBuffer);
         uint8_t* rightPtr = (uint8_t*)env->GetDirectBufferAddress(rightBuffer);
 
         if (leftPtr && rightPtr) {
             g_stereoProcessor->process(
-                leftPtr, leftWidth, leftHeight, leftStride,
-                rightPtr, rightWidth, rightHeight, rightStride
+                    engine,
+                    leftPtr, leftWidth, leftHeight, leftStride,
+                    rightPtr, rightWidth, rightHeight, rightStride
             );
         }
     }
@@ -157,7 +165,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframeJni(JNIEnv *
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setVisualizationModeJni(JNIEnv *env, jobject thiz, jlong handle, jint mode) {}
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setVisualizationModeJni(JNIEnv *env, jobject thiz, jlong handle, jint mode) {
+    if (handle != 0) {
+        auto *engine = reinterpret_cast<MobileGS *>(handle);
+        engine->setVisualizationMode(mode);
+    }
+}
 
 // VULKAN
 JNIEXPORT void JNICALL
@@ -200,18 +213,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveWorldJni(JNIEnv *env
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_importModel3DJni(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
-    if (handle != 0) {
-        auto *engine = reinterpret_cast<MobileGS *>(handle);
-        const char *nativePath = env->GetStringUTFChars(path, 0);
-        bool result = engine->importModel3D(nativePath);
-        env->ReleaseStringUTFChars(path, nativePath);
-        return result;
-    }
-    return false;
-}
-
-JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorldJni(JNIEnv *env, jobject thiz, jlong handle, jstring path) {
     if (handle != 0) {
         auto *engine = reinterpret_cast<MobileGS *>(handle);
@@ -223,10 +224,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_loadWorldJni(JNIEnv *env
     return false;
 }
 
-// OPENCV
-JNIEXPORT jobject JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_detectEdgesJni(JNIEnv *env, jobject thiz, jlong handle, jobject bitmap) {
-    return bitmap;
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateMeshJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray vertices) {
+    // Stub for Mesh Occlusion integration
 }
 
 } // extern "C"

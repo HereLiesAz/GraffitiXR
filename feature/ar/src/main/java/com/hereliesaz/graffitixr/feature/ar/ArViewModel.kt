@@ -3,31 +3,28 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.feature.ar.computervision.TeleologicalTracker
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
-    private val stereoDepthProvider: StereoDepthProvider
+    private val stereoDepthProvider: StereoDepthProvider,
+    private val teleologicalTracker: TeleologicalTracker,
+    private val projectRepository: ProjectRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
-
-    init {
-        // Log capability status for debugging
-        if (stereoDepthProvider.isSupported()) {
-            println("ArViewModel: Stereo Depth is SUPPORTED on this device.")
-        } else {
-            println("ArViewModel: Stereo Depth is NOT supported.")
-        }
-    }
 
     fun setTempCapture(bitmap: Bitmap) {
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
@@ -42,10 +39,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Triggers the capture of a SLAM keyframe.
-     * Sets a temporary path/ID which the View observes to call the Native Bridge.
-     */
     fun captureKeyframe() {
         val timestamp = System.currentTimeMillis()
         _uiState.update { it.copy(pendingKeyframePath = "keyframe_$timestamp") }
@@ -63,8 +56,35 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(showPointCloud = !it.showPointCloud) }
     }
 
-    // Target Creation State Updates
+    // --- Teleological Pipeline ---
 
+    /**
+     * Called periodically by the ArView image analyzer.
+     * Triggers the OpenCV solvePnP algorithm to correct AR drift.
+     */
+    fun processTeleologicalFrame(bitmap: Bitmap, viewMatrix: FloatArray) {
+        viewModelScope.launch {
+            val project = projectRepository.currentProject.value ?: return@launch
+            val fingerprint = project.fingerprint ?: return@launch
+
+            // Basic FOV assumptions for standard mobile cameras.
+            // In a production scenario, these should be pulled from CameraCharacteristics.
+            val width = bitmap.width.toFloat()
+            val height = bitmap.height.toFloat()
+            val fx = width * 0.8f
+            val fy = height * 0.8f
+            val cx = width / 2f
+            val cy = height / 2f
+            val intrinsics = floatArrayOf(fx, fy, cx, cy)
+
+            val success = teleologicalTracker.computeCorrection(bitmap, fingerprint, intrinsics, viewMatrix)
+            if (success) {
+                _uiState.update { it.copy(trackingState = "Locked (Teleological)") }
+            }
+        }
+    }
+
+    // Target Creation State Updates
     fun updateUnwarpPoints(points: List<androidx.compose.ui.geometry.Offset>) {
         _uiState.update { it.copy(unwarpPoints = points) }
     }

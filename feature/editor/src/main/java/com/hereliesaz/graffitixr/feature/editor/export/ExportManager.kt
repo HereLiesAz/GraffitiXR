@@ -14,16 +14,13 @@ import com.hereliesaz.graffitixr.common.model.BlendMode
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
+import kotlin.math.sqrt
 
 @Singleton
 class ExportManager @Inject constructor() {
 
     companion object {
         private const val TAG = "ExportManager"
-        private const val GRID_ROWS = 3
-        private const val GRID_COLS = 3
-        // (Rows + 1) * (Cols + 1) * 2 coordinates (x,y)
-        private const val EXPECTED_MESH_SIZE = (GRID_ROWS + 1) * (GRID_COLS + 1) * 2
     }
 
     /**
@@ -84,7 +81,6 @@ class ExportManager @Inject constructor() {
         matrix.postTranslate(dx, dy)
 
         // 2. User Transformations (Scale, Rotate, Translate around center)
-        // User transforms are applied relative to the screen center (canvas center)
         val px = dstW / 2f
         val py = dstH / 2f
 
@@ -94,17 +90,21 @@ class ExportManager @Inject constructor() {
 
         val mesh = layer.warpMesh
         if (!mesh.isNullOrEmpty()) {
-            // Draw using mesh
             canvas.save()
             canvas.concat(matrix)
 
-            // Check if mesh size matches expected grid size
-            if (mesh.size == EXPECTED_MESH_SIZE) {
-                canvas.drawBitmapMesh(layer.bitmap, GRID_COLS, GRID_ROWS, mesh.toFloatArray(), 0, null, 0, paint)
+            // FIX: Dynamically calculate grid dimension.
+            // Vertices array size formula: (rows + 1) * (cols + 1) * 2 = size
+            // Assuming square grids (rows == cols), we reverse engineer cols:
+            val meshSize = mesh.size
+            val gridCols = (sqrt(meshSize / 2.0)).toInt() - 1
+            val expectedSize = (gridCols + 1) * (gridCols + 1) * 2
+
+            if (meshSize == expectedSize && gridCols > 0) {
+                canvas.drawBitmapMesh(layer.bitmap, gridCols, gridCols, mesh.toFloatArray(), 0, null, 0, paint)
             } else {
-                // Fallback if mesh size mismatch (e.g. different grid size)
-                // For now, just draw without warp to avoid crash
-                 canvas.drawBitmap(layer.bitmap, 0f, 0f, paint)
+                Log.w(TAG, "Mesh size mismatch or invalid grid. Drawing flat image fallback.")
+                canvas.drawBitmap(layer.bitmap, 0f, 0f, paint)
             }
             canvas.restore()
         } else {

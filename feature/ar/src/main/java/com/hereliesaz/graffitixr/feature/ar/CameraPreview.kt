@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -45,16 +46,16 @@ fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    
+
     val previewView = remember { PreviewView(context) }
-    
+
     // Use case: ImageCapture. We intentionally don't set OUTPUT_FORMAT_JPEG explicitly 
     // because some devices/versions might default to it or support only it with minimize latency,
     // but we will verify the format in the callback.
-    val imageCapture = remember { 
+    val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-            .build() 
+            .build()
     }
 
     // Connect controller
@@ -67,8 +68,8 @@ fun CameraPreview(
                 object : ImageCapture.OnImageCapturedCallback() {
                     override fun onCaptureSuccess(image: ImageProxy) {
                         try {
-                            // Convert ImageProxy to Bitmap
-                            val bitmap = imageProxyToBitmap(image)
+                            // Convert ImageProxy to Bitmap using Context for YUV fallback
+                            val bitmap = imageProxyToBitmap(context, image)
                             onPhotoCaptured(bitmap)
                         } catch (e: Exception) {
                             Log.e("CameraPreview", "Failed to process image: ${e.message}", e)
@@ -92,7 +93,7 @@ fun CameraPreview(
         val cameraProvider = context.getCameraProvider()
         val preview = Preview.Builder().build()
         preview.setSurfaceProvider(previewView.surfaceProvider)
-        
+
         val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
         try {
@@ -121,18 +122,26 @@ private suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspend
     }, ContextCompat.getMainExecutor(this))
 }
 
-private fun imageProxyToBitmap(image: ImageProxy): Bitmap {
-    // Explicitly check format
-    if (image.format != ImageFormat.JPEG) {
-        throw IllegalArgumentException("Expected JPEG format, but got ${image.format}. YUV conversion is not yet implemented.")
+private fun imageProxyToBitmap(context: Context, image: ImageProxy): Bitmap {
+    val bitmap: Bitmap
+
+    if (image.format == ImageFormat.JPEG) {
+        val buffer: ByteBuffer = image.planes[0].buffer
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
+        bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            ?: throw IllegalArgumentException("Failed to decode JPEG byte array")
+    } else if (image.format == ImageFormat.YUV_420_888) {
+        // FIX: Utilize YuvToRgbConverter to prevent crashes on devices that ignore JPEG request
+        bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+        val converter = YuvToRgbConverter(context)
+        image.image?.let {
+            converter.yuvToRgb(it, bitmap)
+        } ?: throw IllegalArgumentException("ImageProxy does not contain a valid Image")
+    } else {
+        throw IllegalArgumentException("Unsupported image format: ${image.format}")
     }
 
-    val buffer: ByteBuffer = image.planes[0].buffer
-    val bytes = ByteArray(buffer.remaining())
-    buffer.get(bytes)
-    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        ?: throw IllegalArgumentException("Failed to decode JPEG byte array")
-    
     // Rotate if needed
     val rotation = image.imageInfo.rotationDegrees
     if (rotation != 0) {

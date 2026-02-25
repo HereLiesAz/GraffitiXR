@@ -16,6 +16,7 @@ import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
 import com.hereliesaz.graffitixr.feature.editor.BitmapUtils
@@ -163,11 +164,40 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(editorMode = mode) }
     }
 
+    /**
+     * Standard state save for non-destructive edits (opacity, rotation, etc).
+     * This simply copies the UI state object. The Bitmap reference remains the same.
+     */
     private fun saveState() {
         if (undoStack.size >= maxStackSize) {
             undoStack.removeFirst()
         }
         undoStack.addLast(_uiState.value)
+        redoStack.clear()
+        _uiState.update { it.copy(canUndo = true, canRedo = false) }
+    }
+
+    /**
+     * Call this BEFORE executing drawing tools (Brush, Eraser, Liquify) that alter pixels.
+     * This creates a deep copy of the Bitmap so the history stack remains immutable.
+     */
+    fun saveDestructiveState() {
+        if (undoStack.size >= maxStackSize) {
+            undoStack.removeFirst()
+        }
+
+        val currentState = _uiState.value
+        val clonedLayers = currentState.layers.map { layer ->
+            // Clone the active layer's bitmap to freeze it in history
+            if (layer.id == currentState.activeLayerId) {
+                val clonedBitmap = layer.bitmap.copy(layer.bitmap.config ?: Bitmap.Config.ARGB_8888, true)
+                layer.copy(bitmap = clonedBitmap)
+            } else {
+                layer
+            }
+        }
+
+        undoStack.addLast(currentState.copy(layers = clonedLayers))
         redoStack.clear()
         _uiState.update { it.copy(canUndo = true, canRedo = false) }
     }
@@ -420,6 +450,8 @@ class EditorViewModel @Inject constructor(
                     val newPath = projectRepository.saveArtifact(projectId, filename, bytes)
                     val newUri = Uri.parse("file://$newPath")
 
+                    saveState() // Save history before modifying
+
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
@@ -446,7 +478,8 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(dispatchers.default) {
-            val edged = com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(activeLayer.bitmap)
+            // FIX: Use the unified ImageProcessor from common layer
+            val edged = ImageProcessor.detectEdges(activeLayer.bitmap)
 
             if (edged != null) {
                 try {
@@ -454,6 +487,8 @@ class EditorViewModel @Inject constructor(
                     val bytes = BitmapUtils.bitmapToByteArray(edged)
                     val newPath = projectRepository.saveArtifact(projectId, filename, bytes)
                     val newUri = Uri.parse("file://$newPath")
+
+                    saveState() // Save history before modifying
 
                     _uiState.update { state ->
                         state.copy(
@@ -546,7 +581,7 @@ class EditorViewModel @Inject constructor(
             // 1. Save Native World Map
             val mapPath = currentState.mapPath
             if (mapPath != null) {
-                // LOCKING: SlamManager is now thread-safe, but we still handle the return value.
+                // LOCKING: SlamManager is now thread-safe
                 val success = slamManager.saveWorld(mapPath)
                 if (!success) {
                     Log.e("EditorViewModel", "Failed to save native world map. Aborting project save to prevent corruption.")
