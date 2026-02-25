@@ -1,4 +1,4 @@
-# AzNavRail Complete Guide (v7.25)
+# AzNavRail Complete Guide (v7.55)
 
 Welcome to the definitive "Encyclopedic" guide for **AzNavRail**. This document details every single feature, its abilities, its limitations, and strict usage protocols.
 
