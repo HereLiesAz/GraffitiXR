@@ -114,7 +114,7 @@ fun MainScreen(
                         onRendererCreated = onRendererCreated
                     )
                 } else if (currentNavRoute == "editor" || currentNavRoute == null || currentNavRoute == "project_library" || currentNavRoute == "settings") {
-                    val backgroundColor = if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) Color.Transparent else Color.Black
+                    val backgroundColor = if (editorUiState.editorMode == EditorMode.TRACE) Color.Black else Color.Black
                     Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
                         MainContentLayer(
                             editorUiState = editorUiState,
