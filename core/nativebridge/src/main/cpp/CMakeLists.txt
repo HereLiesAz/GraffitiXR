@@ -4,7 +4,7 @@ project("graffitixr_native")
 
 # Set the OpenCV directory.
 # This assumes OpenCV is located in a 'libs' folder at the root of your project.
-set(OPENCV_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../libs/opencv/sdk/native/jni)
+set(OPENCV_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/opencv/sdk/native/jni/)
 set(OpenCV_DIR ${OPENCV_SDK_DIR})
 
 # Find OpenCV package

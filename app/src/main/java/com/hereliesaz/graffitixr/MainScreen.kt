@@ -11,6 +11,7 @@ import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import androidx.compose.runtime.collectAsState
 
 /**
  * The primary container for the AR and Editor views.
@@ -29,7 +30,7 @@ fun MainScreen(
 ) {
     // This assumes MainViewModel and EditorViewModel provide the necessary state
     // We observe the state here to pass down to subcomponents
-    val uiState = editorViewModel.uiState.value
+    val uiState = editorViewModel.uiState.collectAsState().value
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
 
     Box(modifier = modifier.fillMaxSize()) {

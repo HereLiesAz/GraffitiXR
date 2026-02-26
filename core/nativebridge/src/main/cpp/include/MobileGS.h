@@ -69,7 +69,6 @@ private:
     unsigned int mVao, mVbo;
     unsigned int mProgram;
 
-    // Shader sources declared in implementation
     static const char* VS_SRC;
     static const char* FS_SRC;
 };

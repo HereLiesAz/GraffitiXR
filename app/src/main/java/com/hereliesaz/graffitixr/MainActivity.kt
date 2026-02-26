@@ -300,10 +300,22 @@ class MainActivity : ComponentActivity() {
                     if (layer.isSketch) {
                         azRailItem(id = "brush_${layer.id}", text = "Brush") { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
                         azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                        azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                        azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                        azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                        azRailItem(id = "color_${layer.id}", text = "Color") { activate(); editorViewModel.setActiveTool(Tool.COLOR) }
+                        azRailItem(id = "adj_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
+
+
                     } else {
                         azRailItem(id = "iso_${layer.id}", text = "Isolate") { activate(); editorViewModel.onRemoveBackgroundClicked() }
                         azRailItem(id = "line_${layer.id}", text = "Outline") { activate(); editorViewModel.onLineDrawingClicked() }
                         azRailItem(id = "adj_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
+                        azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                        azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                        azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                        azRailItem(id = "balance_${layer.id}", text = "Balance") { activate(); editorViewModel.onBalanceClicked() }
+
                     }
                 }
             ) {

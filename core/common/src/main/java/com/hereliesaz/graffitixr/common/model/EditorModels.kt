@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import com.hereliesaz.graffitixr.common.model.Tool
 
 /**
  * Represents a single graphical layer in the editor with all aesthetic and spatial parameters.
@@ -63,10 +64,6 @@ enum class RotationAxis {
     Z
 }
 
-/**
- * Tools available for sketch and modification.
- */
-
 
 /**
  * The global state for the Editor UI, including AR and Gesture feedback flags.
@@ -85,5 +82,6 @@ data class EditorUiState(
     val showRotationAxisFeedback: Boolean = false,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val undoCount: Int = 0,
-    val redoCount: Int = 0
+    val redoCount: Int = 0,
+    val isLoading: Boolean = false
 )

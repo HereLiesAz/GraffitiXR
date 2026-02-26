@@ -1,24 +1,44 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.model.*
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class EditorViewModel @Inject constructor(
-    private val slamManager: SlamManager
+    private val projectRepository: ProjectRepository,
+    @ApplicationContext private val context: Context,
+    private val backgroundRemover: BackgroundRemover,
+    private val slamManager: SlamManager,
+    private val dispatchers: DispatcherProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch(dispatchers.main) {
+            projectRepository.currentProject.collect { project ->
+                if (project != null) {
+                    _uiState.update { it.copy(projectId = project.id) }
+                }
+            }
+        }
+    }
 
     fun setEditorMode(mode: EditorMode) = _uiState.update { it.copy(editorMode = mode) }
 
@@ -38,7 +58,14 @@ class EditorViewModel @Inject constructor(
     fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     fun setActiveTool(tool: Tool) = _uiState.update { it.copy(activeTool = tool) }
     fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
-    fun onLayerRemoved(id: String) = _uiState.update { s -> s.copy(layers = s.layers.filter { it.id != id }) }
+
+    fun onLayerRemoved(id: String) {
+        _uiState.update { state ->
+            val updatedLayers = state.layers.filter { it.id != id }
+            val newActiveId = if (state.activeLayerId == id) updatedLayers.firstOrNull()?.id else state.activeLayerId
+            state.copy(layers = updatedLayers, activeLayerId = newActiveId)
+        }
+    }
 
     fun onLayerReordered(newIds: List<String>) {
         _uiState.update { state ->
@@ -48,9 +75,86 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun saveProject(name: String) { /* Persistence */ }
-    fun exportProject() { /* Export */ }
-    fun onRemoveBackgroundClicked() { /* AI Isolate */ }
-    fun onLineDrawingClicked() { /* Edge detection */ }
+    fun saveProject(name: String = "New Project") {
+        viewModelScope.launch(dispatchers.default) {
+            val project = projectRepository.currentProject.value
+            if (project == null) {
+                projectRepository.createProject(GraffitiProject(name = name))
+            } else {
+                projectRepository.updateProject(project.copy(name = name))
+            }
+        }
+    }
+
+    fun exportProject() { /* Export Logic stub */ }
+
+    fun onRemoveBackgroundClicked() {
+        val state = _uiState.value
+        val layerId = state.activeLayerId ?: return
+        val layer = state.layers.find { it.id == layerId } ?: return
+        val projectId = state.projectId ?: return
+
+        _uiState.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch(dispatchers.default) {
+            val bitmap = BitmapUtils.getBitmapFromUri(context, layer.uri!!)
+            if (bitmap != null) {
+                val result = backgroundRemover.removeBackground(bitmap)
+                result.onSuccess { fgBitmap ->
+                    val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", BitmapUtils.bitmapToByteArray(fgBitmap))
+                    updateLayerUri(layerId, Uri.parse("file://$path"))
+                }
+            }
+            _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    fun onLineDrawingClicked() {
+        val state = _uiState.value
+        val layerId = state.activeLayerId ?: return
+        val layer = state.layers.find { it.id == layerId } ?: return
+        val projectId = state.projectId ?: return
+
+        _uiState.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch(dispatchers.default) {
+            val bitmap = BitmapUtils.getBitmapFromUri(context, layer.uri!!)
+            if (bitmap != null) {
+                val resultBitmap = com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(bitmap)
+                if (resultBitmap != null) {
+                    val path = projectRepository.saveArtifact(projectId, "line_art_${System.currentTimeMillis()}.png", BitmapUtils.bitmapToByteArray(resultBitmap))
+                    updateLayerUri(layerId, Uri.parse("file://$path"))
+                }
+            }
+            _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    private fun updateLayerUri(id: String, uri: Uri) {
+        _uiState.update { state ->
+            val updatedLayers = state.layers.map { if (it.id == id) it.copy(uri = uri) else it }
+            state.copy(layers = updatedLayers)
+        }
+    }
+
     fun onAdjustClicked() = _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) }
+
+    fun onScaleChanged(scale: Float) {
+        updateActiveLayer { it.copy(scale = scale) }
+    }
+
+    fun onOffsetChanged(delta: androidx.compose.ui.geometry.Offset) {
+        updateActiveLayer { it.copy(offset = it.offset + delta) }
+    }
+
+    fun toggleImageLock() {
+        updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }
+    }
+
+    private fun updateActiveLayer(transform: (Layer) -> Layer) {
+        _uiState.update { state ->
+            val id = state.activeLayerId ?: return@update state
+            state.copy(layers = state.layers.map { if (it.id == id) transform(it) else it })
+        }
+    }
 }

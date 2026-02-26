@@ -22,7 +22,7 @@ const char* MobileGS::VS_SRC = R"(
     void main() {
         vColor = aColor;
         gl_Position = uProj * uView * vec4(aPos, 1.0);
-        gl_PointSize = 10.0 * aScale.x; // Simplified splat sizing
+        gl_PointSize = 10.0 * aScale.x;
     }
 )";
 
@@ -40,7 +40,12 @@ const char* MobileGS::FS_SRC = R"(
     }
 )";
 
-MobileGS::MobileGS() : mIsRunning(true), mNeedsResort(false) {
+MobileGS::MobileGS() : mIsRunning(true), mNeedsResort(false), mVao(0), mVbo(0), mProgram(0) {
+    std::fill(std::begin(mViewMatrix), std::end(mViewMatrix), 0.0f);
+    std::fill(std::begin(mProjMatrix), std::end(mProjMatrix), 0.0f);
+    mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
+    mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
+
     mSortThread = std::thread(&MobileGS::sortThreadLoop, this);
 }
 
@@ -50,14 +55,22 @@ MobileGS::~MobileGS() {
 }
 
 void MobileGS::initialize(int width, int height) {
-    // OpenGL ES 3.0 initialization logic would go here
     LOGI("MobileGS initialized for %dx%d", width, height);
+}
+
+void MobileGS::updateCamera(const float* viewMatrix, const float* projMatrix) {
+    std::copy(viewMatrix, viewMatrix + 16, mViewMatrix);
+    std::copy(projMatrix, projMatrix + 16, mProjMatrix);
+}
+
+void MobileGS::render() {
+    // OpenGL ES 3.0 rendering stub.
+    // Ensure this doesn't clear the screen to black if it's supposed to be an AR overlay.
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depthMap, const cv::Mat& colorFrame) {
     std::lock_guard<std::mutex> lock(mDataMutex);
 
-    // Iterate through depth map and generate splats
     for (int y = 0; y < depthMap.rows; y += 4) {
         for (int x = 0; x < depthMap.cols; x += 4) {
             float depth = depthMap.at<float>(y, x);
@@ -67,7 +80,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depthMap, const cv::Mat& colorFr
             if (mVoxelGrid.find(key) != mVoxelGrid.end()) continue;
 
             SplatGaussian splat;
-            splat.pos[0] = (float)x; // Simplified projection
+            splat.pos[0] = (float)x;
             splat.pos[1] = (float)y;
             splat.pos[2] = depth;
 
@@ -91,13 +104,12 @@ void MobileGS::sortThreadLoop() {
     while (mIsRunning) {
         if (mNeedsResort) {
             std::lock_guard<std::mutex> lock(mDataMutex);
-            // Back-to-front sorting based on mViewMatrix
             std::sort(mGaussians.begin(), mGaussians.end(), [this](const SplatGaussian& a, const SplatGaussian& b) {
-                return a.pos[2] > b.pos[2]; // Simplified Z-sort
+                return a.pos[2] > b.pos[2];
             });
             mNeedsResort = false;
         }
-        std::this_thread::sleep_for(std::memory_literals::operator""ms(16));
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 }
 

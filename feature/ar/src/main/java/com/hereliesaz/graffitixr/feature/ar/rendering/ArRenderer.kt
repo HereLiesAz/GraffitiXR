@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
+import android.opengl.GLES11Ext
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import com.google.ar.core.Session
@@ -16,19 +17,27 @@ class ArRenderer(
 ) : GLSurfaceView.Renderer {
 
     var session: Session? = null
-    private val backgroundRenderer = BackgroundRenderer()
     private var hasSetTextureNames = false
+    private var dummyTextureId = -1
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Timber.tag("AR_DEBUG").e(">>> [1] onSurfaceCreated() INITIATED")
-        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+
+        // CRITICAL FIX: Ensure the GL surface is fully transparent to allow the CameraX
+        // preview behind it to be visible.
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
 
         try {
-            backgroundRenderer.createOnGlThread(context)
-            Timber.tag("AR_DEBUG").e(">>> [2] BackgroundRenderer created successfully")
+            // Generate a dummy texture ID to satisfy ARCore's internal requirements
+            // even though we aren't drawing the camera feed through OpenGL.
+            val textures = IntArray(1)
+            GLES30.glGenTextures(1, textures, 0)
+            dummyTextureId = textures[0]
+            GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, dummyTextureId)
 
+            slamManager.createOnGlThread()
             slamManager.resetGLState()
-            slamManager.initialize()
+            slamManager.ensureInitialized()
             slamManager.setVisualizationMode(0) // 0 = AR Mode
             Timber.tag("AR_DEBUG").e(">>> [3] SlamManager initialized for AR Mode")
         } catch (e: Exception) {
@@ -47,13 +56,12 @@ class ArRenderer(
 
         val currentSession = session
         if (currentSession == null) {
-            Timber.tag("AR_DEBUG").e(">>> [!] ABORT onDrawFrame: ARCore Session is NULL!")
             return
         }
 
         try {
             if (!hasSetTextureNames) {
-                currentSession.setCameraTextureName(backgroundRenderer.textureId)
+                currentSession.setCameraTextureName(dummyTextureId)
                 hasSetTextureNames = true
                 Timber.tag("AR_DEBUG").e(">>> [5] Camera texture name linked to ARCore Session")
             }
@@ -62,15 +70,7 @@ class ArRenderer(
             val frame = currentSession.update()
             val camera = frame.camera
 
-            // Draw the camera feed
-            backgroundRenderer.draw(frame)
-
-            // CRITICAL CHECK: Is ARCore actually tracking the world?
             if (camera.trackingState == TrackingState.TRACKING) {
-                // We log this as debug instead of error so it doesn't completely flood the red error logs 60 times a second,
-                // but if you want it red, change .d to .e!
-                Timber.tag("AR_DEBUG").d(">>> [6] Camera is TRACKING. Sending matrices to SlamManager.")
-
                 val viewMatrix = FloatArray(16)
                 val projMatrix = FloatArray(16)
 
@@ -79,10 +79,7 @@ class ArRenderer(
 
                 slamManager.updateCamera(viewMatrix, projMatrix)
                 slamManager.draw()
-            } else {
-                Timber.tag("AR_DEBUG").e(">>> [X] Camera NOT TRACKING. Reason: ${camera.trackingFailureReason}")
             }
-
         } catch (e: Exception) {
             Timber.tag("AR_DEBUG").e(e, ">>> [!] CRITICAL EXCEPTION during onDrawFrame")
         }
