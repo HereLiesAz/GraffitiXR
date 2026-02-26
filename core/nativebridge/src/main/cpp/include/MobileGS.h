@@ -63,6 +63,7 @@ public:
     void updateCamera(float* viewMatrix, float* projectionMatrix);
     void updateLight(float intensity, float* colorCorrection = nullptr);
     void alignMap(float* transform);
+    void setLocation(double latitude, double longitude, double altitude);
 
     // Data Ingestion
     void processDepthData(uint8_t* depthBuffer, int width, int height);
@@ -89,6 +90,8 @@ private:
 
     float lightIntensity = 1.0f;
     float lightColor[3] = {1.0f, 1.0f, 1.0f};
+
+    double lastLat = 0, lastLon = 0, lastAlt = 0;
 
     VulkanBackend* vulkanRenderer = nullptr;
 

@@ -74,6 +74,8 @@ fun mapBlendMode(mode: ModelBlendMode): BlendMode {
         ModelBlendMode.Lighten -> BlendMode.Lighten
         ModelBlendMode.ColorDodge -> BlendMode.ColorDodge
         ModelBlendMode.ColorBurn -> BlendMode.ColorBurn
+        ModelBlendMode.HardLight -> BlendMode.Hardlight
+        ModelBlendMode.SoftLight -> BlendMode.Softlight
         ModelBlendMode.Difference -> BlendMode.Difference
         ModelBlendMode.Exclusion -> BlendMode.Exclusion
         ModelBlendMode.Hue -> BlendMode.Hue

@@ -246,6 +246,13 @@ void MobileGS::updateLight(float intensity, float* colorCorrection) {
     }
 }
 
+void MobileGS::setLocation(double latitude, double longitude, double altitude) {
+    lastLat = latitude;
+    lastLon = longitude;
+    lastAlt = altitude;
+    LOGI("Location updated: %f, %f, %f", latitude, longitude, altitude);
+}
+
 void MobileGS::processDepthData(uint8_t* depthBuffer, int width, int height) {
     if (!depthBuffer || width <= 0 || height <= 0) return;
 

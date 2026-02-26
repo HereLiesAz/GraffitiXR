@@ -54,6 +54,9 @@ class SlamManager @Inject constructor() {
     fun feedStereoData(leftImage: Image, rightImage: Image) = lock.withLock {
         if (!isDestroyed.get()) feedStereoDataJni(nativeHandle, leftImage.planes[0].buffer, leftImage.width, leftImage.height, leftImage.planes[0].rowStride, rightImage.planes[0].buffer, rightImage.width, rightImage.height, rightImage.planes[0].rowStride)
     }
+    fun feedLocationData(latitude: Double, longitude: Double, altitude: Double) = lock.withLock {
+        if (!isDestroyed.get()) feedLocationDataJni(nativeHandle, latitude, longitude, altitude)
+    }
     fun alignMap(transform: FloatArray) = lock.withLock { if (!isDestroyed.get()) alignMapJni(nativeHandle, transform) }
     fun saveKeyframe(path: String) = lock.withLock { if (!isDestroyed.get()) saveKeyframeJni(nativeHandle, path) else false }
     fun onSurfaceChanged(width: Int, height: Int) = lock.withLock { if (!isDestroyed.get()) onSurfaceChangedJni(nativeHandle, width, height) }
@@ -90,6 +93,7 @@ class SlamManager @Inject constructor() {
     private external fun feedDepthDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int)
     private external fun feedMonocularDataJni(handle: Long, buffer: ByteBuffer, width: Int, height: Int)
     private external fun feedStereoDataJni(handle: Long, leftBuffer: ByteBuffer, leftWidth: Int, leftHeight: Int, leftStride: Int, rightBuffer: ByteBuffer, rightWidth: Int, rightHeight: Int, rightStride: Int)
+    private external fun feedLocationDataJni(handle: Long, latitude: Double, longitude: Double, altitude: Double)
     private external fun alignMapJni(handle: Long, transform: FloatArray)
     private external fun saveKeyframeJni(handle: Long, path: String): Boolean
     private external fun setVisualizationModeJni(handle: Long, mode: Int)

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.composable
@@ -46,11 +45,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * The main activity for GraffitiXR.
- * Manages the high-level application state and AzNavRail configuration.
- * Camera hardware is managed exclusively by ARCore via ArView to prevent hardware contention.
- */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -67,19 +61,21 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[android.Manifest.permission.CAMERA] ?: false
+        val hasLocation = p[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        if (hasLocation) {
+            slamManager.feedLocationData(0.0, 0.0, 0.0)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initial permission check
         hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
             this, android.Manifest.permission.CAMERA
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
         slamManager.ensureInitialized()
 
-        // Handle security provider updates (fixes SSL issues for GitHub updates)
         lifecycleScope.launch {
             securityProviderManager.securityProviderState.collect { state ->
                 if (state is SecurityProviderState.RecoverableError) {
@@ -102,7 +98,6 @@ class MainActivity : ComponentActivity() {
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
 
-                // Navigation Observer (Surveyor and Library)
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
                         when (destination) {
@@ -114,7 +109,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Sync Rail visual state with ViewModel mode
                 LaunchedEffect(navController) {
                     navController.currentBackStackEntryFlow.collect { entry ->
                         val route = entry.destination.route
@@ -129,7 +123,6 @@ class MainActivity : ComponentActivity() {
 
                 val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked
 
-                // Asset Pickers
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.onAddLayer(it) }
                 }
@@ -138,7 +131,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
-                    // 1. CONFIGURE THE RAIL
                     if (isRailVisible) {
                         configureRail(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
@@ -146,9 +138,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // 2. THE VIEWPORT (BACKGROUND)
-                    // Full-screen content that ignores safe zones.
-                    // This is where ARCore renders.
                     background(weight = 0) {
                         MainScreen(
                             viewModel = mainViewModel,
@@ -161,8 +150,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // 3. THE UI (ONSCREEN)
-                    // Safe area content. Respects safe zones and rail padding.
                     onscreen {
                         Box(Modifier.fillMaxSize()) {
                             AzNavHost(startDestination = EditorMode.AR.name) {
@@ -172,7 +159,6 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
                             }
 
-                            // Modal Overlays
                             if (showSaveDialog) {
                                 SaveProjectDialog(
                                     initialName = editorUiState.projectId ?: "New Project",
@@ -257,65 +243,12 @@ class MainActivity : ComponentActivity() {
         azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
         azAdvanced(infoScreen = showInfoScreen, onDismissInfoScreen = { showInfoScreen = false })
 
-        azRailHostItem(id = "mode_host", text = navStrings.modes, info = "Modes")
-        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = "Start AR Mode") {
-            if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.AR)
-            else permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
-        }
-        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.traceMode, info = "Start Lightbox Mode") {
-            editorViewModel.setEditorMode(EditorMode.TRACE)
+        val requestPermissions = {
+            permissionLauncher.launch(
+                arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.ACCESS_FINE_LOCATION)
+            )
         }
 
-        // Project Menu Host
-        azRailHostItem(id = "project_host", text = "Project", info = "Project Actions")
-        azRailSubItem(id = "add_layer", hostId = "project_host", text = "Add Layer", info = "Add Image Layer") {
-            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-        }
-        azRailSubItem(id = "add_sketch", hostId = "project_host", text = "Add Sketch", info = "Add Sketch Layer") {
-            editorViewModel.onAddBlankLayer()
-        }
-
-        // Layer Management using azRailRelocItem with Nested Rails and Context Menus
-        editorUiState.layers.forEach { layer ->
-            azRailRelocItem(
-                id = layer.id,
-                hostId = "project_host", // Group them under the Project host or a dedicated layers host if preferred
-                text = layer.name,
-                info = "Manage Layer: ${layer.name}",
-                onRelocate = { from, to, newOrder ->
-                    editorViewModel.onLayerReordered(newOrder)
-                },
-                nestedContent = {
-                    // Nested Rail for Tools (Popup)
-                    azRailItem(id = "tool_brush", text = "Brush", info = "Use Brush") {
-                        editorViewModel.onLayerActivated(layer.id)
-                        editorViewModel.setActiveTool(Tool.BRUSH)
-                    }
-                    azRailItem(id = "tool_eraser", text = "Eraser", info = "Use Eraser") {
-                        editorViewModel.onLayerActivated(layer.id)
-                        editorViewModel.setActiveTool(Tool.ERASER)
-                    }
-                    azRailItem(id = "tool_flip_h", text = "Flip H", info = "Flip Horizontally") {
-                        editorViewModel.onLayerActivated(layer.id)
-                        editorViewModel.onFlipLayer(true)
-                    }
-                }
-            ) {
-                // Hidden Context Menu (Long Press)
-                listItem(text = "Rename") {
-                    // Trigger rename dialog (implementation depends on UI state)
-                }
-                listItem(text = "Duplicate") {
-                    editorViewModel.onDuplicateLayer(layer.id)
-                }
-                listItem(text = "Delete") {
-                    editorViewModel.onLayerRemoved(layer.id)
-                }
-            }
-        }
-    }
-
-        // --- MODES ---
         azRailHostItem(id = "mode_host", text = navStrings.modes)
         azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, shape = AzButtonShape.NONE)
         azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, shape = AzButtonShape.NONE)
@@ -338,7 +271,6 @@ class MainActivity : ComponentActivity() {
             azDivider()
         }
 
-        // --- DESIGN TOOLS ---
         azRailHostItem(id = "design_host", text = navStrings.design)
         azRailSubItem(id = "add_img", hostId = "design_host", text = "Image", shape = AzButtonShape.NONE) {
             overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -355,7 +287,6 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        // --- DYNAMIC LAYERS ---
         editorUiState.layers.reversed().forEach { layer ->
             azRailRelocItem(
                 id = "layer_${layer.id}",
@@ -382,7 +313,6 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        // --- PROJECT ACTIONS ---
         azRailHostItem(id = "project_host", text = navStrings.project)
         azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, shape = AzButtonShape.NONE) { showSaveDialog = true }
         azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToLibrary() }

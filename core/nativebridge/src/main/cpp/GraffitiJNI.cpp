@@ -115,6 +115,12 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_f
     }
 }
 
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedLocationDataJni(JNIEnv *env, jobject thiz, jlong handle, jdouble latitude, jdouble longitude, jdouble altitude) {
+    if (handle != 0) {
+        reinterpret_cast<MobileGS *>(handle)->setLocation(latitude, longitude, altitude);
+    }
+}
+
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_alignMapJni(JNIEnv *env, jobject thiz, jlong handle, jfloatArray transform) {
     if (handle != 0) {
         jfloat *t = env->GetFloatArrayElements(transform, nullptr);

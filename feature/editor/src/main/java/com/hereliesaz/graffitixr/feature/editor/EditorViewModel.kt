@@ -55,7 +55,7 @@ class EditorViewModel @Inject constructor(
     private val slamManager: SlamManager,
     private val exportManager: ExportManager,
     private val dispatchers: DispatcherProvider
-) : ViewModel() {
+) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -183,7 +183,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onAddLayer(uri: Uri) {
+    override fun onAddLayer(uri: Uri) {
         viewModelScope.launch(dispatchers.io) {
             val bitmap = loadScaledBitmap(uri)
             if (bitmap != null) {
@@ -207,8 +207,8 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onDuplicateLayer(layerId: String) {
-        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+    override fun onLayerDuplicated(id: String) {
+        val layer = _uiState.value.layers.find { it.id == id } ?: return
         saveState()
 
         viewModelScope.launch(dispatchers.io) {
@@ -241,13 +241,13 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onCopyLayerEdits(layerId: String) {
-        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+    override fun copyLayerModifications(id: String) {
+        val layer = _uiState.value.layers.find { it.id == id } ?: return
         copiedLayerAttributes = layer
         viewModelScope.launch { _message.emit("Edits copied") }
     }
 
-    fun onPasteLayerEdits(layerId: String) {
+    override fun pasteLayerModifications(id: String) {
         val source = copiedLayerAttributes
         if (source == null) {
             viewModelScope.launch { _message.emit("No edits copied") }
@@ -257,7 +257,7 @@ class EditorViewModel @Inject constructor(
         saveState()
         _uiState.update { state ->
             val updatedLayers = state.layers.map { target ->
-                if (target.id == layerId) {
+                if (target.id == id) {
                     target.copy(
                         opacity = source.opacity,
                         blendMode = source.blendMode,
@@ -313,6 +313,10 @@ class EditorViewModel @Inject constructor(
         return name.substringBeforeLast(".")
     }
 
+    override fun onDrawingPathFinished(path: List<Offset>) {
+        onDrawingPathFinished(path, _uiState.value.activeTool)
+    }
+
     fun onDrawingPathFinished(points: List<Offset>, tool: Tool) {
         val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
         if (!activeLayer.isSketch) return
@@ -334,14 +338,14 @@ class EditorViewModel @Inject constructor(
                 }
             }
 
-            val path = android.graphics.Path()
+            val p = android.graphics.Path()
             if (points.isNotEmpty()) {
-                path.moveTo(points.first().x, points.first().y)
+                p.moveTo(points.first().x, points.first().y)
                 for (i in 1 until points.size) {
-                    path.lineTo(points[i].x, points[i].y)
+                    p.lineTo(points[i].x, points[i].y)
                 }
             }
-            canvas.drawPath(path, paint)
+            canvas.drawPath(p, paint)
 
             saveDestructiveState()
 
@@ -352,6 +356,8 @@ class EditorViewModel @Inject constructor(
                     }
                 )
             }
+
+            bitmap.recycle()
         }
     }
 
@@ -418,7 +424,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onUndoClicked() {
+    override fun onUndoClicked() {
         if (undoStack.isNotEmpty()) {
             val previousState = undoStack.removeLast()
             redoStack.addLast(_uiState.value)
@@ -435,7 +441,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onRedoClicked() {
+    override fun onRedoClicked() {
         if (redoStack.isNotEmpty()) {
             val nextState = redoStack.removeLast()
             undoStack.addLast(_uiState.value)
@@ -452,21 +458,21 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onMagicClicked() {
+    override fun onMagicClicked() {
         saveState()
         updateActiveLayer {
             it.copy(contrast = 1.2f, saturation = 1.3f, brightness = 0.1f)
         }
     }
 
-    fun onAdjustmentStart() {
+    override fun onAdjustmentStart() {
         if (!isAdjusting) {
             saveState()
             isAdjusting = true
         }
     }
 
-    fun onAdjustmentEnd() {
+    override fun onAdjustmentEnd() {
         isAdjusting = false
     }
 
@@ -478,39 +484,39 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onOpacityChanged(v: Float) { updateActiveLayer { it.copy(opacity = v) } }
-    fun onBrightnessChanged(v: Float) { updateActiveLayer { it.copy(brightness = v) } }
-    fun onContrastChanged(v: Float) { updateActiveLayer { it.copy(contrast = v) } }
-    fun onSaturationChanged(v: Float) { updateActiveLayer { it.copy(saturation = v) } }
-    fun onColorBalanceRChanged(v: Float) { updateActiveLayer { it.copy(colorBalanceR = v) } }
-    fun onColorBalanceGChanged(v: Float) { updateActiveLayer { it.copy(colorBalanceG = v) } }
-    fun onColorBalanceBChanged(v: Float) { updateActiveLayer { it.copy(colorBalanceB = v) } }
+    override fun onOpacityChanged(v: Float) { updateActiveLayer { it.copy(opacity = v) } }
+    override fun onBrightnessChanged(v: Float) { updateActiveLayer { it.copy(brightness = v) } }
+    override fun onContrastChanged(v: Float) { updateActiveLayer { it.copy(contrast = v) } }
+    override fun onSaturationChanged(v: Float) { updateActiveLayer { it.copy(saturation = v) } }
+    override fun onColorBalanceRChanged(v: Float) { updateActiveLayer { it.copy(colorBalanceR = v) } }
+    override fun onColorBalanceGChanged(v: Float) { updateActiveLayer { it.copy(colorBalanceG = v) } }
+    override fun onColorBalanceBChanged(v: Float) { updateActiveLayer { it.copy(colorBalanceB = v) } }
 
-    fun onLayerActivated(layerId: String) {
+    override fun onLayerActivated(id: String) {
         _uiState.update { state ->
-            val layer = state.layers.find { it.id == layerId }
-            state.copy(activeLayerId = layerId, isImageLocked = layer?.isImageLocked ?: false)
+            val layer = state.layers.find { it.id == id }
+            state.copy(activeLayerId = id, isImageLocked = layer?.isImageLocked ?: false)
         }
     }
 
-    fun onLayerReordered(newOrder: List<String>) {
+    override fun onLayerReordered(newOrder: List<String>) {
         _uiState.update { state ->
             val reordered = newOrder.mapNotNull { id -> state.layers.find { it.id == id } }
             state.copy(layers = reordered)
         }
     }
 
-    fun onLayerRenamed(layerId: String, newName: String) {
+    override fun onLayerRenamed(id: String, name: String) {
         _uiState.update { state ->
-            val newLayers = state.layers.map { if (it.id == layerId) it.copy(name = newName) else it }
+            val newLayers = state.layers.map { if (it.id == id) it.copy(name = name) else it }
             state.copy(layers = newLayers)
         }
     }
 
-    fun onLayerRemoved(layerId: String) {
+    override fun onLayerRemoved(id: String) {
         _uiState.update { state ->
-            val newLayers = state.layers.filter { it.id != layerId }
-            val newActiveId = if (state.activeLayerId == layerId) null else state.activeLayerId
+            val newLayers = state.layers.filter { it.id != id }
+            val newActiveId = if (state.activeLayerId == id) null else state.activeLayerId
             val isLocked = if (newActiveId != null) {
                 newLayers.find { it.id == newActiveId }?.isImageLocked ?: false
             } else false
@@ -518,7 +524,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun toggleImageLock() {
+    override fun toggleImageLock() {
         updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }
     }
 
@@ -526,19 +532,19 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     }
 
-    fun onScaleChanged(scale: Float) {
-        updateActiveLayer { it.copy(scale = it.scale * scale) }
+    override fun onScaleChanged(s: Float) {
+        updateActiveLayer { it.copy(scale = it.scale * s) }
     }
 
-    fun onOffsetChanged(offset: Offset) {
-        updateActiveLayer { it.copy(offset = it.offset + offset) }
+    override fun onOffsetChanged(o: Offset) {
+        updateActiveLayer { it.copy(offset = it.offset + o) }
     }
 
-    fun onRotationXChanged(d: Float) { updateActiveLayer { it.copy(rotationX = it.rotationX + d) } }
-    fun onRotationYChanged(d: Float) { updateActiveLayer { it.copy(rotationY = it.rotationY + d) } }
-    fun onRotationZChanged(d: Float) { updateActiveLayer { it.copy(rotationZ = it.rotationZ + d) } }
+    override fun onRotationXChanged(d: Float) { updateActiveLayer { it.copy(rotationX = it.rotationX + d) } }
+    override fun onRotationYChanged(d: Float) { updateActiveLayer { it.copy(rotationY = it.rotationY + d) } }
+    override fun onRotationZChanged(d: Float) { updateActiveLayer { it.copy(rotationZ = it.rotationZ + d) } }
 
-    fun onCycleRotationAxis() {
+    override fun onCycleRotationAxis() {
         _uiState.update {
             val nextAxis = when (it.activeRotationAxis) {
                 RotationAxis.X -> RotationAxis.Y
@@ -549,10 +555,10 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onGestureStart() {}
-    fun onGestureEnd() {}
+    override fun onGestureStart() {}
+    override fun onGestureEnd() {}
 
-    fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
+    override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
         updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
     }
 
@@ -566,7 +572,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onLayerWarpChanged(layerId: String, mesh: List<Float>) {
+    override fun onLayerWarpChanged(layerId: String, mesh: List<Float>) {
         _uiState.update { state ->
             val newLayers = state.layers.map {
                 if (it.id == layerId) it.copy(warpMesh = mesh) else it
@@ -575,14 +581,14 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onFeedbackShown() {}
-    fun onDoubleTapHintDismissed() { _uiState.update { it.copy(showDoubleTapHint = false) } }
-    fun onOnboardingComplete(mode: Any) {}
-    fun onAdjustClicked() { _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) } }
-    fun onColorClicked() { _uiState.update { it.copy(activePanel = EditorPanel.COLOR) } }
-    fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
+    override fun onFeedbackShown() {}
+    override fun onDoubleTapHintDismissed() { _uiState.update { it.copy(showDoubleTapHint = false) } }
+    override fun onOnboardingComplete(mode: Any) {}
+    override fun onAdjustClicked() { _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) } }
+    override fun onColorClicked() { _uiState.update { it.copy(activePanel = EditorPanel.COLOR) } }
+    override fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
 
-    fun onLineDrawingClicked() {
+    override fun onLineDrawingClicked() {
         val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch(dispatchers.default) {
@@ -599,7 +605,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onRemoveBackgroundClicked() {
+    override fun onRemoveBackgroundClicked() {
         val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch(dispatchers.default) {
@@ -617,7 +623,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onCycleBlendMode() {
+    override fun onCycleBlendMode() {
         updateActiveLayer { layer ->
             val modes = BlendMode.entries.toTypedArray()
             val nextIndex = (layer.blendMode.ordinal + 1) % modes.size
