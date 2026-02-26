@@ -70,7 +70,6 @@ class CrashActivity : ComponentActivity() {
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
 
-                        // Error Log Box
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -87,7 +86,6 @@ class CrashActivity : ComponentActivity() {
                             )
                         }
 
-                        // Action Buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -163,9 +161,8 @@ class CrashActivity : ComponentActivity() {
     }
 
     private fun reportIssue(body: String) {
-        // Safe access to BuildConfig dynamically linked properties.
-        val repoOwner = BuildConfig.REPO_OWNER
-        val repoName = BuildConfig.REPO_NAME
+        val repoOwner = "HereLiesAz"
+        val repoName = "GraffitiXR"
 
         val encodedBody = URLEncoder.encode(body, StandardCharsets.UTF_8.toString())
         val url = "https://github.com/$repoOwner/$repoName/issues/new?labels=crash&body=$encodedBody"

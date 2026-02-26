@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.runtime.*
@@ -195,19 +196,17 @@ class MainActivity : ComponentActivity() {
         azDivider()
 
         // --- DYNAMIC LAYERS (Nested Rail Parents) ---
-        // Each layer item is a parent to a Nested Rail (Popup) containing its specific tools.
         editorUiState.layers.reversed().forEach { layer ->
             azRailRelocItem(
                 id = "layer_${layer.id}",
                 hostId = "design_host",
                 text = layer.name,
                 info = "Open Layer Tools",
-                nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL, // Force popup style
+                nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
                 onClick = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) },
                 onRelocate = { _, _, newOrder ->
                     editorViewModel.onLayerReordered(newOrder.map { it.removePrefix("layer_") }.reversed())
                 },
-                // NESTED CONTENT: The Tools (Brush, Eraser, etc.) appear in the Nested Rail
                 nestedContent = {
                     val activate = { if (editorUiState.activeLayerId != layer.id) editorViewModel.onLayerActivated(layer.id) }
 
@@ -278,7 +277,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @Composable
     fun AppContent(
         navHostScope: AzNavHostScope,
         navController: NavHostController,
