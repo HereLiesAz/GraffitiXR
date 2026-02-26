@@ -91,7 +91,6 @@ class MainActivity : ComponentActivity() {
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
 
-                // Navigation Observer
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
                         when (destination) {
@@ -100,6 +99,18 @@ class MainActivity : ComponentActivity() {
                             "settings" -> showSettings = true
                         }
                         dashboardViewModel.onNavigationConsumed()
+                    }
+                }
+
+                LaunchedEffect(navController) {
+                    navController.currentBackStackEntryFlow.collect { entry ->
+                        val route = entry.destination.route
+                        if (route != null) {
+                            try {
+                                val mode = EditorMode.valueOf(route)
+                                if (editorUiState.editorMode != mode) editorViewModel.setEditorMode(mode)
+                            } catch (e: Exception) { }
+                        }
                     }
                 }
 
@@ -136,7 +147,6 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
                             }
 
-                            // Modal Overlays
                             if (showSaveDialog) {
                                 SaveProjectDialog(
                                     initialName = editorUiState.projectId ?: "New Project",
@@ -162,6 +172,19 @@ class MainActivity : ComponentActivity() {
                                         dashboardViewModel.onNewProject(editorUiState.isRightHanded)
                                         showLibrary = false
                                     }
+                                )
+                            }
+
+                            if (showSettings) {
+                                SettingsScreen(
+                                    currentVersion = "1.18.0",
+                                    updateStatus = "Up to date",
+                                    isCheckingForUpdate = false,
+                                    isRightHanded = editorUiState.isRightHanded,
+                                    onHandednessChanged = { editorViewModel.toggleHandedness() },
+                                    onCheckForUpdates = {},
+                                    onInstallUpdate = {},
+                                    onClose = { showSettings = false }
                                 )
                             }
                         }
@@ -224,7 +247,6 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        // Dynamic Layers
         editorUiState.layers.reversed().forEach { layer ->
             azRailRelocItem(
                 id = "layer_${layer.id}",
@@ -254,5 +276,12 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, shape = AzButtonShape.NONE) { showSaveDialog = true }
         azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToLibrary() }
         azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, shape = AzButtonShape.NONE) { editorViewModel.exportProject() }
+        azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToSettings() }
+
+        azDivider()
+        azRailItem(id = "help", text = "Help") { showInfoScreen = true }
+        if (editorUiState.editorMode == EditorMode.AR) {
+            azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
+        }
     }
 }

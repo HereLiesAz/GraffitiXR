@@ -2,6 +2,9 @@
 #include <android/log.h>
 #include <fstream>
 #include <ctime>
+#include <cmath>
+#include <algorithm>
+#include <cstring>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
 #include <GLES3/gl3.h>
@@ -15,6 +18,9 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 #endif
 
+/**
+ * Internal matrix multiplication helper.
+ */
 static void multiplyMatricesInternal(const float* a, const float* b, float* result) {
     for (int col = 0; col < 4; ++col) {
         for (int row = 0; row < 4; ++row) {
@@ -27,7 +33,10 @@ static void multiplyMatricesInternal(const float* a, const float* b, float* resu
     }
 }
 
-static GLuint compileShader(GLenum type, const char* source) {
+/**
+ * OpenGL Shader Compilation Helper.
+ */
+static GLuint compileShaderInternal(GLenum type, const char* source) {
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &source, NULL);
     glCompileShader(shader);
@@ -48,10 +57,13 @@ static GLuint compileShader(GLenum type, const char* source) {
     return shader;
 }
 
-static GLuint createProgram(const char* vertSrc, const char* fragSrc) {
-    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertSrc);
+/**
+ * OpenGL Program Creation Helper.
+ */
+static GLuint createProgramInternal(const char* vertSrc, const char* fragSrc) {
+    GLuint vertexShader = compileShaderInternal(GL_VERTEX_SHADER, vertSrc);
     if (!vertexShader) return 0;
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragSrc);
+    GLuint fragmentShader = compileShaderInternal(GL_FRAGMENT_SHADER, fragSrc);
     if (!fragmentShader) return 0;
 
     GLuint program = glCreateProgram();
@@ -83,12 +95,21 @@ MobileGS::~MobileGS() {
         delete vulkanRenderer;
         vulkanRenderer = nullptr;
     }
+    if (pointProgram != 0) {
+        glDeleteProgram(pointProgram);
+    }
+    if (pointVBO != 0) {
+        glDeleteBuffers(1, &pointVBO);
+    }
 }
 
-void MobileGS::initialize() { isInitialized = true; }
+void MobileGS::initialize() {
+    isInitialized = true;
+}
 
 void MobileGS::reset() {
     isInitialized = false;
+    std::lock_guard<std::mutex> lock(pointMutex);
     mVoxelGrid.clear();
 }
 
@@ -96,7 +117,9 @@ void MobileGS::onSurfaceChanged(int width, int height) {
     viewportWidth = width;
     viewportHeight = height;
     glViewport(0, 0, width, height);
-    if (vulkanRenderer && visMode == 0) vulkanRenderer->resize(width, height);
+    if (vulkanRenderer && visMode == 0) {
+        vulkanRenderer->resize(width, height);
+    }
 }
 
 void MobileGS::draw() {
@@ -132,7 +155,7 @@ void MobileGS::draw() {
                     "  if(length(coord) > 0.5) discard;\n"
                     "  o_FragColor = v_Color;\n"
                     "}\n";
-            pointProgram = createProgram(vShaderStr, fShaderStr);
+            pointProgram = createProgramInternal(vShaderStr, fShaderStr);
             if (pointProgram == 0) { LOGE("Failed to create point program"); return; }
         }
 
@@ -173,7 +196,7 @@ void MobileGS::draw() {
             glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
             glEnableVertexAttribArray(1);
 
-            glDrawArrays(GL_POINTS, 0, pointData.size() / 7);
+            glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(pointData.size() / 7));
 
             glDisableVertexAttribArray(0);
             glDisableVertexAttribArray(1);
@@ -220,7 +243,9 @@ void MobileGS::alignMap(float* transform) {
 void MobileGS::updateLight(float intensity, float* colorCorrection) {
     lightIntensity = intensity;
     if (colorCorrection) {
-        lightColor[0] = colorCorrection[0]; lightColor[1] = colorCorrection[1]; lightColor[2] = colorCorrection[2];
+        lightColor[0] = colorCorrection[0];
+        lightColor[1] = colorCorrection[1];
+        lightColor[2] = colorCorrection[2];
     }
 }
 
@@ -252,7 +277,9 @@ void MobileGS::processDepthData(uint8_t* depthBuffer, int width, int height) {
             VoxelKey key = { (int)(wx / VOXEL_SIZE), (int)(wy / VOXEL_SIZE), (int)(wz / VOXEL_SIZE) };
 
             if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
-                mVoxelGrid[key] = { wx, wy, wz, 1.0f, 1.0f, 1.0f, 1.0f, 0.1f };
+                if (mVoxelGrid.size() < MAX_VOXELS) {
+                    mVoxelGrid[key] = { wx, wy, wz, 1.0f, 1.0f, 1.0f, 1.0f, 0.1f };
+                }
             } else {
                 mVoxelGrid[key].confidence = std::min(1.0f, mVoxelGrid[key].confidence + 0.05f);
             }
@@ -307,12 +334,16 @@ void MobileGS::addStereoPoints(const std::vector<cv::Point3f>& points) {
     for (const auto& p : points) {
         VoxelKey key = { (int)(p.x / VOXEL_SIZE), (int)(p.y / VOXEL_SIZE), (int)(p.z / VOXEL_SIZE) };
         if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
-            mVoxelGrid[key] = { p.x, p.y, p.z, 0.0f, 1.0f, 1.0f, 1.0f, 0.1f };
+            if (mVoxelGrid.size() < MAX_VOXELS) {
+                mVoxelGrid[key] = { p.x, p.y, p.z, 0.0f, 1.0f, 1.0f, 1.0f, 0.1f };
+            }
         }
     }
 }
 
-void MobileGS::setVisualizationMode(int mode) { visMode = mode; }
+void MobileGS::setVisualizationMode(int mode) {
+    visMode = mode;
+}
 
 bool MobileGS::saveMap(const char* path) {
     std::lock_guard<std::mutex> lock(pointMutex);
@@ -323,7 +354,7 @@ bool MobileGS::saveMap(const char* path) {
     int version = 1;
     out.write((char*)&version, 4);
 
-    int splatCount = mVoxelGrid.size();
+    int splatCount = static_cast<int>(mVoxelGrid.size());
     out.write((char*)&splatCount, 4);
 
     int keyframeCount = 1;

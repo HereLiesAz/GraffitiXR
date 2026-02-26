@@ -4,11 +4,13 @@ import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -26,8 +28,8 @@ import javax.microedition.khronos.opengles.GL10
 
 /**
  * The AR Viewport implementation.
- * Manages the ARCore Session, the OpenGL rendering lifecycle, and the integration
- * with the native MobileGS engine.
+ * Manages the ARCore Session lifecycle and the OpenGL rendering pipeline.
+ * Replaces CameraX with ARCore's native camera feed for high-precision tracking.
  */
 @Composable
 fun ArView(
@@ -41,20 +43,66 @@ fun ArView(
 ) {
     if (!hasCameraPermission) return
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 1. Manage Session Lifecycle explicitly
+    val sessionState = remember { mutableStateOf<Session?>(null) }
+
+    // 2. Initialize Renderers once
+    val backgroundRenderer = remember { BackgroundRenderer() }
+    val planeRenderer = remember { PlaneRenderer() }
+    val pointCloudRenderer = remember { PointCloudRenderer() }
+    val layerRenderer = remember { ProjectedImageRenderer() }
+    val displayRotationHelper = remember { DisplayRotationHelper(context) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    if (sessionState.value == null) {
+                        try {
+                            val session = Session(context)
+                            val config = Config(session).apply {
+                                focusMode = Config.FocusMode.AUTO
+                                updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                                planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                                lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
+                            }
+                            session.configure(config)
+                            sessionState.value = session
+                        } catch (e: Exception) {
+                            Log.e("ArView", "ARCore Session creation failed", e)
+                        }
+                    }
+                    sessionState.value?.resume()
+                    displayRotationHelper.onResume()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    displayRotationHelper.onPause()
+                    sessionState.value?.pause()
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    sessionState.value?.close()
+                    sessionState.value = null
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val renderer = remember {
         object : GLSurfaceView.Renderer {
-            private var session: Session? = null
-            private val backgroundRenderer = BackgroundRenderer()
-            private val planeRenderer = PlaneRenderer()
-            private val pointCloudRenderer = PointCloudRenderer()
-            private val layerRenderer = ProjectedImageRenderer()
-            private val displayRotationHelper = DisplayRotationHelper(context)
+            private val viewMatrix = FloatArray(16)
+            private val projMatrix = FloatArray(16)
 
             override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-                GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+                GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
 
-                // Initialize GL components
+                // Initialize renderers on the GL thread
                 backgroundRenderer.createOnGlThread(context)
                 planeRenderer.createOnGlThread(context)
                 pointCloudRenderer.createOnGlThread(context)
@@ -63,11 +111,11 @@ fun ArView(
                 // Initialize native engine components
                 slamManager.resetGLState()
                 slamManager.initialize()
+                slamManager.setVisualizationMode(0) // AR Mode
 
-                // Set to AR Scanning mode (Vulkan backend managed internally where possible)
-                slamManager.setVisualizationMode(0)
+                // Connect ARCore to the background texture
+                sessionState.value?.setCameraTextureName(backgroundRenderer.textureId)
 
-                // Notify parent
                 onRendererCreated(ArRenderer(slamManager))
             }
 
@@ -78,89 +126,66 @@ fun ArView(
             }
 
             override fun onDrawFrame(gl: GL10?) {
-                // Clear screen
                 GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-                // Initialize session if not present
-                if (session == null) {
-                    try {
-                        session = Session(context).apply {
-                            val config = Config(this)
-                            config.focusMode = Config.FocusMode.AUTO
-                            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                            config.lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
-                            this.configure(config)
-                            this.setCameraTextureName(backgroundRenderer.textureId)
-                        }
-                        session?.resume()
-                    } catch (e: Exception) {
-                        Log.e("ArView", "Failed to create ARCore session", e)
-                        return
-                    }
-                }
+                val session = sessionState.value ?: return
 
-                val sessionObj = session ?: return
-                displayRotationHelper.updateSessionIfNeeded(sessionObj)
+                // Texture must be set before session update
+                session.setCameraTextureName(backgroundRenderer.textureId)
+                displayRotationHelper.updateSessionIfNeeded(session)
 
                 try {
-                    val frame = sessionObj.update()
+                    val frame = session.update()
+                    val camera = frame.camera
 
-                    // 1. Draw camera feed
+                    // 1. DRAW CAMERA FEED
                     backgroundRenderer.draw(frame)
 
-                    val camera = frame.camera
-                    val viewMatrix = FloatArray(16)
-                    val projMatrix = FloatArray(16)
+                    // 2. EXTRACT CAMERA MATRICES
                     camera.getViewMatrix(viewMatrix, 0)
                     camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
 
-                    // 2. Visualise Surface Planes
+                    // 3. RENDER SURFACE POLYGONS
                     if (camera.trackingState == TrackingState.TRACKING) {
-                        planeRenderer.drawPlanes(sessionObj, viewMatrix, projMatrix, camera.pose)
+                        planeRenderer.drawPlanes(session, viewMatrix, projMatrix, camera.pose)
                     }
 
-                    // 3. Visualise Point Cloud (Raw ARCore features)
+                    // 4. RENDER POINT CLOUD
                     frame.acquirePointCloud().use { pointCloud ->
                         pointCloudRenderer.update(pointCloud)
                         pointCloudRenderer.draw(viewMatrix, projMatrix)
                     }
 
-                    // 4. Update Native SLAM Engine (Voxel Map)
+                    // 5. UPDATE NATIVE SLAM
                     slamManager.updateCamera(viewMatrix, projMatrix)
 
-                    // Feed current image for teleological (OpenCV) correction
-                    try {
-                        frame.acquireCameraImage().use { image ->
-                            viewModel.processTeleologicalFrame(image)
-                        }
-                    } catch (e: Exception) {
-                        // Image might be unavailable this frame
-                    }
-
-                    // Feed light estimation to native splat renderer
+                    // Feed light estimation
                     val lightEstimate = frame.lightEstimate
                     if (lightEstimate.state == com.google.ar.core.LightEstimate.State.VALID) {
                         slamManager.updateLight(lightEstimate.pixelIntensity)
                     }
 
-                    // Render the native splats
+                    // Native Splat Map Render
                     slamManager.draw()
 
-                    // 5. Draw Active Projection Layer
+                    // 6. RENDER ACTIVE PROJECTED LAYER
                     activeLayer?.let { layer ->
                         layerRenderer.setBitmap(layer.bitmap)
+                        val identity = FloatArray(16).apply { android.opengl.Matrix.setIdentityM(this, 0) }
+                        layerRenderer.draw(viewMatrix, projMatrix, identity, layer)
+                    }
 
-                        // Identity matrix for the 3D quad placement
-                        val anchorMatrix = FloatArray(16)
-                        android.opengl.Matrix.setIdentityM(anchorMatrix, 0)
-
-                        // Render onto the digital wall
-                        layerRenderer.draw(viewMatrix, projMatrix, anchorMatrix, layer)
+                    // 7. BACKGROUND TELEOLOGICAL TASKS
+                    if (frame.timestamp % 10 == 0L) {
+                        try {
+                            frame.acquireCameraImage()?.use { image ->
+                                viewModel.processTeleologicalFrame(image)
+                            }
+                        } catch (e: Exception) { }
                     }
 
                 } catch (e: Exception) {
-                    Log.e("ArView", "Render error", e)
+                    Log.e("ArView", "Render failure", e)
                 }
             }
         }
