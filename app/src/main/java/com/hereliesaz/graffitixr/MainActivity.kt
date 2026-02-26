@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                     initiallyExpanded = false,
                 ) {
                     if (isRailVisible) {
-                        ConfigureRail(mainViewModel, editorViewModel, arViewModel, dashboardViewModel, overlayImagePicker, backgroundImagePicker)
+                        configureRail(mainViewModel, editorViewModel, arViewModel, dashboardViewModel, overlayImagePicker, backgroundImagePicker)
                     }
 
                     onscreen {
@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    private fun AzNavRailScope.ConfigureRail(
+    private fun AzNavHostScope.configureRail(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
         arViewModel: ArViewModel,
