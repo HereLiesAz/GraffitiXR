@@ -1,19 +1,25 @@
+// ~~~ FILE: ./core/nativebridge/src/main/cpp/GraffitiJNI.cpp ~~~
 #include <jni.h>
 #include <vector>
 #include <android/native_window_jni.h>
 #include <android/asset_manager_jni.h>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 #include "include/SlamEngine.h"
 #include "include/VulkanBackend.h"
 #include "include/MobileGS.h"
 
+// Global Engine Singletons
 static VulkanBackend* gVulkanRenderer = nullptr;
 static MobileGS* gSlamEngine = nullptr;
 
 extern "C" {
 
+// --- Lifecycle Management ---
+
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initialize(JNIEnv* env, jobject thiz) {
     if (!gSlamEngine) gSlamEngine = new MobileGS();
-    gSlamEngine->initialize(1920, 1080);
+    gSlamEngine->initialize(1920, 1080); // Default resolution, updated by onSurfaceChanged
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_ensureInitialized(JNIEnv* env, jobject thiz) {
@@ -35,59 +41,134 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_d
     }
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_createOnGlThread(JNIEnv* env, jobject thiz) {}
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_createOnGlThread(JNIEnv* env, jobject thiz) {
+    // Vulkan manages its own thread context, but we keep this stub for legacy GL hooks if needed
+}
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLState(JNIEnv* env, jobject thiz) {}
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLState(JNIEnv* env, jobject thiz) {
+    // No-op for Vulkan
+}
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setVisualizationMode(JNIEnv* env, jobject thiz, jint mode) {}
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setVisualizationMode(JNIEnv* env, jobject thiz, jint mode) {
+    // TODO: Pass mode to Vulkan renderer (Heatmap vs RGB)
+}
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChanged(JNIEnv* env, jobject thiz, jint width, jint height) {
     if (gSlamEngine) gSlamEngine->initialize(width, height);
+    if (gVulkanRenderer) gVulkanRenderer->resize(width, height);
 }
+
+// --- Rendering Loop ---
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_draw(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->render();
-    if (gVulkanRenderer) gVulkanRenderer->renderFrame();
+    if (gVulkanRenderer && gSlamEngine) {
+        // Thread-safe data transfer: Engine (Physics) -> Renderer (Vulkan)
+        std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
+        gVulkanRenderer->renderFrame(gSlamEngine->getSplats());
+    }
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setBitmap(JNIEnv* env, jobject thiz, jobject bitmap) {}
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setBitmap(JNIEnv* env, jobject thiz, jobject bitmap) {
+    // TODO: Load bitmap texture into Vulkan
+}
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
     if (gSlamEngine) {
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
+
         gSlamEngine->updateCamera(view, proj);
+        if (gVulkanRenderer) {
+            gVulkanRenderer->updateCamera(view, proj);
+        }
+
         env->ReleaseFloatArrayElements(viewMatrix, view, JNI_ABORT);
         env->ReleaseFloatArrayElements(projMatrix, proj, JNI_ABORT);
     }
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLight(JNIEnv* env, jobject thiz, jfloat intensity) {}
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLight(JNIEnv* env, jobject thiz, jfloat intensity) {
+    if (gVulkanRenderer) {
+        float white[] = {1.0f, 1.0f, 1.0f};
+        gVulkanRenderer->setLighting(intensity, white);
+    }
+}
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedMonocularData(JNIEnv* env, jobject thiz, jobject data, jint width, jint height) {}
+// --- Sensor Data Feeds ---
+
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedMonocularData(
+        JNIEnv* env, jobject thiz, jobject data, jint width, jint height) {
+    if (!gSlamEngine || data == nullptr) return;
+
+    // Direct buffer access for high performance (No copy)
+    uint8_t* buffer = (uint8_t*)env->GetDirectBufferAddress(data);
+    if (!buffer) return;
+
+    // Wrap buffer in OpenCV Mat (assuming Gray/YUV_Y or RGB depending on source)
+    // For monocular feeds from ARCore/CameraX, this is typically the Y plane (CV_8UC1)
+    cv::Mat frame(height, width, CV_8UC1, buffer);
+
+    // Create a dummy depth map for now since this is monocular
+    // In production, this calls a Monocular Depth Estimator (MiDaS/LiteRT)
+    cv::Mat dummyDepth = cv::Mat::ones(height, width, CV_32F) * 2.0f; // 2 meters default
+
+    // Convert grayscale to RGB for the engine
+    cv::Mat colorFrame;
+    cv::cvtColor(frame, colorFrame, cv::COLOR_GRAY2RGB);
+
+    gSlamEngine->processDepthFrame(dummyDepth, colorFrame);
+}
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedStereoData(
         JNIEnv* env, jobject thiz, jbyteArray left, jbyteArray right, jint w, jint h) {
+
     jbyte* l_ptr = env->GetByteArrayElements(left, nullptr);
     jbyte* r_ptr = env->GetByteArrayElements(right, nullptr);
-    SlamEngine::getInstance()->processStereo(reinterpret_cast<int8_t*>(l_ptr), reinterpret_cast<int8_t*>(r_ptr), w, h);
+
+    // Process Stereo to Depth
+    SlamEngine::getInstance()->processStereo(
+            reinterpret_cast<int8_t*>(l_ptr),
+            reinterpret_cast<int8_t*>(r_ptr),
+            w, h
+    );
+
+    // TODO: Feed result to gSlamEngine->processDepthFrame(...)
+
     env->ReleaseByteArrayElements(left, l_ptr, JNI_ABORT);
     env->ReleaseByteArrayElements(right, r_ptr, JNI_ABORT);
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedLocationData(JNIEnv* env, jobject thiz, jdouble lat, jdouble lon, jdouble alt) {}
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedLocationData(JNIEnv* env, jobject thiz, jdouble lat, jdouble lon, jdouble alt) {
+    // Store GPS for Geo-anchoring
+}
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_processTeleologicalFrame(JNIEnv* env, jobject thiz, jobject buffer, jlong timestamp) {}
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_processTeleologicalFrame(
+        JNIEnv* env, jobject thiz, jobject buffer, jlong timestamp) {
+    // Feature extraction hook for map alignment
+    uint8_t* data = (uint8_t*)env->GetDirectBufferAddress(buffer);
+    if (!data) return;
 
-JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframe(JNIEnv* env, jobject thiz, jlong timestamp) { return JNI_TRUE; }
+    // Placeholder: In a full impl, this passes to ORB_SLAM or custom tracker
+}
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_toggleFlashlight(JNIEnv* env, jobject thiz, jboolean enabled) {}
+JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframe(JNIEnv* env, jobject thiz, jlong timestamp) {
+    return JNI_TRUE;
+}
+
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_toggleFlashlight(JNIEnv* env, jobject thiz, jboolean enabled) {
+    // Hardware control via NDK Camera2 is complex; usually handled in Kotlin.
+    // This hook allows the engine to adjust exposure settings if it controlled the camera.
+}
+
+// --- Vulkan Lifecycle ---
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initVulkan(
         JNIEnv* env, jobject thiz, jobject surface, jobject asset_mgr, jint width, jint height) {
     if (!gVulkanRenderer) gVulkanRenderer = new VulkanBackend();
+
     ANativeWindow* window = ANativeWindow_fromSurface(env, surface);
     AAssetManager* mgr = AAssetManager_fromJava(env, asset_mgr);
+
     gVulkanRenderer->initialize(window, mgr);
     gVulkanRenderer->resize(width, height);
 }

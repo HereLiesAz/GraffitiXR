@@ -1,3 +1,4 @@
+// ~~~ FILE: ./core/nativebridge/src/main/cpp/MobileGS.cpp ~~~
 #include "include/MobileGS.h"
 #include <android/log.h>
 #include <fstream>
@@ -7,40 +8,7 @@
 #define LOG_TAG "MobileGS"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
-const char* MobileGS::VS_SRC = R"(
-    #version 300 es
-    layout(location = 0) in vec3 aPos;
-    layout(location = 1) in vec3 aScale;
-    layout(location = 2) in vec4 aRot;
-    layout(location = 3) in vec4 aColor;
-
-    uniform mat4 uView;
-    uniform mat4 uProj;
-
-    out vec4 vColor;
-
-    void main() {
-        vColor = aColor;
-        gl_Position = uProj * uView * vec4(aPos, 1.0);
-        gl_PointSize = 10.0 * aScale.x;
-    }
-)";
-
-const char* MobileGS::FS_SRC = R"(
-    #version 300 es
-    precision mediump float;
-    in vec4 vColor;
-    out vec4 fragColor;
-
-    void main() {
-        float d = distance(gl_PointCoord, vec2(0.5));
-        if (d > 0.5) discard;
-        float alpha = vColor.a * exp(-d * d * 10.0);
-        fragColor = vec4(vColor.rgb, alpha);
-    }
-)";
-
-MobileGS::MobileGS() : mIsRunning(true), mNeedsResort(false), mVao(0), mVbo(0), mProgram(0) {
+MobileGS::MobileGS() : mIsRunning(true), mNeedsResort(false) {
     std::fill(std::begin(mViewMatrix), std::end(mViewMatrix), 0.0f);
     std::fill(std::begin(mProjMatrix), std::end(mProjMatrix), 0.0f);
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
@@ -61,11 +29,6 @@ void MobileGS::initialize(int width, int height) {
 void MobileGS::updateCamera(const float* viewMatrix, const float* projMatrix) {
     std::copy(viewMatrix, viewMatrix + 16, mViewMatrix);
     std::copy(projMatrix, projMatrix + 16, mProjMatrix);
-}
-
-void MobileGS::render() {
-    // OpenGL ES 3.0 rendering stub.
-    // Ensure this doesn't clear the screen to black if it's supposed to be an AR overlay.
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depthMap, const cv::Mat& colorFrame) {
@@ -134,4 +97,12 @@ bool MobileGS::loadModel(const std::string& path) {
     mGaussians.resize(count);
     file.read(reinterpret_cast<char*>(mGaussians.data()), count * sizeof(SplatGaussian));
     return true;
+}
+
+std::vector<SplatGaussian>& MobileGS::getSplats() {
+    return mGaussians;
+}
+
+std::mutex& MobileGS::getMutex() {
+    return mDataMutex;
 }

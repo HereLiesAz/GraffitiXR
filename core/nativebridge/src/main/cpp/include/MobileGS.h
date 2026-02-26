@@ -1,3 +1,4 @@
+// ~~~ FILE: ./core/nativebridge/src/main/cpp/include/MobileGS.h ~~~
 #ifndef GRAFFITIXR_MOBILE_GS_H
 #define GRAFFITIXR_MOBILE_GS_H
 
@@ -8,10 +9,10 @@
 #include <mutex>
 #include <thread>
 #include <map>
-#include "VulkanBackend.h"
 
 /**
  * Structure representing a single Gaussian Splat point.
+ * Matches Vulkan vertex input expectations.
  */
 struct SplatGaussian {
     float pos[3];
@@ -37,6 +38,7 @@ struct VoxelKey {
 /**
  * Mobile-optimized Gaussian Splatting engine.
  * Handles real-time point cloud generation from depth data and sorted rendering.
+ * Purely mathematical/state-driven. Rendering is delegated to VulkanBackend.
  */
 class MobileGS {
 public:
@@ -44,13 +46,16 @@ public:
     ~MobileGS();
 
     void initialize(int width, int height);
+    void init() { initialize(1920, 1080); } // Legacy wrapper
     void updateCamera(const float* viewMatrix, const float* projMatrix);
     void processDepthFrame(const cv::Mat& depthMap, const cv::Mat& colorFrame);
 
-    void render();
-
     bool saveModel(const std::string& path);
     bool loadModel(const std::string& path);
+
+    // Thread-safe access for the Vulkan Renderer
+    std::vector<SplatGaussian>& getSplats();
+    std::mutex& getMutex();
 
 private:
     void sortThreadLoop();
@@ -65,12 +70,6 @@ private:
     std::thread mSortThread;
     bool mIsRunning;
     bool mNeedsResort;
-
-    unsigned int mVao, mVbo;
-    unsigned int mProgram;
-
-    static const char* VS_SRC;
-    static const char* FS_SRC;
 };
 
 #endif // GRAFFITIXR_MOBILE_GS_H
