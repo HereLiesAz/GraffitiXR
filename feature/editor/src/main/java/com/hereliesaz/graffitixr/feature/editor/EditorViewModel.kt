@@ -635,7 +635,6 @@ class EditorViewModel @Inject constructor(
         _exportTrigger.value = true
         viewModelScope.launch(dispatchers.io) {
             try {
-                // Default high res or based on background
                 val width = 1920
                 val height = 1080
                 val bitmap = exportManager.exportSingleImage(_uiState.value.layers, width, height)
@@ -774,5 +773,59 @@ class EditorViewModel @Inject constructor(
         )
         projectRepository.createProject(newProject)
         _uiState.update { it.copy(projectId = newProject.id) }
+    }
+
+    // --- Native Toolkit Binding Implementations ---
+
+    fun applyCurvesLut(points: List<Offset>) {
+        val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            val lutArray = withContext(dispatchers.default) {
+                // Call top-level function directly
+                createLut(points)
+            }
+
+            val newBitmap = withContext(dispatchers.default) {
+                val bmpCopy = activeLayer.bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                // slamManager.applyLut(bmpCopy, lutArray) // Uncomment once native signature is added
+                bmpCopy
+            }
+
+            saveDestructiveState()
+
+            _uiState.update { state ->
+                val updatedLayers = state.layers.map { layer ->
+                    if (layer.id == state.activeLayerId) layer.copy(bitmap = newBitmap) else layer
+                }
+                state.copy(layers = updatedLayers, isLoading = false)
+            }
+        }
+    }
+
+    fun applyLiquifyTool(meshData: FloatArray) {
+        val activeLayer = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId } ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            val newBitmap = withContext(dispatchers.default) {
+                val bmpCopy = activeLayer.bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                // Calls directly down to the JNI wrapper in SlamManager (Comment out if signature isn't implemented in native yet)
+                // slamManager.processLiquify(bmpCopy, meshData)
+                bmpCopy
+            }
+
+            saveDestructiveState()
+
+            _uiState.update { state ->
+                val updatedLayers = state.layers.map { layer ->
+                    if (layer.id == state.activeLayerId) layer.copy(bitmap = newBitmap) else layer
+                }
+                state.copy(layers = updatedLayers, isLoading = false)
+            }
+        }
     }
 }

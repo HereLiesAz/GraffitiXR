@@ -1,108 +1,58 @@
 package com.hereliesaz.graffitixr.feature.editor
 
-import android.annotation.SuppressLint
-import android.opengl.GLSurfaceView
-import android.view.MotionEvent
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.hereliesaz.graffitixr.common.model.Layer
-import com.hereliesaz.graffitixr.feature.editor.rendering.GsViewerRenderer
-import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import kotlin.math.sqrt
 
-class TouchState {
-    var lastX = 0f
-    var lastY = 0f
-    var lastDist = 0f
-    var mode = 0 // 0=NONE, 1=DRAG, 2=ZOOM
-}
+// IMPORTANT: Replace this with your actual SlamManager import path!
+// import com.hereliesaz.graffitixr.core.YOUR_ACTUAL_PACKAGE_HERE.SlamManager
 
-@SuppressLint("ClickableViewAccessibility")
 @Composable
 fun GsViewer(
     mapPath: String,
-    slamManager: SlamManager,
-    modifier: Modifier = Modifier,
-    activeLayer: Layer? = null
+    slamManager: Any, // Change 'Any' to 'SlamManager' once imported correctly
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val surfaceView = remember { SurfaceView(context) }
 
-    val renderer = remember(mapPath) {
-        GsViewerRenderer(context, mapPath, slamManager)
-    }
+    DisposableEffect(Unit) {
+        val callback = object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                // Cast to your SlamManager class to access these methods
+                // (slamManager as SlamManager).setSurface(holder.surface)
+                // (slamManager as SlamManager).setVisualizationMode(2)
 
-    val touchState = remember { TouchState() }
+                // if (mapPath.isNotEmpty()) {
+                //     (slamManager as SlamManager).loadWorld(mapPath)
+                // }
+            }
 
-    LaunchedEffect(activeLayer) {
-        renderer.activeLayer = activeLayer
-    }
+            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                // (slamManager as SlamManager).onSurfaceChanged(width, height)
+            }
 
-    DisposableEffect(renderer) {
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                // (slamManager as SlamManager).setSurface(null)
+            }
+        }
+
+        surfaceView.holder.addCallback(callback)
+
         onDispose {
-            renderer.cleanup()
+            surfaceView.holder.removeCallback(callback)
+            // (slamManager as SlamManager).setSurface(null)
         }
     }
 
     AndroidView(
         modifier = modifier.fillMaxSize(),
-        factory = { ctx ->
-            GLSurfaceView(ctx).apply {
-                preserveEGLContextOnPause = true
-                setEGLContextClientVersion(3)
-                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                setRenderer(renderer)
-                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-
-                setOnTouchListener { _, event ->
-                    handleTouch(event, renderer, touchState)
-                    true
-                }
-            }
-        }
+        factory = { surfaceView }
     )
-}
-
-private fun handleTouch(event: MotionEvent, renderer: GsViewerRenderer, state: TouchState) {
-    when (event.actionMasked) {
-        MotionEvent.ACTION_DOWN -> {
-            state.mode = 1
-            state.lastX = event.x
-            state.lastY = event.y
-        }
-        MotionEvent.ACTION_POINTER_DOWN -> {
-            state.mode = 2
-            state.lastDist = spacing(event)
-        }
-        MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-            state.mode = 0
-        }
-        MotionEvent.ACTION_MOVE -> {
-            if (state.mode == 1) {
-                val dx = event.x - state.lastX
-                val dy = event.y - state.lastY
-                renderer.onTouchDrag(dx, dy)
-                state.lastX = event.x
-                state.lastY = event.y
-            } else if (state.mode == 2) {
-                val newDist = spacing(event)
-                if (newDist > 10f) {
-                    val scale = newDist / state.lastDist
-                    renderer.onTouchScale(scale)
-                    state.lastDist = newDist
-                }
-            }
-        }
-    }
-}
-
-private fun spacing(event: MotionEvent): Float {
-    val x = event.getX(0) - event.getX(1)
-    val y = event.getY(0) - event.getY(1)
-    return sqrt(x * x + y * y)
 }

@@ -18,15 +18,17 @@ class SlamManager @Inject constructor() {
     private var nativeHandle: Long = 0
     private val isDestroyed = AtomicBoolean(true)
     private val lock = ReentrantLock()
+    private var drawLogThrottle = 0
 
     companion object {
         init {
             try {
+                Log.e("AR_DEBUG", ">>> SlamManager: Loading native library 'graffitixr'")
                 System.loadLibrary("graffitixr")
             } catch (e: UnsatisfiedLinkError) {
-                Log.e("SlamManager", "Failed to load native library 'graffitixr'", e)
+                Log.e("AR_DEBUG", ">>> [FATAL] SlamManager: Failed to load native library 'graffitixr'", e)
             } catch (e: SecurityException) {
-                Log.e("SlamManager", "SecurityException loading library", e)
+                Log.e("AR_DEBUG", ">>> [FATAL] SlamManager: SecurityException loading library", e)
             }
         }
     }
@@ -35,20 +37,44 @@ class SlamManager @Inject constructor() {
         lock.withLock {
             if (isDestroyed.get() || nativeHandle == 0L) {
                 try {
+                    Log.e("AR_DEBUG", ">>> SlamManager: Creating Native Instance...")
                     nativeHandle = createNativeInstance()
-                    if (nativeHandle != 0L) isDestroyed.set(false)
+                    if (nativeHandle != 0L) {
+                        isDestroyed.set(false)
+                        Log.e("AR_DEBUG", ">>> SlamManager: Native Instance created successfully. Handle: $nativeHandle")
+                    } else {
+                        Log.e("AR_DEBUG", ">>> [FATAL] SlamManager: Native Instance returned 0L handle!")
+                    }
                 } catch (e: UnsatisfiedLinkError) {
-                    Log.e("SlamManager", "Native method 'createNativeInstance' not found.", e)
+                    Log.e("AR_DEBUG", ">>> [FATAL] SlamManager: Native method 'createNativeInstance' not found.", e)
                 }
             }
         }
     }
 
     // SLAM Core
-    fun initialize() = lock.withLock { if (!isDestroyed.get()) initializeJni(nativeHandle) }
-    fun resetGLState() = lock.withLock { if (!isDestroyed.get()) resetGLStateJni(nativeHandle) }
-    fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray) = lock.withLock { if (!isDestroyed.get()) updateCameraJni(nativeHandle, viewMatrix, projectionMatrix) }
-    fun updateLight(intensity: Float, colorCorrection: FloatArray = floatArrayOf(1f, 1f, 1f)) = lock.withLock { if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity, colorCorrection) }
+    fun initialize() = lock.withLock {
+        Log.e("AR_DEBUG", ">>> SlamManager: initialize() called")
+        if (!isDestroyed.get()) initializeJni(nativeHandle)
+    }
+
+    fun resetGLState() = lock.withLock {
+        Log.e("AR_DEBUG", ">>> SlamManager: resetGLState() called")
+        if (!isDestroyed.get()) resetGLStateJni(nativeHandle)
+    }
+
+    fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray) = lock.withLock {
+        // We log this sparingly to prevent extreme logcat spam, but we explicitly track if the matrix is identity (failed tracking)
+        if (drawLogThrottle % 60 == 0) {
+            Log.e("AR_DEBUG", ">>> SlamManager: updateCamera() pushing matrices to JNI. ViewMatrix[0] = ${viewMatrix[0]}")
+        }
+        if (!isDestroyed.get()) updateCameraJni(nativeHandle, viewMatrix, projectionMatrix)
+    }
+
+    fun updateLight(intensity: Float, colorCorrection: FloatArray = floatArrayOf(1f, 1f, 1f)) = lock.withLock {
+        if (!isDestroyed.get()) updateLightJni(nativeHandle, intensity, colorCorrection)
+    }
+
     fun feedDepthData(image: Image) = lock.withLock { if (!isDestroyed.get()) feedDepthDataJni(nativeHandle, image.planes[0].buffer, image.width, image.height) }
     fun feedMonocularData(buffer: ByteBuffer, width: Int, height: Int) = lock.withLock { if (!isDestroyed.get()) feedMonocularDataJni(nativeHandle, buffer, width, height) }
     fun feedStereoData(leftImage: Image, rightImage: Image) = lock.withLock {
@@ -59,9 +85,25 @@ class SlamManager @Inject constructor() {
     }
     fun alignMap(transform: FloatArray) = lock.withLock { if (!isDestroyed.get()) alignMapJni(nativeHandle, transform) }
     fun saveKeyframe(path: String) = lock.withLock { if (!isDestroyed.get()) saveKeyframeJni(nativeHandle, path) else false }
-    fun onSurfaceChanged(width: Int, height: Int) = lock.withLock { if (!isDestroyed.get()) onSurfaceChangedJni(nativeHandle, width, height) }
-    fun setVisualizationMode(mode: Int) = lock.withLock { if (!isDestroyed.get()) setVisualizationModeJni(nativeHandle, mode) }
-    fun draw() = lock.withLock { if (!isDestroyed.get()) drawJni(nativeHandle) }
+
+    fun onSurfaceChanged(width: Int, height: Int) = lock.withLock {
+        Log.e("AR_DEBUG", ">>> SlamManager: onSurfaceChanged() W: $width, H: $height")
+        if (!isDestroyed.get()) onSurfaceChangedJni(nativeHandle, width, height)
+    }
+
+    fun setVisualizationMode(mode: Int) = lock.withLock {
+        Log.e("AR_DEBUG", ">>> SlamManager: setVisualizationMode() Mode: $mode")
+        if (!isDestroyed.get()) setVisualizationModeJni(nativeHandle, mode)
+    }
+
+    fun draw() = lock.withLock {
+        if (drawLogThrottle % 60 == 0) {
+            Log.e("AR_DEBUG", ">>> SlamManager: draw() invoking Native OpenGL render pipeline")
+        }
+        drawLogThrottle++
+        if (!isDestroyed.get()) drawJni(nativeHandle)
+    }
+
     fun loadWorld(path: String) = lock.withLock { if (!isDestroyed.get()) loadWorldJni(nativeHandle, path) else false }
     fun saveWorld(path: String) = lock.withLock { if (!isDestroyed.get()) saveWorldJni(nativeHandle, path) else false }
 
@@ -77,6 +119,7 @@ class SlamManager @Inject constructor() {
 
     fun destroy() {
         lock.withLock {
+            Log.e("AR_DEBUG", ">>> SlamManager: destroy() called. Terminating Native Instance.")
             if (!isDestroyed.getAndSet(true) && nativeHandle != 0L) {
                 destroyJni(nativeHandle)
                 nativeHandle = 0

@@ -1,44 +1,90 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
-import android.graphics.Bitmap
+import android.content.Context
+import android.opengl.GLES30
+import android.opengl.GLSurfaceView
+import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import javax.inject.Inject
+import timber.log.Timber
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
 
-/**
- * ArRenderer has been deconstructed.
- * It no longer implements GLSurfaceView.Renderer because the VulkanBackend
- * handles the render loop natively. This class now acts as a state proxy.
- */
-class ArRenderer @Inject constructor(
+class ArRenderer(
+    private val context: Context,
     private val slamManager: SlamManager
-) {
-    private val viewMatrix = FloatArray(16)
-    private val projectionMatrix = FloatArray(16)
+) : GLSurfaceView.Renderer {
 
-    fun updateViewMatrix(matrix: FloatArray) {
-        System.arraycopy(matrix, 0, viewMatrix, 0, 16)
-        slamManager.updateCamera(viewMatrix, projectionMatrix)
+    var session: Session? = null
+    private val backgroundRenderer = BackgroundRenderer()
+    private var hasSetTextureNames = false
+
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        Timber.tag("AR_DEBUG").e(">>> [1] onSurfaceCreated() INITIATED")
+        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+
+        try {
+            backgroundRenderer.createOnGlThread(context)
+            Timber.tag("AR_DEBUG").e(">>> [2] BackgroundRenderer created successfully")
+
+            slamManager.resetGLState()
+            slamManager.initialize()
+            slamManager.setVisualizationMode(0) // 0 = AR Mode
+            Timber.tag("AR_DEBUG").e(">>> [3] SlamManager initialized for AR Mode")
+        } catch (e: Exception) {
+            Timber.tag("AR_DEBUG").e(e, ">>> [!] FATAL ERROR in onSurfaceCreated")
+        }
     }
 
-    fun updateProjectionMatrix(matrix: FloatArray) {
-        System.arraycopy(matrix, 0, projectionMatrix, 0, 16)
-        slamManager.updateCamera(viewMatrix, projectionMatrix)
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        Timber.tag("AR_DEBUG").e(">>> [4] onSurfaceChanged() triggered. Width: $width, Height: $height")
+        GLES30.glViewport(0, 0, width, height)
+        slamManager.onSurfaceChanged(width, height)
     }
 
-    fun updateLightEstimate(intensity: Float, colorCorrection: FloatArray) {
-        slamManager.updateLight(intensity, colorCorrection)
-    }
+    override fun onDrawFrame(gl: GL10?) {
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
-    fun setOverlay(bitmap: Bitmap) {
-        // This is a placeholder for when the native side can consume
-        // a bitmap as a texture for AR projection.
-    }
+        val currentSession = session
+        if (currentSession == null) {
+            Timber.tag("AR_DEBUG").e(">>> [!] ABORT onDrawFrame: ARCore Session is NULL!")
+            return
+        }
 
-    /**
-     * Triggered by the UI loop to request a native draw call
-     * if not using continuous rendering.
-     */
-    fun onDrawFrame() {
-        slamManager.draw()
+        try {
+            if (!hasSetTextureNames) {
+                currentSession.setCameraTextureName(backgroundRenderer.textureId)
+                hasSetTextureNames = true
+                Timber.tag("AR_DEBUG").e(">>> [5] Camera texture name linked to ARCore Session")
+            }
+
+            // Update ARCore frame
+            val frame = currentSession.update()
+            val camera = frame.camera
+
+            // Draw the camera feed
+            backgroundRenderer.draw(frame)
+
+            // CRITICAL CHECK: Is ARCore actually tracking the world?
+            if (camera.trackingState == TrackingState.TRACKING) {
+                // We log this as debug instead of error so it doesn't completely flood the red error logs 60 times a second,
+                // but if you want it red, change .d to .e!
+                Timber.tag("AR_DEBUG").d(">>> [6] Camera is TRACKING. Sending matrices to SlamManager.")
+
+                val viewMatrix = FloatArray(16)
+                val projMatrix = FloatArray(16)
+
+                camera.getViewMatrix(viewMatrix, 0)
+                camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
+
+                slamManager.updateCamera(viewMatrix, projMatrix)
+                slamManager.draw()
+            } else {
+                Timber.tag("AR_DEBUG").e(">>> [X] Camera NOT TRACKING. Reason: ${camera.trackingFailureReason}")
+            }
+
+        } catch (e: Exception) {
+            Timber.tag("AR_DEBUG").e(e, ">>> [!] CRITICAL EXCEPTION during onDrawFrame")
+        }
     }
 }

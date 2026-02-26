@@ -41,7 +41,11 @@ fun ArView(
     onRendererCreated: (ArRenderer) -> Unit,
     hasCameraPermission: Boolean
 ) {
-    if (!hasCameraPermission) return
+    if (!hasCameraPermission) {
+        Log.e("AR_DEBUG", ">>> ArView: ABORTING - No Camera Permission!")
+        return
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -54,7 +58,6 @@ fun ArView(
     val layerRenderer = remember { ProjectedImageRenderer() }
     val displayRotationHelper = remember { DisplayRotationHelper(context) }
 
-    // Synchronize ARCore Session with Activity Lifecycle
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -75,7 +78,7 @@ fun ArView(
                         displayRotationHelper.onResume()
                         isSessionResumed = true
                     } catch (e: Exception) {
-                        Log.e("ArView", "ARCore Session resume failed", e)
+                        Log.e("AR_DEBUG", ">>> [FATAL] ARCore Session resume failed", e)
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
@@ -100,10 +103,10 @@ fun ArView(
         object : GLSurfaceView.Renderer {
             private val viewMatrix = FloatArray(16)
             private val projMatrix = FloatArray(16)
+            private var lastBoundSession: Session? = null
+            private var frameCount = 0L
 
             override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-                GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
-
                 backgroundRenderer.createOnGlThread(context)
                 planeRenderer.createOnGlThread(context)
                 pointCloudRenderer.createOnGlThread(context)
@@ -113,8 +116,8 @@ fun ArView(
                 slamManager.initialize()
                 slamManager.setVisualizationMode(0)
 
-                sessionState.value?.setCameraTextureName(backgroundRenderer.textureId)
-                onRendererCreated(ArRenderer(slamManager))
+                lastBoundSession = null
+                onRendererCreated(ArRenderer(context, slamManager))
             }
 
             override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -124,27 +127,57 @@ fun ArView(
             }
 
             override fun onDrawFrame(gl: GL10?) {
+                GLES30.glDepthMask(true)
+                GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
                 GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
                 val session = sessionState.value ?: return
                 if (!isSessionResumed) return
 
-                session.setCameraTextureName(backgroundRenderer.textureId)
+                if (lastBoundSession != session) {
+                    session.setCameraTextureName(backgroundRenderer.textureId)
+                    lastBoundSession = session
+                }
+
                 displayRotationHelper.updateSessionIfNeeded(session)
 
                 try {
                     val frame = session.update()
                     val camera = frame.camera
+                    frameCount++
 
                     // 1. Draw camera feed
                     backgroundRenderer.draw(frame)
+
+                    // -----------------------------------------------------------
+                    // CRITICAL FIX: The FBO & VAO Hijack Prevention
+                    // Force OpenGL to draw to the Screen (FBO 0) and unbind all
+                    // previous vertex arrays before the AR elements render.
+                    // -----------------------------------------------------------
+                    GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+                    // Depending on GL ES version, VAO unbinding helps prevent attribute bleed
+                    // GLES30.glBindVertexArray(0)
+                    GLES30.glUseProgram(0)
+                    GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+                    GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
+                    GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
+                    GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, 0)
+
+                    GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+                    GLES30.glDepthMask(true)
+                    GLES30.glDepthFunc(GLES30.GL_LESS)
+                    GLES30.glEnable(GLES30.GL_BLEND)
+                    GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+                    GLES30.glDisable(GLES30.GL_CULL_FACE)
 
                     // 2. Extract Pose
                     camera.getViewMatrix(viewMatrix, 0)
                     camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
 
-                    // 3. Render Polygons (Planes)
+                    // 3. Render Polygons (Planes & Point Clouds) FIRST
                     if (camera.trackingState == TrackingState.TRACKING) {
+                        if (frameCount % 60 == 0L) Log.e("AR_DEBUG", ">>> State: TRACKING. Drawing point cloud & planes.")
+
                         planeRenderer.drawPlanes(session, viewMatrix, projMatrix, camera.pose)
 
                         frame.acquirePointCloud().use { pointCloud ->
@@ -153,22 +186,29 @@ fun ArView(
                         }
                     }
 
-                    // 4. Update Native SLAM
-                    slamManager.updateCamera(viewMatrix, projMatrix)
+                    // 4. Render Projected Artwork
+                    if (activeLayer != null) {
+                        layerRenderer.setBitmap(activeLayer.bitmap)
 
+                        val modelMatrix = FloatArray(16).apply {
+                            android.opengl.Matrix.setIdentityM(this, 0)
+                            android.opengl.Matrix.translateM(this, 0, 0f, 0f, -2.0f) // Push 2m forward
+                            android.opengl.Matrix.scaleM(this, 0, activeLayer.scale, activeLayer.scale, 1.0f)
+                            android.opengl.Matrix.rotateM(this, 0, activeLayer.rotationZ, 0f, 0f, 1f)
+                        }
+
+                        layerRenderer.draw(viewMatrix, projMatrix, modelMatrix, activeLayer)
+                    }
+
+                    // 5. Update & Draw Native SLAM LAST!
+                    // If the Native C++ Engine is corrupting the GL State Machine,
+                    // executing it last ensures our Java AR elements render safely to the screen first.
+                    slamManager.updateCamera(viewMatrix, projMatrix)
                     val lightEstimate = frame.lightEstimate
                     if (lightEstimate.state == com.google.ar.core.LightEstimate.State.VALID) {
                         slamManager.updateLight(lightEstimate.pixelIntensity)
                     }
-
                     slamManager.draw()
-
-                    // 5. Render Projected Artwork
-                    activeLayer?.let { layer ->
-                        layerRenderer.setBitmap(layer.bitmap)
-                        val identity = FloatArray(16).apply { android.opengl.Matrix.setIdentityM(this, 0) }
-                        layerRenderer.draw(viewMatrix, projMatrix, identity, layer)
-                    }
 
                     // 6. Asynchronous CV Tasks
                     if (frame.timestamp % 15 == 0L) {
@@ -183,7 +223,7 @@ fun ArView(
                     }
 
                 } catch (e: Exception) {
-                    Log.e("ArView", "Draw frame failure", e)
+                    Log.e("AR_DEBUG", ">>> [FATAL] Draw frame failure", e)
                 }
             }
         }
@@ -195,6 +235,7 @@ fun ArView(
             GLSurfaceView(ctx).apply {
                 preserveEGLContextOnPause = true
                 setEGLContextClientVersion(3)
+                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                 setRenderer(renderer)
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             }
