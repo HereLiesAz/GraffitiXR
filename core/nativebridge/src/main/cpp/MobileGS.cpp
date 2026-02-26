@@ -123,9 +123,6 @@ void MobileGS::onSurfaceChanged(int width, int height) {
 }
 
 void MobileGS::draw() {
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     if (!isInitialized) return;
 
     if (visMode == 0 && vulkanRenderer) {
