@@ -25,15 +25,34 @@ class TeleologicalTracker @Inject constructor(private val slamManager: SlamManag
     }
 
     fun processTeleologicalFrame(bitmap: Bitmap): Mat {
+        // OpenCV asserts the bitmap MUST be ARGB_8888 or RGB_565.
+        // CameraX/DualAnalyzer might be feeding us hardware bitmaps or other configs.
+        val safeBitmap = if (bitmap.config != Bitmap.Config.ARGB_8888) {
+            bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: return Mat()
+        } else {
+            bitmap
+        }
+
         val mat = Mat()
-        Utils.bitmapToMat(bitmap, mat)
+        Utils.bitmapToMat(safeBitmap, mat)
+
         val grayMat = Mat()
         if (mat.channels() == 4) {
             Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_RGBA2GRAY)
-        } else {
+        } else if (mat.channels() == 3) {
             Imgproc.cvtColor(mat, grayMat, Imgproc.COLOR_RGB2GRAY)
+        } else {
+            // Already grayscale or a format OpenCV can't natively resolve via generic cvtColor.
+            mat.copyTo(grayMat)
         }
+
         mat.release()
+
+        // Only recycle if we created a temporary copy. Don't destroy the source payload.
+        if (safeBitmap !== bitmap) {
+            safeBitmap.recycle()
+        }
+
         return grayMat
     }
 }

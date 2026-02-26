@@ -1,83 +1,44 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.graphics.Bitmap
-import android.opengl.GLSurfaceView
-import android.opengl.Matrix
-import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengles.GL10
+import javax.inject.Inject
 
-class ArRenderer(
+/**
+ * ArRenderer has been deconstructed.
+ * It no longer implements GLSurfaceView.Renderer because the VulkanBackend
+ * handles the render loop natively. This class now acts as a state proxy.
+ */
+class ArRenderer @Inject constructor(
     private val slamManager: SlamManager
-) : GLSurfaceView.Renderer {
-
-    private val projectionMatrix = FloatArray(16)
+) {
     private val viewMatrix = FloatArray(16)
-    private val simpleQuadRenderer = SimpleQuadRenderer()
-    private val modelMatrix = FloatArray(16)
-    private var overlayBitmap: Bitmap? = null
-    private var pendingOverlayBitmap: Bitmap? = null
-
-    init {
-        Matrix.setIdentityM(projectionMatrix, 0)
-        Matrix.setIdentityM(viewMatrix, 0)
-        Matrix.setIdentityM(modelMatrix, 0)
-    }
-
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        slamManager.ensureInitialized()
-        slamManager.initialize()
-        simpleQuadRenderer.createOnGlThread()
-    }
-
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        slamManager.onSurfaceChanged(width, height)
-        val ratio = width.toFloat() / height.toFloat()
-        Matrix.perspectiveM(projectionMatrix, 0, 45f, ratio, 0.1f, 100f)
-    }
-
-    override fun onDrawFrame(gl: GL10?) {
-        slamManager.updateCamera(viewMatrix, projectionMatrix)
-        // The native draw call now handles clearing the screen to transparent
-        slamManager.draw()
-
-        val pending = pendingOverlayBitmap
-        if (pending != null) {
-            simpleQuadRenderer.updateTexture(pending)
-            pendingOverlayBitmap = null
-        }
-
-        if (overlayBitmap != null) {
-            Matrix.setIdentityM(modelMatrix, 0)
-            Matrix.translateM(modelMatrix, 0, 0f, 0f, -1.0f)
-            simpleQuadRenderer.draw(
-                viewMatrix,
-                projectionMatrix,
-                modelMatrix,
-                simpleQuadRenderer.getTextureId(),
-                1f, 0f, 1f, 1f, 1f,
-                BlendMode.SrcOver
-            )
-        }
-    }
+    private val projectionMatrix = FloatArray(16)
 
     fun updateViewMatrix(matrix: FloatArray) {
         System.arraycopy(matrix, 0, viewMatrix, 0, 16)
+        slamManager.updateCamera(viewMatrix, projectionMatrix)
     }
 
-    fun updateLightEstimate(intensity: Float, colorCorrection: FloatArray = floatArrayOf(1f, 1f, 1f)) {
+    fun updateProjectionMatrix(matrix: FloatArray) {
+        System.arraycopy(matrix, 0, projectionMatrix, 0, 16)
+        slamManager.updateCamera(viewMatrix, projectionMatrix)
+    }
+
+    fun updateLightEstimate(intensity: Float, colorCorrection: FloatArray) {
         slamManager.updateLight(intensity, colorCorrection)
     }
 
-    fun setOverlay(bitmap: Bitmap?) {
-        overlayBitmap = bitmap
-        if (bitmap != null) {
-            pendingOverlayBitmap = bitmap
-        }
+    fun setOverlay(bitmap: Bitmap) {
+        // This is a placeholder for when the native side can consume
+        // a bitmap as a texture for AR projection.
     }
 
-    fun saveKeyframe(path: String) {
-        slamManager.saveKeyframe(path)
+    /**
+     * Triggered by the UI loop to request a native draw call
+     * if not using continuous rendering.
+     */
+    fun onDrawFrame() {
+        slamManager.draw()
     }
 }
