@@ -96,7 +96,7 @@ class EditorViewModelTest {
     @Test
     fun `initial state is correct`() = runTest {
         val state = viewModel.uiState.value
-        assertEquals(EditorMode.TRACE, state.editorMode)
+        assertEquals(EditorMode.AR, state.editorMode)
         assertTrue(state.layers.isEmpty())
         assertFalse(state.isLoading)
     }
