@@ -16,7 +16,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHostScope
-import com.hereliesaz.aznavrail.AzNavRailScope
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
@@ -86,7 +85,7 @@ class MainActivity : ComponentActivity() {
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
 
-                // Navigation Observer
+                // 1. Dashboard Navigation Observer
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
                         when (destination) {
@@ -95,16 +94,28 @@ class MainActivity : ComponentActivity() {
                                 startActivity(intent)
                             }
                             "project_library" -> {
-                                // For now, we assume this is handled by a modal or separate screen
-                                // If using Navigation Component for screens:
-                                // navController.navigate("library")
-                                // Since layout is custom, we might toggle a state or use AzNavHost
+                                // Just a modal/overlay in this single-activity architecture for now
+                                // or potentially a navigation destination if we expanded the graph
                             }
-                            "settings" -> {
-                                // Similarly handle settings
-                            }
+                            "settings" -> { }
                         }
                         dashboardViewModel.onNavigationConsumed()
+                    }
+                }
+
+                // 2. Rail <-> ViewModel Synchronization
+                // When the Rail navigates (changes route), update the ViewModel.
+                LaunchedEffect(navController) {
+                    navController.currentBackStackEntryFlow.collect { entry ->
+                        val route = entry.destination.route
+                        if (route != null) {
+                            try {
+                                val mode = EditorMode.valueOf(route)
+                                editorViewModel.setEditorMode(mode)
+                            } catch (e: IllegalArgumentException) {
+                                // Ignore routes that aren't modes (if any)
+                            }
+                        }
                     }
                 }
 
@@ -146,8 +157,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ... (Rest of file remains unchanged)
-
     override fun onDestroy() {
         super.onDestroy()
         if (isFinishing) slamManager.destroy()
@@ -181,11 +190,47 @@ class MainActivity : ComponentActivity() {
 
         val requestPermissions = { permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.ACCESS_FINE_LOCATION)) }
 
+        // --- CORE MODES ---
+        // Added 'route' parameters. AzNavRail uses these to highlight the active item.
+        // We removed the 'onClick' handlers because the route change triggers the LaunchedEffect in MainActivity.
+
         azRailHostItem(id = "mode_host", text = navStrings.modes, info = "Switch editor modes")
-        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = "Augmented Reality", shape = AzButtonShape.NONE) { if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.AR) else requestPermissions() }
-        azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, info = "AR Overlay", shape = AzButtonShape.NONE) { if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.OVERLAY) else requestPermissions() }
-        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, info = "Static Image", shape = AzButtonShape.NONE) { editorViewModel.setEditorMode(EditorMode.STATIC) }
-        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, info = "Trace Mode", shape = AzButtonShape.NONE) { editorViewModel.setEditorMode(EditorMode.TRACE) }
+
+        azRailSubItem(
+            id = "ar",
+            hostId = "mode_host",
+            text = navStrings.arMode,
+            info = "Augmented Reality",
+            shape = AzButtonShape.NONE,
+            route = EditorMode.AR.name
+        )
+
+        azRailSubItem(
+            id = "overlay",
+            hostId = "mode_host",
+            text = navStrings.overlay,
+            info = "AR Overlay",
+            shape = AzButtonShape.NONE,
+            route = EditorMode.OVERLAY.name
+        )
+
+        azRailSubItem(
+            id = "mockup",
+            hostId = "mode_host",
+            text = navStrings.mockup,
+            info = "Static Image",
+            shape = AzButtonShape.NONE,
+            route = EditorMode.STATIC.name
+        )
+
+        azRailSubItem(
+            id = "trace",
+            hostId = "mode_host",
+            text = navStrings.trace,
+            info = "Trace Mode",
+            shape = AzButtonShape.NONE,
+            route = EditorMode.TRACE.name
+        )
 
         azDivider()
 
