@@ -18,10 +18,13 @@ import com.hereliesaz.graffitixr.common.model.BlendMode
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.feature.editor.export.ExportManager
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -50,6 +53,7 @@ class EditorViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val backgroundRemover: BackgroundRemover,
     private val slamManager: SlamManager,
+    private val exportManager: ExportManager,
     private val dispatchers: DispatcherProvider
 ) : ViewModel() {
 
@@ -99,7 +103,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    private fun restoreProjectState(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) {
+    private fun restoreProjectState(project: GraffitiProject) {
         val isFirstLoad = lastRestoredProjectId != project.id
         lastRestoredProjectId = project.id
 
@@ -107,7 +111,7 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.io) {
             try {
                 val restoredLayers = project.layers.mapNotNull { overlayLayer ->
-                    loadBitmapFromUri(overlayLayer.uri)?.let { bitmap ->
+                    loadScaledBitmap(overlayLayer.uri)?.let { bitmap ->
                         Layer(
                             id = overlayLayer.id,
                             name = overlayLayer.name,
@@ -134,10 +138,11 @@ class EditorViewModel @Inject constructor(
                     }
                 }
 
-                val backgroundBitmap = project.backgroundImageUri?.let { loadBitmapFromUri(it) }
+                val backgroundBitmap = project.backgroundImageUri?.let { loadScaledBitmap(it) }
 
                 _uiState.update {
                     it.copy(
+                        projectId = project.id,
                         layers = restoredLayers,
                         backgroundImageUri = project.backgroundImageUri?.toString(),
                         backgroundBitmap = backgroundBitmap,
@@ -180,7 +185,7 @@ class EditorViewModel @Inject constructor(
 
     fun onAddLayer(uri: Uri) {
         viewModelScope.launch(dispatchers.io) {
-            val bitmap = loadBitmapFromUri(uri)
+            val bitmap = loadScaledBitmap(uri)
             if (bitmap != null) {
                 val fileName = getFileName(uri)
                 val newLayer = Layer(
@@ -420,7 +425,7 @@ class EditorViewModel @Inject constructor(
 
             viewModelScope.launch(dispatchers.io) {
                 val restoredLayers = previousState.layers.map { layer ->
-                    val bitmap = loadBitmapFromUri(layer.uri) ?: layer.bitmap
+                    val bitmap = loadScaledBitmap(layer.uri) ?: layer.bitmap
                     layer.copy(bitmap = bitmap)
                 }
                 withContext(dispatchers.main) {
@@ -437,7 +442,7 @@ class EditorViewModel @Inject constructor(
 
             viewModelScope.launch(dispatchers.io) {
                 val restoredLayers = nextState.layers.map { layer ->
-                    val bitmap = loadBitmapFromUri(layer.uri) ?: layer.bitmap
+                    val bitmap = loadScaledBitmap(layer.uri) ?: layer.bitmap
                     layer.copy(bitmap = bitmap)
                 }
                 withContext(dispatchers.main) {
@@ -468,7 +473,7 @@ class EditorViewModel @Inject constructor(
     fun setBackgroundImage(uri: Uri?) {
         if (uri == null) return
         viewModelScope.launch(dispatchers.io) {
-            val bitmap = loadBitmapFromUri(uri)
+            val bitmap = loadScaledBitmap(uri)
             _uiState.update { it.copy(backgroundImageUri = uri.toString(), backgroundBitmap = bitmap) }
         }
     }
@@ -585,7 +590,7 @@ class EditorViewModel @Inject constructor(
 
             val project = projectRepository.currentProject.value
             val savedUri = project?.let {
-                val path = projectRepository.saveArtifact(it.id, "edges_${System.currentTimeMillis()}.png", BitmapUtils.bitmapToByteArray(edgesBitmap))
+                val path = projectRepository.saveArtifact(it.id, "edges_${System.currentTimeMillis()}.png", com.hereliesaz.graffitixr.feature.editor.BitmapUtils.bitmapToByteArray(edgesBitmap))
                 if (path != null) Uri.parse("file://$path") else null
             } ?: activeLayer.uri
 
@@ -602,7 +607,7 @@ class EditorViewModel @Inject constructor(
             result.onSuccess { bgRemovedBitmap ->
                 val project = projectRepository.currentProject.value
                 val savedUri = project?.let {
-                    val path = projectRepository.saveArtifact(it.id, "isolated_${System.currentTimeMillis()}.png", BitmapUtils.bitmapToByteArray(bgRemovedBitmap))
+                    val path = projectRepository.saveArtifact(it.id, "isolated_${System.currentTimeMillis()}.png", com.hereliesaz.graffitixr.feature.editor.BitmapUtils.bitmapToByteArray(bgRemovedBitmap))
                     if (path != null) Uri.parse("file://$path") else null
                 } ?: activeLayer.uri
 
@@ -622,6 +627,24 @@ class EditorViewModel @Inject constructor(
 
     fun exportProject() {
         _exportTrigger.value = true
+        viewModelScope.launch(dispatchers.io) {
+            try {
+                // Default high res or based on background
+                val width = 1920
+                val height = 1080
+                val bitmap = exportManager.exportSingleImage(_uiState.value.layers, width, height)
+
+                com.hereliesaz.graffitixr.common.util.saveBitmapToGallery(context, bitmap)
+                bitmap.recycle()
+
+                _message.emit("Export successful")
+            } catch (e: Exception) {
+                Log.e("EditorViewModel", "Export failed", e)
+                _message.emit("Export failed")
+            } finally {
+                _exportTrigger.value = false
+            }
+        }
     }
 
     fun onExportComplete() {
@@ -635,14 +658,35 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadBitmapFromUri(uri: Uri): Bitmap? {
+    private suspend fun loadScaledBitmap(uri: Uri): Bitmap? {
         return withContext(dispatchers.io) {
             try {
+                val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+
                 if (uri.scheme == "file") {
-                    BitmapFactory.decodeFile(uri.path)
+                    BitmapFactory.decodeFile(uri.path, options)
                 } else {
-                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        BitmapFactory.decodeStream(inputStream)
+                    context.contentResolver.openInputStream(uri)?.use {
+                        BitmapFactory.decodeStream(it, null, options)
+                    }
+                }
+
+                // Downsample to fit within 2048x2048 to avoid OOM
+                var sampleSize = 1
+                while (options.outWidth / sampleSize > 2048 || options.outHeight / sampleSize > 2048) {
+                    sampleSize *= 2
+                }
+
+                val loadOptions = BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                    inMutable = true // Allow modification
+                }
+
+                if (uri.scheme == "file") {
+                    BitmapFactory.decodeFile(uri.path, loadOptions)
+                } else {
+                    context.contentResolver.openInputStream(uri)?.use {
+                        BitmapFactory.decodeStream(it, null, loadOptions)
                     }
                 }
             } catch (e: Exception) {
@@ -655,10 +699,12 @@ class EditorViewModel @Inject constructor(
     fun saveProject(name: String? = null) {
         isSaving = true
         viewModelScope.launch(dispatchers.io) {
-            val currentProject = projectRepository.currentProject.value
             val currentState = _uiState.value
+            val currentProjectId = currentState.projectId
+            val currentRepoProject = projectRepository.currentProject.value
+
             val overlayLayers = currentState.layers.map { layer ->
-                com.hereliesaz.graffitixr.common.model.OverlayLayer(
+                OverlayLayer(
                     id = layer.id,
                     name = layer.name,
                     uri = layer.uri,
@@ -682,29 +728,45 @@ class EditorViewModel @Inject constructor(
                 )
             }
 
-            if (currentProject != null) {
-                val updatedProject = currentProject.copy(
-                    name = name ?: currentProject.name,
-                    layers = overlayLayers,
-                    backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
-                    mapPath = currentState.mapPath,
-                    isRightHanded = currentState.isRightHanded,
-                    lastModified = System.currentTimeMillis()
-                )
-                projectRepository.updateProject(updatedProject)
+            if (currentProjectId != null) {
+                val projectToUpdate = if (currentRepoProject?.id == currentProjectId) {
+                    currentRepoProject
+                } else {
+                    projectRepository.getProject(currentProjectId)
+                }
+
+                if (projectToUpdate != null) {
+                    val updatedProject = projectToUpdate.copy(
+                        name = name ?: projectToUpdate.name,
+                        layers = overlayLayers,
+                        backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
+                        mapPath = currentState.mapPath,
+                        isRightHanded = currentState.isRightHanded,
+                        lastModified = System.currentTimeMillis()
+                    )
+                    projectRepository.updateProject(updatedProject)
+                } else {
+                    Log.e("EditorViewModel", "Project ID $currentProjectId missing in repo. Creating new.")
+                    createNewProject(name, overlayLayers, currentState)
+                }
             } else {
-                val newProject = com.hereliesaz.graffitixr.common.model.GraffitiProject(
-                    id = UUID.randomUUID().toString(),
-                    name = name ?: "Untitled Project",
-                    layers = overlayLayers,
-                    backgroundImageUri = if (currentState.backgroundImageUri != null) Uri.parse(currentState.backgroundImageUri) else null,
-                    mapPath = currentState.mapPath,
-                    isRightHanded = currentState.isRightHanded,
-                    lastModified = System.currentTimeMillis()
-                )
-                projectRepository.createProject(newProject)
+                createNewProject(name, overlayLayers, currentState)
             }
             isSaving = false
         }
+    }
+
+    private suspend fun createNewProject(name: String?, layers: List<OverlayLayer>, state: EditorUiState) {
+        val newProject = GraffitiProject(
+            id = UUID.randomUUID().toString(),
+            name = name ?: "Untitled Project",
+            layers = layers,
+            backgroundImageUri = if (state.backgroundImageUri != null) Uri.parse(state.backgroundImageUri) else null,
+            mapPath = state.mapPath,
+            isRightHanded = state.isRightHanded,
+            lastModified = System.currentTimeMillis()
+        )
+        projectRepository.createProject(newProject)
+        _uiState.update { it.copy(projectId = newProject.id) }
     }
 }

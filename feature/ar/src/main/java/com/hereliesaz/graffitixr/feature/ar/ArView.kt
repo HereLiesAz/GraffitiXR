@@ -1,45 +1,36 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import android.content.Context
-import android.graphics.PixelFormat
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
+import android.opengl.GLES30
+import android.opengl.GLSurfaceView
 import android.util.Log
-import android.view.Surface
-import android.view.SurfaceHolder
-import android.view.SurfaceView
-import android.view.WindowManager
-import android.opengl.Matrix
-import androidx.annotation.OptIn
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.google.ar.core.Config
+import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.design.rendering.ProjectedImageRenderer
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
-import com.hereliesaz.graffitixr.feature.ar.util.DualAnalyzer
+import com.hereliesaz.graffitixr.feature.ar.rendering.BackgroundRenderer
+import com.hereliesaz.graffitixr.feature.ar.rendering.PlaneRenderer
+import com.hereliesaz.graffitixr.feature.ar.rendering.PointCloudRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import java.util.concurrent.Executors
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
 
 /**
- * ArView manages the camera lifecycle and the native Vulkan surface.
- * It provides the physical Surface to SlamManager for direct native rendering.
+ * The AR Viewport implementation.
+ * Manages the ARCore Session lifecycle and the OpenGL rendering pipeline.
+ * Hardware camera is managed via ARCore. No CameraX bindings should be active simultaneously.
  */
-@OptIn(ExperimentalGetImage::class)
 @Composable
 fun ArView(
     viewModel: ArViewModel,
@@ -50,138 +41,163 @@ fun ArView(
     onRendererCreated: (ArRenderer) -> Unit,
     hasCameraPermission: Boolean
 ) {
+    if (!hasCameraPermission) return
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val assetManager = context.assets
 
-    val renderer = remember(slamManager) { ArRenderer(slamManager) }
-    var ambientLight by remember { mutableFloatStateOf(0.5f) }
+    val sessionState = remember { mutableStateOf<Session?>(null) }
+    var isSessionResumed by remember { mutableStateOf(false) }
 
-    val previewView = remember {
-        PreviewView(context).apply {
-            implementationMode = PreviewView.ImplementationMode.PERFORMANCE
-            scaleType = PreviewView.ScaleType.FILL_CENTER
+    val backgroundRenderer = remember { BackgroundRenderer() }
+    val planeRenderer = remember { PlaneRenderer() }
+    val pointCloudRenderer = remember { PointCloudRenderer() }
+    val layerRenderer = remember { ProjectedImageRenderer() }
+    val displayRotationHelper = remember { DisplayRotationHelper(context) }
+
+    // Synchronize ARCore Session with Activity Lifecycle
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    try {
+                        if (sessionState.value == null) {
+                            val session = Session(context)
+                            val config = Config(session).apply {
+                                focusMode = Config.FocusMode.AUTO
+                                updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                                planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                                lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
+                            }
+                            session.configure(config)
+                            sessionState.value = session
+                        }
+                        sessionState.value?.resume()
+                        displayRotationHelper.onResume()
+                        isSessionResumed = true
+                    } catch (e: Exception) {
+                        Log.e("ArView", "ARCore Session resume failed", e)
+                    }
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    isSessionResumed = false
+                    displayRotationHelper.onPause()
+                    sessionState.value?.pause()
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    sessionState.value?.close()
+                    sessionState.value = null
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
-    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
-    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-    var camera by remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
-
-    val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
-
-    val listener = remember(renderer) {
-        object : SensorEventListener {
-            private val rotationMatrix = FloatArray(16)
-            private val remappedMatrix = FloatArray(16)
+    val renderer = remember {
+        object : GLSurfaceView.Renderer {
             private val viewMatrix = FloatArray(16)
+            private val projMatrix = FloatArray(16)
 
-            override fun onSensorChanged(event: SensorEvent?) {
-                event?.let {
-                    SensorManager.getRotationMatrixFromVector(rotationMatrix, it.values)
-                    val display = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
-                    when(display.rotation) {
-                        Surface.ROTATION_0 -> SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Y, remappedMatrix)
-                        Surface.ROTATION_90 -> SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X, remappedMatrix)
-                        Surface.ROTATION_180 -> SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Y, remappedMatrix)
-                        Surface.ROTATION_270 -> SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X, remappedMatrix)
-                        else -> System.arraycopy(rotationMatrix, 0, remappedMatrix, 0, 16)
+            override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+                GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+
+                backgroundRenderer.createOnGlThread(context)
+                planeRenderer.createOnGlThread(context)
+                pointCloudRenderer.createOnGlThread(context)
+                layerRenderer.createOnGlThread(context)
+
+                slamManager.resetGLState()
+                slamManager.initialize()
+                slamManager.setVisualizationMode(0)
+
+                sessionState.value?.setCameraTextureName(backgroundRenderer.textureId)
+                onRendererCreated(ArRenderer(slamManager))
+            }
+
+            override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+                displayRotationHelper.onSurfaceChanged(width, height)
+                GLES30.glViewport(0, 0, width, height)
+                slamManager.onSurfaceChanged(width, height)
+            }
+
+            override fun onDrawFrame(gl: GL10?) {
+                GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+
+                val session = sessionState.value ?: return
+                if (!isSessionResumed) return
+
+                session.setCameraTextureName(backgroundRenderer.textureId)
+                displayRotationHelper.updateSessionIfNeeded(session)
+
+                try {
+                    val frame = session.update()
+                    val camera = frame.camera
+
+                    // 1. Draw camera feed
+                    backgroundRenderer.draw(frame)
+
+                    // 2. Extract Pose
+                    camera.getViewMatrix(viewMatrix, 0)
+                    camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
+
+                    // 3. Render Polygons (Planes)
+                    if (camera.trackingState == TrackingState.TRACKING) {
+                        planeRenderer.drawPlanes(session, viewMatrix, projMatrix, camera.pose)
+
+                        frame.acquirePointCloud().use { pointCloud ->
+                            pointCloudRenderer.update(pointCloud)
+                            pointCloudRenderer.draw(viewMatrix, projMatrix)
+                        }
                     }
-                    Matrix.transposeM(viewMatrix, 0, remappedMatrix, 0)
-                    slamManager.updateCamera(viewMatrix, FloatArray(16).apply { Matrix.perspectiveM(this, 0, 60f, 1080f/2340f, 0.1f, 100f) })
+
+                    // 4. Update Native SLAM
+                    slamManager.updateCamera(viewMatrix, projMatrix)
+
+                    val lightEstimate = frame.lightEstimate
+                    if (lightEstimate.state == com.google.ar.core.LightEstimate.State.VALID) {
+                        slamManager.updateLight(lightEstimate.pixelIntensity)
+                    }
+
+                    slamManager.draw()
+
+                    // 5. Render Projected Artwork
+                    activeLayer?.let { layer ->
+                        layerRenderer.setBitmap(layer.bitmap)
+                        val identity = FloatArray(16).apply { android.opengl.Matrix.setIdentityM(this, 0) }
+                        layerRenderer.draw(viewMatrix, projMatrix, identity, layer)
+                    }
+
+                    // 6. Asynchronous CV Tasks
+                    if (frame.timestamp % 15 == 0L) {
+                        try {
+                            frame.acquireCameraImage()?.use { image ->
+                                val yBuffer = image.planes[0].buffer
+                                val yData = ByteArray(yBuffer.remaining())
+                                yBuffer.get(yData)
+                                viewModel.processTeleologicalFrame(yData, image.width, image.height)
+                            }
+                        } catch (e: Exception) { }
+                    }
+
+                } catch (e: Exception) {
+                    Log.e("ArView", "Draw frame failure", e)
                 }
             }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
     }
 
-    // Native Surface Management
-    val surfaceView = remember {
-        SurfaceView(context).apply {
-            holder.setFormat(PixelFormat.TRANSLUCENT)
-            setZOrderMediaOverlay(true)
-            holder.addCallback(object : SurfaceHolder.Callback {
-                override fun surfaceCreated(holder: SurfaceHolder) {
-                    slamManager.initVulkan(holder.surface, assetManager)
-                }
-
-                override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                    slamManager.resizeVulkan(width, height)
-                    slamManager.onSurfaceChanged(width, height)
-                }
-
-                override fun surfaceDestroyed(holder: SurfaceHolder) {
-                    slamManager.destroyVulkan()
-                }
-            })
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { ctx ->
+            GLSurfaceView(ctx).apply {
+                preserveEGLContextOnPause = true
+                setEGLContextClientVersion(3)
+                setRenderer(renderer)
+                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            }
         }
-    }
-
-    DisposableEffect(sensorManager, rotationSensor) {
-        if (rotationSensor != null) {
-            sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
-        }
-        onDispose {
-            sensorManager.unregisterListener(listener)
-            cameraProvider?.unbindAll()
-            cameraExecutor.shutdown()
-        }
-    }
-
-    LaunchedEffect(hasCameraPermission, lifecycleOwner) {
-        if (hasCameraPermission) {
-            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-            cameraProviderFuture.addListener({
-                try {
-                    val provider = cameraProviderFuture.get()
-                    cameraProvider = provider
-                    val preview = Preview.Builder().build()
-                    val selector = CameraSelector.DEFAULT_BACK_CAMERA
-                    val analysis = ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
-                        .build()
-                        .also {
-                            it.setAnalyzer(cameraExecutor) { imageProxy ->
-                                val image = imageProxy.image
-                                if (image != null) {
-                                    // Direct monocular feed to SLAM
-                                    val buffer = image.planes[0].buffer
-                                    slamManager.feedMonocularData(buffer, image.width, image.height)
-
-                                    // Optional: Process for light estimation
-                                    val yPlane = image.planes[0].buffer
-                                    var sum = 0L
-                                    val pixels = ByteArray(yPlane.remaining())
-                                    yPlane.get(pixels)
-                                    for (p in pixels) sum += (p.toInt() and 0xFF)
-                                    ambientLight = (sum / pixels.size.toFloat()) / 255f
-                                }
-                                imageProxy.close()
-                            }
-                        }
-
-                    preview.setSurfaceProvider(previewView.surfaceProvider)
-                    provider.unbindAll()
-                    camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
-                } catch (e: Exception) {
-                    Log.e("ArView", "Camera binding failed", e)
-                }
-            }, ContextCompat.getMainExecutor(context))
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (hasCameraPermission) {
-            AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
-        }
-        AndroidView(factory = { surfaceView }, modifier = Modifier.fillMaxSize())
-    }
-
-    LaunchedEffect(ambientLight, uiState.isFlashlightOn) {
-        val intensity = if (uiState.isFlashlightOn) 1.0f else ambientLight
-        slamManager.updateLight(intensity)
-        camera?.cameraControl?.enableTorch(uiState.isFlashlightOn)
-    }
+    )
 }
