@@ -13,6 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.navigation.NavHostController
+import com.hereliesaz.aznavrail.AzNavHostScope
+import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.ar.ArView
@@ -88,6 +91,32 @@ fun MainScreen(
             else -> {
                 // Default fallback
                 Box(Modifier.fillMaxSize().background(Color.Black))
+            }
+        }
+    }
+}
+
+@Composable
+fun TraceBackground(editorViewModel: EditorViewModel) {
+    val editorUiState by editorViewModel.uiState.collectAsState()
+
+    if (editorUiState.editorMode == EditorMode.TRACE) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black), // Black background for lightbox mode
+            contentAlignment = Alignment.Center
+        ) {
+            val bitmap = editorUiState.backgroundBitmap
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Trace Image",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                Text("Lightbox Mode: Import an image to trace", color = Color.White)
             }
         }
     }
