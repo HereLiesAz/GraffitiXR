@@ -144,7 +144,7 @@ class EditorViewModel @Inject constructor(
                         mapPath = project.mapPath,
                         activeLayerId = if (isFirstLoad) restoredLayers.firstOrNull()?.id else it.activeLayerId,
                         isRightHanded = project.isRightHanded,
-                        editorMode = if (isFirstLoad) EditorMode.TRACE else it.editorMode
+                        editorMode = if (isFirstLoad) EditorMode.AR else it.editorMode
                     )
                 }
             } catch (e: Exception) {
