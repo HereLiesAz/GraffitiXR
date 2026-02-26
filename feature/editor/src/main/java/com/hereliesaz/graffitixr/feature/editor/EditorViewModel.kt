@@ -137,19 +137,45 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onAdjustClicked() = _uiState.update { it.copy(activePanel = EditorPanel.ADJUST) }
-
-    fun onScaleChanged(scale: Float) {
-        updateActiveLayer { it.copy(scale = scale) }
+    fun onAdjustClicked() {
+        _uiState.update {
+            it.copy(activePanel = if (it.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST)
+        }
     }
 
-    fun onOffsetChanged(delta: androidx.compose.ui.geometry.Offset) {
-        updateActiveLayer { it.copy(offset = it.offset + delta) }
+    fun onDismissPanel() {
+        _uiState.update { it.copy(activePanel = EditorPanel.NONE) }
+    }
+
+    fun onTransformGesture(pan: androidx.compose.ui.geometry.Offset, zoom: Float, rotation: Float) {
+        updateActiveLayer { layer ->
+            layer.copy(
+                scale = layer.scale * zoom,
+                offset = layer.offset + pan,
+                rotationZ = layer.rotationZ + rotation
+            )
+        }
     }
 
     fun toggleImageLock() {
         updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }
     }
+
+    // --- Action Methods matching EditorUi Signatures ---
+    fun onOpacityChanged(value: Float) = updateActiveLayer { it.copy(opacity = value) }
+    fun onBrightnessChanged(value: Float) = updateActiveLayer { it.copy(brightness = value) }
+    fun onContrastChanged(value: Float) = updateActiveLayer { it.copy(contrast = value) }
+    fun onSaturationChanged(value: Float) = updateActiveLayer { it.copy(saturation = value) }
+    fun onColorBalanceRChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceR = value) }
+    fun onColorBalanceGChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceG = value) }
+    fun onColorBalanceBChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceB = value) }
+
+    fun onUndoClicked() { /* Decrease undo index stack */ }
+    fun onRedoClicked() { /* Increase undo index stack */ }
+    fun onMagicClicked() { /* Trigger auto-alignment logic */ }
+
+    fun onAdjustmentStart() = _uiState.update { it.copy(gestureInProgress = true) }
+    fun onAdjustmentEnd() = _uiState.update { it.copy(gestureInProgress = false) }
 
     private fun updateActiveLayer(transform: (Layer) -> Layer) {
         _uiState.update { state ->

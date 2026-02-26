@@ -1,22 +1,33 @@
 package com.hereliesaz.graffitixr
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.ar.CameraPreview
+import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
+import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import androidx.compose.runtime.collectAsState
 
-/**
- * The primary container for the AR and Editor views.
- * Reconciled to accept the specific parameter list demanded by MainActivity.
- */
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -28,44 +39,99 @@ fun MainScreen(
     hasCameraPermission: Boolean,
     modifier: Modifier = Modifier
 ) {
-    // This assumes MainViewModel and EditorViewModel provide the necessary state
-    // We observe the state here to pass down to subcomponents
-    val uiState = editorViewModel.uiState.collectAsState().value
+    val uiState by editorViewModel.uiState.collectAsState()
+    val mainUiState by viewModel.uiState.collectAsState()
+    val arUiState by arViewModel.uiState.collectAsState()
+
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Implementation of the AR viewport or background
-        ArViewport(
-            viewModel = arViewModel,
-            uiState = uiState,
-            projectRepository = projectRepository,
-            activeLayer = activeLayer,
-            onRendererCreated = onRendererCreated,
-            hasCameraPermission = hasCameraPermission
-        )
-
-        // Overlay for editor-specific feedback
-        EditorOverlay(
-            uiState = uiState
-        )
+        if (mainUiState.isCapturingTarget) {
+            TargetCreationBackground(
+                uiState = arUiState,
+                captureStep = mainUiState.captureStep,
+                onPhotoCaptured = { arViewModel.setTempCapture(it) },
+                onCaptureConsumed = { viewModel.setCaptureStep(CaptureStep.RECTIFY) },
+                onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) }
+            )
+        } else {
+            ArViewport(
+                uiState = uiState,
+                editorViewModel = editorViewModel,
+                slamManager = slamManager,
+                activeLayer = activeLayer,
+                hasCameraPermission = hasCameraPermission
+            )
+        }
     }
 }
 
 @Composable
 fun ArViewport(
-    viewModel: ArViewModel,
     uiState: EditorUiState,
-    projectRepository: ProjectRepository,
+    editorViewModel: EditorViewModel,
+    slamManager: SlamManager,
     activeLayer: Layer?,
-    onRendererCreated: (ArRenderer) -> Unit,
     hasCameraPermission: Boolean
 ) {
-    // Subcomponent implementation that now recognizes its parameters
-}
+    val isImageLocked = activeLayer?.isImageLocked ?: false
 
-@Composable
-fun EditorOverlay(
-    uiState: EditorUiState
-) {
-    // Feedback logic for gestures or tools
+    // 1. Render Backgrounds (Camera or Mockup)
+    if (hasCameraPermission && (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY)) {
+        CameraPreview(
+            controller = rememberCameraController(),
+            onPhotoCaptured = {},
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+
+    if (uiState.editorMode == EditorMode.AR) {
+        val context = LocalContext.current
+        AndroidView(
+            factory = { ctx ->
+                GsViewer(ctx).apply {
+                    setZOrderMediaOverlay(true)
+                    holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+
+    if (uiState.editorMode == EditorMode.MOCKUP && uiState.backgroundBitmap != null) {
+        androidx.compose.foundation.Image(
+            bitmap = uiState.backgroundBitmap!!.asImageBitmap(),
+            contentDescription = "Background Mockup",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+    }
+
+    // 2. Render Layers & Handle Gestures
+    Canvas(modifier = Modifier
+        .fillMaxSize()
+        .pointerInput(uiState.activeLayerId, isImageLocked) {
+            if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
+                detectTransformGestures { _, pan, zoom, rotation ->
+                    editorViewModel.onTransformGesture(pan, zoom, rotation)
+                }
+            }
+        }
+    ) {
+        uiState.layers.filter { it.isVisible }.forEach { layer ->
+            layer.bitmap?.let { bmp ->
+                withTransform({
+                    translate(layer.offset.x, layer.offset.y)
+                    scale(layer.scale, layer.scale)
+                    rotate(layer.rotationZ) // Basic Z rotation for 2D canvas fallback
+                }) {
+                    drawImage(
+                        image = bmp.asImageBitmap(),
+                        alpha = layer.opacity,
+                        blendMode = mapBlendMode(layer.blendMode)
+                    )
+                }
+            }
+        }
+    }
 }

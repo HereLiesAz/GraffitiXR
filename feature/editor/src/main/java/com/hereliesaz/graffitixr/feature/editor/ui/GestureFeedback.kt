@@ -14,8 +14,7 @@ import com.hereliesaz.graffitixr.common.model.RotationAxis
  * Renders visual feedback when a transformation gesture is active.
  */
 @Composable
-fun GestureFeedback(state: EditorUiState) {
-    // These properties are now confirmed to be in the EditorUiState data class
+fun GestureFeedback(state: EditorUiState, modifier: Modifier = Modifier) {
     val showFeedback = state.gestureInProgress || state.showRotationAxisFeedback
     val activeLayer = state.layers.find { it.id == state.activeLayerId }
     val isLocked = activeLayer?.isImageLocked ?: false
@@ -28,7 +27,7 @@ fun GestureFeedback(state: EditorUiState) {
         }
 
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Text(

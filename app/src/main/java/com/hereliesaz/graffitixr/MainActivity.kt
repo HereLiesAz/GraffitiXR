@@ -292,7 +292,7 @@ class MainActivity : ComponentActivity() {
                 id = "layer_${layer.id}",
                 hostId = "design_host",
                 text = layer.name,
-                alignment = AzNestedRailAlignment.HORIZONTAL,
+                nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
                 onClick = { editorViewModel.onLayerActivated(layer.id) },
                 onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
                 nestedContent = {
