@@ -45,14 +45,19 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * Ingests an ARCore image frame for background CV processing.
-     * Runs on the Default (Background) dispatcher to avoid render thread jank.
+     * Processes pixel data on a background thread.
+     * Receives a ByteArray copy to ensure the data persists after the ArImage is closed.
      */
-    fun processTeleologicalFrame(image: Image) {
+    fun processTeleologicalFrame(yData: ByteArray, width: Int, height: Int) {
         viewModelScope.launch(dispatchers.default) {
-            val yPlane = image.planes[0].buffer
-            slamManager.feedMonocularData(yPlane, image.width, image.height)
-            teleologicalTracker.processTeleologicalFrame(image)
+            // 1. Feed to Native Engine
+            val directBuffer = ByteBuffer.allocateDirect(yData.size)
+            directBuffer.put(yData)
+            directBuffer.position(0)
+            slamManager.feedMonocularData(directBuffer, width, height)
+
+            // 2. Feed to CV Tracker
+            teleologicalTracker.processTeleologicalFrame(yData, width, height)
         }
     }
 
@@ -78,5 +83,10 @@ class ArViewModel @Inject constructor(
 
     fun onKeyframeCaptured() {
         _uiState.update { it.copy(pendingKeyframePath = null) }
+    }
+
+    // Fallback for older UI components
+    fun processTeleologicalFrame(bitmap: Bitmap): org.opencv.core.Mat {
+        return teleologicalTracker.processTeleologicalFrame(bitmap)
     }
 }
