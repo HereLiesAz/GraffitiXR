@@ -1,12 +1,19 @@
 package com.hereliesaz.graffitixr
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavHostController
 import com.hereliesaz.aznavrail.AzNavHostScope
 import com.hereliesaz.aznavrail.model.AzDockingSide
@@ -58,6 +65,32 @@ fun MainScreen(
                 onRendererCreated = onRendererCreated,
                 hasCameraPermission = hasCameraPermission
             )
+        }
+    }
+}
+
+@Composable
+fun TraceBackground(editorViewModel: EditorViewModel) {
+    val editorUiState by editorViewModel.uiState.collectAsState()
+
+    if (editorUiState.editorMode == EditorMode.TRACE) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black), // Black background for lightbox mode
+            contentAlignment = Alignment.Center
+        ) {
+            val bitmap = editorUiState.backgroundBitmap
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Trace Image",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                Text("Lightbox Mode: Import an image to trace", color = Color.White)
+            }
         }
     }
 }

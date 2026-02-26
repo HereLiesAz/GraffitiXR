@@ -146,9 +146,60 @@ class MainActivity : ComponentActivity() {
         azConfig(packButtons = true, dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
 
         azRailHostItem(id = "mode_host", text = navStrings.modes, info = "Modes")
-        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode) {
+        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, info = "Start AR Mode") {
             if(hasCameraPermission) editorViewModel.setEditorMode(EditorMode.AR)
             else permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+        }
+        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.traceMode, info = "Start Lightbox Mode") {
+            editorViewModel.setEditorMode(EditorMode.TRACE)
+        }
+
+        // Project Menu Host
+        azRailHostItem(id = "project_host", text = "Project", info = "Project Actions")
+        azRailSubItem(id = "add_layer", hostId = "project_host", text = "Add Layer", info = "Add Image Layer") {
+            overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+        azRailSubItem(id = "add_sketch", hostId = "project_host", text = "Add Sketch", info = "Add Sketch Layer") {
+            editorViewModel.onAddBlankLayer()
+        }
+
+        // Layer Management using azRailRelocItem with Nested Rails and Context Menus
+        editorUiState.layers.forEach { layer ->
+            azRailRelocItem(
+                id = layer.id,
+                hostId = "project_host", // Group them under the Project host or a dedicated layers host if preferred
+                text = layer.name,
+                info = "Manage Layer: ${layer.name}",
+                onRelocate = { from, to, newOrder ->
+                    editorViewModel.onLayerReordered(newOrder)
+                },
+                nestedContent = {
+                    // Nested Rail for Tools (Popup)
+                    azRailItem(id = "tool_brush", text = "Brush", info = "Use Brush") {
+                        editorViewModel.onLayerActivated(layer.id)
+                        editorViewModel.setActiveTool(Tool.BRUSH)
+                    }
+                    azRailItem(id = "tool_eraser", text = "Eraser", info = "Use Eraser") {
+                        editorViewModel.onLayerActivated(layer.id)
+                        editorViewModel.setActiveTool(Tool.ERASER)
+                    }
+                    azRailItem(id = "tool_flip_h", text = "Flip H", info = "Flip Horizontally") {
+                        editorViewModel.onLayerActivated(layer.id)
+                        editorViewModel.onFlipLayer(true)
+                    }
+                }
+            ) {
+                // Hidden Context Menu (Long Press)
+                listItem(text = "Rename") {
+                    // Trigger rename dialog (implementation depends on UI state)
+                }
+                listItem(text = "Duplicate") {
+                    editorViewModel.onDuplicateLayer(layer.id)
+                }
+                listItem(text = "Delete") {
+                    editorViewModel.onLayerRemoved(layer.id)
+                }
+            }
         }
     }
 

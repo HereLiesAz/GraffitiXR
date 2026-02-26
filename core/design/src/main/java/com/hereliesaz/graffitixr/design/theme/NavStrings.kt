@@ -10,6 +10,7 @@ data class NavStrings(
     val mockupInfo: String = "Mockup Mode",
     val trace: String = "Trace",
     val traceInfo: String = "Trace Mode",
+    val traceMode: String = "Lightbox",
     val grid: String = "Target",
     val surveyor: String = "Survey",
     val surveyorInfo: String = "Map Wall",
