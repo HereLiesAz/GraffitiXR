@@ -79,7 +79,10 @@ MobileGS::MobileGS() {
 }
 
 MobileGS::~MobileGS() {
-    if (vulkanRenderer) { delete vulkanRenderer; vulkanRenderer = nullptr; }
+    if (vulkanRenderer) {
+        delete vulkanRenderer;
+        vulkanRenderer = nullptr;
+    }
 }
 
 void MobileGS::initialize() { isInitialized = true; }
@@ -87,8 +90,6 @@ void MobileGS::initialize() { isInitialized = true; }
 void MobileGS::reset() {
     isInitialized = false;
     mVoxelGrid.clear();
-    // Do not destroy vulkanRenderer here, strictly destroy on surface destruction
-    // to allow rapid re-entry
 }
 
 void MobileGS::onSurfaceChanged(int width, int height) {
@@ -99,18 +100,15 @@ void MobileGS::onSurfaceChanged(int width, int height) {
 }
 
 void MobileGS::draw() {
-    // Shared clear is risky if contexts differ, but basic glClear is usually safe in current context
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (!isInitialized) return;
 
-    // MODE 0: AR / Scanning (Vulkan Preferred)
     if (visMode == 0 && vulkanRenderer) {
         vulkanRenderer->setLighting(lightIntensity, lightColor);
         vulkanRenderer->renderFrame();
     }
-        // MODE 1: Editor / Viewer (OpenGL ES Only)
     else if (visMode == 1) {
         if (pointProgram == 0) {
             const char* vShaderStr =
@@ -121,7 +119,7 @@ void MobileGS::draw() {
                     "out vec4 v_Color;\n"
                     "void main() {\n"
                     "  gl_Position = u_MvpMatrix * vec4(a_Position, 1.0);\n"
-                    "  gl_PointSize = 15.0;\n" // Larger points for visibility in editor
+                    "  gl_PointSize = 15.0;\n"
                     "  v_Color = a_Color;\n"
                     "}\n";
             const char* fShaderStr =
@@ -131,7 +129,7 @@ void MobileGS::draw() {
                     "out vec4 o_FragColor;\n"
                     "void main() {\n"
                     "  vec2 coord = gl_PointCoord - vec2(0.5);\n"
-                    "  if(length(coord) > 0.5) discard;\n" // Circular points
+                    "  if(length(coord) > 0.5) discard;\n"
                     "  o_FragColor = v_Color;\n"
                     "}\n";
             pointProgram = createProgram(vShaderStr, fShaderStr);
@@ -140,7 +138,6 @@ void MobileGS::draw() {
 
         glUseProgram(pointProgram);
 
-        // Apply alignment matrix to view before rendering
         float finalView[16];
         multiplyMatricesInternal(viewMtx, alignmentMtx, finalView);
 
@@ -150,7 +147,6 @@ void MobileGS::draw() {
         GLint mvpLoc = glGetUniformLocation(pointProgram, "u_MvpMatrix");
         glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp);
 
-        // Extract points for rendering (Snapshot)
         std::vector<float> pointData;
         {
             std::lock_guard<std::mutex> lock(pointMutex);
@@ -158,10 +154,8 @@ void MobileGS::draw() {
                 pointData.reserve(mVoxelGrid.size() * 7);
                 for (const auto& pair : mVoxelGrid) {
                     const auto& p = pair.second;
-                    // Only render points with sufficient confidence
                     if (p.confidence > 0.2f) {
                         pointData.push_back(p.x); pointData.push_back(p.y); pointData.push_back(p.z);
-                        // Visualize confidence as alpha
                         pointData.push_back(p.r); pointData.push_back(p.g); pointData.push_back(p.b);
                         pointData.push_back(p.a * p.confidence);
                     }
@@ -188,16 +182,23 @@ void MobileGS::draw() {
     }
 }
 
-bool MobileGS::initVulkan(ANativeWindow* window, AAssetManager* mgr) { return vulkanRenderer ? vulkanRenderer->initialize(window, mgr) : false; }
-void MobileGS::resizeVulkan(int width, int height) { if (vulkanRenderer) vulkanRenderer->resize(width, height); }
-void MobileGS::destroyVulkan() { if (vulkanRenderer) vulkanRenderer->destroy(); }
+bool MobileGS::initVulkan(ANativeWindow* window, AAssetManager* mgr) {
+    return vulkanRenderer ? vulkanRenderer->initialize(window, mgr) : false;
+}
+
+void MobileGS::resizeVulkan(int width, int height) {
+    if (vulkanRenderer) vulkanRenderer->resize(width, height);
+}
+
+void MobileGS::destroyVulkan() {
+    if (vulkanRenderer) vulkanRenderer->destroy();
+}
 
 void MobileGS::updateCamera(float* view, float* proj) {
     if (view && proj) {
         std::copy(view, view + 16, viewMtx);
         std::copy(proj, proj + 16, projMtx);
 
-        // Only update Vulkan if in scanning mode
         if (visMode == 0 && vulkanRenderer) {
             float finalView[16];
             {
@@ -223,31 +224,27 @@ void MobileGS::updateLight(float intensity, float* colorCorrection) {
     }
 }
 
-// FIX: Actually unprojects the depth buffer and maps it to the Voxel Grid
 void MobileGS::processDepthData(uint8_t* depthBuffer, int width, int height) {
     if (!depthBuffer || width <= 0 || height <= 0) return;
 
     std::lock_guard<std::mutex> lock(pointMutex);
 
-    // Approximate intrinsics from projection matrix
     float fx = projMtx[0] * (width / 2.0f);
     float fy = projMtx[5] * (height / 2.0f);
     float cx = width / 2.0f;
     float cy = height / 2.0f;
 
-    // Subsample to preserve battery and CPU
     int subsample = 8;
     for (int y = 0; y < height; y += subsample) {
         for (int x = 0; x < width; x += subsample) {
-            int index = (y * width + x) * 2; // 16-bit depth
+            int index = (y * width + x) * 2;
             uint16_t d16 = depthBuffer[index] | (depthBuffer[index + 1] << 8);
-            if (d16 == 0 || d16 > 6500) continue; // Out of bounds
+            if (d16 == 0 || d16 > 6500) continue;
 
             float z = d16 / 1000.0f;
             float px = (x - cx) * z / fx;
             float py = (y - cy) * z / fy;
 
-            // Camera space to World Space (Simplified inverse approximation for speed)
             float wx = px * viewMtx[0] + py * viewMtx[1] + z * viewMtx[2] + viewMtx[3];
             float wy = px * viewMtx[4] + py * viewMtx[5] + z * viewMtx[6] + viewMtx[7];
             float wz = px * viewMtx[8] + py * viewMtx[9] + z * viewMtx[10] + viewMtx[11];
@@ -263,14 +260,11 @@ void MobileGS::processDepthData(uint8_t* depthBuffer, int width, int height) {
     }
 }
 
-// Implement basic feature detection to simulate "Cloud Points" for monocular setup
 void MobileGS::processMonocularData(uint8_t* imageData, int width, int height) {
     if (!imageData || width <= 0 || height <= 0) return;
 
-    // Use OpenCV to detect features
     cv::Mat img(height, width, CV_8UC1, imageData);
     std::vector<cv::KeyPoint> keypoints;
-    // Fast feature detector for performance
     cv::Ptr<cv::FeatureDetector> detector = cv::FastFeatureDetector::create(40);
     detector->detect(img, keypoints);
 
@@ -278,33 +272,27 @@ void MobileGS::processMonocularData(uint8_t* imageData, int width, int height) {
 
     std::lock_guard<std::mutex> lock(pointMutex);
 
-    // Approximate intrinsics
     float fx = projMtx[0] * (width / 2.0f);
     float fy = projMtx[5] * (height / 2.0f);
     float cx = width / 2.0f;
     float cy = height / 2.0f;
 
-    // Project features to a fixed depth (e.g., 1.5m) to visualize them as a "cloud"
     float z = 1.5f;
 
     for (const auto& kp : keypoints) {
         float px = (kp.pt.x - cx) * z / fx;
         float py = (kp.pt.y - cy) * z / fy;
 
-        // Camera space to World Space
         float wx = px * viewMtx[0] + py * viewMtx[1] + z * viewMtx[2] + viewMtx[3];
         float wy = px * viewMtx[4] + py * viewMtx[5] + z * viewMtx[6] + viewMtx[7];
         float wz = px * viewMtx[8] + py * viewMtx[9] + z * viewMtx[10] + viewMtx[11];
 
         VoxelKey key = { (int)(wx / VOXEL_SIZE), (int)(wy / VOXEL_SIZE), (int)(wz / VOXEL_SIZE) };
 
-        // Add point (Greenish color for monocular features)
         if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
             if (mVoxelGrid.size() >= MAX_VOXELS) {
-                // Simple reset strategy to prevent indefinite growth and lag
                 mVoxelGrid.clear();
             }
-            // Color mapping based on position for visual variety
             float r = (sin(wx) + 1.0f) * 0.5f;
             float g = (cos(wy) + 1.0f) * 0.5f;
             mVoxelGrid[key] = { wx, wy, wz, r, g, 1.0f, 1.0f, 0.1f };
@@ -326,31 +314,25 @@ void MobileGS::addStereoPoints(const std::vector<cv::Point3f>& points) {
 
 void MobileGS::setVisualizationMode(int mode) { visMode = mode; }
 
-// FIX: Implement correct Binary Serialization corresponding to docs/data_formats.md
 bool MobileGS::saveMap(const char* path) {
     std::lock_guard<std::mutex> lock(pointMutex);
     std::ofstream out(path, std::ios::binary);
     if (!out) return false;
 
-    // Header
     out.write("GXRM", 4);
     int version = 1;
     out.write((char*)&version, 4);
 
-    // Splat Count
     int splatCount = mVoxelGrid.size();
     out.write((char*)&splatCount, 4);
 
-    // Keyframe Count (Fixed at 1 for now to store active tracking offset)
     int keyframeCount = 1;
     out.write((char*)&keyframeCount, 4);
 
-    // Data payload
     for (const auto& pair : mVoxelGrid) {
-        out.write((char*)&pair.second, sizeof(SplatPoint)); // 32 bytes aligned
+        out.write((char*)&pair.second, sizeof(SplatPoint));
     }
 
-    // Write alignment matrix
     out.write((char*)alignmentMtx, 16 * sizeof(float));
 
     out.close();
@@ -396,11 +378,9 @@ bool MobileGS::saveKeyframe(const char* path) {
         return false;
     }
 
-    // Save current camera pose
     out.write((char*)viewMtx, 16 * sizeof(float));
     out.write((char*)projMtx, 16 * sizeof(float));
 
-    // Save simple timestamp
     time_t now = time(0);
     out.write((char*)&now, sizeof(time_t));
 

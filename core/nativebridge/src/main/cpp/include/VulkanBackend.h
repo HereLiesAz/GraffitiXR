@@ -10,6 +10,10 @@
 
 #include <vector>
 
+/**
+ * Robust Vulkan rendering backend for MobileGS.
+ * Handles swapchain lifecycle, memory management, and hardware synchronization.
+ */
 class VulkanBackend {
 public:
     VulkanBackend();
@@ -37,7 +41,7 @@ private:
     bool createSwapchain();
     bool createImageViews();
     bool createRenderPass();
-    bool createPipeline(); // Placeholder for future expansion
+    bool createPipeline();
     bool createFramebuffers();
     bool createCommandPool();
     bool createCommandBuffers();
@@ -57,24 +61,23 @@ private:
     float lightIntensity = 1.0f;
     float lightColor[3] = {1.0f, 1.0f, 1.0f};
 
-    // Vulkan Handles
+    // Vulkan Handles - Initialized to null for safety
     VkInstance instance = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device = VK_NULL_HANDLE;
 
-    // Queues
     VkQueue graphicsQueue = VK_NULL_HANDLE;
     VkQueue presentQueue = VK_NULL_HANDLE;
-    uint32_t graphicsQueueFamilyIndex = -1;
+    uint32_t graphicsQueueFamilyIndex = 0;
 
     // Swapchain
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     std::vector<VkImage> swapchainImages;
     std::vector<VkImageView> swapchainImageViews;
     std::vector<VkFramebuffer> swapchainFramebuffers;
-    VkFormat swapchainImageFormat;
-    VkExtent2D swapchainExtent;
+    VkFormat swapchainImageFormat = VK_FORMAT_UNDEFINED;
+    VkExtent2D swapchainExtent = {0, 0};
 
     // Pipeline
     VkRenderPass renderPass = VK_NULL_HANDLE;
