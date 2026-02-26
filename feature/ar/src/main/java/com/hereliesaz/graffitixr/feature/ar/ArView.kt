@@ -31,4 +31,11 @@ class ArView(
         // Fixed: Reference to the teleological processing hook
         slamManager.processTeleologicalFrame(buffer, timestamp)
     }
+
+    /**
+     * Should be called when the hosting View or Activity is paused or destroyed.
+     */
+    fun onDestroy() {
+        slamManager.reset()
+    }
 }
