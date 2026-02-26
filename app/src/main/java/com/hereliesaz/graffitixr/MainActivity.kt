@@ -292,7 +292,7 @@ class MainActivity : ComponentActivity() {
                 id = "layer_${layer.id}",
                 hostId = "design_host",
                 text = layer.name,
-                nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
+                alignment = AzNestedRailAlignment.HORIZONTAL,
                 onClick = { editorViewModel.onLayerActivated(layer.id) },
                 onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
                 nestedContent = {
@@ -305,8 +305,6 @@ class MainActivity : ComponentActivity() {
                         azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
                         azRailItem(id = "color_${layer.id}", text = "Color") { activate(); editorViewModel.setActiveTool(Tool.COLOR) }
                         azRailItem(id = "adj_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
-
-
                     } else {
                         azRailItem(id = "iso_${layer.id}", text = "Isolate") { activate(); editorViewModel.onRemoveBackgroundClicked() }
                         azRailItem(id = "line_${layer.id}", text = "Outline") { activate(); editorViewModel.onLineDrawingClicked() }
