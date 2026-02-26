@@ -6,12 +6,12 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.opengl.Matrix
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.WindowManager
-import android.opengl.Matrix
 import androidx.annotation.OptIn
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
@@ -35,10 +35,6 @@ import com.hereliesaz.graffitixr.feature.ar.util.DualAnalyzer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.util.concurrent.Executors
 
-/**
- * ArView manages the camera lifecycle and the native Vulkan surface.
- * It provides the physical Surface to SlamManager for direct native rendering.
- */
 @OptIn(ExperimentalGetImage::class)
 @Composable
 fun ArView(
@@ -96,7 +92,6 @@ fun ArView(
         }
     }
 
-    // Native Surface Management
     val surfaceView = remember {
         SurfaceView(context).apply {
             holder.setFormat(PixelFormat.TRANSLUCENT)
@@ -138,28 +133,23 @@ fun ArView(
                     cameraProvider = provider
                     val preview = Preview.Builder().build()
                     val selector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                    val dualAnalyzer = DualAnalyzer(
+                        onLightUpdate = { luma -> ambientLight = luma },
+                        onTeleologicalFrame = { bitmap ->
+                            viewModel.processTeleologicalFrame(bitmap)
+                        },
+                        onSlamFrame = { buffer, w, h ->
+                            slamManager.feedMonocularData(buffer, w, h)
+                        }
+                    )
+
                     val analysis = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                         .build()
                         .also {
-                            it.setAnalyzer(cameraExecutor) { imageProxy ->
-                                val image = imageProxy.image
-                                if (image != null) {
-                                    // Direct monocular feed to SLAM
-                                    val buffer = image.planes[0].buffer
-                                    slamManager.feedMonocularData(buffer, image.width, image.height)
-
-                                    // Optional: Process for light estimation
-                                    val yPlane = image.planes[0].buffer
-                                    var sum = 0L
-                                    val pixels = ByteArray(yPlane.remaining())
-                                    yPlane.get(pixels)
-                                    for (p in pixels) sum += (p.toInt() and 0xFF)
-                                    ambientLight = (sum / pixels.size.toFloat()) / 255f
-                                }
-                                imageProxy.close()
-                            }
+                            it.setAnalyzer(cameraExecutor, dualAnalyzer)
                         }
 
                     preview.setSurfaceProvider(previewView.surfaceProvider)

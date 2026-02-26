@@ -23,7 +23,7 @@ class GsViewerRenderer(
     val camera = VirtualCamera()
     private var isModelLoaded = false
     private val layerRenderer = ProjectedImageRenderer()
-    
+
     var activeLayer: Layer? = null
         set(value) {
             field = value
@@ -39,8 +39,11 @@ class GsViewerRenderer(
 
         slamManager.resetGLState()
         slamManager.initialize()
-        // Use full Gaussian Splats for 3D Mockup mode
-        slamManager.setVisualizationMode(0) // GAUSSIAN
+
+        // CRITICAL: Set visualization mode to 1 (OpenGL/Editor)
+        // This prevents the native engine from attempting Vulkan calls on this thread
+        slamManager.setVisualizationMode(1)
+
         layerRenderer.createOnGlThread(context)
 
         if (mapPath.isNotEmpty()) {
@@ -60,9 +63,9 @@ class GsViewerRenderer(
         if (isModelLoaded) {
             val view = camera.viewMatrix
             val proj = camera.projectionMatrix
-            
+
             slamManager.updateCamera(view, proj)
-            slamManager.draw()
+            slamManager.draw() // Will use OpenGL path in Native because of Mode 1
 
             // Draw Active Layer in 3D
             activeLayer?.let { layer ->

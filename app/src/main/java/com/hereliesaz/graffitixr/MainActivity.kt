@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,6 +27,7 @@ import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.ar.MappingActivity
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
@@ -82,6 +84,29 @@ class MainActivity : ComponentActivity() {
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
+                val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
+
+                // Navigation Observer
+                LaunchedEffect(dashboardNavigation) {
+                    dashboardNavigation?.let { destination ->
+                        when (destination) {
+                            "surveyor" -> {
+                                val intent = Intent(this@MainActivity, MappingActivity::class.java)
+                                startActivity(intent)
+                            }
+                            "project_library" -> {
+                                // For now, we assume this is handled by a modal or separate screen
+                                // If using Navigation Component for screens:
+                                // navController.navigate("library")
+                                // Since layout is custom, we might toggle a state or use AzNavHost
+                            }
+                            "settings" -> {
+                                // Similarly handle settings
+                            }
+                        }
+                        dashboardViewModel.onNavigationConsumed()
+                    }
+                }
 
                 val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked
                 val dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
@@ -120,6 +145,8 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // ... (Rest of file remains unchanged)
 
     override fun onDestroy() {
         super.onDestroy()

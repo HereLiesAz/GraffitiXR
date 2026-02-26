@@ -23,20 +23,10 @@ class ExportManager @Inject constructor() {
         private const val TAG = "ExportManager"
     }
 
-    /**
-     * Exports the given layers to a single Bitmap.
-     * Respects layer transformations (Scale, Rotate, Translate), opacity, and blend modes.
-     * Also applies Mesh Warp if present.
-     *
-     * @param layers The list of layers to export.
-     * @param width The width of the target canvas (e.g., screen width).
-     * @param height The height of the target canvas (e.g., screen height).
-     */
     fun exportSingleImage(layers: List<Layer>, width: Int, height: Int): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        // Reuse Paint and Matrix to reduce GC pressure
         val paint = Paint().apply {
             isAntiAlias = true
             isFilterBitmap = true
@@ -64,10 +54,8 @@ class ExportManager @Inject constructor() {
             paint.blendMode = mapBlendMode(layer.blendMode)
         }
 
-        // Prepare matrix for transformation
         matrix.reset()
 
-        // 1. ContentScale.Fit logic (Center and Scale to fit canvas)
         val srcW = layer.bitmap.width.toFloat()
         val srcH = layer.bitmap.height.toFloat()
         val dstW = canvasWidth.toFloat()
@@ -80,7 +68,6 @@ class ExportManager @Inject constructor() {
         matrix.setScale(scaleFit, scaleFit)
         matrix.postTranslate(dx, dy)
 
-        // 2. User Transformations (Scale, Rotate, Translate around center)
         val px = dstW / 2f
         val py = dstH / 2f
 
@@ -93,29 +80,38 @@ class ExportManager @Inject constructor() {
             canvas.save()
             canvas.concat(matrix)
 
-            // FIX: Dynamically calculate grid dimension.
-            // Vertices array size formula: (rows + 1) * (cols + 1) * 2 = size
-            // Assuming square grids (rows == cols), we reverse engineer cols:
+            // FIX: Robust grid column calculation
             val meshSize = mesh.size
-            val gridCols = (sqrt(meshSize / 2.0)).toInt() - 1
+            // Assume square grid logic: (cols+1)*(cols+1)*2 = size
+            // Default 3x3 grid = 4*4*2 = 32 floats
+            var gridCols = (sqrt(meshSize / 2.0)).toInt() - 1
+
+            // Safety check: if calculation doesn't match size perfectly, fallback to 3x3 or flat
             val expectedSize = (gridCols + 1) * (gridCols + 1) * 2
 
-            if (meshSize == expectedSize && gridCols > 0) {
+            if (meshSize != expectedSize) {
+                Log.w(TAG, "Mesh size $meshSize does not match square grid assumption. Defaulting to 3x3 check.")
+                if (meshSize == 32) {
+                    gridCols = 3
+                } else {
+                    gridCols = -1 // Invalid
+                }
+            }
+
+            if (gridCols > 0) {
                 canvas.drawBitmapMesh(layer.bitmap, gridCols, gridCols, mesh.toFloatArray(), 0, null, 0, paint)
             } else {
-                Log.w(TAG, "Mesh size mismatch or invalid grid. Drawing flat image fallback.")
+                Log.w(TAG, "Invalid mesh data. Drawing flat.")
                 canvas.drawBitmap(layer.bitmap, 0f, 0f, paint)
             }
             canvas.restore()
         } else {
-            // Standard draw
             canvas.drawBitmap(layer.bitmap, matrix, paint)
         }
     }
 
     private fun mapBlendMode(mode: BlendMode): AndroidBlendMode? {
         if (android.os.Build.VERSION.SDK_INT < 29) return null
-
         return when(mode) {
             BlendMode.SrcOver -> AndroidBlendMode.SRC_OVER
             BlendMode.Multiply -> AndroidBlendMode.MULTIPLY
@@ -146,17 +142,6 @@ class ExportManager @Inject constructor() {
             BlendMode.Xor -> AndroidBlendMode.XOR
             BlendMode.Plus -> AndroidBlendMode.PLUS
             BlendMode.Modulate -> AndroidBlendMode.MODULATE
-        }
-    }
-
-    fun saveBitmapToFile(bitmap: Bitmap, file: File) {
-        try {
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
-        } catch (e: IOException) {
-            Log.e(TAG, "Failed to save bitmap to file", e)
-            throw e
         }
     }
 }

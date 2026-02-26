@@ -9,6 +9,7 @@
 #include <android/asset_manager_jni.h>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/photo.hpp>
+#include <cmath>
 
 #define TAG "GraffitiJNI"
 #if defined(NDEBUG)
@@ -176,7 +177,6 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_p
     bitmapToMat(env, bitmap, src);
     bitmapToMat(env, mask, maskMat);
 
-    // Inpaint expects 8UC1 or 8UC3 src, and 8UC1 mask
     if(src.channels() == 4) cv::cvtColor(src, src, cv::COLOR_RGBA2RGB);
     if(maskMat.channels() > 1) cv::cvtColor(maskMat, maskMat, cv::COLOR_RGBA2GRAY);
 
@@ -185,11 +185,123 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_p
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_processLiquifyJni(JNIEnv *env, jobject thiz, jlong handle, jobject bitmap, jfloatArray meshData) {
-    // Stubbed robust wrapper for remap logic
+    if(handle == 0 || !bitmap || !meshData) return;
+
+    cv::Mat src;
+    bitmapToMat(env, bitmap, src);
+
+    jfloat* mesh = env->GetFloatArrayElements(meshData, nullptr);
+    jsize len = env->GetArrayLength(meshData);
+
+    // Reverse engineer grid size from flattened array [x,y, x,y...]
+    // Size = (rows+1) * (cols+1) * 2
+    // Assuming square grid for simplicity in JNI (though WarpableImage handles rectangular)
+    // cols = sqrt(len/2) - 1
+    int gridSize = (int)(sqrt(len / 2.0)) - 1;
+
+    if (gridSize <= 0) {
+        env->ReleaseFloatArrayElements(meshData, mesh, 0);
+        return;
+    }
+
+    // Create Remap Maps
+    cv::Mat mapX(src.size(), CV_32F);
+    cv::Mat mapY(src.size(), CV_32F);
+
+    int width = src.cols;
+    int height = src.rows;
+
+    float cellW = (float)width / gridSize;
+    float cellH = (float)height / gridSize;
+
+    // Bilinear Interpolation of the Mesh Control Points to create pixel-wise map
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            // Find cell index
+            int cellX = (int)(x / cellW);
+            int cellY = (int)(y / cellH);
+            if (cellX >= gridSize) cellX = gridSize - 1;
+            if (cellY >= gridSize) cellY = gridSize - 1;
+
+            // Normalized coords within cell
+            float u = (x - cellX * cellW) / cellW;
+            float v = (y - cellY * cellH) / cellH;
+
+            // Mesh Indices
+            int idxTL = (cellY * (gridSize + 1) + cellX) * 2;
+            int idxTR = (cellY * (gridSize + 1) + (cellX + 1)) * 2;
+            int idxBL = ((cellY + 1) * (gridSize + 1) + cellX) * 2;
+            int idxBR = ((cellY + 1) * (gridSize + 1) + (cellX + 1)) * 2;
+
+            // Interpolate X
+            float xTop = (1 - u) * mesh[idxTL] + u * mesh[idxTR];
+            float xBot = (1 - u) * mesh[idxBL] + u * mesh[idxBR];
+            mapX.at<float>(y, x) = (1 - v) * xTop + v * xBot;
+
+            // Interpolate Y
+            float yTop = (1 - u) * mesh[idxTL+1] + u * mesh[idxTR+1];
+            float yBot = (1 - u) * mesh[idxBL+1] + u * mesh[idxBR+1];
+            mapY.at<float>(y, x) = (1 - v) * yTop + v * yBot;
+        }
+    }
+
+    cv::Mat dst;
+    cv::remap(src, dst, mapX, mapY, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0,0,0,0));
+
+    env->ReleaseFloatArrayElements(meshData, mesh, 0);
+    matToBitmap(env, dst, bitmap);
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_processBurnDodgeJni(JNIEnv *env, jobject thiz, jlong handle, jobject bitmap, jobject mask, jboolean isBurn) {
-    // Stubbed logic for alpha composite manipulation
+    if(handle == 0 || !bitmap || !mask) return;
+
+    AndroidBitmapInfo info;
+    void *pixels;
+    void *maskPixels;
+
+    if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) return;
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) return;
+
+    AndroidBitmapInfo maskInfo;
+    if (AndroidBitmap_getInfo(env, mask, &maskInfo) < 0) {
+        AndroidBitmap_unlockPixels(env, bitmap);
+        return;
+    }
+    if (AndroidBitmap_lockPixels(env, mask, &maskPixels) < 0) {
+        AndroidBitmap_unlockPixels(env, bitmap);
+        return;
+    }
+
+    uint32_t* src = (uint32_t*)pixels;
+    uint32_t* msk = (uint32_t*)maskPixels;
+    int count = info.width * info.height;
+
+    // Multiplier: Burn < 1.0, Dodge > 1.0
+    float factor = isBurn ? 0.9f : 1.1f;
+
+    for(int i = 0; i < count; ++i) {
+        // Read Mask Alpha or Red channel
+        uint32_t maskVal = msk[i];
+        int alpha = (maskVal >> 24) & 0xFF;
+
+        if (alpha > 10) { // If mask is present
+            uint32_t p = src[i];
+            int r = (p) & 0xFF;
+            int g = (p >> 8) & 0xFF;
+            int b = (p >> 16) & 0xFF;
+            int a = (p >> 24) & 0xFF;
+
+            // Apply simple exposure adjustment
+            r = std::min(255, std::max(0, (int)(r * factor)));
+            g = std::min(255, std::max(0, (int)(g * factor)));
+            b = std::min(255, std::max(0, (int)(b * factor)));
+
+            src[i] = (a << 24) | (b << 16) | (g << 8) | r;
+        }
+    }
+
+    AndroidBitmap_unlockPixels(env, mask);
+    AndroidBitmap_unlockPixels(env, bitmap);
 }
 
 } // extern "C"

@@ -87,58 +87,70 @@ void MobileGS::initialize() { isInitialized = true; }
 void MobileGS::reset() {
     isInitialized = false;
     mVoxelGrid.clear();
-    if (vulkanRenderer) vulkanRenderer->destroy();
+    // Do not destroy vulkanRenderer here, strictly destroy on surface destruction
+    // to allow rapid re-entry
 }
 
 void MobileGS::onSurfaceChanged(int width, int height) {
     viewportWidth = width;
     viewportHeight = height;
     glViewport(0, 0, width, height);
-    if (vulkanRenderer) vulkanRenderer->resize(width, height);
+    if (vulkanRenderer && visMode == 0) vulkanRenderer->resize(width, height);
 }
 
 void MobileGS::draw() {
+    // Shared clear is risky if contexts differ, but basic glClear is usually safe in current context
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     if (!isInitialized) return;
-    if (vulkanRenderer) {
+
+    // MODE 0: AR / Scanning (Vulkan Preferred)
+    if (visMode == 0 && vulkanRenderer) {
         vulkanRenderer->setLighting(lightIntensity, lightColor);
         vulkanRenderer->renderFrame();
     }
-
-    if (visMode == 1) { // Point Cloud
+        // MODE 1: Editor / Viewer (OpenGL ES Only)
+    else if (visMode == 1) {
         if (pointProgram == 0) {
             const char* vShaderStr =
-                "#version 300 es\n"
-                "layout(location = 0) in vec3 a_Position;\n"
-                "layout(location = 1) in vec4 a_Color;\n"
-                "uniform mat4 u_MvpMatrix;\n"
-                "out vec4 v_Color;\n"
-                "void main() {\n"
-                "  gl_Position = u_MvpMatrix * vec4(a_Position, 1.0);\n"
-                "  gl_PointSize = 10.0;\n"
-                "  v_Color = a_Color;\n"
-                "}\n";
+                    "#version 300 es\n"
+                    "layout(location = 0) in vec3 a_Position;\n"
+                    "layout(location = 1) in vec4 a_Color;\n"
+                    "uniform mat4 u_MvpMatrix;\n"
+                    "out vec4 v_Color;\n"
+                    "void main() {\n"
+                    "  gl_Position = u_MvpMatrix * vec4(a_Position, 1.0);\n"
+                    "  gl_PointSize = 15.0;\n" // Larger points for visibility in editor
+                    "  v_Color = a_Color;\n"
+                    "}\n";
             const char* fShaderStr =
-                "#version 300 es\n"
-                "precision mediump float;\n"
-                "in vec4 v_Color;\n"
-                "out vec4 o_FragColor;\n"
-                "void main() {\n"
-                "  o_FragColor = v_Color;\n"
-                "}\n";
+                    "#version 300 es\n"
+                    "precision mediump float;\n"
+                    "in vec4 v_Color;\n"
+                    "out vec4 o_FragColor;\n"
+                    "void main() {\n"
+                    "  vec2 coord = gl_PointCoord - vec2(0.5);\n"
+                    "  if(length(coord) > 0.5) discard;\n" // Circular points
+                    "  o_FragColor = v_Color;\n"
+                    "}\n";
             pointProgram = createProgram(vShaderStr, fShaderStr);
             if (pointProgram == 0) { LOGE("Failed to create point program"); return; }
         }
 
         glUseProgram(pointProgram);
 
+        // Apply alignment matrix to view before rendering
+        float finalView[16];
+        multiplyMatricesInternal(viewMtx, alignmentMtx, finalView);
+
         float mvp[16];
-        multiplyMatricesInternal(projMtx, viewMtx, mvp);
+        multiplyMatricesInternal(projMtx, finalView, mvp);
 
         GLint mvpLoc = glGetUniformLocation(pointProgram, "u_MvpMatrix");
         glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp);
 
+        // Extract points for rendering (Snapshot)
         std::vector<float> pointData;
         {
             std::lock_guard<std::mutex> lock(pointMutex);
@@ -146,8 +158,13 @@ void MobileGS::draw() {
                 pointData.reserve(mVoxelGrid.size() * 7);
                 for (const auto& pair : mVoxelGrid) {
                     const auto& p = pair.second;
-                    pointData.push_back(p.x); pointData.push_back(p.y); pointData.push_back(p.z);
-                    pointData.push_back(p.r); pointData.push_back(p.g); pointData.push_back(p.b); pointData.push_back(p.a);
+                    // Only render points with sufficient confidence
+                    if (p.confidence > 0.2f) {
+                        pointData.push_back(p.x); pointData.push_back(p.y); pointData.push_back(p.z);
+                        // Visualize confidence as alpha
+                        pointData.push_back(p.r); pointData.push_back(p.g); pointData.push_back(p.b);
+                        pointData.push_back(p.a * p.confidence);
+                    }
                 }
             }
         }
@@ -177,14 +194,18 @@ void MobileGS::destroyVulkan() { if (vulkanRenderer) vulkanRenderer->destroy(); 
 
 void MobileGS::updateCamera(float* view, float* proj) {
     if (view && proj) {
-        float finalView[16];
-        {
-            std::lock_guard<std::mutex> lock(alignMutex);
-            multiplyMatricesInternal(view, alignmentMtx, finalView);
-        }
-        std::copy(finalView, finalView + 16, viewMtx);
+        std::copy(view, view + 16, viewMtx);
         std::copy(proj, proj + 16, projMtx);
-        if (vulkanRenderer) vulkanRenderer->updateCamera(viewMtx, projMtx);
+
+        // Only update Vulkan if in scanning mode
+        if (visMode == 0 && vulkanRenderer) {
+            float finalView[16];
+            {
+                std::lock_guard<std::mutex> lock(alignMutex);
+                multiplyMatricesInternal(view, alignmentMtx, finalView);
+            }
+            vulkanRenderer->updateCamera(finalView, projMtx);
+        }
     }
 }
 
@@ -283,7 +304,12 @@ void MobileGS::processMonocularData(uint8_t* imageData, int width, int height) {
                 // Simple reset strategy to prevent indefinite growth and lag
                 mVoxelGrid.clear();
             }
-            mVoxelGrid[key] = { wx, wy, wz, 0.0f, 1.0f, 0.0f, 1.0f, 0.1f };
+            // Color mapping based on position for visual variety
+            float r = (sin(wx) + 1.0f) * 0.5f;
+            float g = (cos(wy) + 1.0f) * 0.5f;
+            mVoxelGrid[key] = { wx, wy, wz, r, g, 1.0f, 1.0f, 0.1f };
+        } else {
+            mVoxelGrid[key].confidence = std::min(1.0f, mVoxelGrid[key].confidence + 0.1f);
         }
     }
 }
@@ -363,4 +389,22 @@ bool MobileGS::loadMap(const char* path) {
     return true;
 }
 
-bool MobileGS::saveKeyframe(const char* path) { return true; }
+bool MobileGS::saveKeyframe(const char* path) {
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        LOGE("Failed to open keyframe path: %s", path);
+        return false;
+    }
+
+    // Save current camera pose
+    out.write((char*)viewMtx, 16 * sizeof(float));
+    out.write((char*)projMtx, 16 * sizeof(float));
+
+    // Save simple timestamp
+    time_t now = time(0);
+    out.write((char*)&now, sizeof(time_t));
+
+    out.close();
+    LOGI("Saved keyframe to %s", path);
+    return true;
+}

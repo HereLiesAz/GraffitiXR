@@ -1,4 +1,3 @@
-// ~~~ FILE: ./core/common/src/main/java/com/hereliesaz/graffitixr/common/model/UiState.kt ~~~
 package com.hereliesaz.graffitixr.common.model
 
 import android.graphics.Bitmap
@@ -32,6 +31,7 @@ enum class Tool {
 }
 
 data class EditorUiState(
+    val projectId: String? = null,
     val activeLayerId: String? = null,
     val layers: List<Layer> = emptyList(),
     val editorMode: EditorMode = EditorMode.AR,

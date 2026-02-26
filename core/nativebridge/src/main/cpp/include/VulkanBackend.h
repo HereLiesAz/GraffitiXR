@@ -35,13 +35,15 @@ private:
     bool selectPhysicalDevice();
     bool createLogicalDevice();
     bool createSwapchain();
+    bool createImageViews();
     bool createRenderPass();
-    bool createPipeline();
+    bool createPipeline(); // Placeholder for future expansion
     bool createFramebuffers();
     bool createCommandPool();
     bool createCommandBuffers();
     bool createSyncObjects();
 
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void cleanupSwapchain();
     void recreateSwapchain();
 
@@ -61,14 +63,31 @@ private:
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device = VK_NULL_HANDLE;
 
+    // Queues
+    VkQueue graphicsQueue = VK_NULL_HANDLE;
+    VkQueue presentQueue = VK_NULL_HANDLE;
+    uint32_t graphicsQueueFamilyIndex = -1;
+
     // Swapchain
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+    std::vector<VkImage> swapchainImages;
+    std::vector<VkImageView> swapchainImageViews;
     std::vector<VkFramebuffer> swapchainFramebuffers;
+    VkFormat swapchainImageFormat;
+    VkExtent2D swapchainExtent;
 
     // Pipeline
     VkRenderPass renderPass = VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+    VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+
+    // Commands & Sync
     VkCommandPool commandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers;
+
+    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+    VkFence inFlightFence = VK_NULL_HANDLE;
 };
 
 #endif // GRAFFITIXR_VULKANBACKEND_H

@@ -49,6 +49,8 @@ public:
     void processDepthData(uint8_t* depthBuffer, int width, int height);
     void processMonocularData(uint8_t* imageData, int width, int height);
     void addStereoPoints(const std::vector<cv::Point3f>& points);
+
+    // 0 = AR (Vulkan), 1 = Editor (OpenGL)
     void setVisualizationMode(int mode);
 
     bool saveMap(const char* path);
@@ -77,7 +79,7 @@ private:
     std::mutex alignMutex;
     std::mutex pointMutex;
 
-    // GLES Rendering (Fallback)
+    // GLES Rendering (Fallback / Editor)
     unsigned int pointProgram = 0;
     unsigned int pointVBO = 0;
 };
