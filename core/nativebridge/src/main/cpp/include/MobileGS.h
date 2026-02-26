@@ -1,115 +1,77 @@
-#ifndef GRAFFITIXR_MOBILEGS_H
-#define GRAFFITIXR_MOBILEGS_H
+#ifndef GRAFFITIXR_MOBILE_GS_H
+#define GRAFFITIXR_MOBILE_GS_H
 
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <mutex>
-#include <cstdint>
 #include <opencv2/core.hpp>
-#include <android/native_window.h>
-#include <android/asset_manager.h>
+#include <opencv2/imgproc.hpp>
+#include <vector>
+#include <string>
+#include <mutex>
+#include <thread>
+#include <map>
 #include "VulkanBackend.h"
 
 /**
- * Voxel hashing structure for Sparse SLAM map.
+ * Structure representing a single Gaussian Splat point.
  */
-struct VoxelKey {
-    int x, y, z;
-    bool operator==(const VoxelKey& o) const {
-        return x == o.x && y == o.y && z == o.z;
-    }
-};
-
-/**
- * Hash function for VoxelKey to enable use in unordered_map.
- */
-struct VoxelHash {
-    std::size_t operator()(const VoxelKey& k) const {
-        return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1) ^ (std::hash<int>()(k.z) << 2);
-    }
-};
-
-/**
- * Data structure for a single 3D Gaussian Splat point.
- * Aligned to 32 bytes for performance.
- */
-struct SplatPoint {
-    float x, y, z;
-    float r, g, b, a;
+struct SplatGaussian {
+    float pos[3];
+    float scale[3];
+    float rot[4];
+    float color[4];
+    float opacity;
     float confidence;
 };
 
 /**
- * MobileGS: The primary native engine for 3D Gaussian Splatting and Voxel Mapping.
+ * Key for voxel-based spatial hashing to prevent redundant splat generation.
+ */
+struct VoxelKey {
+    int x, y, z;
+    bool operator<(const VoxelKey& other) const {
+        if (x != other.x) return x < other.x;
+        if (y != other.y) return y < other.y;
+        return z < other.z;
+    }
+};
+
+/**
+ * Mobile-optimized Gaussian Splatting engine.
+ * Handles real-time point cloud generation from depth data and sorted rendering.
  */
 class MobileGS {
 public:
     MobileGS();
     ~MobileGS();
 
-    // Lifecycle
-    void initialize();
-    void reset();
-    void onSurfaceChanged(int width, int height);
-    void draw();
+    void initialize(int width, int height);
+    void updateCamera(const float* viewMatrix, const float* projMatrix);
+    void processDepthFrame(const cv::Mat& depthMap, const cv::Mat& colorFrame);
 
-    // Vulkan Integration
-    bool initVulkan(ANativeWindow* window, AAssetManager* mgr);
-    void resizeVulkan(int width, int height);
-    void destroyVulkan();
+    void render();
 
-    // State Updates
-    void updateCamera(float* viewMatrix, float* projectionMatrix);
-    void updateLight(float intensity, float* colorCorrection = nullptr);
-    void alignMap(float* transform);
-    void setLocation(double latitude, double longitude, double altitude);
-
-    // Data Ingestion
-    void processDepthData(uint8_t* depthBuffer, int width, int height);
-    void processMonocularData(uint8_t* imageData, int width, int height);
-    void addStereoPoints(const std::vector<cv::Point3f>& points);
-
-    /**
-     * Sets the rendering mode.
-     * 0 = AR Mode (Vulkan Backend)
-     * 1 = Editor Mode (GLES3 Fallback)
-     */
-    void setVisualizationMode(int mode);
-
-    // Serialization
-    bool saveMap(const char* path);
-    bool loadMap(const char* path);
-    bool saveKeyframe(const char* path);
+    bool saveModel(const std::string& path);
+    bool loadModel(const std::string& path);
 
 private:
-    bool isInitialized = false;
-    int viewportWidth = 0;
-    int viewportHeight = 0;
-    int visMode = 0;
+    void sortThreadLoop();
 
-    float lightIntensity = 1.0f;
-    float lightColor[3] = {1.0f, 1.0f, 1.0f};
+    std::vector<SplatGaussian> mGaussians;
+    std::map<VoxelKey, size_t> mVoxelGrid;
 
-    double lastLat = 0, lastLon = 0, lastAlt = 0;
+    float mViewMatrix[16];
+    float mProjMatrix[16];
 
-    VulkanBackend* vulkanRenderer = nullptr;
+    std::mutex mDataMutex;
+    std::thread mSortThread;
+    bool mIsRunning;
+    bool mNeedsResort;
 
-    // Voxel storage system
-    std::unordered_map<VoxelKey, SplatPoint, VoxelHash> mVoxelGrid;
-    const float VOXEL_SIZE = 0.05f;
-    const size_t MAX_VOXELS = 10000;
+    unsigned int mVao, mVbo;
+    unsigned int mProgram;
 
-    float viewMtx[16];
-    float projMtx[16];
-    float alignmentMtx[16];
-
-    std::mutex alignMutex;
-    std::mutex pointMutex;
-
-    // GLES Rendering (Fallback / Editor)
-    unsigned int pointProgram = 0;
-    unsigned int pointVBO = 0;
+    // Shader sources declared in implementation
+    static const char* VS_SRC;
+    static const char* FS_SRC;
 };
 
-#endif // GRAFFITIXR_MOBILEGS_H
+#endif // GRAFFITIXR_MOBILE_GS_H

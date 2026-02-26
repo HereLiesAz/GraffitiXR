@@ -38,6 +38,7 @@ accompanistPermissions = "0.37.3"
 datastore = "1.2.0"
 material3 = "1.4.0"
 roomExternalAntlr = "2.8.4"
+inkBrush = "1.0.0"
 
 [libraries]
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
@@ -94,6 +95,7 @@ play-services-location = { group = "com.google.android.gms", name = "play-servic
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 androidx-room-external-antlr = { group = "androidx.room", name = "room-external-antlr", version.ref = "roomExternalAntlr" }
+androidx-ink-brush = { group = "androidx.ink", name = "ink-brush", version.ref = "inkBrush" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

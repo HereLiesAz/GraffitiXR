@@ -1,28 +1,37 @@
-#ifndef STEREO_PROCESSOR_H
-#define STEREO_PROCESSOR_H
+#ifndef GRAFFITIXR_STEREO_PROCESSOR_H
+#define GRAFFITIXR_STEREO_PROCESSOR_H
 
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/calib3d.hpp>
 #include <vector>
+#include <cstdint>
 
-// Forward declaration
-class MobileGS;
-
+/**
+ * Handles disparity mapping and depth estimation from dual camera streams.
+ */
 class StereoProcessor {
 public:
     StereoProcessor();
     ~StereoProcessor();
 
-    // FIX: Added engine reference to allow data pushback
-    void process(
-            MobileGS* engine,
-            const unsigned char* leftData, int leftWidth, int leftHeight, int leftStride,
-            const unsigned char* rightData, int rightWidth, int rightHeight, int rightStride
-    );
+    /**
+     * Processes left and right frame buffers to generate a depth map.
+     */
+    void processStereo(int8_t* leftData, int8_t* rightData, int width, int height);
+
+    /**
+     * Returns the last computed disparity map.
+     */
+    cv::Mat getDisparityMap() const;
 
 private:
-    cv::Ptr<cv::StereoSGBM> stereoSgbm;
-    cv::Mat Q;
+    cv::Mat mLeftFrame;
+    cv::Mat mRightFrame;
+    cv::Mat mDisparityMap;
+
+    // StereoBM or StereoSGBM instance
+    cv::Ptr<cv::StereoSGBM> mStereoMatcher;
 };
 
-#endif // STEREO_PROCESSOR_H
+#endif // GRAFFITIXR_STEREO_PROCESSOR_H

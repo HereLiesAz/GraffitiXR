@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
                             AzNavHost(startDestination = EditorMode.AR.name) {
                                 composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
-                                composable(EditorMode.STATIC.name) { EditorOverlay(editorViewModel, mainUiState) }
+                                composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
                             }
 
@@ -252,7 +252,7 @@ class MainActivity : ComponentActivity() {
         azRailHostItem(id = "mode_host", text = navStrings.modes)
         azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, shape = AzButtonShape.NONE)
         azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, shape = AzButtonShape.NONE)
-        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.STATIC.name, shape = AzButtonShape.NONE)
+        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, shape = AzButtonShape.NONE)
         azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, shape = AzButtonShape.NONE)
 
         azDivider()
@@ -279,7 +279,7 @@ class MainActivity : ComponentActivity() {
             editorViewModel.onAddBlankLayer()
         }
 
-        if (editorUiState.editorMode == EditorMode.STATIC) {
+        if (editorUiState.editorMode == EditorMode.MOCKUP) {
             azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, shape = AzButtonShape.NONE) {
                 backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }

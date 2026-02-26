@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.feature.dashboard
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.hereliesaz.graffitixr.common.model.EditorMode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

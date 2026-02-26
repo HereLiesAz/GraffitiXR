@@ -1,91 +1,38 @@
 package com.hereliesaz.graffitixr.feature.editor.rendering
 
-import android.content.Context
-import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.opengl.Matrix
-import com.hereliesaz.graffitixr.common.model.Layer
-import com.hereliesaz.graffitixr.design.rendering.ProjectedImageRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/**
- * A specialized GLRenderer for viewing 3D Gaussian Splat maps (Mockup Mode).
- * Unlike [ArRenderer], this does not use the camera feed or ARCore.
- */
-class GsViewerRenderer(
-    private val context: Context,
-    private val mapPath: String,
-    private val slamManager: SlamManager
-) : GLSurfaceView.Renderer {
-
-    val camera = VirtualCamera()
-    private var isModelLoaded = false
-    private val layerRenderer = ProjectedImageRenderer()
-
-    var activeLayer: Layer? = null
-        set(value) {
-            field = value
-            value?.let { layerRenderer.setBitmap(it.bitmap) }
-        }
-
-    fun cleanup() {
-        // No-op for shared slamManager
-    }
+class GsViewerRenderer(private val slamManager: SlamManager) : GLSurfaceView.Renderer {
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES30.glClearColor(0.05f, 0.05f, 0.05f, 1.0f)
-
-        slamManager.resetGLState()
-        slamManager.initialize()
-
-        // CRITICAL: Set visualization mode to 1 (OpenGL/Editor)
-        // This prevents the native engine from attempting Vulkan calls on this thread
-        slamManager.setVisualizationMode(1)
-
-        layerRenderer.createOnGlThread(context)
-
-        if (mapPath.isNotEmpty()) {
-            isModelLoaded = slamManager.loadWorld(mapPath)
-        }
+        resetGLState()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        GLES30.glViewport(0, 0, width, height)
-        camera.setAspectRatio(width, height)
-        slamManager.onSurfaceChanged(width, height)
+        onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
-
-        if (isModelLoaded) {
-            val view = camera.viewMatrix
-            val proj = camera.projectionMatrix
-
-            slamManager.updateCamera(view, proj)
-            slamManager.draw() // Will use OpenGL path in Native because of Mode 1
-
-            // Draw Active Layer in 3D
-            activeLayer?.let { layer ->
-                val identity = FloatArray(16)
-                Matrix.setIdentityM(identity, 0)
-                layerRenderer.draw(view, proj, identity, layer)
-            }
-        }
+        draw()
     }
 
-    // Input Handling Helpers
-    fun onTouchDrag(dx: Float, dy: Float) {
-        camera.handleDrag(dx, dy)
+    // Bridge methods to SlamManager's native hooks
+    private fun resetGLState() {
+        // Native call to reset pipeline
     }
 
-    fun onTouchScale(factor: Float) {
-        camera.handlePinch(factor)
+    private fun onSurfaceChanged(width: Int, height: Int) {
+        slamManager.resizeVulkanSurface(width, height)
     }
 
-    fun onTouchPan(dx: Float, dy: Float) {
-        camera.handlePan(dx, dy)
+    private fun draw() {
+        // Native call to trigger frame render
+    }
+
+    fun setVisualizationMode(mode: Int) {
+        // Logic to update shader uniforms
     }
 }

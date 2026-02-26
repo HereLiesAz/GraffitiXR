@@ -1,41 +1,40 @@
 package com.hereliesaz.graffitixr.design.components
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import com.hereliesaz.graffitixr.common.model.EditorMode
 
+/**
+ * Displays contextual help based on the current active EditorMode.
+ */
 @Composable
 fun OnboardingDialog(
-    editorMode: EditorMode,
+    mode: EditorMode,
     onDismiss: () -> Unit
 ) {
-    val title = when (editorMode) {
-        EditorMode.AR -> "Welcome to AR Grid Mode!"
-        else -> "Welcome to ${editorMode.name} Mode!"
+    val title = when (mode) {
+        EditorMode.AR -> "AR Mode"
+        EditorMode.TRACE -> "Trace Mode"
+        EditorMode.MOCKUP -> "Mockup Mode"
+        EditorMode.OVERLAY -> "Overlay Mode"
     }
 
-    val message = when (editorMode) {
-        EditorMode.STATIC -> "In this mode, you can mockup your artwork on a static background image. Use the controls to adjust the size, position, and orientation of your artwork."
-        EditorMode.OVERLAY -> "In this mode, you can overlay your artwork on the live camera feed. This is a great way to get a quick preview of your work in the real world."
-        EditorMode.TRACE -> "In this mode, your device acts as a lightbox. Place a piece of paper over the screen to trace your artwork. You can lock the screen to prevent accidental touches."
-        EditorMode.AR -> "In this mode, you can use Augmented Reality to place your artwork in the real world. First, you'll need to create an image target by pointing your camera at a real-world object."
-        else -> "Welcome to ${editorMode.name} mode. Use the available tools to edit your project."
+    val description = when (mode) {
+        EditorMode.AR -> "Virtually project images onto real-world surfaces."
+        EditorMode.TRACE -> "Project images onto surfaces to trace them in real space."
+        EditorMode.MOCKUP -> "Visualize your artwork on 3D surfaces with perspective."
+        EditorMode.OVERLAY -> "Compare your progress with a semi-transparent reference."
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = title) },
-        text = {
-            Column {
-                Text(text = message)
-            }
-        },
+        text = { Text(text = description) },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Got it!")
+                Text("Got it")
             }
         }
     )

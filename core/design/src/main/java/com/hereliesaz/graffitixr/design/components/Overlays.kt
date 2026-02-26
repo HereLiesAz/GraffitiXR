@@ -28,7 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.common.model.ArState
-import com.hereliesaz.graffitixr.common.model.EditorMode
 import kotlinx.coroutines.delay
 
 @Composable

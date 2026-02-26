@@ -1,34 +1,27 @@
 package com.hereliesaz.graffitixr.nativebridge.depth
 
-import android.content.Context
-import android.media.Image
-import com.hereliesaz.graffitixr.common.util.CameraCapabilities
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import javax.inject.Singleton
 
-interface DepthProvider {
-    fun isSupported(): Boolean
-    fun processDepth(image: Image)
-    fun processStereoPair(leftImage: Image, rightImage: Image)
-}
-
+/**
+ * Processes dual-camera streams to generate depth information for AR occlusion.
+ */
+@Singleton
 class StereoDepthProvider @Inject constructor(
-    @param:ApplicationContext private val context: Context,
     private val slamManager: SlamManager
-) : DepthProvider {
+) {
 
-    override fun isSupported(): Boolean {
-        return CameraCapabilities.hasLogicalMultiCameraSupport(context)
-    }
-
-    override fun processDepth(image: Image) {
-        // No-op for stereo provider, it expects pairs
-    }
-
-    override fun processStereoPair(leftImage: Image, rightImage: Image) {
-        if (isSupported()) {
-            slamManager.feedStereoData(leftImage, rightImage)
+    /**
+     * Passes raw stereo frame data to the native engine for disparity mapping.
+     * * @param left The byte array from the left camera sensor.
+     * @param right The byte array from the right camera sensor.
+     * @param width Frame width in pixels.
+     * @param height Frame height in pixels.
+     */
+    fun processFrames(left: ByteArray, right: ByteArray, width: Int, height: Int) {
+        if (left.isNotEmpty() && right.isNotEmpty()) {
+            slamManager.feedStereoData(left, right, width, height)
         }
     }
 }

@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.hilt.android)
+    implementation(libs.androidx.ink.brush)
     ksp(libs.hilt.compiler)
 
     // AZ Nav Rail (Ensure this is available if used in Editor, though usually in App)
