@@ -269,4 +269,64 @@ class EditorViewModelTest {
         
         coVerify { projectRepository.updateProject(any<com.hereliesaz.graffitixr.common.model.GraffitiProject>()) }
     }
+
+    @Test
+    fun `undo restores previous state`() = runTest {
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.layers.size)
+
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.layers.size)
+    }
+
+    @Test
+    fun `redo restores undone state`() = runTest {
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(0, viewModel.uiState.value.layers.size)
+
+        viewModel.onRedoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.layers.size)
+    }
+
+    @Test
+    fun `gesture undo restores state`() = runTest {
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val initialScale = viewModel.uiState.value.layers.first().scale
+
+        // Start gesture (pushes history)
+        viewModel.onGestureStart()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Transform
+        viewModel.onTransformGesture(Offset.Zero, 2.0f, 0f)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val modifiedScale = viewModel.uiState.value.layers.first().scale
+        assertEquals(initialScale * 2.0f, modifiedScale, 0.01f)
+
+        // End gesture
+        viewModel.onGestureEnd()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Undo
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val restoredScale = viewModel.uiState.value.layers.first().scale
+        assertEquals(initialScale, restoredScale, 0.01f)
+    }
 }
