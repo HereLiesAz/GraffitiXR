@@ -56,12 +56,17 @@ class EditorViewModelTest {
         // Mock static methods for Bitmap and Uri
         mockkStatic(BitmapFactory::class)
         mockkStatic(Uri::class)
-        
+        mockkObject(BitmapUtils)
+
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         every { mockBitmap.width } returns 100
         every { mockBitmap.height } returns 100
         every { BitmapFactory.decodeStream(any()) } returns mockBitmap
-        
+
+        // Mock BitmapUtils so ImageDecoder/BitmapFactory isn't invoked in unit tests
+        coEvery { BitmapUtils.getBitmapDimensions(any(), any()) } returns Pair(100, 100)
+        coEvery { BitmapUtils.getBitmapFromUri(any(), any()) } returns mockBitmap
+
         every { Uri.parse(any()) } answers {
             val uriString = it.invocation.args[0] as String
             val mUri = mockk<Uri>()
@@ -70,7 +75,7 @@ class EditorViewModelTest {
             every { mUri.path } returns if (uriString.contains("://")) uriString.split("://")[1] else uriString
             mUri
         }
-        
+
         // Mock Context and ContentResolver
         val contentResolver = mockk<ContentResolver>()
         val inputStream = ByteArrayInputStream(ByteArray(0))
@@ -92,6 +97,7 @@ class EditorViewModelTest {
         Dispatchers.resetMain()
         unmockkStatic(BitmapFactory::class)
         unmockkStatic(Uri::class)
+        unmockkObject(BitmapUtils)
     }
 
     @Test
