@@ -65,10 +65,12 @@ target_include_directories(graffitixr_native PRIVATE
 find_library(log-lib log)
 find_library(android-lib android)
 find_library(vulkan-lib vulkan)
+find_library(jnigraphics-lib jnigraphics)
 
 target_link_libraries(graffitixr_native
     ${log-lib}
     ${android-lib}
     ${vulkan-lib}
+    ${jnigraphics-lib}
     ${OpenCV_LIBS}
 )
