@@ -1,23 +1,27 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.hardware.camera2.CameraManager
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.nio.ByteBuffer
 import javax.inject.Inject
-import android.graphics.Bitmap
-import androidx.compose.ui.geometry.Offset
 
 /**
  * Manages spatial state and native bridge coordination for AR features.
  */
 @HiltViewModel
 class ArViewModel @Inject constructor(
-    private val slamManager: SlamManager
+    private val slamManager: SlamManager,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
@@ -35,16 +39,27 @@ class ArViewModel @Inject constructor(
      */
     fun captureKeyframe() {
         val timestamp = System.currentTimeMillis()
-        val success = slamManager.saveKeyframe(timestamp)
-        // Undo count is not in ArUiState, handled elsewhere or ignored here for now
+        val keyframesDir = java.io.File(context.filesDir, "keyframes").apply { mkdirs() }
+        val outputPath = java.io.File(keyframesDir, "keyframe_$timestamp.gxrm").absolutePath
+        val success = slamManager.saveKeyframe(timestamp, outputPath)
+        if (success) {
+            _uiState.update { it.copy(pendingKeyframePath = outputPath) }
+        }
     }
 
     /**
-     * Toggles the hardware flashlight state via the native bridge.
+     * Toggles the hardware flashlight state via Android Camera2 API.
      */
     fun toggleFlashlight() {
-        slamManager.toggleFlashlight()
-        _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
+        val newState = !_uiState.value.isFlashlightOn
+        try {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val cameraId = cameraManager.cameraIdList.firstOrNull() ?: return
+            cameraManager.setTorchMode(cameraId, newState)
+            _uiState.update { it.copy(isFlashlightOn = newState) }
+        } catch (e: Exception) {
+            // Camera unavailable or torch not supported
+        }
     }
 
     /**

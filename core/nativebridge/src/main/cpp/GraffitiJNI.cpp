@@ -159,8 +159,28 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
     // Placeholder: In a full impl, this passes to ORB_SLAM or custom tracker
 }
 
-JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSaveKeyframe(JNIEnv* env, jobject thiz, jlong timestamp) {
-    return JNI_TRUE;
+JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSaveKeyframe(JNIEnv* env, jobject thiz, jlong timestamp, jstring outputPath) {
+    if (!gSlamEngine) return JNI_FALSE;
+    const char* pathCStr = env->GetStringUTFChars(outputPath, nullptr);
+    bool result = gSlamEngine->saveModel(std::string(pathCStr));
+    env->ReleaseStringUTFChars(outputPath, pathCStr);
+    return result ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSaveModel(JNIEnv* env, jobject thiz, jstring path) {
+    if (!gSlamEngine) return JNI_FALSE;
+    const char* pathCStr = env->GetStringUTFChars(path, nullptr);
+    bool result = gSlamEngine->saveModel(std::string(pathCStr));
+    env->ReleaseStringUTFChars(path, pathCStr);
+    return result ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadModel(JNIEnv* env, jobject thiz, jstring path) {
+    if (!gSlamEngine) return JNI_FALSE;
+    const char* pathCStr = env->GetStringUTFChars(path, nullptr);
+    bool result = gSlamEngine->loadModel(std::string(pathCStr));
+    env->ReleaseStringUTFChars(path, pathCStr);
+    return result ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeToggleFlashlight(JNIEnv* env, jobject thiz, jboolean enabled) {

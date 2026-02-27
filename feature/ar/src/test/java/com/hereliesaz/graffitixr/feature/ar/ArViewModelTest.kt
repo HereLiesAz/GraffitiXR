@@ -1,6 +1,9 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.Context
+import android.hardware.camera2.CameraManager
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.nio.ByteBuffer
@@ -21,12 +25,16 @@ class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
+    private val cameraManager: CameraManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = ArViewModel(slamManager)
+        every { context.getSystemService(Context.CAMERA_SERVICE) } returns cameraManager
+        every { cameraManager.cameraIdList } returns arrayOf("0")
+        viewModel = ArViewModel(slamManager, context)
     }
 
     @After
@@ -42,9 +50,10 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `toggleFlashlight calls slamManager`() = runTest {
+    fun `toggleFlashlight updates flashlight state`() = runTest {
+        assertFalse(viewModel.uiState.value.isFlashlightOn)
         viewModel.toggleFlashlight()
-        verify { slamManager.toggleFlashlight() }
+        assertTrue(viewModel.uiState.value.isFlashlightOn)
     }
 
     @Test
@@ -55,9 +64,10 @@ class ArViewModelTest {
 
     @Test
     fun `captureKeyframe calls slamManager`() = runTest {
-        io.mockk.every { slamManager.saveKeyframe(any()) } returns true
+        io.mockk.every { context.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir")!!)
+        io.mockk.every { slamManager.saveKeyframe(any(), any()) } returns true
         viewModel.captureKeyframe()
-        verify { slamManager.saveKeyframe(any()) }
+        verify { slamManager.saveKeyframe(any(), any()) }
     }
 
     @Test
