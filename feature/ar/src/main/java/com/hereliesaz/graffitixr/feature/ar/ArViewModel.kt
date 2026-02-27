@@ -69,6 +69,18 @@ class ArViewModel @Inject constructor(
         slamManager.initialize()
     }
 
+    fun startScanning() {
+        _uiState.update { it.copy(isScanning = true) }
+    }
+
+    fun stopScanning() {
+        _uiState.update { it.copy(isScanning = false) }
+    }
+
+    fun updateTrackingState(state: String, pointCount: Int) {
+        _uiState.update { it.copy(trackingState = state, pointCloudCount = pointCount) }
+    }
+
     fun setTempCapture(bitmap: Bitmap) {
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
     }

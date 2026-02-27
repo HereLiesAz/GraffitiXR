@@ -5,13 +5,14 @@
 #include <android/asset_manager_jni.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
-#include "include/SlamEngine.h"
 #include "include/VulkanBackend.h"
 #include "include/MobileGS.h"
+#include "include/StereoProcessor.h"
 
 // Global Engine Singletons
 static VulkanBackend* gVulkanRenderer = nullptr;
 static MobileGS* gSlamEngine = nullptr;
+static StereoProcessor gStereoProcessor;
 
 extern "C" {
 
@@ -129,21 +130,48 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
         JNIEnv* env, jobject thiz, jbyteArray left, jbyteArray right, jint w, jint h) {
+    if (!gSlamEngine) return;
 
     jbyte* l_ptr = env->GetByteArrayElements(left, nullptr);
     jbyte* r_ptr = env->GetByteArrayElements(right, nullptr);
+    if (!l_ptr || !r_ptr) {
+        if (l_ptr) env->ReleaseByteArrayElements(left, l_ptr, JNI_ABORT);
+        if (r_ptr) env->ReleaseByteArrayElements(right, r_ptr, JNI_ABORT);
+        return;
+    }
 
-    // Process Stereo to Depth
-    SlamEngine::getInstance()->processStereo(
+    // Copy left frame before releasing (grayscale → RGB color context)
+    cv::Mat leftGray(h, w, CV_8UC1, reinterpret_cast<uint8_t*>(l_ptr));
+    cv::Mat colorFrame;
+    cv::cvtColor(leftGray, colorFrame, cv::COLOR_GRAY2RGB);
+
+    gStereoProcessor.processStereo(
             reinterpret_cast<int8_t*>(l_ptr),
             reinterpret_cast<int8_t*>(r_ptr),
             w, h
     );
 
-    // TODO: Feed result to gSlamEngine->processDepthFrame(...)
-
     env->ReleaseByteArrayElements(left, l_ptr, JNI_ABORT);
     env->ReleaseByteArrayElements(right, r_ptr, JNI_ABORT);
+
+    cv::Mat disparity = gStereoProcessor.getDisparityMap();
+    if (disparity.empty()) return;
+
+    // Convert CV_16S disparity (fixed-point 1/16 pixel) to CV_32F depth in metres.
+    // depth ≈ (baseline_mm * focal_px) / disp_px. Use kScale as conservative approximation.
+    constexpr float kScale = 500.0f;
+    constexpr float kEpsilon = 1e-3f;
+    cv::Mat dispFloat;
+    disparity.convertTo(dispFloat, CV_32F, 1.0f / 16.0f);
+    cv::Mat depthMap(dispFloat.rows, dispFloat.cols, CV_32F);
+    for (int r = 0; r < dispFloat.rows; ++r) {
+        for (int c = 0; c < dispFloat.cols; ++c) {
+            float d = dispFloat.at<float>(r, c);
+            depthMap.at<float>(r, c) = (d > kEpsilon) ? (kScale / d) : 0.0f;
+        }
+    }
+
+    gSlamEngine->processDepthFrame(depthMap, colorFrame);
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedLocationData(JNIEnv* env, jobject thiz, jdouble lat, jdouble lon, jdouble alt) {
