@@ -23,11 +23,13 @@ data class ArUiState(
     val activeUnwarpPointIndex: Int = -1,
     val magnifierPosition: Offset = Offset.Zero,
     val maskPath: androidx.compose.ui.graphics.Path? = null,
-    val isCaptureRequested: Boolean = false
+    val isCaptureRequested: Boolean = false,
+    val undoCount: Int = 0,
+    val gestureInProgress: Boolean = false
 )
 
 enum class Tool {
-    NONE, BRUSH, ERASER, BLUR, HEAL, BURN, DODGE, LIQUIFY
+    NONE, BRUSH, ERASER, BLUR, HEAL, BURN, DODGE, LIQUIFY, COLOR
 }
 
 

@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import androidx.lifecycle.ViewModel
-import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +18,7 @@ class ArViewModel @Inject constructor(
     private val slamManager: SlamManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(EditorUiState())
+    private val _uiState = MutableStateFlow(ArUiState())
     val uiState = _uiState.asStateFlow()
 
     /**
@@ -61,5 +61,13 @@ class ArViewModel @Inject constructor(
             // Ensuring the property is accessed on the correct type
             currentState.copy(gestureInProgress = inProgress)
         }
+    }
+
+    fun setTempCapture(bitmap: android.graphics.Bitmap) {
+        _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
+    }
+
+    fun setUnwarpPoints(points: List<androidx.compose.ui.geometry.Offset>) {
+        _uiState.update { it.copy(unwarpPoints = points) }
     }
 }
