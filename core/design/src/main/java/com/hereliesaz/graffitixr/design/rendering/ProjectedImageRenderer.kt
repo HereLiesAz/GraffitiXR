@@ -25,6 +25,20 @@ class ProjectedImageRenderer {
     }
 
     /**
+     * Updates the native visual properties (brightness, contrast, color balance) based on the Layer.
+     */
+    fun updateLayerVisuals(layer: Layer) {
+        applyNativeColorAdjustment(
+            layer.brightness,
+            layer.contrast,
+            layer.saturation,
+            layer.colorBalanceR,
+            layer.colorBalanceG,
+            layer.colorBalanceB
+        )
+    }
+
+    /**
      * Sets the blend mode for the current rendering pass.
      * Uses androidx.compose.ui.graphics.BlendMode to maintain UI/Renderer parity.
      */
@@ -46,4 +60,13 @@ class ProjectedImageRenderer {
     private fun applyNativeBlendMode(mode: BlendMode) {
         // JNI call to update pipeline color blending state
     }
+
+    private external fun applyNativeColorAdjustment(
+        brightness: Float,
+        contrast: Float,
+        saturation: Float,
+        r: Float,
+        g: Float,
+        b: Float
+    )
 }

@@ -209,18 +209,40 @@ class EditorViewModel @Inject constructor(
         val project = projectRepository.currentProject.value ?: return
         val filename = "${project.name.replace(" ", "_")}_export.gxr"
 
-        // Use Scoped Storage or Cache
-        val exportFile = File(context.cacheDir, filename)
-        val exportUri = Uri.fromFile(exportFile)
-
         viewModelScope.launch(dispatchers.io) {
             _uiState.update { it.copy(isLoading = true) }
-            projectManager.exportProjectToUri(context, project.id, exportUri)
-
-            withContext(dispatchers.main) {
-                _uiState.update { it.copy(isLoading = false) }
-                Toast.makeText(context, "Project exported to ${exportFile.absolutePath}", Toast.LENGTH_LONG).show()
-                // In production, trigger a Share Intent here
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    val contentValues = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                    }
+                    val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                    if (uri != null) {
+                        projectManager.exportProjectToUri(context, project.id, uri)
+                        withContext(dispatchers.main) {
+                            _uiState.update { it.copy(isLoading = false) }
+                            Toast.makeText(context, "Project exported to Downloads", Toast.LENGTH_LONG).show()
+                        }
+                    } else {
+                        throw java.io.IOException("Failed to create MediaStore entry")
+                    }
+                } else {
+                    val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                    val file = File(downloadsDir, filename)
+                    val uri = Uri.fromFile(file)
+                    projectManager.exportProjectToUri(context, project.id, uri)
+                    withContext(dispatchers.main) {
+                        _uiState.update { it.copy(isLoading = false) }
+                        Toast.makeText(context, "Project exported to ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -283,6 +305,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun onMagicClicked() {
+        pushHistory()
         // Auto-adjust brightness/contrast
         updateActiveLayer {
             it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f)
@@ -328,16 +351,17 @@ class EditorViewModel @Inject constructor(
 
     // Call this on gesture end to save the final state
     fun onGestureEnd() {
-        pushHistory()
         saveProject()
         _uiState.update { it.copy(gestureInProgress = false) }
     }
 
     fun onGestureStart() {
+        pushHistory()
         _uiState.update { it.copy(gestureInProgress = true) }
     }
 
     fun toggleImageLock() {
+        pushHistory()
         updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }
     }
 
@@ -378,7 +402,10 @@ class EditorViewModel @Inject constructor(
         // Auto-hide feedback after delay handled by UI component
     }
 
-    fun onAdjustmentStart() = _uiState.update { it.copy(gestureInProgress = true) }
+    fun onAdjustmentStart() {
+        pushHistory()
+        _uiState.update { it.copy(gestureInProgress = true) }
+    }
     fun onAdjustmentEnd() = _uiState.update { it.copy(gestureInProgress = false) }
 
     // Helper

@@ -46,5 +46,6 @@ class GsViewer @JvmOverloads constructor(
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         slamManager.destroyVulkanEngine()
+        slamManager.reset()
     }
 }

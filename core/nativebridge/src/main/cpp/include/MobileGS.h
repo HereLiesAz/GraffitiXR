@@ -48,6 +48,7 @@ public:
     void initialize(int width, int height);
     void init() { initialize(1920, 1080); } // Legacy wrapper
     void updateCamera(const float* viewMatrix, const float* projMatrix);
+    void updateAnchorTransform(const float* transformMatrix);
     void processDepthFrame(const cv::Mat& depthMap, const cv::Mat& colorFrame);
 
     bool saveModel(const std::string& path);
@@ -65,6 +66,7 @@ private:
 
     float mViewMatrix[16];
     float mProjMatrix[16];
+    float mAnchorMatrix[16];
 
     std::mutex mDataMutex;
     std::thread mSortThread;
