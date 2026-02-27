@@ -11,9 +11,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.nio.ByteBuffer
@@ -39,8 +37,8 @@ class ArViewModelTest {
     @Test
     fun `initial state is correct`() = runTest {
         val state = viewModel.uiState.first()
-        assertFalse(state.gestureInProgress)
-        assertEquals(0, state.undoCount)
+        assertFalse(state.isScanning)
+        assertFalse(state.isFlashlightOn)
     }
 
     @Test
@@ -56,16 +54,10 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `captureKeyframe calls slamManager and updates undoCount`() = runTest {
-        // Assume saveKeyframe returns true
+    fun `captureKeyframe calls slamManager`() = runTest {
         io.mockk.every { slamManager.saveKeyframe(any()) } returns true
-        
         viewModel.captureKeyframe()
-
         verify { slamManager.saveKeyframe(any()) }
-        
-        val state = viewModel.uiState.value
-        assertEquals(1, state.undoCount)
     }
 
     @Test
@@ -75,14 +67,5 @@ class ArViewModelTest {
         val h = 480
         viewModel.onFrameAvailable(buffer, w, h)
         verify { slamManager.feedMonocularData(buffer, w, h) }
-    }
-
-    @Test
-    fun `setGestureInProgress updates state`() = runTest {
-        viewModel.setGestureInProgress(true)
-        assertTrue(viewModel.uiState.value.gestureInProgress)
-
-        viewModel.setGestureInProgress(false)
-        assertFalse(viewModel.uiState.value.gestureInProgress)
     }
 }

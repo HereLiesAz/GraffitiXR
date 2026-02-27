@@ -7,6 +7,8 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.coEvery
@@ -42,6 +44,7 @@ class EditorViewModelTest {
     private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
     private val backgroundRemover: BackgroundRemover = mockk(relaxed = true)
+    private val projectManager: ProjectManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
@@ -81,7 +84,7 @@ class EditorViewModelTest {
             override val unconfined: CoroutineDispatcher = testDispatcher
         }
 
-        viewModel = EditorViewModel(projectRepository, context, backgroundRemover, slamManager, testDispatcherProvider)
+        viewModel = EditorViewModel(projectRepository, projectManager, context, backgroundRemover, slamManager, testDispatcherProvider)
     }
 
     @After
