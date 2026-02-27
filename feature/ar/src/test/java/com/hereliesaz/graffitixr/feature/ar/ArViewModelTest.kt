@@ -1,12 +1,8 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import android.graphics.Bitmap
-import android.net.Uri
-import com.hereliesaz.graffitixr.feature.ar.computervision.TeleologicalTracker
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
-import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
-import io.mockk.every
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -17,27 +13,22 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.Ignore
+import java.nio.ByteBuffer
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
-    private val stereoDepthProvider: StereoDepthProvider = mockk(relaxed = true)
-    private val teleologicalTracker: TeleologicalTracker = mockk(relaxed = true)
-    private val projectRepository: ProjectRepository = mockk(relaxed = true)
+    private val slamManager: SlamManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        every { stereoDepthProvider.isSupported() } returns false
-        viewModel = ArViewModel(stereoDepthProvider, teleologicalTracker, projectRepository)
+        viewModel = ArViewModel(slamManager)
     }
 
     @After
@@ -48,67 +39,50 @@ class ArViewModelTest {
     @Test
     fun `initial state is correct`() = runTest {
         val state = viewModel.uiState.first()
-        assertFalse(state.isFlashlightOn)
-        assertTrue(state.showPointCloud)
-        assertNull(state.tempCaptureBitmap)
+        assertFalse(state.gestureInProgress)
+        assertEquals(0, state.undoCount)
     }
 
     @Test
-    fun `toggleFlashlight updates state`() = runTest {
+    fun `toggleFlashlight calls slamManager`() = runTest {
         viewModel.toggleFlashlight()
-        assertTrue(viewModel.uiState.value.isFlashlightOn)
-
-        viewModel.toggleFlashlight()
-        assertFalse(viewModel.uiState.value.isFlashlightOn)
+        verify { slamManager.toggleFlashlight() }
     }
 
     @Test
-    fun `togglePointCloud updates state`() = runTest {
-        viewModel.togglePointCloud()
-        assertFalse(viewModel.uiState.value.showPointCloud)
-
-        viewModel.togglePointCloud()
-        assertTrue(viewModel.uiState.value.showPointCloud)
+    fun `initEngine calls slamManager`() = runTest {
+        viewModel.initEngine()
+        verify { slamManager.initialize() }
     }
 
     @Test
-    fun `setTempCapture updates bitmap`() = runTest {
-        val bitmap = mockk<Bitmap>()
-        viewModel.setTempCapture(bitmap)
-        assertEquals(bitmap, viewModel.uiState.value.tempCaptureBitmap)
-    }
-
-    @Test
-    fun `onFrameCaptured updates state`() = runTest {
-        val bitmap = mockk<Bitmap>()
-        val uri = mockk<Uri>()
-        // uri.path is used in viewmodel, so we must mock it
-        every { uri.path } returns "/tmp/test"
+    fun `captureKeyframe calls slamManager and updates undoCount`() = runTest {
+        // Assume saveKeyframe returns true
+        io.mockk.every { slamManager.saveKeyframe(any()) } returns true
         
-        viewModel.onFrameCaptured(bitmap, uri)
+        viewModel.captureKeyframe()
+
+        verify { slamManager.saveKeyframe(any()) }
         
         val state = viewModel.uiState.value
-        assertEquals(bitmap, state.tempCaptureBitmap)
-        assertEquals("/tmp/test", state.pendingKeyframePath)
+        assertEquals(1, state.undoCount)
     }
 
     @Test
-    fun `captureKeyframe sets pendingKeyframePath`() = runTest {
-        viewModel.captureKeyframe()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val path = viewModel.uiState.value.pendingKeyframePath
-        assertNotNull(path)
-        assertTrue(path!!.startsWith("keyframe_"))
+    fun `onFrameAvailable calls slamManager`() = runTest {
+        val buffer = ByteBuffer.allocate(0)
+        val w = 640
+        val h = 480
+        viewModel.onFrameAvailable(buffer, w, h)
+        verify { slamManager.feedMonocularData(buffer, w, h) }
     }
 
     @Test
-    fun `onKeyframeCaptured clears pendingKeyframePath`() = runTest {
-        viewModel.captureKeyframe()
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertNotNull(viewModel.uiState.value.pendingKeyframePath)
+    fun `setGestureInProgress updates state`() = runTest {
+        viewModel.setGestureInProgress(true)
+        assertTrue(viewModel.uiState.value.gestureInProgress)
 
-        viewModel.onKeyframeCaptured()
-        assertNull(viewModel.uiState.value.pendingKeyframePath)
+        viewModel.setGestureInProgress(false)
+        assertFalse(viewModel.uiState.value.gestureInProgress)
     }
 }
