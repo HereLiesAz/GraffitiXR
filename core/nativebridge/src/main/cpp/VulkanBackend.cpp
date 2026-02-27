@@ -414,3 +414,46 @@ VkShaderModule VulkanBackend::createShaderModule(const std::vector<char>& code) 
     }
     return shaderModule;
 }
+
+// Missing implementations
+void VulkanBackend::cleanupSwapchain() {
+    for (size_t i = 0; i < m_swapchainFramebuffers.size(); i++) {
+        vkDestroyFramebuffer(m_device, m_swapchainFramebuffers[i], nullptr);
+    }
+    vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
+    vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+    for (size_t i = 0; i < m_swapchainImageViews.size(); i++) {
+        vkDestroyImageView(m_device, m_swapchainImageViews[i], nullptr);
+    }
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+}
+
+void VulkanBackend::recreateSwapchain() {
+    vkDeviceWaitIdle(m_device);
+    cleanupSwapchain();
+    createSwapchain();
+    createImageViews();
+    createRenderPass();
+    createGraphicsPipeline();
+    createFramebuffers();
+}
+
+bool VulkanBackend::createSyncObjects() {
+    m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    m_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+    VkSemaphoreCreateInfo semaphoreInfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        if (vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS) {
+            return false;
+        }
+    }
+    return true;
+}
