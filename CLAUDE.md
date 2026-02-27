@@ -61,7 +61,6 @@ GraffitiXR is a **multi-module Android app** (Kotlin + C++17) for AR-assisted mu
 The C++ engine lives in `core/nativebridge/src/main/cpp/`. Key files:
 - `MobileGS.cpp` / `MobileGS.h` — Sparse voxel hash map (5mm³ voxels), Gaussian splat rendering via `GL_POINTS`
 - `GraffitiJNI.cpp` — JNI boundary; exposes native pointer as `long` handle to Kotlin
-- `SlamManager.cpp` — Manages ARCore depth + pose pipeline
 - `StereoProcessor.cpp` — Dual-camera stereo depth fusion
 
 **JNI Protocol:** Always pass memory as `ByteBuffer` (never raw pointers). C++ extracts the address via `GetDirectBufferAddress`.
@@ -91,6 +90,7 @@ Key tuning constants in `MobileGS.h`: `VOXEL_SIZE` (20mm), `CONFIDENCE_THRESHOLD
 - **Packages:** Flat packages matching module names — e.g., `:core:nativebridge` → `com.hereliesaz.graffitixr.nativebridge`
 - **UI:** Jetpack Compose only (no XML layouts); AzNavRail (`com.github.HereLiesAZ:AzNavRail`) for navigation — a vertical thumb-driven rail, right-side by default
 - **Dependencies:** All versions managed in `gradle/libs.versions.toml` (version catalog); never hardcode versions in module `build.gradle.kts`
+- **Protobuf dual-version:** Root `build.gradle.kts` intentionally forces Protobuf `3.25.5` in the buildscript classpath (AGP 9.0.1 requirement) and `4.28.2` in the app runtime. Do not align these — the split is required.
 - **Versioning:** Update `version.properties` for Major/Minor; build number auto-increments from git commit count
 
 ## Testing Notes

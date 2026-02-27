@@ -98,9 +98,9 @@ fun ArViewport(
         )
     }
 
-    if (uiState.editorMode == EditorMode.MOCKUP && uiState.backgroundBitmap != null) {
+    uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }?.let { bmp ->
         androidx.compose.foundation.Image(
-            bitmap = uiState.backgroundBitmap!!.asImageBitmap(),
+            bitmap = bmp.asImageBitmap(),
             contentDescription = "Background Mockup",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop

@@ -27,7 +27,7 @@ buildscript {
         resolutionStrategy {
             // Force common dependencies
             commonForcedDependencies.forEach { force(it) }
-            // Force Protobuf 3.25.5 for buildscript compatibility with AGP 9.0.1
+            // AGP 9.0.1 requires Protobuf 3.25.5 in the buildscript classpath
             protobufModules.forEach { force("$it:3.25.5") }
         }
     }

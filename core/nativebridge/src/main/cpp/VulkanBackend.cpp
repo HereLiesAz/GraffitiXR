@@ -352,7 +352,8 @@ uint32_t VulkanBackend::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlag
             return i;
         }
     }
-    throw std::runtime_error("failed to find suitable memory type!");
+    LOGE("findMemoryType: no suitable memory type found (filter=0x%x, props=0x%x)", typeFilter, properties);
+    return UINT32_MAX;
 }
 
 bool VulkanBackend::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
@@ -366,7 +367,16 @@ bool VulkanBackend::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, Vk
     VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-    if (vkAllocateMemory(m_device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) return false;
+    if (allocInfo.memoryTypeIndex == UINT32_MAX) {
+        vkDestroyBuffer(m_device, buffer, nullptr);
+        buffer = VK_NULL_HANDLE;
+        return false;
+    }
+    if (vkAllocateMemory(m_device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+        vkDestroyBuffer(m_device, buffer, nullptr);
+        buffer = VK_NULL_HANDLE;
+        return false;
+    }
     vkBindBufferMemory(m_device, buffer, bufferMemory, 0);
     return true;
 }
@@ -387,7 +397,7 @@ void VulkanBackend::uploadSplatData(const std::vector<SplatGaussian>& splats) {
             vkDestroyBuffer(m_device, m_vertexBuffer, nullptr);
             vkFreeMemory(m_device, m_vertexBufferMemory, nullptr);
         }
-        m_vertexBufferSize = bufferSize * 1.5; // Allocate extra to prevent frequent reallocations
+        m_vertexBufferSize = static_cast<size_t>(bufferSize) + static_cast<size_t>(bufferSize) / 2; // 1.5x to prevent frequent reallocations
         createBuffer(m_vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_vertexBuffer, m_vertexBufferMemory);
     }
     void* data;
@@ -428,29 +438,6 @@ VkShaderModule VulkanBackend::createShaderModule(const std::vector<char>& code) 
     return shaderModule;
 }
 
-// Missing implementations
-void VulkanBackend::cleanupSwapchain() {
-    for (size_t i = 0; i < m_swapchainFramebuffers.size(); i++) {
-        vkDestroyFramebuffer(m_device, m_swapchainFramebuffers[i], nullptr);
-    }
-    vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
-    vkDestroyRenderPass(m_device, m_renderPass, nullptr);
-    for (size_t i = 0; i < m_swapchainImageViews.size(); i++) {
-        vkDestroyImageView(m_device, m_swapchainImageViews[i], nullptr);
-    }
-    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
-}
-
-void VulkanBackend::recreateSwapchain() {
-    vkDeviceWaitIdle(m_device);
-    cleanupSwapchain();
-    createSwapchain();
-    createImageViews();
-    createRenderPass();
-    createGraphicsPipeline();
-    createFramebuffers();
-}
 
 bool VulkanBackend::createSyncObjects() {
     m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -475,10 +462,23 @@ void VulkanBackend::cleanupSwapchain() {
     for (auto framebuffer : m_swapchainFramebuffers) {
         vkDestroyFramebuffer(m_device, framebuffer, nullptr);
     }
+    m_swapchainFramebuffers.clear();
+
+    // Pipeline depends on swapchain extent — must be recreated on resize
+    if (m_graphicsPipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
+        m_graphicsPipeline = VK_NULL_HANDLE;
+    }
+
     for (auto imageView : m_swapchainImageViews) {
         vkDestroyImageView(m_device, imageView, nullptr);
     }
-    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+    m_swapchainImageViews.clear();
+
+    if (m_swapchain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+        m_swapchain = VK_NULL_HANDLE;
+    }
 }
 
 void VulkanBackend::recreateSwapchain() {
@@ -486,5 +486,6 @@ void VulkanBackend::recreateSwapchain() {
     cleanupSwapchain();
     createSwapchain();
     createImageViews();
+    createGraphicsPipeline();
     createFramebuffers();
 }
