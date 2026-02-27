@@ -128,7 +128,7 @@ fun ArViewport(
                     drawImage(
                         image = bmp.asImageBitmap(),
                         alpha = layer.opacity,
-                        blendMode = mapBlendMode(layer.blendMode)
+                        blendMode = layer.blendMode
                     )
                 }
             }

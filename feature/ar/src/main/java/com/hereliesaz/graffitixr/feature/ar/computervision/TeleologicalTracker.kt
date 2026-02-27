@@ -40,8 +40,7 @@ class TeleologicalTracker @Inject constructor(private val slamManager: SlamManag
             // Update the Native Engine with the correction matrix
             // Note: In a real SLAM system, we'd fuse this with Kalman filtering.
             // For GraffitiXR Beta, we snap the anchor.
-            // slamManager.updateAnchorTransform(transformFloats)
-            // (Function to be exposed in SlamManager if needed, or updateCamera offset)
+            slamManager.updateAnchorTransform(transformFloats)
 
             transformMat.release()
         }
