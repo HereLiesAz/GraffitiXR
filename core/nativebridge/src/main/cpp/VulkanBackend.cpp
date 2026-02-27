@@ -313,7 +313,9 @@ void VulkanBackend::renderFrame(const std::vector<SplatGaussian>& splats) {
     VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[m_currentFrame]};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
-    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]) != VK_SUCCESS) return;
+    VkResult submitResult = vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]);
+    if (submitResult == VK_ERROR_OUT_OF_DATE_KHR) { recreateSwapchain(); return; }
+    if (submitResult != VK_SUCCESS) { LOGE("vkQueueSubmit failed: %d", submitResult); return; }
 
     VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     presentInfo.waitSemaphoreCount = 1;

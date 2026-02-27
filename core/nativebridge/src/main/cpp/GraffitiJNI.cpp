@@ -218,15 +218,20 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
 
 // --- Vulkan Lifecycle ---
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVulkan(
+JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVulkan(
         JNIEnv* env, jobject thiz, jobject surface, jobject asset_mgr, jint width, jint height) {
     if (!gVulkanRenderer) gVulkanRenderer = new VulkanBackend();
 
     ANativeWindow* window = ANativeWindow_fromSurface(env, surface);
     AAssetManager* mgr = AAssetManager_fromJava(env, asset_mgr);
 
-    gVulkanRenderer->initialize(window, mgr);
+    if (!gVulkanRenderer->initialize(window, mgr)) {
+        delete gVulkanRenderer;
+        gVulkanRenderer = nullptr;
+        return JNI_FALSE;
+    }
     gVulkanRenderer->resize(width, height);
+    return JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeResizeVulkan(JNIEnv* env, jobject thiz, jint width, jint height) {

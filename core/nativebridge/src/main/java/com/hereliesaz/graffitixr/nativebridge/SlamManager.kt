@@ -77,8 +77,8 @@ open class SlamManager @Inject constructor() {
         toggleFlashlight(flashlightOn)
     }
 
-    open fun initVulkan(surface: Surface, assetManager: AssetManager, width: Int, height: Int) = nativeInitVulkan(surface, assetManager, width, height)
-    private external fun nativeInitVulkan(surface: Surface, assetManager: AssetManager, width: Int, height: Int)
+    open fun initVulkan(surface: Surface, assetManager: AssetManager, width: Int, height: Int): Boolean = nativeInitVulkan(surface, assetManager, width, height)
+    private external fun nativeInitVulkan(surface: Surface, assetManager: AssetManager, width: Int, height: Int): Boolean
 
     open fun resizeVulkan(width: Int, height: Int) = nativeResizeVulkan(width, height)
     private external fun nativeResizeVulkan(width: Int, height: Int)
@@ -86,7 +86,7 @@ open class SlamManager @Inject constructor() {
     open fun destroyVulkan() = nativeDestroyVulkan()
     private external fun nativeDestroyVulkan()
 
-    open fun initVulkanEngine(surface: Surface, assetManager: AssetManager, width: Int, height: Int) =
+    open fun initVulkanEngine(surface: Surface, assetManager: AssetManager, width: Int, height: Int): Boolean =
         initVulkan(surface, assetManager, width, height)
     open fun resizeVulkanSurface(width: Int, height: Int) = resizeVulkan(width, height)
     open fun destroyVulkanEngine() = destroyVulkan()

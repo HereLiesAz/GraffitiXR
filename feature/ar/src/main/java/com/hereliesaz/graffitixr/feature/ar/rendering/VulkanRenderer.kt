@@ -14,9 +14,11 @@ class VulkanRenderer @Inject constructor(
     /**
      * Initializes the native Vulkan pipeline.
      */
+    var isReady = false
+        private set
+
     fun onSurfaceCreated(surface: Surface, assetManager: AssetManager, width: Int, height: Int) {
-        // Corrected: Passing Surface and AssetManager as expected by updated SlamManager
-        slamManager.initVulkan(surface, assetManager, width, height)
+        isReady = slamManager.initVulkan(surface, assetManager, width, height)
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {

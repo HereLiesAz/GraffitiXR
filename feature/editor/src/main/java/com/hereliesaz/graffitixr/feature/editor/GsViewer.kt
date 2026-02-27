@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
 import android.util.AttributeSet
+import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -30,13 +31,13 @@ class GsViewer @JvmOverloads constructor(
         val height = height
         val assetManager = context.assets
 
-        // Fixed: Passing Surface, AssetManager, and dimensions to the native engine
-        slamManager.initVulkanEngine(
+        val ok = slamManager.initVulkanEngine(
             surface = holder.surface,
             assetManager = assetManager,
             width = width,
             height = height
         )
+        if (!ok) Log.e("GsViewer", "Vulkan init failed — device may not support required features")
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
