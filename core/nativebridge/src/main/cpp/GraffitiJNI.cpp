@@ -3,16 +3,24 @@
 #include <vector>
 #include <android/native_window_jni.h>
 #include <android/asset_manager_jni.h>
+#include <android/bitmap.h>
+#include <android/log.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include "include/VulkanBackend.h"
 #include "include/MobileGS.h"
 #include "include/StereoProcessor.h"
 
+#define LOG_TAG "GraffitiJNI"
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
 // Global Engine Singletons
 static VulkanBackend* gVulkanRenderer = nullptr;
 static MobileGS* gSlamEngine = nullptr;
 static StereoProcessor gStereoProcessor;
+
+// Overlay bitmap stored as RGBA cv::Mat for Vulkan texture upload
+static cv::Mat gOverlayBitmap;
 
 extern "C" {
 
@@ -70,7 +78,28 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetBitmap(JNIEnv* env, jobject thiz, jobject bitmap) {
-    // TODO: Load bitmap texture into Vulkan
+    if (!bitmap) {
+        gOverlayBitmap.release();
+        return;
+    }
+    AndroidBitmapInfo info;
+    if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) {
+        LOGE("nativeSetBitmap: AndroidBitmap_getInfo failed");
+        return;
+    }
+    void* pixels = nullptr;
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) {
+        LOGE("nativeSetBitmap: AndroidBitmap_lockPixels failed");
+        return;
+    }
+    // Copy ARGB_8888 pixel data into an OpenCV Mat (BGRA layout from Android → convert to RGBA)
+    cv::Mat src(info.height, info.width, CV_8UC4, pixels);
+    cv::Mat rgba;
+    cv::cvtColor(src, rgba, cv::COLOR_BGRA2RGBA);
+    gOverlayBitmap = rgba.clone(); // Deep copy before unlocking
+    AndroidBitmap_unlockPixels(env, bitmap);
+    // TODO: When VulkanBackend gains an overlay texture pass, call
+    // gVulkanRenderer->setOverlayTexture(gOverlayBitmap) here.
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
