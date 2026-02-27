@@ -95,6 +95,5 @@ fun mapBlendMode(mode: ModelBlendMode): BlendMode {
         ModelBlendMode.Xor -> BlendMode.Xor
         ModelBlendMode.Plus -> BlendMode.Plus
         ModelBlendMode.Modulate -> BlendMode.Modulate
-        else -> BlendMode.SrcOver
     }
 }

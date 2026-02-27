@@ -59,8 +59,14 @@ open class SlamManager @Inject constructor() {
     open fun processTeleologicalFrame(buffer: ByteBuffer, timestamp: Long) = nativeProcessTeleologicalFrame(buffer, timestamp)
     private external fun nativeProcessTeleologicalFrame(buffer: ByteBuffer, timestamp: Long)
 
-    open fun saveKeyframe(timestamp: Long): Boolean = nativeSaveKeyframe(timestamp)
-    private external fun nativeSaveKeyframe(timestamp: Long): Boolean
+    open fun saveKeyframe(timestamp: Long, outputPath: String): Boolean = nativeSaveKeyframe(timestamp, outputPath)
+    private external fun nativeSaveKeyframe(timestamp: Long, outputPath: String): Boolean
+
+    open fun saveModel(path: String): Boolean = nativeSaveModel(path)
+    private external fun nativeSaveModel(path: String): Boolean
+
+    open fun loadModel(path: String): Boolean = nativeLoadModel(path)
+    private external fun nativeLoadModel(path: String): Boolean
 
     private external fun nativeToggleFlashlight(enabled: Boolean)
 
