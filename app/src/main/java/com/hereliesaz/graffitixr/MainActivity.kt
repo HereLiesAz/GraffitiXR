@@ -303,7 +303,7 @@ class MainActivity : ComponentActivity() {
                         azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
                         azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
                         azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                        azRailItem(id = "color_${layer.id}", text = "Color") { activate(); editorViewModel.setActiveTool(Tool.COLOR) }
+                        azRailItem(id = "color_${layer.id}", text = "Color") { activate(); editorViewModel.setActiveTool(Tool.COLOR); editorViewModel.onColorClicked() }
                         azRailItem(id = "adj_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
                     } else {
                         azRailItem(id = "iso_${layer.id}", text = "Isolate") { activate(); editorViewModel.onRemoveBackgroundClicked() }
