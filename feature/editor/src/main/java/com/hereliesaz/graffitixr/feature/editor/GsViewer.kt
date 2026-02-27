@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.AttributeSet
 import android.util.Log
 import android.view.SurfaceHolder
@@ -27,17 +29,22 @@ class GsViewer @JvmOverloads constructor(
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
-        val width = width
-        val height = height
-        val assetManager = context.assets
-
+        if (!isVulkanSupported()) {
+            Log.e("GsViewer", "Vulkan not supported on this device (API ${Build.VERSION.SDK_INT})")
+            return
+        }
         val ok = slamManager.initVulkanEngine(
             surface = holder.surface,
-            assetManager = assetManager,
+            assetManager = context.assets,
             width = width,
             height = height
         )
-        if (!ok) Log.e("GsViewer", "Vulkan init failed — device may not support required features")
+        if (!ok) Log.e("GsViewer", "Vulkan init failed — check driver support and shader assets")
+    }
+
+    private fun isVulkanSupported(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+        return context.packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL)
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {

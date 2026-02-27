@@ -99,4 +99,11 @@ class ProjectRepositoryImpl @Inject constructor(
         val project = getProject(projectId) ?: return
         updateProject(project.copy(mapPath = path))
     }
+
+    override suspend fun importProject(uri: android.net.Uri): Result<GraffitiProject> {
+        val project = projectManager.importProjectFromUri(context, uri)
+            ?: return Result.failure(Exception("Failed to import project from $uri"))
+        _currentProject.value = project
+        return Result.success(project)
+    }
 }

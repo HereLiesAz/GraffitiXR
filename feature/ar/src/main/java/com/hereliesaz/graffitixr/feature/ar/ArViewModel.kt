@@ -1,11 +1,19 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.hardware.camera2.CameraManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Bundle
 import androidx.compose.ui.geometry.Offset
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.GpsData
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,16 +35,46 @@ class ArViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState = _uiState.asStateFlow()
 
-    /**
-     * Feeds camera frame data to the SLAM engine.
-     */
+    private val locationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            slamManager.feedLocationData(location.latitude, location.longitude, location.altitude)
+            _uiState.update {
+                it.copy(gpsData = GpsData(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    altitude = location.altitude,
+                    accuracy = location.accuracy,
+                    time = location.time
+                ))
+            }
+        }
+        @Deprecated("Kept for API < 29")
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+    }
+
+    fun startLocationUpdates() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) return
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        try {
+            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000L, 2f, locationListener)
+        } catch (e: Exception) { /* GPS unavailable */ }
+    }
+
+    fun stopLocationUpdates() {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        lm.removeUpdates(locationListener)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopLocationUpdates()
+    }
+
     fun onFrameAvailable(buffer: ByteBuffer, width: Int, height: Int) {
         slamManager.feedMonocularData(buffer, width, height)
     }
 
-    /**
-     * Captures a spatial keyframe and increments the local undo stack count.
-     */
     fun captureKeyframe() {
         val timestamp = System.currentTimeMillis()
         val keyframesDir = java.io.File(context.filesDir, "keyframes").apply { mkdirs() }
@@ -47,9 +85,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Toggles the hardware flashlight state via Android Camera2 API.
-     */
     fun toggleFlashlight() {
         val newState = !_uiState.value.isFlashlightOn
         try {
@@ -62,19 +97,18 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Signals the native engine to prepare for session start.
-     */
     fun initEngine() {
         slamManager.initialize()
     }
 
     fun startScanning() {
         _uiState.update { it.copy(isScanning = true) }
+        startLocationUpdates()
     }
 
     fun stopScanning() {
         _uiState.update { it.copy(isScanning = false) }
+        stopLocationUpdates()
     }
 
     fun updateTrackingState(state: String, pointCount: Int) {

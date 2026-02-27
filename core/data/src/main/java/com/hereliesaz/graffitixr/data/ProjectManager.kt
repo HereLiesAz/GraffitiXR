@@ -16,6 +16,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -195,6 +196,63 @@ class ProjectManager @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("ProjectManager", "Export failed", e)
+        }
+    }
+
+    /**
+     * Imports a project from a .gxr zip file at the given URI.
+     * Extracts into /files/projects/{projectId}/ and returns the loaded metadata.
+     * Returns null if the zip is invalid or missing project.json.
+     */
+    suspend fun importProjectFromUri(context: Context, uri: Uri): GraffitiProject? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                ZipInputStream(inputStream).use { zis ->
+                    // First pass: find project.json to get the project ID
+                    var projectData: GraffitiProject? = null
+                    val extractedFiles = mutableMapOf<String, File>()
+
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        val name = entry.name
+                        // Strip top-level folder prefix if present (e.g. "projectId/file" -> "file")
+                        val relativeName = if (name.contains('/')) name.substringAfter('/') else name
+
+                        if (!entry.isDirectory && relativeName.isNotEmpty()) {
+                            // Buffer entry data (can't seek in ZipInputStream)
+                            val bytes = zis.readBytes()
+                            if (relativeName == "project.json") {
+                                try {
+                                    projectData = json.decodeFromString<GraffitiProject>(bytes.decodeToString())
+                                } catch (e: Exception) {
+                                    Log.e("ProjectManager", "Failed to parse project.json", e)
+                                }
+                            }
+                            // Store all files for extraction after we know the project ID
+                            extractedFiles[relativeName] = File.createTempFile("gxr_", null, context.cacheDir).also {
+                                it.writeBytes(bytes)
+                            }
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
+
+                    val project = projectData ?: return@use null
+                    val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
+
+                    // Move extracted files into the project directory
+                    for ((name, tmpFile) in extractedFiles) {
+                        val dest = File(destDir, name)
+                        dest.parentFile?.mkdirs()
+                        tmpFile.renameTo(dest)
+                    }
+
+                    project
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ProjectManager", "Import failed", e)
+            null
         }
     }
 

@@ -22,6 +22,10 @@ static StereoProcessor gStereoProcessor;
 // Overlay bitmap stored as RGBA cv::Mat for Vulkan texture upload
 static cv::Mat gOverlayBitmap;
 
+// Last known GPS fix for geo-anchoring
+struct Gpsfix { double lat = 0, lon = 0, alt = 0; bool valid = false; };
+static Gpsfix gLastGps;
+
 extern "C" {
 
 // --- Lifecycle Management ---
@@ -204,7 +208,15 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedLocationData(JNIEnv* env, jobject thiz, jdouble lat, jdouble lon, jdouble alt) {
-    // Store GPS for Geo-anchoring
+    gLastGps = {lat, lon, alt, true};
+}
+
+JNIEXPORT jdoubleArray JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastGps(JNIEnv* env, jobject thiz) {
+    jdoubleArray result = env->NewDoubleArray(4);
+    if (!result) return nullptr;
+    jdouble buf[4] = {gLastGps.lat, gLastGps.lon, gLastGps.alt, gLastGps.valid ? 1.0 : 0.0};
+    env->SetDoubleArrayRegion(result, 0, 4, buf);
+    return result;
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeProcessTeleologicalFrame(

@@ -56,6 +56,10 @@ open class SlamManager @Inject constructor() {
     open fun feedLocationData(latitude: Double, longitude: Double, altitude: Double) = nativeFeedLocationData(latitude, longitude, altitude)
     private external fun nativeFeedLocationData(latitude: Double, longitude: Double, altitude: Double)
 
+    /** Returns [lat, lon, alt, isValid(1.0/0.0)] or null if no fix. */
+    open fun getLastGps(): DoubleArray? = nativeGetLastGps()?.takeIf { it[3] > 0.5 }
+    private external fun nativeGetLastGps(): DoubleArray?
+
     open fun processTeleologicalFrame(buffer: ByteBuffer, timestamp: Long) = nativeProcessTeleologicalFrame(buffer, timestamp)
     private external fun nativeProcessTeleologicalFrame(buffer: ByteBuffer, timestamp: Long)
 

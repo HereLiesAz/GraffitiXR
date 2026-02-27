@@ -96,4 +96,12 @@ interface ProjectRepository {
      * @param path The file path to the serialized map.
      */
     suspend fun updateMapPath(projectId: String, path: String)
+
+    /**
+     * Imports a project from a .gxr zip file URI.
+     * Extracts and persists the project, then sets it as the current project.
+     * @param uri The URI of the .gxr file to import.
+     * @return [Result.success] with the imported project, or [Result.failure] on error.
+     */
+    suspend fun importProject(uri: android.net.Uri): Result<GraffitiProject>
 }
