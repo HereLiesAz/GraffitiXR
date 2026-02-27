@@ -17,19 +17,19 @@ extern "C" {
 
 // --- Lifecycle Management ---
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initialize(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv* env, jobject thiz) {
     if (!gSlamEngine) gSlamEngine = new MobileGS();
     gSlamEngine->initialize(1920, 1080); // Default resolution, updated by onSurfaceChanged
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_ensureInitialized(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeEnsureInitialized(JNIEnv* env, jobject thiz) {
     if (!gSlamEngine) {
         gSlamEngine = new MobileGS();
         gSlamEngine->initialize(1920, 1080);
     }
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroy(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {
         delete gSlamEngine;
         gSlamEngine = nullptr;
@@ -41,26 +41,26 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_d
     }
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_createOnGlThread(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeCreateOnGlThread(JNIEnv* env, jobject thiz) {
     // Vulkan manages its own thread context, but we keep this stub for legacy GL hooks if needed
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resetGLState(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeResetGLState(JNIEnv* env, jobject thiz) {
     // No-op for Vulkan
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setVisualizationMode(JNIEnv* env, jobject thiz, jint mode) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVisualizationMode(JNIEnv* env, jobject thiz, jint mode) {
     // TODO: Pass mode to Vulkan renderer (Heatmap vs RGB)
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_onSurfaceChanged(JNIEnv* env, jobject thiz, jint width, jint height) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeOnSurfaceChanged(JNIEnv* env, jobject thiz, jint width, jint height) {
     if (gSlamEngine) gSlamEngine->initialize(width, height);
     if (gVulkanRenderer) gVulkanRenderer->resize(width, height);
 }
 
 // --- Rendering Loop ---
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_draw(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDraw(JNIEnv* env, jobject thiz) {
     if (gVulkanRenderer && gSlamEngine) {
         // Thread-safe data transfer: Engine (Physics) -> Renderer (Vulkan)
         std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
@@ -68,11 +68,11 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_d
     }
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setBitmap(JNIEnv* env, jobject thiz, jobject bitmap) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetBitmap(JNIEnv* env, jobject thiz, jobject bitmap) {
     // TODO: Load bitmap texture into Vulkan
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
     if (gSlamEngine) {
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
@@ -87,7 +87,15 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_u
     }
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateLight(JNIEnv* env, jobject thiz, jfloat intensity) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransform(JNIEnv* env, jobject thiz, jfloatArray transform) {
+    if (gSlamEngine) {
+        jfloat* mat = env->GetFloatArrayElements(transform, nullptr);
+        gSlamEngine->updateAnchorTransform(mat);
+        env->ReleaseFloatArrayElements(transform, mat, JNI_ABORT);
+    }
+}
+
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateLight(JNIEnv* env, jobject thiz, jfloat intensity) {
     if (gVulkanRenderer) {
         float white[] = {1.0f, 1.0f, 1.0f};
         gVulkanRenderer->setLighting(intensity, white);
@@ -96,7 +104,7 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_u
 
 // --- Sensor Data Feeds ---
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedMonocularData(
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedMonocularData(
         JNIEnv* env, jobject thiz, jobject data, jint width, jint height) {
     if (!gSlamEngine || data == nullptr) return;
 
@@ -119,7 +127,7 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_f
     gSlamEngine->processDepthFrame(dummyDepth, colorFrame);
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedStereoData(
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
         JNIEnv* env, jobject thiz, jbyteArray left, jbyteArray right, jint w, jint h) {
 
     jbyte* l_ptr = env->GetByteArrayElements(left, nullptr);
@@ -138,11 +146,11 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_f
     env->ReleaseByteArrayElements(right, r_ptr, JNI_ABORT);
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_feedLocationData(JNIEnv* env, jobject thiz, jdouble lat, jdouble lon, jdouble alt) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedLocationData(JNIEnv* env, jobject thiz, jdouble lat, jdouble lon, jdouble alt) {
     // Store GPS for Geo-anchoring
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_processTeleologicalFrame(
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeProcessTeleologicalFrame(
         JNIEnv* env, jobject thiz, jobject buffer, jlong timestamp) {
     // Feature extraction hook for map alignment
     uint8_t* data = (uint8_t*)env->GetDirectBufferAddress(buffer);
@@ -151,18 +159,18 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_p
     // Placeholder: In a full impl, this passes to ORB_SLAM or custom tracker
 }
 
-JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_saveKeyframe(JNIEnv* env, jobject thiz, jlong timestamp) {
+JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSaveKeyframe(JNIEnv* env, jobject thiz, jlong timestamp) {
     return JNI_TRUE;
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_toggleFlashlight(JNIEnv* env, jobject thiz, jboolean enabled) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeToggleFlashlight(JNIEnv* env, jobject thiz, jboolean enabled) {
     // Hardware control via NDK Camera2 is complex; usually handled in Kotlin.
     // This hook allows the engine to adjust exposure settings if it controlled the camera.
 }
 
 // --- Vulkan Lifecycle ---
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initVulkan(
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVulkan(
         JNIEnv* env, jobject thiz, jobject surface, jobject asset_mgr, jint width, jint height) {
     if (!gVulkanRenderer) gVulkanRenderer = new VulkanBackend();
 
@@ -173,11 +181,11 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_i
     gVulkanRenderer->resize(width, height);
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_resizeVulkan(JNIEnv* env, jobject thiz, jint width, jint height) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeResizeVulkan(JNIEnv* env, jobject thiz, jint width, jint height) {
     if (gVulkanRenderer) gVulkanRenderer->resize(width, height);
 }
 
-JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroyVulkan(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroyVulkan(JNIEnv* env, jobject thiz) {
     if (gVulkanRenderer) {
         gVulkanRenderer->destroy();
         delete gVulkanRenderer;
