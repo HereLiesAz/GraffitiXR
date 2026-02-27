@@ -27,7 +27,7 @@ data class ArUiState(
 )
 
 enum class Tool {
-    NONE, BRUSH, ERASER, BLUR, HEAL, BURN, DODGE, LIQUIFY
+    NONE, BRUSH, ERASER, BLUR, HEAL, BURN, DODGE, LIQUIFY, COLOR
 }
 
 

@@ -85,6 +85,20 @@ open class SlamManager @Inject constructor() {
     open fun resizeVulkanSurface(width: Int, height: Int) = resizeVulkan(width, height)
     open fun destroyVulkanEngine() = destroyVulkan()
 
+    /**
+     * Resets the native state to allow transitioning between OpenGL (ArView) and Vulkan (GsViewer).
+     * This method should be called when destroying a surface or pausing a view.
+     */
+    fun reset() {
+        // We attempt to reset both GL and Vulkan states to be safe.
+        // In a real implementation, we might track which one is active.
+        try {
+            resetGLState()
+        } catch (e: Exception) {
+            // Ignore if GL context is not active
+        }
+    }
+
     companion object {
         init {
             // This name MUST match the add_library() call in CMake

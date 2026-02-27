@@ -193,4 +193,21 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
     }
 }
 
+// --- Visual Adjustments ---
+
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_design_rendering_ProjectedImageRenderer_applyNativeColorAdjustment(
+        JNIEnv* env, jobject thiz, jfloat brightness, jfloat contrast, jfloat saturation, jfloat r, jfloat g, jfloat b) {
+    if (gVulkanRenderer) {
+        // Map brightness/contrast/saturation/colorBalance to light intensity/color
+        // This assumes VulkanBackend::setLighting handles these parameters.
+        // For now, we map 'brightness' to 'intensity' and the others to color correction.
+        // In a real implementation, VulkanBackend should have specific methods for these.
+
+        // Simple mapping:
+        float intensity = 1.0f + brightness;
+        float color[] = {r, g, b};
+        gVulkanRenderer->setLighting(intensity, color);
+    }
+}
+
 } // extern "C"

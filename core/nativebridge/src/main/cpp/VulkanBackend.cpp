@@ -457,3 +457,21 @@ bool VulkanBackend::createSyncObjects() {
     }
     return true;
 }
+
+void VulkanBackend::cleanupSwapchain() {
+    for (auto framebuffer : m_swapchainFramebuffers) {
+        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+    }
+    for (auto imageView : m_swapchainImageViews) {
+        vkDestroyImageView(m_device, imageView, nullptr);
+    }
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+}
+
+void VulkanBackend::recreateSwapchain() {
+    vkDeviceWaitIdle(m_device);
+    cleanupSwapchain();
+    createSwapchain();
+    createImageViews();
+    createFramebuffers();
+}
