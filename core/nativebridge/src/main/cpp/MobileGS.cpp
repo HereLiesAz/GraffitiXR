@@ -14,6 +14,9 @@ MobileGS::MobileGS() : mIsRunning(true), mNeedsResort(false) {
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
     mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
 
+    std::fill(std::begin(mAnchorMatrix), std::end(mAnchorMatrix), 0.0f);
+    mAnchorMatrix[0] = mAnchorMatrix[5] = mAnchorMatrix[10] = mAnchorMatrix[15] = 1.0f;
+
     mSortThread = std::thread(&MobileGS::sortThreadLoop, this);
 }
 
@@ -27,8 +30,26 @@ void MobileGS::initialize(int width, int height) {
 }
 
 void MobileGS::updateCamera(const float* viewMatrix, const float* projMatrix) {
-    std::copy(viewMatrix, viewMatrix + 16, mViewMatrix);
+    // Apply anchor transform: EffectiveView = View * Anchor
+    // Note: Assuming column-major order for OpenGL-style matrices
+    float effectiveView[16];
+
+    // Matrix multiplication: effectiveView = viewMatrix * mAnchorMatrix
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 4; ++c) {
+            effectiveView[c * 4 + r] = 0.0f;
+            for (int k = 0; k < 4; ++k) {
+                effectiveView[c * 4 + r] += viewMatrix[k * 4 + r] * mAnchorMatrix[c * 4 + k];
+            }
+        }
+    }
+
+    std::copy(effectiveView, effectiveView + 16, mViewMatrix);
     std::copy(projMatrix, projMatrix + 16, mProjMatrix);
+}
+
+void MobileGS::updateAnchorTransform(const float* transformMatrix) {
+    std::copy(transformMatrix, transformMatrix + 16, mAnchorMatrix);
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depthMap, const cv::Mat& colorFrame) {
