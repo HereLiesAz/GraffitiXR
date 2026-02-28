@@ -33,11 +33,20 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 @Composable
 fun MappingScreen(
     viewModel: ArViewModel,
+    hasCameraPermission: Boolean,
     modifier: Modifier = Modifier
 ) {
     val uiState: ArUiState by viewModel.uiState.collectAsState()
 
     Box(modifier = modifier.fillMaxSize()) {
+        // Live camera feed as background
+        if (hasCameraPermission) {
+            CameraPreview(
+                controller = rememberCameraController(),
+                onPhotoCaptured = {},
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         // Status overlay — top bar
         Row(
             modifier = Modifier
