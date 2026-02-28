@@ -5,7 +5,9 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
 import com.hereliesaz.graffitixr.common.model.*
+import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -150,7 +152,7 @@ class ProjectManager @Inject constructor(
 
         return@withContext try {
             val jsonString = projectFile.readText()
-            val projectData = json.decodeFromString<GraffitiProject>(jsonString)
+            val projectData = migrateIfNeeded(context, json.decodeFromString<GraffitiProject>(jsonString))
 
             // Load Target Bitmaps
             val targetBitmaps = projectData.targetImageUris.mapNotNull { uri ->
@@ -174,11 +176,90 @@ class ProjectManager @Inject constructor(
 
         return@withContext try {
             val jsonString = projectFile.readText()
-            json.decodeFromString<GraffitiProject>(jsonString)
+            val project = json.decodeFromString<GraffitiProject>(jsonString)
+            migrateIfNeeded(context, project)
         } catch (e: Exception) {
             Log.e("ProjectManager", "Failed to load project metadata", e)
             null
         }
+    }
+
+    /**
+     * Migrates [GraffitiProject.legacyVisuals] into the first [OverlayLayer] (or creates one from
+     * [GraffitiProject.overlayImageUri]) when the legacy field carries non-default values.
+     * Saves the updated project back to disk so migration only runs once.
+     */
+    private suspend fun migrateIfNeeded(context: Context, project: GraffitiProject): GraffitiProject {
+        val lv = project.legacyVisuals
+        val defaults = LegacyVisuals()
+        if (lv == defaults) return project // Nothing to migrate
+
+        val migratedLayers: List<OverlayLayer> = when {
+            // Case 1: no layers yet — promote overlayImageUri + legacyVisuals into a new layer
+            project.layers.isEmpty() && project.overlayImageUri != null -> {
+                val uri = project.overlayImageUri!!
+                listOf(
+                    OverlayLayer(
+                        uri = uri,
+                        name = "Overlay",
+                        scale = lv.scale,
+                        offset = lv.offset,
+                        rotationX = lv.rotationX,
+                        rotationY = lv.rotationY,
+                        rotationZ = lv.rotationZ,
+                        opacity = lv.opacity,
+                        blendMode = lv.blendMode.toModelBlendMode(),
+                        brightness = lv.brightness,
+                        contrast = lv.contrast,
+                        saturation = lv.saturation,
+                        colorBalanceR = lv.colorBalanceR,
+                        colorBalanceG = lv.colorBalanceG,
+                        colorBalanceB = lv.colorBalanceB
+                    )
+                )
+            }
+            // Case 2: layers exist but first one still has all-default visual values — apply legacyVisuals to it
+            project.layers.isNotEmpty() && project.layers.first().hasDefaultVisuals() -> {
+                val first = project.layers.first().copy(
+                    scale = lv.scale,
+                    offset = lv.offset,
+                    rotationX = lv.rotationX,
+                    rotationY = lv.rotationY,
+                    rotationZ = lv.rotationZ,
+                    opacity = lv.opacity,
+                    blendMode = lv.blendMode.toModelBlendMode(),
+                    brightness = lv.brightness,
+                    contrast = lv.contrast,
+                    saturation = lv.saturation,
+                    colorBalanceR = lv.colorBalanceR,
+                    colorBalanceG = lv.colorBalanceG,
+                    colorBalanceB = lv.colorBalanceB
+                )
+                listOf(first) + project.layers.drop(1)
+            }
+            else -> project.layers
+        }
+
+        val migrated = project.copy(layers = migratedLayers, legacyVisuals = defaults)
+        saveProject(context, migrated)
+        Log.i("ProjectManager", "Migrated legacyVisuals for project ${project.id}")
+        return migrated
+    }
+
+    private fun OverlayLayer.hasDefaultVisuals(): Boolean {
+        return scale == 1f &&
+            offset == Offset.Zero &&
+            rotationX == 0f &&
+            rotationY == 0f &&
+            rotationZ == 0f &&
+            opacity == 1f &&
+            blendMode == ModelBlendMode.SrcOver &&
+            brightness == 0f &&
+            contrast == 1f &&
+            saturation == 1f &&
+            colorBalanceR == 1f &&
+            colorBalanceG == 1f &&
+            colorBalanceB == 1f
     }
 
     /**
@@ -254,6 +335,38 @@ class ProjectManager @Inject constructor(
             Log.e("ProjectManager", "Import failed", e)
             null
         }
+    }
+
+    private fun ComposeBlendMode.toModelBlendMode(): ModelBlendMode = when (this) {
+        ComposeBlendMode.Multiply   -> ModelBlendMode.Multiply
+        ComposeBlendMode.Screen     -> ModelBlendMode.Screen
+        ComposeBlendMode.Overlay    -> ModelBlendMode.Overlay
+        ComposeBlendMode.Darken     -> ModelBlendMode.Darken
+        ComposeBlendMode.Lighten    -> ModelBlendMode.Lighten
+        ComposeBlendMode.ColorDodge -> ModelBlendMode.ColorDodge
+        ComposeBlendMode.ColorBurn  -> ModelBlendMode.ColorBurn
+        ComposeBlendMode.Hardlight  -> ModelBlendMode.HardLight
+        ComposeBlendMode.Softlight  -> ModelBlendMode.SoftLight
+        ComposeBlendMode.Difference -> ModelBlendMode.Difference
+        ComposeBlendMode.Exclusion  -> ModelBlendMode.Exclusion
+        ComposeBlendMode.Hue        -> ModelBlendMode.Hue
+        ComposeBlendMode.Saturation -> ModelBlendMode.Saturation
+        ComposeBlendMode.Color      -> ModelBlendMode.Color
+        ComposeBlendMode.Luminosity -> ModelBlendMode.Luminosity
+        ComposeBlendMode.Clear      -> ModelBlendMode.Clear
+        ComposeBlendMode.Src        -> ModelBlendMode.Src
+        ComposeBlendMode.Dst        -> ModelBlendMode.Dst
+        ComposeBlendMode.DstOver    -> ModelBlendMode.DstOver
+        ComposeBlendMode.SrcIn      -> ModelBlendMode.SrcIn
+        ComposeBlendMode.DstIn      -> ModelBlendMode.DstIn
+        ComposeBlendMode.SrcOut     -> ModelBlendMode.SrcOut
+        ComposeBlendMode.DstOut     -> ModelBlendMode.DstOut
+        ComposeBlendMode.SrcAtop    -> ModelBlendMode.SrcAtop
+        ComposeBlendMode.DstAtop    -> ModelBlendMode.DstAtop
+        ComposeBlendMode.Xor        -> ModelBlendMode.Xor
+        ComposeBlendMode.Plus       -> ModelBlendMode.Plus
+        ComposeBlendMode.Modulate   -> ModelBlendMode.Modulate
+        else                        -> ModelBlendMode.SrcOver
     }
 
     private fun zipFolder(folder: File, parentFolder: String, zos: ZipOutputStream) {
