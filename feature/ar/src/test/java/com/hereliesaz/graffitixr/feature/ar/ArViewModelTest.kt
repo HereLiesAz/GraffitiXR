@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.hardware.camera2.CameraManager
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.every
 import io.mockk.mockk
@@ -25,6 +26,7 @@ class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
+    private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
     private val cameraManager: CameraManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
@@ -34,7 +36,7 @@ class ArViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { context.getSystemService(Context.CAMERA_SERVICE) } returns cameraManager
         every { cameraManager.cameraIdList } returns arrayOf("0")
-        viewModel = ArViewModel(slamManager, context)
+        viewModel = ArViewModel(slamManager, projectRepository, context)
     }
 
     @After

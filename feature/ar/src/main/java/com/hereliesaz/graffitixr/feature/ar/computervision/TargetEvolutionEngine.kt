@@ -159,4 +159,59 @@ class TargetEvolutionEngine @Inject constructor() {
         
         corners
     }
+
+    /**
+     * Attempts to snap the largest contour in the mask to exactly 4 points (a quadrilateral).
+     * This is used to create a clean physical target for AR alignment.
+     */
+    suspend fun snapToTarget(mask: Bitmap): List<Offset> = withContext(Dispatchers.IO) {
+        val maskMat = Mat()
+        Utils.bitmapToMat(mask, maskMat)
+        Imgproc.cvtColor(maskMat, maskMat, Imgproc.COLOR_RGBA2GRAY)
+
+        val contours = mutableListOf<MatOfPoint>()
+        val hierarchy = Mat()
+        Imgproc.findContours(maskMat, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+        if (contours.isEmpty()) {
+            return@withContext emptyList()
+        }
+
+        val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return@withContext emptyList()
+        val contour2f = org.opencv.core.MatOfPoint2f(*largestContour.toArray())
+        val peri = Imgproc.arcLength(contour2f, true)
+
+        // Iteratively refine epsilon to find 4 corners
+        var approx = org.opencv.core.MatOfPoint2f()
+        var epsilon = 0.02 * peri
+        var found = false
+
+        // Try to find a 4-point approximation by varying epsilon
+        for (i in 0 until 10) {
+            Imgproc.approxPolyDP(contour2f, approx, epsilon, true)
+            val count = approx.total().toInt()
+            if (count == 4) {
+                found = true
+                break
+            } else if (count > 4) {
+                epsilon *= 1.2 // Increase epsilon to reduce points
+            } else {
+                epsilon *= 0.8 // Decrease epsilon to increase points
+            }
+        }
+
+        // If we couldn't find exactly 4, take the best 4 from the current approx
+        val points = if (found) {
+            approx.toArray()
+        } else {
+            // Fallback: If still not 4, just return what we have (or empty)
+            approx.toArray()
+        }
+
+        maskMat.release()
+        hierarchy.release()
+        contour2f.release()
+
+        points.map { Offset(it.x.toFloat(), it.y.toFloat()) }
+    }
 }

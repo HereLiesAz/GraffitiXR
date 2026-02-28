@@ -12,14 +12,17 @@ import android.os.Bundle
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.GpsData
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import javax.inject.Inject
 
@@ -29,6 +32,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ArViewModel @Inject constructor(
     private val slamManager: SlamManager,
+    private val projectRepository: ProjectRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -37,15 +41,17 @@ class ArViewModel @Inject constructor(
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
+            val gpsData = GpsData(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                altitude = location.altitude,
+                accuracy = location.accuracy,
+                time = location.time
+            )
             slamManager.feedLocationData(location.latitude, location.longitude, location.altitude)
-            _uiState.update {
-                it.copy(gpsData = GpsData(
-                    latitude = location.latitude,
-                    longitude = location.longitude,
-                    altitude = location.altitude,
-                    accuracy = location.accuracy,
-                    time = location.time
-                ))
+            _uiState.update { it.copy(gpsData = gpsData) }
+            viewModelScope.launch {
+                projectRepository.updateProject { it.copy(gpsData = gpsData) }
             }
         }
         @Deprecated("Kept for API < 29")

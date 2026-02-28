@@ -28,6 +28,10 @@ public:
     void resize(int width, int height);
     void updateCamera(const float* viewMatrix, const float* projectionMatrix);
     void setLighting(float intensity, const float* colorCorrection);
+    void setVisualizationMode(int mode);
+
+    // Upload RGBA bitmap as overlay; subsequent frames will alpha-blend it over the splats.
+    void setOverlayTexture(int width, int height, const uint8_t* rgba);
 
 private:
     ANativeWindow* m_window = nullptr;
@@ -54,6 +58,20 @@ private:
 
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> m_commandBuffers;
+
+    int m_visualizationMode = 0; // 0=RGB, 1=Heatmap
+    int m_overlayEnabled = 0;
+
+    // Descriptor infrastructure
+    VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
+    VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
+
+    // Overlay texture (default: 1x1 white dummy, replaced on setOverlayTexture)
+    VkImage m_overlayImage = VK_NULL_HANDLE;
+    VkDeviceMemory m_overlayImageMemory = VK_NULL_HANDLE;
+    VkImageView m_overlayImageView = VK_NULL_HANDLE;
+    VkSampler m_overlaySampler = VK_NULL_HANDLE;
 
     // Synchronization
     std::vector<VkSemaphore> m_imageAvailableSemaphores;
@@ -100,6 +118,20 @@ private:
     std::vector<char> readFile(const std::string& filename);
     void cleanupSwapchain();
     void recreateSwapchain();
+
+    // Texture / descriptor helpers
+    bool createDescriptorSetLayout();
+    bool createDescriptorPool();
+    bool createSampler();
+    bool createTextureImage(int width, int height, const uint8_t* rgba,
+                            VkImage& image, VkDeviceMemory& memory);
+    bool createTextureImageView(VkImage image, VkImageView& view);
+    void destroyOverlayResources();
+    bool createDescriptorSet();
+    VkCommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands(VkCommandBuffer cmd);
+    void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 };
 
 #endif // GRAFFITIXR_VULKAN_BACKEND_H

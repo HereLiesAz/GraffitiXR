@@ -63,7 +63,7 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVisualizationMode(JNIEnv* env, jobject thiz, jint mode) {
-    // TODO: Pass mode to Vulkan renderer (Heatmap vs RGB)
+    if (gVulkanRenderer) gVulkanRenderer->setVisualizationMode(mode);
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeOnSurfaceChanged(JNIEnv* env, jobject thiz, jint width, jint height) {
@@ -102,8 +102,9 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
     cv::cvtColor(src, rgba, cv::COLOR_BGRA2RGBA);
     gOverlayBitmap = rgba.clone(); // Deep copy before unlocking
     AndroidBitmap_unlockPixels(env, bitmap);
-    // TODO: When VulkanBackend gains an overlay texture pass, call
-    // gVulkanRenderer->setOverlayTexture(gOverlayBitmap) here.
+    if (gVulkanRenderer) {
+        gVulkanRenderer->setOverlayTexture(rgba.cols, rgba.rows, gOverlayBitmap.data);
+    }
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
