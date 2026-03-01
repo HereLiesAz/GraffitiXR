@@ -13,6 +13,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.ar.core.Config
+import com.google.ar.core.Session
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.GpsData
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -38,6 +41,40 @@ class ArViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState = _uiState.asStateFlow()
+
+    private var arSession: Session? = null
+
+    /** Creates the ARCore session once; returns the existing session on subsequent calls. */
+    fun initArSession(): Session? {
+        if (arSession != null) return arSession
+        return try {
+            val s = Session(context)
+            val cfg = Config(s)
+            if (s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                cfg.depthMode = Config.DepthMode.AUTOMATIC
+            }
+            cfg.focusMode = Config.FocusMode.AUTO
+            cfg.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+            s.configure(cfg)
+            arSession = s
+            s
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Initialises the ARCore session and assigns it to [renderer]. Safe to call multiple times. */
+    fun attachSessionToRenderer(renderer: ArRenderer) {
+        renderer.session = initArSession()
+    }
+
+    fun resumeArSession() {
+        try { arSession?.resume() } catch (_: Exception) {}
+    }
+
+    fun pauseArSession() {
+        try { arSession?.pause() } catch (_: Exception) {}
+    }
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
@@ -75,6 +112,8 @@ class ArViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopLocationUpdates()
+        arSession?.close()
+        arSession = null
     }
 
     fun onFrameAvailable(buffer: ByteBuffer, width: Int, height: Int) {

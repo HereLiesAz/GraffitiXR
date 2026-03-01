@@ -1,5 +1,6 @@
 // ~~~ FILE: ./core/nativebridge/src/main/cpp/GraffitiJNI.cpp ~~~
 #include <jni.h>
+#include <cmath>
 #include <vector>
 #include <android/native_window_jni.h>
 #include <android/asset_manager_jni.h>
@@ -7,6 +8,7 @@
 #include <android/log.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
 #include "include/VulkanBackend.h"
 #include "include/MobileGS.h"
 #include "include/StereoProcessor.h"
@@ -25,6 +27,59 @@ static cv::Mat gOverlayBitmap;
 // Last known GPS fix for geo-anchoring
 struct Gpsfix { double lat = 0, lon = 0, alt = 0; bool valid = false; };
 static Gpsfix gLastGps;
+
+// Optical-flow depth state
+static cv::Mat gPrevGray;
+static std::vector<cv::Point2f> gPrevFeatures;
+
+// Last RGB color frame — shared between monocular and ARCore depth paths
+static cv::Mat gLastColorFrame;
+
+/**
+ * Estimates a depth map from optical flow between the previous and current grayscale frames.
+ *
+ * Uses Lucas-Kanade sparse optical flow. Flow magnitude is inversely proportional to depth
+ * (parallax effect): depth ≈ kScale / flow_pixels, where kScale encodes baseline × focal-length.
+ * The result is a sparse-but-shaped depth map; pixels with no tracked feature keep the 2m fallback.
+ *
+ * kScale = baseline_m × focal_px ≈ 0.02m × 1200px = 24 for a walking-speed, 30fps, mid-range camera.
+ * This can be refined once ARCore poses supply the actual inter-frame translation.
+ */
+static cv::Mat computeOpticalFlowDepth(const cv::Mat& gray, int width, int height) {
+    // Start with the same 2 m fallback used previously — optical flow patches it where tracked.
+    cv::Mat depth = cv::Mat::ones(height, width, CV_32F) * 2.0f;
+
+    if (gPrevGray.empty() || gPrevFeatures.empty()) return depth;
+
+    std::vector<cv::Point2f> nextPts;
+    std::vector<uchar>       status;
+    std::vector<float>       err;
+    cv::calcOpticalFlowPyrLK(gPrevGray, gray, gPrevFeatures, nextPts, status, err,
+                             cv::Size(21, 21), /*maxLevel=*/3);
+
+    // depth ≈ (baseline_m × focal_px) / flow_px.
+    // Tuned for ~2 cm/frame translation at 30 fps, ~1200 px focal length.
+    constexpr float kScale   = 24.0f;
+    constexpr float kMinFlow = 0.5f;  // px — ignore sub-pixel noise
+    constexpr float kMinDep  = 0.3f;  // m
+    constexpr float kMaxDep  = 8.0f;  // m  (CULL_DISTANCE in MobileGS is 5 m)
+
+    for (size_t i = 0; i < nextPts.size(); i++) {
+        if (!status[i]) continue;
+        float dx   = nextPts[i].x - gPrevFeatures[i].x;
+        float dy   = nextPts[i].y - gPrevFeatures[i].y;
+        float flow = std::sqrt(dx * dx + dy * dy);
+        if (flow < kMinFlow) continue;
+
+        float d  = kScale / flow;
+        d        = std::max(kMinDep, std::min(kMaxDep, d));
+        int px   = static_cast<int>(nextPts[i].x);
+        int py   = static_cast<int>(nextPts[i].y);
+        if (px >= 0 && px < width && py >= 0 && py < height)
+            depth.at<float>(py, px) = d;
+    }
+    return depth;
+}
 
 extern "C" {
 
@@ -143,23 +198,59 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
         JNIEnv* env, jobject thiz, jobject data, jint width, jint height) {
     if (!gSlamEngine || data == nullptr) return;
 
-    // Direct buffer access for high performance (No copy)
     uint8_t* buffer = (uint8_t*)env->GetDirectBufferAddress(data);
     if (!buffer) return;
 
-    // Wrap buffer in OpenCV Mat (assuming Gray/YUV_Y or RGB depending on source)
-    // For monocular feeds from ARCore/CameraX, this is typically the Y plane (CV_8UC1)
+    // Y-plane (grayscale) from CameraX
     cv::Mat frame(height, width, CV_8UC1, buffer);
 
-    // Create a dummy depth map for now since this is monocular
-    // In production, this calls a Monocular Depth Estimator (MiDaS/LiteRT)
-    cv::Mat dummyDepth = cv::Mat::ones(height, width, CV_32F) * 2.0f; // 2 meters default
+    // --- Optical-flow depth (replaces constant 2 m dummy) ---
+    cv::Mat depthMap = computeOpticalFlowDepth(frame, width, height);
 
-    // Convert grayscale to RGB for the engine
+    // Update flow state for the next frame
+    cv::goodFeaturesToTrack(frame, gPrevFeatures, /*maxCorners=*/300,
+                            /*qualityLevel=*/0.01, /*minDistance=*/7);
+    gPrevGray = frame.clone();
+
+    // Convert grayscale to RGB for the SLAM engine
     cv::Mat colorFrame;
     cv::cvtColor(frame, colorFrame, cv::COLOR_GRAY2RGB);
 
-    gSlamEngine->processDepthFrame(dummyDepth, colorFrame);
+    // Keep a copy for the ARCore depth path (nativeFeedArCoreDepth uses this color frame)
+    gLastColorFrame = colorFrame.clone();
+
+    gSlamEngine->processDepthFrame(depthMap, colorFrame);
+}
+
+// --- ARCore Depth API path ---
+// Called from Kotlin after frame.acquireDepthImage16Bits() when an ARCore session is active.
+// DEPTH16 encoding: bits[12:0] = depth in millimetres, bits[15:13] = confidence (0=invalid, 7=max).
+// This provides metric depth on ARCore Depth-capable devices, improving on optical-flow scale.
+// When ARCore session integration is complete, call slamManager.feedArCoreDepth() from ArRenderer.
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
+        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height) {
+    if (!gSlamEngine || gLastColorFrame.empty()) return;
+
+    auto* rawDepth = static_cast<const uint16_t*>(env->GetDirectBufferAddress(depthBuffer));
+    if (!rawDepth) return;
+
+    cv::Mat depthMap(height, width, CV_32F, cv::Scalar(0.0f));
+    for (int r = 0; r < height; r++) {
+        for (int c = 0; c < width; c++) {
+            uint16_t raw     = rawDepth[r * width + c];
+            uint16_t depthMm = raw & 0x1FFFu;        // lower 13 bits: millimetres
+            uint8_t  conf    = (raw >> 13u) & 0x7u;  // upper  3 bits: confidence
+            if (conf > 0 && depthMm > 0)
+                depthMap.at<float>(r, c) = depthMm / 1000.0f;  // mm → metres
+        }
+    }
+
+    // ARCore depth may be lower resolution than the color frame — resize if needed
+    if (depthMap.cols != gLastColorFrame.cols || depthMap.rows != gLastColorFrame.rows) {
+        cv::resize(depthMap, depthMap, gLastColorFrame.size(), 0, 0, cv::INTER_NEAREST);
+    }
+
+    gSlamEngine->processDepthFrame(depthMap, gLastColorFrame);
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
@@ -221,12 +312,19 @@ JNIEXPORT jdoubleArray JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamM
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeProcessTeleologicalFrame(
-        JNIEnv* env, jobject thiz, jobject buffer, jlong timestamp) {
-    // Feature extraction hook for map alignment
+        JNIEnv* env, jobject thiz, jobject buffer, jlong timestamp, jint width, jint height) {
+    if (!gSlamEngine) return;
     uint8_t* data = (uint8_t*)env->GetDirectBufferAddress(buffer);
-    if (!data) return;
+    if (!data || width <= 0 || height <= 0) return;
 
-    // Placeholder: In a full impl, this passes to ORB_SLAM or custom tracker
+    // Re-localization keyframe: feed through the same depth-frame pipeline as monocular.
+    // The Kotlin-side TeleologicalTracker handles ORB matching and calls updateAnchorTransform;
+    // this path ensures the SLAM voxel map also ingests the keyframe for map densification.
+    cv::Mat frame(height, width, CV_8UC1, data);
+    cv::Mat colorFrame;
+    cv::cvtColor(frame, colorFrame, cv::COLOR_GRAY2RGB);
+    cv::Mat dummyDepth = cv::Mat::ones(height, width, CV_32F) * 2.0f;
+    gSlamEngine->processDepthFrame(dummyDepth, colorFrame);
 }
 
 JNIEXPORT jboolean JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSaveKeyframe(JNIEnv* env, jobject thiz, jlong timestamp, jstring outputPath) {

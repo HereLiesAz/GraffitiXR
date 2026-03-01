@@ -27,9 +27,8 @@ class ArView(
         slamManager.setBitmap(bitmap)
     }
 
-    fun processFrame(buffer: ByteBuffer, timestamp: Long) {
-        // Fixed: Reference to the teleological processing hook
-        slamManager.processTeleologicalFrame(buffer, timestamp)
+    fun processFrame(buffer: ByteBuffer, timestamp: Long, width: Int, height: Int) {
+        slamManager.processTeleologicalFrame(buffer, timestamp, width, height)
     }
 
     /**

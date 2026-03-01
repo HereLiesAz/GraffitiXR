@@ -50,6 +50,15 @@ open class SlamManager @Inject constructor() {
     open fun feedMonocularData(data: ByteBuffer, width: Int, height: Int) = nativeFeedMonocularData(data, width, height)
     private external fun nativeFeedMonocularData(data: ByteBuffer, width: Int, height: Int)
 
+    /**
+     * Feeds an ARCore DEPTH16 depth image to the SLAM engine for the most recently received
+     * color frame. Call this from [ArRenderer.onDrawFrame] after [Frame.acquireDepthImage16Bits].
+     * Only available once an ARCore session is active and the device supports the Depth API.
+     */
+    open fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int) =
+        nativeFeedArCoreDepth(depthBuffer, width, height)
+    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int)
+
     open fun feedStereoData(left: ByteArray, right: ByteArray, width: Int, height: Int) = nativeFeedStereoData(left, right, width, height)
     private external fun nativeFeedStereoData(left: ByteArray, right: ByteArray, width: Int, height: Int)
 
@@ -60,8 +69,9 @@ open class SlamManager @Inject constructor() {
     open fun getLastGps(): DoubleArray? = nativeGetLastGps()?.takeIf { it[3] > 0.5 }
     private external fun nativeGetLastGps(): DoubleArray?
 
-    open fun processTeleologicalFrame(buffer: ByteBuffer, timestamp: Long) = nativeProcessTeleologicalFrame(buffer, timestamp)
-    private external fun nativeProcessTeleologicalFrame(buffer: ByteBuffer, timestamp: Long)
+    open fun processTeleologicalFrame(buffer: ByteBuffer, timestamp: Long, width: Int, height: Int) =
+        nativeProcessTeleologicalFrame(buffer, timestamp, width, height)
+    private external fun nativeProcessTeleologicalFrame(buffer: ByteBuffer, timestamp: Long, width: Int, height: Int)
 
     open fun saveKeyframe(timestamp: Long, outputPath: String): Boolean = nativeSaveKeyframe(timestamp, outputPath)
     private external fun nativeSaveKeyframe(timestamp: Long, outputPath: String): Boolean

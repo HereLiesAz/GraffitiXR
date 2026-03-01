@@ -1,10 +1,12 @@
 package com.hereliesaz.graffitixr
 
+import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -12,7 +14,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -58,9 +59,11 @@ fun MainScreen(
             ArViewport(
                 uiState = uiState,
                 editorViewModel = editorViewModel,
+                arViewModel = arViewModel,
                 slamManager = slamManager,
                 activeLayer = activeLayer,
-                hasCameraPermission = hasCameraPermission
+                hasCameraPermission = hasCameraPermission,
+                onRendererCreated = onRendererCreated
             )
         }
     }
@@ -70,32 +73,58 @@ fun MainScreen(
 fun ArViewport(
     uiState: EditorUiState,
     editorViewModel: EditorViewModel,
+    arViewModel: ArViewModel,
     slamManager: SlamManager,
     activeLayer: Layer?,
-    hasCameraPermission: Boolean
+    hasCameraPermission: Boolean,
+    onRendererCreated: (ArRenderer) -> Unit
 ) {
     val isImageLocked = activeLayer?.isImageLocked ?: false
 
     // 1. Render Backgrounds (Camera or Mockup)
-    if (hasCameraPermission && (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY)) {
-        CameraPreview(
-            controller = rememberCameraController(),
-            onPhotoCaptured = {},
-            modifier = Modifier.fillMaxSize()
-        )
-    }
-
-    if (uiState.editorMode == EditorMode.AR) {
-        val context = LocalContext.current
-        AndroidView(
-            factory = { ctx ->
-                GsViewer(ctx).apply {
-                    setZOrderMediaOverlay(true)
-                    holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+    if (hasCameraPermission) {
+        when (uiState.editorMode) {
+            EditorMode.AR -> {
+                // AR mode: ARCore owns the camera. GLSurfaceView renders the camera feed
+                // via BackgroundRenderer and feeds frames to the SLAM engine.
+                DisposableEffect(Unit) {
+                    arViewModel.resumeArSession()
+                    onDispose { arViewModel.pauseArSession() }
                 }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+                AndroidView(
+                    factory = { ctx ->
+                        val renderer = ArRenderer(ctx, slamManager)
+                        arViewModel.attachSessionToRenderer(renderer)
+                        onRendererCreated(renderer)
+                        GLSurfaceView(ctx).apply {
+                            setEGLContextClientVersion(3)
+                            setRenderer(renderer)
+                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Vulkan SLAM overlay on top of the ARCore camera background.
+                AndroidView(
+                    factory = { ctx ->
+                        GsViewer(ctx).apply {
+                            setZOrderMediaOverlay(true)
+                            holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            EditorMode.OVERLAY -> {
+                // Overlay mode: CameraX preview, no ARCore.
+                CameraPreview(
+                    controller = rememberCameraController(),
+                    onPhotoCaptured = {},
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            else -> {}
+        }
     }
 
     uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }?.let { bmp ->

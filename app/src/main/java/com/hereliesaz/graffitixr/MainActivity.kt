@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -52,6 +53,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
     @Inject lateinit var securityProviderManager: SecurityProviderManager
 
+    private val arViewModel: ArViewModel by viewModels()
+
     var use3dBackground by mutableStateOf(false)
     var showSaveDialog by mutableStateOf(false)
     var showInfoScreen by mutableStateOf(false)
@@ -91,7 +94,7 @@ class MainActivity : ComponentActivity() {
 
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val editorViewModel: EditorViewModel = hiltViewModel()
-                val arViewModel: ArViewModel = hiltViewModel()
+                // arViewModel is obtained via by viewModels() at Activity level for lifecycle access.
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
@@ -145,7 +148,9 @@ class MainActivity : ComponentActivity() {
                             arViewModel = arViewModel,
                             slamManager = slamManager,
                             projectRepository = projectRepository,
-                            onRendererCreated = { renderRefState.value = it },
+                            onRendererCreated = { renderer ->
+                                renderRefState.value = renderer
+                            },
                             hasCameraPermission = hasCameraPermission
                         )
                     }
@@ -216,6 +221,18 @@ class MainActivity : ComponentActivity() {
             showUnlockInstructions = mainUiState.showUnlockInstructions,
             isCapturingTarget = mainUiState.isCapturingTarget
         )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-resume ARCore session when returning from background (no-op if session is null or
+        // not yet initialized — DisposableEffect in ArViewport manages mode-level lifecycle).
+        arViewModel.resumeArSession()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        arViewModel.pauseArSession()
     }
 
     override fun onDestroy() {
