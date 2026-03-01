@@ -51,7 +51,7 @@ open class SlamManager @Inject constructor() {
     private external fun nativeFeedMonocularData(data: ByteBuffer, width: Int, height: Int)
 
     /**
-     * Supplies ARCore camera intrinsics and inter-frame translation magnitude so the native
+up     * Supplies ARCore camera intrinsics and inter-frame translation magnitude so the native
      * optical-flow depth estimator can compute an accurate kScale each frame.
      * Call this every tracking frame before [feedMonocularData].
      */
