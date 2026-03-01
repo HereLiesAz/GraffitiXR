@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
-import android.opengl.GLES11Ext
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import com.google.ar.core.Session
@@ -16,25 +15,15 @@ class ArRenderer(
     private val slamManager: SlamManager
 ) : GLSurfaceView.Renderer {
 
-    var session: Session? = null
+    @Volatile var session: Session? = null
+    private val backgroundRenderer = BackgroundRenderer()
     private var hasSetTextureNames = false
-    private var dummyTextureId = -1
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Timber.tag("AR_DEBUG").e(">>> [1] onSurfaceCreated() INITIATED")
-
-        // CRITICAL FIX: Ensure the GL surface is fully transparent to allow the CameraX
-        // preview behind it to be visible.
-        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
-
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         try {
-            // Generate a dummy texture ID to satisfy ARCore's internal requirements
-            // even though we aren't drawing the camera feed through OpenGL.
-            val textures = IntArray(1)
-            GLES30.glGenTextures(1, textures, 0)
-            dummyTextureId = textures[0]
-            GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, dummyTextureId)
-
+            backgroundRenderer.createOnGlThread(context)
             slamManager.createOnGlThread()
             slamManager.resetGLState()
             slamManager.ensureInitialized()
@@ -49,36 +38,56 @@ class ArRenderer(
         Timber.tag("AR_DEBUG").e(">>> [4] onSurfaceChanged() triggered. Width: $width, Height: $height")
         GLES30.glViewport(0, 0, width, height)
         slamManager.onSurfaceChanged(width, height)
+        // Rotation 0 = portrait; update if the app supports landscape.
+        session?.setDisplayGeometry(0, width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
-        val currentSession = session
-        if (currentSession == null) {
-            return
-        }
+        val currentSession = session ?: return
 
         try {
             if (!hasSetTextureNames) {
-                currentSession.setCameraTextureName(dummyTextureId)
+                currentSession.setCameraTextureName(backgroundRenderer.textureId)
                 hasSetTextureNames = true
-                Timber.tag("AR_DEBUG").e(">>> [5] Camera texture name linked to ARCore Session")
+                Timber.tag("AR_DEBUG").e(">>> [5] Camera texture linked to BackgroundRenderer")
             }
 
-            // Update ARCore frame
             val frame = currentSession.update()
             val camera = frame.camera
+
+            // Always draw the camera feed as the background.
+            backgroundRenderer.draw(frame)
 
             if (camera.trackingState == TrackingState.TRACKING) {
                 val viewMatrix = FloatArray(16)
                 val projMatrix = FloatArray(16)
-
                 camera.getViewMatrix(viewMatrix, 0)
                 camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
-
                 slamManager.updateCamera(viewMatrix, projMatrix)
-                slamManager.draw()
+
+                // Feed luminance (Y-plane) to the SLAM monocular pipeline.
+                try {
+                    val image = frame.acquireCameraImage()
+                    try {
+                        val yPlane = image.planes[0]
+                        slamManager.feedMonocularData(yPlane.buffer, image.width, image.height)
+                    } finally {
+                        image.close()
+                    }
+                } catch (_: Exception) { /* frame unavailable this tick */ }
+
+                // Feed ARCore DEPTH16 to the SLAM depth pipeline when available.
+                try {
+                    val depthImage = frame.acquireDepthImage16Bits()
+                    try {
+                        val depthPlane = depthImage.planes[0]
+                        slamManager.feedArCoreDepth(depthPlane.buffer, depthImage.width, depthImage.height)
+                    } finally {
+                        depthImage.close()
+                    }
+                } catch (_: Exception) { /* depth not available on this device or frame */ }
             }
         } catch (e: Exception) {
             Timber.tag("AR_DEBUG").e(e, ">>> [!] CRITICAL EXCEPTION during onDrawFrame")
