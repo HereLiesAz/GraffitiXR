@@ -32,7 +32,19 @@
 - [x] **UI Integration:** Added "Keyframe" capture entry point to the navigation rail.
 - [x] **Code Quality:** Resolved compiler warnings and cleaned up redundant null checks in `ArRenderer`.
 
+## AR Pipeline — End-to-End Wiring `[DONE]`
+- [x] **ARCore session wiring:** `ArViewModel.initArSession/resume/pauseArSession`; session lifecycle via `DisposableEffect` (mode) + `MainActivity.onResume/onPause` (activity).
+- [x] **Camera background:** `BackgroundRenderer` wired to `ArRenderer`; real ARCore camera feed renders in AR mode. CameraX no longer active in AR mode.
+- [x] **Monocular SLAM feed:** `frame.acquireCameraImage()` Y-plane → `feedMonocularData` → native optical flow → `processDepthFrame` — SLAM engine receives real data for the first time.
+- [x] **ARCore Depth API:** `frame.acquireDepthImage16Bits()` → `feedArCoreDepth` → DEPTH16 decode → `processDepthFrame` (metric override).
+- [x] **Dynamic kScale:** `camera.imageIntrinsics.focalLength` + inter-frame `camera.pose` delta → `setCameraMotion` → native `kScale = focalLengthPx × translationM` (replaces fixed 24.0 constant).
+- [x] **Tracking state feedback:** `ArRenderer.onTrackingChanged` callback → `arViewModel.updateTrackingState` → live colored chip overlay in `ArViewport`.
+- [x] **Mode-based camera ownership:** AR = ARCore; Overlay = CameraX; `DisposableEffect` pauses ARCore session when leaving AR mode to release camera.
+- [x] **Unit tests:** `TeleologicalTrackerTest`, `DualAnalyzerTest`, `ProjectManagerTest` — covering CV pipeline, SLAM callbacks, and project I/O.
+
 ## Ongoing
 - [ ] UI/UX refinement for one-handed operation.
 - [ ] Performance benchmarking on mid-range devices.
 - [ ] Community feedback loop.
+- [ ] LRU culling in `MobileGS::pruneMap()` to handle `MAX_SPLATS` overflow on long scans.
+- [ ] `nativeGetSplatCount()` JNI function to surface live voxel count in the tracking state HUD.
