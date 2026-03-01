@@ -25,9 +25,12 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.aznavrail.model.AzNestedRailAlignment
+import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.Tool
+import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
@@ -124,7 +127,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked
+                val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked && !mainUiState.isCapturingTarget
 
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.onAddLayer(it) }
@@ -137,7 +140,7 @@ class MainActivity : ComponentActivity() {
                     if (isRailVisible) {
                         configureRail(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
-                            overlayImagePicker, backgroundImagePicker
+                            overlayImagePicker, backgroundImagePicker, editorUiState
                         )
                     }
 
@@ -162,6 +165,31 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
+                            }
+
+                            if (mainUiState.isCapturingTarget) {
+                                val arUiState by arViewModel.uiState.collectAsState()
+                                TargetCreationUi(
+                                    uiState = arUiState,
+                                    isRightHanded = editorUiState.isRightHanded,
+                                    captureStep = mainUiState.captureStep,
+                                    onConfirm = { mainViewModel.onConfirmTargetCreation() },
+                                    onRetake = { mainViewModel.onRetakeCapture() },
+                                    onCancel = { mainViewModel.onCancelCaptureClicked() },
+                                    onUnwarpConfirm = { points ->
+                                        arViewModel.setUnwarpPoints(points)
+                                        mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                    },
+                                    onMaskConfirmed = { bitmap ->
+                                        arViewModel.setTempCapture(bitmap)
+                                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                                    },
+                                    onRequestCapture = { arViewModel.requestCapture() },
+                                    onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
+                                    onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPoint(it) },
+                                    onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
+                                    onUpdateMaskPath = { arViewModel.updateMaskPath(it) }
+                                )
                             }
 
                             if (showSaveDialog) {
@@ -246,9 +274,9 @@ class MainActivity : ComponentActivity() {
         arViewModel: ArViewModel,
         dashboardViewModel: DashboardViewModel,
         overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
-        backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>
+        backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
+        editorUiState: EditorUiState
     ) {
-        val editorUiState = editorViewModel.uiState.value
         val navStrings = NavStrings()
         val activeHighlightColor = when (editorUiState.activeRotationAxis) {
             RotationAxis.X -> Color.Red
@@ -319,7 +347,6 @@ class MainActivity : ComponentActivity() {
                         azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
                         azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
                         azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                        azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
                         azRailItem(id = "color_${layer.id}", text = "Color") { activate(); editorViewModel.setActiveTool(Tool.COLOR); editorViewModel.onColorClicked() }
                         azRailItem(id = "adj_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
                     } else {
