@@ -9,15 +9,21 @@ import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import timber.log.Timber
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.sqrt
 
 class ArRenderer(
     private val context: Context,
-    private val slamManager: SlamManager
+    private val slamManager: SlamManager,
+    private val onTrackingChanged: (state: String, pointCount: Int) -> Unit = { _, _ -> }
 ) : GLSurfaceView.Renderer {
 
     @Volatile var session: Session? = null
     private val backgroundRenderer = BackgroundRenderer()
     private var hasSetTextureNames = false
+
+    // Previous camera world-position for inter-frame translation magnitude.
+    private var prevPx = 0f; private var prevPy = 0f; private var prevPz = 0f
+    private var hasPrevPose = false
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Timber.tag("AR_DEBUG").e(">>> [1] onSurfaceCreated() INITIATED")
@@ -60,12 +66,29 @@ class ArRenderer(
             // Always draw the camera feed as the background.
             backgroundRenderer.draw(frame)
 
-            if (camera.trackingState == TrackingState.TRACKING) {
+            val trackingState = camera.trackingState
+            onTrackingChanged(trackingState.name, 0)
+
+            if (trackingState == TrackingState.TRACKING) {
                 val viewMatrix = FloatArray(16)
                 val projMatrix = FloatArray(16)
                 camera.getViewMatrix(viewMatrix, 0)
                 camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
                 slamManager.updateCamera(viewMatrix, projMatrix)
+
+                // Compute inter-frame translation magnitude from ARCore world-space pose.
+                val t = camera.pose.translation  // [x, y, z] in metres
+                val translationM = if (hasPrevPose) {
+                    val dx = t[0] - prevPx; val dy = t[1] - prevPy; val dz = t[2] - prevPz
+                    sqrt(dx * dx + dy * dy + dz * dz)
+                } else 0.02f  // first frame — use sensible default
+                prevPx = t[0]; prevPy = t[1]; prevPz = t[2]; hasPrevPose = true
+
+                // Focal length (fx) in image pixels from ARCore camera intrinsics.
+                val focalLengthPx = camera.imageIntrinsics.focalLength[0]
+
+                // Update native kScale before feeding the monocular frame.
+                slamManager.setCameraMotion(focalLengthPx, translationM)
 
                 // Feed luminance (Y-plane) to the SLAM monocular pipeline.
                 try {

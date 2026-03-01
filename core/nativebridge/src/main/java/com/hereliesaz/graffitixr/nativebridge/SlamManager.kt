@@ -51,6 +51,15 @@ open class SlamManager @Inject constructor() {
     private external fun nativeFeedMonocularData(data: ByteBuffer, width: Int, height: Int)
 
     /**
+     * Supplies ARCore camera intrinsics and inter-frame translation magnitude so the native
+     * optical-flow depth estimator can compute an accurate kScale each frame.
+     * Call this every tracking frame before [feedMonocularData].
+     */
+    open fun setCameraMotion(focalLengthPx: Float, translationM: Float) =
+        nativeSetCameraMotion(focalLengthPx, translationM)
+    private external fun nativeSetCameraMotion(focalLengthPx: Float, translationM: Float)
+
+    /**
      * Feeds an ARCore DEPTH16 depth image to the SLAM engine for the most recently received
      * color frame. Call this from [ArRenderer.onDrawFrame] after [Frame.acquireDepthImage16Bits].
      * Only available once an ARCore session is active and the device supports the Depth API.

@@ -35,6 +35,12 @@ static std::vector<cv::Point2f> gPrevFeatures;
 // Last RGB color frame — shared between monocular and ARCore depth paths
 static cv::Mat gLastColorFrame;
 
+// ARCore-supplied camera parameters for dynamic kScale.
+// Updated each tracking frame via nativeSetCameraMotion().
+// Defaults are sensible fallbacks (mid-range phone, ~2 cm/frame at 30 fps).
+static float gFocalLengthPx = 1200.0f;
+static float gTranslationM  =   0.02f;
+
 /**
  * Estimates a depth map from optical flow between the previous and current grayscale frames.
  *
@@ -42,8 +48,8 @@ static cv::Mat gLastColorFrame;
  * (parallax effect): depth ≈ kScale / flow_pixels, where kScale encodes baseline × focal-length.
  * The result is a sparse-but-shaped depth map; pixels with no tracked feature keep the 2m fallback.
  *
- * kScale = baseline_m × focal_px ≈ 0.02m × 1200px = 24 for a walking-speed, 30fps, mid-range camera.
- * This can be refined once ARCore poses supply the actual inter-frame translation.
+ * kScale = translation_m × focal_px, updated each tracking frame via nativeSetCameraMotion().
+ * Falls back to 0.02 m × 1200 px = 24 when ARCore poses are not yet available.
  */
 static cv::Mat computeOpticalFlowDepth(const cv::Mat& gray, int width, int height) {
     // Start with the same 2 m fallback used previously — optical flow patches it where tracked.
@@ -57,9 +63,9 @@ static cv::Mat computeOpticalFlowDepth(const cv::Mat& gray, int width, int heigh
     cv::calcOpticalFlowPyrLK(gPrevGray, gray, gPrevFeatures, nextPts, status, err,
                              cv::Size(21, 21), /*maxLevel=*/3);
 
-    // depth ≈ (baseline_m × focal_px) / flow_px.
-    // Tuned for ~2 cm/frame translation at 30 fps, ~1200 px focal length.
-    constexpr float kScale   = 24.0f;
+    // depth ≈ (translation_m × focal_px) / flow_px.
+    // kScale is updated each frame from ARCore pose + camera intrinsics when available.
+    const float     kScale   = gFocalLengthPx * gTranslationM;
     constexpr float kMinFlow = 0.5f;  // px — ignore sub-pixel noise
     constexpr float kMinDep  = 0.3f;  // m
     constexpr float kMaxDep  = 8.0f;  // m  (CULL_DISTANCE in MobileGS is 5 m)
@@ -251,6 +257,14 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
     }
 
     gSlamEngine->processDepthFrame(depthMap, gLastColorFrame);
+}
+
+// Called once per tracking frame with the ARCore camera intrinsics and inter-frame translation
+// magnitude so that computeOpticalFlowDepth() can use a real kScale instead of a fixed constant.
+JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCameraMotion(
+        JNIEnv*, jobject, jfloat focalLengthPx, jfloat translationM) {
+    if (focalLengthPx > 0.0f) gFocalLengthPx = focalLengthPx;
+    if (translationM  > 0.0f) gTranslationM  = translationM;
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
