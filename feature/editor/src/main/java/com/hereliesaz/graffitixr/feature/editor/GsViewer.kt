@@ -24,22 +24,17 @@ class GsViewer @JvmOverloads constructor(
     @Inject
     lateinit var slamManager: SlamManager
 
+    private var isVulkanInitialized = false
+
     init {
         holder.addCallback(this)
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
+        // Dimensions are not yet reliable here — init is deferred to surfaceChanged.
         if (!isVulkanSupported()) {
             Log.e("GsViewer", "Vulkan not supported on this device (API ${Build.VERSION.SDK_INT})")
-            return
         }
-        val ok = slamManager.initVulkanEngine(
-            surface = holder.surface,
-            assetManager = context.assets,
-            width = width,
-            height = height
-        )
-        if (!ok) Log.e("GsViewer", "Vulkan init failed — check driver support and shader assets")
     }
 
     private fun isVulkanSupported(): Boolean {
@@ -48,12 +43,27 @@ class GsViewer @JvmOverloads constructor(
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        // Fixed: Passing new dimensions on surface resize
-        slamManager.resizeVulkanSurface(width, height)
+        if (!isVulkanSupported() || width == 0 || height == 0) return
+        if (!isVulkanInitialized) {
+            val ok = slamManager.initVulkanEngine(
+                surface = holder.surface,
+                assetManager = context.assets,
+                width = width,
+                height = height
+            )
+            if (ok) {
+                isVulkanInitialized = true
+            } else {
+                Log.e("GsViewer", "Vulkan init failed — check driver support and shader assets")
+            }
+        } else {
+            slamManager.resizeVulkanSurface(width, height)
+        }
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         slamManager.destroyVulkanEngine()
         slamManager.reset()
+        isVulkanInitialized = false
     }
 }

@@ -81,11 +81,14 @@ void VulkanBackend::destroy() {
         vkDestroyBuffer(m_device, m_vertexBuffer, nullptr);
         vkFreeMemory(m_device, m_vertexBufferMemory, nullptr);
 
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        for (size_t i = 0; i < m_imageAvailableSemaphores.size(); ++i) {
             vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
             vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
             vkDestroyFence(m_device, m_inFlightFences[i], nullptr);
         }
+        m_imageAvailableSemaphores.clear();
+        m_renderFinishedSemaphores.clear();
+        m_inFlightFences.clear();
 
         vkDestroyCommandPool(m_device, m_commandPool, nullptr);
         vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
