@@ -5,10 +5,9 @@
 ## Key Features
 *   **Offline-First:** No cloud dependencies; zero data collected.
 *   **Custom Engine (MobileGS):** C++17 native engine for 3D Gaussian Splatting and spatial mapping.
-*   **Full ARCore Pipeline:** Live camera feed via `BackgroundRenderer`, monocular optical-flow depth, and ARCore Depth API — all feeding real data to the SLAM engine.
-*   **Dynamic Depth Calibration:** Inter-frame camera pose and intrinsics used to compute accurate `kScale` for optical-flow depth estimation each frame.
+*   **Full ARCore Pipeline:** Live camera feed via `BackgroundRenderer`, color frame relocalization, and ARCore Depth API — all feeding real data to the SLAM engine.
 *   **AzNavRail UI:** Thumb-driven navigation for one-handed use in the field.
-*   **Dual Render Paths:** OpenGL ES (`ArRenderer`) for camera background; Vulkan (`GsViewer`) for SLAM voxel splats.
+*   **Single GL Render Path:** `ArRenderer` handles both camera background (`BackgroundRenderer`) and SLAM voxel splats (`slamManager.draw()`) in a single `GLSurfaceView`.
 *   **Multi-Lens Support:** Automatically uses dual-camera stereo depth on supported devices; falls back to optical flow.
 *   **Teleological Correction:** Automatic map-to-world alignment using OpenCV fingerprinting.
 
@@ -16,9 +15,9 @@
 Strictly decoupled multi-module architecture:
 *   `:app` — Navigation, `ArViewport` composable, camera ownership orchestration.
 *   `:feature:ar` — ARCore session, `ArRenderer`, `BackgroundRenderer`, sensor fusion, SLAM data feeding.
-*   `:feature:editor` — Image manipulation, layer management, `GsViewer` (Vulkan).
+*   `:feature:editor` — Image manipulation, layer management.
 *   `:feature:dashboard` — Project library, settings.
-*   `:core:nativebridge` — `SlamManager` JNI bridge, `MobileGS` voxel engine, optical flow depth, Vulkan backend.
+*   `:core:nativebridge` — `SlamManager` JNI bridge, `MobileGS` voxel engine, OpenGL ES rendering.
 *   `:core:data` / `:core:domain` / `:core:common` — Clean Architecture data layer.
 
 ## Setup & Building

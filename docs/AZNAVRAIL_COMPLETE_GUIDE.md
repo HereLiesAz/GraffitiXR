@@ -1,4 +1,4 @@
-# AzNavRail Complete Guide (v7.55)
+# AzNavRail Complete Guide (v7.62)
 
 Welcome to the definitive "Encyclopedic" guide for **AzNavRail**. This document details every single feature, its abilities, its limitations, and strict usage protocols.
 
@@ -121,9 +121,14 @@ azAdvanced(enableRailDragging = true)
 
 **Usage:**
 ```kotlin
-azAdvanced(infoScreen = true)
+azAdvanced(helpEnabled = true)
 azRailItem(..., info = "This goes to Home")
+
+// v7.60+: place a dedicated help button on the rail
+azHelpRailItem(id = "help", text = "Help")
 ```
+
+`azHelpRailItem(id, text)` is an explicit item type that places a permanent help button on the rail. Tapping it activates the Info Screen overlay. Use it when you want help always visible as a rail item rather than only in the expanded menu.
 
 ---
 

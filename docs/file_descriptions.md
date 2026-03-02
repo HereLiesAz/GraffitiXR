@@ -12,8 +12,8 @@ This document lists key files in the repository and their purposes.
 *   `setup_libs.sh`: Script to download OpenCV and GLM native libraries.
 
 ## Application (`:app`)
-*   `MainActivity.kt`: Entry point. Holds `ArViewModel by viewModels()` for `onResume/onPause` ARCore lifecycle. Passes `arViewModel` and `onRendererCreated` into `MainScreen`.
-*   `MainScreen.kt`: `ArViewport` composable. Manages mode-based rendering (AR = `GLSurfaceView`+`GsViewer`, Overlay = CameraX, Mockup/Trace = static). Shows live tracking state chip in AR mode.
+*   `MainActivity.kt`: Entry point. Holds `ArViewModel by viewModels()` for `onResume/onPause` ARCore lifecycle. Configures the AzNavRail via `azConfig()`, `azTheme()`, `azAdvanced(helpEnabled = true)`, and `azHelpRailItem()`. Passes `arViewModel` and `onRendererCreated` into `MainScreen`.
+*   `MainScreen.kt`: `ArViewport` composable. Manages mode-based rendering (AR = `GLSurfaceView` — `ArRenderer` handles both camera feed and SLAM splats, Overlay = CameraX, Mockup/Trace = static). Shows live tracking state chip in AR mode.
 *   `MainViewModel.kt`: Cross-cutting state — touch lock, `CaptureStep` wizard for target creation.
 
 ## Core Modules
@@ -31,7 +31,7 @@ This document lists key files in the repository and their purposes.
 *   `src/test/.../ProjectManagerTest.kt`: Unit tests for `ProjectManager` (file I/O, zip import failure paths).
 
 ### `:core:nativebridge`
-*   `nativebridge/SlamManager.kt`: Kotlin JNI bridge. All native calls go through here. Key methods: `updateCamera`, `setCameraMotion`, `feedMonocularData`, `feedArCoreDepth`, `feedStereoData`, `feedLocationData`, `draw`, `saveModel`, `loadModel`, `saveKeyframe`, `initVulkanEngine`, `resizeVulkanSurface`, `destroyVulkanEngine`.
+*   `nativebridge/SlamManager.kt`: Kotlin JNI bridge. All native calls go through here. Key methods: `updateCamera`, `updateAnchorTransform`, `setArCoreTrackingState`, `feedColorFrame`, `feedArCoreDepth`, `feedStereoData`, `draw`.
 *   `src/main/cpp/GraffitiJNI.cpp`: JNI implementation. Contains `computeOpticalFlowDepth` (Lucas-Kanade optical flow, dynamic `kScale = gFocalLengthPx × gTranslationM`), `nativeSetCameraMotion`, `nativeFeedMonocularData`, `nativeFeedArCoreDepth`.
 *   `src/main/cpp/MobileGS.cpp` / `MobileGS.h`: Sparse voxel hash map, `processDepthFrame`, `draw`, `saveModel/loadModel`.
 *   `src/main/cpp/StereoProcessor.cpp`: Stereo disparity → depth pipeline.
@@ -41,19 +41,17 @@ This document lists key files in the repository and their purposes.
 
 ### `:feature:ar`
 *   `ArViewModel.kt`: ARCore session lifecycle (`initArSession`, `attachSessionToRenderer`, `resumeArSession`, `pauseArSession`), GPS, flashlight, tracking state, keyframe capture.
-*   `rendering/ArRenderer.kt`: `GLSurfaceView.Renderer`. Initialises `BackgroundRenderer`, tracks prev pose, extracts `camera.imageIntrinsics`, calls `setCameraMotion` + `feedMonocularData` + `feedArCoreDepth` each tracking frame. `onTrackingChanged` callback reports state to `ArViewModel`.
+*   `rendering/ArRenderer.kt`: `GLSurfaceView.Renderer`. Initialises `BackgroundRenderer`; calls `setArCoreTrackingState`, `updateCamera`, `feedArCoreDepth`, `feedColorFrame`, and `slamManager.draw()` each frame. `onTrackingUpdated: (Boolean)` callback reports state to `ArViewModel`.
 *   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES` camera texture full-screen.
 *   `CameraPreview.kt`: CameraX preview composable — used in Overlay mode only.
 *   `computervision/TeleologicalTracker.kt`: OpenCV PnP-based anchor correction.
-*   `computervision/DualAnalyzer.kt`: `ImageAnalysis.Analyzer` for monocular SLAM and light estimation callbacks (bound in Mapping mode).
-*   `MappingActivity.kt` / `MappingScreen.kt`: Standalone mapping flow with camera permission handling and tracking HUD.
+*   `computervision/DualAnalyzer.kt`: `ImageAnalysis.Analyzer` for SLAM callbacks and light estimation.
 *   `src/test/.../TeleologicalTrackerTest.kt`: Unit tests for `trackAndCorrect` (PnP result handling, `Mat.release()`).
 *   `src/test/.../DualAnalyzerTest.kt`: Unit tests for SLAM callback, light throttle, luminosity path.
 *   `src/test/.../ArViewModelTest.kt`: Unit tests for session management, flashlight, GPS, keyframe.
 
 ### `:feature:editor`
 *   `EditorViewModel.kt`: Layer operations, image manipulation, undo/redo, project save/load.
-*   `GsViewer.kt`: `SurfaceView` with `setZOrderMediaOverlay(true)`. Initialises Vulkan engine on `surfaceCreated`; manages resize/destroy lifecycle.
 *   `src/test/.../EditorViewModelTest.kt`: Unit tests for layer ops and bitmap dimensions.
 
 ### `:feature:dashboard`

@@ -24,15 +24,13 @@ Executed inside `ArRenderer.onDrawFrame` each tracking frame:
 
 1. **Camera pose** — `camera.getViewMatrix/getProjectionMatrix` → `slamManager.updateCamera()`
 
-2. **Motion calibration** — `camera.imageIntrinsics.focalLength[0]` + translation magnitude from consecutive `camera.pose.translation` values → `slamManager.setCameraMotion(focalLengthPx, translationM)`. Sets native `kScale = focalLengthPx × translationM` for optical-flow depth.
+2. **Color frame** — `frame.acquireCameraImage()` → RGBA → `slamManager.feedColorFrame()`
+   - Used for relocalization / fingerprinting; called when tracking and when not tracking.
+   - The native engine handles internal optical flow as an implementation detail.
 
-3. **Monocular depth (optical flow fallback)**
-   - `frame.acquireCameraImage()` → Y-plane → `slamManager.feedMonocularData()`
-   - Native: Lucas-Kanade sparse flow → `depth ≈ kScale / flow_px` → `processDepthFrame()`
-
-4. **Metric depth (Depth API devices)**
+3. **Metric depth (Depth API devices)**
    - `frame.acquireDepthImage16Bits()` → DEPTH16 buffer → `slamManager.feedArCoreDepth()`
-   - Native: decode millimetre depth + confidence → `processDepthFrame()` (overrides optical-flow)
+   - Native: decode millimetre depth + confidence → `processDepthFrame()` (metric-accurate voxel placement)
 
 ### C. Voxel Map Accumulation
 `processDepthFrame(depthMap, colorFrame)` in `MobileGS`:
@@ -50,19 +48,7 @@ Binary format written by `saveModel(path)` / `saveKeyframe(timestamp, path)`:
 
 ## 2. Gaussian Splatting Visualization
 
-**Module:** `:feature:editor`
-**Key class:** `GsViewer`
-
-`GsViewer` is a `SurfaceView` with `setZOrderMediaOverlay(true)` that initializes the Vulkan backend and sits above `ArRenderer`'s `GLSurfaceView` in the view hierarchy.
-
-### Vulkan Rendering Stack
-*   **Descriptor layout:** `binding=0` UBO (matrices), `binding=1` overlay sampler
-*   **Push constants:** `{visualizationMode: int, overlayEnabled: int, vpW: float, vpH: float}` — 16 bytes
-*   **Visualization modes:** `0` = RGB (default), `1` = Heatmap (confidence-based thermal gradient in fragment shader)
-
-### Fragment Shader Splat Falloff
-$$\alpha = e^{-\frac{1}{2} (x^T \Sigma^{-1} x)}$$
-Fragments below the alpha threshold are discarded.
+SLAM splats are rendered by `slamManager.draw()` inside `ArRenderer`'s `GLSurfaceView` via OpenGL ES 3.0 `GL_POINTS`. The `BackgroundRenderer` renders the camera feed first, then splats are drawn on top in the same GL context.
 
 ---
 
@@ -71,7 +57,4 @@ Fragments below the alpha threshold are discarded.
 When in **Mockup Mode**, editor layers project onto the 3D scene:
 
 1. **Projection:** User's 2D canvas projected as a decal using projective texture mapping.
-2. **Occlusion:**
-   * `GsViewer` renders splat depth into a Depth Texture.
-   * Graffiti layers are rendered with depth test enabled.
-   * **Result:** Real-world geometry (pillars, edges) correctly occludes the projected image.
+2. **Occlusion:** Real-world geometry depth is derived from the SLAM voxel map rendered via `slamManager.draw()`. Graffiti layers are rendered with depth test enabled so geometry (pillars, edges) correctly occludes the projected image.
