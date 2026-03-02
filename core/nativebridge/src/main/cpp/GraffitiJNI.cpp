@@ -107,8 +107,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_draw(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {
-        std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
-        gSlamEngine->draw();
+        gSlamEngine->draw();  // draw() acquires the mutex internally; do NOT lock here
     }
 }
 
