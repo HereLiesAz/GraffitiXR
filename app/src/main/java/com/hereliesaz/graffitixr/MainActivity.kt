@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.composable
@@ -128,6 +131,16 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked && !mainUiState.isCapturingTarget
+
+                // Request camera permission proactively on first launch so the camera
+                // feed is visible without requiring the user to tap "Create" first.
+                LaunchedEffect(Unit) {
+                    if (!hasCameraPermission) {
+                        permissionLauncher.launch(
+                            arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+                        )
+                    }
+                }
 
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.onAddLayer(it) }
@@ -253,6 +266,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Re-check in case the user granted permission in system Settings while away.
+        hasCameraPermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
         // Re-resume ARCore session when returning from background (no-op if session is null or
         // not yet initialized — DisposableEffect in ArViewport manages mode-level lifecycle).
         arViewModel.resumeArSession()

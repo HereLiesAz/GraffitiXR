@@ -184,7 +184,19 @@ bool VulkanBackend::createSwapchain() {
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     createInfo.preTransform = capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+    // Pick a supported composite alpha mode. Prefer INHERIT (transparent overlay),
+    // fall back to OPAQUE if the device doesn't support INHERIT.
+    VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    const VkCompositeAlphaFlagBitsKHR preferred[] = {
+        VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+        VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+        VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
+        VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+    };
+    for (auto flag : preferred) {
+        if (capabilities.supportedCompositeAlpha & flag) { compositeAlpha = flag; break; }
+    }
+    createInfo.compositeAlpha = compositeAlpha;
     createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     createInfo.clipped = VK_TRUE;
     if (vkCreateSwapchainKHR(m_device, &createInfo, nullptr, &m_swapchain) != VK_SUCCESS) return false;
