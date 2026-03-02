@@ -105,6 +105,6 @@ class ArRenderer(
 
         slamManager.draw()
 
-        onTrackingUpdated(camera.trackingState == TrackingState.TRACKING)
+        onTrackingUpdated(isTracking)
     }
 }
