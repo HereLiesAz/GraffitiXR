@@ -9,6 +9,10 @@ android {
     defaultConfig {
         minSdk = 29
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            // Build only for ARM architectures (skip x86/x86_64 emulator builds)
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17")
