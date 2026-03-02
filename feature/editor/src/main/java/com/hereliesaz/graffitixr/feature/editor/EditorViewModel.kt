@@ -1,4 +1,3 @@
-
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
@@ -56,8 +55,9 @@ class EditorViewModel @Inject constructor(
                     // Load bitmaps for all layers that have URIs
                     viewModelScope.launch(dispatchers.io) {
                         val layersWithBitmaps = layers.map { layer ->
-                            if (layer.uri != null) {
-                                layer.copy(bitmap = BitmapUtils.getBitmapFromUri(context, layer.uri))
+                            val localUri = layer.uri
+                            if (localUri != null) {
+                                layer.copy(bitmap = BitmapUtils.getBitmapFromUri(context, localUri))
                             } else layer
                         }
                         withContext(dispatchers.main) {
