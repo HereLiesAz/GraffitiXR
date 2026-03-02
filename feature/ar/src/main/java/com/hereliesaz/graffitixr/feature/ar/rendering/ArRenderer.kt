@@ -8,6 +8,9 @@ import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import timber.log.Timber
+import java.nio.ByteBuffer
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.sqrt
@@ -22,17 +25,30 @@ class ArRenderer(
     /** Set to true only after session.resume() completes; false after session.pause(). */
     @Volatile var isSessionResumed: Boolean = false
     private val backgroundRenderer = BackgroundRenderer()
+    private val featurePointRenderer = FeaturePointRenderer()
     private var hasSetTextureNames = false
 
     // Previous camera world-position for inter-frame translation magnitude.
     private var prevPx = 0f; private var prevPy = 0f; private var prevPz = 0f
     private var hasPrevPose = false
 
+    // SLAM computation runs on a dedicated background thread so the GL thread
+    // is never blocked by OpenCV optical-flow or voxel-map updates.
+    // compareAndSet(false,true) acts as a drop-gate: if the previous frame
+    // is still being processed the new one is skipped rather than queued.
+    private var monoBuf: ByteBuffer? = null
+    private var depthBuf: ByteBuffer? = null
+    private val slamBusy = AtomicBoolean(false)
+    private val slamExecutor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "slam-worker").also { it.isDaemon = true }
+    }
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Timber.tag("AR_DEBUG").e(">>> [1] onSurfaceCreated() INITIATED")
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         try {
             backgroundRenderer.createOnGlThread(context)
+            featurePointRenderer.createOnGlThread()
             slamManager.createOnGlThread()
             slamManager.resetGLState()
             slamManager.ensureInitialized()
@@ -80,6 +96,16 @@ class ArRenderer(
                 camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
                 slamManager.updateCamera(viewMatrix, projMatrix)
 
+                // Draw ARCore's native tracking feature points as cyan circles.
+                try {
+                    val pointCloud = frame.acquirePointCloud()
+                    try {
+                        featurePointRenderer.draw(pointCloud, viewMatrix, projMatrix)
+                    } finally {
+                        pointCloud.release()
+                    }
+                } catch (_: Exception) { /* point cloud unavailable this frame */ }
+
                 // Compute inter-frame translation magnitude from ARCore world-space pose.
                 val t = camera.pose.translation  // [x, y, z] in metres
                 val translationM = if (hasPrevPose) {
@@ -94,26 +120,44 @@ class ArRenderer(
                 // Update native kScale before feeding the monocular frame.
                 slamManager.setCameraMotion(focalLengthPx, translationM)
 
-                // Feed luminance (Y-plane) to the SLAM monocular pipeline.
+                // Feed luminance (Y-plane) to the SLAM pipeline — off GL thread.
+                // The ARCore ByteBuffer is only valid until image.close(), so we copy
+                // it into a pre-allocated direct buffer before releasing the image.
                 try {
                     val image = frame.acquireCameraImage()
-                    try {
-                        val yPlane = image.planes[0]
-                        slamManager.feedMonocularData(yPlane.buffer, image.width, image.height)
-                    } finally {
-                        image.close()
+                    if (slamBusy.compareAndSet(false, true)) {
+                        val src = image.planes[0].buffer
+                        val needed = src.remaining()
+                        if (monoBuf == null || monoBuf!!.capacity() < needed) {
+                            monoBuf = ByteBuffer.allocateDirect(needed)
+                        }
+                        val buf = monoBuf!!.also { it.clear(); it.put(src); it.rewind() }
+                        val w = image.width; val h = image.height
+                        slamExecutor.execute {
+                            try { slamManager.feedMonocularData(buf, w, h) }
+                            finally { slamBusy.set(false) }
+                        }
                     }
+                    image.close()
                 } catch (_: Exception) { /* frame unavailable this tick */ }
 
-                // Feed ARCore DEPTH16 to the SLAM depth pipeline when available.
+                // Feed ARCore DEPTH16 to the SLAM pipeline — off GL thread.
                 try {
                     val depthImage = frame.acquireDepthImage16Bits()
-                    try {
-                        val depthPlane = depthImage.planes[0]
-                        slamManager.feedArCoreDepth(depthPlane.buffer, depthImage.width, depthImage.height)
-                    } finally {
-                        depthImage.close()
+                    if (slamBusy.compareAndSet(false, true)) {
+                        val src = depthImage.planes[0].buffer
+                        val needed = src.remaining()
+                        if (depthBuf == null || depthBuf!!.capacity() < needed) {
+                            depthBuf = ByteBuffer.allocateDirect(needed)
+                        }
+                        val buf = depthBuf!!.also { it.clear(); it.put(src); it.rewind() }
+                        val w = depthImage.width; val h = depthImage.height
+                        slamExecutor.execute {
+                            try { slamManager.feedArCoreDepth(buf, w, h) }
+                            finally { slamBusy.set(false) }
+                        }
                     }
+                    depthImage.close()
                 } catch (_: Exception) { /* depth not available on this device or frame */ }
             }
         } catch (_: SessionPausedException) {

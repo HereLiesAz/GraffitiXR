@@ -48,11 +48,18 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.main) {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
-                    _uiState.update {
-                        it.copy(
-                            projectId = project.id,
-                            layers = project.layers.map { overlayLayer -> overlayLayer.toLayer() }
-                        )
+                    val layers = project.layers.map { overlayLayer -> overlayLayer.toLayer() }
+                    _uiState.update { it.copy(projectId = project.id, layers = layers) }
+                    // Load bitmaps for all layers that have URIs
+                    viewModelScope.launch(dispatchers.io) {
+                        val layersWithBitmaps = layers.map { layer ->
+                            if (layer.uri != null) {
+                                layer.copy(bitmap = BitmapUtils.getBitmapFromUri(context, layer.uri))
+                            } else layer
+                        }
+                        withContext(dispatchers.main) {
+                            _uiState.update { it.copy(layers = layersWithBitmaps) }
+                        }
                     }
                     // Load background if exists
                     val bgUri = project.backgroundImageUri
@@ -114,13 +121,13 @@ class EditorViewModel @Inject constructor(
     fun onAddLayer(uri: Uri) {
         pushHistory()
         viewModelScope.launch(dispatchers.io) {
-            // Validate URI and dimensions before adding
-            val dim = BitmapUtils.getBitmapDimensions(context, uri)
-            if (dim.first > 0 && dim.second > 0) {
+            val bitmap = BitmapUtils.getBitmapFromUri(context, uri)
+            if (bitmap != null) {
                 val newLayer = Layer(
                     id = UUID.randomUUID().toString(),
                     name = "Layer ${_uiState.value.layers.size + 1}",
                     uri = uri,
+                    bitmap = bitmap,
                     isVisible = true
                 )
                 withContext(dispatchers.main) {
@@ -313,11 +320,18 @@ class EditorViewModel @Inject constructor(
     }
 
     private fun updateLayerUri(id: String, uri: Uri) {
-        _uiState.update { state ->
-            val updatedLayers = state.layers.map { if (it.id == id) it.copy(uri = uri) else it }
-            state.copy(layers = updatedLayers)
+        viewModelScope.launch(dispatchers.io) {
+            val bitmap = BitmapUtils.getBitmapFromUri(context, uri)
+            withContext(dispatchers.main) {
+                _uiState.update { state ->
+                    val updatedLayers = state.layers.map {
+                        if (it.id == id) it.copy(uri = uri, bitmap = bitmap) else it
+                    }
+                    state.copy(layers = updatedLayers)
+                }
+            }
+            saveProject()
         }
-        saveProject()
     }
 
     // --- UI Interactions ---

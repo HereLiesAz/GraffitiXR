@@ -128,8 +128,10 @@ JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_n
 }
 
 JNIEXPORT void JNICALL Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeOnSurfaceChanged(JNIEnv* env, jobject thiz, jint width, jint height) {
+    // Only update SLAM engine dimensions. Vulkan resize is driven by GsViewer.surfaceChanged
+    // (nativeResizeVulkan) on the main thread. Calling gVulkanRenderer->resize() here from
+    // the GL thread caused a concurrent vkDeviceWaitIdle crash.
     if (gSlamEngine) gSlamEngine->initialize(width, height);
-    if (gVulkanRenderer) gVulkanRenderer->resize(width, height);
 }
 
 // --- Rendering Loop ---

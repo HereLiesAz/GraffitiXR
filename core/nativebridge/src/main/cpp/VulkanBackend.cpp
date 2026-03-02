@@ -173,7 +173,23 @@ bool VulkanBackend::createSwapchain() {
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &capabilities);
     uint32_t imageCount = std::min(capabilities.minImageCount + 1, capabilities.maxImageCount > 0 ? capabilities.maxImageCount : capabilities.minImageCount + 1);
     m_swapchainExtent = capabilities.currentExtent;
-    m_swapchainFormat = VK_FORMAT_R8G8B8A8_UNORM;
+
+    // Enumerate device-supported surface formats and prefer an alpha-capable one.
+    // RGBA and BGRA are equivalent for our shaders (vec4 output); either gives transparency.
+    uint32_t formatCount = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, m_surface, &formatCount, nullptr);
+    std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, m_surface, &formatCount, surfaceFormats.data());
+    m_swapchainFormat = surfaceFormats.empty() ? VK_FORMAT_R8G8B8A8_UNORM : surfaceFormats[0].format;
+    const VkFormat kPreferred[] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM};
+    for (VkFormat pref : kPreferred) {
+        bool found = false;
+        for (const auto& sf : surfaceFormats) {
+            if (sf.format == pref) { m_swapchainFormat = pref; found = true; break; }
+        }
+        if (found) break;
+    }
+    LOGI("Swapchain format selected: %d", m_swapchainFormat);
     VkSwapchainCreateInfoKHR createInfo{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
     createInfo.surface = m_surface;
     createInfo.minImageCount = imageCount;
