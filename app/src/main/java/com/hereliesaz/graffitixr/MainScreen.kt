@@ -13,6 +13,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -96,6 +98,7 @@ fun ArViewport(
     val isImageLocked = activeLayer?.isImageLocked ?: false
     val arUiState by arViewModel.uiState.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
     // 1. Render Backgrounds (Camera or Mockup)
     if (hasCameraPermission) {
@@ -103,16 +106,22 @@ fun ArViewport(
             EditorMode.AR -> {
                 // AR mode: ARCore owns the camera. GLSurfaceView renders the camera feed
                 // via BackgroundRenderer and feeds frames to the SLAM engine.
-                DisposableEffect(Unit) {
+                // Key on editorMode so this re-fires when returning to AR from another mode.
+                DisposableEffect(uiState.editorMode) {
                     arViewModel.initArSession(context)
                     arViewModel.resumeArSession()
-                    onDispose { arViewModel.pauseArSession() }
+                    rendererRef.value?.let { arViewModel.attachSessionToRenderer(it) }
+                    onDispose {
+                        arViewModel.pauseArSession()
+                        arViewModel.attachSessionToRenderer(null)
+                    }
                 }
                 AndroidView(
                     factory = { ctx ->
                         val renderer = ArRenderer(ctx, slamManager) { state, count ->
                             arViewModel.updateTrackingState(state, count)
                         }
+                        rendererRef.value = renderer
                         arViewModel.attachSessionToRenderer(renderer)
                         onRendererCreated(renderer)
                         GLSurfaceView(ctx).apply {

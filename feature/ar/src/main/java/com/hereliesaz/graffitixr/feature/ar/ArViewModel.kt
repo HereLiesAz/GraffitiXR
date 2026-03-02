@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import com.hereliesaz.graffitixr.common.model.ArUiState
@@ -48,18 +49,22 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun attachSessionToRenderer(arRenderer: ArRenderer) {
+    fun attachSessionToRenderer(arRenderer: ArRenderer?) {
         this.renderer = arRenderer
         // If session is already initialized, attach it to the renderer
         renderer?.attachSession(session)
     }
 
     fun resumeArSession() {
+        val s = session ?: return
         try {
+            s.resume()
             isSessionResumed = true
-            session?.resume()
-        } catch (e: Exception) {
-            _uiState.update { it.copy(trackingState = "Error Resuming: ${e.message}") }
+        } catch (e: com.google.ar.core.exceptions.CameraNotAvailableException) {
+            Log.e("ArViewModel", "Camera not available on resume", e)
+        } catch (e: IllegalStateException) {
+            // Session already resumed — safe to ignore
+            Log.w("ArViewModel", "resumeArSession called on already-resumed session", e)
         }
     }
 
