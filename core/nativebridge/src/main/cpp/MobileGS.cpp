@@ -5,9 +5,9 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
 
 // Tuning constants
-constexpr size_t MAX_SPLATS = 500000;
-constexpr float VOXEL_SIZE = 0.02f;           // 20mm
-constexpr float CONFIDENCE_THRESHOLD = 0.6f;
+static constexpr size_t MAX_SPLATS = 500000;
+static constexpr float VOXEL_SIZE = 0.02f;           // 20mm
+static constexpr float CONFIDENCE_THRESHOLD = 0.6f;
 
 void MobileGS::initialize(int width, int height) {
     mFeatureDetector = cv::ORB::create(500);

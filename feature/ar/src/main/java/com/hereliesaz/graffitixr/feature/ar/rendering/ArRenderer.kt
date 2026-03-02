@@ -7,16 +7,13 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/**
- * Unified rendering pipeline. Now dictates tracking state to the native engine
- * to prevent redundant optical-flow and feature matching calculations.
- */
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
@@ -34,9 +31,6 @@ class ArRenderer(
 
     fun attachSession(session: Session?) {
         this.session = session
-        // The DisplayListener lifecycle is tied to session attachment, not activity resume/pause.
-        // pauseArSession() leaves the listener registered, which is safe — updateSessionIfNeeded
-        // is a no-op unless the viewport actually changed, and the session re-validates on resume.
         if (session != null) {
             displayRotationHelper.onResume()
         } else {
@@ -48,7 +42,7 @@ class ArRenderer(
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
-        cameraTextureNameSet = false  // reset so it re-registers on the first frame
+        cameraTextureNameSet = false
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -60,14 +54,17 @@ class ArRenderer(
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         val activeSession = session ?: return
 
-        // Register texture name once per surface (lazy, handles session attaching after surface creation)
         if (!cameraTextureNameSet) {
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
             cameraTextureNameSet = true
         }
 
         displayRotationHelper.updateSessionIfNeeded(activeSession)
-        val frame: Frame = activeSession.update()
+        val frame: Frame = try {
+            activeSession.update()
+        } catch (e: SessionPausedException) {
+            return
+        }
         val camera = frame.camera
 
         backgroundRenderer.draw(frame)
@@ -96,7 +93,6 @@ class ArRenderer(
                 e.printStackTrace()
             }
         } else {
-            // When not tracking, we still feed the color frame so OpenCV can try to relocalize
             try {
                 val cameraImage = frame.acquireCameraImage()
                 val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
