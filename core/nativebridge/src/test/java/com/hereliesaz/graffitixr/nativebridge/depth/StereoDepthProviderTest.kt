@@ -17,25 +17,25 @@ class StereoDepthProviderTest {
     }
 
     @Test
-    fun `processFrames calls slamManager`() {
+    fun `processStereoFrames calls slamManager`() {
         val left = ByteArray(10)
         val right = ByteArray(10)
         val w = 640
         val h = 480
 
-        provider.processFrames(left, right, w, h)
+        provider.processStereoFrames(left, right, w, h)
 
-        verify { slamManager.feedStereoData(left, right, w, h) }
+        verify { slamManager.feedStereoData(any(), any(), w, h) }
     }
 
     @Test
-    fun `processFrames does NOT call slamManager when data is empty`() {
+    fun `processStereoFrames does NOT call slamManager when data is empty`() {
         val left = ByteArray(0)
         val right = ByteArray(0)
         val w = 640
         val h = 480
 
-        provider.processFrames(left, right, w, h)
+        provider.processStereoFrames(left, right, w, h)
 
         verify(exactly = 0) { slamManager.feedStereoData(any(), any(), any(), any()) }
     }
