@@ -282,6 +282,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        arViewModel.destroyArSession()
         if (isFinishing) slamManager.destroy()
     }
 

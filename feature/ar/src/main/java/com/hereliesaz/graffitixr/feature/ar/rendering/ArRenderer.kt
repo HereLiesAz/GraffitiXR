@@ -29,7 +29,7 @@ class ArRenderer(
     private val viewMatrix = FloatArray(16)
     private val projMatrix = FloatArray(16)
 
-    fun attachSession(session: Session) {
+    fun attachSession(session: Session?) {
         this.session = session
     }
 

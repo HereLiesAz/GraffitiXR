@@ -32,31 +32,46 @@ class ArViewModel @Inject constructor(
      */
     fun initArSession(context: android.content.Context) {
         if (session == null) {
-            session = Session(context)
-            // Configure the session (e.g., depth API)
-            val config = session!!.config
-            config.depthMode = com.google.ar.core.Config.DepthMode.AUTOMATIC
-            session!!.configure(config)
-            
-            // If renderer is already attached, attach the session to it
-            renderer?.attachSession(session!!)
+            try {
+                session = Session(context)
+                // Configure the session (e.g., depth API)
+                val config = session!!.config
+                config.depthMode = com.google.ar.core.Config.DepthMode.AUTOMATIC
+                config.updateMode = com.google.ar.core.Config.UpdateMode.LATEST_CAMERA_IMAGE
+                session!!.configure(config)
+                
+                // If renderer is already attached, attach the session to it
+                renderer?.attachSession(session)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(trackingState = "Error: ${e.message}") }
+            }
         }
     }
 
     fun attachSessionToRenderer(arRenderer: ArRenderer) {
         this.renderer = arRenderer
         // If session is already initialized, attach it to the renderer
-        session?.let { arRenderer.attachSession(it) }
+        renderer?.attachSession(session)
     }
 
     fun resumeArSession() {
-        isSessionResumed = true
-        session?.resume()
+        try {
+            isSessionResumed = true
+            session?.resume()
+        } catch (e: Exception) {
+            _uiState.update { it.copy(trackingState = "Error Resuming: ${e.message}") }
+        }
     }
 
     fun pauseArSession() {
         isSessionResumed = false
         session?.pause()
+    }
+
+    fun destroyArSession() {
+        session?.close()
+        session = null
+        renderer?.attachSession(null)
     }
 
     /**
