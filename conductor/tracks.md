@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Bug fix AR display**
+- [x] **Track: Bug fix AR display**
   *Link: [./tracks/fix_ar_rendering_failure_20260302/](./tracks/fix_ar_rendering_failure_20260302/)*
