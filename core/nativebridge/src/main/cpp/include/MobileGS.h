@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include <mutex>
 #include <vector>
+#include <GLES3/gl3.h>
 
 struct Splat {
     float x, y, z;
@@ -22,11 +23,13 @@ public:
     void attemptRelocalization(const cv::Mat& colorFrame);
 
     void draw();
+    void destroy();
     std::mutex& getMutex() { return mMutex; }
 
 private:
     bool performPnP(const cv::Mat& grayFrame);
     void pruneMap();
+    void initShaders();
 
     std::mutex mMutex;
     bool mIsArCoreTracking = false;
@@ -38,4 +41,15 @@ private:
     std::vector<cv::KeyPoint> mTargetKeypoints;
 
     std::vector<Splat> splatData;
+
+    // GLES handles
+    GLuint mProgram = 0;
+    GLuint mPointVbo = 0;
+    GLuint mMeshVbo = 0;
+
+    int mPointCount = 0;
+    int mMeshVertexCount = 0;
+
+    float mViewMatrix[16];
+    float mProjMatrix[16];
 };

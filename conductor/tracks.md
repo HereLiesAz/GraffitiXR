@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [~] **Track: AR Native Visualization Enhancement**
+- [x] **Track: AR Native Visualization Enhancement**
 *Link: [./tracks/ar_native_viz_20260302/](./tracks/ar_native_viz_20260302/)*
