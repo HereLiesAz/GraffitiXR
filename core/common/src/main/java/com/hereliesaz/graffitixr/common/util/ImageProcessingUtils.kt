@@ -29,6 +29,70 @@ object ImageProcessingUtils {
 
     private const val TAG = "ImageProcessingUtils"
 
+    // Thread-local direct buffer for YUV->RGBA conversion
+    private var rgbaBuffer: java.nio.ByteBuffer? = null
+    private var rgbaBufferSize = 0
+
+    /**
+     * Converts an ARCore camera Image (YUV_420_888) directly to RGBA ByteBuffer.
+     * Uses a direct buffer for zero-copy JNI transfer.
+     */
+    fun convertYuvToRgbaDirect(image: android.media.Image): java.nio.ByteBuffer {
+        val width = image.width
+        val height = image.height
+        val requiredSize = width * height * 4  // RGBA
+
+        // Allocate or reuse direct buffer
+        if (rgbaBuffer == null || rgbaBufferSize != requiredSize) {
+            rgbaBuffer = java.nio.ByteBuffer.allocateDirect(requiredSize)
+            rgbaBufferSize = requiredSize
+        }
+
+        val buffer = rgbaBuffer!!
+        buffer.clear()
+
+        val yPlane = image.planes[0]
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
+
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
+
+        val yRowStride = yPlane.rowStride
+        val uvRowStride = uPlane.rowStride
+        val uvPixelStride = uPlane.pixelStride
+
+        for (j in 0 until height) {
+            for (i in 0 until width) {
+                val yIndex = j * yRowStride + i
+                val uvIndex = (j / 2) * uvRowStride + (i / 2) * uvPixelStride
+
+                val y = (yBuffer.get(yIndex).toInt() and 0xFF) - 16
+                val u = (uBuffer.get(uvIndex).toInt() and 0xFF) - 128
+                val v = (vBuffer.get(uvIndex).toInt() and 0xFF) - 128
+
+                // YUV to RGB conversion (BT.601)
+                val y1192 = 1192 * y.coerceAtLeast(0)
+                var r = (y1192 + 1634 * v) shr 10
+                var g = (y1192 - 833 * v - 400 * u) shr 10
+                var b = (y1192 + 2066 * u) shr 10
+
+                r = r.coerceIn(0, 255)
+                g = g.coerceIn(0, 255)
+                b = b.coerceIn(0, 255)
+
+                buffer.put(r.toByte())
+                buffer.put(g.toByte())
+                buffer.put(b.toByte())
+                buffer.put(0xFF.toByte())  // Alpha
+            }
+        }
+
+        buffer.rewind()
+        return buffer
+    }
+
     fun applyAdjustments(
         bitmap: Bitmap,
         brightness: Float,

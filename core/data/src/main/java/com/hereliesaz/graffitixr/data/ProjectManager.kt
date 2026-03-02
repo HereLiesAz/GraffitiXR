@@ -156,7 +156,7 @@ class ProjectManager @Inject constructor(
 
             // Load Target Bitmaps
             val targetBitmaps = projectData.targetImageUris.mapNotNull { uri ->
-                ImageUtils.getBitmapFromUri(context, uri)
+                ImageUtils.loadBitmapSync(context, uri)
             }
 
             LoadedProject(projectData, targetBitmaps)

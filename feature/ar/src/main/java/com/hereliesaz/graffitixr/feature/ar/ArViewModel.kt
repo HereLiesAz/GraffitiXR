@@ -116,6 +116,21 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isCaptureRequested = false) }
     }
 
+    // ==================== Scanning Controls ====================
+
+    fun startScanning() {
+        _uiState.update { it.copy(isScanning = true) }
+    }
+
+    fun stopScanning() {
+        _uiState.update { it.copy(isScanning = false) }
+    }
+
+    fun captureKeyframe() {
+        // Keyframe capture is handled by the native engine
+        // This triggers the SLAM engine to save the current state
+    }
+
     // ==================== Flashlight ====================
 
     fun toggleFlashlight() {

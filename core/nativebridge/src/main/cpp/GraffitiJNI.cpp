@@ -2,11 +2,13 @@
 #include <android/log.h>
 #include <opencv2/opencv.hpp>
 #include <GLES3/gl3.h>
-#include "MobileGS.h"
+#include "include/MobileGS.h"
+#include "include/StereoProcessor.h"
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 MobileGS* gSlamEngine = nullptr;
+StereoProcessor* gStereoProcessor = nullptr;
 cv::Mat gLastColorFrame;
 
 extern "C" {
@@ -107,6 +109,30 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_draw(JNIEnv* env, jobjec
     if (gSlamEngine) {
         std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
         gSlamEngine->draw();
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
+        JNIEnv* env, jobject thiz, jobject leftBuffer, jobject rightBuffer, jint width, jint height) {
+
+    if (!gStereoProcessor) {
+        gStereoProcessor = new StereoProcessor();
+    }
+
+    auto* leftData = static_cast<int8_t*>(env->GetDirectBufferAddress(leftBuffer));
+    auto* rightData = static_cast<int8_t*>(env->GetDirectBufferAddress(rightBuffer));
+    if (!leftData || !rightData) return;
+
+    gStereoProcessor->processStereo(leftData, rightData, width, height);
+
+    // Get disparity map and convert to depth for MobileGS
+    cv::Mat disparity = gStereoProcessor->getDisparityMap();
+    if (!disparity.empty() && gSlamEngine && !gLastColorFrame.empty()) {
+        cv::Mat depthFromStereo;
+        disparity.convertTo(depthFromStereo, CV_32F);
+        // Note: Proper depth = baseline * focal / disparity, but needs calibration
+        gSlamEngine->processDepthFrame(depthFromStereo, gLastColorFrame);
     }
 }
 }

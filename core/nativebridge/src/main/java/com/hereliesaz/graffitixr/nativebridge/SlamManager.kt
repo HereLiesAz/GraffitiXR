@@ -42,4 +42,16 @@ class SlamManager {
 
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int)
     private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int)
+
+    /**
+     * Feeds stereo camera data for devices with dual cameras.
+     * Processes through StereoProcessor to generate disparity-based depth.
+     */
+    fun feedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int) {
+        if (leftBuffer.isDirect && rightBuffer.isDirect) {
+            nativeFeedStereoData(leftBuffer, rightBuffer, width, height)
+        }
+    }
+
+    private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int)
 }

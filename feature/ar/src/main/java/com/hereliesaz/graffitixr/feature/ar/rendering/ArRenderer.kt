@@ -22,8 +22,9 @@ class ArRenderer(
     private val onTrackingUpdated: (String, Int) -> Unit
 ) : GLSurfaceView.Renderer {
 
-    private var session: Session? = null
-    private val backgroundRenderer = BackgroundRenderer(context)
+    var session: Session? = null
+        private set
+    private val backgroundRenderer = BackgroundRenderer()
 
     private val viewMatrix = FloatArray(16)
     private val projMatrix = FloatArray(16)
@@ -34,7 +35,7 @@ class ArRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
-        backgroundRenderer.createOnGlThread()
+        backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
     }
 
