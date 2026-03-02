@@ -14,7 +14,7 @@ Unit tests live in `src/test/` inside each module. Run all at once or per-module
 
 | File | Module | Covers |
 |---|---|---|
-| `TeleologicalTrackerTest` | `:feature:ar` | `trackAndCorrect` PnP result handling, `Mat.release()` |
+| `TeleologicalTrackerTest` | `:feature:ar` | `trackAndCorrect` PnP result handling, `Mat.release()` (tests currently commented out — pending fix) |
 | `DualAnalyzerTest` | `:feature:ar` | SLAM callback, light throttle, luminosity path |
 | `ArViewModelTest` | `:feature:ar` | Session management, flashlight, GPS, keyframe capture |
 | `EditorViewModelTest` | `:feature:editor` | Layer operations, bitmap dimensions, undo/redo |

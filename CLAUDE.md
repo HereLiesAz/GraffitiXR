@@ -112,7 +112,7 @@ Each ARCore tracking frame in `ArRenderer.onDrawFrame`:
 ## Testing Notes
 
 - Unit tests: `src/test/` in each module; run per-module with `:module:testDebugUnitTest`
-- Existing unit test files: `TeleologicalTrackerTest` (`:feature:ar`), `DualAnalyzerTest` (`:feature:ar`), `ProjectManagerTest` (`:core:data`), `EditorViewModelTest` (`:feature:editor`), `ArViewModelTest` (`:feature:ar`)
+- Existing unit test files: `TeleologicalTrackerTest` (`:feature:ar`) (tests currently commented out — to be re-enabled), `DualAnalyzerTest` (`:feature:ar`), `ProjectManagerTest` (`:core:data`), `EditorViewModelTest` (`:feature:editor`), `ArViewModelTest` (`:feature:ar`)
 - Mock patterns:
   - `android.util.Log` → `mockkStatic(Log::class)` + `every { Log.e(any(), any()) } returns 0`
   - `ImageProcessingUtils` → `mockkObject(ImageProcessingUtils)`
