@@ -51,6 +51,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(libs.arcore.client)

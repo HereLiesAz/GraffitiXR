@@ -4,7 +4,8 @@
       "Bash(find:*)",
       "Bash(./gradlew assembleDebug:*)",
       "Bash(./gradlew clean:*)",
-      "Bash(./gradlew:*)"
+      "Bash(./gradlew:*)",
+      "Bash(xargs:*)"
     ]
   }
 }
