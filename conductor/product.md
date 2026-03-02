@@ -13,7 +13,7 @@ The platform serves a diverse range of creators, from professional muralists wor
 - **Seamless Local Storage:** Efficiently manage complex project containers (.gxr) locally, ensuring that all maps, fingerprints, and art assets remain under the artist's control without cloud dependencies.
 
 ## Core Features
-- **AR Mode:** Advanced AR projection using confidence-based voxel mapping and Gaussian Splat rendering for precise digital-to-physical alignment.
+- **AR Mode:** Advanced AR projection using confidence-based voxel mapping and native Gaussian Splat/Point-Cloud rendering for precise digital-to-physical alignment and real-time environmental feedback.
 - **Mockup & Overlay:** In-app tools for pre-visualizing art on photos and performing real-time adjustments to transparency and alignment.
 - **Project Library:** A centralized local management system for .gxr project containers, organizing all environmental data and artistic assets.
 

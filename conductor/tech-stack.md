@@ -16,6 +16,7 @@
 
 ## AR & Computer Vision
 - **ARCore (1.52.0):** Google's platform for building augmented reality experiences, providing pose tracking and environmental understanding.
+- **OpenGL ES 3.0:** Native graphics API used for high-performance rendering of point clouds and surface meshes in the AR viewport.
 - **OpenCV (4.13.0):** Comprehensive computer vision library used for image processing and fingerprinting.
 - **LiteRT (2.1.1):** AI Edge runtime for specialized machine learning tasks (e.g., subject segmentation).
 
