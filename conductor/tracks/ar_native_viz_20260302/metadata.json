@@ -1,0 +1,8 @@
+{
+  "track_id": "ar_native_viz_20260302",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-03-02T14:33:00Z",
+  "updated_at": "2026-03-02T14:33:00Z",
+  "description": "Replace text indicator with native point cloud and surface mesh visualization."
+}
