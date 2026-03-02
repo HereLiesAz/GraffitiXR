@@ -1,6 +1,15 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 #include <mutex>
+#include <vector>
+
+static constexpr size_t MAX_SPLATS = 500000;
+
+struct Splat {
+    float x, y, z;
+    float r, g, b, a;
+    float confidence;
+};
 
 class MobileGS {
 public:
@@ -18,6 +27,7 @@ public:
 
 private:
     bool performPnP(const cv::Mat& grayFrame);
+    void pruneMap();
 
     std::mutex mMutex;
     bool mIsArCoreTracking = false;
@@ -27,4 +37,6 @@ private:
 
     cv::Mat mTargetDescriptors;
     std::vector<cv::KeyPoint> mTargetKeypoints;
+
+    std::vector<Splat> splatData;
 };

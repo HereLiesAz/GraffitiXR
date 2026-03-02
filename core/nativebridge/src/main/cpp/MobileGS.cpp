@@ -1,4 +1,5 @@
 #include "MobileGS.h"
+#include <algorithm>
 #include <android/log.h>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
@@ -17,6 +18,21 @@ bool MobileGS::isTracking() const {
     return mIsArCoreTracking;
 }
 
+void MobileGS::pruneMap() {
+    if (splatData.size() < MAX_SPLATS) return;
+
+    const size_t evictCount = MAX_SPLATS / 10;  // evict bottom 10% by confidence
+
+    std::partial_sort(splatData.begin(),
+                      splatData.begin() + evictCount,
+                      splatData.end(),
+                      [](const Splat& a, const Splat& b) {
+                          return a.confidence < b.confidence;
+                      });
+
+    splatData.erase(splatData.begin(), splatData.begin() + evictCount);
+}
+
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mIsArCoreTracking) return;
@@ -24,6 +40,13 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     // ARCore is tracking. We only use this cycle to update the Gaussian
     // Splat voxels with hardware depth. PnP is completely bypassed.
     // updateVoxels(depth, color);
+    //
+    // Example insertion path (wired for pruning):
+    // Splat s = buildSplat(depth, color);
+    // splatData.push_back(s);
+    // if (splatData.size() >= MAX_SPLATS) {
+    //     pruneMap();
+    // }
 }
 
 void MobileGS::attemptRelocalization(const cv::Mat& colorFrame) {
