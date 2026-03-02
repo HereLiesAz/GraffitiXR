@@ -1,8 +1,8 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import android.content.Context
-import android.hardware.camera2.CameraManager
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import android.graphics.Bitmap
+import androidx.compose.ui.geometry.Offset
+import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.every
 import io.mockk.mockk
@@ -15,28 +15,25 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.nio.ByteBuffer
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
-    private val projectRepository: ProjectRepository = mockk(relaxed = true)
-    private val context: Context = mockk(relaxed = true)
-    private val cameraManager: CameraManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        every { context.getSystemService(Context.CAMERA_SERVICE) } returns cameraManager
-        every { cameraManager.cameraIdList } returns arrayOf("0")
-        viewModel = ArViewModel(slamManager, projectRepository, context)
+        viewModel = ArViewModel(slamManager)
     }
 
     @After
@@ -49,6 +46,8 @@ class ArViewModelTest {
         val state = viewModel.uiState.first()
         assertFalse(state.isScanning)
         assertFalse(state.isFlashlightOn)
+        assertEquals("Initializing", state.trackingState)
+        assertEquals(0, state.pointCloudCount)
     }
 
     @Test
@@ -56,28 +55,130 @@ class ArViewModelTest {
         assertFalse(viewModel.uiState.value.isFlashlightOn)
         viewModel.toggleFlashlight()
         assertTrue(viewModel.uiState.value.isFlashlightOn)
+        viewModel.toggleFlashlight()
+        assertFalse(viewModel.uiState.value.isFlashlightOn)
     }
 
     @Test
-    fun `initEngine calls slamManager`() = runTest {
-        viewModel.initEngine()
-        verify { slamManager.initialize() }
+    fun `updateTrackingState with TRACKING sets correct state`() = runTest {
+        viewModel.updateTrackingState(TrackingState.TRACKING, 100)
+
+        val state = viewModel.uiState.value
+        assertEquals("Tracking", state.trackingState)
+        assertEquals(100, state.pointCloudCount)
+        assertTrue(state.isScanning)
     }
 
     @Test
-    fun `captureKeyframe calls slamManager`() = runTest {
-        io.mockk.every { context.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir")!!)
-        io.mockk.every { slamManager.saveKeyframe(any(), any()) } returns true
-        viewModel.captureKeyframe()
-        verify { slamManager.saveKeyframe(any(), any()) }
+    fun `updateTrackingState with PAUSED sets correct state`() = runTest {
+        viewModel.updateTrackingState(TrackingState.PAUSED, 50)
+
+        val state = viewModel.uiState.value
+        assertEquals("Paused", state.trackingState)
+        assertEquals(50, state.pointCloudCount)
+        assertFalse(state.isScanning)
     }
 
     @Test
-    fun `onFrameAvailable calls slamManager`() = runTest {
-        val buffer = ByteBuffer.allocate(0)
-        val w = 640
-        val h = 480
-        viewModel.onFrameAvailable(buffer, w, h)
-        verify { slamManager.feedMonocularData(buffer, w, h) }
+    fun `updateTrackingState with STOPPED sets correct state`() = runTest {
+        viewModel.updateTrackingState(TrackingState.STOPPED, 0)
+
+        val state = viewModel.uiState.value
+        assertEquals("Stopped", state.trackingState)
+        assertEquals(0, state.pointCloudCount)
+        assertFalse(state.isScanning)
+    }
+
+    @Test
+    fun `ensureEngineInitialized calls slamManager`() = runTest {
+        viewModel.ensureEngineInitialized()
+        verify { slamManager.ensureInitialized() }
+    }
+
+    // ==================== Capture Workflow Tests ====================
+
+    @Test
+    fun `setTempCapture stores bitmap in state`() = runTest {
+        val mockBitmap = mockk<Bitmap>(relaxed = true)
+
+        assertNull(viewModel.uiState.value.tempCaptureBitmap)
+        viewModel.setTempCapture(mockBitmap)
+
+        assertEquals(mockBitmap, viewModel.uiState.value.tempCaptureBitmap)
+    }
+
+    @Test
+    fun `onCaptureConsumed clears temp capture`() = runTest {
+        val mockBitmap = mockk<Bitmap>(relaxed = true)
+        viewModel.setTempCapture(mockBitmap)
+        assertNotNull(viewModel.uiState.value.tempCaptureBitmap)
+
+        viewModel.onCaptureConsumed()
+        assertNull(viewModel.uiState.value.tempCaptureBitmap)
+    }
+
+    @Test
+    fun `setUnwarpPoints updates state`() = runTest {
+        val points = listOf(Offset(0f, 0f), Offset(100f, 0f), Offset(100f, 100f), Offset(0f, 100f))
+
+        assertTrue(viewModel.uiState.value.unwarpPoints.isEmpty())
+        viewModel.setUnwarpPoints(points)
+
+        assertEquals(4, viewModel.uiState.value.unwarpPoints.size)
+        assertEquals(points, viewModel.uiState.value.unwarpPoints)
+    }
+
+    @Test
+    fun `setActiveUnwarpPoint updates index`() = runTest {
+        assertEquals(-1, viewModel.uiState.value.activeUnwarpPointIndex)
+
+        viewModel.setActiveUnwarpPoint(2)
+        assertEquals(2, viewModel.uiState.value.activeUnwarpPointIndex)
+    }
+
+    @Test
+    fun `setMagnifierPosition updates position`() = runTest {
+        val position = Offset(150f, 200f)
+
+        assertEquals(Offset.Zero, viewModel.uiState.value.magnifierPosition)
+        viewModel.setMagnifierPosition(position)
+
+        assertEquals(position, viewModel.uiState.value.magnifierPosition)
+    }
+
+    @Test
+    fun `requestCapture sets flag`() = runTest {
+        assertFalse(viewModel.uiState.value.isCaptureRequested)
+
+        viewModel.requestCapture()
+        assertTrue(viewModel.uiState.value.isCaptureRequested)
+    }
+
+    @Test
+    fun `onCaptureRequestHandled clears flag`() = runTest {
+        viewModel.requestCapture()
+        assertTrue(viewModel.uiState.value.isCaptureRequested)
+
+        viewModel.onCaptureRequestHandled()
+        assertFalse(viewModel.uiState.value.isCaptureRequested)
+    }
+
+    // ==================== Session Lifecycle Tests ====================
+
+    @Test
+    fun `resumeArSession sets isSessionResumed`() = runTest {
+        assertFalse(viewModel.isSessionResumed)
+
+        viewModel.resumeArSession()
+        assertTrue(viewModel.isSessionResumed)
+    }
+
+    @Test
+    fun `pauseArSession clears isSessionResumed`() = runTest {
+        viewModel.resumeArSession()
+        assertTrue(viewModel.isSessionResumed)
+
+        viewModel.pauseArSession()
+        assertFalse(viewModel.isSessionResumed)
     }
 }

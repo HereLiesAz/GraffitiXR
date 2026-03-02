@@ -56,16 +56,16 @@ class EditorViewModelTest {
         // Mock static methods for Bitmap and Uri
         mockkStatic(BitmapFactory::class)
         mockkStatic(Uri::class)
-        mockkObject(BitmapUtils)
+        mockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
 
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         every { mockBitmap.width } returns 100
         every { mockBitmap.height } returns 100
         every { BitmapFactory.decodeStream(any()) } returns mockBitmap
 
-        // Mock BitmapUtils so ImageDecoder/BitmapFactory isn't invoked in unit tests
-        coEvery { BitmapUtils.getBitmapDimensions(any(), any()) } returns Pair(100, 100)
-        coEvery { BitmapUtils.getBitmapFromUri(any(), any()) } returns mockBitmap
+        // Mock ImageUtils so ImageDecoder/BitmapFactory isn't invoked in unit tests
+        coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.getBitmapDimensions(any(), any()) } returns Pair(100, 100)
+        coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(any(), any()) } returns mockBitmap
 
         every { Uri.parse(any()) } answers {
             val uriString = it.invocation.args[0] as String
@@ -97,7 +97,7 @@ class EditorViewModelTest {
         Dispatchers.resetMain()
         unmockkStatic(BitmapFactory::class)
         unmockkStatic(Uri::class)
-        unmockkObject(BitmapUtils)
+        unmockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
     }
 
     @Test

@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.model.*
+import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.data.ProjectManager
@@ -57,7 +58,7 @@ class EditorViewModel @Inject constructor(
                         val layersWithBitmaps = layers.map { layer ->
                             val localUri = layer.uri
                             if (localUri != null) {
-                                layer.copy(bitmap = BitmapUtils.getBitmapFromUri(context, localUri))
+                                layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, localUri))
                             } else layer
                         }
                         withContext(dispatchers.main) {
@@ -124,7 +125,7 @@ class EditorViewModel @Inject constructor(
     fun onAddLayer(uri: Uri) {
         pushHistory()
         viewModelScope.launch(dispatchers.io) {
-            val bitmap = BitmapUtils.getBitmapFromUri(context, uri)
+            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
                 val newLayer = Layer(
                     id = UUID.randomUUID().toString(),
@@ -156,7 +157,7 @@ class EditorViewModel @Inject constructor(
     fun setBackgroundImage(uri: Uri) {
         viewModelScope.launch(dispatchers.io) {
             _uiState.update { it.copy(isLoading = true) }
-            val bitmap = BitmapUtils.getBitmapFromUri(context, uri)
+            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             _uiState.update { it.copy(backgroundBitmap = bitmap, isLoading = false) }
         }
     }
@@ -271,11 +272,11 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(dispatchers.default) {
-            val bitmap = BitmapUtils.getBitmapFromUri(context, uri)
+            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
                 val result = backgroundRemover.removeBackground(bitmap)
                 result.onSuccess { fgBitmap ->
-                    val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", BitmapUtils.bitmapToByteArray(fgBitmap))
+                    val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(fgBitmap))
                     updateLayerUri(layerId, Uri.parse("file://$path"))
                 }
                 result.onFailure {
@@ -300,11 +301,11 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch(dispatchers.default) {
-            val bitmap = BitmapUtils.getBitmapFromUri(context, uri)
+            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
                 val resultBitmap = com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(bitmap)
                 if (resultBitmap != null) {
-                    val path = projectRepository.saveArtifact(projectId, "line_art_${System.currentTimeMillis()}.png", BitmapUtils.bitmapToByteArray(resultBitmap))
+                    val path = projectRepository.saveArtifact(projectId, "line_art_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(resultBitmap))
                     updateLayerUri(layerId, Uri.parse("file://$path"))
                 }
             }
@@ -324,7 +325,7 @@ class EditorViewModel @Inject constructor(
 
     private fun updateLayerUri(id: String, uri: Uri) {
         viewModelScope.launch(dispatchers.io) {
-            val bitmap = BitmapUtils.getBitmapFromUri(context, uri)
+            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             withContext(dispatchers.main) {
                 _uiState.update { state ->
                     val updatedLayers = state.layers.map {
