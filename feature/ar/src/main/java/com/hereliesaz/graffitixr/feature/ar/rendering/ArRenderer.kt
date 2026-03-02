@@ -89,6 +89,12 @@ class ArRenderer(
         }
 
         slamManager.draw()
-        onTrackingUpdated(camera.trackingState.name, 0)
+
+        val trackingStateString = when (camera.trackingState) {
+            TrackingState.TRACKING -> "Tracking"
+            TrackingState.PAUSED -> "Paused"
+            TrackingState.STOPPED -> "Stopped"
+        }
+        onTrackingUpdated(trackingStateString, 0)
     }
 }

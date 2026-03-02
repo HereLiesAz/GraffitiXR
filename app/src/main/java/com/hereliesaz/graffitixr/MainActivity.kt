@@ -72,9 +72,8 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[android.Manifest.permission.CAMERA] ?: false
         val hasLocation = p[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-        if (hasLocation) {
-            slamManager.feedLocationData(0.0, 0.0, 0.0)
-        }
+        // TODO: Wire up GPS data to SLAM engine when location-based anchoring is implemented
+        // if (hasLocation) { slamManager.feedLocationData(...) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

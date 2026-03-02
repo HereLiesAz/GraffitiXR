@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
-import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.every
 import io.mockk.mockk
@@ -60,8 +59,8 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `updateTrackingState with TRACKING sets correct state`() = runTest {
-        viewModel.updateTrackingState(TrackingState.TRACKING, 100)
+    fun `updateTrackingState with Tracking sets correct state`() = runTest {
+        viewModel.updateTrackingState("Tracking", 100)
 
         val state = viewModel.uiState.value
         assertEquals("Tracking", state.trackingState)
@@ -70,8 +69,8 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `updateTrackingState with PAUSED sets correct state`() = runTest {
-        viewModel.updateTrackingState(TrackingState.PAUSED, 50)
+    fun `updateTrackingState with Paused sets correct state`() = runTest {
+        viewModel.updateTrackingState("Paused", 50)
 
         val state = viewModel.uiState.value
         assertEquals("Paused", state.trackingState)
@@ -80,8 +79,8 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `updateTrackingState with STOPPED sets correct state`() = runTest {
-        viewModel.updateTrackingState(TrackingState.STOPPED, 0)
+    fun `updateTrackingState with Stopped sets correct state`() = runTest {
+        viewModel.updateTrackingState("Stopped", 0)
 
         val state = viewModel.uiState.value
         assertEquals("Stopped", state.trackingState)

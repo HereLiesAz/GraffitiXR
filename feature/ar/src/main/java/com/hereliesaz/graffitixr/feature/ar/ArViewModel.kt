@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
-import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -41,19 +40,14 @@ class ArViewModel @Inject constructor(
 
     /**
      * Updates the tracking state from ARCore.
-     * Converts the ARCore TrackingState enum to a display string.
+     * The state string is already converted by ArRenderer.
      */
-    fun updateTrackingState(state: TrackingState, pointCount: Int) {
-        val stateString = when (state) {
-            TrackingState.TRACKING -> "Tracking"
-            TrackingState.PAUSED -> "Paused"
-            TrackingState.STOPPED -> "Stopped"
-        }
+    fun updateTrackingState(state: String, pointCount: Int) {
         _uiState.update {
             it.copy(
-                trackingState = stateString,
+                trackingState = state,
                 pointCloudCount = pointCount,
-                isScanning = state == TrackingState.TRACKING
+                isScanning = state == "Tracking"
             )
         }
     }
@@ -98,7 +92,7 @@ class ArViewModel @Inject constructor(
     /**
      * Updates the mask path for target refinement.
      */
-    fun updateMaskPath(path: androidx.compose.ui.graphics.Path) {
+    fun updateMaskPath(path: androidx.compose.ui.graphics.Path?) {
         _uiState.update { it.copy(maskPath = path) }
     }
 
