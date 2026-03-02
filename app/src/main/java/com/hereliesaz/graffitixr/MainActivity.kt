@@ -64,7 +64,6 @@ class MainActivity : ComponentActivity() {
 
     var use3dBackground by mutableStateOf(false)
     var showSaveDialog by mutableStateOf(false)
-    var showInfoScreen by mutableStateOf(false)
     var showLibrary by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
@@ -154,7 +153,7 @@ class MainActivity : ComponentActivity() {
                     if (isRailVisible) {
                         configureRail(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
-                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState
+                            overlayImagePicker, backgroundImagePicker, editorUiState
                         )
                     }
 
@@ -293,8 +292,7 @@ class MainActivity : ComponentActivity() {
         dashboardViewModel: DashboardViewModel,
         overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
-        editorUiState: EditorUiState,
-        arUiState: ArUiState
+        editorUiState: EditorUiState
     ) {
         val navStrings = NavStrings()
         val activeHighlightColor = when (editorUiState.activeRotationAxis) {
@@ -305,7 +303,7 @@ class MainActivity : ComponentActivity() {
 
         azTheme(activeColor = activeHighlightColor, defaultShape = AzButtonShape.RECTANGLE, headerIconShape = AzHeaderIconShape.ROUNDED)
         azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
-        azAdvanced(infoScreen = showInfoScreen, onDismissInfoScreen = { showInfoScreen = false })
+        azAdvanced(helpEnabled = true)
 
         val requestPermissions = {
             permissionLauncher.launch(
@@ -384,18 +382,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // History actions — shown whenever there are layers to act on.
-        if (editorUiState.layers.isNotEmpty()) {
-            azDivider()
-            val undoLabel = if (editorUiState.undoCount > 0) "Undo (${editorUiState.undoCount})" else "Undo"
-            val redoLabel = if (editorUiState.redoCount > 0) "Redo (${editorUiState.redoCount})" else "Redo"
-            azRailItem(id = "undo", text = undoLabel) { editorViewModel.onUndoClicked() }
-            azRailItem(id = "redo", text = redoLabel) { editorViewModel.onRedoClicked() }
-            if (editorUiState.editorMode == EditorMode.AR) {
-                azRailItem(id = "magic", text = "Align") { editorViewModel.onMagicClicked() }
-            }
-        }
-
         azDivider()
 
         azRailHostItem(id = "project_host", text = navStrings.project)
@@ -406,7 +392,7 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        azRailItem(id = "help", text = "Help") { showInfoScreen = true }
+        azHelpRailItem(id = "help", text = "Help")
         if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
             azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
         }
@@ -414,14 +400,5 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
         }
 
-        // AR tracking state — read-only colour indicator showing SLAM status.
-        if (editorUiState.editorMode == EditorMode.AR) {
-            val trackingColor = when (arUiState.trackingState) {
-                "TRACKING" -> Color(0xFF1B5E20)
-                "PAUSED"   -> Color(0xFFE65100)
-                else       -> Color(0xFF424242)
-            }
-            azRailItem(id = "tracking_state", text = arUiState.trackingState, content = trackingColor) {}
-        }
     }
 }
