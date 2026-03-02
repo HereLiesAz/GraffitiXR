@@ -13,6 +13,7 @@ find_package(OpenCV REQUIRED)
 # --- Shader Compilation ---
 # Locate glslc from the Android NDK's bundled shaderc.
 find_program(GLSLC glslc HINTS
+    "${ANDROID_NDK}/shader-tools/${ANDROID_HOST_TAG}"
     "$ENV{ANDROID_NDK}/shader-tools/${ANDROID_HOST_TAG}"
     "$ENV{ANDROID_NDK_HOME}/shader-tools/${ANDROID_HOST_TAG}"
 )

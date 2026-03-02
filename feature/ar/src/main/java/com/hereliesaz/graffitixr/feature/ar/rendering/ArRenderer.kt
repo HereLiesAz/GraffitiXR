@@ -5,6 +5,7 @@ import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import timber.log.Timber
 import javax.microedition.khronos.egl.EGLConfig
@@ -18,6 +19,8 @@ class ArRenderer(
 ) : GLSurfaceView.Renderer {
 
     @Volatile var session: Session? = null
+    /** Set to true only after session.resume() completes; false after session.pause(). */
+    @Volatile var isSessionResumed: Boolean = false
     private val backgroundRenderer = BackgroundRenderer()
     private var hasSetTextureNames = false
 
@@ -52,6 +55,7 @@ class ArRenderer(
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
         val currentSession = session ?: return
+        if (!isSessionResumed) return
 
         try {
             if (!hasSetTextureNames) {
@@ -112,6 +116,9 @@ class ArRenderer(
                     }
                 } catch (_: Exception) { /* depth not available on this device or frame */ }
             }
+        } catch (_: SessionPausedException) {
+            // Session paused between the isSessionResumed check and update() — skip this frame.
+            isSessionResumed = false
         } catch (e: Exception) {
             Timber.tag("AR_DEBUG").e(e, ">>> [!] CRITICAL EXCEPTION during onDrawFrame")
         }

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.lang.ref.WeakReference
 import java.nio.ByteBuffer
 import javax.inject.Inject
 
@@ -45,6 +46,7 @@ class ArViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     private var arSession: Session? = null
+    private var rendererRef: WeakReference<ArRenderer>? = null
 
     /** Creates the ARCore session once; returns the existing session on subsequent calls. */
     fun initArSession(): Session? {
@@ -68,13 +70,18 @@ class ArViewModel @Inject constructor(
     /** Initialises the ARCore session and assigns it to [renderer]. Safe to call multiple times. */
     fun attachSessionToRenderer(renderer: ArRenderer) {
         renderer.session = initArSession()
+        rendererRef = WeakReference(renderer)
     }
 
     fun resumeArSession() {
-        try { arSession?.resume() } catch (_: Exception) {}
+        try {
+            arSession?.resume()
+            rendererRef?.get()?.isSessionResumed = true
+        } catch (_: Exception) {}
     }
 
     fun pauseArSession() {
+        rendererRef?.get()?.isSessionResumed = false
         try { arSession?.pause() } catch (_: Exception) {}
     }
 
