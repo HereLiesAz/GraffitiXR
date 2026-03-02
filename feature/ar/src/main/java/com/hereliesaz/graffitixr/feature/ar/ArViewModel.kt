@@ -80,14 +80,11 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * Updates the tracking state from ARCore.
+     * Updates the tracking state from ARCore. No-ops if unchanged to avoid frame-rate churn.
      */
     fun setTrackingState(isTracking: Boolean) {
-        _uiState.update {
-            it.copy(
-                isScanning = isTracking
-            )
-        }
+        if (_uiState.value.isScanning == isTracking) return
+        _uiState.update { it.copy(isScanning = isTracking) }
     }
 
     // ==================== Capture Workflow ====================
@@ -149,14 +146,6 @@ class ArViewModel @Inject constructor(
     }
 
     // ==================== Scanning Controls ====================
-
-    fun startScanning() {
-        _uiState.update { it.copy(isScanning = true) }
-    }
-
-    fun stopScanning() {
-        _uiState.update { it.copy(isScanning = false) }
-    }
 
     fun captureKeyframe() {
         // Keyframe capture is handled by the native engine

@@ -28,6 +28,7 @@ class ArRenderer(
     private val viewMatrix = FloatArray(16)
     private val projMatrix = FloatArray(16)
     private var cameraTextureNameSet = false
+    private var frameCount = 0
 
     fun attachSession(session: Session?) {
         this.session = session
@@ -72,6 +73,10 @@ class ArRenderer(
         val isTracking = camera.trackingState == TrackingState.TRACKING
         slamManager.setArCoreTrackingState(isTracking)
 
+        // Throttle the expensive Kotlin YUV→RGBA conversion to ~20fps.
+        // At 60fps this loop consumes ~100% CPU and causes ANRs.
+        val shouldFeedColorFrame = (frameCount++ % 3 == 0)
+
         if (isTracking) {
             camera.getViewMatrix(viewMatrix, 0)
             camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
@@ -83,16 +88,18 @@ class ArRenderer(
                 slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)
                 depthImage.close()
 
-                val cameraImage = frame.acquireCameraImage()
-                val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
-                slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
-                cameraImage.close()
+                if (shouldFeedColorFrame) {
+                    val cameraImage = frame.acquireCameraImage()
+                    val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
+                    slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
+                    cameraImage.close()
+                }
             } catch (e: NotYetAvailableException) {
                 // Wait for hardware to catch up.
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        } else {
+        } else if (shouldFeedColorFrame) {
             try {
                 val cameraImage = frame.acquireCameraImage()
                 val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
@@ -105,6 +112,6 @@ class ArRenderer(
 
         slamManager.draw()
 
-        onTrackingUpdated(camera.trackingState == TrackingState.TRACKING)
+        onTrackingUpdated(isTracking)
     }
 }

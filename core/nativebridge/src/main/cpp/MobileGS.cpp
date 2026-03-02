@@ -115,35 +115,54 @@ void MobileGS::pruneMap() {
     splatData.erase(splatData.begin(), splatData.begin() + evictCount);
 }
 
+// Transform a camera-space point to world-space using the inverse of the view matrix.
+// V is the 4x4 column-major view matrix (world→camera). V^-1 (camera→world) for a
+// rigid-body transform is: R^T for rotation, -R^T*t for translation.
+static void camToWorld(const float* V, float xc, float yc, float zc,
+                       float& xw, float& yw, float& zw) {
+    // R^T * (P_cam - t), where t = [V[12], V[13], V[14]]
+    float dx = xc - V[12], dy = yc - V[13], dz = zc - V[14];
+    xw = V[0]*dx + V[1]*dy + V[2]*dz;
+    yw = V[4]*dx + V[5]*dy + V[6]*dz;
+    zw = V[8]*dx + V[9]*dy + V[10]*dz;
+}
+
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mIsArCoreTracking || depth.empty()) return;
 
-    // 1. Update Point Cloud
-    int step = 16; 
+    const float* V = mViewMatrix;
+    const float halfW = depth.cols / 2.0f;
+    const float halfH = depth.rows / 2.0f;
+
+    // 1. Update Point Cloud — store in world space so the accumulated map is stable
+    //    as the camera moves. Back-projection uses simplified intrinsics (focal ≈ halfW).
+    int step = 16;
     for (int r = 0; r < depth.rows; r += step) {
         for (int c = 0; c < depth.cols; c += step) {
             float d = depth.at<float>(r, c);
             if (d > 0.1f && d < 5.0f) {
-                float x = (c - depth.cols / 2.0f) / (depth.cols / 2.0f) * d;
-                float y = -(r - depth.rows / 2.0f) / (depth.rows / 2.0f) * d;
-                float z = -d;
+                float xc = (c - halfW) / halfW * d;
+                float yc = -(r - halfH) / halfH * d;
+                float zc = -d;
+
+                float xw, yw, zw;
+                camToWorld(V, xc, yc, zc, xw, yw, zw);
 
                 cv::Vec3b col = color.at<cv::Vec3b>(r, c);
-                splatData.push_back({x, y, z, col[0]/255.0f, col[1]/255.0f, col[2]/255.0f, 1.0f, 1.0f});
+                splatData.push_back({xw, yw, zw, col[0]/255.0f, col[1]/255.0f, col[2]/255.0f, 1.0f, 1.0f});
             }
         }
     }
-    
+
     if (splatData.size() > MAX_SPLATS) pruneMap();
     mPointCount = static_cast<int>(splatData.size());
-    
+
     glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-    // Buffer orphaning to avoid stalls
     glBufferData(GL_ARRAY_BUFFER, MAX_SPLATS * sizeof(Splat), nullptr, GL_DYNAMIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, splatData.size() * sizeof(Splat), splatData.data());
 
-    // 2. Generate Mesh
+    // 2. Generate Mesh — also in world space
     std::vector<float> meshVertices;
     int mStep = 32;
     for (int r = 0; r < depth.rows - mStep; r += mStep) {
@@ -154,10 +173,15 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
 
             if (d1 > 0.1f && d2 > 0.1f && d3 > 0.1f) {
                 auto addVertex = [&](int row, int col, float dist) {
-                    meshVertices.push_back((col - depth.cols / 2.0f) / (depth.cols / 2.0f) * dist);
-                    meshVertices.push_back(-(row - depth.rows / 2.0f) / (depth.rows / 2.0f) * dist);
-                    meshVertices.push_back(-dist);
-                    meshVertices.push_back(1.0f); meshVertices.push_back(1.0f); 
+                    float xc = (col - halfW) / halfW * dist;
+                    float yc = -(row - halfH) / halfH * dist;
+                    float zc = -dist;
+                    float xw, yw, zw;
+                    camToWorld(V, xc, yc, zc, xw, yw, zw);
+                    meshVertices.push_back(xw);
+                    meshVertices.push_back(yw);
+                    meshVertices.push_back(zw);
+                    meshVertices.push_back(1.0f); meshVertices.push_back(1.0f);
                     meshVertices.push_back(1.0f); meshVertices.push_back(0.5f);
                 };
 
@@ -169,7 +193,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     }
     mMeshVertexCount = static_cast<int>(meshVertices.size() / 7);
     glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
-    // Buffer orphaning
     glBufferData(GL_ARRAY_BUFFER, (depth.rows * depth.cols / (mStep * mStep)) * 6 * 7 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, meshVertices.size() * sizeof(float), meshVertices.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -217,8 +240,17 @@ void MobileGS::draw() {
 
     glUseProgram(mProgram);
 
+    // MVP = proj * view (column-major). Points are stored in world space.
+    float mvp[16];
+    for (int col = 0; col < 4; col++) {
+        for (int row = 0; row < 4; row++) {
+            float s = 0;
+            for (int k = 0; k < 4; k++) s += mProjMatrix[k*4 + row] * mViewMatrix[col*4 + k];
+            mvp[col*4 + row] = s;
+        }
+    }
     GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
-    glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mProjMatrix); 
+    glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp);
 
     if (mPointCount > 0) {
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
