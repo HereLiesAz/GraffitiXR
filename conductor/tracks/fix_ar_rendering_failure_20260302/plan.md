@@ -18,12 +18,12 @@
     - [x] **CRITICAL:** Run the reproduction test again and confirm it now passes (Green Phase).
 - [x] Task: Conductor - User Manual Verification 'Core Rendering Fix' (Protocol in workflow.md) [bad233de]
 
-## Phase 3: Stability & Resource Management
-- [ ] Task: Refactor initialization logic for improved robustness.
-    - [ ] Implement better error handling and state reporting in the AR renderer.
-    - [ ] Ensure proper resource cleanup (Surface release, Native engine shutdown) when the AR view is paused or destroyed.
-    - [ ] Verify that the reproduction test and all existing `feature:ar` tests pass (Refactor Phase).
-- [ ] Task: Expand test coverage for AR lifecycle transitions.
-    - [ ] Add tests for pausing and resuming AR mode to ensure rendering remains stable.
-    - [ ] Verify code coverage for the fix meets the >80% requirement.
-- [ ] Task: Conductor - User Manual Verification 'Stability & Resource Management' (Protocol in workflow.md)
+## Phase 3: Stability & Resource Management [checkpoint: 55c212e8]
+- [x] Task: Refactor initialization logic for improved robustness. [fd400cdf]
+    - [x] Implement better error handling and state reporting in the AR renderer.
+    - [x] Ensure proper resource cleanup (Surface release, Native engine shutdown) when the AR view is paused or destroyed.
+    - [x] Verify that the reproduction test and all existing `feature:ar` tests pass (Refactor Phase).
+- [x] Task: Expand test coverage for AR lifecycle transitions. [fd400cdf]
+    - [x] Add tests for pausing and resuming AR mode to ensure rendering remains stable.
+    - [x] Verify code coverage for the fix meets the >80% requirement.
+- [x] Task: Conductor - User Manual Verification 'Stability & Resource Management' (Protocol in workflow.md) [55c212e8]
