@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,21 +22,41 @@ class ArViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     private var renderer: ArRenderer? = null
+    var session: Session? = null
+        private set
     var isSessionResumed = false
         private set
 
+    /**
+     * Initializes the ARCore session.
+     */
+    fun initArSession(context: android.content.Context) {
+        if (session == null) {
+            session = Session(context)
+            // Configure the session (e.g., depth API)
+            val config = session!!.config
+            config.depthMode = com.google.ar.core.Config.DepthMode.AUTOMATIC
+            session!!.configure(config)
+            
+            // If renderer is already attached, attach the session to it
+            renderer?.attachSession(session!!)
+        }
+    }
+
     fun attachSessionToRenderer(arRenderer: ArRenderer) {
         this.renderer = arRenderer
+        // If session is already initialized, attach it to the renderer
+        session?.let { arRenderer.attachSession(it) }
     }
 
     fun resumeArSession() {
         isSessionResumed = true
-        renderer?.session?.resume()
+        session?.resume()
     }
 
     fun pauseArSession() {
         isSessionResumed = false
-        renderer?.session?.pause()
+        session?.pause()
     }
 
     /**

@@ -95,6 +95,7 @@ fun ArViewport(
 ) {
     val isImageLocked = activeLayer?.isImageLocked ?: false
     val arUiState by arViewModel.uiState.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // 1. Render Backgrounds (Camera or Mockup)
     if (hasCameraPermission) {
@@ -103,6 +104,7 @@ fun ArViewport(
                 // AR mode: ARCore owns the camera. GLSurfaceView renders the camera feed
                 // via BackgroundRenderer and feeds frames to the SLAM engine.
                 DisposableEffect(Unit) {
+                    arViewModel.initArSession(context)
                     arViewModel.resumeArSession()
                     onDispose { arViewModel.pauseArSession() }
                 }
