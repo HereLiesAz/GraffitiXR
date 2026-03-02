@@ -8,7 +8,7 @@ import android.view.WindowManager
 import com.google.ar.core.Session
 
 class DisplayRotationHelper(private val context: Context) : DisplayManager.DisplayListener {
-    private var viewportChanged = false
+    @Volatile private var viewportChanged = false
     private var viewportWidth = 0
     private var viewportHeight = 0
     private val display: Display? by lazy {
@@ -31,12 +31,14 @@ class DisplayRotationHelper(private val context: Context) : DisplayManager.Displ
         context.getSystemService(DisplayManager::class.java).unregisterDisplayListener(this)
     }
 
+    @Synchronized
     fun onSurfaceChanged(width: Int, height: Int) {
         viewportWidth = width
         viewportHeight = height
         viewportChanged = true
     }
 
+    @Synchronized
     fun updateSessionIfNeeded(session: Session) {
         val localDisplay = display
         if (viewportChanged && localDisplay != null) {

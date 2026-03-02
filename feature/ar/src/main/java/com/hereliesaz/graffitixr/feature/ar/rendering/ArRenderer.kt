@@ -30,9 +30,13 @@ class ArRenderer(
 
     private val viewMatrix = FloatArray(16)
     private val projMatrix = FloatArray(16)
+    private var cameraTextureNameSet = false
 
     fun attachSession(session: Session?) {
         this.session = session
+        // The DisplayListener lifecycle is tied to session attachment, not activity resume/pause.
+        // pauseArSession() leaves the listener registered, which is safe — updateSessionIfNeeded
+        // is a no-op unless the viewport actually changed, and the session re-validates on resume.
         if (session != null) {
             displayRotationHelper.onResume()
         } else {
@@ -44,7 +48,7 @@ class ArRenderer(
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
-        session?.setCameraTextureName(backgroundRenderer.textureId)
+        cameraTextureNameSet = false  // reset so it re-registers on the first frame
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -55,6 +59,12 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         val activeSession = session ?: return
+
+        // Register texture name once per surface (lazy, handles session attaching after surface creation)
+        if (!cameraTextureNameSet) {
+            activeSession.setCameraTextureName(backgroundRenderer.textureId)
+            cameraTextureNameSet = true
+        }
 
         displayRotationHelper.updateSessionIfNeeded(activeSession)
         val frame: Frame = activeSession.update()
