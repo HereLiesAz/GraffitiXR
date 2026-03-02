@@ -3,13 +3,12 @@
 #include <mutex>
 #include <vector>
 
-static constexpr size_t MAX_SPLATS = 500000;
-
 struct Splat {
     float x, y, z;
     float r, g, b, a;
     float confidence;
 };
+static_assert(sizeof(Splat) == 32, "Splat struct layout changed — update .bin serialization.");
 
 class MobileGS {
 public:
