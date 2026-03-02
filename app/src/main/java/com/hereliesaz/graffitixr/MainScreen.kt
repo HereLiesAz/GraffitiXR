@@ -62,7 +62,10 @@ fun MainScreen(
                 uiState = arUiState,
                 captureStep = mainUiState.captureStep,
                 onPhotoCaptured = { arViewModel.setTempCapture(it) },
-                onCaptureConsumed = { viewModel.setCaptureStep(CaptureStep.RECTIFY) },
+                onCaptureConsumed = {
+                    arViewModel.onCaptureConsumed()
+                    viewModel.setCaptureStep(CaptureStep.RECTIFY)
+                },
                 onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) }
             )
         } else {

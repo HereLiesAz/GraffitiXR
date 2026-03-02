@@ -167,4 +167,24 @@ class ArViewModel @Inject constructor(
     fun setUnwarpPoints(points: List<Offset>) {
         _uiState.update { it.copy(unwarpPoints = points) }
     }
+
+    fun requestCapture() {
+        _uiState.update { it.copy(isCaptureRequested = true) }
+    }
+
+    fun onCaptureConsumed() {
+        _uiState.update { it.copy(isCaptureRequested = false) }
+    }
+
+    fun setActiveUnwarpPoint(index: Int) {
+        _uiState.update { it.copy(activeUnwarpPointIndex = index) }
+    }
+
+    fun setMagnifierPosition(position: Offset) {
+        _uiState.update { it.copy(magnifierPosition = position) }
+    }
+
+    fun updateMaskPath(path: androidx.compose.ui.graphics.Path?) {
+        _uiState.update { it.copy(maskPath = path) }
+    }
 }
