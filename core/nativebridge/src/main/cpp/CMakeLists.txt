@@ -55,23 +55,20 @@ if(GLSLC)
     add_dependencies(graffitixr_native compile_shaders)
 endif()
 
-# Include directories
-target_include_directories(graffitixr_native PRIVATE
-    include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/glm
-    ${OpenCV_INCLUDE_DIRS}
+add_library(
+        graffitixr_native
+        SHARED
+        src/main/cpp/GraffitiJNI.cpp
+        src/main/cpp/MobileGS.cpp
+        # VulkanBackend.cpp is GONE
 )
 
-# Link necessary Android, Vulkan, and OpenCV libraries
-find_library(log-lib log)
-find_library(android-lib android)
-find_library(vulkan-lib vulkan)
-find_library(jnigraphics-lib jnigraphics)
-
-target_link_libraries(graffitixr_native
-    ${log-lib}
-    ${android-lib}
-    ${vulkan-lib}
-    ${jnigraphics-lib}
-    ${OpenCV_LIBS}
+# Make sure you are linking GLESv3 and Android log
+target_link_libraries(
+        graffitixr_native
+        ${log-lib}
+        GLESv3
+        EGL
+        android
+        # whatever opencv linking you already have
 )
