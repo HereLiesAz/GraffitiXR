@@ -8,6 +8,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
+import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -25,29 +26,37 @@ class ArRenderer(
     var session: Session? = null
         private set
     private val backgroundRenderer = BackgroundRenderer()
+    private val displayRotationHelper = DisplayRotationHelper(context)
 
     private val viewMatrix = FloatArray(16)
     private val projMatrix = FloatArray(16)
 
     fun attachSession(session: Session?) {
         this.session = session
+        if (session != null) {
+            displayRotationHelper.onResume()
+        } else {
+            displayRotationHelper.onPause()
+        }
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
+        session?.setCameraTextureName(backgroundRenderer.textureId)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES30.glViewport(0, 0, width, height)
+        displayRotationHelper.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         val activeSession = session ?: return
 
-        activeSession.setCameraTextureName(backgroundRenderer.textureId)
+        displayRotationHelper.updateSessionIfNeeded(activeSession)
         val frame: Frame = activeSession.update()
         val camera = frame.camera
 
