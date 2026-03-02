@@ -1,3 +1,4 @@
+
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
@@ -43,6 +44,8 @@ class EditorViewModel @Inject constructor(
     private val undoStack = ArrayDeque<List<Layer>>()
     private val redoStack = ArrayDeque<List<Layer>>()
     private val MAX_STACK_SIZE = 20
+
+    private var copiedLayerState: Layer? = null
 
     init {
         viewModelScope.launch(dispatchers.main) {
@@ -422,6 +425,69 @@ class EditorViewModel @Inject constructor(
     }
     fun onAdjustmentEnd() = _uiState.update { it.copy(gestureInProgress = false) }
 
+    fun setLayerTransform(scale: Float, offset: androidx.compose.ui.geometry.Offset, rx: Float, ry: Float, rz: Float) {
+        updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
+    }
+
+    fun onLayerWarpChanged(layerId: String, mesh: List<Float>) {
+        _uiState.update { state ->
+            state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(warpMesh = mesh) else it })
+        }
+    }
+
+    fun copyLayerModifications(id: String) {
+        copiedLayerState = _uiState.value.layers.find { it.id == id }
+    }
+
+    fun pasteLayerModifications(id: String) {
+        val source = copiedLayerState ?: return
+        pushHistory()
+        _uiState.update { state ->
+            state.copy(layers = state.layers.map {
+                if (it.id == id) {
+                    it.copy(
+                        opacity = source.opacity,
+                        brightness = source.brightness,
+                        contrast = source.contrast,
+                        saturation = source.saturation,
+                        colorBalanceR = source.colorBalanceR,
+                        colorBalanceG = source.colorBalanceG,
+                        colorBalanceB = source.colorBalanceB,
+                        blendMode = source.blendMode,
+                        warpMesh = source.warpMesh
+                    )
+                } else it
+            })
+        }
+        saveProject()
+    }
+
+    fun onCycleBlendMode() {
+        pushHistory()
+        updateActiveLayer { layer ->
+            val domainModes = com.hereliesaz.graffitixr.common.model.BlendMode.values()
+            val currentDomainMode = layer.blendMode.toModelBlendMode()
+            val nextIndex = (domainModes.indexOf(currentDomainMode) + 1) % domainModes.size
+            layer.copy(blendMode = domainModes[nextIndex].toComposeBlendMode())
+        }
+    }
+
+    fun onLayerDuplicated(id: String) {
+        val layer = _uiState.value.layers.find { it.id == id } ?: return
+        pushHistory()
+        val duplicated = layer.copy(id = UUID.randomUUID().toString(), name = "${layer.name} Copy")
+        _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id) }
+        saveProject()
+    }
+
+    fun onLayerRenamed(id: String, name: String) {
+        pushHistory()
+        _uiState.update { state ->
+            state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it })
+        }
+        saveProject()
+    }
+
     // Helper
     private fun updateActiveLayer(transform: (Layer) -> Layer) {
         _uiState.update { state ->
@@ -431,16 +497,9 @@ class EditorViewModel @Inject constructor(
     }
 
     // Stubs for interface compliance if needed
-    fun setLayerTransform(scale: Float, offset: androidx.compose.ui.geometry.Offset, rx: Float, ry: Float, rz: Float) {}
     fun onFeedbackShown() { _uiState.update { it.copy(showRotationAxisFeedback = false) } }
     fun onDoubleTapHintDismissed() {}
     fun onOnboardingComplete(mode: Any) {}
     fun onDrawingPathFinished(path: List<androidx.compose.ui.geometry.Offset>) {}
     fun onColorClicked() = onBalanceClicked()
-    fun onLayerWarpChanged(layerId: String, mesh: List<Float>) {}
-    fun onCycleBlendMode() {}
-    fun onLayerDuplicated(id: String) {}
-    fun copyLayerModifications(id: String) {}
-    fun pasteLayerModifications(id: String) {}
-    fun onLayerRenamed(id: String, name: String) {}
 }

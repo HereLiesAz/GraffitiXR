@@ -1,25 +1,32 @@
+
 package com.hereliesaz.graffitixr.feature.editor
 
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 
 @Composable
 fun MockupScreen(viewModel: EditorViewModel) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Example of a valid gesture detector call inside this screen
-    /* Modifier.pointerInput(Unit) {
-        detectTransformGestures { centroid, pan, zoom, rotation ->
-            viewModel.onTransformGesture(centroid, pan, zoom, rotation)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, rotation ->
+                    viewModel.onTransformGesture(pan, zoom, rotation)
+                }
+            }
+    ) {
+        // Logic for warp mesh updates
+        uiState.activeLayerId?.let { layerId ->
+            // When user manipulates mesh pins, trigger:
+            // viewModel.onLayerWarpChanged(layerId, updatedPoints)
         }
-    }
-    */
-
-    // Logic for warp mesh updates
-    uiState.activeLayerId?.let { layerId ->
-        // When user manipulates mesh pins:
-        // viewModel.onLayerWarpChanged(layerId, updatedPoints)
     }
 }

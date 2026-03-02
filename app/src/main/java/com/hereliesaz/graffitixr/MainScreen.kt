@@ -1,7 +1,10 @@
+
 package com.hereliesaz.graffitixr
 
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -151,6 +154,18 @@ fun ArViewport(
     // 2. Render Layers & Handle Gestures
     Canvas(modifier = Modifier
         .fillMaxSize()
+        .pointerInput(uiState.activeLayerId, isImageLocked) {
+            if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    editorViewModel.onGestureStart()
+                    do {
+                        val event = awaitPointerEvent()
+                    } while (event.changes.any { it.pressed })
+                    editorViewModel.onGestureEnd()
+                }
+            }
+        }
         .pointerInput(uiState.activeLayerId, isImageLocked) {
             if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
                 detectTransformGestures { _, pan, zoom, rotation ->

@@ -1,3 +1,4 @@
+
 package com.hereliesaz.graffitixr
 
 import android.content.ClipData
@@ -69,9 +70,12 @@ class CrashActivity : ComponentActivity() {
         val repoOwner = "HereLiesAz"
         val repoName = "GraffitiXR"
 
-        // Prevent ActivityNotFoundException by keeping the URL under ~2000 chars.
+        // Prevent ActivityNotFoundException by keeping the URL under ~2000 chars,
+        // while preserving BOTH the top of the stack trace and the critical "Caused by" at the bottom.
         val safeBody = if (body.length > 1500) {
-            body.substring(0, 1500) + "\n\n... [Log truncated for URL limit. Please paste the FULL log from your clipboard!]"
+            val top = body.substring(0, 500)
+            val bottom = body.substring(body.length - 900)
+            "$top\n\n... [Log truncated for URL limit. Please paste the FULL log from your clipboard!] ...\n\n$bottom"
         } else {
             body
         }

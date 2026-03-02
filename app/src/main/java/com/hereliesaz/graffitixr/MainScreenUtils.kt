@@ -1,3 +1,4 @@
+
 package com.hereliesaz.graffitixr
 
 import android.content.ContentValues
@@ -20,16 +21,24 @@ fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit)
     val handlerThread = HandlerThread("PixelCopyThread").apply { start() }
     val handler = Handler(handlerThread.looper)
 
+    var requestSubmitted = false
     try {
         PixelCopy.request(window, android.graphics.Rect(0, 0, view.width, view.height), bitmap, { copyResult ->
-            if (copyResult == PixelCopy.SUCCESS) {
-                onCaptured(bitmap)
+            try {
+                if (copyResult == PixelCopy.SUCCESS) {
+                    onCaptured(bitmap)
+                }
+            } finally {
+                handlerThread.quitSafely()
             }
-            handlerThread.quitSafely()
         }, handler)
-    } catch (e: IllegalArgumentException) {
+        requestSubmitted = true
+    } catch (e: Exception) {
         e.printStackTrace()
-        handlerThread.quitSafely()
+    } finally {
+        if (!requestSubmitted) {
+            handlerThread.quitSafely()
+        }
     }
 }
 
