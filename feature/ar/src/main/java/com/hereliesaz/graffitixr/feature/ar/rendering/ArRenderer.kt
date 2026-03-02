@@ -3,30 +3,39 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
+import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.NotYetAvailableException
+import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
+/**
+ * Unified rendering pipeline. Now dictates tracking state to the native engine
+ * to prevent redundant optical-flow and feature matching calculations.
+ */
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
-    private val onTrackingUpdate: (TrackingState, Int) -> Unit
+    private val onTrackingUpdated: (String, Int) -> Unit
 ) : GLSurfaceView.Renderer {
 
-    // Made public to satisfy the ViewModel access requirements
-    var session: Session? = null
-    private val backgroundRenderer = BackgroundRenderer()
-    private val pointCloudRenderer = FeaturePointRenderer()
+    private var session: Session? = null
+    private val backgroundRenderer = BackgroundRenderer(context)
 
-    private val projectionMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
+    private val projMatrix = FloatArray(16)
+
+    fun attachSession(session: Session) {
+        this.session = session
+    }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
-        backgroundRenderer.createOnGlThread(context)
-        pointCloudRenderer.createOnGlThread() // Context parameter removed to match signature
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+        backgroundRenderer.createOnGlThread()
+        slamManager.ensureInitialized()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -35,41 +44,50 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+        val activeSession = session ?: return
 
-        val currentSession = session ?: return
+        activeSession.setCameraTextureName(backgroundRenderer.textureId)
+        val frame: Frame = activeSession.update()
+        val camera = frame.camera
 
-        try {
-            currentSession.setCameraTextureName(backgroundRenderer.textureId)
-            val frame = currentSession.update()
-            val camera = frame.camera
+        backgroundRenderer.draw(frame)
 
-            backgroundRenderer.draw(frame)
+        val isTracking = camera.trackingState == TrackingState.TRACKING
+        slamManager.setArCoreTrackingState(isTracking)
 
-            if (camera.trackingState == TrackingState.TRACKING) {
-                camera.getViewMatrix(viewMatrix, 0)
-                camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
+        if (isTracking) {
+            camera.getViewMatrix(viewMatrix, 0)
+            camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
+            slamManager.updateCamera(viewMatrix, projMatrix)
 
-                val persistentPoints = slamManager.getPersistedPoints()
-                val pointCount = slamManager.nativeGetPersistedPointCount()
+            try {
+                val depthImage = frame.acquireDepthImage16Bits()
+                val depthBuffer = depthImage.planes[0].buffer
+                slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)
+                depthImage.close()
 
-                if (persistentPoints != null && pointCount > 0) {
-                    pointCloudRenderer.update(persistentPoints, pointCount)
-                    pointCloudRenderer.draw(viewMatrix, projectionMatrix)
-                    onTrackingUpdate(camera.trackingState, pointCount)
-                } else {
-                    val arCloud = frame.acquirePointCloud()
-                    onTrackingUpdate(camera.trackingState, arCloud.points.remaining() / 4)
-                    pointCloudRenderer.update(arCloud)
-                    pointCloudRenderer.draw(viewMatrix, projectionMatrix)
-                    arCloud.release()
-                }
+                val cameraImage = frame.acquireCameraImage()
+                val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
+                slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
+                cameraImage.close()
+            } catch (e: NotYetAvailableException) {
+                // Wait for hardware to catch up.
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            // Suppress teardown race conditions
+        } else {
+            // When not tracking, we still feed the color frame so OpenCV can try to relocalize
+            try {
+                val cameraImage = frame.acquireCameraImage()
+                val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
+                slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
+                cameraImage.close()
+            } catch (e: Exception) {
+                // Ignore
+            }
         }
-    }
 
-    fun attachSession(session: Session) {
-        this.session = session
+        slamManager.draw()
+        onTrackingUpdated(camera.trackingState.name, 0)
     }
 }

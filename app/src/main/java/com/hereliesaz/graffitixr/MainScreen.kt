@@ -1,3 +1,4 @@
+
 package com.hereliesaz.graffitixr
 
 import android.opengl.GLSurfaceView
@@ -29,8 +30,13 @@ import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.feature.editor.GsViewer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 
+/**
+ * Main operational screen managing the AR viewport, capture workflows, and the digital canvas.
+ * Stripped of the dual-render pipeline to preserve battery life and eliminate compositor conflicts.
+ */
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -74,6 +80,10 @@ fun MainScreen(
     }
 }
 
+/**
+ * The unified AR rendering viewport. No more surface z-ordering turf wars.
+ * ARCore owns the camera, GLSurfaceView owns the paint.
+ */
 @Composable
 fun ArViewport(
     uiState: EditorUiState,
@@ -108,6 +118,16 @@ fun ArViewport(
                             setEGLContextClientVersion(3)
                             setRenderer(renderer)
                             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Vulkan SLAM overlay on top of the ARCore camera background.
+                AndroidView(
+                    factory = { ctx ->
+                        GsViewer(ctx).apply {
+                            setZOrderMediaOverlay(true)
+                            holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
                         }
                     },
                     modifier = Modifier.fillMaxSize()

@@ -1,77 +1,30 @@
-// ~~~ FILE: ./core/nativebridge/src/main/cpp/include/MobileGS.h ~~~
-#ifndef GRAFFITIXR_MOBILE_GS_H
-#define GRAFFITIXR_MOBILE_GS_H
-
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
-#include <vector>
-#include <string>
+#pragma once
+#include <opencv2/opencv.hpp>
 #include <mutex>
-#include <thread>
-#include <map>
 
-/**
- * Structure representing a single Gaussian Splat point.
- * Matches Vulkan vertex input expectations.
- */
-struct SplatGaussian {
-    float pos[3];
-    float scale[3];
-    float rot[4];
-    float color[4];
-    float opacity;
-    float confidence;
-};
-
-/**
- * Key for voxel-based spatial hashing to prevent redundant splat generation.
- */
-struct VoxelKey {
-    int x, y, z;
-    bool operator<(const VoxelKey& other) const {
-        if (x != other.x) return x < other.x;
-        if (y != other.y) return y < other.y;
-        return z < other.z;
-    }
-};
-
-/**
- * Mobile-optimized Gaussian Splatting engine.
- * Handles real-time point cloud generation from depth data and sorted rendering.
- * Purely mathematical/state-driven. Rendering is delegated to VulkanBackend.
- */
 class MobileGS {
 public:
-    MobileGS();
-    ~MobileGS();
-
     void initialize(int width, int height);
-    void init() { initialize(1920, 1080); } // Legacy wrapper
-    void updateCamera(const float* viewMatrix, const float* projMatrix);
-    void updateAnchorTransform(const float* transformMatrix);
-    void processDepthFrame(const cv::Mat& depthMap, const cv::Mat& colorFrame);
+    void updateCamera(float* viewMat, float* projMat);
+    void updateAnchorTransform(float* transformMat);
+    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color);
 
-    bool saveModel(const std::string& path);
-    bool loadModel(const std::string& path);
+    void setArCoreTrackingState(bool isTracking);
+    bool isTracking() const;
+    void attemptRelocalization(const cv::Mat& colorFrame);
 
-    // Thread-safe access for the Vulkan Renderer
-    std::vector<SplatGaussian>& getSplats();
-    std::mutex& getMutex();
+    void draw();
+    std::mutex& getMutex() { return mMutex; }
 
 private:
-    void sortThreadLoop();
+    bool performPnP(const cv::Mat& grayFrame);
 
-    std::vector<SplatGaussian> mGaussians;
-    std::map<VoxelKey, size_t> mVoxelGrid;
+    std::mutex mMutex;
+    bool mIsArCoreTracking = false;
 
-    float mViewMatrix[16];
-    float mProjMatrix[16];
-    float mAnchorMatrix[16];
+    cv::Ptr<cv::ORB> mFeatureDetector;
+    cv::Ptr<cv::DescriptorMatcher> mMatcher;
 
-    std::mutex mDataMutex;
-    std::thread mSortThread;
-    bool mIsRunning;
-    bool mNeedsResort;
+    cv::Mat mTargetDescriptors;
+    std::vector<cv::KeyPoint> mTargetKeypoints;
 };
-
-#endif // GRAFFITIXR_MOBILE_GS_H
