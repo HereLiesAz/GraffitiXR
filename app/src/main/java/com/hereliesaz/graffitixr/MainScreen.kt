@@ -1,4 +1,3 @@
-
 package com.hereliesaz.graffitixr
 
 import android.opengl.GLSurfaceView
@@ -128,8 +127,8 @@ fun ArViewport(
                 }
                 AndroidView(
                     factory = { ctx ->
-                        val renderer = ArRenderer(ctx, slamManager) { state, count ->
-                            arViewModel.updateTrackingState(state, count)
+                        val renderer = ArRenderer(ctx, slamManager) { isTracking ->
+                            arViewModel.setTrackingState(isTracking)
                         }
                         rendererRef.value = renderer
                         arViewModel.attachSessionToRenderer(renderer)
@@ -206,32 +205,6 @@ fun ArViewport(
                     )
                 }
             }
-        }
-    }
-
-    // AR debug overlay — shows live tracking state for on-device diagnostics.
-    if (uiState.editorMode == EditorMode.AR) {
-        val chipColor = when (arUiState.trackingState) {
-            "TRACKING"     -> Color(0xCC1B5E20)  // dark green
-            "PAUSED"       -> Color(0xCCE65100)  // orange
-            else           -> Color(0xCC424242)  // grey (initializing / stopped)
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 12.dp, start = 12.dp),
-            contentAlignment = Alignment.TopStart
-        ) {
-            Text(
-                text = arUiState.trackingState,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(chipColor)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
         }
     }
 }

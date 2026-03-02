@@ -7,11 +7,11 @@ This plan implements native point cloud and surface mesh rendering in the `Mobil
 
 ### Phase 1: Cleanup & Removal
 **Goal**: Remove the tracking text indicator and delete the standalone Mapping/Surveyor flow.
-- [ ] Task: Remove `TrackingStatusChip` from `MainScreen.kt`.
-- [ ] Task: Delete `feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/MappingActivity.kt` and `MappingScreen.kt`.
-- [ ] Task: Remove `MappingActivity` from `feature/ar/src/main/AndroidManifest.xml`.
-- [ ] Task: Remove "surveyor" intent handling in `MainActivity.kt`.
-- [ ] Task: Update `ArViewModel.kt` to remove unused tracking state update logic.
+- [~] Task: Remove `TrackingStatusChip` from `MainScreen.kt`.
+- [~] Task: Delete `feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/MappingActivity.kt` and `MappingScreen.kt`.
+- [~] Task: Remove `MappingActivity` from `feature/ar/src/main/AndroidManifest.xml`.
+- [~] Task: Remove "surveyor" intent handling in `MainActivity.kt`.
+- [~] Task: Update `ArViewModel.kt` to remove unused tracking state update logic.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Cleanup & Removal' (Protocol in workflow.md)
 
 ### Phase 2: Native Point Cloud Rendering

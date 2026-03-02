@@ -7,11 +7,7 @@ import androidx.compose.ui.graphics.Color
 
 data class ArUiState(
     val isScanning: Boolean = false,
-    val pointCloudCount: Int = 0,
-    val planeCount: Int = 0,
     val isTargetDetected: Boolean = false,
-    val trackingState: String = "Initializing",
-    val showPointCloud: Boolean = true,
     val isFlashlightOn: Boolean = false,
     val tempCaptureBitmap: Bitmap? = null,
     val capturedTargetUris: List<Uri> = emptyList(),

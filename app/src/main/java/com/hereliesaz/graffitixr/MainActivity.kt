@@ -40,7 +40,6 @@ import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
-import com.hereliesaz.graffitixr.feature.ar.MappingActivity
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
@@ -110,7 +109,6 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
                         when (destination) {
-                            "surveyor" -> startActivity(Intent(this@MainActivity, MappingActivity::class.java))
                             "project_library" -> showLibrary = true
                             "settings" -> showSettings = true
                         }
@@ -323,9 +321,6 @@ class MainActivity : ComponentActivity() {
             azRailHostItem(id = "target_host", text = navStrings.grid)
             azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
                 if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
-            }
-            azRailSubItem(id = "surveyor", hostId = "target_host", text = navStrings.surveyor, shape = AzButtonShape.NONE) {
-                if (hasCameraPermission) dashboardViewModel.navigateToSurveyor() else requestPermissions()
             }
             azRailSubItem(id = "key", hostId = "target_host", text = "Keyframe", shape = AzButtonShape.NONE) {
                 arViewModel.captureKeyframe()

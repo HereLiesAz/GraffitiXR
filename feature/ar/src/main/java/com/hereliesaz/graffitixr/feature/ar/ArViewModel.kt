@@ -44,7 +44,7 @@ class ArViewModel @Inject constructor(
                 // If renderer is already attached, attach the session to it
                 renderer?.attachSession(session)
             } catch (e: Exception) {
-                _uiState.update { it.copy(trackingState = "Error: ${e.message}") }
+                Log.e("ArViewModel", "Failed to initialize AR session", e)
             }
         }
     }
@@ -81,14 +81,11 @@ class ArViewModel @Inject constructor(
 
     /**
      * Updates the tracking state from ARCore.
-     * The state string is already converted by ArRenderer.
      */
-    fun updateTrackingState(state: String, pointCount: Int) {
+    fun setTrackingState(isTracking: Boolean) {
         _uiState.update {
             it.copy(
-                trackingState = state,
-                pointCloudCount = pointCount,
-                isScanning = state == "Tracking"
+                isScanning = isTracking
             )
         }
     }

@@ -17,7 +17,7 @@ import javax.microedition.khronos.opengles.GL10
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
-    private val onTrackingUpdated: (String, Int) -> Unit
+    private val onTrackingUpdated: (Boolean) -> Unit
 ) : GLSurfaceView.Renderer {
 
     var session: Session? = null
@@ -105,11 +105,6 @@ class ArRenderer(
 
         slamManager.draw()
 
-        val trackingStateString = when (camera.trackingState) {
-            TrackingState.TRACKING -> "Tracking"
-            TrackingState.PAUSED -> "Paused"
-            TrackingState.STOPPED -> "Stopped"
-        }
-        onTrackingUpdated(trackingStateString, 0)
+        onTrackingUpdated(camera.trackingState == TrackingState.TRACKING)
     }
 }
