@@ -4,7 +4,9 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.util.Log
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -132,13 +134,24 @@ class ArViewModel @Inject constructor(
 
     fun toggleFlashlight() {
         val newState = !_uiState.value.isFlashlightOn
+        // Update state first so OVERLAY mode's LaunchedEffect can drive CameraX torch.
+        _uiState.update { it.copy(isFlashlightOn = newState) }
+        // Also try via CameraManager for AR mode (best-effort; may fail if camera is in use).
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
+            cameraManager.getCameraCharacteristics(id)
+                .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+        }
+        if (cameraId == null) {
+            Log.w("ArViewModel", "toggleFlashlight: no flash-capable camera found")
+            return
+        }
         try {
-            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-            val cameraId = cameraManager.cameraIdList.firstOrNull() ?: return
             cameraManager.setTorchMode(cameraId, newState)
-            _uiState.update { it.copy(isFlashlightOn = newState) }
         } catch (e: Exception) {
-            // Camera unavailable or torch not supported
+            // Expected in AR/OVERLAY modes where ARCore or CameraX owns the camera.
+            // The OVERLAY mode torch is driven via CameraControl in MainScreen.
+            Log.d("ArViewModel", "setTorchMode skipped (camera in use): ${e.message}")
         }
     }
 

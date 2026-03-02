@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.util.Log
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -27,9 +29,25 @@ import kotlin.coroutines.suspendCoroutine
 
 class CameraController {
     internal var onCaptureRequested: (() -> Unit)? = null
+    private var cameraControl: CameraControl? = null
 
     fun takePicture() {
         onCaptureRequested?.invoke()
+    }
+
+    /** Called by CameraPreview once the camera is bound. */
+    internal fun onCameraReady(control: CameraControl) {
+        cameraControl = control
+    }
+
+    /** Called when the camera is unbound (lifecycle stop). */
+    internal fun onCameraReleased() {
+        cameraControl = null
+    }
+
+    /** Enables or disables the camera torch. No-op if camera isn't bound yet. */
+    fun enableTorch(enabled: Boolean) {
+        cameraControl?.enableTorch(enabled)
     }
 }
 
@@ -98,15 +116,20 @@ fun CameraPreview(
 
         try {
             cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
+            val camera: Camera = cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
                 preview,
                 imageCapture
             )
+            controller.onCameraReady(camera.cameraControl)
         } catch(exc: Exception) {
             Log.e("CameraPreview", "Use case binding failed", exc)
         }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        onDispose { controller.onCameraReleased() }
     }
 
     AndroidView(

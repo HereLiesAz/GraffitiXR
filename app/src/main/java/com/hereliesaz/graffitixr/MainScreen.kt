@@ -2,28 +2,19 @@ package com.hereliesaz.graffitixr
 
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -133,8 +124,13 @@ fun ArViewport(
             }
             EditorMode.OVERLAY -> {
                 // Overlay mode: CameraX preview, no ARCore.
+                // Sync flashlight state → CameraX CameraControl (reliable torch when CameraX owns camera).
+                val controller = rememberCameraController()
+                LaunchedEffect(arUiState.isFlashlightOn) {
+                    controller.enableTorch(arUiState.isFlashlightOn)
+                }
                 CameraPreview(
-                    controller = rememberCameraController(),
+                    controller = controller,
                     onPhotoCaptured = {},
                     modifier = Modifier.fillMaxSize()
                 )
@@ -168,7 +164,7 @@ fun ArViewport(
                 withTransform({
                     translate(layer.offset.x, layer.offset.y)
                     scale(layer.scale, layer.scale)
-                    rotate(layer.rotationZ) // Basic Z rotation for 2D canvas fallback
+                    rotate(layer.rotationZ)
                 }) {
                     drawImage(
                         image = bmp.asImageBitmap(),
@@ -177,32 +173,6 @@ fun ArViewport(
                     )
                 }
             }
-        }
-    }
-
-    // AR debug overlay — shows live tracking state for on-device diagnostics.
-    if (uiState.editorMode == EditorMode.AR) {
-        val chipColor = when (arUiState.trackingState) {
-            "TRACKING"     -> Color(0xCC1B5E20)  // dark green
-            "PAUSED"       -> Color(0xCCE65100)  // orange
-            else           -> Color(0xCC424242)  // grey (initializing / stopped)
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 12.dp, start = 12.dp),
-            contentAlignment = Alignment.TopStart
-        ) {
-            Text(
-                text = arUiState.trackingState,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(chipColor)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
         }
     }
 }

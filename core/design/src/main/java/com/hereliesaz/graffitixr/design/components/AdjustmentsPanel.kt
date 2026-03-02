@@ -20,19 +20,14 @@ data class AdjustmentsState(
     val hideUiForCapture: Boolean = false,
     val isTouchLocked: Boolean = false,
     val hasImage: Boolean = false,
-    val isArMode: Boolean = false,
-    val hasHistory: Boolean = false,
-    val undoCount: Int = 0,
-    val redoCount: Int = 0,
     val isRightHanded: Boolean = true,
-    val isCapturingTarget: Boolean = false,
     val activeLayer: OverlayLayer? = null
 )
 
 /**
- * Integrated panel for image adjustments, color balance, and undo/redo controls.
- * This panel handles the visibility of the adjustment knobs and the persistent 
- * action row (Undo, Redo, Magic Wand).
+ * Panel for image adjustments (opacity, brightness, contrast, saturation, color balance).
+ * Only visible when the user explicitly opens Adjust or Balance from the rail.
+ * Undo/Redo/Magic Align live in the rail itself.
  */
 @Composable
 fun AdjustmentsPanel(
@@ -48,36 +43,15 @@ fun AdjustmentsPanel(
     onColorBalanceRChange: (Float) -> Unit,
     onColorBalanceGChange: (Float) -> Unit,
     onColorBalanceBChange: (Float) -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onMagicAlign: () -> Unit,
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Hide entirely during capture or if touch is locked
     if (state.hideUiForCapture || state.isTouchLocked) return
+    if (!showKnobs && !showColorBalance) return
 
-    val hasImage = state.hasImage
-    val isArMode = state.isArMode
-    val hasHistory = state.hasHistory
+    val bottomPadding = if (isLandscape) 16.dp else (screenHeight * 0.0f)
 
-    // The panel should be visible if we are adjusting an image, or if we have an image active,
-    // or if we are in AR mode (to provide access to the Magic Wand for anchoring),
-    // or if there's any history to undo/redo.
-    // HOWEVER, we hide the action row (Undo, Redo, Magic) during Target Creation.
-    val canShowActionRow = !state.isCapturingTarget
-    val isVisible = showKnobs || showColorBalance || (canShowActionRow && (hasImage || isArMode || hasHistory))
-
-    if (!isVisible) return
-
-    // Layout Constants matching the project's UI design system
-    val portraitBottomKeepoutPercentage = 0.0f
-    val landscapeBottomPadding = 16.dp
-    
-    val bottomPadding = if (isLandscape) landscapeBottomPadding else (screenHeight * portraitBottomKeepoutPercentage)
-
-    // Resolve active layer properties
     val activeLayer = state.activeLayer
     val opacity = activeLayer?.opacity ?: 1f
     val brightness = activeLayer?.brightness ?: 0f
@@ -94,9 +68,7 @@ fun AdjustmentsPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Image-specific adjustment knobs
-        // These are only shown if an image is actually present to adjust.
-        if (hasImage) {
+        if (state.hasImage) {
             AnimatedVisibility(
                 visible = showColorBalance,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -134,21 +106,6 @@ fun AdjustmentsPanel(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-        }
-
-        // Persistent Action Row: Undo, Redo, and Magic Wand (Magic Align)
-        // These are visible as long as the panel itself is visible.
-        if (canShowActionRow) {
-            UndoRedoRow(
-                canUndo = true, // Logic handled by ViewModel, but we can pass state if needed
-                canRedo = true, // Logic handled by ViewModel
-                undoCount = state.undoCount,
-                redoCount = state.redoCount,
-                onUndo = onUndo,
-                onRedo = onRedo,
-                onMagicClicked = onMagicAlign,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
