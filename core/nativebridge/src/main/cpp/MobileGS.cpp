@@ -12,25 +12,41 @@ static constexpr size_t MAX_SPLATS = 500000;
 static constexpr float VOXEL_SIZE = 0.02f;           // 20mm
 static constexpr float CONFIDENCE_THRESHOLD = 0.6f;
 
+// Gaussian splat vertex shader.
+// aConfidence (location 2) drives splat radius; perspective division makes closer
+// splats naturally larger. gl_PointSize is clamped to avoid driver-limit overruns.
 static const char* kVertexShader =
     "#version 300 es\n"
     "layout(location = 0) in vec3 aPosition;\n"
     "layout(location = 1) in vec4 aColor;\n"
+    "layout(location = 2) in float aConfidence;\n"
     "uniform mat4 uMvp;\n"
     "out vec4 vColor;\n"
     "void main() {\n"
-    "  gl_Position = uMvp * vec4(aPosition, 1.0);\n"
-    "  gl_PointSize = 4.0;\n"
+    "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
+    "  gl_Position = clip;\n"
+    "  // Perspective-correct size: (base + confidence bonus) / depth\n"
+    "  float sz = (16.0 + 12.0 * aConfidence) / clip.w;\n"
+    "  gl_PointSize = clamp(sz, 2.0, 64.0);\n"
     "  vColor = aColor;\n"
     "}\n";
 
+// Gaussian splat fragment shader.
+// gl_PointCoord is [0,1] across the point sprite. We map it to [-1,1] and apply
+// a Gaussian falloff so each point renders as a soft, feathered ellipse rather
+// than a hard dot. Fragments outside the unit circle are discarded for a clean edge.
+// Blending (additive) in draw() composites overlapping splats correctly.
 static const char* kFragmentShader =
     "#version 300 es\n"
     "precision mediump float;\n"
     "in vec4 vColor;\n"
     "out vec4 oColor;\n"
     "void main() {\n"
-    "  oColor = vColor;\n"
+    "  vec2 d = gl_PointCoord - 0.5;\n"   // centre at origin, range [-0.5, 0.5]
+    "  float r2 = dot(d, d) * 4.0;\n"     // normalise so edge == 1.0
+    "  if (r2 > 1.0) discard;\n"
+    "  float alpha = exp(-4.0 * r2);\n"   // Gaussian: 1.0 at centre, ~0 at edge
+    "  oColor = vec4(vColor.rgb, alpha);\n"
     "}\n";
 
 static GLuint compileShader(GLenum type, const char* source) {
@@ -252,15 +268,31 @@ void MobileGS::draw() {
     GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
     glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp);
 
+    // --- Gaussian splats ---
+    // Additive blending: overlapping splats accumulate intensity without needing
+    // back-to-front sorting. Depth test ON (splats respect scene depth) but depth
+    // writes OFF (splats don't occlude each other or the camera feed).
     if (mPointCount > 0) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glDepthMask(GL_FALSE);
+
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(7 * sizeof(float)));
+
         glDrawArrays(GL_POINTS, 0, mPointCount);
+
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
     }
 
+    // --- Wireframe mesh ---
+    // Rendered opaque on top of the splats so the surface structure stays legible.
     if (mMeshVertexCount > 0) {
         glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
         glEnableVertexAttribArray(0);
@@ -272,5 +304,6 @@ void MobileGS::draw() {
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
+    glDisableVertexAttribArray(2);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
