@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.nativebridge
 
-import android.graphics.Bitmap
 import java.nio.ByteBuffer
 
 /**

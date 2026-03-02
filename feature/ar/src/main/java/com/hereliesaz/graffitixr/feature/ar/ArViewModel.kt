@@ -1,16 +1,17 @@
-
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.graphics.Bitmap
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
+import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.common.model.ArUiState
-import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import java.nio.ByteBuffer
 import javax.inject.Inject
-import dagger.hilt.android.lifecycle.HiltViewModel
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
@@ -22,6 +23,7 @@ class ArViewModel @Inject constructor(
 
     private var renderer: ArRenderer? = null
     var isSessionResumed = false
+        private set
 
     fun attachSessionToRenderer(arRenderer: ArRenderer) {
         this.renderer = arRenderer
@@ -37,27 +39,96 @@ class ArViewModel @Inject constructor(
         renderer?.session?.pause()
     }
 
-    fun updateTrackingState(state: com.google.ar.core.TrackingState, count: Int) {
-        _uiState.update { it.copy(trackingState = state, pointCount = count) }
+    /**
+     * Updates the tracking state from ARCore.
+     * Converts the ARCore TrackingState enum to a display string.
+     */
+    fun updateTrackingState(state: TrackingState, pointCount: Int) {
+        val stateString = when (state) {
+            TrackingState.TRACKING -> "Tracking"
+            TrackingState.PAUSED -> "Paused"
+            TrackingState.STOPPED -> "Stopped"
+        }
+        _uiState.update {
+            it.copy(
+                trackingState = stateString,
+                pointCloudCount = pointCount,
+                isScanning = state == TrackingState.TRACKING
+            )
+        }
     }
 
-    fun feedLocationData(lat: Double, lon: Double, alt: Double, accuracy: Float) {
-        slamManager.feedLocationData(lat, lon, alt, accuracy)
+    // ==================== Capture Workflow ====================
+
+    /**
+     * Stores a captured bitmap for the target creation workflow.
+     */
+    fun setTempCapture(bitmap: Bitmap) {
+        _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
     }
 
-    fun feedMonocularData(buffer: ByteBuffer, width: Int, height: Int) {
-        slamManager.feedMonocularData(buffer, width, height)
+    /**
+     * Clears the temporary capture after it has been processed.
+     */
+    fun onCaptureConsumed() {
+        _uiState.update { it.copy(tempCaptureBitmap = null) }
     }
 
-    fun saveKeyframe() {
-        slamManager.saveKeyframe()
+    /**
+     * Sets the corner points for perspective unwarp.
+     */
+    fun setUnwarpPoints(points: List<Offset>) {
+        _uiState.update { it.copy(unwarpPoints = points) }
     }
 
-    fun initialize() {
-        slamManager.initialize()
+    /**
+     * Sets the active unwarp point being dragged.
+     */
+    fun setActiveUnwarpPoint(index: Int) {
+        _uiState.update { it.copy(activeUnwarpPointIndex = index) }
     }
 
-    fun setTempCapture(bitmap: android.graphics.Bitmap) {}
-    fun onCaptureConsumed() {}
-    fun setUnwarpPoints(points: List<androidx.compose.ui.geometry.Offset>) {}
+    /**
+     * Updates the magnifier position during point adjustment.
+     */
+    fun setMagnifierPosition(position: Offset) {
+        _uiState.update { it.copy(magnifierPosition = position) }
+    }
+
+    /**
+     * Updates the mask path for target refinement.
+     */
+    fun updateMaskPath(path: androidx.compose.ui.graphics.Path) {
+        _uiState.update { it.copy(maskPath = path) }
+    }
+
+    /**
+     * Requests a capture from the camera.
+     */
+    fun requestCapture() {
+        _uiState.update { it.copy(isCaptureRequested = true) }
+    }
+
+    /**
+     * Clears the capture request flag after handling.
+     */
+    fun onCaptureRequestHandled() {
+        _uiState.update { it.copy(isCaptureRequested = false) }
+    }
+
+    // ==================== Flashlight ====================
+
+    fun toggleFlashlight() {
+        _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
+    }
+
+    // ==================== SLAM Engine Delegation ====================
+
+    /**
+     * Ensures the native SLAM engine is initialized.
+     * Called by ArRenderer on surface creation.
+     */
+    fun ensureEngineInitialized() {
+        slamManager.ensureInitialized()
+    }
 }
