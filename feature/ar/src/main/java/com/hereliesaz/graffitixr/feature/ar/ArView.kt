@@ -1,40 +1,36 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import android.graphics.Bitmap
-import android.opengl.GLSurfaceView
+import android.content.Context
+import android.util.AttributeSet
+import android.view.SurfaceView
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengles.GL10
 
-class ArView(
-    private val slamManager: SlamManager
-) : GLSurfaceView.Renderer {
+class ArView @JvmOverloads constructor(
+    context: Context, attrs: AttributeSet? = null
+) : SurfaceView(context, attrs) {
 
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        slamManager.createOnGlThread()
+    private val slamManager = SlamManager()
+
+    fun createOnGlThread() { }
+
+    fun onSurfaceChanged(width: Int, height: Int) {
+        slamManager.resizeVulkanSurface(width, height)
     }
 
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        slamManager.onSurfaceChanged(width, height)
+    fun draw() {
+        slamManager.nativeDraw()
     }
 
-    override fun onDrawFrame(gl: GL10?) {
-        slamManager.draw()
+    fun setBitmap(width: Int, height: Int, pixels: ByteBuffer) {
+        slamManager.nativeSetBitmap(width, height, pixels)
     }
 
-    fun setSourceBitmap(bitmap: Bitmap?) {
-        slamManager.setBitmap(bitmap)
+    fun processTeleologicalFrame(yuvBuffer: ByteBuffer, width: Int, height: Int, stride: Int) {
+        slamManager.processTeleologicalFrame(yuvBuffer, width, height, stride)
     }
 
-    fun processFrame(buffer: ByteBuffer, timestamp: Long, width: Int, height: Int) {
-        slamManager.processTeleologicalFrame(buffer, timestamp, width, height)
-    }
-
-    /**
-     * Should be called when the hosting View or Activity is paused or destroyed.
-     */
-    fun onDestroy() {
+    fun reset() {
         slamManager.reset()
     }
 }
