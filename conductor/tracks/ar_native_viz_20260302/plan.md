@@ -1,16 +1,18 @@
 # Implementation Plan: AR Native Visualization Enhancement
 
 ## Overview
-This plan implements native point cloud and surface mesh rendering in the `MobileGS` engine and removes the placeholder text-based tracking indicator.
+This plan implements native point cloud and surface mesh rendering in the `MobileGS` engine and removes the placeholder text-based tracking indicator and the standalone Mapping/Surveyor flow.
 
 ## Phases
 
-### Phase 1: Cleanup & Preparation
-**Goal**: Remove the text indicator from the UI and prepare `ArRenderer` for the new visualizations.
+### Phase 1: Cleanup & Removal
+**Goal**: Remove the tracking text indicator and delete the standalone Mapping/Surveyor flow.
 - [ ] Task: Remove `TrackingStatusChip` from `MainScreen.kt`.
-- [ ] Task: Remove `trackingState` text update in `ArRenderer.kt`.
-- [ ] Task: Update `ArUiState` to remove `trackingState` (or keep it if needed elsewhere, but don't show it).
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Cleanup & Preparation' (Protocol in workflow.md)
+- [ ] Task: Delete `feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/MappingActivity.kt` and `MappingScreen.kt`.
+- [ ] Task: Remove `MappingActivity` from `feature/ar/src/main/AndroidManifest.xml`.
+- [ ] Task: Remove "surveyor" intent handling in `MainActivity.kt`.
+- [ ] Task: Update `ArViewModel.kt` to remove unused tracking state update logic.
+- [ ] Task: Conductor - User Manual Verification 'Phase 1: Cleanup & Removal' (Protocol in workflow.md)
 
 ### Phase 2: Native Point Cloud Rendering
 **Goal**: Implement GLES rendering for the point cloud (voxels/splats) in the native engine.
