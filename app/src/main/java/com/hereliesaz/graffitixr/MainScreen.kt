@@ -207,4 +207,28 @@ fun ArViewport(
             }
         }
     }
+
+    // AR debug overlay — shows live tracking state for on-device diagnostics.
+    if (uiState.editorMode == EditorMode.AR) {
+        val isTracking = arUiState.isScanning
+        val chipColor = if (isTracking) Color(0xCC1B5E20) else Color(0xCC424242)
+        val trackingLabel = if (isTracking) "TRACKING" else "SEARCHING"
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 12.dp, start = 12.dp),
+            contentAlignment = Alignment.TopStart
+        ) {
+            Text(
+                text = trackingLabel,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(chipColor)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+    }
 }
