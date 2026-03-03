@@ -1,1 +1,151 @@
-package com.hereliesaz.graffitixr.feature.ar.rendering\n\nimport android.content.Context\nimport android.opengl.GLES30\nimport android.opengl.GLSurfaceView\nimport android.util.Log\nimport com.google.ar.core.Config\nimport com.google.ar.core.Frame\nimport com.google.ar.core.Session\nimport com.google.ar.core.TrackingState\nimport com.google.ar.core.exceptions.NotYetAvailableException\nimport com.google.ar.core.exceptions.SessionPausedException\nimport com.hereliesaz.graffitixr.common.util.ImageProcessingUtils\nimport com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper\nimport com.hereliesaz.graffitixr.nativebridge.SlamManager\nimport javax.microedition.khronos.egl.EGLConfig\nimport javax.microedition.khronos.opengles.GL10\n\nclass ArRenderer(\n    private val context: Context,\n    private val slamManager: SlamManager,\n    private val onTrackingUpdated: (Boolean) -> Unit\n) : GLSurfaceView.Renderer {\n\n    var session: Session? = null\n        private set\n    private val backgroundRenderer = BackgroundRenderer()\n    private val displayRotationHelper = DisplayRotationHelper(context)\n\n    private val viewMatrix = FloatArray(16)\n    private val projMatrix = FloatArray(16)\n    private var cameraTextureNameSet = false\n    private var frameCount = 0\n\n    private var pendingFlashlightMode: Boolean? = null\n\n    fun attachSession(session: Session?) {\n        Log.i(\"ArRenderer\", \"attachSession: session is ${if (session != null) \"NOT null\" else \"null\"}\")\n        this.session = session\n        if (session != null) {\n            displayRotationHelper.onResume()\n        } else {\n            displayRotationHelper.onPause()\n        }\n    }\n\n    /**\n     * Queues a flashlight state change to be applied on the GL thread.\n     */\n    fun updateFlashlight(isOn: Boolean) {\n        pendingFlashlightMode = isOn\n    }\n\n    /**\n     * Uses reflection to get the `Config.FlashlightMode` enum value.\n     */\n    private fun getFlashlightModeEnum(isOn: Boolean): Any? {\n        return try {\n            val flashlightModeClass = Class.forName(\"com.google.ar.core.Config\$FlashlightMode\")\n            val fieldName = if (isOn) \"ON\" else \"OFF\"\n            flashlightModeClass.getField(fieldName).get(null)\n        } catch (e: Exception) {\n            Log.e(\"ArRenderer\", \"Failed to get FlashlightMode enum via reflection\", e)\n            null\n        }\n    }\n\n    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {\n        Log.i(\"ArRenderer\", \"onSurfaceCreated\")\n        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f) // Fully transparent background\n        backgroundRenderer.createOnGlThread(context)\n        slamManager.ensureInitialized()\n        slamManager.initGl() // Initialize GL resources for MobileGS\n        cameraTextureNameSet = false\n    }\n\n    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {\n        Log.i(\"ArRenderer\", \"onSurfaceChanged: ${width}x${height}\")\n        GLES30.glViewport(0, 0, width, height)\n        displayRotationHelper.onSurfaceChanged(width, height)\n    }\n\n    override fun onDrawFrame(gl: GL10?) {\n        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)\n\n        val activeSession = session ?: return\n\n        // Apply pending flashlight changes safely on the GL thread.\n        pendingFlashlightMode?.let { isOn ->\n            getFlashlightModeEnum(isOn)?.let { mode ->\n                try {\n                    val config = activeSession.config\n                    val flashlightModeClass = Class.forName(\"com.google.ar.core.Config\$FlashlightMode\")\n                    val method = config.javaClass.getMethod(\"setFlashlightMode\", flashlightModeClass)\n                    method.invoke(config, mode)\n                    activeSession.configure(config)\n                    Log.i(\"ArRenderer\", \"Flashlight mode successfully updated to: ${if (isOn) \"ON\" else \"OFF\"}\")\n                } catch (e: Exception) {\n                    Log.e(\"ArRenderer\", \"Failed to apply flashlight configuration\", e)\n                }\n            }\n            pendingFlashlightMode = null // Consume the request\n        }\n\n        if (!cameraTextureNameSet) {\n            activeSession.setCameraTextureName(backgroundRenderer.textureId)\n            cameraTextureNameSet = true\n        }\n\n        displayRotationHelper.updateSessionIfNeeded(activeSession)\n        val frame: Frame = try {\n            activeSession.update()\n        } catch (e: SessionPausedException) {\n            return // Session is paused, no frame to draw.\n        } catch (e: Exception) {\n            Log.e(\"ArRenderer\", \"Session update failed\", e)\n            return\n        }\n\n        backgroundRenderer.draw(frame)\n        val camera = frame.camera\n        val isTracking = camera.trackingState == TrackingState.TRACKING\n\n        camera.getViewMatrix(viewMatrix, 0)\n        camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)\n        slamManager.setArCoreTrackingState(isTracking)\n        slamManager.updateCamera(viewMatrix, projMatrix)\n\n        // Throttled frame processing\n        if (frameCount++ % 2 == 0) {\n            try {\n                frame.acquireCameraImage().use { image ->\n                    val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)\n                    slamManager.feedColorFrame(rgbaBuffer, image.width, image.height)\n                }\n\n                frame.acquireDepthImage16Bits().use { depthImage ->\n                    val depthBuffer = depthImage.planes[0].buffer\n                    slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)\n                }\n            } catch (e: NotYetAvailableException) {\n                // Expected at the beginning of a session\n            } catch (e: Exception) {\n                Log.e(\"ArRenderer\", \"Error processing frame data\", e)\n            }\n        }\n\n        slamManager.draw()\n        onTrackingUpdated(isTracking)\n    }\n}\n
+package com.hereliesaz.graffitixr.feature.ar.rendering
+
+import android.content.Context
+import android.opengl.GLES30
+import android.opengl.GLSurfaceView
+import android.util.Log
+import com.google.ar.core.Config
+import com.google.ar.core.Frame
+import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
+import com.google.ar.core.exceptions.NotYetAvailableException
+import com.google.ar.core.exceptions.SessionPausedException
+import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
+import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
+
+class ArRenderer(
+    private val context: Context,
+    private val slamManager: SlamManager,
+    private val onTrackingUpdated: (Boolean) -> Unit
+) : GLSurfaceView.Renderer {
+
+    var session: Session? = null
+        private set
+    private val backgroundRenderer = BackgroundRenderer()
+    private val displayRotationHelper = DisplayRotationHelper(context)
+
+    private val viewMatrix = FloatArray(16)
+    private val projMatrix = FloatArray(16)
+    private var cameraTextureNameSet = false
+    private var frameCount = 0
+
+    private var pendingFlashlightMode: Boolean? = null
+
+    fun attachSession(session: Session?) {
+        Log.i("ArRenderer", "attachSession: session is ${if (session != null) "NOT null" else "null"}")
+        this.session = session
+        if (session != null) {
+            displayRotationHelper.onResume()
+        } else {
+            displayRotationHelper.onPause()
+        }
+    }
+
+    /**
+     * Queues a flashlight state change to be applied on the GL thread.
+     */
+    fun updateFlashlight(isOn: Boolean) {
+        pendingFlashlightMode = isOn
+    }
+
+    /**
+     * Uses reflection to get the `Config.FlashlightMode` enum value.
+     */
+    private fun getFlashlightModeEnum(isOn: Boolean): Any? {
+        return try {
+            val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
+            val fieldName = if (isOn) "ON" else "OFF"
+            flashlightModeClass.getField(fieldName).get(null)
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Failed to get FlashlightMode enum via reflection", e)
+            null
+        }
+    }
+
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        Log.i("ArRenderer", "onSurfaceCreated")
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f) // Fully transparent background
+        backgroundRenderer.createOnGlThread(context)
+        slamManager.ensureInitialized()
+        slamManager.initGl() // Initialize GL resources for MobileGS
+        cameraTextureNameSet = false
+    }
+
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        Log.i("ArRenderer", "onSurfaceChanged: ${width}x${height}")
+        GLES30.glViewport(0, 0, width, height)
+        displayRotationHelper.onSurfaceChanged(width, height)
+    }
+
+    override fun onDrawFrame(gl: GL10?) {
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+
+        val activeSession = session ?: return
+
+        // Apply pending flashlight changes safely on the GL thread.
+        pendingFlashlightMode?.let { isOn ->
+            getFlashlightModeEnum(isOn)?.let { mode ->
+                try {
+                    val config = activeSession.config
+                    val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
+                    val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
+                    method.invoke(config, mode)
+                    activeSession.configure(config)
+                    Log.i("ArRenderer", "Flashlight mode successfully updated to: ${if (isOn) "ON" else "OFF"}")
+                } catch (e: Exception) {
+                    Log.e("ArRenderer", "Failed to apply flashlight configuration", e)
+                }
+            }
+            pendingFlashlightMode = null // Consume the request
+        }
+
+        if (!cameraTextureNameSet) {
+            activeSession.setCameraTextureName(backgroundRenderer.textureId)
+            cameraTextureNameSet = true
+        }
+
+        displayRotationHelper.updateSessionIfNeeded(activeSession)
+        val frame: Frame = try {
+            activeSession.update()
+        } catch (e: SessionPausedException) {
+            return // Session is paused, no frame to draw.
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Session update failed", e)
+            return
+        }
+
+        backgroundRenderer.draw(frame)
+        val camera = frame.camera
+        val isTracking = camera.trackingState == TrackingState.TRACKING
+
+        camera.getViewMatrix(viewMatrix, 0)
+        camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
+        slamManager.setArCoreTrackingState(isTracking)
+        slamManager.updateCamera(viewMatrix, projMatrix)
+
+        // Throttled frame processing
+        if (frameCount++ % 2 == 0) {
+            try {
+                frame.acquireCameraImage().use { image ->
+                    val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
+                    slamManager.feedColorFrame(rgbaBuffer, image.width, image.height)
+                }
+
+                frame.acquireDepthImage16Bits().use { depthImage ->
+                    val depthBuffer = depthImage.planes[0].buffer
+                    slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)
+                }
+            } catch (e: NotYetAvailableException) {
+                // Expected at the beginning of a session
+            } catch (e: Exception) {
+                Log.e("ArRenderer", "Error processing frame data", e)
+            }
+        }
+
+        slamManager.draw()
+        onTrackingUpdated(isTracking)
+    }
+}
