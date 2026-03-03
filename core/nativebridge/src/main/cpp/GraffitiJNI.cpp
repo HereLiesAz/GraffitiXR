@@ -33,13 +33,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_ensureInitialized(JNIEnv
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateViewport(JNIEnv* env, jobject thiz, jint width, jint height) {
-    if (gSlamEngine) {
-        gSlamEngine->initialize(width, height);
-    }
-}
-
-JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initGl(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {
         LOGD("Initializing MobileGS GL context");

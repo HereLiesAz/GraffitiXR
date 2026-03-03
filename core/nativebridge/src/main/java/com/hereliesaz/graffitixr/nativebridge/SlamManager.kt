@@ -14,7 +14,6 @@ class SlamManager {
     external fun destroy()
     external fun draw()
 
-    external fun updateViewport(width: Int, height: Int)
     external fun updateCamera(viewMatrix: FloatArray, projMatrix: FloatArray)
     external fun setArCoreTrackingState(isTracking: Boolean)
 
