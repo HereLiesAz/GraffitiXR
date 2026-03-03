@@ -91,9 +91,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     cv::Mat frame(height, width, CV_8UC4, buffer);
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
 
-    if (!gSlamEngine->isTracking()) {
-        gSlamEngine->attemptRelocalization(gLastColorFrame);
-    }
+    // Fix 2: Schedule continuous loop-closure check (runs even when tracking healthy)
+    gSlamEngine->scheduleRelocCheck(gLastColorFrame);
     gFrameCount++;
 }
 

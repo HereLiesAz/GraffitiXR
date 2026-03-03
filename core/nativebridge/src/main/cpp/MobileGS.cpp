@@ -7,6 +7,10 @@
 #include <fstream>
 #include <cmath>
 #include <numeric>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
@@ -83,9 +87,11 @@ void MobileGS::initialize(int width, int height) {
     memset(mViewMatrix, 0, sizeof(mViewMatrix));
     memset(mProjMatrix, 0, sizeof(mProjMatrix));
     memset(mAnchorMatrix, 0, sizeof(mAnchorMatrix));
+    memset(mTargetAnchorMatrix, 0, sizeof(mTargetAnchorMatrix));
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
     mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
     mAnchorMatrix[0] = mAnchorMatrix[5] = mAnchorMatrix[10] = mAnchorMatrix[15] = 1.0f;
+    mTargetAnchorMatrix[0] = mTargetAnchorMatrix[5] = mTargetAnchorMatrix[10] = mTargetAnchorMatrix[15] = 1.0f;
 
     mFrameCounter = 0;
     splatData.reserve(MAX_SPLATS);
@@ -95,6 +101,12 @@ void MobileGS::initialize(int width, int height) {
     if (!mSortRunning) {
         mSortRunning = true;
         mSortThread = std::thread(&MobileGS::sortThreadFunc, this);
+    }
+
+    // Fix 2: Start Background Reloc Thread
+    if (!mRelocRunning) {
+        mRelocRunning = true;
+        mRelocThread = std::thread(&MobileGS::relocThreadFunc, this);
     }
 
     LOGI("MobileGS initialized (CPU side) with %dx%d", width, height);
@@ -114,6 +126,15 @@ void MobileGS::destroy() {
         mSortCv.notify_all();
         if (mSortThread.joinable()) {
             mSortThread.join();
+        }
+    }
+
+    // Fix 2: Stop Reloc Thread cleanly
+    if (mRelocRunning) {
+        mRelocRunning = false;
+        mRelocCv.notify_all();
+        if (mRelocThread.joinable()) {
+            mRelocThread.join();
         }
     }
 
@@ -230,9 +251,225 @@ static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
     nzw = R[2]*nxc + R[5]*nyc + R[8]*nzc;
 }
 
+// ─── Fix 1: Smooth anchor interpolation ──────────────────────────────────────
+// Must be called while holding mMutex (draw() guarantees this).
+void MobileGS::interpolateAnchorStep() {
+    if (!mAnchorInterpolating) return;
+    mInterpolationProgress = std::min(1.0f, mInterpolationProgress + INTERP_STEP);
+    float t = mInterpolationProgress;
+
+    glm::mat4 cur = glm::make_mat4(mAnchorMatrix);
+    glm::mat4 tgt = glm::make_mat4(mTargetAnchorMatrix);
+
+    glm::quat qCur = glm::quat_cast(glm::mat3(cur));
+    glm::quat qTgt = glm::quat_cast(glm::mat3(tgt));
+    glm::vec3 tCur = glm::vec3(cur[3]);
+    glm::vec3 tTgt = glm::vec3(tgt[3]);
+
+    glm::mat4 result = glm::mat4_cast(glm::slerp(qCur, qTgt, t));
+    result[3] = glm::vec4(glm::mix(tCur, tTgt, t), 1.0f);
+    memcpy(mAnchorMatrix, glm::value_ptr(result), 16 * sizeof(float));
+
+    if (t >= 1.0f) mAnchorInterpolating = false;
+}
+
+// ─── Fix 2: Background relocalization / loop-closure thread ──────────────────
+void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
+    {
+        std::lock_guard<std::mutex> lk(mRelocMutex);
+        colorFrame.copyTo(mRelocColorFrame);
+    }
+    // mIsArCoreTracking and mFrameCounter are read without mMutex — acceptable
+    // for this non-critical gating check (both live on the GL thread anyway).
+    bool triggerNow = !mIsArCoreTracking ||
+                      (mFrameCounter - mLastRelocTriggerFrame >= LOOP_CLOSURE_INTERVAL);
+    if (triggerNow) {
+        mLastRelocTriggerFrame = mFrameCounter;
+        mRelocRequested = true;
+        mRelocCv.notify_one();
+    }
+}
+
+void MobileGS::relocThreadFunc() {
+    while (mRelocRunning) {
+        cv::Mat frame;
+        {
+            std::unique_lock<std::mutex> lock(mRelocMutex);
+            mRelocCv.wait(lock, [this] { return mRelocRequested || !mRelocRunning; });
+            if (!mRelocRunning) break;
+            frame = mRelocColorFrame.clone();
+            mRelocRequested = false;
+        }
+        if (!frame.empty()) {
+            runPnPMatch(frame);
+        }
+    }
+}
+
+void MobileGS::runPnPMatch(const cv::Mat& frame) {
+    // Snapshot shared data under lock so PnP computation runs lock-free.
+    cv::Mat targetDesc;
+    std::vector<cv::Point3f> targetPts;
+    float projMat[16], anchorMat[16];
+    int screenW, screenH;
+    bool isTracking;
+    {
+        std::lock_guard<std::mutex> lk(mMutex);
+        if (mTargetDescriptors.empty() || mTargetKeypoints3D.empty()) return;
+        targetDesc = mTargetDescriptors.clone();
+        targetPts  = mTargetKeypoints3D;
+        memcpy(projMat,   mProjMatrix,   16 * sizeof(float));
+        memcpy(anchorMat, mAnchorMatrix, 16 * sizeof(float));
+        screenW    = mScreenWidth;
+        screenH    = mScreenHeight;
+        isTracking = mIsArCoreTracking;
+    }
+
+    cv::Mat gray;
+    cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
+
+    // Use thread-local detector/matcher — not shared with GL thread.
+    auto detector = cv::ORB::create(500);
+    auto matcher  = cv::DescriptorMatcher::create("BruteForce-Hamming");
+
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+    detector->detectAndCompute(gray, cv::noArray(), kps, descs);
+    if (descs.empty()) return;
+
+    std::vector<cv::DMatch> matches;
+    matcher->match(targetDesc, descs, matches);
+
+    std::vector<cv::Point3f> objPts;
+    std::vector<cv::Point2f> imgPts;
+    for (const auto& m : matches) {
+        if (m.distance < 50.0f && m.queryIdx < (int)targetPts.size()) {
+            objPts.push_back(targetPts[m.queryIdx]);
+            imgPts.push_back(kps[m.trainIdx].pt);
+        }
+    }
+
+    if (objPts.size() < 10) return;
+
+    cv::Mat rvec, tvec;
+    float fx   = projMat[0] * screenW / 2.0f;
+    float fy   = projMat[5] * screenH / 2.0f;
+    float cx_p = screenW / 2.0f;
+    float cy_p = screenH / 2.0f;
+
+    cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << fx, 0, cx_p, 0, fy, cy_p, 0, 0, 1);
+    cv::Mat distCoeffs   = cv::Mat::zeros(4, 1, CV_64F);
+
+    bool success = cv::solvePnPRansac(objPts, imgPts, cameraMatrix, distCoeffs, rvec, tvec);
+    if (!success) return;
+
+    cv::Mat R;
+    cv::Rodrigues(rvec, R);
+    cv::Mat T = cv::Mat::eye(4, 4, CV_32F);
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) T.at<float>(i, j) = R.at<double>(i, j);
+        T.at<float>(i, 3) = tvec.at<double>(i, 0);
+    }
+
+    // Only apply correction if drift exceeds threshold OR tracking is lost.
+    float drift = glm::length(
+        glm::vec3(T.at<float>(0, 3), T.at<float>(1, 3), T.at<float>(2, 3)) -
+        glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
+    );
+
+    if (drift > DRIFT_THRESHOLD_M || !isTracking) {
+        std::lock_guard<std::mutex> lk(mMutex);
+        memcpy(mTargetAnchorMatrix, T.data, 16 * sizeof(float));
+        mInterpolationProgress = 0.0f;
+        mAnchorInterpolating   = true;
+    }
+}
+
+// ─── Fix 3: Dynamic fingerprint accumulation ──────────────────────────────────
+// Must be called while holding mMutex (processDepthFrame guarantees this).
+void MobileGS::tryUpdateFingerprint(const cv::Mat& color) {
+    if (mLastDepthFrame.empty() || color.empty()) return;
+
+    cv::Mat gray;
+    cv::cvtColor(color, gray, cv::COLOR_RGB2GRAY);
+
+    std::vector<cv::KeyPoint> allKps;
+    cv::Mat allDescs;
+    mFeatureDetector->detectAndCompute(gray, cv::noArray(), allKps, allDescs);
+    if (allDescs.empty()) return;
+
+    // Peripheral-only sampling: 3x3 grid, skip center cell [1][1]
+    int cellW = gray.cols / 3;
+    int cellH = gray.rows / 3;
+    auto isPeripheral = [&](const cv::KeyPoint& kp) {
+        int col = std::min((int)(kp.pt.x / cellW), 2);
+        int row = std::min((int)(kp.pt.y / cellH), 2);
+        return !(row == 1 && col == 1);
+    };
+
+    const float* V  = mViewMatrix;
+    float fx  = mProjMatrix[0];
+    float fy  = mProjMatrix[5];
+    float px  = mProjMatrix[8];
+    float py  = mProjMatrix[9];
+    float halfW = mLastDepthFrame.cols / 2.0f;
+    float halfH = mLastDepthFrame.rows / 2.0f;
+
+    std::vector<cv::Point3f> newPts;
+    cv::Mat newDescs;
+
+    for (int i = 0; i < (int)allKps.size(); ++i) {
+        const cv::KeyPoint& kp = allKps[i];
+        if (!isPeripheral(kp)) continue;
+
+        int u = (int)kp.pt.x;
+        int v = (int)kp.pt.y;
+        if (u < 0 || u >= mLastDepthFrame.cols || v < 0 || v >= mLastDepthFrame.rows) continue;
+
+        float depth = mLastDepthFrame.at<float>(v, u);
+        if (depth <= 0.0f || depth > 5.0f) continue;
+
+        // Unproject pixel to camera space (same formula as processDepthFrame)
+        float x_ndc = (u - halfW) / halfW;
+        float y_ndc = -(v - halfH) / halfH;
+        float xc = (x_ndc + px) * depth / fx;
+        float yc = (y_ndc + py) * depth / fy;
+        float zc = -depth;
+
+        float xw, yw, zw;
+        camToWorld(V, xc, yc, zc, xw, yw, zw);
+
+        newPts.push_back(cv::Point3f(xw, yw, zw));
+        newDescs.push_back(allDescs.row(i));
+    }
+
+    if (newPts.empty()) return;
+
+    // Append to existing fingerprint
+    mTargetKeypoints3D.insert(mTargetKeypoints3D.end(), newPts.begin(), newPts.end());
+    if (mTargetDescriptors.empty()) {
+        mTargetDescriptors = newDescs.clone();
+    } else {
+        cv::vconcat(mTargetDescriptors, newDescs, mTargetDescriptors);
+    }
+
+    // Trim oldest entries if over the cap
+    if (mTargetKeypoints3D.size() > MAX_FINGERPRINT_KEYPOINTS) {
+        size_t excess = mTargetKeypoints3D.size() - MAX_FINGERPRINT_KEYPOINTS;
+        mTargetKeypoints3D.erase(mTargetKeypoints3D.begin(),
+                                 mTargetKeypoints3D.begin() + excess);
+        mTargetDescriptors = mTargetDescriptors
+                                 .rowRange((int)excess, mTargetDescriptors.rows)
+                                 .clone();
+    }
+}
+
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mIsArCoreTracking || depth.empty() || color.empty() || !mCameraReady) return;
+
+    // Fix 3: Store latest depth frame for dynamic fingerprint updates
+    mLastDepthFrame = depth.clone();
 
     const float* V = mViewMatrix;
     float fx = mProjMatrix[0];
@@ -346,6 +583,14 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
             mSortRequested = true;
         }
         mSortCv.notify_one();
+    }
+
+    // Fix 3: Periodically grow the fingerprint with peripheral keypoints
+    if (mIsArCoreTracking &&
+        mTargetDescriptors.rows > 0 &&
+        (mFrameCounter - mLastFingerprintUpdateFrame) >= FINGERPRINT_UPDATE_INTERVAL) {
+        tryUpdateFingerprint(color);
+        mLastFingerprintUpdateFrame = mFrameCounter;
     }
 }
 
@@ -467,7 +712,10 @@ void MobileGS::attemptRelocalization(const cv::Mat& colorFrame) {
                 }
                 T.at<float>(i, 3) = tvec.at<double>(i, 0);
             }
-            memcpy(mAnchorMatrix, T.data, 16 * sizeof(float));
+            // Fix 1: Smooth interpolation instead of instant teleport
+            memcpy(mTargetAnchorMatrix, T.data, 16 * sizeof(float));
+            mInterpolationProgress = 0.0f;
+            mAnchorInterpolating   = true;
         }
     }
 }
@@ -554,6 +802,7 @@ void MobileGS::loadModel(const std::string& path) {
 
 void MobileGS::draw() {
     std::lock_guard<std::mutex> lock(mMutex);
+    interpolateAnchorStep();  // Fix 1: advance smooth anchor interpolation
     if (!mProgram || !mCameraReady || mPointCount == 0) return;
 
     // Check if sorter thread finished a new batch

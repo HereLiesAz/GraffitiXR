@@ -49,6 +49,9 @@ public:
     void attemptRelocalization(const cv::Mat& colorFrame);
     void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
 
+    // Fix 2: Schedule a background relocalization / loop-closure check
+    void scheduleRelocCheck(const cv::Mat& colorFrame);
+
     // Project Data I/O
     void saveModel(const std::string& path);
     void loadModel(const std::string& path);
@@ -65,6 +68,16 @@ private:
     // Background Sorter Thread
     void sortThreadFunc();
     cv::Point3f getCameraWorldPosition() const;
+
+    // Fix 1: Smooth anchor interpolation (caller must hold mMutex)
+    void interpolateAnchorStep();
+
+    // Fix 2: Background relocalization thread
+    void relocThreadFunc();
+    void runPnPMatch(const cv::Mat& frame);
+
+    // Fix 3: Dynamic fingerprint accumulation (caller must hold mMutex)
+    void tryUpdateFingerprint(const cv::Mat& color);
 
     std::mutex mMutex;
     bool mIsArCoreTracking = false;
@@ -86,6 +99,30 @@ private:
     std::atomic<bool> mSortRequested{false};
     std::vector<uint32_t> mDrawIndices;
     bool mIndicesDirty = false;
+
+    // Fix 1: Smooth anchor interpolation state
+    float mTargetAnchorMatrix[16];
+    bool  mAnchorInterpolating   = false;
+    float mInterpolationProgress = 0.0f;
+    static constexpr int   INTERP_FRAMES = 30;
+    static constexpr float INTERP_STEP   = 1.0f / 30.0f;
+
+    // Fix 2: Background relocalization thread (loop closure)
+    std::thread             mRelocThread;
+    std::mutex              mRelocMutex;
+    std::condition_variable mRelocCv;
+    std::atomic<bool>       mRelocRunning{false};
+    std::atomic<bool>       mRelocRequested{false};
+    cv::Mat                 mRelocColorFrame;
+    uint64_t                mLastRelocTriggerFrame = 0;
+    static constexpr uint64_t LOOP_CLOSURE_INTERVAL = 60;   // ~1 s at 60 fps
+    static constexpr float    DRIFT_THRESHOLD_M     = 0.003f; // 3 mm
+
+    // Fix 3: Dynamic fingerprint accumulation
+    cv::Mat  mLastDepthFrame;
+    uint64_t mLastFingerprintUpdateFrame = 0;
+    static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 300; // ~5 s at 60 fps
+    static constexpr size_t   MAX_FINGERPRINT_KEYPOINTS   = 2000;
 
     // GLES handles
     GLuint mProgram = 0;
