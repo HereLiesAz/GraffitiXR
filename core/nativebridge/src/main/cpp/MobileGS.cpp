@@ -1,4 +1,4 @@
-#include "MobileGS.h"
+#include "include/MobileGS.h"
 #include <algorithm>
 #include <android/log.h>
 #include <cstring>
@@ -8,8 +8,6 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 static constexpr size_t MAX_SPLATS = 500000;
-static constexpr float VOXEL_SIZE = 0.02f;
-static constexpr float CONFIDENCE_THRESHOLD = 0.6f;
 
 static const char* kVertexShader =
     "#version 300 es\n"
@@ -21,7 +19,7 @@ static const char* kVertexShader =
     "void main() {\n"
     "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
     "  gl_Position = clip;\n"
-    "  // Larger splats for diagnostics\n"
+    "  // Larger splats for diagnostics: 100.0 base size adjusted by confidence and distance\n"
     "  float sz = (100.0 + 80.0 * aConfidence) / clip.w;\n"
     "  gl_PointSize = clamp(sz, 5.0, 256.0);\n"
     "  vColor = aColor;\n"
@@ -69,7 +67,14 @@ void MobileGS::initialize(int width, int height) {
     memset(mProjMatrix, 0, sizeof(mProjMatrix));
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
     mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
+    LOGI("MobileGS initialized (CPU side)");
+}
+
+void MobileGS::initGl() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mProgram != 0) return; // Already initialized
     initShaders();
+    LOGI("MobileGS GL initialized");
 }
 
 void MobileGS::destroy() {
@@ -123,29 +128,58 @@ bool MobileGS::isTracking() const { return mIsArCoreTracking; }
 
 static void camToWorld(const float* V, float xc, float yc, float zc,
                        float& xw, float& yw, float& zw) {
-    float dx = xc - V[12], dy = yc - V[13], dz = zc - V[14];
-    xw = V[0]*dx + V[1]*dy + V[2]*dz;
-    yw = V[4]*dx + V[5]*dy + V[6]*dz;
-    zw = V[8]*dx + V[9]*dy + V[10]*dz;
+    // V is column-major World-to-Camera (V)
+    // We want Camera-to-World (V_inv)
+    // For rigid transform V = [R | t], V_inv = [R^T | -R^T * t]
+    float R[9] = { V[0], V[4], V[8], V[1], V[5], V[9], V[2], V[6], V[10] };
+    float t[3] = { V[12], V[13], V[14] };
+
+    // Pw = R^T * (Pc - t)
+    float dx = xc - t[0];
+    float dy = yc - t[1];
+    float dz = zc - t[2];
+
+    xw = R[0]*dx + R[3]*dy + R[6]*dz;
+    yw = R[1]*dx + R[4]*dy + R[7]*dz;
+    zw = R[2]*dx + R[5]*dy + R[8]*dz;
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (!mIsArCoreTracking || depth.empty() || color.empty()) return;
+    if (!mIsArCoreTracking || depth.empty() || color.empty() || !mCameraReady) return;
 
     const float* V = mViewMatrix;
+    // Projection matrix is also column-major
+    // P = [ m[0]  m[4]  m[8]  m[12] ]
+    //     [ m[1]  m[5]  m[9]  m[13] ]
+    //     [ m[2]  m[6]  m[10] m[14] ]
+    //     [ m[3]  m[7]  m[11] m[15] ]
+    float fx = mProjMatrix[0];
+    float fy = mProjMatrix[5];
+    float cx = mProjMatrix[8];
+    float cy = mProjMatrix[9];
+
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
 
     int pointsAdded = 0;
-    int step = 32; // Skip more pixels for performance while diagnosing
+    int step = 16;
     for (int r = 0; r < depth.rows; r += step) {
         for (int c = 0; c < depth.cols; c += step) {
             float d = depth.at<float>(r, c);
-            if (d > 0.1f && d < 4.0f) {
-                float xc = (c - halfW) / halfW * d;
-                float yc = -(r - halfH) / halfH * d;
+            if (d > 0.1f && d < 5.0f) {
+                // Back-project using projection matrix components
+                // x_ndc = (c - halfW)/halfW
+                // y_ndc = -(r - halfH)/halfH
+                float x_ndc = (c - halfW) / halfW;
+                float y_ndc = -(r - halfH) / halfH;
+
+                // xc = (x_ndc + cx) * d / fx
+                // yc = (y_ndc + cy) * d / fy
+                float xc = (x_ndc + cx) * d / fx;
+                float yc = (y_ndc + cy) * d / fy;
                 float zc = -d;
+
                 float xw, yw, zw;
                 camToWorld(V, xc, yc, zc, xw, yw, zw);
 
@@ -156,14 +190,16 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
         }
     }
 
-    if (splatData.size() > MAX_SPLATS) splatData.erase(splatData.begin(), splatData.begin() + 1000);
+    if (splatData.size() > MAX_SPLATS) {
+        splatData.erase(splatData.begin(), splatData.begin() + (splatData.size() - MAX_SPLATS));
+    }
     mPointCount = static_cast<int>(splatData.size());
 
-    if (pointsAdded > 0) {
+    if (mPointVbo != 0 && pointsAdded > 0) {
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
         glBufferSubData(GL_ARRAY_BUFFER, 0, splatData.size() * sizeof(Splat), splatData.data());
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
@@ -186,6 +222,7 @@ void MobileGS::draw() {
     glUseProgram(mProgram);
 
     float mvp[16];
+    // Matrix multiply P * V
     for (int col = 0; col < 4; col++) {
         for (int row = 0; row < 4; row++) {
             float s = 0;
@@ -198,7 +235,7 @@ void MobileGS::draw() {
 
     if (mPointCount > 0) {
         glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(GL_FALSE);
 
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);

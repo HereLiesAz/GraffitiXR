@@ -18,9 +18,17 @@ extern "C" {
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_ensureInitialized(JNIEnv* env, jobject thiz) {
     if (!gSlamEngine) {
-        LOGD("Initializing MobileGS engine");
+        LOGD("Initializing MobileGS engine (CPU)");
         gSlamEngine = new MobileGS();
         gSlamEngine->initialize(1920, 1080);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initGl(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) {
+        LOGD("Initializing MobileGS GL context");
+        gSlamEngine->initGl();
     }
 }
 
@@ -67,6 +75,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
     if (!buffer || !gSlamEngine) return;
 
+    // Direct buffer is RGBA from ImageProcessingUtils.kt
     cv::Mat frame(height, width, CV_8UC4, buffer);
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
 
@@ -86,8 +95,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 
     if (!gSlamEngine) return;
 
-    // Fix: Even if color frame is missing, we shouldn't drop depth entirely if we want to build a map.
-    // However, MobileGS::processDepthFrame needs color for the splats.
     if (gLastColorFrame.empty()) {
         if (gFrameCount % 100 == 0) LOGD("JNI: Dropping depth frame: No color frame yet");
         return;

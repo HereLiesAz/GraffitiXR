@@ -44,9 +44,10 @@ class ArRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Log.i("ArRenderer", "onSurfaceCreated")
-        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f) // Fully transparent background
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
+        slamManager.initGl() // Initialize GL resources for MobileGS
         cameraTextureNameSet = false
     }
 
@@ -57,9 +58,8 @@ class ArRenderer(
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        // Pulse background color slightly to confirm rendering is active
-        val pulse = (sin(frameCount * 0.1) * 0.05 + 0.05).toFloat()
-        GLES30.glClearColor(pulse, pulse, pulse, 1.0f)
+        // Clear with transparent black
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         
         val activeSession = session

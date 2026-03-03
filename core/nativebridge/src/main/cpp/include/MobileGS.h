@@ -14,6 +14,7 @@ static_assert(sizeof(Splat) == 32, "Splat struct layout changed — update .bin 
 class MobileGS {
 public:
     void initialize(int width, int height);
+    void initGl();
     void updateCamera(float* viewMat, float* projMat);
     void updateAnchorTransform(float* transformMat);
     void processDepthFrame(const cv::Mat& depth, const cv::Mat& color);

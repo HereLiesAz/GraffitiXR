@@ -13,6 +13,7 @@ class SlamManager {
     }
 
     external fun ensureInitialized()
+    external fun initGl()
     external fun destroy()
     external fun draw()
 
