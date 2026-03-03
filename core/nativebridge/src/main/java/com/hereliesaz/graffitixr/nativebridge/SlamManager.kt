@@ -15,12 +15,14 @@ class SlamManager {
     external fun draw()
 
     external fun updateViewport(width: Int, height: Int)
-    external fun setViewportSize(width: Int, height: Int)  // Issue 4: lightweight; no engine reinit
     external fun updateCamera(viewMatrix: FloatArray, projMatrix: FloatArray)
     external fun updateAnchorTransform(transform: FloatArray)
     external fun setArCoreTrackingState(isTracking: Boolean)
-    external fun clearMap()                                // Issue 2: reset state between projects
-    external fun setRelocEnabled(enabled: Boolean)         // Issue 3: pause reloc in non-AR modes
+
+    // Wrappers so MockK can intercept these in unit tests (external fun cannot be subclassed)
+    fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
+    fun clearMap() = nativeClearMap()                       // Issue 2: reset state between projects
+    fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled) // Issue 3
 
     fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int) {
         if (depthBuffer.isDirect) {
@@ -47,6 +49,9 @@ class SlamManager {
         nativeSetTargetFingerprint(descriptors, rows, cols, type, points3d)
     }
 
+    private external fun nativeClearMap()
+    private external fun nativeSetViewportSize(width: Int, height: Int)
+    private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int)
     private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int)
     private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int)
