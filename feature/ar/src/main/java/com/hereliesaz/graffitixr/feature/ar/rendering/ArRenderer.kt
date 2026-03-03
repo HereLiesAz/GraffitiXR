@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
+import android.util.Log
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -83,24 +84,28 @@ class ArRenderer(
             slamManager.updateCamera(viewMatrix, projMatrix)
 
             try {
-                val depthImage = frame.acquireDepthImage16Bits()
-                val depthBuffer = depthImage.planes[0].buffer
-                slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)
-                depthImage.close()
-
+                // To avoid the JNI bridge returning early because it hasn't seen a color frame yet,
+                // we'll feed a color frame FIRST if we're doing both this frame.
                 if (shouldFeedColorFrame) {
                     val cameraImage = frame.acquireCameraImage()
                     val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
                     slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
                     cameraImage.close()
                 }
+
+                val depthImage = frame.acquireDepthImage16Bits()
+                val depthBuffer = depthImage.planes[0].buffer
+                slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)
+                depthImage.close()
+
             } catch (e: NotYetAvailableException) {
                 // Normal during ARCore initialization — depth data not yet ready.
+                if (frameCount % 100 == 0) Log.d("ArRenderer", "Depth not yet available...")
             } catch (e: UnsupportedOperationException) {
                 // Depth API not supported on this device / session not configured for depth.
-                android.util.Log.w("ArRenderer", "Depth API unavailable: ${e.message}")
+                Log.w("ArRenderer", "Depth API unavailable: ${e.message}")
             } catch (e: Exception) {
-                android.util.Log.e("ArRenderer", "Depth frame error: ${e.message}")
+                Log.e("ArRenderer", "Depth frame error: ${e.message}")
             }
         } else if (shouldFeedColorFrame) {
             try {
@@ -108,6 +113,7 @@ class ArRenderer(
                 val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
                 slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
                 cameraImage.close()
+                if (frameCount % 100 == 0) Log.d("ArRenderer", "Feeding color frame while not tracking (reloc mode)")
             } catch (e: Exception) {
                 // Ignore
             }

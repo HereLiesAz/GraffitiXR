@@ -5,17 +5,20 @@
 #include "include/MobileGS.h"
 #include "include/StereoProcessor.h"
 
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 MobileGS* gSlamEngine = nullptr;
 StereoProcessor* gStereoProcessor = nullptr;
 cv::Mat gLastColorFrame;
+int gFrameCount = 0;
 
 extern "C" {
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_ensureInitialized(JNIEnv* env, jobject thiz) {
     if (!gSlamEngine) {
+        LOGD("Initializing MobileGS engine");
         gSlamEngine = new MobileGS();
         gSlamEngine->initialize(1920, 1080);
     }
@@ -24,6 +27,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_ensureInitialized(JNIEnv
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroy(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {
+        LOGD("Destroying MobileGS engine");
         delete gSlamEngine;
         gSlamEngine = nullptr;
     }
@@ -68,23 +72,33 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     cv::Mat frame(height, width, CV_8UC4, buffer);
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
 
+    if (gFrameCount % 100 == 0) {
+        LOGD("Received color frame %d: %dx%d", gFrameCount, width, height);
+    }
+
     // If ARCore is lost, pass the frame to attempt relocalization
     if (!gSlamEngine->isTracking()) {
         gSlamEngine->attemptRelocalization(gLastColorFrame);
     }
+    gFrameCount++;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height) {
 
-    if (!gSlamEngine || gLastColorFrame.empty()) return;
+    if (!gSlamEngine) return;
+    if (gLastColorFrame.empty()) {
+        if (gFrameCount % 100 == 0) LOGD("Dropping depth frame: No color frame yet");
+        return;
+    }
 
     auto* rawDepth = static_cast<const uint16_t*>(env->GetDirectBufferAddress(depthBuffer));
     if (!rawDepth) return;
 
     cv::Mat depthMap(height, width, CV_32F, cv::Scalar(0.0f));
 
+    int validPoints = 0;
     for (int r = 0; r < height; r++) {
         for (int c = 0; c < width; c++) {
             uint16_t raw = rawDepth[r * width + c];
@@ -93,8 +107,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 
             if (conf >= 1 && depthMm > 0) {
                 depthMap.at<float>(r, c) = depthMm / 1000.0f;
+                validPoints++;
             }
         }
+    }
+
+    if (gFrameCount % 100 == 0) {
+        LOGD("Processing depth frame: %dx%d, valid points: %d", width, height, validPoints);
     }
 
     if (depthMap.cols != gLastColorFrame.cols || depthMap.rows != gLastColorFrame.rows) {

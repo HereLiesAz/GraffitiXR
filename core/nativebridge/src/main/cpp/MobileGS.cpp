@@ -13,8 +13,6 @@ static constexpr float VOXEL_SIZE = 0.02f;           // 20mm
 static constexpr float CONFIDENCE_THRESHOLD = 0.6f;
 
 // Gaussian splat vertex shader.
-// aConfidence (location 2) drives splat radius; perspective division makes closer
-// splats naturally larger. gl_PointSize is clamped to avoid driver-limit overruns.
 static const char* kVertexShader =
     "#version 300 es\n"
     "layout(location = 0) in vec3 aPosition;\n"
@@ -26,27 +24,23 @@ static const char* kVertexShader =
     "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
     "  gl_Position = clip;\n"
     "  // Perspective-correct size: (base + confidence bonus) / depth\n"
-    "  float sz = (16.0 + 12.0 * aConfidence) / clip.w;\n"
-    "  gl_PointSize = clamp(sz, 2.0, 64.0);\n"
+    "  float sz = (20.0 + 15.0 * aConfidence) / clip.w;\n"
+    "  gl_PointSize = clamp(sz, 2.0, 128.0);\n"
     "  vColor = aColor;\n"
     "}\n";
 
 // Gaussian splat fragment shader.
-// gl_PointCoord is [0,1] across the point sprite. We map it to [-1,1] and apply
-// a Gaussian falloff so each point renders as a soft, feathered ellipse rather
-// than a hard dot. Fragments outside the unit circle are discarded for a clean edge.
-// Blending (additive) in draw() composites overlapping splats correctly.
 static const char* kFragmentShader =
     "#version 300 es\n"
     "precision mediump float;\n"
     "in vec4 vColor;\n"
     "out vec4 oColor;\n"
     "void main() {\n"
-    "  vec2 d = gl_PointCoord - 0.5;\n"   // centre at origin, range [-0.5, 0.5]
-    "  float r2 = dot(d, d) * 4.0;\n"     // normalise so edge == 1.0
+    "  vec2 d = gl_PointCoord - 0.5;\n"
+    "  float r2 = dot(d, d) * 4.0;\n"
     "  if (r2 > 1.0) discard;\n"
-    "  float alpha = exp(-4.0 * r2);\n"   // Gaussian: 1.0 at centre, ~0 at edge
-    "  oColor = vec4(vColor.rgb, alpha);\n"
+    "  float alpha = exp(-4.0 * r2);\n"
+    "  oColor = vec4(vColor.rgb, alpha * vColor.a);\n"
     "}\n";
 
 static GLuint compileShader(GLenum type, const char* source) {
@@ -74,7 +68,7 @@ void MobileGS::initialize(int width, int height) {
     std::lock_guard<std::mutex> lock(mMutex);
     mFeatureDetector = cv::ORB::create(500);
     mMatcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
-    // Zero-init matrices so they're safe to read before the first updateCamera() call.
+    // Zero-init matrices
     memset(mViewMatrix, 0, sizeof(mViewMatrix));
     memset(mProjMatrix, 0, sizeof(mProjMatrix));
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
@@ -130,11 +124,22 @@ void MobileGS::initShaders() {
     LOGI("SLAM shaders linked OK (program %u).", mProgram);
 
     glGenBuffers(1, &mPointVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+    glBufferData(GL_ARRAY_BUFFER, MAX_SPLATS * sizeof(Splat), nullptr, GL_DYNAMIC_DRAW);
+
     glGenBuffers(1, &mMeshVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
+    // Rough estimate for mesh buffer size
+    glBufferData(GL_ARRAY_BUFFER, 1024 * 1024 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void MobileGS::setArCoreTrackingState(bool isTracking) {
     std::lock_guard<std::mutex> lock(mMutex);
+    if (mIsArCoreTracking != isTracking) {
+        LOGI("ARCore Tracking State Changed: %s", isTracking ? "TRACKING" : "LOST");
+    }
     mIsArCoreTracking = isTracking;
 }
 
@@ -157,12 +162,19 @@ void MobileGS::pruneMap() {
     splatData.erase(splatData.begin(), splatData.begin() + evictCount);
 }
 
-// Transform a camera-space point to world-space using the inverse of the view matrix.
-// V is the 4x4 column-major view matrix (world→camera). V^-1 (camera→world) for a
-// rigid-body transform is: R^T for rotation, -R^T*t for translation.
 static void camToWorld(const float* V, float xc, float yc, float zc,
                        float& xw, float& yw, float& zw) {
-    // R^T * (P_cam - t), where t = [V[12], V[13], V[14]]
+    // V is world->camera. We need camera->world (V^-1).
+    // For a rigid transform [R | t], V^-1 = [R^T | -R^T * t]
+    // ARCore view matrix is already provided as world->camera.
+
+    // Extraction of R and t from column-major V:
+    // R is top-left 3x3:
+    // V[0] V[4] V[8]
+    // V[1] V[5] V[9]
+    // V[2] V[6] V[10]
+    // t is V[12], V[13], V[14]
+
     float dx = xc - V[12], dy = yc - V[13], dz = zc - V[14];
     xw = V[0]*dx + V[1]*dy + V[2]*dz;
     yw = V[4]*dx + V[5]*dy + V[6]*dz;
@@ -177,8 +189,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
 
-    // 1. Update Point Cloud — store in world space so the accumulated map is stable
-    //    as the camera moves. Back-projection uses simplified intrinsics (focal ≈ halfW).
+    int pointsAdded = 0;
     int step = 16;
     for (int r = 0; r < depth.rows; r += step) {
         for (int c = 0; c < depth.cols; c += step) {
@@ -193,6 +204,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
 
                 cv::Vec3b col = color.at<cv::Vec3b>(r, c);
                 splatData.push_back({xw, yw, zw, col[0]/255.0f, col[1]/255.0f, col[2]/255.0f, 1.0f, 1.0f});
+                pointsAdded++;
             }
         }
     }
@@ -200,11 +212,12 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     if (splatData.size() > MAX_SPLATS) pruneMap();
     mPointCount = static_cast<int>(splatData.size());
 
-    glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-    glBufferData(GL_ARRAY_BUFFER, MAX_SPLATS * sizeof(Splat), nullptr, GL_DYNAMIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, splatData.size() * sizeof(Splat), splatData.data());
+    if (pointsAdded > 0) {
+        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, splatData.size() * sizeof(Splat), splatData.data());
+    }
 
-    // 2. Generate Mesh — also in world space
+    // 2. Generate Mesh
     std::vector<float> meshVertices;
     int mStep = 32;
     for (int r = 0; r < depth.rows - mStep; r += mStep) {
@@ -223,8 +236,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
                     meshVertices.push_back(xw);
                     meshVertices.push_back(yw);
                     meshVertices.push_back(zw);
-                    meshVertices.push_back(1.0f); meshVertices.push_back(1.0f);
-                    meshVertices.push_back(1.0f); meshVertices.push_back(0.5f);
+                    meshVertices.push_back(0.0f); meshVertices.push_back(1.0f);
+                    meshVertices.push_back(0.0f); meshVertices.push_back(0.3f); // Green wireframe
                 };
 
                 addVertex(r, c, d1); addVertex(r + mStep, c, d2);
@@ -234,9 +247,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
         }
     }
     mMeshVertexCount = static_cast<int>(meshVertices.size() / 7);
-    glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
-    glBufferData(GL_ARRAY_BUFFER, (depth.rows * depth.cols / (mStep * mStep)) * 6 * 7 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, meshVertices.size() * sizeof(float), meshVertices.data());
+    if (mMeshVertexCount > 0) {
+        glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, meshVertices.size() * sizeof(float), meshVertices.data());
+    }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -248,23 +262,13 @@ void MobileGS::attemptRelocalization(const cv::Mat& colorFrame) {
     cv::cvtColor(colorFrame, gray, cv::COLOR_RGB2GRAY);
 
     if (performPnP(gray)) {
-        LOGI("Teleological target re-acquired via OpenCV. Awaiting ARCore handoff.");
+        LOGI("Target re-acquired via OpenCV.");
     }
 }
 
 bool MobileGS::performPnP(const cv::Mat& grayFrame) {
     if (mTargetDescriptors.empty()) return false;
-
-    std::vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
-    mFeatureDetector->detectAndCompute(grayFrame, cv::noArray(), keypoints, descriptors);
-
-    if (descriptors.empty()) return false;
-
-    std::vector<cv::DMatch> matches;
-    mMatcher->match(descriptors, mTargetDescriptors, matches);
-
-    return false;
+    return false; // Placeholder
 }
 
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
@@ -282,9 +286,6 @@ void MobileGS::updateAnchorTransform(float* transformMat) {
 
 void MobileGS::draw() {
     std::lock_guard<std::mutex> lock(mMutex);
-    // Render as soon as we have a valid camera frame — even if tracking is temporarily lost.
-    // mCameraReady is set on the first updateCamera() call; mIsArCoreTracking only gates
-    // data ingestion (processDepthFrame / attemptRelocalization).
     if (!mProgram || !mCameraReady) return;
 
     static int sDrawCount = 0;
@@ -294,10 +295,11 @@ void MobileGS::draw() {
     }
 
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
 
     glUseProgram(mProgram);
 
-    // MVP = proj * view (column-major). Points are stored in world space.
+    // MVP = proj * view
     float mvp[16];
     for (int col = 0; col < 4; col++) {
         for (int row = 0; row < 4; row++) {
@@ -309,10 +311,6 @@ void MobileGS::draw() {
     GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
     glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp);
 
-    // --- Gaussian splats ---
-    // Additive blending: overlapping splats accumulate intensity without needing
-    // back-to-front sorting. Depth test ON (splats respect scene depth) but depth
-    // writes OFF (splats don't occlude each other or the camera feed).
     if (mPointCount > 0) {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE);
@@ -332,8 +330,6 @@ void MobileGS::draw() {
         glDisable(GL_BLEND);
     }
 
-    // --- Wireframe mesh ---
-    // Rendered opaque on top of the splats so the surface structure stays legible.
     if (mMeshVertexCount > 0) {
         glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
         glEnableVertexAttribArray(0);
