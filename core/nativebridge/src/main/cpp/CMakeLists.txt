@@ -17,6 +17,7 @@ add_library(graffitixr SHARED
     GraffitiJNI.cpp
     MobileGS.cpp
     StereoProcessor.cpp
+    SuperPointDetector.cpp
 )
 
 # Include directories
