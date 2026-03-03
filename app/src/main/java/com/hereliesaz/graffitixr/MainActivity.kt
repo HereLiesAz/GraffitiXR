@@ -293,6 +293,7 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
+    @Composable
     private fun AzNavHostScope.configureRail(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -362,7 +363,7 @@ class MainActivity : ComponentActivity() {
                 nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
                 onClick = {
                     editorViewModel.onLayerActivated(layer.id)
-                    // Force the tool to NONE when layer is explicitly tapped.
+                    // Forces the tool to NONE when layer is tapped.
                     // This seamlessly closes the nested tool rail and reactivates 3D transforms.
                     editorViewModel.setActiveTool(Tool.NONE)
                 },
@@ -370,33 +371,36 @@ class MainActivity : ComponentActivity() {
                 nestedContent = {
                     val activate = { editorViewModel.onLayerActivated(layer.id) }
 
-                    // Creates a reusable lambda containing the custom Compose logic for the drag gesture
+                    // Explicitly typed as @Composable () -> Unit to satisfy compiler
                     val addSizeItem: () -> Unit = {
+                        val sizeContent: @Composable () -> Unit = {
+                            val liveState by editorViewModel.uiState.collectAsState()
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        detectVerticalDragGestures { change, dragAmount ->
+                                            change.consume()
+                                            // dragAmount is positive down; user pulls UP to increase size
+                                            val currentSize = editorViewModel.uiState.value.brushSize
+                                            editorViewModel.setBrushSize(currentSize - dragAmount * 0.5f)
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Visual preview of the circle size updates reactively
+                                Box(
+                                    modifier = Modifier
+                                        .size((liveState.brushSize / 2f).coerceIn(4f, 36f).dp)
+                                        .background(Color.White, CircleShape)
+                                )
+                            }
+                        }
+
                         azRailItem(
                             id = "size_${layer.id}",
                             text = "Size",
-                            content = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .pointerInput(Unit) {
-                                            detectVerticalDragGestures { change, dragAmount ->
-                                                change.consume()
-                                                // dragAmount is positive down; user pulls UP to increase size
-                                                val newSize = editorUiState.brushSize - dragAmount * 0.5f
-                                                editorViewModel.setBrushSize(newSize)
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    // Visual preview of the circle size
-                                    Box(
-                                        modifier = Modifier
-                                            .size((editorUiState.brushSize / 2f).coerceIn(4f, 36f).dp)
-                                            .background(Color.White, CircleShape)
-                                    )
-                                }
-                            }
+                            content = sizeContent
                         ) {}
                     }
 
