@@ -1,6 +1,7 @@
 // ~~~ FILE: ./core/nativebridge/src/main/cpp/include/MobileGS.h ~~~
 #pragma once
 #include <opencv2/opencv.hpp>
+#include "SuperPointDetector.h"
 #include <mutex>
 #include <vector>
 #include <unordered_map>
