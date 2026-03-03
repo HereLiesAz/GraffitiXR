@@ -108,15 +108,28 @@ class ArRenderer(
             try {
                 if (shouldFeedColorFrame) {
                     val cameraImage = frame.acquireCameraImage()
-                    val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
-                    slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
-                    cameraImage.close()
+                    try {
+                        val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
+                        slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
+                    } finally {
+                        cameraImage.close()
+                    }
                 }
 
-                val depthImage = frame.acquireDepthImage16Bits()
-                val depthBuffer = depthImage.planes[0].buffer
-                slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)
-                depthImage.close()
+                val depthImage = try {
+                    frame.acquireDepthImage16Bits()
+                } catch (e: NotYetAvailableException) {
+                    null
+                }
+                
+                depthImage?.let { image ->
+                    try {
+                        val depthBuffer = image.planes[0].buffer
+                        slamManager.feedArCoreDepth(depthBuffer, image.width, image.height)
+                    } finally {
+                        image.close()
+                    }
+                }
 
             } catch (e: NotYetAvailableException) {
                 // Normal during ARCore initialization
@@ -128,9 +141,12 @@ class ArRenderer(
         } else if (shouldFeedColorFrame) {
             try {
                 val cameraImage = frame.acquireCameraImage()
-                val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
-                slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
-                cameraImage.close()
+                try {
+                    val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
+                    slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
+                } finally {
+                    cameraImage.close()
+                }
             } catch (e: Exception) { }
         }
 

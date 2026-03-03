@@ -8,10 +8,49 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
+// Global variables
 MobileGS* gSlamEngine = nullptr;
 StereoProcessor* gStereoProcessor = nullptr;
 cv::Mat gLastColorFrame;
 int gFrameCount = 0;
+JavaVM* gJvm = nullptr;
+
+// JNI OnLoad to cache the JVM
+extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved) {
+    gJvm = vm;
+    LOGD("JNI_OnLoad: Cached JavaVM");
+    return JNI_VERSION_1_6;
+}
+
+// Helper function to get JNIEnv for the current thread.
+// Can be called from any C++ code in this shared library.
+// It is the responsibility of the caller to detach the thread if it was attached.
+JNIEnv* attachCurrentThreadAndGetEnv() {
+    JNIEnv* env;
+    if (gJvm == nullptr) {
+        LOGE("Cannot attach thread, gJvm is null");
+        return nullptr;
+    }
+    int getEnvStat = gJvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+    if (getEnvStat == JNI_EDETACHED) {
+        if (gJvm->AttachCurrentThread(&env, NULL) != 0) {
+            LOGE("Failed to attach current thread");
+            return nullptr;
+        }
+        return env;
+    } else if (getEnvStat == JNI_OK) {
+        return env;
+    } else {
+        LOGE("GetEnv failed with error %d", getEnvStat);
+        return nullptr;
+    }
+}
+
+void detachCurrentThread() {
+    if (gJvm != nullptr) {
+        gJvm->DetachCurrentThread();
+    }
+}
 
 extern "C" {
 
@@ -86,8 +125,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 
     if (!gSlamEngine) return;
 
-    // Fix: Even if color frame is missing, we shouldn't drop depth entirely if we want to build a map.
-    // However, MobileGS::processDepthFrame needs color for the splats.
     if (gLastColorFrame.empty()) {
         if (gFrameCount % 100 == 0) LOGD("JNI: Dropping depth frame: No color frame yet");
         return;
@@ -143,4 +180,5 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
         gSlamEngine->processDepthFrame(depthFromStereo, gLastColorFrame);
     }
 }
+
 }
