@@ -1,103 +1,39 @@
 package com.hereliesaz.graffitixr
 
+import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.ArUiState
-import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.EditorUiState
-import com.hereliesaz.graffitixr.common.model.Layer
-import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
-import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.feature.editor.EditorUiState
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import kotlinx.coroutines.coroutineScope
 
-/**
- * Main operational screen managing the AR viewport, capture workflows, and the digital canvas.
- * Stripped of the dual-render pipeline to preserve battery life and eliminate compositor conflicts.
- */
 @Composable
 fun MainScreen(
-    viewModel: MainViewModel,
-    editorViewModel: EditorViewModel,
-    arViewModel: ArViewModel,
-    slamManager: SlamManager,
-    projectRepository: ProjectRepository,
-    onRendererCreated: (ArRenderer) -> Unit,
-    hasCameraPermission: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val uiState by editorViewModel.uiState.collectAsState()
-    val mainUiState by viewModel.uiState.collectAsState()
-    val arUiState by arViewModel.uiState.collectAsState()
-
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        if (mainUiState.isCapturingTarget) {
-            TargetCreationBackground(
-                uiState = arUiState,
-                captureStep = mainUiState.captureStep,
-                onPhotoCaptured = { arViewModel.setTempCapture(it) },
-                onCaptureConsumed = {
-                    arViewModel.onCaptureConsumed()
-                    viewModel.setCaptureStep(CaptureStep.RECTIFY)
-                },
-                onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) }
-            )
-        } else {
-            ArViewport(
-                uiState = uiState,
-                arUiState = arUiState,
-                editorViewModel = editorViewModel,
-                arViewModel = arViewModel,
-                slamManager = slamManager,
-                activeLayer = activeLayer,
-                hasCameraPermission = hasCameraPermission,
-                onRendererCreated = onRendererCreated
-            )
-        }
-    }
-}
-
-/**
- * The unified AR rendering viewport. No more surface z-ordering turf wars.
- * ARCore owns the camera, GLSurfaceView owns the paint.
- */
-@Composable
-fun ArViewport(
     uiState: EditorUiState,
     arUiState: ArUiState,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     slamManager: SlamManager,
-    activeLayer: Layer?,
     hasCameraPermission: Boolean,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
+    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
     val isImageLocked = activeLayer?.isImageLocked ?: false
     val context = androidx.compose.ui.platform.LocalContext.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
@@ -108,7 +44,6 @@ fun ArViewport(
             EditorMode.AR -> {
                 // AR mode: ARCore owns the camera. GLSurfaceView renders the camera feed
                 // via BackgroundRenderer and feeds frames to the SLAM engine.
-                // Key on editorMode so this re-fires when returning to AR from another mode.
                 DisposableEffect(uiState.editorMode) {
                     arViewModel.initArSession(context)
                     arViewModel.resumeArSession()
@@ -128,6 +63,8 @@ fun ArViewport(
                         onRendererCreated(renderer)
                         GLSurfaceView(ctx).apply {
                             setEGLContextClientVersion(3)
+                            setZOrderMediaOverlay(true)
+                            holder.setFormat(PixelFormat.TRANSLUCENT)
                             setRenderer(renderer)
                             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                         }
@@ -136,8 +73,6 @@ fun ArViewport(
                 )
             }
             EditorMode.OVERLAY -> {
-                // Overlay mode: CameraX preview, no ARCore.
-                // Sync flashlight state → CameraX CameraControl (reliable torch when CameraX owns camera).
                 val controller = rememberCameraController()
                 LaunchedEffect(arUiState.isFlashlightOn) {
                     controller.enableTorch(arUiState.isFlashlightOn)
@@ -166,20 +101,10 @@ fun ArViewport(
         .fillMaxSize()
         .pointerInput(uiState.activeLayerId, isImageLocked) {
             if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    editorViewModel.onGestureStart()
-                    do {
-                        val event = awaitPointerEvent()
-                    } while (event.changes.any { it.pressed })
-                    editorViewModel.onGestureEnd()
-                }
-            }
-        }
-        .pointerInput(uiState.activeLayerId, isImageLocked) {
-            if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
-                detectTransformGestures { _, pan, zoom, rotation ->
-                    editorViewModel.onTransformGesture(pan, zoom, rotation)
+                coroutineScope {
+                    detectTransformGestures { _, pan, zoom, rotation ->
+                        editorViewModel.onTransformGesture(pan, zoom, rotation)
+                    }
                 }
             }
         }
@@ -200,5 +125,4 @@ fun ArViewport(
             }
         }
     }
-
 }

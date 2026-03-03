@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.sin
 
 class ArRenderer(
     private val context: Context,
@@ -43,7 +44,7 @@ class ArRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Log.i("ArRenderer", "onSurfaceCreated")
-        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
         cameraTextureNameSet = false
@@ -56,7 +57,11 @@ class ArRenderer(
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        // Pulse background color slightly to confirm rendering is active
+        val pulse = (sin(frameCount * 0.1) * 0.05 + 0.05).toFloat()
+        GLES30.glClearColor(pulse, pulse, pulse, 1.0f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+        
         val activeSession = session
         if (activeSession == null) {
             if (frameCount % 100 == 0) Log.w("ArRenderer", "onDrawFrame: session is null")
@@ -76,23 +81,29 @@ class ArRenderer(
             if (frameCount % 100 == 0) Log.w("ArRenderer", "onDrawFrame: session paused")
             frameCount++
             return
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Session update failed", e)
+            frameCount++
+            return
         }
+        
         val camera = frame.camera
 
+        // 1. Draw Camera Feed
         backgroundRenderer.draw(frame)
 
         val isTracking = camera.trackingState == TrackingState.TRACKING
         slamManager.setArCoreTrackingState(isTracking)
 
-        // Always update camera matrices so the engine knows the view/proj
+        // Always update camera matrices
         camera.getViewMatrix(viewMatrix, 0)
         camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
         slamManager.updateCamera(viewMatrix, projMatrix)
 
-        // Throttle color frame ingestion, but keep depth/draw active
         val shouldFeedColorFrame = (frameCount % 3 == 0)
         frameCount++
 
+        // 2. Process Data
         if (isTracking) {
             try {
                 if (shouldFeedColorFrame) {
@@ -108,14 +119,13 @@ class ArRenderer(
                 depthImage.close()
 
             } catch (e: NotYetAvailableException) {
-                // Normal during ARCore initialization — depth data not yet ready.
+                // Normal during ARCore initialization
             } catch (e: UnsupportedOperationException) {
-                Log.w("ArRenderer", "Depth API unavailable: ${e.message}")
+                // Depth API not supported
             } catch (e: Exception) {
                 Log.e("ArRenderer", "Frame processing error", e)
             }
         } else if (shouldFeedColorFrame) {
-            // Relocalization mode: feed color frames to MobileGS even if not tracking
             try {
                 val cameraImage = frame.acquireCameraImage()
                 val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
@@ -124,7 +134,7 @@ class ArRenderer(
             } catch (e: Exception) { }
         }
 
-        // Draw the SLAM overlays (splats, mesh)
+        // 3. Draw Overlays
         slamManager.draw()
 
         onTrackingUpdated(isTracking)

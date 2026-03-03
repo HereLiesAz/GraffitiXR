@@ -45,9 +45,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCamera(JNIEnv* env
     if (gSlamEngine) {
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
-
         gSlamEngine->updateCamera(view, proj);
-
         env->ReleaseFloatArrayElements(viewMatrix, view, JNI_ABORT);
         env->ReleaseFloatArrayElements(projMatrix, proj, JNI_ABORT);
     }
@@ -73,10 +71,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
 
     if (gFrameCount % 100 == 0) {
-        LOGD("Received color frame %d: %dx%d", gFrameCount, width, height);
+        LOGD("JNI: Received color frame %d: %dx%d", gFrameCount, width, height);
     }
 
-    // If ARCore is lost, pass the frame to attempt relocalization
     if (!gSlamEngine->isTracking()) {
         gSlamEngine->attemptRelocalization(gLastColorFrame);
     }
@@ -88,8 +85,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height) {
 
     if (!gSlamEngine) return;
+
+    // Fix: Even if color frame is missing, we shouldn't drop depth entirely if we want to build a map.
+    // However, MobileGS::processDepthFrame needs color for the splats.
     if (gLastColorFrame.empty()) {
-        if (gFrameCount % 100 == 0) LOGD("Dropping depth frame: No color frame yet");
+        if (gFrameCount % 100 == 0) LOGD("JNI: Dropping depth frame: No color frame yet");
         return;
     }
 
@@ -97,14 +97,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
     if (!rawDepth) return;
 
     cv::Mat depthMap(height, width, CV_32F, cv::Scalar(0.0f));
-
     int validPoints = 0;
     for (int r = 0; r < height; r++) {
         for (int c = 0; c < width; c++) {
             uint16_t raw = rawDepth[r * width + c];
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
-
             if (conf >= 1 && depthMm > 0) {
                 depthMap.at<float>(r, c) = depthMm / 1000.0f;
                 validPoints++;
@@ -113,7 +111,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
     }
 
     if (gFrameCount % 100 == 0) {
-        LOGD("Processing depth frame: %dx%d, valid points: %d", width, height, validPoints);
+        LOGD("JNI: Processing depth frame: %dx%d, valid: %d", width, height, validPoints);
     }
 
     if (depthMap.cols != gLastColorFrame.cols || depthMap.rows != gLastColorFrame.rows) {
@@ -126,30 +124,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_draw(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {
-        gSlamEngine->draw();  // draw() acquires the mutex internally; do NOT lock here
+        gSlamEngine->draw();
     }
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
         JNIEnv* env, jobject thiz, jobject leftBuffer, jobject rightBuffer, jint width, jint height) {
-
-    if (!gStereoProcessor) {
-        gStereoProcessor = new StereoProcessor();
-    }
-
+    if (!gStereoProcessor) gStereoProcessor = new StereoProcessor();
     auto* leftData = static_cast<int8_t*>(env->GetDirectBufferAddress(leftBuffer));
     auto* rightData = static_cast<int8_t*>(env->GetDirectBufferAddress(rightBuffer));
     if (!leftData || !rightData) return;
-
     gStereoProcessor->processStereo(leftData, rightData, width, height);
-
-    // Get disparity map and convert to depth for MobileGS
     cv::Mat disparity = gStereoProcessor->getDisparityMap();
     if (!disparity.empty() && gSlamEngine && !gLastColorFrame.empty()) {
         cv::Mat depthFromStereo;
         disparity.convertTo(depthFromStereo, CV_32F);
-        // Note: Proper depth = baseline * focal / disparity, but needs calibration
         gSlamEngine->processDepthFrame(depthFromStereo, gLastColorFrame);
     }
 }
