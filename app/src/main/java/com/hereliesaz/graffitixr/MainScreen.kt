@@ -23,6 +23,7 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 
 @Composable
 fun MainScreen(
@@ -43,14 +44,20 @@ fun MainScreen(
     if (hasCameraPermission) {
         when (uiState.editorMode) {
             EditorMode.AR -> {
-                // Let the ViewModel manage the AR session lifecycle
+                // Track GLSurfaceView to ensure onPause is called when switching modes.
+                var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
+
+                // Delay AR session start to allow previous camera clients (like CameraX) to release hardware.
+                // This mitigates recovery loops and ERROR_CAMERA_IN_USE during mode transitions.
                 LaunchedEffect(Unit) {
+                    delay(300)
                     arViewModel.setArMode(true, context)
                 }
 
-                // When this composable is disposed, notify the ViewModel to exit AR mode
+                // Ensure the AR session and renderer are paused when this composable is removed.
                 DisposableEffect(Unit) {
                     onDispose {
+                        glView?.onPause()
                         arViewModel.setArMode(false, context)
                     }
                 }
@@ -68,13 +75,15 @@ fun MainScreen(
                         rendererRef.value = renderer
                         arViewModel.attachSessionToRenderer(renderer)
                         onRendererCreated(renderer)
-                        GLSurfaceView(ctx).apply {
+                        val view = GLSurfaceView(ctx).apply {
                             setEGLContextClientVersion(3)
                             setZOrderMediaOverlay(true)
                             holder.setFormat(PixelFormat.TRANSLUCENT)
                             setRenderer(renderer)
                             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                         }
+                        glView = view
+                        view
                     },
                     modifier = Modifier.fillMaxSize()
                 )
