@@ -120,6 +120,12 @@ class ArViewModel @Inject constructor(
                 session!!.configure(config)
                 renderer?.attachSession(session)
                 Log.d("ArViewModel", "AR Session Initialized")
+
+                // Fix 4: Load SuperPoint model asynchronously on first session creation.
+                viewModelScope.launch(Dispatchers.IO) {
+                    val loaded = slamManager.loadSuperPoint(context.assets)
+                    Log.d("ArViewModel", "SuperPoint: ${if (loaded) "ready" else "ORB fallback"}")
+                }
             } catch (e: Throwable) {
                 _isCameraInUseByAr.value = false
                 Log.e("ArViewModel", "Failed to initialize AR session", e)

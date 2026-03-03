@@ -67,3 +67,21 @@ echo "SUCCESS"
 echo "OpenCV installed at: ${TARGET_OPENCV}"
 echo "Ensure settings.gradle.kts points to: project(\":opencv\").projectDir = file(\"core/nativebridge/libs/opencv/sdk\")"
 echo "========================================"
+
+# ── SuperPoint ONNX model check ───────────────────────────────────────────────
+SP_ASSET="app/src/main/assets/superpoint.onnx"
+echo ""
+if [ -f "$SP_ASSET" ]; then
+    SP_SIZE=$(du -h "$SP_ASSET" | cut -f1)
+    echo "[✓] SuperPoint model found: ${SP_ASSET} (${SP_SIZE})"
+else
+    echo "[!] SuperPoint model not found: ${SP_ASSET}"
+    echo "    AI-driven feature matching (Fix 4) will use ORB fallback until the model is placed."
+    echo ""
+    echo "    To generate the model, run:"
+    echo "      pip install torch requests"
+    echo "      python3 scripts/convert_superpoint.py"
+    echo ""
+    echo "    The model is ~5 MB. You can also gitignore it and regenerate on each machine."
+fi
+echo "────────────────────────────────────────"
