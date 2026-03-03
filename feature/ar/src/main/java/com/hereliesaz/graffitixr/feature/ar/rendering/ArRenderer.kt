@@ -4,6 +4,7 @@ import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import android.util.Log
+import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -32,6 +33,8 @@ class ArRenderer(
     private var cameraTextureNameSet = false
     private var frameCount = 0
 
+    private var pendingFlashlightMode: Int? = null
+
     fun attachSession(session: Session?) {
         Log.i("ArRenderer", "attachSession: session is ${if (session != null) "NOT null" else "null"}")
         this.session = session
@@ -45,19 +48,10 @@ class ArRenderer(
     /**
      * Toggles the flashlight if supported.
      * Note: Flashlight control requires ARCore 1.32.0+
+     * We queue the change to be applied on the next frame to avoid CameraAccessException.
      */
     fun updateFlashlight(isOn: Boolean) {
-        val activeSession = session ?: return
-        try {
-            val config = activeSession.config
-            // We use the integer constant directly if the symbol is not resolving in the current IDE context
-            // ON = 1, OFF = 0
-            val method = config.javaClass.getMethod("setFlashlightMode", Int::class.javaPrimitiveType)
-            method.invoke(config, if (isOn) 1 else 0)
-            activeSession.configure(config)
-        } catch (e: Exception) {
-            Log.e("ArRenderer", "Failed to update flashlight via reflection", e)
-        }
+        pendingFlashlightMode = if (isOn) 1 else 0
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -85,6 +79,21 @@ class ArRenderer(
             if (frameCount % 100 == 0) Log.w("ArRenderer", "onDrawFrame: session is null")
             frameCount++
             return
+        }
+
+        // Apply pending flashlight changes
+        pendingFlashlightMode?.let { mode ->
+            try {
+                val config = activeSession.config
+                val method = config.javaClass.getMethod("setFlashlightMode", Int::class.javaPrimitiveType)
+                method.invoke(config, mode)
+                activeSession.configure(config)
+                Log.d("ArRenderer", "Flashlight mode updated to $mode")
+            } catch (e: Exception) {
+                Log.e("ArRenderer", "Failed to update flashlight", e)
+            } finally {
+                pendingFlashlightMode = null
+            }
         }
 
         if (!cameraTextureNameSet) {
