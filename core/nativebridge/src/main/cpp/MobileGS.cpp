@@ -74,6 +74,11 @@ void MobileGS::initialize(int width, int height) {
     std::lock_guard<std::mutex> lock(mMutex);
     mFeatureDetector = cv::ORB::create(500);
     mMatcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
+    // Zero-init matrices so they're safe to read before the first updateCamera() call.
+    memset(mViewMatrix, 0, sizeof(mViewMatrix));
+    memset(mProjMatrix, 0, sizeof(mProjMatrix));
+    mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
+    mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
     initShaders();
 }
 
@@ -96,12 +101,33 @@ void MobileGS::destroy() {
 void MobileGS::initShaders() {
     GLuint vertexShader = compileShader(GL_VERTEX_SHADER, kVertexShader);
     GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
+    if (!vertexShader || !fragmentShader) {
+        LOGE("Shader compilation failed — rendering disabled.");
+        return;
+    }
     mProgram = glCreateProgram();
     glAttachShader(mProgram, vertexShader);
     glAttachShader(mProgram, fragmentShader);
     glLinkProgram(mProgram);
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+
+    GLint linked = 0;
+    glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
+    if (!linked) {
+        GLint len = 0;
+        glGetProgramiv(mProgram, GL_INFO_LOG_LENGTH, &len);
+        if (len > 0) {
+            char* log = (char*)malloc(len);
+            glGetProgramInfoLog(mProgram, len, nullptr, log);
+            LOGE("Shader link failed:\n%s", log);
+            free(log);
+        }
+        glDeleteProgram(mProgram);
+        mProgram = 0;
+        return;
+    }
+    LOGI("SLAM shaders linked OK (program %u).", mProgram);
 
     glGenBuffers(1, &mPointVbo);
     glGenBuffers(1, &mMeshVbo);
@@ -245,6 +271,10 @@ void MobileGS::updateCamera(float* viewMat, float* projMat) {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(mViewMatrix, viewMat, 16 * sizeof(float));
     memcpy(mProjMatrix, projMat, 16 * sizeof(float));
+    if (!mCameraReady) {
+        mCameraReady = true;
+        LOGI("Camera matrices received — SLAM rendering enabled.");
+    }
 }
 
 void MobileGS::updateAnchorTransform(float* transformMat) {
@@ -252,7 +282,18 @@ void MobileGS::updateAnchorTransform(float* transformMat) {
 
 void MobileGS::draw() {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (!mProgram || !mIsArCoreTracking) return;
+    // Render as soon as we have a valid camera frame — even if tracking is temporarily lost.
+    // mCameraReady is set on the first updateCamera() call; mIsArCoreTracking only gates
+    // data ingestion (processDepthFrame / attemptRelocalization).
+    if (!mProgram || !mCameraReady) return;
+
+    static int sDrawCount = 0;
+    if ((sDrawCount++ % 180) == 0) {
+        LOGI("draw(): points=%d  mesh_verts=%d  tracking=%d",
+             mPointCount, mMeshVertexCount, (int)mIsArCoreTracking);
+    }
+
+    glEnable(GL_DEPTH_TEST);
 
     glUseProgram(mProgram);
 

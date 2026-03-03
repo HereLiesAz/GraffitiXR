@@ -52,4 +52,5 @@ private:
 
     float mViewMatrix[16];
     float mProjMatrix[16];
+    bool mCameraReady = false;
 };

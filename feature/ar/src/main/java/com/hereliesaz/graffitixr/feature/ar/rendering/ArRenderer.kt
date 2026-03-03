@@ -95,9 +95,12 @@ class ArRenderer(
                     cameraImage.close()
                 }
             } catch (e: NotYetAvailableException) {
-                // Wait for hardware to catch up.
+                // Normal during ARCore initialization — depth data not yet ready.
+            } catch (e: UnsupportedOperationException) {
+                // Depth API not supported on this device / session not configured for depth.
+                android.util.Log.w("ArRenderer", "Depth API unavailable: ${e.message}")
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("ArRenderer", "Depth frame error: ${e.message}")
             }
         } else if (shouldFeedColorFrame) {
             try {

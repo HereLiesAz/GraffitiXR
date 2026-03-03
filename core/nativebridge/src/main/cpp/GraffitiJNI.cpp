@@ -91,7 +91,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
 
-            if (conf >= 4 && depthMm > 0) {
+            if (conf >= 1 && depthMm > 0) {
                 depthMap.at<float>(r, c) = depthMm / 1000.0f;
             }
         }
