@@ -19,9 +19,9 @@ static const char* kVertexShader =
     "void main() {\n"
     "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
     "  gl_Position = clip;\n"
-    "  // Larger splats for diagnostics: 100.0 base size adjusted by confidence and distance\n"
-    "  float sz = (100.0 + 80.0 * aConfidence) / clip.w;\n"
-    "  gl_PointSize = clamp(sz, 5.0, 256.0);\n"
+    "  // Smaller splats for better visibility: base 5.0, confidence-based 5.0\n"
+    "  float sz = (5.0 + 5.0 * aConfidence) / clip.w;\n"
+    "  gl_PointSize = clamp(sz, 1.0, 32.0);\n"
     "  vColor = aColor;\n"
     "}\n";
 
@@ -35,7 +35,7 @@ static const char* kFragmentShader =
     "  float r2 = dot(d, d) * 4.0;\n"
     "  if (r2 > 1.0) discard;\n"
     "  float alpha = exp(-4.0 * r2);\n"
-    "  oColor = vec4(vColor.rgb, alpha * vColor.a);\n"
+    "  oColor = vec4(vColor.rgb, alpha * vColor.a * 0.6);\n" // Added 0.6 multiplier for transparency
     "}\n";
 
 static GLuint compileShader(GLenum type, const char* source) {
