@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -26,6 +27,7 @@ class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
+    private val stereoProvider: StereoDepthProvider = mockk(relaxed = true)
     private val session: Session = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
@@ -33,7 +35,7 @@ class ArViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = ArViewModel(slamManager)
+        viewModel = ArViewModel(slamManager, stereoProvider)
     }
 
     @After

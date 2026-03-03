@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.content.Context
 import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,13 +20,14 @@ class ArSessionTest {
 
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
+    private val stereoProvider: StereoDepthProvider = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = ArViewModel(slamManager)
+        viewModel = ArViewModel(slamManager, stereoProvider)
     }
 
     @After
