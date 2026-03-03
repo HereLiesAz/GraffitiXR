@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -207,7 +208,69 @@ fun UnwarpUi(
                     )
                 }
         ) {
-            // Overlay controls (Magnifier could go here)
+            // Hint label
+            Text(
+                text = "Drag corners to unwarp perspective",
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+
+            // Magnifier indicator — visible while a corner is being dragged
+            if (activePointIndex != -1) {
+                val magRadiusPx = with(density) { 40.dp.roundToPx() }
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                magnifierPosition.x.toInt() - magRadiusPx,
+                                magnifierPosition.y.toInt() - magRadiusPx * 2 - 8
+                            )
+                        }
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.75f))
+                        .border(2.dp, Color.Cyan, CircleShape)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawLine(Color.Cyan, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), strokeWidth = 1.5f)
+                        drawLine(Color.Cyan, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), strokeWidth = 1.5f)
+                    }
+                }
+            }
+
+            // Bottom controls: Retake | Next
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilledTonalButton(
+                    onClick = onRetake,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Retake")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Retake")
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Button(
+                    onClick = { onConfirm(points) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = "Next")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Next")
+                }
+            }
         }
     }
 }

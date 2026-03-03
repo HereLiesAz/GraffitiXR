@@ -13,14 +13,15 @@ import java.nio.ByteBuffer
  */
 class DualAnalyzer(
     private val onLightUpdate: (Float) -> Unit,
-    private val onSlamFrame: ((ByteBuffer, Int, Int) -> Unit)? = null
+    private val onSlamFrame: ((ByteBuffer, Int, Int) -> Unit)? = null,
+    private val clock: () -> Long = System::currentTimeMillis
 ) : ImageAnalysis.Analyzer {
 
-    private var lastLightUpdate = 0L
     private val lightIntervalMs = 200L
+    private var lastLightUpdate = -lightIntervalMs
 
     override fun analyze(image: ImageProxy) {
-        val now = System.currentTimeMillis()
+        val now = clock()
 
         // 1. SLAM Tracking (Every Frame - primarily for Stereo Depth fallback)
         if (onSlamFrame != null && image.planes.isNotEmpty()) {

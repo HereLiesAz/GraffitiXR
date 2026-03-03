@@ -26,7 +26,8 @@ class DualAnalyzerTest {
         lightCallCount = 0
         analyzer = DualAnalyzer(
             onLightUpdate = { lightCallCount++ },
-            onSlamFrame = { _, _, _ -> slamCallCount++ }
+            onSlamFrame = { _, _, _ -> slamCallCount++ },
+            clock = { 0L }  // fixed clock: all frames appear instantaneous
         )
     }
 
