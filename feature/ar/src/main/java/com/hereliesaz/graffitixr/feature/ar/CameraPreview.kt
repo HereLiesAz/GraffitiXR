@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
+import com.hereliesaz.graffitixr.feature.ar.util.DualAnalyzer
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -63,7 +64,8 @@ fun CameraPreview(
     controller: CameraController,
     onPhotoCaptured: (Bitmap) -> Unit,
     modifier: Modifier = Modifier,
-    onAnalyzerFrame: ((ByteBuffer, Int, Int) -> Unit)? = null
+    onAnalyzerFrame: ((ByteBuffer, Int, Int) -> Unit)? = null,
+    onLightUpdate: ((Float) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -110,30 +112,39 @@ fun CameraPreview(
         }
     }
 
-    // Background executor for image analysis (SGBM stereo matching is CPU-intensive)
-    val analysisExecutor = remember(onAnalyzerFrame != null) {
-        if (onAnalyzerFrame != null) Executors.newSingleThreadExecutor() else null
+    // Background executor for image analysis
+    val hasAnalysis = onAnalyzerFrame != null || onLightUpdate != null
+    val analysisExecutor = remember(hasAnalysis) {
+        if (hasAnalysis) Executors.newSingleThreadExecutor() else null
     }
     DisposableEffect(analysisExecutor) {
         onDispose { analysisExecutor?.shutdown() }
     }
 
-    // ImageAnalysis use case: extract Y-plane every 10th frame (~3 fps at 30 fps)
-    val imageAnalysis = remember(onAnalyzerFrame) {
-        onAnalyzerFrame?.let { callback ->
+    // ImageAnalysis use case.
+    // If onLightUpdate is provided, use DualAnalyzer — it handles both stereo and ambient light
+    // with its own 200 ms light throttle; backpressure replaces the manual frame counter.
+    // Otherwise fall back to the legacy manual-throttle path (stereo only).
+    val imageAnalysis = remember(onAnalyzerFrame, onLightUpdate) {
+        val executor = analysisExecutor ?: return@remember null
+        val analysis = ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+        if (onLightUpdate != null) {
+            analysis.setAnalyzer(executor, DualAnalyzer(
+                onLightUpdate = onLightUpdate,
+                onSlamFrame = onAnalyzerFrame
+            ))
+        } else if (onAnalyzerFrame != null) {
             var frameIndex = 0
-            ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { analysis ->
-                    analysis.setAnalyzer(analysisExecutor!!) { image ->
-                        if (frameIndex++ % 10 == 0) {
-                            callback(image.planes[0].buffer, image.width, image.height)
-                        }
-                        image.close()
-                    }
+            analysis.setAnalyzer(executor) { image ->
+                if (frameIndex++ % 10 == 0) {
+                    onAnalyzerFrame(image.planes[0].buffer, image.width, image.height)
                 }
+                image.close()
+            }
         }
+        analysis
     }
 
     LaunchedEffect(lifecycleOwner) {

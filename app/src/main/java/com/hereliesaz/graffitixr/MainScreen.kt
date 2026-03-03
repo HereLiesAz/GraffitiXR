@@ -88,6 +88,7 @@ fun MainScreen(
                     controller = controller,
                     onPhotoCaptured = {},
                     onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
+                    onLightUpdate = arViewModel::updateLightLevel,
                     modifier = Modifier.fillMaxSize()
                 )
             }

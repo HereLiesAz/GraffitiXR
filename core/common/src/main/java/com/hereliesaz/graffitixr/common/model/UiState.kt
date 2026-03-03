@@ -9,6 +9,7 @@ data class ArUiState(
     val isScanning: Boolean = false,
     val isTargetDetected: Boolean = false,
     val isFlashlightOn: Boolean = false,
+    val lightLevel: Float = 1.0f,
     val tempCaptureBitmap: Bitmap? = null,
     val capturedTargetUris: List<Uri> = emptyList(),
     val capturedTargetImages: List<Bitmap> = emptyList(),

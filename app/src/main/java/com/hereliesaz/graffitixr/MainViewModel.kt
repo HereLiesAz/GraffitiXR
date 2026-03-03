@@ -1,12 +1,19 @@
 package com.hereliesaz.graffitixr
 
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -32,7 +39,10 @@ data class MainUiState(
  * This ViewModel is scoped to the [MainActivity] lifecycle and survives navigation changes.
  */
 @HiltViewModel
-class MainViewModel @Inject constructor() : ViewModel() {
+class MainViewModel @Inject constructor(
+    private val projectRepository: ProjectRepository,
+    private val slamManager: SlamManager
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -82,13 +92,28 @@ class MainViewModel @Inject constructor() : ViewModel() {
     }
 
     /**
-     * Finalizes the target creation and exits the flow.
+     * Finalizes the target creation flow.
+     *
+     * If [bitmap] is provided (the masked/warped target image), generates an ORB fingerprint,
+     * persists it to the current project, and registers it with the SLAM engine so
+     * relocalization works from the very first session — even before [tryUpdateFingerprint]
+     * has had a chance to accumulate depth-backed keypoints.
      */
-    fun onConfirmTargetCreation() {
+    fun onConfirmTargetCreation(bitmap: Bitmap? = null) {
         _uiState.update {
-            it.copy(
-                isCapturingTarget = false,
-                captureStep = CaptureStep.NONE
+            it.copy(isCapturingTarget = false, captureStep = CaptureStep.NONE)
+        }
+        bitmap ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val fp = ImageProcessingUtils.generateFingerprint(bitmap)
+            val project = projectRepository.currentProject.value ?: return@launch
+            projectRepository.updateProject(project.copy(fingerprint = fp))
+            slamManager.setTargetFingerprint(
+                fp.descriptorsData,
+                fp.descriptorsRows,
+                fp.descriptorsCols,
+                fp.descriptorsType,
+                fp.points3d.toFloatArray()
             )
         }
     }

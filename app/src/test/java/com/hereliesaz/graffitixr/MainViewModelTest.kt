@@ -1,6 +1,9 @@
 package com.hereliesaz.graffitixr
 
 import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -17,11 +20,13 @@ class MainViewModelTest {
 
     private lateinit var viewModel: MainViewModel
     private val testDispatcher = StandardTestDispatcher()
+    private val projectRepository: ProjectRepository = mockk(relaxed = true)
+    private val slamManager: SlamManager = mockk(relaxed = true)
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = MainViewModel()
+        viewModel = MainViewModel(projectRepository, slamManager)
     }
 
     @After

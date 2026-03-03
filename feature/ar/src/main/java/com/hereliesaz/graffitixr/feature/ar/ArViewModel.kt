@@ -238,4 +238,15 @@ class ArViewModel @Inject constructor(
     fun onCameraFrameForStereo(buffer: ByteBuffer, width: Int, height: Int) {
         stereoProvider.submitFrame(buffer, width, height)
     }
+
+    // ==================== Ambient Light Estimation ====================
+
+    /**
+     * Receives an ambient light estimate from DualAnalyzer (OVERLAY mode).
+     * Stored in state so the AR renderer can adjust overlay brightness.
+     */
+    fun updateLightLevel(level: Float) {
+        if (kotlin.math.abs(_uiState.value.lightLevel - level) < 0.01f) return
+        _uiState.update { it.copy(lightLevel = level) }
+    }
 }

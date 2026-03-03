@@ -176,7 +176,7 @@ class MainActivity : ComponentActivity() {
                                     uiState = arUiState,
                                     isRightHanded = editorUiState.isRightHanded,
                                     captureStep = mainUiState.captureStep,
-                                    onConfirm = { mainViewModel.onConfirmTargetCreation() },
+                                    onConfirm = { mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap) },
                                     onRetake = { mainViewModel.onRetakeCapture() },
                                     onCancel = { mainViewModel.onCancelCaptureClicked() },
                                     onUnwarpConfirm = { points ->
