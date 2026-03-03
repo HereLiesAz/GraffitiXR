@@ -42,6 +42,24 @@ class ArRenderer(
         }
     }
 
+    /**
+     * Toggles the flashlight if supported.
+     * Note: Flashlight control requires ARCore 1.32.0+
+     */
+    fun updateFlashlight(isOn: Boolean) {
+        val activeSession = session ?: return
+        try {
+            val config = activeSession.config
+            // We use the integer constant directly if the symbol is not resolving in the current IDE context
+            // ON = 1, OFF = 0
+            val method = config.javaClass.getMethod("setFlashlightMode", Int::class.javaPrimitiveType)
+            method.invoke(config, if (isOn) 1 else 0)
+            activeSession.configure(config)
+        } catch (e: Exception) {
+            Log.e("ArRenderer", "Failed to update flashlight via reflection", e)
+        }
+    }
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Log.i("ArRenderer", "onSurfaceCreated")
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f) // Fully transparent background

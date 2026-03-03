@@ -155,7 +155,9 @@ class ArViewModel @Inject constructor(
     // ==================== Flashlight ====================
 
     fun toggleFlashlight() {
-        _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
+        val isOn = !_uiState.value.isFlashlightOn
+        _uiState.update { it.copy(isFlashlightOn = isOn) }
+        renderer?.updateFlashlight(isOn)
     }
 
     // ==================== SLAM Engine Delegation ====================
