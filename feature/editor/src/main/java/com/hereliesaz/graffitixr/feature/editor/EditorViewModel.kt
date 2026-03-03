@@ -59,6 +59,7 @@ class EditorViewModel @Inject constructor(
                         }
 
                         // Load SLAM Model
+                        slamManager.clearMap()  // Issue 2: reset previous project's state
                         val mapPath = projectManager.getMapPath(context, project.id)
                         if (File(mapPath).exists()) {
                             slamManager.loadModel(mapPath)
