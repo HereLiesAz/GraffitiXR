@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
             this, android.Manifest.permission.CAMERA
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
+        securityProviderManager.installAsync(this)
         slamManager.ensureInitialized()
 
         lifecycleScope.launch {

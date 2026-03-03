@@ -1,7 +1,10 @@
+// FILE: core/nativebridge/src/main/cpp/include/MobileGS.h
 #pragma once
 #include <opencv2/opencv.hpp>
 #include <mutex>
 #include <vector>
+#include <unordered_map>
+#include <string>
 #include <GLES3/gl3.h>
 
 struct Splat {
@@ -10,6 +13,20 @@ struct Splat {
     float confidence;
 };
 static_assert(sizeof(Splat) == 32, "Splat struct layout changed — update .bin serialization.");
+
+// Voxel spatial hashing keys
+struct VoxelKey {
+    int x, y, z;
+    bool operator==(const VoxelKey& other) const {
+        return x == other.x && y == other.y && z == other.z;
+    }
+};
+
+struct VoxelKeyHash {
+    std::size_t operator()(const VoxelKey& k) const {
+        return ((std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1)) >> 1) ^ (std::hash<int>()(k.z) << 1);
+    }
+};
 
 class MobileGS {
 public:
@@ -21,14 +38,20 @@ public:
 
     void setArCoreTrackingState(bool isTracking);
     bool isTracking() const;
+
+    // Teleological SLAM
     void attemptRelocalization(const cv::Mat& colorFrame);
+    void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
+
+    // Project Data I/O
+    void saveModel(const std::string& path);
+    void loadModel(const std::string& path);
 
     void draw();
     void destroy();
     std::mutex& getMutex() { return mMutex; }
 
 private:
-    bool performPnP(const cv::Mat& grayFrame);
     void pruneMap();
     void initShaders();
 
@@ -39,9 +62,10 @@ private:
     cv::Ptr<cv::DescriptorMatcher> mMatcher;
 
     cv::Mat mTargetDescriptors;
-    std::vector<cv::KeyPoint> mTargetKeypoints;
+    std::vector<cv::Point3f> mTargetKeypoints3D;
 
     std::vector<Splat> splatData;
+    std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
 
     // GLES handles
     GLuint mProgram = 0;
@@ -53,5 +77,9 @@ private:
 
     float mViewMatrix[16];
     float mProjMatrix[16];
+    float mAnchorMatrix[16]; // For holding the Teleological offset
     bool mCameraReady = false;
+
+    int mScreenWidth = 1920;
+    int mScreenHeight = 1080;
 };

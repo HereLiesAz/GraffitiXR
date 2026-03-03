@@ -1,3 +1,4 @@
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/computervision/TargetEvolutionEngine.kt
 package com.hereliesaz.graffitixr.feature.ar.computervision
 
 import android.graphics.Bitmap
@@ -17,36 +18,23 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Engine responsible for generating and refining target masks using OpenCV.
- */
 @Singleton
 class TargetEvolutionEngine @Inject constructor() {
 
-    /**
-     * Generates an initial mask guess for the image.
-     */
     suspend fun initialGuess(image: Bitmap): Bitmap = withContext(Dispatchers.IO) {
-        // Simple initial guess: center 50% of the image
         val maskMat = Mat.zeros(image.height, image.width, CvType.CV_8UC1)
-        val rect = Rect(image.width / 4, image.height / 4, image.width / 2, image.height / 2)
-        Imgproc.rectangle(maskMat, rect, Scalar(255.0), -1)
+        try {
+            val rect = Rect(image.width / 4, image.height / 4, image.width / 2, image.height / 2)
+            Imgproc.rectangle(maskMat, rect, Scalar(255.0), -1)
 
-        val resultBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(maskMat, resultBitmap)
-        maskMat.release()
-        resultBitmap
+            val resultBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(maskMat, resultBitmap)
+            return@withContext resultBitmap
+        } finally {
+            maskMat.release()
+        }
     }
 
-    /**
-     * Refines an existing mask based on a touch point using the FloodFill algorithm.
-     *
-     * @param image The original source image (RGB/RGBA).
-     * @param currentMask The current binary mask (Black/White).
-     * @param touchPoint The coordinate where the user touched.
-     * @param isAdding Whether to add to the mask or subtract from it.
-     * @return A new refined binary mask Bitmap.
-     */
     suspend fun refineMask(
         image: Bitmap,
         currentMask: Bitmap,
@@ -55,163 +43,130 @@ class TargetEvolutionEngine @Inject constructor() {
     ): Bitmap = withContext(Dispatchers.IO) {
         val srcMat = Mat()
         val maskMat = Mat()
-
-        Utils.bitmapToMat(image, srcMat)
-        
-        // OpenCV's floodFill supports 1 or 3 channels. 
-        // Utils.bitmapToMat usually results in 4 channels (RGBA).
-        if (srcMat.channels() == 4) {
-            Imgproc.cvtColor(srcMat, srcMat, Imgproc.COLOR_RGBA2RGB)
-        } else if (srcMat.channels() != 1 && srcMat.channels() != 3) {
-            // Fallback for unexpected channel counts
-            Timber.w("Unexpected channel count in srcMat: ${srcMat.channels()}. Converting to RGB.")
-            Imgproc.cvtColor(srcMat, srcMat, Imgproc.COLOR_BGR2RGB)
-        }
-
         val tempMask = Mat()
-        Utils.bitmapToMat(currentMask, tempMask)
-        Imgproc.cvtColor(tempMask, maskMat, Imgproc.COLOR_RGBA2GRAY)
-        Imgproc.threshold(maskMat, maskMat, 10.0, 255.0, Imgproc.THRESH_BINARY)
-        tempMask.release()
-
-        // Floodmask must be 2 pixels wider and taller than the input image.
-        val floodMask = Mat.zeros(srcMat.rows() + 2, srcMat.cols() + 2, CvType.CV_8UC1)
-
-        val loDiff = Scalar(20.0, 20.0, 20.0)
-        val upDiff = Scalar(20.0, 20.0, 20.0)
-
-        val seed = Point(touchPoint.x.toDouble(), touchPoint.y.toDouble())
-
-        // Flags: 4-connectivity, Fill value 255, Fixed range, Mask only
-        val flags = 4 +
-                (255 shl 8) +
-                Imgproc.FLOODFILL_FIXED_RANGE +
-                Imgproc.FLOODFILL_MASK_ONLY
-
-        val rect = Rect()
+        val floodMask = Mat()
+        val newRegion = Mat()
 
         try {
+            Utils.bitmapToMat(image, srcMat)
+
+            if (srcMat.channels() == 4) {
+                Imgproc.cvtColor(srcMat, srcMat, Imgproc.COLOR_RGBA2RGB)
+            } else if (srcMat.channels() != 1 && srcMat.channels() != 3) {
+                Timber.w("Unexpected channel count in srcMat: ${srcMat.channels()}. Converting to RGB.")
+                Imgproc.cvtColor(srcMat, srcMat, Imgproc.COLOR_BGR2RGB)
+            }
+
+            Utils.bitmapToMat(currentMask, tempMask)
+            Imgproc.cvtColor(tempMask, maskMat, Imgproc.COLOR_RGBA2GRAY)
+            Imgproc.threshold(maskMat, maskMat, 10.0, 255.0, Imgproc.THRESH_BINARY)
+
+            floodMask.create(srcMat.rows() + 2, srcMat.cols() + 2, CvType.CV_8UC1)
+            floodMask.setTo(Scalar(0.0))
+
+            val loDiff = Scalar(20.0, 20.0, 20.0)
+            val upDiff = Scalar(20.0, 20.0, 20.0)
+            val seed = Point(touchPoint.x.toDouble(), touchPoint.y.toDouble())
+            val flags = 4 + (255 shl 8) + Imgproc.FLOODFILL_FIXED_RANGE + Imgproc.FLOODFILL_MASK_ONLY
+            val rect = Rect()
+
             Imgproc.floodFill(
-                srcMat, 
-                floodMask, 
-                seed, 
-                Scalar(255.0, 255.0, 255.0), 
-                rect, 
-                loDiff, 
-                upDiff, 
+                srcMat,
+                floodMask,
+                seed,
+                Scalar(255.0, 255.0, 255.0),
+                rect,
+                loDiff,
+                upDiff,
                 flags
             )
+
+            val roi = floodMask.submat(1, srcMat.rows() + 1, 1, srcMat.cols() + 1)
+            roi.copyTo(newRegion)
+
+            if (isAdding) {
+                Core.bitwise_or(maskMat, newRegion, maskMat)
+            } else {
+                Core.bitwise_not(newRegion, newRegion)
+                Core.bitwise_and(maskMat, newRegion, maskMat)
+            }
+
+            val resultBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(maskMat, resultBitmap)
+            return@withContext resultBitmap
+
         } catch (e: Exception) {
             Timber.e(e, "OpenCV floodFill failed")
-            // Return the original mask on failure to avoid crashing
             return@withContext currentMask
+        } finally {
+            srcMat.release(); maskMat.release(); tempMask.release(); floodMask.release(); newRegion.release()
         }
-
-        // Extract the result from the floodmask (excluding the 1px border)
-        val newRegion = floodMask.submat(1, srcMat.rows() + 1, 1, srcMat.cols() + 1)
-
-        if (isAdding) {
-            Core.bitwise_or(maskMat, newRegion, maskMat)
-        } else {
-            Core.bitwise_not(newRegion, newRegion)
-            Core.bitwise_and(maskMat, newRegion, maskMat)
-        }
-
-        val resultBitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(maskMat, resultBitmap)
-
-        srcMat.release()
-        maskMat.release()
-        floodMask.release()
-        newRegion.release()
-
-        resultBitmap
     }
 
-    /**
-     * Extracts corners from a mask.
-     */
     suspend fun extractCorners(mask: Bitmap): List<Offset> = withContext(Dispatchers.IO) {
         val maskMat = Mat()
-        Utils.bitmapToMat(mask, maskMat)
-        Imgproc.cvtColor(maskMat, maskMat, Imgproc.COLOR_RGBA2GRAY)
-        
-        val contours = mutableListOf<MatOfPoint>()
         val hierarchy = Mat()
-        Imgproc.findContours(maskMat, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
-        
-        if (contours.isEmpty()) {
-            return@withContext emptyList()
+        try {
+            Utils.bitmapToMat(mask, maskMat)
+            Imgproc.cvtColor(maskMat, maskMat, Imgproc.COLOR_RGBA2GRAY)
+
+            val contours = mutableListOf<MatOfPoint>()
+            Imgproc.findContours(maskMat, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+            if (contours.isEmpty()) return@withContext emptyList()
+
+            val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return@withContext emptyList()
+
+            val peri = Imgproc.arcLength(org.opencv.core.MatOfPoint2f(*largestContour.toArray()), true)
+            val approx = org.opencv.core.MatOfPoint2f()
+            Imgproc.approxPolyDP(org.opencv.core.MatOfPoint2f(*largestContour.toArray()), approx, 0.02 * peri, true)
+
+            return@withContext approx.toArray().map { Offset(it.x.toFloat(), it.y.toFloat()) }
+        } finally {
+            maskMat.release()
+            hierarchy.release()
         }
-        
-        // Find the largest contour
-        val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return@withContext emptyList()
-        
-        // Approximate to a polygon
-        val peri = Imgproc.arcLength(org.opencv.core.MatOfPoint2f(*largestContour.toArray()), true)
-        val approx = org.opencv.core.MatOfPoint2f()
-        Imgproc.approxPolyDP(org.opencv.core.MatOfPoint2f(*largestContour.toArray()), approx, 0.02 * peri, true)
-        
-        val corners = approx.toArray().map { Offset(it.x.toFloat(), it.y.toFloat()) }
-        
-        maskMat.release()
-        hierarchy.release()
-        
-        corners
     }
 
-    /**
-     * Attempts to snap the largest contour in the mask to exactly 4 points (a quadrilateral).
-     * This is used to create a clean physical target for AR alignment.
-     */
     suspend fun snapToTarget(mask: Bitmap): List<Offset> = withContext(Dispatchers.IO) {
         val maskMat = Mat()
-        Utils.bitmapToMat(mask, maskMat)
-        Imgproc.cvtColor(maskMat, maskMat, Imgproc.COLOR_RGBA2GRAY)
-
-        val contours = mutableListOf<MatOfPoint>()
         val hierarchy = Mat()
-        Imgproc.findContours(maskMat, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+        var contour2f = org.opencv.core.MatOfPoint2f()
+        try {
+            Utils.bitmapToMat(mask, maskMat)
+            Imgproc.cvtColor(maskMat, maskMat, Imgproc.COLOR_RGBA2GRAY)
 
-        if (contours.isEmpty()) {
-            return@withContext emptyList()
-        }
+            val contours = mutableListOf<MatOfPoint>()
+            Imgproc.findContours(maskMat, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
-        val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return@withContext emptyList()
-        val contour2f = org.opencv.core.MatOfPoint2f(*largestContour.toArray())
-        val peri = Imgproc.arcLength(contour2f, true)
+            if (contours.isEmpty()) return@withContext emptyList()
 
-        // Iteratively refine epsilon to find 4 corners
-        var approx = org.opencv.core.MatOfPoint2f()
-        var epsilon = 0.02 * peri
-        var found = false
+            val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return@withContext emptyList()
+            contour2f = org.opencv.core.MatOfPoint2f(*largestContour.toArray())
+            val peri = Imgproc.arcLength(contour2f, true)
 
-        // Try to find a 4-point approximation by varying epsilon
-        for (i in 0 until 10) {
-            Imgproc.approxPolyDP(contour2f, approx, epsilon, true)
-            val count = approx.total().toInt()
-            if (count == 4) {
-                found = true
-                break
-            } else if (count > 4) {
-                epsilon *= 1.2 // Increase epsilon to reduce points
-            } else {
-                epsilon *= 0.8 // Decrease epsilon to increase points
+            var approx = org.opencv.core.MatOfPoint2f()
+            var epsilon = 0.02 * peri
+            var found = false
+
+            for (i in 0 until 10) {
+                Imgproc.approxPolyDP(contour2f, approx, epsilon, true)
+                val count = approx.total().toInt()
+                if (count == 4) {
+                    found = true
+                    break
+                } else if (count > 4) {
+                    epsilon *= 1.2
+                } else {
+                    epsilon *= 0.8
+                }
             }
+
+            return@withContext approx.toArray().map { Offset(it.x.toFloat(), it.y.toFloat()) }
+        } finally {
+            maskMat.release()
+            hierarchy.release()
+            contour2f.release()
         }
-
-        // If we couldn't find exactly 4, take the best 4 from the current approx
-        val points = if (found) {
-            approx.toArray()
-        } else {
-            // Fallback: If still not 4, just return what we have (or empty)
-            approx.toArray()
-        }
-
-        maskMat.release()
-        hierarchy.release()
-        contour2f.release()
-
-        points.map { Offset(it.x.toFloat(), it.y.toFloat()) }
     }
 }

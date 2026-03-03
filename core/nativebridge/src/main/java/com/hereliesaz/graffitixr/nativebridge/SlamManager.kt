@@ -1,11 +1,8 @@
+// FILE: core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt
 package com.hereliesaz.graffitixr.nativebridge
 
 import java.nio.ByteBuffer
 
-/**
- * The JNI bridge to the C++ MobileGS engine.
- * Now configured as a state-aware relocalization watchdog.
- */
 class SlamManager {
 
     init {
@@ -17,42 +14,40 @@ class SlamManager {
     external fun destroy()
     external fun draw()
 
+    external fun updateViewport(width: Int, height: Int)
     external fun updateCamera(viewMatrix: FloatArray, projMatrix: FloatArray)
     external fun updateAnchorTransform(transform: FloatArray)
-
-    // Informs the native engine to sleep its heavy PnP loops
     external fun setArCoreTrackingState(isTracking: Boolean)
 
-    /**
-     * Feeds the ARCore DEPTH16 buffer directly to the SLAM engine.
-     */
-    fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int) {
+    fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int) {
         if (depthBuffer.isDirect) {
-            nativeFeedArCoreDepth(depthBuffer, width, height)
+            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride)
         }
     }
 
-    /**
-     * Feeds the ARCore camera color frame (YUV converted to RGBA)
-     */
     fun feedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int) {
         if (colorBuffer.isDirect) {
             nativeFeedColorFrame(colorBuffer, width, height)
         }
     }
 
-    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int)
-    private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int)
-
-    /**
-     * Feeds stereo camera data for devices with dual cameras.
-     * Processes through StereoProcessor to generate disparity-based depth.
-     */
     fun feedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int) {
         if (leftBuffer.isDirect && rightBuffer.isDirect) {
             nativeFeedStereoData(leftBuffer, rightBuffer, width, height)
         }
     }
 
+    fun saveModel(path: String) { nativeSaveModel(path) }
+    fun loadModel(path: String) { nativeLoadModel(path) }
+
+    fun setTargetFingerprint(descriptors: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
+        nativeSetTargetFingerprint(descriptors, rows, cols, type, points3d)
+    }
+
+    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int)
+    private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int)
     private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int)
+    private external fun nativeSaveModel(path: String)
+    private external fun nativeLoadModel(path: String)
+    private external fun nativeSetTargetFingerprint(descriptors: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray)
 }

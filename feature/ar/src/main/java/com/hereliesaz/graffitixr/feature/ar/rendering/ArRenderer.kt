@@ -1,3 +1,4 @@
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
@@ -29,7 +30,6 @@ class ArRenderer(
 
     private val viewMatrix = FloatArray(16)
     private val projMatrix = FloatArray(16)
-    private var cameraTextureNameSet = false
     private var frameCount = 0
 
     private var pendingFlashlightMode: Boolean? = null
@@ -44,16 +44,10 @@ class ArRenderer(
         }
     }
 
-    /**
-     * Queues a flashlight state change to be applied on the GL thread.
-     */
     fun updateFlashlight(isOn: Boolean) {
         pendingFlashlightMode = isOn
     }
 
-    /**
-     * Uses reflection to get the `Config.FlashlightMode` enum value.
-     */
     private fun getFlashlightModeEnum(isOn: Boolean): Any? {
         return try {
             val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
@@ -67,17 +61,18 @@ class ArRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Timber.i("onSurfaceCreated")
-        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f) // Fully transparent background
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
-        slamManager.initGl() // Initialize GL resources for MobileGS
-        cameraTextureNameSet = false
+        slamManager.initGl()
+        session?.setCameraTextureName(backgroundRenderer.textureId)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         Timber.i("onSurfaceChanged: ${width}x${height}")
         GLES30.glViewport(0, 0, width, height)
         displayRotationHelper.onSurfaceChanged(width, height)
+        slamManager.updateViewport(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -85,7 +80,6 @@ class ArRenderer(
 
         val activeSession = session ?: return
 
-        // Apply pending flashlight changes safely on the GL thread.
         pendingFlashlightMode?.let { isOn ->
             getFlashlightModeEnum(isOn)?.let { mode ->
                 try {
@@ -94,24 +88,19 @@ class ArRenderer(
                     val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
                     method.invoke(config, mode)
                     activeSession.configure(config)
-                    Timber.i("Flashlight mode successfully updated to: ${if (isOn) "ON" else "OFF"}")
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to apply flashlight configuration")
                 }
             }
-            pendingFlashlightMode = null // Consume the request
-        }
-
-        if (!cameraTextureNameSet) {
-            activeSession.setCameraTextureName(backgroundRenderer.textureId)
-            cameraTextureNameSet = true
+            pendingFlashlightMode = null
         }
 
         displayRotationHelper.updateSessionIfNeeded(activeSession)
+
         val frame: Frame = try {
             activeSession.update()
         } catch (e: SessionPausedException) {
-            return // Session is paused, no frame to draw.
+            return
         } catch (e: Exception) {
             Timber.e(e, "Session update failed")
             return
@@ -126,7 +115,6 @@ class ArRenderer(
         slamManager.setArCoreTrackingState(isTracking)
         slamManager.updateCamera(viewMatrix, projMatrix)
 
-        // Throttled frame processing
         if (frameCount++ % 2 == 0) {
             try {
                 frame.acquireCameraImage().use { image ->
@@ -135,8 +123,13 @@ class ArRenderer(
                 }
 
                 frame.acquireDepthImage16Bits().use { depthImage ->
-                    val depthBuffer = depthImage.planes[0].buffer
-                    slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)
+                    val depthPlane = depthImage.planes[0]
+                    slamManager.feedArCoreDepth(
+                        depthPlane.buffer,
+                        depthImage.width,
+                        depthImage.height,
+                        depthPlane.rowStride
+                    )
                 }
             } catch (e: NotYetAvailableException) {
                 // Expected at the beginning of a session
