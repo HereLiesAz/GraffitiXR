@@ -83,3 +83,32 @@
 ## 3. NEXT STEPS
 * **Verify:** Run the app. If it crashes, check the logs for "dlopen failed" or Hilt injection errors.
 * **Refine:** The Edge Detection (Canny) parameters are hardcoded. Make them dynamic.
+
+---
+# GRAFFITIXR: STATUS UPDATE
+
+## STATUS: STABLE
+**Date:** 2026-03-02
+
+## Issues Resolved Since Last Update
+
+### [FIXED] The Ghost Renderer
+* **Issue:** GsViewerRenderer and ArRenderer fought for the SLAM point cloud.
+* **Fix:** GsViewer removed entirely. `ArRenderer` now owns the full GL context — `BackgroundRenderer` draws the camera feed, `slamManager.draw()` renders SLAM splats via OpenGL ES 3.0 in the same GLSurfaceView.
+
+### [FIXED] Single-Color AR Display
+* **Issue:** AR mode showed a solid color instead of the camera feed.
+* **Root Cause:** `session.setDisplayGeometry()` was never called — `frame.transformCoordinates2d()` returned degenerate UV coordinates.
+* **Fix:** `DisplayRotationHelper` wired into `ArRenderer`; `updateSessionIfNeeded(session)` called each frame before `activeSession.update()`.
+
+### [FIXED] MAX_SPLATS Crash on Long Scans
+* **Issue:** App crashed after ~2 minutes of scanning when splatData exceeded MAX_SPLATS (500k).
+* **Fix:** `pruneMap()` implemented in `MobileGS.cpp` — evicts the 10% least-confident splats via `std::partial_sort` when the limit is reached.
+
+### [FIXED] Session Lifecycle Crashes
+* **Issue:** AR session crashed on resume, mode-switch, and after tracking loss.
+* **Fix:** `DisposableEffect` keyed on `editorMode` (was `Unit`) — session re-attaches on return to AR mode. `resumeArSession()` catches `IllegalStateException` to guard against double-resume.
+
+## Active Risks
+* `TeleologicalTrackerTest` tests are currently commented out — need re-enabling and fixing.
+* `nativeGetSplatCount()` JNI function not yet implemented — can't surface live voxel count in UI.

@@ -15,7 +15,6 @@ graph TD
     FeatureEditor --> CoreDomain
     FeatureDash --> CoreData[":core:data"]
 
-    CoreNative --> Vulkan[Vulkan SDK]
     CoreNative --> GLES[OpenGL ES 3.0]
     CoreNative --> OpenCV[OpenCV 4.x]
     CoreData --> CoreDomain
@@ -26,23 +25,21 @@ graph TD
 ## Module Definitions
 
 ### `:feature:ar`
-ARCore session lifecycle (`ArViewModel`), camera frame acquisition (`ArRenderer`), sensor fusion, optical flow depth, and SLAM data feeding. `ArRenderer` renders the camera background via `BackgroundRenderer`; `GsViewer` (in `:feature:editor`) renders SLAM splats above it via Vulkan.
+ARCore session lifecycle (`ArViewModel`), camera frame acquisition (`ArRenderer`), sensor fusion, and SLAM data feeding. `ArRenderer` renders the camera background via `BackgroundRenderer` and calls `slamManager.draw()` for SLAM splat rendering via OpenGL ES 3.0.
 
 ### `:feature:editor`
-Mural preparation tools. Layer hierarchy, image manipulation, `GsViewer` (`SurfaceView` + Vulkan).
+Mural preparation tools. Layer hierarchy, image manipulation.
 
 ### `:core:nativebridge`
-C++17 MobileGS engine and JNI boundary (`GraffitiJNI.cpp`). Handles voxel hashing, Gaussian splatting, optical flow depth, DEPTH16 decoding, and Vulkan/OpenGL rendering.
+C++17 MobileGS engine and JNI boundary (`GraffitiJNI.cpp`). Handles voxel hashing, Gaussian splatting, DEPTH16 decoding, and OpenGL ES 3.0 rendering.
 
 ## Data Flow (AR Pipeline)
 
 Each ARCore tracking frame in `ArRenderer.onDrawFrame`:
 
 ```
-camera.imageIntrinsics + camera.pose ──► setCameraMotion(fxPx, translationM)
-                                              │
-frame.acquireCameraImage() [Y-plane] ────────► feedMonocularData()
-                                              │  └─ optical flow → processDepthFrame()
+camera.trackingState ────────────────────────► setArCoreTrackingState(isTracking)
+frame.acquireCameraImage() [RGBA] ───────────► feedColorFrame()   (relocalization / fingerprinting)
 frame.acquireDepthImage16Bits() ─────────────► feedArCoreDepth()
                                               │  └─ DEPTH16 decode → processDepthFrame()
 camera.getViewMatrix/ProjectionMatrix ───────► updateCamera()
@@ -50,8 +47,8 @@ camera.getViewMatrix/ProjectionMatrix ───────► updateCamera()
                                     MobileGS::processDepthFrame()
                                               │
                             ┌─────────────────┴──────────────────┐
-                     BackgroundRenderer                     GsViewer (Vulkan)
-                  (camera feed, GLSurfaceView)         (voxel splats, SurfaceView)
+                     BackgroundRenderer                   slamManager.draw()
+                  (camera feed, GLSurfaceView)       (voxel splats, same GLSurfaceView)
 ```
 
 **Camera ownership:**

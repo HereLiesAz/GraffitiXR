@@ -22,34 +22,20 @@ Defined in `MobileGS.h`; tune for performance vs. accuracy.
 
 Each tracking frame, `ArRenderer.onDrawFrame` feeds the engine in this order:
 
-### Step 1 — Motion calibration (`setCameraMotion`)
-```kotlin
-slamManager.setCameraMotion(
-    focalLengthPx = camera.imageIntrinsics.focalLength[0],
-    translationM  = magnitude(camera.pose.translation - prevPose.translation)
-)
-```
-Sets `kScale = focalLengthPx × translationM` in native, used by optical flow depth.
+### Step 1 — Color frame (`feedColorFrame`)
+RGBA buffer from `frame.acquireCameraImage()` → `nativeFeedColorFrame`:
+Feeds the color frame to the native engine for relocalization and fingerprinting. Called on every frame — both when tracking and when not tracking. Internal optical flow is handled as a native engine implementation detail.
 
-### Step 2 — Monocular feed (`feedMonocularData`)
-Y-plane (luma) from `frame.acquireCameraImage()` → `nativeFeedMonocularData`:
-1. Convert to grayscale `cv::Mat`.
-2. Run `cv::goodFeaturesToTrack` to detect features.
-3. Run `cv::calcOpticalFlowPyrLK` against the previous frame.
-4. Compute sparse depth: `depth = kScale / flow_px` (clamped 0.3–8.0m).
-5. Call `gSlamEngine->processDepthFrame(depthMap, colorFrame)`.
-6. Update `gPrevGray` / `gPrevFeatures` for next frame.
-
-### Step 3 — Metric depth (`feedArCoreDepth`, Depth API devices only)
+### Step 2 — Metric depth (`feedArCoreDepth`, Depth API devices only)
 DEPTH16 buffer from `frame.acquireDepthImage16Bits()` → `nativeFeedArCoreDepth`:
 1. Decode: `depthMm = raw & 0x1FFF`, `conf = (raw >> 13) & 0x7`.
 2. Skip pixels where `conf == 0`.
 3. Convert to metres `cv::Mat`, resize to match colour frame.
 4. Call `gSlamEngine->processDepthFrame(depthMap, colorFrame)`.
 
-When ARCore depth is available it **replaces** the optical-flow estimate for that frame, providing metric-accurate voxel placement.
+When ARCore depth is available it provides metric-accurate voxel placement.
 
-### Step 4 — Camera pose (`updateCamera`)
+### Step 3 — Camera pose (`updateCamera`)
 ```kotlin
 slamManager.updateCamera(viewMatrix, projMatrix)
 ```
@@ -71,5 +57,4 @@ Stores the view/projection matrices used by `processDepthFrame` for unprojection
 *   **Fix:** Ensure `setCameraMotion` is being called each tracking frame before `feedMonocularData`.
 
 ### "App crashes after scanning for 2 minutes"
-*   **Cause:** `MAX_SPLATS` exceeded.
-*   **Fix:** Implement an LRU culling strategy in `MobileGS::pruneMap()` to delete old voxels.
+LRU pruning is now implemented via `pruneMap()` — automatically evicts the 10% least-confident splats using `std::partial_sort` when `MAX_SPLATS` is reached. This prevents OOM crashes on long scans.

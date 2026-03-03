@@ -22,14 +22,14 @@ Contains:
 
 ### 3. Rendering Pipeline
 
-Two parallel render paths exist:
+A single OpenGL ES 3.0 render path runs inside `ArRenderer`'s `GLSurfaceView`:
 
-| Path | Surface | When active |
+| Step | Call | Content |
 |---|---|---|
-| OpenGL ES 3.0 (`ArRenderer` / `GLSurfaceView`) | `BackgroundRenderer` draws ARCore camera feed | Always in AR mode — camera background only |
-| Vulkan (`GsViewer` / `SurfaceView`) | `VulkanBackend` renders voxel splats | Whenever `GsViewer` surface is alive |
+| 1 | `backgroundRenderer.draw(frame)` | ARCore camera feed (full-screen, `EXTERNAL_OES`) |
+| 2 | `slamManager.draw()` | SLAM voxel splats (`GL_POINTS`) drawn on top in the same GL context |
 
-`ArRenderer` no longer calls `slamManager.draw()`. `GsViewer` sits above `ArRenderer` with `setZOrderMediaOverlay(true)` and owns all SLAM voxel rendering.
+`ArRenderer.onDrawFrame` owns both steps. There is no separate surface for splat rendering.
 
 ### 4. Depth Processing (`processDepthFrame`)
 *   **Input**: `cv::Mat` depth (metres, CV_32F) + colour frame (`gLastColorFrame`).
@@ -46,7 +46,8 @@ Used as a fallback when ARCore Depth API frames are unavailable.
 
 ## Memory Management
 *   **Limits**: `MAX_SPLATS` is set to 500,000 to prevent OOM.
-*   **Culling**: Points further than `CULL_DISTANCE` (5m) are ignored.
+*   **LRU Pruning**: `pruneMap()` is implemented — when `splatData.size() >= MAX_SPLATS`, it evicts the lowest-confidence 10% of splats using `std::partial_sort`. This prevents OOM crashes on long scans.
+*   **Distance Culling**: Points further than `CULL_DISTANCE` (5m) are ignored.
 
 ## JNI Interface (`GraffitiJNI.cpp` → `SlamManager.kt`)
 
@@ -55,17 +56,12 @@ All data is passed as `ByteBuffer` (never raw pointers); native side calls `GetD
 | Kotlin method | Description |
 |---|---|
 | `updateCamera(view, proj)` | Store current ARCore view + projection matrices |
-| `setCameraMotion(fxPx, tM)` | Update optical-flow `kScale` from ARCore intrinsics and inter-frame translation magnitude |
-| `feedMonocularData(buf, w, h)` | Y-plane → optical flow → sparse depth → `processDepthFrame()` |
-| `feedArCoreDepth(buf, w, h)` | DEPTH16 decode → `processDepthFrame()` (overrides optical-flow estimates) |
+| `setArCoreTrackingState(isTracking)` | Notify native engine of ARCore tracking state; adjusts behavior when lost |
+| `updateAnchorTransform(transform)` | Apply teleological correction — updates global map alignment transform |
+| `feedColorFrame(buf, w, h)` | RGBA color frame for relocalization / fingerprinting; called both when tracking and when not tracking |
+| `feedArCoreDepth(buf, w, h)` | DEPTH16 decode → `processDepthFrame()` (metric depth, Depth API devices only) |
 | `feedStereoData(l, r, w, h)` | Stereo disparity → depth → `processDepthFrame()` |
-| `feedLocationData(lat, lon, alt)` | GPS geo-anchor |
-| `draw()` | OpenGL ES render (splat `GL_POINTS`) — called by GL path only |
-| `saveModel(path)` / `loadModel(path)` | Serialize / deserialize to GXRM binary |
-| `saveKeyframe(ts, path)` | Write GXRM with current pose metadata |
-| `initVulkanEngine(surface, assets, w, h)` | Initialize Vulkan backend |
-| `resizeVulkanSurface(w, h)` | Handle surface resize |
-| `destroyVulkanEngine()` | Tear down Vulkan backend |
+| `draw()` | OpenGL ES render (splat `GL_POINTS`) — called by `ArRenderer` each frame |
 
 ### ARCore DEPTH16 Encoding
 ```

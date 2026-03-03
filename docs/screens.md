@@ -7,10 +7,9 @@ There is effectively one screen. The background rendering layer changes based on
 ### AR Mode (`EditorMode.AR`)
 | Layer | Surface | Content |
 |---|---|---|
-| Bottom | `GLSurfaceView` (`ArRenderer`) | ARCore live camera feed via `BackgroundRenderer` |
-| Middle | `SurfaceView` (`GsViewer`, `setZOrderMediaOverlay`) | Vulkan SLAM voxel splats |
+| Bottom | `GLSurfaceView` (`ArRenderer`) | ARCore live camera feed via `BackgroundRenderer`; SLAM voxel splats via `slamManager.draw()` |
 | Top | Compose `Canvas` | 2D editor layers (bitmaps, transforms) |
-| HUD | Compose `Text` chip | Live `trackingState` (green=TRACKING, orange=PAUSED, grey=other) |
+| HUD | Compose `Text` chip | Live tracking state (green=TRACKING, grey=SEARCHING) based on `arUiState.isScanning` |
 
 ARCore owns the camera in this mode. CameraX Preview is **not** active.
 
@@ -44,9 +43,6 @@ The "screens" are logic states navigated via the `AzNavRail`:
 ---
 
 ## 3. Secondary Screens
-
-### Mapping / Surveyor (`MappingActivity`)
-Standalone Activity for scanning dedicated maps. Shows a live tracking chip and point count HUD. Requires camera permission; falls back gracefully if denied.
 
 ### Project Library
 Full-screen bottom sheet over the main viewport. Lists saved `.gxr` projects; supports load, delete, and new project.

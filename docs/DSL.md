@@ -1,212 +1,61 @@
-# AzNavRail DSL Configuration
+# AzNavRail DSL Configuration (v7.62)
 
-GraffitiXR configures the rail in `MainScreen.kt` using the DSL.
+GraffitiXR configures the rail in `MainActivity.kt` using the DSL split across three config functions.
 
-## Example Structure
 ## IMPORTANT: AzNavRail MUST be used within an AzHostActivityLayout container. The library enforces strict layout rules (safe zones, padding, z-ordering) and will throw a runtime error if AzNavRail is instantiated directly without a host wrapper (except when running as a system overlay service).
 
+## Configuration Functions
+
+The v7.62 API splits settings across three dedicated functions:
+
+| Function | Purpose |
+|---|---|
+| `azTheme(...)` | Visual appearance — active color, button shapes |
+| `azConfig(...)` | Layout behavior — button packing, docking side |
+| `azAdvanced(...)` | Feature flags — dragging, help screen |
+
+## GraffitiXR Rail Pattern (from `MainActivity.kt`)
+
 ```kotlin
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import com.hereliesaz.aznavrail.AzHostActivityLayout
-import com.hereliesaz.aznavrail.AzNavHost
-import com.hereliesaz.aznavrail.AzTextBox
-import com.hereliesaz.aznavrail.model.AzButtonShape
-import com.hereliesaz.aznavrail.model.AzDockingSide
-import com.hereliesaz.aznavrail.model.AzHeaderIconShape
+AzHostActivityLayout(navController = navController) {
 
-@Composable
-fun SampleScreen() {
-    val navController = rememberNavController()
-    // currentDestination and isLandscape are automatically derived by AzHostActivityLayout
-    // but can be overridden if needed.
+    // Visual theme
+    azTheme(
+        activeColor = activeHighlightColor,
+        defaultShape = AzButtonShape.RECTANGLE,
+        headerIconShape = AzHeaderIconShape.ROUNDED
+    )
 
-    var isOnline by remember { mutableStateOf(true) }
-    var isDarkMode by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    val railCycleOptions = remember { listOf("A", "B", "C", "D") }
-    var railSelectedOption by remember { mutableStateOf(railCycleOptions.first()) }
-    val menuCycleOptions = remember { listOf("X", "Y", "Z") }
-    var menuSelectedOption by remember { mutableStateOf(menuCycleOptions.first()) }
+    // Layout config
+    azConfig(
+        packButtons = true,
+        dockingSide = if (isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+    )
 
-    AzHostActivityLayout(navController = navController) {
-        azSettings(
-            // displayAppNameInHeader = true, // Set to true to display the app name instead of the icon
-            packRailButtons = false,
-            isLoading = isLoading,
-            defaultShape = AzButtonShape.RECTANGLE, // Set a default shape for all rail items
-            enableRailDragging = true, // Enable the draggable rail feature
-            headerIconShape = AzHeaderIconShape.ROUNDED, // Set the header icon shape to ROUNDED
-            activeColor = MaterialTheme.colorScheme.tertiary, // Optional: Secondary color for the selected item
-            vibrate = true, // Optional: Enable haptic feedback for gestures
-            dockingSide = AzDockingSide.LEFT, // Optional: AzDockingSide.LEFT (default) or AzDockingSide.RIGHT
-            noMenu = false // Optional: If true, all items are displayed on the rail and the menu is disabled
-        )
+    // Feature flags
+    azAdvanced(helpEnabled = true)
 
-        // A standard menu item - only appears in the expanded menu
-        azMenuItem(id = "home", text = "Home", route = "home")
+    // Mode host with sub-items (accordion hierarchy)
+    azRailHostItem(id = "mode_host", text = "Modes")
+    azRailSubItem(id = "ar",      hostId = "mode_host", text = "AR",      route = "AR",      shape = AzButtonShape.NONE)
+    azRailSubItem(id = "overlay", hostId = "mode_host", text = "Overlay", route = "Overlay", shape = AzButtonShape.NONE)
+    azRailSubItem(id = "mockup",  hostId = "mode_host", text = "Mockup",  route = "Mockup",  shape = AzButtonShape.NONE)
+    azRailSubItem(id = "trace",   hostId = "mode_host", text = "Trace",   route = "Trace",   shape = AzButtonShape.NONE)
 
-        // A menu item with multi-line text
-        azMenuItem(id = "multi-line", text = "This is a\nmulti-line item", route = "multi-line")
+    // Dedicated help button (v7.60+)
+    azHelpRailItem(id = "help", text = "Help")
 
-        // A rail item with the default shape (RECTANGLE)
-        azRailItem(id = "favorites", text = "Favorites", route = "favorites")
-
-        // A disabled rail item that overrides the default shape
-        azRailItem(
-            id = "profile",
-            text = "Profile",
-            shape = AzButtonShape.CIRCLE,
-            disabled = true,
-            route = "profile"
-        )
-
-        azDivider()
-
-        // A rail toggle item with the SQUARE shape
-        azRailToggle(
-            id = "online",
-            isChecked = isOnline,
-            toggleOnText = "Online",
-            toggleOffText = "Offline",
-            shape = AzButtonShape.SQUARE,
-            route = "online",
-            onClick = { isOnline = !isOnline }
-        )
-
-        // A menu toggle item
-        azMenuToggle(
-            id = "dark-mode",
-            isChecked = isDarkMode,
-            toggleOnText = "Dark Mode",
-            toggleOffText = "Light Mode",
-            route = "dark-mode",
-            onClick = { isDarkMode = !isDarkMode }
-        )
-
-        azDivider()
-
-        // A rail cycler with a disabled option
-        azRailCycler(
-            id = "rail-cycler",
-            options = railCycleOptions,
-            selectedOption = railSelectedOption,
-            disabledOptions = listOf("C"),
-            route = "rail-cycler",
-            onClick = {
-                val currentIndex = railCycleOptions.indexOf(railSelectedOption)
-                val nextIndex = (currentIndex + 1) % railCycleOptions.size
-                railSelectedOption = railCycleOptions[nextIndex]
-            }
-        )
-
-        // A menu cycler
-        azMenuCycler(
-            id = "menu-cycler",
-            options = menuCycleOptions,
-            selectedOption = menuSelectedOption,
-            route = "menu-cycler",
-            onClick = {
-                val currentIndex = menuCycleOptions.indexOf(menuSelectedOption)
-                val nextIndex = (currentIndex + 1) % menuCycleOptions.size
-                menuSelectedOption = menuCycleOptions[nextIndex]
-            }
-        )
-
-
-        // A button to demonstrate the loading state
-        azRailItem(id = "loading", text = "Load", route = "loading", onClick = { isLoading = !isLoading })
-
-        azDivider()
-
-        azMenuHostItem(id = "menu-host", text = "Menu Host", route = "menu-host")
-        azMenuSubItem(id = "menu-sub-1", hostId = "menu-host", text = "Menu Sub 1", route = "menu-sub-1")
-        azMenuSubItem(id = "menu-sub-2", hostId = "menu-host", text = "Menu Sub 2", route = "menu-sub-2")
-
-        azRailHostItem(id = "rail-host", text = "Rail Host", route = "rail-host")
-        azRailSubItem(id = "rail-sub-1", hostId = "rail-host", text = "Rail Sub 1", route = "rail-sub-1")
-        azMenuSubItem(id = "rail-sub-2", hostId = "rail-host", text = "Menu Sub 2", route = "rail-sub-2")
-
-        azMenuSubToggle(
-            id = "sub-toggle",
-            hostId = "menu-host",
-            isChecked = isDarkMode,
-            toggleOnText = "Sub Toggle On",
-            toggleOffText = "Sub Toggle Off",
-            route = "sub-toggle",
-            onClick = { isDarkMode = !isDarkMode }
-        )
-
-        azRailSubCycler(
-            id = "sub-cycler",
-            hostId = "rail-host",
-            options = menuCycleOptions,
-            selectedOption = menuSelectedOption,
-            route = "sub-cycler",
-            onClick = {
-                val currentIndex = menuCycleOptions.indexOf(menuSelectedOption)
-                val nextIndex = (currentIndex + 1) % menuCycleOptions.size
-                menuSelectedOption = menuCycleOptions[nextIndex]
-            }
-        )
-
-        // Your app's main content goes here, wrapped in 'onscreen' to enforce layout rules.
-        onscreen(alignment = Alignment.Center) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                AzTextBox(
-                    modifier = Modifier.padding(bottom = 16.dp),
-                    hint = "Enter text...",
-                    onSubmit = { text ->
-                        // Log.d(TAG, "Submitted text: $text")
-                    },
-                    submitButtonContent = {
-                        Text("Go")
-                    }
-                )
-
-                AzNavHost(startDestination = "home") {
-                    composable("home") { Text("Home Screen") }
-                    composable("multi-line") { Text("Multi-line Screen") }
-                    composable("favorites") { Text("Favorites Screen") }
-                    composable("profile") { Text("Profile Screen") }
-                    composable("online") { Text("Online Screen") }
-                    composable("dark-mode") { Text("Dark Mode Screen") }
-                    composable("rail-cycler") { Text("Rail Cycler Screen") }
-                    composable("menu-cycler") { Text("Menu Cycler Screen") }
-                    composable("loading") { Text("Loading Screen") }
-                    composable("menu-host") { Text("Menu Host Screen") }
-                    composable("menu-sub-1") { Text("Menu Sub 1 Screen") }
-                    composable("menu-sub-2") { Text("Menu Sub 2 Screen") }
-                    composable("rail-host") { Text("Rail Host Screen") }
-                    composable("rail-sub-1") { Text("Rail Sub 1 Screen") }
-                    composable("rail-sub-2") { Text("Rail Sub 2 Screen") }
-                    composable("sub-toggle") { Text("Sub Toggle Screen") }
-                    composable("sub-cycler") { Text("Sub Cycler Screen") }
-                }
-            }
-        }
-    }
+    // App content — full-screen camera/canvas behind the rail
+    background(weight = 0) { ArViewport(...) }
 }
+```
 
+## `azHelpRailItem(id, text)`
+
+Added in v7.60. Places a dedicated help button directly on the rail as a permanent item. When tapped, it activates the Info Screen overlay (the same overlay triggered by `azAdvanced(helpEnabled = true)`). Use this instead of relying on the auto-generated Help menu item when you want the help button always visible on the rail.
+
+```kotlin
+azHelpRailItem(id = "help", text = "Help")
 ```
 
 ## AzHostActivityLayout Layout Rules
