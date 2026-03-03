@@ -94,7 +94,7 @@ class ArViewModel @Inject constructor(
                 // If renderer is already attached, attach the session to it
                 renderer?.attachSession(session)
                 Log.d("ArViewModel", "AR Session Initialized")
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e("ArViewModel", "Failed to initialize AR session", e)
             }
         }

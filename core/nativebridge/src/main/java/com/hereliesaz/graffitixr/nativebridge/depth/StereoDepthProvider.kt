@@ -35,6 +35,7 @@ class StereoDepthProvider @Inject constructor(
      * @param height Frame height.
      */
     fun processStereoFrames(left: ByteArray, right: ByteArray, width: Int, height: Int) {
+        if (left.isEmpty() || right.isEmpty()) return
         val requiredSize = left.size
 
         if (currentAllocationSize != requiredSize || directLeftBuffer == null) {

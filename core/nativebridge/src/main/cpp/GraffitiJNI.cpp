@@ -88,7 +88,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCamera(JNIEnv* env
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateAnchorTransform(JNIEnv* env, jobject thiz, jfloatArray transform) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransform(JNIEnv* env, jobject thiz, jfloatArray transform) {
     if (gSlamEngine) {
         jfloat* mat = env->GetFloatArrayElements(transform, nullptr);
         gSlamEngine->updateAnchorTransform(mat);

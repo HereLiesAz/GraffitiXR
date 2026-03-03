@@ -16,10 +16,10 @@ class SlamManager {
 
     external fun updateViewport(width: Int, height: Int)
     external fun updateCamera(viewMatrix: FloatArray, projMatrix: FloatArray)
-    external fun updateAnchorTransform(transform: FloatArray)
     external fun setArCoreTrackingState(isTracking: Boolean)
 
     // Wrappers so MockK can intercept these in unit tests (external fun cannot be subclassed)
+    fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
     fun clearMap() = nativeClearMap()                       // Issue 2: reset state between projects
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled) // Issue 3
@@ -49,6 +49,7 @@ class SlamManager {
         nativeSetTargetFingerprint(descriptors, rows, cols, type, points3d)
     }
 
+    private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeClearMap()
     private external fun nativeSetViewportSize(width: Int, height: Int)
     private external fun nativeSetRelocEnabled(enabled: Boolean)
