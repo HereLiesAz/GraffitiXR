@@ -70,8 +70,6 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[android.Manifest.permission.CAMERA] ?: false
         val hasLocation = p[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-        // TODO: Wire up GPS data to SLAM engine when location-based anchoring is implemented
-        // if (hasLocation) { slamManager.feedLocationData(...) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,7 +96,6 @@ class MainActivity : ComponentActivity() {
 
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val editorViewModel: EditorViewModel = hiltViewModel()
-                // arViewModel is obtained via by viewModels() at Activity level for lifecycle access.
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
@@ -130,8 +127,6 @@ class MainActivity : ComponentActivity() {
 
                 val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked && !mainUiState.isCapturingTarget
 
-                // Request camera permission proactively on first launch so the camera
-                // feed is visible without requiring the user to tap "Create" first.
                 LaunchedEffect(Unit) {
                     if (!hasCameraPermission) {
                         permissionLauncher.launch(
@@ -157,15 +152,15 @@ class MainActivity : ComponentActivity() {
 
                     background(weight = 0) {
                         MainScreen(
-                            viewModel = mainViewModel,
+                            uiState = editorUiState,
+                            arUiState = arUiState,
                             editorViewModel = editorViewModel,
                             arViewModel = arViewModel,
                             slamManager = slamManager,
-                            projectRepository = projectRepository,
+                            hasCameraPermission = hasCameraPermission,
                             onRendererCreated = { renderer ->
                                 renderRefState.value = renderer
-                            },
-                            hasCameraPermission = hasCameraPermission
+                            }
                         )
                     }
 
@@ -263,12 +258,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Re-check in case the user granted permission in system Settings while away.
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
-        // Re-resume ARCore session when returning from background (no-op if session is null or
-        // not yet initialized — DisposableEffect in ArViewport manages mode-level lifecycle).
         arViewModel.resumeArSession()
     }
 
