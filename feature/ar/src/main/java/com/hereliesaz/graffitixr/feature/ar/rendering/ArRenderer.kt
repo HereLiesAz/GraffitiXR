@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.util.Log
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
@@ -13,6 +12,7 @@ import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import timber.log.Timber
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -35,7 +35,7 @@ class ArRenderer(
     private var pendingFlashlightMode: Boolean? = null
 
     fun attachSession(session: Session?) {
-        Log.i("ArRenderer", "attachSession: session is ${if (session != null) "NOT null" else "null"}")
+        Timber.i("attachSession: session is ${if (session != null) "NOT null" else "null"}")
         this.session = session
         if (session != null) {
             displayRotationHelper.onResume()
@@ -60,13 +60,13 @@ class ArRenderer(
             val fieldName = if (isOn) "ON" else "OFF"
             flashlightModeClass.getField(fieldName).get(null)
         } catch (e: Exception) {
-            Log.e("ArRenderer", "Failed to get FlashlightMode enum via reflection", e)
+            Timber.e(e, "Failed to get FlashlightMode enum via reflection")
             null
         }
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        Log.i("ArRenderer", "onSurfaceCreated")
+        Timber.i("onSurfaceCreated")
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f) // Fully transparent background
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
@@ -75,7 +75,7 @@ class ArRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        Log.i("ArRenderer", "onSurfaceChanged: ${width}x${height}")
+        Timber.i("onSurfaceChanged: ${width}x${height}")
         GLES30.glViewport(0, 0, width, height)
         displayRotationHelper.onSurfaceChanged(width, height)
     }
@@ -94,9 +94,9 @@ class ArRenderer(
                     val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
                     method.invoke(config, mode)
                     activeSession.configure(config)
-                    Log.i("ArRenderer", "Flashlight mode successfully updated to: ${if (isOn) "ON" else "OFF"}")
+                    Timber.i("Flashlight mode successfully updated to: ${if (isOn) "ON" else "OFF"}")
                 } catch (e: Exception) {
-                    Log.e("ArRenderer", "Failed to apply flashlight configuration", e)
+                    Timber.e(e, "Failed to apply flashlight configuration")
                 }
             }
             pendingFlashlightMode = null // Consume the request
@@ -113,7 +113,7 @@ class ArRenderer(
         } catch (e: SessionPausedException) {
             return // Session is paused, no frame to draw.
         } catch (e: Exception) {
-            Log.e("ArRenderer", "Session update failed", e)
+            Timber.e(e, "Session update failed")
             return
         }
 
@@ -141,7 +141,7 @@ class ArRenderer(
             } catch (e: NotYetAvailableException) {
                 // Expected at the beginning of a session
             } catch (e: Exception) {
-                Log.e("ArRenderer", "Error processing frame data", e)
+                Timber.e(e, "Error processing frame data")
             }
         }
 
