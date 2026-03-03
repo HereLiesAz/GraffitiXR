@@ -62,17 +62,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setArCoreTrackingState(J
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMap(JNIEnv* env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearMap(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) gSlamEngine->clearMap();
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setViewportSize(JNIEnv* env, jobject thiz, jint width, jint height) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetViewportSize(JNIEnv* env, jobject thiz, jint width, jint height) {
     if (gSlamEngine) gSlamEngine->setViewportSize(width, height);
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setRelocEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
