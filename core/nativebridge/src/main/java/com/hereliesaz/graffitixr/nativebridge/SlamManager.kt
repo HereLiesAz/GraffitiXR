@@ -15,9 +15,12 @@ class SlamManager {
     external fun draw()
 
     external fun updateViewport(width: Int, height: Int)
+    external fun setViewportSize(width: Int, height: Int)  // Issue 4: lightweight; no engine reinit
     external fun updateCamera(viewMatrix: FloatArray, projMatrix: FloatArray)
     external fun updateAnchorTransform(transform: FloatArray)
     external fun setArCoreTrackingState(isTracking: Boolean)
+    external fun clearMap()                                // Issue 2: reset state between projects
+    external fun setRelocEnabled(enabled: Boolean)         // Issue 3: pause reloc in non-AR modes
 
     fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int) {
         if (depthBuffer.isDirect) {

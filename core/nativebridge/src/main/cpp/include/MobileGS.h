@@ -43,14 +43,15 @@ public:
     void processDepthFrame(const cv::Mat& depth, const cv::Mat& color);
 
     void setArCoreTrackingState(bool isTracking);
-    bool isTracking() const;
 
     // Teleological SLAM
-    void attemptRelocalization(const cv::Mat& colorFrame);
     void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
-
-    // Fix 2: Schedule a background relocalization / loop-closure check
     void scheduleRelocCheck(const cv::Mat& colorFrame);
+
+    // Lifecycle helpers
+    void clearMap();                         // Reset all SLAM state (safe from any thread, no GL)
+    void setViewportSize(int width, int height); // Lightweight; does not reinitialize the engine
+    void setRelocEnabled(bool enabled);      // Pause/resume background reloc thread
 
     // Project Data I/O
     void saveModel(const std::string& path);
@@ -107,12 +108,13 @@ private:
     static constexpr int   INTERP_FRAMES = 30;
     static constexpr float INTERP_STEP   = 1.0f / 30.0f;
 
-    // Fix 2: Background relocalization thread (loop closure)
+    // Background relocalization thread (loop closure)
     std::thread             mRelocThread;
     std::mutex              mRelocMutex;
     std::condition_variable mRelocCv;
     std::atomic<bool>       mRelocRunning{false};
     std::atomic<bool>       mRelocRequested{false};
+    std::atomic<bool>       mRelocEnabled{true};  // Issue 3: gate for non-AR modes
     cv::Mat                 mRelocColorFrame;
     uint64_t                mLastRelocTriggerFrame = 0;
     static constexpr uint64_t LOOP_CLOSURE_INTERVAL = 60;   // ~1 s at 60 fps

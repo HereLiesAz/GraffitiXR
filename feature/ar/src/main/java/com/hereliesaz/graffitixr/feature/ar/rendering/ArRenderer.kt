@@ -72,7 +72,8 @@ class ArRenderer(
         Timber.i("onSurfaceChanged: ${width}x${height}")
         GLES30.glViewport(0, 0, width, height)
         displayRotationHelper.onSurfaceChanged(width, height)
-        slamManager.updateViewport(width, height)
+        // Issue 4: lightweight viewport update; does not reinitialize the engine or wipe map data
+        slamManager.setViewportSize(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {

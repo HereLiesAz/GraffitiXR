@@ -11,15 +11,18 @@ import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.nio.ByteBuffer
 import javax.inject.Inject
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
-    private val slamManager: SlamManager
+    private val slamManager: SlamManager,
+    private val stereoProvider: StereoDepthProvider   // Issue 1: temporal stereo depth
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
@@ -108,6 +111,7 @@ class ArViewModel @Inject constructor(
         try {
             s.resume()
             isSessionResumed = true
+            slamManager.setRelocEnabled(true)  // Issue 3: re-enable reloc on AR resume
             Log.d("ArViewModel", "AR Session Resumed")
         } catch (e: CameraNotAvailableException) {
             Log.e("ArViewModel", "Camera not available on resume", e)
@@ -121,6 +125,7 @@ class ArViewModel @Inject constructor(
         if (!isSessionResumed) return // Avoid redundant pauses
         isSessionResumed = false
         session?.pause()
+        slamManager.setRelocEnabled(false)  // Issue 3: stop waking reloc thread off-mode
         Log.d("ArViewModel", "AR Session Paused")
     }
 

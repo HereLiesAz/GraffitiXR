@@ -62,6 +62,21 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setArCoreTrackingState(J
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_clearMap(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) gSlamEngine->clearMap();
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setViewportSize(JNIEnv* env, jobject thiz, jint width, jint height) {
+    if (gSlamEngine) gSlamEngine->setViewportSize(width, height);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setRelocEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
+    if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
     if (gSlamEngine) {
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);

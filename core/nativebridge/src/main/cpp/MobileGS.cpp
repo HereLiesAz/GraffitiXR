@@ -173,7 +173,41 @@ void MobileGS::setArCoreTrackingState(bool isTracking) {
     mIsArCoreTracking = isTracking;
 }
 
-bool MobileGS::isTracking() const { return mIsArCoreTracking; }
+// ─── Issue 2: Reset all SLAM state for a new project ─────────────────────────
+// Must NOT call any GL functions — safe to call from any thread.
+void MobileGS::clearMap() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    splatData.clear();
+    mVoxelGrid.clear();
+    mPointCount = 0;
+    mTargetDescriptors = cv::Mat();
+    mTargetKeypoints3D.clear();
+    mLastDepthFrame = cv::Mat();
+
+    memset(mAnchorMatrix, 0, sizeof(mAnchorMatrix));
+    memset(mTargetAnchorMatrix, 0, sizeof(mTargetAnchorMatrix));
+    mAnchorMatrix[0] = mAnchorMatrix[5] = mAnchorMatrix[10] = mAnchorMatrix[15] = 1.0f;
+    mTargetAnchorMatrix[0] = mTargetAnchorMatrix[5] = mTargetAnchorMatrix[10] = mTargetAnchorMatrix[15] = 1.0f;
+    mAnchorInterpolating = false;
+    mInterpolationProgress = 0.0f;
+
+    mFrameCounter = 0;
+    mLastRelocTriggerFrame = 0;
+    mLastFingerprintUpdateFrame = 0;
+    LOGI("MobileGS: map cleared for new project");
+}
+
+// ─── Issue 4: Lightweight viewport update (does not reinitialize the engine) ──
+void MobileGS::setViewportSize(int width, int height) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mScreenWidth = width;
+    mScreenHeight = height;
+}
+
+// ─── Issue 3: Enable/disable the background reloc thread ─────────────────────
+void MobileGS::setRelocEnabled(bool enabled) {
+    mRelocEnabled = enabled;
+}
 
 // Extracts world position of camera from View Matrix (Camera-to-World translation)
 cv::Point3f MobileGS::getCameraWorldPosition() const {
@@ -273,8 +307,9 @@ void MobileGS::interpolateAnchorStep() {
     if (t >= 1.0f) mAnchorInterpolating = false;
 }
 
-// ─── Fix 2: Background relocalization / loop-closure thread ──────────────────
+// ─── Fix 2 + Issue 3: Background relocalization / loop-closure thread ─────────
 void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
+    if (!mRelocEnabled) return;  // Issue 3: paused when not in AR mode
     {
         std::lock_guard<std::mutex> lk(mRelocMutex);
         colorFrame.copyTo(mRelocColorFrame);
@@ -585,9 +620,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
         mSortCv.notify_one();
     }
 
-    // Fix 3: Periodically grow the fingerprint with peripheral keypoints
+    // Issue 5: Grow (or auto-seed) the fingerprint with peripheral keypoints.
+    // Runs even when no explicit fingerprint has been set — tryUpdateFingerprint()
+    // will auto-initialize mTargetDescriptors on the first successful call.
     if (mIsArCoreTracking &&
-        mTargetDescriptors.rows > 0 &&
         (mFrameCounter - mLastFingerprintUpdateFrame) >= FINGERPRINT_UPDATE_INTERVAL) {
         tryUpdateFingerprint(color);
         mLastFingerprintUpdateFrame = mFrameCounter;
@@ -665,59 +701,6 @@ void MobileGS::setTargetFingerprint(const cv::Mat& descriptors, const std::vecto
     std::lock_guard<std::mutex> lock(mMutex);
     mTargetDescriptors = descriptors.clone();
     mTargetKeypoints3D = points3d;
-}
-
-void MobileGS::attemptRelocalization(const cv::Mat& colorFrame) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (mIsArCoreTracking || mTargetDescriptors.empty() || mTargetKeypoints3D.empty() || colorFrame.empty()) return;
-
-    cv::Mat gray;
-    cv::cvtColor(colorFrame, gray, cv::COLOR_RGB2GRAY);
-
-    std::vector<cv::KeyPoint> kps;
-    cv::Mat descs;
-    mFeatureDetector->detectAndCompute(gray, cv::noArray(), kps, descs);
-    if (descs.empty()) return;
-
-    std::vector<cv::DMatch> matches;
-    mMatcher->match(mTargetDescriptors, descs, matches);
-
-    std::vector<cv::Point3f> objPts;
-    std::vector<cv::Point2f> imgPts;
-    for (const auto& m : matches) {
-        if (m.distance < 50.0f && m.queryIdx < mTargetKeypoints3D.size()) {
-            objPts.push_back(mTargetKeypoints3D[m.queryIdx]);
-            imgPts.push_back(kps[m.trainIdx].pt);
-        }
-    }
-
-    if (objPts.size() >= 10) {
-        cv::Mat rvec, tvec;
-        float fx = mProjMatrix[0] * mScreenWidth / 2.0f;
-        float fy = mProjMatrix[5] * mScreenHeight / 2.0f;
-        float cx = mScreenWidth / 2.0f;
-        float cy = mScreenHeight / 2.0f;
-
-        cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
-        cv::Mat distCoeffs = cv::Mat::zeros(4, 1, CV_64F);
-
-        bool success = cv::solvePnPRansac(objPts, imgPts, cameraMatrix, distCoeffs, rvec, tvec);
-        if (success) {
-            cv::Mat R;
-            cv::Rodrigues(rvec, R);
-            cv::Mat T = cv::Mat::eye(4, 4, CV_32F);
-            for (int i=0; i<3; ++i) {
-                for (int j=0; j<3; ++j) {
-                    T.at<float>(i, j) = R.at<double>(i, j);
-                }
-                T.at<float>(i, 3) = tvec.at<double>(i, 0);
-            }
-            // Fix 1: Smooth interpolation instead of instant teleport
-            memcpy(mTargetAnchorMatrix, T.data, 16 * sizeof(float));
-            mInterpolationProgress = 0.0f;
-            mAnchorInterpolating   = true;
-        }
-    }
 }
 
 void MobileGS::updateAnchorTransform(float* transformMat) {
