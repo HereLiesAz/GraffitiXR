@@ -1,11 +1,14 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
-import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.google.ar.core.Config
 import com.google.ar.core.Session
+import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,26 +26,71 @@ class ArViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     private var renderer: ArRenderer? = null
-    var session: Session? = null
-        private set
-    var isSessionResumed = false
-        private set
+    private var session: Session? = null
+
+    private var isActivityResumed = false
+    private var isInArMode = false
+    private var isSessionResumed = false
+
+    // ==================== Session Lifecycle Management ====================
 
     /**
-     * Initializes the ARCore session.
+     * Notifies the ViewModel that the parent Activity is resumed.
      */
-    fun initArSession(context: android.content.Context) {
+    fun onActivityResumed() {
+        isActivityResumed = true
+        updateSessionState()
+    }
+
+    /**
+     * Notifies the ViewModel that the parent Activity is paused.
+     */
+    fun onActivityPaused() {
+        isActivityResumed = false
+        updateSessionState()
+    }
+
+    /**
+     * Notifies the ViewModel that the UI has entered or exited AR mode.
+     * This is the primary trigger for creating/destroying the AR session.
+     */
+    fun setArMode(enabled: Boolean, context: Context) {
+        if (isInArMode == enabled) return
+        isInArMode = enabled
+
+        if (enabled) {
+            initArSession(context)
+        }
+        // Don't destroy session immediately, let pause handle it
+        // to prevent race conditions when switching to CameraX.
+        updateSessionState()
+    }
+
+    /**
+     * Centralized logic to decide if the AR session should be running.
+     * The session should only be active if the UI is in AR mode AND the Activity is in the foreground.
+     */
+    private fun updateSessionState() {
+        val shouldBeRunning = isActivityResumed && isInArMode
+        if (shouldBeRunning && !isSessionResumed) {
+            resumeArSession()
+        } else if (!shouldBeRunning && isSessionResumed) {
+            pauseArSession()
+        }
+    }
+
+    private fun initArSession(context: Context) {
         if (session == null) {
             try {
                 session = Session(context)
-                // Configure the session (e.g., depth API)
                 val config = session!!.config
-                config.depthMode = com.google.ar.core.Config.DepthMode.AUTOMATIC
-                config.updateMode = com.google.ar.core.Config.UpdateMode.LATEST_CAMERA_IMAGE
+                config.depthMode = Config.DepthMode.AUTOMATIC
+                config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 session!!.configure(config)
-                
+
                 // If renderer is already attached, attach the session to it
                 renderer?.attachSession(session)
+                Log.d("ArViewModel", "AR Session Initialized")
             } catch (e: Exception) {
                 Log.e("ArViewModel", "Failed to initialize AR session", e)
             }
@@ -55,12 +103,13 @@ class ArViewModel @Inject constructor(
         renderer?.attachSession(session)
     }
 
-    fun resumeArSession() {
+    private fun resumeArSession() {
         val s = session ?: return
         try {
             s.resume()
             isSessionResumed = true
-        } catch (e: com.google.ar.core.exceptions.CameraNotAvailableException) {
+            Log.d("ArViewModel", "AR Session Resumed")
+        } catch (e: CameraNotAvailableException) {
             Log.e("ArViewModel", "Camera not available on resume", e)
         } catch (e: IllegalStateException) {
             // Session already resumed — safe to ignore
@@ -68,16 +117,21 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun pauseArSession() {
+    private fun pauseArSession() {
+        if (!isSessionResumed) return // Avoid redundant pauses
         isSessionResumed = false
         session?.pause()
+        Log.d("ArViewModel", "AR Session Paused")
     }
 
     fun destroyArSession() {
         session?.close()
         session = null
         renderer?.attachSession(null)
+        Log.d("ArViewModel", "AR Session Destroyed")
     }
+
+    // ======================================================================
 
     /**
      * Updates the tracking state from ARCore. No-ops if unchanged to avoid frame-rate churn.

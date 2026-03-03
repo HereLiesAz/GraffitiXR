@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -28,7 +27,6 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.aznavrail.model.AzNestedRailAlignment
-import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -69,15 +67,14 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[android.Manifest.permission.CAMERA] ?: false
-        val hasLocation = p[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-            this, android.Manifest.permission.CAMERA
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        hasCameraPermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
 
         securityProviderManager.installAsync(this)
         slamManager.ensureInitialized()
@@ -262,12 +259,12 @@ class MainActivity : ComponentActivity() {
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
-        arViewModel.resumeArSession()
+        arViewModel.onActivityResumed()
     }
 
     override fun onPause() {
         super.onPause()
-        arViewModel.pauseArSession()
+        arViewModel.onActivityPaused()
     }
 
     override fun onDestroy() {
@@ -298,7 +295,7 @@ class MainActivity : ComponentActivity() {
 
         val requestPermissions = {
             permissionLauncher.launch(
-                arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.ACCESS_FINE_LOCATION)
+                arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
             )
         }
 

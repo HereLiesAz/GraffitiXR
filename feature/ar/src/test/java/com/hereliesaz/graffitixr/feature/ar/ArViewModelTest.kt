@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Session
@@ -15,11 +16,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import java.lang.reflect.Field
@@ -30,6 +27,7 @@ class ArViewModelTest {
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
     private val session: Session = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -149,23 +147,37 @@ class ArViewModelTest {
     // ==================== Session Lifecycle Tests ====================
 
     @Test
-    fun `resumeArSession sets isSessionResumed`() = runTest {
+    fun `session resumes only when in AR mode and activity is resumed`() = runTest {
         setPrivateField(viewModel, "session", session)
-        assertFalse(viewModel.isSessionResumed)
+        assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
 
-        viewModel.resumeArSession()
-        assertTrue(viewModel.isSessionResumed)
+        // Enter AR mode, but activity is paused
+        viewModel.setArMode(true, context)
+        assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
+
+        // Resume activity
+        viewModel.onActivityResumed()
+        assertTrue(getPrivateField(viewModel, "isSessionResumed") as Boolean)
         verify { session.resume() }
     }
 
     @Test
-    fun `pauseArSession clears isSessionResumed`() = runTest {
+    fun `session pauses when activity is paused or not in AR mode`() = runTest {
         setPrivateField(viewModel, "session", session)
-        viewModel.resumeArSession()
-        assertTrue(viewModel.isSessionResumed)
+        viewModel.setArMode(true, context)
+        viewModel.onActivityResumed()
+        assertTrue(getPrivateField(viewModel, "isSessionResumed") as Boolean)
 
-        viewModel.pauseArSession()
-        assertFalse(viewModel.isSessionResumed)
+        // Pause activity
+        viewModel.onActivityPaused()
+        assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
+        verify { session.pause() }
+
+        // Resume activity, then exit AR mode
+        viewModel.onActivityResumed()
+        assertTrue(getPrivateField(viewModel, "isSessionResumed") as Boolean)
+        viewModel.setArMode(false, context)
+        assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
         verify { session.pause() }
     }
 
@@ -173,5 +185,11 @@ class ArViewModelTest {
         val field = obj.javaClass.getDeclaredField(fieldName)
         field.isAccessible = true
         field.set(obj, value)
+    }
+
+    private fun getPrivateField(obj: Any, fieldName: String): Any? {
+        val field = obj.javaClass.getDeclaredField(fieldName)
+        field.isAccessible = true
+        return field.get(obj)
     }
 }

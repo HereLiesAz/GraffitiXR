@@ -11,11 +11,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
-import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
@@ -36,22 +36,22 @@ fun MainScreen(
 ) {
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
     val isImageLocked = activeLayer?.isImageLocked ?: false
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
     // 1. Render Backgrounds (Camera or Mockup)
     if (hasCameraPermission) {
         when (uiState.editorMode) {
             EditorMode.AR -> {
-                // AR mode: ARCore owns the camera. GLSurfaceView renders the camera feed
-                // via BackgroundRenderer and feeds frames to the SLAM engine.
-                DisposableEffect(uiState.editorMode) {
-                    arViewModel.initArSession(context)
-                    arViewModel.resumeArSession()
-                    rendererRef.value?.let { arViewModel.attachSessionToRenderer(it) }
+                // Let the ViewModel manage the AR session lifecycle
+                LaunchedEffect(Unit) {
+                    arViewModel.setArMode(true, context)
+                }
+
+                // When this composable is disposed, notify the ViewModel to exit AR mode
+                DisposableEffect(Unit) {
                     onDispose {
-                        arViewModel.pauseArSession()
-                        arViewModel.attachSessionToRenderer(null)
+                        arViewModel.setArMode(false, context)
                     }
                 }
 

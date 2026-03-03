@@ -17,7 +17,6 @@ class DualAnalyzerTest {
 
     private var slamCallCount = 0
     private var lightCallCount = 0
-    private var teleologicalCallCount = 0
 
     private lateinit var analyzer: DualAnalyzer
 
@@ -25,10 +24,8 @@ class DualAnalyzerTest {
     fun setUp() {
         slamCallCount = 0
         lightCallCount = 0
-        teleologicalCallCount = 0
         analyzer = DualAnalyzer(
             onLightUpdate = { lightCallCount++ },
-            onTeleologicalFrame = { teleologicalCallCount++ },
             onSlamFrame = { _, _, _ -> slamCallCount++ }
         )
     }
@@ -72,7 +69,6 @@ class DualAnalyzerTest {
         var capturedHeight = 0
         val a = DualAnalyzer(
             onLightUpdate = {},
-            onTeleologicalFrame = {},
             onSlamFrame = { _, w, h -> capturedWidth = w; capturedHeight = h }
         )
         a.analyze(mockImageProxy(width = 1280, height = 720))
@@ -97,16 +93,8 @@ class DualAnalyzerTest {
     }
 
     @Test
-    fun `teleological callback not triggered for unsupported image format`() {
-        // RAW10 is not YUV_420_888 or JPEG — should never reach bitmap extraction
-        val image = mockImageProxy(format = ImageFormat.RAW10)
-        analyzer.analyze(image)
-        assertEquals(0, teleologicalCallCount)
-    }
-
-    @Test
     fun `analyzer completes without crash when onSlamFrame is null`() {
-        val a = DualAnalyzer(onLightUpdate = {}, onTeleologicalFrame = {})
+        val a = DualAnalyzer(onLightUpdate = {})
         a.analyze(mockImageProxy()) // must not throw
     }
 
@@ -114,7 +102,7 @@ class DualAnalyzerTest {
     fun `light estimation reads average luminosity from Y plane`() {
         // All pixels set to 128 → average ≈ 0.502
         var capturedLight = -1f
-        val a = DualAnalyzer(onLightUpdate = { capturedLight = it }, onTeleologicalFrame = {})
+        val a = DualAnalyzer(onLightUpdate = { capturedLight = it })
         val data = ByteArray(640 * 480) { 128.toByte() }
         val buf = ByteBuffer.wrap(data)
         val plane = mockk<ImageProxy.PlaneProxy> {

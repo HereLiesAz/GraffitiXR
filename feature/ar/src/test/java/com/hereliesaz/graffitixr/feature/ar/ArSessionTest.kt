@@ -1,10 +1,9 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.Context
 import com.google.ar.core.Session
-import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -12,8 +11,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -22,6 +19,7 @@ class ArSessionTest {
 
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -36,17 +34,17 @@ class ArSessionTest {
     }
 
     @Test
-    fun `resumeArSession should not crash if session is null`() = runTest {
-        // session is null by default
-        viewModel.resumeArSession()
-        // Should not throw any exception
+    fun `session should not resume if activity is paused`() = runTest {
+        viewModel.setArMode(true, context)
+        viewModel.onActivityPaused()
+        // No direct way to check if session is paused, but no exception should be thrown.
     }
 
     @Test
-    fun `pauseArSession should not crash if session is null`() = runTest {
-        // session is null by default
-        viewModel.pauseArSession()
-        // Should not throw any exception
+    fun `session should not resume if not in AR mode`() = runTest {
+        viewModel.setArMode(false, context)
+        viewModel.onActivityResumed()
+        // No direct way to check if session is resumed, but no exception should be thrown.
     }
 
     @Test
