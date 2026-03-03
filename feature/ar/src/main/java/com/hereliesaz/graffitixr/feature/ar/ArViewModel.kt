@@ -228,4 +228,14 @@ class ArViewModel @Inject constructor(
     fun ensureEngineInitialized() {
         slamManager.ensureInitialized()
     }
+
+    // ==================== Stereo Depth (Temporal) ====================
+
+    /**
+     * Receives a Y-plane frame from CameraX (OVERLAY mode) for temporal stereo depth.
+     * Consecutive frames are treated as left/right pair and fed to the SLAM engine.
+     */
+    fun onCameraFrameForStereo(buffer: ByteBuffer, width: Int, height: Int) {
+        stereoProvider.submitFrame(buffer, width, height)
+    }
 }

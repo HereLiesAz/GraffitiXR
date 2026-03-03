@@ -87,6 +87,7 @@ fun MainScreen(
                 CameraPreview(
                     controller = controller,
                     onPhotoCaptured = {},
+                    onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
                     modifier = Modifier.fillMaxSize()
                 )
             }

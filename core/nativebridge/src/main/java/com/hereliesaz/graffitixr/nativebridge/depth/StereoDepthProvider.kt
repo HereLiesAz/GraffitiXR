@@ -18,6 +18,14 @@ class StereoDepthProvider @Inject constructor(
     private var directRightBuffer: ByteBuffer? = null
     private var currentAllocationSize = 0
 
+    // Temporal stereo state (single-camera, consecutive frames)
+    private var prevFrameBuffer: ByteBuffer? = null
+    private var stereoLeft: ByteBuffer? = null
+    private var stereoRight: ByteBuffer? = null
+    private var stereoFrameSize: Int = 0
+    private var prevWidth: Int = 0
+    private var prevHeight: Int = 0
+
     /**
      * Processes incoming stereo frames by mapping them into native memory space.
      *
@@ -48,5 +56,56 @@ class StereoDepthProvider @Inject constructor(
         }
 
         slamManager.feedStereoData(directLeftBuffer!!, directRightBuffer!!, width, height)
+    }
+
+    /**
+     * Accepts a single Y-plane frame (from CameraX ImageAnalysis) and pairs it with the
+     * previous frame to form a temporal stereo pair. Skips on the very first call.
+     *
+     * @param yPlane The Y-plane ByteBuffer from ImageProxy.planes[0].buffer.
+     * @param width  Frame width.
+     * @param height Frame height.
+     */
+    fun submitFrame(yPlane: ByteBuffer, width: Int, height: Int) {
+        val snapshot = yPlane.duplicate()  // independent position, shared backing data
+        val frameSize = snapshot.remaining()
+
+        if (stereoFrameSize != frameSize || stereoLeft == null) {
+            stereoLeft = ByteBuffer.allocateDirect(frameSize)
+            stereoRight = ByteBuffer.allocateDirect(frameSize)
+            prevFrameBuffer = ByteBuffer.allocateDirect(frameSize)
+            stereoFrameSize = frameSize
+            prevFrameBuffer!!.put(snapshot)
+            prevFrameBuffer!!.rewind()
+            prevWidth = width
+            prevHeight = height
+            return
+        }
+
+        if (prevWidth != width || prevHeight != height) {
+            prevFrameBuffer!!.clear()
+            prevFrameBuffer!!.put(snapshot)
+            prevFrameBuffer!!.rewind()
+            prevWidth = width
+            prevHeight = height
+            return
+        }
+
+        // Left = previous frame, Right = current frame
+        stereoLeft!!.clear()
+        prevFrameBuffer!!.rewind()
+        stereoLeft!!.put(prevFrameBuffer!!)
+        stereoLeft!!.rewind()
+
+        stereoRight!!.clear()
+        stereoRight!!.put(snapshot)
+        stereoRight!!.rewind()
+
+        // Advance previous frame to current
+        prevFrameBuffer!!.clear()
+        prevFrameBuffer!!.put(stereoRight!!.duplicate().also { it.rewind() })
+        prevFrameBuffer!!.rewind()
+
+        slamManager.feedStereoData(stereoLeft!!, stereoRight!!, width, height)
     }
 }

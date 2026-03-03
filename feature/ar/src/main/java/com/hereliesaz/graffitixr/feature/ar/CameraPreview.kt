@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -24,6 +25,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
 import java.nio.ByteBuffer
+import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -60,7 +62,8 @@ fun rememberCameraController(): CameraController {
 fun CameraPreview(
     controller: CameraController,
     onPhotoCaptured: (Bitmap) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAnalyzerFrame: ((ByteBuffer, Int, Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -107,6 +110,32 @@ fun CameraPreview(
         }
     }
 
+    // Background executor for image analysis (SGBM stereo matching is CPU-intensive)
+    val analysisExecutor = remember(onAnalyzerFrame != null) {
+        if (onAnalyzerFrame != null) Executors.newSingleThreadExecutor() else null
+    }
+    DisposableEffect(analysisExecutor) {
+        onDispose { analysisExecutor?.shutdown() }
+    }
+
+    // ImageAnalysis use case: extract Y-plane every 10th frame (~3 fps at 30 fps)
+    val imageAnalysis = remember(onAnalyzerFrame) {
+        onAnalyzerFrame?.let { callback ->
+            var frameIndex = 0
+            ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also { analysis ->
+                    analysis.setAnalyzer(analysisExecutor!!) { image ->
+                        if (frameIndex++ % 10 == 0) {
+                            callback(image.planes[0].buffer, image.width, image.height)
+                        }
+                        image.close()
+                    }
+                }
+        }
+    }
+
     LaunchedEffect(lifecycleOwner) {
         val cameraProvider = context.getCameraProvider()
         val preview = Preview.Builder().build()
@@ -116,11 +145,11 @@ fun CameraPreview(
 
         try {
             cameraProvider.unbindAll()
+            val useCases = listOfNotNull(preview, imageCapture, imageAnalysis).toTypedArray()
             val camera: Camera = cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
-                preview,
-                imageCapture
+                *useCases
             )
             controller.onCameraReady(camera.cameraControl)
         } catch(exc: Exception) {
