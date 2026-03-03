@@ -54,6 +54,12 @@ fun MainScreen(
                         arViewModel.attachSessionToRenderer(null)
                     }
                 }
+
+                // Apply flashlight state when it changes
+                LaunchedEffect(arUiState.isFlashlightOn) {
+                    rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
+                }
+
                 AndroidView(
                     factory = { ctx ->
                         val renderer = ArRenderer(ctx, slamManager) { isTracking ->
