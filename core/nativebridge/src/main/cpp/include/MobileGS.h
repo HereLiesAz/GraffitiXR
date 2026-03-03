@@ -1,18 +1,24 @@
-// FILE: core/nativebridge/src/main/cpp/include/MobileGS.h
+// ~~~ FILE: ./core/nativebridge/src/main/cpp/include/MobileGS.h ~~~
 #pragma once
 #include <opencv2/opencv.hpp>
 #include <mutex>
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <thread>
+#include <atomic>
+#include <condition_variable>
 #include <GLES3/gl3.h>
 
+// Upgraded Splat Struct (48 bytes)
 struct Splat {
-    float x, y, z;
-    float r, g, b, a;
-    float confidence;
+    float x, y, z;          // Position (12 bytes)
+    float r, g, b, a;       // Color (16 bytes)
+    float confidence;       // SLAM Confidence (4 bytes)
+    float nx, ny, nz;       // Surface Normal (12 bytes)
+    float radius;           // Splat Scale (4 bytes)
 };
-static_assert(sizeof(Splat) == 32, "Splat struct layout changed — update .bin serialization.");
+static_assert(sizeof(Splat) == 48, "Splat struct layout changed — update .bin serialization.");
 
 // Voxel spatial hashing keys
 struct VoxelKey {
@@ -53,7 +59,12 @@ public:
 
 private:
     void pruneMap();
+    void continuousOptimize();
     void initShaders();
+
+    // Background Sorter Thread
+    void sortThreadFunc();
+    cv::Point3f getCameraWorldPosition() const;
 
     std::mutex mMutex;
     bool mIsArCoreTracking = false;
@@ -67,17 +78,28 @@ private:
     std::vector<Splat> splatData;
     std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
 
+    // Depth Sorting Concurrency
+    std::thread mSortThread;
+    std::mutex mSortMutex;
+    std::condition_variable mSortCv;
+    std::atomic<bool> mSortRunning{false};
+    std::atomic<bool> mSortRequested{false};
+    std::vector<uint32_t> mDrawIndices;
+    bool mIndicesDirty = false;
+
     // GLES handles
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
-    GLuint mMeshVbo = 0;
+    GLuint mIndexVbo = 0;  // NEW: Element Buffer for sorted rendering
 
     int mPointCount = 0;
-    int mMeshVertexCount = 0;
+
+    // Optimization State
+    uint64_t mFrameCounter = 0;
 
     float mViewMatrix[16];
     float mProjMatrix[16];
-    float mAnchorMatrix[16]; // For holding the Teleological offset
+    float mAnchorMatrix[16];
     bool mCameraReady = false;
 
     int mScreenWidth = 1920;
