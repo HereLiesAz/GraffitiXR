@@ -21,14 +21,17 @@ class ArRenderer(
     private val slamManager: SlamManager,
     private val onTrackingUpdated: (Boolean) -> Unit
 ) : GLSurfaceView.Renderer {
+
     var session: Session? = null
         private set
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
+
     private val viewMatrix = FloatArray(16)
     private val projMatrix = FloatArray(16)
     private var cameraTextureNameSet = false
     private var frameCount = 0
+
     private var pendingFlashlightMode: Boolean? = null
 
     fun attachSession(session: Session?) {
@@ -79,6 +82,7 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+
         val activeSession = session ?: return
 
         // Apply pending flashlight changes safely on the GL thread.
@@ -102,8 +106,8 @@ class ArRenderer(
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
             cameraTextureNameSet = true
         }
-        displayRotationHelper.updateSessionIfNeeded(activeSession)
 
+        displayRotationHelper.updateSessionIfNeeded(activeSession)
         val frame: Frame = try {
             activeSession.update()
         } catch (e: SessionPausedException) {
@@ -114,13 +118,11 @@ class ArRenderer(
         }
 
         backgroundRenderer.draw(frame)
-
         val camera = frame.camera
         val isTracking = camera.trackingState == TrackingState.TRACKING
 
         camera.getViewMatrix(viewMatrix, 0)
         camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
-
         slamManager.setArCoreTrackingState(isTracking)
         slamManager.updateCamera(viewMatrix, projMatrix)
 
@@ -131,6 +133,7 @@ class ArRenderer(
                     val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
                     slamManager.feedColorFrame(rgbaBuffer, image.width, image.height)
                 }
+
                 frame.acquireDepthImage16Bits().use { depthImage ->
                     val depthBuffer = depthImage.planes[0].buffer
                     slamManager.feedArCoreDepth(depthBuffer, depthImage.width, depthImage.height)
