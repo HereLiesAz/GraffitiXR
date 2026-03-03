@@ -1,12 +1,11 @@
 package com.hereliesaz.graffitixr.feature.editor
 
-import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.toArgb
 
 /**
  * Extension for EditorViewModel to seamlessly integrate the UI-layer 2D drawing tools.
@@ -29,7 +28,9 @@ fun EditorViewModel.applyStrokeToActiveLayer(stroke: List<Offset>) {
         val processedBitmap = ImageProcessor.applyToolToBitmap(
             originalBitmap = bitmap,
             stroke = stroke,
-            tool = activeTool
+            tool = activeTool,
+            brushSize = currentState.brushSize,
+            brushColor = currentState.activeColor.toArgb()
         )
 
         // Update the state flow with the newly mutated bitmap
@@ -37,18 +38,13 @@ fun EditorViewModel.applyStrokeToActiveLayer(stroke: List<Offset>) {
             this[activeLayerIndex] = activeLayer.copy(bitmap = processedBitmap)
         }
 
-        // You will likely need to cast or access the private MutableStateFlow here
-        // depending on your exact EditorViewModel visibility, or proxy it through a public method.
         updateLayersInternal(updatedLayers)
     }
 }
 
 /**
  * Helper to update the UI State layers.
- * Ensure your EditorViewModel exposes a method to accept this new list.
  */
 private fun EditorViewModel.updateLayersInternal(newLayers: List<com.hereliesaz.graffitixr.common.model.Layer>) {
-    // Assuming you have a public method like setLayers(layers) or similar.
-    // If not, add `fun setLayers(layers: List<Layer>)` to EditorViewModel.
-    this.javaClass.methods.find { it.name == "setLayers" }?.invoke(this, newLayers)
+    this.setLayers(newLayers)
 }

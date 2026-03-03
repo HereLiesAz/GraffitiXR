@@ -1,10 +1,11 @@
+// FILE: core/common/src/main/java/com/hereliesaz/graffitixr/common/model/EditorModels.kt
 package com.hereliesaz.graffitixr.common.model
 
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
-import com.hereliesaz.graffitixr.common.model.Tool
+import androidx.compose.ui.graphics.Color
 
 /**
  * Represents a single graphical layer in the editor with all aesthetic and spatial parameters.
@@ -83,5 +84,8 @@ data class EditorUiState(
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val undoCount: Int = 0,
     val redoCount: Int = 0,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val brushSize: Float = 50f,
+    val activeColor: Color = Color.White,
+    val showColorPicker: Boolean = false
 )

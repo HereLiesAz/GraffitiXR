@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.DispatcherProvider
@@ -32,7 +34,7 @@ class EditorViewModel @Inject constructor(
     private val backgroundRemover: BackgroundRemover,
     private val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider
-) : ViewModel() {
+) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState = _uiState.asStateFlow()
@@ -58,14 +60,12 @@ class EditorViewModel @Inject constructor(
                             } else layer
                         }
 
-                        // Load SLAM Model
-                        slamManager.clearMap()  // Issue 2: reset previous project's state
+                        slamManager.clearMap()
                         val mapPath = projectManager.getMapPath(context, project.id)
                         if (File(mapPath).exists()) {
                             slamManager.loadModel(mapPath)
                         }
 
-                        // Inject Fingerprint for Relocalization
                         project.fingerprint?.let { fp ->
                             slamManager.setTargetFingerprint(
                                 fp.descriptorsData,
@@ -101,7 +101,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(undoCount = undoStack.size, redoCount = redoStack.size) }
     }
 
-    fun onUndoClicked() {
+    override fun onUndoClicked() {
         if (undoStack.isEmpty()) return
         redoStack.addLast(_uiState.value.layers)
         _uiState.update { it.copy(layers = undoStack.removeLast()) }
@@ -109,7 +109,7 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
-    fun onRedoClicked() {
+    override fun onRedoClicked() {
         if (redoStack.isEmpty()) return
         undoStack.addLast(_uiState.value.layers)
         _uiState.update { it.copy(layers = redoStack.removeLast()) }
@@ -117,7 +117,7 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
-    fun onAddLayer(uri: Uri) {
+    override fun onAddLayer(uri: Uri) {
         pushHistory()
         viewModelScope.launch(dispatchers.io) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
@@ -183,8 +183,9 @@ class EditorViewModel @Inject constructor(
 
     fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     fun setActiveTool(tool: Tool) = _uiState.update { it.copy(activeTool = tool) }
-    fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
-    fun onLayerRemoved(id: String) {
+    override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
+
+    override fun onLayerRemoved(id: String) {
         pushHistory()
         _uiState.update { state ->
             val updated = state.layers.filter { it.id != id }
@@ -192,13 +193,15 @@ class EditorViewModel @Inject constructor(
         }
         saveProject()
     }
-    fun onLayerReordered(newIds: List<String>) {
+
+    override fun onLayerReordered(newIds: List<String>) {
         pushHistory()
         _uiState.update { state ->
             val map = state.layers.associateBy { it.id }
             state.copy(layers = newIds.mapNotNull { map[it] })
         }
     }
+
     fun exportProject() {
         val project = projectRepository.currentProject.value ?: return
         val filename = "${project.name.replace(" ", "_")}_export.gxr"
@@ -240,7 +243,8 @@ class EditorViewModel @Inject constructor(
             }
         }
     }
-    fun onRemoveBackgroundClicked() {
+
+    override fun onRemoveBackgroundClicked() {
         val state = _uiState.value
         val layerId = state.activeLayerId ?: return
         val layer = state.layers.find { it.id == layerId } ?: return
@@ -264,7 +268,8 @@ class EditorViewModel @Inject constructor(
             }
         }
     }
-    fun onLineDrawingClicked() {
+
+    override fun onLineDrawingClicked() {
         val state = _uiState.value
         val layerId = state.activeLayerId ?: return
         val layer = state.layers.find { it.id == layerId } ?: return
@@ -304,50 +309,84 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun onMagicClicked() { pushHistory(); updateActiveLayer { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) } }
-    fun onAdjustClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST) } }
+    override fun onMagicClicked() { pushHistory(); updateActiveLayer { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) } }
+    override fun onAdjustClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST) } }
     fun onBalanceClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR) } }
-    fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
-    fun onTransformGesture(pan: androidx.compose.ui.geometry.Offset, zoom: Float, rotation: Float) {
+    override fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
+
+    fun onTransformGesture(pan: Offset, zoom: Float, rotation: Float) {
         updateActiveLayer { layer -> layer.copy(scale = layer.scale * zoom, offset = layer.offset + pan, rotationZ = layer.rotationZ + rotation) }
     }
-    fun onGestureEnd() { saveProject(); _uiState.update { it.copy(gestureInProgress = false) } }
-    fun onGestureStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
-    fun toggleImageLock() { pushHistory(); updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) } }
-    fun onOpacityChanged(value: Float) = updateActiveLayer { it.copy(opacity = value) }
-    fun onBrightnessChanged(value: Float) = updateActiveLayer { it.copy(brightness = value) }
-    fun onContrastChanged(value: Float) = updateActiveLayer { it.copy(contrast = value) }
-    fun onSaturationChanged(value: Float) = updateActiveLayer { it.copy(saturation = value) }
-    fun onColorBalanceRChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceR = value) }
-    fun onColorBalanceGChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceG = value) }
-    fun onColorBalanceBChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceB = value) }
-    fun onScaleChanged(value: Float) = updateActiveLayer { it.copy(scale = value) }
-    fun onOffsetChanged(value: androidx.compose.ui.geometry.Offset) = updateActiveLayer { it.copy(offset = it.offset + value) }
-    fun onRotationXChanged(value: Float) { updateActiveLayer { it.copy(rotationX = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.X) } }
-    fun onRotationYChanged(value: Float) { updateActiveLayer { it.copy(rotationY = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Y) } }
-    fun onRotationZChanged(value: Float) { updateActiveLayer { it.copy(rotationZ = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Z) } }
-    fun onCycleRotationAxis() {
+
+    override fun onGestureEnd() { saveProject(); _uiState.update { it.copy(gestureInProgress = false) } }
+    override fun onGestureStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
+    override fun toggleImageLock() { pushHistory(); updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) } }
+    override fun onOpacityChanged(value: Float) = updateActiveLayer { it.copy(opacity = value) }
+    override fun onBrightnessChanged(value: Float) = updateActiveLayer { it.copy(brightness = value) }
+    override fun onContrastChanged(value: Float) = updateActiveLayer { it.copy(contrast = value) }
+    override fun onSaturationChanged(value: Float) = updateActiveLayer { it.copy(saturation = value) }
+    override fun onColorBalanceRChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceR = value) }
+    override fun onColorBalanceGChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceG = value) }
+    override fun onColorBalanceBChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceB = value) }
+    override fun onScaleChanged(value: Float) = updateActiveLayer { it.copy(scale = value) }
+    override fun onOffsetChanged(value: Offset) = updateActiveLayer { it.copy(offset = it.offset + value) }
+
+    override fun onRotationXChanged(value: Float) { updateActiveLayer { it.copy(rotationX = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.X) } }
+    override fun onRotationYChanged(value: Float) { updateActiveLayer { it.copy(rotationY = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Y) } }
+    override fun onRotationZChanged(value: Float) { updateActiveLayer { it.copy(rotationZ = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Z) } }
+
+    override fun onCycleRotationAxis() {
         val next = when (_uiState.value.activeRotationAxis) { RotationAxis.X -> RotationAxis.Y; RotationAxis.Y -> RotationAxis.Z; RotationAxis.Z -> RotationAxis.X }
         _uiState.update { it.copy(activeRotationAxis = next, showRotationAxisFeedback = true) }
     }
-    fun onAdjustmentStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
-    fun onAdjustmentEnd() = _uiState.update { it.copy(gestureInProgress = false) }
-    fun setLayerTransform(scale: Float, offset: androidx.compose.ui.geometry.Offset, rx: Float, ry: Float, rz: Float) { updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) } }
-    fun onLayerWarpChanged(layerId: String, mesh: List<Float>) { _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(warpMesh = mesh) else it }) } }
-    fun copyLayerModifications(id: String) { copiedLayerState = _uiState.value.layers.find { it.id == id } }
-    fun pasteLayerModifications(id: String) {
+
+    override fun onAdjustmentStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
+    override fun onAdjustmentEnd() = _uiState.update { it.copy(gestureInProgress = false) }
+
+    override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) { updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) } }
+    override fun onLayerWarpChanged(layerId: String, mesh: List<Float>) { _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(warpMesh = mesh) else it }) } }
+    override fun copyLayerModifications(id: String) { copiedLayerState = _uiState.value.layers.find { it.id == id } }
+
+    override fun pasteLayerModifications(id: String) {
         val source = copiedLayerState ?: return
         pushHistory()
         _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == id) it.copy(opacity = source.opacity, brightness = source.brightness, contrast = source.contrast, saturation = source.saturation, colorBalanceR = source.colorBalanceR, colorBalanceG = source.colorBalanceG, colorBalanceB = source.colorBalanceB, blendMode = source.blendMode, warpMesh = source.warpMesh) else it }) }
         saveProject()
     }
-    fun onCycleBlendMode() { pushHistory(); updateActiveLayer { layer -> val domainModes = com.hereliesaz.graffitixr.common.model.BlendMode.values(); val currentDomainMode = layer.blendMode.toModelBlendMode(); val nextIndex = (domainModes.indexOf(currentDomainMode) + 1) % domainModes.size; layer.copy(blendMode = domainModes[nextIndex].toComposeBlendMode()) } }
-    fun onLayerDuplicated(id: String) { val layer = _uiState.value.layers.find { it.id == id } ?: return; pushHistory(); val duplicated = layer.copy(id = UUID.randomUUID().toString(), name = "${layer.name} Copy"); _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id) }; saveProject() }
-    fun onLayerRenamed(id: String, name: String) { pushHistory(); _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it }) }; saveProject() }
+
+    override fun onCycleBlendMode() { pushHistory(); updateActiveLayer { layer -> val domainModes = com.hereliesaz.graffitixr.common.model.BlendMode.values(); val currentDomainMode = layer.blendMode.toModelBlendMode(); val nextIndex = (domainModes.indexOf(currentDomainMode) + 1) % domainModes.size; layer.copy(blendMode = domainModes[nextIndex].toComposeBlendMode()) } }
+    override fun onLayerDuplicated(id: String) { val layer = _uiState.value.layers.find { it.id == id } ?: return; pushHistory(); val duplicated = layer.copy(id = UUID.randomUUID().toString(), name = "${layer.name} Copy"); _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id) }; saveProject() }
+    override fun onLayerRenamed(id: String, name: String) { pushHistory(); _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it }) }; saveProject() }
+
     private fun updateActiveLayer(transform: (Layer) -> Layer) { _uiState.update { state -> val id = state.activeLayerId ?: return@update state; state.copy(layers = state.layers.map { if (it.id == id) transform(it) else it }) } }
-    fun onFeedbackShown() { _uiState.update { it.copy(showRotationAxisFeedback = false) } }
-    fun onDoubleTapHintDismissed() {}
-    fun onOnboardingComplete(mode: Any) {}
-    fun onDrawingPathFinished(path: List<androidx.compose.ui.geometry.Offset>) {}
-    fun onColorClicked() = onBalanceClicked()
+
+    override fun onFeedbackShown() { _uiState.update { it.copy(showRotationAxisFeedback = false) } }
+    override fun onDoubleTapHintDismissed() {}
+    override fun onOnboardingComplete(mode: Any) {}
+
+    // Core Ext Routing
+    override fun onDrawingPathFinished(path: List<Offset>) {
+        applyStrokeToActiveLayer(path)
+    }
+
+    override fun onColorClicked() {
+        _uiState.update { it.copy(showColorPicker = true) }
+    }
+
+    override fun setBrushSize(size: Float) {
+        _uiState.update { it.copy(brushSize = size.coerceIn(1f, 200f)) }
+    }
+
+    override fun setActiveColor(color: Color) {
+        _uiState.update { it.copy(activeColor = color, showColorPicker = false) }
+    }
+
+    override fun onColorPickerDismissed() {
+        _uiState.update { it.copy(showColorPicker = false) }
+    }
+
+    fun setLayers(layers: List<Layer>) {
+        _uiState.update { it.copy(layers = layers) }
+        saveProject()
+    }
 }

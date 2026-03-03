@@ -1,8 +1,10 @@
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt
 package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -16,14 +18,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.feature.editor.DrawingCanvas
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 
 @Composable
 fun MainScreen(
@@ -46,12 +49,10 @@ fun MainScreen(
             EditorMode.AR -> {
                 var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-                // Mode transition logic: Start AR session.
                 LaunchedEffect(Unit) {
                     arViewModel.setArMode(true, context)
                 }
 
-                // Ensure the AR session and renderer are cleaned up when leaving AR mode.
                 DisposableEffect(Unit) {
                     onDispose {
                         glView?.onPause()
@@ -95,7 +96,7 @@ fun MainScreen(
                     onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
                     onLightUpdate = arViewModel::updateLightLevel,
                     modifier = Modifier.fillMaxSize(),
-                    arViewModel = arViewModel // Informs CameraPreview about ARCore release status
+                    arViewModel = arViewModel
                 )
             }
             else -> {}
@@ -114,11 +115,26 @@ fun MainScreen(
     // 2. Render Layers & Handle Gestures
     Canvas(modifier = Modifier
         .fillMaxSize()
-        .pointerInput(uiState.activeLayerId, isImageLocked) {
+        .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, "tap") {
             if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
-                coroutineScope {
-                    detectTransformGestures { _, pan, zoom, rotation ->
-                        editorViewModel.onTransformGesture(pan, zoom, rotation)
+                // Only allow double tap for axis rotation if NO drawing tool is selected
+                if (uiState.activeTool == Tool.NONE) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            editorViewModel.onCycleRotationAxis()
+                        }
+                    )
+                }
+            }
+        }
+        .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, "transform") {
+            if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
+                // Only allow image transform gestures if NO drawing tool is selected
+                if (uiState.activeTool == Tool.NONE) {
+                    coroutineScope {
+                        detectTransformGestures { _, pan, zoom, rotation ->
+                            editorViewModel.onTransformGesture(pan, zoom, rotation)
+                        }
                     }
                 }
             }
@@ -138,6 +154,21 @@ fun MainScreen(
                     )
                 }
             }
+        }
+    }
+
+    // 3. Render Active Stroke (DrawingCanvas)
+    if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
+        // If an active tool is selected, the DrawingCanvas overlay intercepts strokes
+        if (uiState.activeTool != Tool.NONE) {
+            DrawingCanvas(
+                activeTool = uiState.activeTool,
+                brushSize = uiState.brushSize,
+                activeColor = uiState.activeColor,
+                onPathFinished = { path, _ ->
+                    editorViewModel.onDrawingPathFinished(path)
+                }
+            )
         }
     }
 }

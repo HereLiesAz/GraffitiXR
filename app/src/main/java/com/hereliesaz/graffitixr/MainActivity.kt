@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
 package com.hereliesaz.graffitixr
 
 import android.Manifest
@@ -9,11 +10,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
@@ -237,7 +245,7 @@ class MainActivity : ComponentActivity() {
 
                             if (showSettings) {
                                 SettingsScreen(
-                                    currentVersion = "1.18.0",
+                                    currentVersion = BuildConfig.VERSION_NAME,
                                     updateStatus = "Up to date",
                                     isCheckingForUpdate = false,
                                     isRightHanded = editorUiState.isRightHanded,
@@ -352,17 +360,61 @@ class MainActivity : ComponentActivity() {
                 hostId = "design_host",
                 text = layer.name,
                 nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
-                onClick = { editorViewModel.onLayerActivated(layer.id) },
+                onClick = {
+                    editorViewModel.onLayerActivated(layer.id)
+                    // Force the tool to NONE when layer is explicitly tapped.
+                    // This seamlessly closes the nested tool rail and reactivates 3D transforms.
+                    editorViewModel.setActiveTool(Tool.NONE)
+                },
                 onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
                 nestedContent = {
                     val activate = { editorViewModel.onLayerActivated(layer.id) }
+
+                    // Creates a reusable lambda containing the custom Compose logic for the drag gesture
+                    val addSizeItem: () -> Unit = {
+                        azRailItem(
+                            id = "size_${layer.id}",
+                            text = "Size",
+                            content = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .pointerInput(Unit) {
+                                            detectVerticalDragGestures { change, dragAmount ->
+                                                change.consume()
+                                                // dragAmount is positive down; user pulls UP to increase size
+                                                val newSize = editorUiState.brushSize - dragAmount * 0.5f
+                                                editorViewModel.setBrushSize(newSize)
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Visual preview of the circle size
+                                    Box(
+                                        modifier = Modifier
+                                            .size((editorUiState.brushSize / 2f).coerceIn(4f, 36f).dp)
+                                            .background(Color.White, CircleShape)
+                                    )
+                                }
+                            }
+                        ) {}
+                    }
+
                     if (layer.isSketch) {
                         azRailItem(id = "brush_${layer.id}", text = "Brush") { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
                         azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
                         azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
                         azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                        azRailItem(id = "color_${layer.id}", text = "Color") { activate(); editorViewModel.setActiveTool(Tool.COLOR); editorViewModel.onColorClicked() }
+
+                        addSizeItem()
+
+                        azRailItem(id = "color_${layer.id}", text = "Color", content = editorUiState.activeColor) {
+                            activate()
+                            editorViewModel.setActiveTool(Tool.COLOR)
+                            editorViewModel.onColorClicked()
+                        }
                         azRailItem(id = "adj_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
+                        azRailItem(id = "move_${layer.id}", text = "Move") { activate(); editorViewModel.setActiveTool(Tool.NONE) }
                     } else {
                         azRailItem(id = "iso_${layer.id}", text = "Isolate") { activate(); editorViewModel.onRemoveBackgroundClicked() }
                         azRailItem(id = "line_${layer.id}", text = "Outline") { activate(); editorViewModel.onLineDrawingClicked() }
@@ -370,8 +422,11 @@ class MainActivity : ComponentActivity() {
                         azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
                         azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
                         azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                        azRailItem(id = "balance_${layer.id}", text = "Balance") { activate(); editorViewModel.onBalanceClicked() }
 
+                        addSizeItem()
+
+                        azRailItem(id = "balance_${layer.id}", text = "Balance") { activate(); editorViewModel.onBalanceClicked() }
+                        azRailItem(id = "move_${layer.id}", text = "Move") { activate(); editorViewModel.setActiveTool(Tool.NONE) }
                     }
                 }
             ) {

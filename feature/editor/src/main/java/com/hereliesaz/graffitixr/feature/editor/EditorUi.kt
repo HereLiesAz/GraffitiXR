@@ -1,3 +1,4 @@
+// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorUi.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import androidx.compose.foundation.background
@@ -32,6 +33,15 @@ fun EditorUi(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Box(modifier = Modifier.fillMaxSize()) {
+
+        if (uiState.showColorPicker) {
+            ColorPickerDialog(
+                currentColor = uiState.activeColor,
+                history = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Black, Color.White),
+                onSelectColor = { actions.setActiveColor(it) },
+                onDismiss = { actions.onColorPickerDismissed() }
+            )
+        }
 
         GestureFeedback(
             state = uiState,

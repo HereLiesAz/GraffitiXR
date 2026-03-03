@@ -1,7 +1,9 @@
+// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorActions.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 
 interface EditorActions {
     fun onOpacityChanged(v: Float)
@@ -57,4 +59,8 @@ interface EditorActions {
     fun onDismissPanel()
 
     fun onLayerWarpChanged(layerId: String, mesh: List<Float>)
+
+    fun setBrushSize(size: Float)
+    fun setActiveColor(color: Color)
+    fun onColorPickerDismissed()
 }
