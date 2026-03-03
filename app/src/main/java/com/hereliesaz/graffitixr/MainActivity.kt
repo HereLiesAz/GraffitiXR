@@ -38,6 +38,7 @@ import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
@@ -149,17 +150,28 @@ class MainActivity : ComponentActivity() {
                     }
 
                     background(weight = 0) {
-                        MainScreen(
-                            uiState = editorUiState,
-                            arUiState = arUiState,
-                            editorViewModel = editorViewModel,
-                            arViewModel = arViewModel,
-                            slamManager = slamManager,
-                            hasCameraPermission = hasCameraPermission,
-                            onRendererCreated = { renderer ->
-                                renderRefState.value = renderer
-                            }
-                        )
+                        if (mainUiState.isCapturingTarget) {
+                            TargetCreationBackground(
+                                uiState = arUiState,
+                                captureStep = mainUiState.captureStep,
+                                onPhotoCaptured = { arViewModel.setTempCapture(it) },
+                                onCaptureConsumed = { arViewModel.onCaptureConsumed() },
+                                onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
+                                arViewModel = arViewModel
+                            )
+                        } else {
+                            MainScreen(
+                                uiState = editorUiState,
+                                arUiState = arUiState,
+                                editorViewModel = editorViewModel,
+                                arViewModel = arViewModel,
+                                slamManager = slamManager,
+                                hasCameraPermission = hasCameraPermission,
+                                onRendererCreated = { renderer ->
+                                    renderRefState.value = renderer
+                                }
+                            )
+                        }
                     }
 
                     onscreen {

@@ -23,8 +23,10 @@ class ArRenderer(
     private val onTrackingUpdated: (Boolean) -> Unit
 ) : GLSurfaceView.Renderer {
 
+    private val sessionLock = Any()
     var session: Session? = null
         private set
+        
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
 
@@ -35,12 +37,16 @@ class ArRenderer(
     private var pendingFlashlightMode: Boolean? = null
 
     fun attachSession(session: Session?) {
-        Timber.i("attachSession: session is ${if (session != null) "NOT null" else "null"}")
-        this.session = session
-        if (session != null) {
-            displayRotationHelper.onResume()
-        } else {
-            displayRotationHelper.onPause()
+        synchronized(sessionLock) {
+            Timber.i("attachSession: session is ${if (session != null) "NOT null" else "null"}")
+            this.session = session
+            if (session != null) {
+                displayRotationHelper.onResume()
+                // Ensure texture is set if surface was already created
+                session.setCameraTextureName(backgroundRenderer.textureId)
+            } else {
+                displayRotationHelper.onPause()
+            }
         }
     }
 
@@ -65,7 +71,9 @@ class ArRenderer(
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
         slamManager.initGl()
-        session?.setCameraTextureName(backgroundRenderer.textureId)
+        synchronized(sessionLock) {
+            session?.setCameraTextureName(backgroundRenderer.textureId)
+        }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -79,67 +87,72 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
-        val activeSession = session ?: return
+        var isTracking = false
+        
+        synchronized(sessionLock) {
+            val activeSession = session ?: return
 
-        pendingFlashlightMode?.let { isOn ->
-            getFlashlightModeEnum(isOn)?.let { mode ->
-                try {
-                    val config = activeSession.config
-                    val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
-                    val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
-                    method.invoke(config, mode)
-                    activeSession.configure(config)
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to apply flashlight configuration")
+            pendingFlashlightMode?.let { isOn ->
+                getFlashlightModeEnum(isOn)?.let { mode ->
+                    try {
+                        val config = activeSession.config
+                        val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
+                        val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
+                        method.invoke(config, mode)
+                        activeSession.configure(config)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to apply flashlight configuration")
+                    }
                 }
+                pendingFlashlightMode = null
             }
-            pendingFlashlightMode = null
-        }
 
-        displayRotationHelper.updateSessionIfNeeded(activeSession)
+            displayRotationHelper.updateSessionIfNeeded(activeSession)
 
-        val frame: Frame = try {
-            activeSession.update()
-        } catch (e: SessionPausedException) {
-            return
-        } catch (e: Exception) {
-            Timber.e(e, "Session update failed")
-            return
-        }
-
-        backgroundRenderer.draw(frame)
-        val camera = frame.camera
-        val isTracking = camera.trackingState == TrackingState.TRACKING
-
-        camera.getViewMatrix(viewMatrix, 0)
-        camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
-        slamManager.setArCoreTrackingState(isTracking)
-        slamManager.updateCamera(viewMatrix, projMatrix)
-
-        if (frameCount++ % 2 == 0) {
-            try {
-                frame.acquireCameraImage().use { image ->
-                    val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
-                    slamManager.feedColorFrame(rgbaBuffer, image.width, image.height)
-                }
-
-                frame.acquireDepthImage16Bits().use { depthImage ->
-                    val depthPlane = depthImage.planes[0]
-                    slamManager.feedArCoreDepth(
-                        depthPlane.buffer,
-                        depthImage.width,
-                        depthImage.height,
-                        depthPlane.rowStride
-                    )
-                }
-            } catch (e: NotYetAvailableException) {
-                // Expected at the beginning of a session
+            val frame: Frame = try {
+                activeSession.update()
+            } catch (e: SessionPausedException) {
+                return
             } catch (e: Exception) {
-                Timber.e(e, "Error processing frame data")
+                Timber.e(e, "Session update failed")
+                return
             }
-        }
 
-        slamManager.draw()
+            backgroundRenderer.draw(frame)
+            val camera = frame.camera
+            isTracking = camera.trackingState == TrackingState.TRACKING
+
+            camera.getViewMatrix(viewMatrix, 0)
+            camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
+            slamManager.setArCoreTrackingState(isTracking)
+            slamManager.updateCamera(viewMatrix, projMatrix)
+
+            if (frameCount++ % 2 == 0) {
+                try {
+                    frame.acquireCameraImage().use { image ->
+                        val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
+                        slamManager.feedColorFrame(rgbaBuffer, image.width, image.height)
+                    }
+
+                    frame.acquireDepthImage16Bits().use { depthImage ->
+                        val depthPlane = depthImage.planes[0]
+                        slamManager.feedArCoreDepth(
+                            depthPlane.buffer,
+                            depthImage.width,
+                            depthImage.height,
+                            depthPlane.rowStride
+                        )
+                    }
+                } catch (e: NotYetAvailableException) {
+                    // Expected at the beginning of a session
+                } catch (e: Exception) {
+                    Timber.e(e, "Error processing frame data")
+                }
+            }
+
+            slamManager.draw()
+        }
+        
         onTrackingUpdated(isTracking)
     }
 }

@@ -44,17 +44,14 @@ fun MainScreen(
     if (hasCameraPermission) {
         when (uiState.editorMode) {
             EditorMode.AR -> {
-                // Track GLSurfaceView to ensure onPause is called when switching modes.
                 var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-                // Delay AR session start to allow previous camera clients (like CameraX) to release hardware.
-                // This mitigates recovery loops and ERROR_CAMERA_IN_USE during mode transitions.
+                // Mode transition logic: Start AR session.
                 LaunchedEffect(Unit) {
-                    delay(300)
                     arViewModel.setArMode(true, context)
                 }
 
-                // Ensure the AR session and renderer are paused when this composable is removed.
+                // Ensure the AR session and renderer are cleaned up when leaving AR mode.
                 DisposableEffect(Unit) {
                     onDispose {
                         glView?.onPause()
@@ -62,7 +59,6 @@ fun MainScreen(
                     }
                 }
 
-                // Apply flashlight state when it changes
                 LaunchedEffect(arUiState.isFlashlightOn) {
                     rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
                 }
@@ -98,7 +94,8 @@ fun MainScreen(
                     onPhotoCaptured = {},
                     onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
                     onLightUpdate = arViewModel::updateLightLevel,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    arViewModel = arViewModel // Informs CameraPreview about ARCore release status
                 )
             }
             else -> {}

@@ -31,7 +31,8 @@ fun TargetCreationBackground(
     captureStep: CaptureStep,
     onPhotoCaptured: (Bitmap) -> Unit,
     onCaptureConsumed: () -> Unit,
-    onInitUnwarpPoints: (List<Offset>) -> Unit
+    onInitUnwarpPoints: (List<Offset>) -> Unit,
+    arViewModel: ArViewModel? = null
 ) {
     val cameraController = rememberCameraController()
 
@@ -62,7 +63,8 @@ fun TargetCreationBackground(
                 onPhotoCaptured = {
                     onPhotoCaptured(it)
                     onCaptureConsumed()
-                }
+                },
+                arViewModel = arViewModel
             )
             TargetCreationOverlayBackground(uiState, CaptureStep.CAPTURE)
         }

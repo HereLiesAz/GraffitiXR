@@ -65,16 +65,17 @@ fun CameraPreview(
     onPhotoCaptured: (Bitmap) -> Unit,
     modifier: Modifier = Modifier,
     onAnalyzerFrame: ((ByteBuffer, Int, Int) -> Unit)? = null,
-    onLightUpdate: ((Float) -> Unit)? = null
+    onLightUpdate: ((Float) -> Unit)? = null,
+    arViewModel: ArViewModel? = null // Optional: wait for ARCore release
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-
     val previewView = remember { PreviewView(context) }
+    
+    // If we have an ArViewModel, track when ARCore has fully released the camera.
+    val isArUsingCamera by arViewModel?.isCameraInUseByAr?.collectAsState() ?: remember { mutableStateOf(false) }
 
-    // Use case: ImageCapture. We intentionally don't set OUTPUT_FORMAT_JPEG explicitly 
-    // because some devices/versions might default to it or support only it with minimize latency,
-    // but we will verify the format in the callback.
+    // Use case: ImageCapture
     val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
@@ -84,14 +85,11 @@ fun CameraPreview(
     // Connect controller
     DisposableEffect(controller) {
         controller.onCaptureRequested = {
-            // We use the main executor for the callback itself to simplify UI interaction
-            // The actual image capture work happens on the camera thread + background IO
             imageCapture.takePicture(
                 ContextCompat.getMainExecutor(context),
                 object : ImageCapture.OnImageCapturedCallback() {
                     override fun onCaptureSuccess(image: ImageProxy) {
                         try {
-                            // Convert ImageProxy to Bitmap using Context for YUV fallback
                             val bitmap = imageProxyToBitmap(context, image)
                             onPhotoCaptured(bitmap)
                         } catch (e: Exception) {
@@ -100,7 +98,6 @@ fun CameraPreview(
                             image.close()
                         }
                     }
-
                     override fun onError(exception: ImageCaptureException) {
                         Log.e("CameraPreview", "Photo capture failed: ${exception.message}", exception)
                     }
@@ -121,10 +118,7 @@ fun CameraPreview(
         onDispose { analysisExecutor?.shutdown() }
     }
 
-    // ImageAnalysis use case.
-    // If onLightUpdate is provided, use DualAnalyzer — it handles both stereo and ambient light
-    // with its own 200 ms light throttle; backpressure replaces the manual frame counter.
-    // Otherwise fall back to the legacy manual-throttle path (stereo only).
+    // ImageAnalysis use case
     val imageAnalysis = remember(onAnalyzerFrame, onLightUpdate) {
         val executor = analysisExecutor ?: return@remember null
         val analysis = ImageAnalysis.Builder()
@@ -147,7 +141,17 @@ fun CameraPreview(
         analysis
     }
 
-    LaunchedEffect(lifecycleOwner) {
+    LaunchedEffect(lifecycleOwner, imageAnalysis, isArUsingCamera) {
+        // Only attempt to bind if ARCore has released the camera hardware
+        if (isArUsingCamera) {
+            Log.d("CameraPreview", "Waiting for ARCore to release camera...")
+            return@LaunchedEffect
+        }
+        
+        // Additional delay to allow HAL to stabilize after ARCore release
+        kotlinx.coroutines.delay(500)
+        
+        Log.d("CameraPreview", "Binding CameraX use cases")
         val cameraProvider = context.getCameraProvider()
         val preview = Preview.Builder().build()
         preview.setSurfaceProvider(previewView.surfaceProvider)
@@ -169,7 +173,26 @@ fun CameraPreview(
     }
 
     DisposableEffect(lifecycleOwner) {
-        onDispose { controller.onCameraReleased() }
+        onDispose {
+            Log.d("CameraPreview", "Disposing CameraPreview")
+            controller.onCameraReleased()
+            
+            // Explicitly unbind all use cases asynchronously to clear the hardware lock.
+            try {
+                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+                cameraProviderFuture.addListener({
+                    try {
+                        val provider = cameraProviderFuture.get()
+                        provider.unbindAll()
+                        Log.d("CameraPreview", "Successfully unbound all CameraX use cases")
+                    } catch (e: Exception) {
+                        Log.e("CameraPreview", "Error in unbindAll listener", e)
+                    }
+                }, ContextCompat.getMainExecutor(context))
+            } catch (e: Exception) {
+                Log.e("CameraPreview", "Failed to initiate unbindAll", e)
+            }
+        }
     }
 
     AndroidView(
@@ -195,7 +218,6 @@ private fun imageProxyToBitmap(context: Context, image: ImageProxy): Bitmap {
         bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             ?: throw IllegalArgumentException("Failed to decode JPEG byte array")
     } else if (image.format == ImageFormat.YUV_420_888) {
-        // FIX: Utilize YuvToRgbConverter to prevent crashes on devices that ignore JPEG request
         bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
         val converter = YuvToRgbConverter(context)
         image.image?.let {
@@ -205,7 +227,6 @@ private fun imageProxyToBitmap(context: Context, image: ImageProxy): Bitmap {
         throw IllegalArgumentException("Unsupported image format: ${image.format}")
     }
 
-    // Rotate if needed
     val rotation = image.imageInfo.rotationDegrees
     if (rotation != 0) {
         val matrix = Matrix()
