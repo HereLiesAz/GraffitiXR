@@ -49,6 +49,10 @@ public:
     void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     void scheduleRelocCheck(const cv::Mat& colorFrame);
 
+    // Fix 4: AI feature matching — load SuperPoint ONNX from bytes (AssetManager buffer).
+    // Returns false if model cannot be parsed; ORB fallback stays active.
+    bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
+
     // Lifecycle helpers
     void clearMap();                         // Reset all SLAM state (safe from any thread, no GL)
     void setViewportSize(int width, int height); // Lightweight; does not reinitialize the engine
@@ -86,6 +90,10 @@ private:
 
     cv::Ptr<cv::ORB> mFeatureDetector;
     cv::Ptr<cv::DescriptorMatcher> mMatcher;
+
+    // Fix 4: SuperPoint neural detector (OpenCV DNN / ONNX).
+    // isLoaded() == false until loadSuperPoint() succeeds; ORB is the fallback.
+    SuperPointDetector mSuperPoint;
 
     cv::Mat mTargetDescriptors;
     std::vector<cv::Point3f> mTargetKeypoints3D;

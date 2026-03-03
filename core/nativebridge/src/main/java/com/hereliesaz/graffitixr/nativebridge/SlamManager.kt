@@ -1,6 +1,7 @@
 // FILE: core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt
 package com.hereliesaz.graffitixr.nativebridge
 
+import android.content.res.AssetManager
 import java.nio.ByteBuffer
 
 class SlamManager {
@@ -48,6 +49,14 @@ class SlamManager {
         nativeSetTargetFingerprint(descriptors, rows, cols, type, points3d)
     }
 
+    /**
+     * Fix 4: Load the SuperPoint ONNX model from app assets.
+     * Returns true if the model was found and parsed successfully.
+     * ORB remains active as fallback when this returns false.
+     */
+    fun loadSuperPoint(assetManager: AssetManager): Boolean =
+        nativeLoadSuperPoint(assetManager)
+
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeClearMap()
     private external fun nativeSetViewportSize(width: Int, height: Int)
@@ -58,4 +67,5 @@ class SlamManager {
     private external fun nativeSaveModel(path: String)
     private external fun nativeLoadModel(path: String)
     private external fun nativeSetTargetFingerprint(descriptors: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray)
+    private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
 }

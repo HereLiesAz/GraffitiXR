@@ -1,6 +1,7 @@
 // FILE: core/nativebridge/src/main/cpp/GraffitiJNI.cpp
 #include <jni.h>
 #include <android/log.h>
+#include <android/asset_manager_jni.h>
 #include <opencv2/opencv.hpp>
 #include <GLES3/gl3.h>
 #include "include/MobileGS.h"
@@ -171,6 +172,30 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadModel(JNIEnv* 
         gSlamEngine->loadModel(path);
         env->ReleaseStringUTFChars(pathStr, path);
     }
+}
+
+// Fix 4: Load SuperPoint ONNX model from app assets.
+// Returns true if model loaded successfully; ORB fallback stays active on false.
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
+        JNIEnv* env, jobject thiz, jobject assetManager) {
+    if (!gSlamEngine) return JNI_FALSE;
+
+    AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
+    AAsset* asset = AAssetManager_open(mgr, "superpoint.onnx", AASSET_MODE_BUFFER);
+    if (!asset) {
+        LOGD("superpoint.onnx not found in assets — ORB fallback active");
+        return JNI_FALSE;
+    }
+
+    size_t size = (size_t)AAsset_getLength(asset);
+    std::vector<uchar> buf(size);
+    AAsset_read(asset, buf.data(), (off_t)size);
+    AAsset_close(asset);
+
+    bool ok = gSlamEngine->loadSuperPoint(buf);
+    LOGD("SuperPoint init: %s", ok ? "ready" : "FAILED — ORB fallback active");
+    return ok ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL

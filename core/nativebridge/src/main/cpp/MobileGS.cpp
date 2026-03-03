@@ -363,24 +363,34 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     cv::Mat gray;
     cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
 
-    // Use thread-local detector/matcher — not shared with GL thread.
-    auto detector = cv::ORB::create(500);
-    auto matcher  = cv::DescriptorMatcher::create("BruteForce-Hamming");
-
+    // Fix 4: Use SuperPoint when the stored fingerprint is float-typed (post-transition).
+    // Use ORB when the fingerprint is binary (initial ORB seed from Kotlin) or SP is absent.
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
-    detector->detectAndCompute(gray, cv::noArray(), kps, descs);
+    bool usedSP = mSuperPoint.isLoaded() && (targetDesc.type() != CV_8U)
+                  && mSuperPoint.detect(gray, kps, descs);
+    if (!usedSP) {
+        cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
+    }
     if (descs.empty()) return;
+    // Guard against a mid-transition type mismatch (very brief window while fingerprint resets)
+    if (descs.type() != targetDesc.type()) return;
 
-    std::vector<cv::DMatch> matches;
-    matcher->match(targetDesc, descs, matches);
+    // Runtime matcher: Hamming for binary ORB, L2 for float SuperPoint
+    auto matcher = cv::BFMatcher::create(
+        descs.type() == CV_8U ? cv::NORM_HAMMING : cv::NORM_L2);
+
+    std::vector<std::vector<cv::DMatch>> knnMatches;
+    matcher->knnMatch(targetDesc, descs, knnMatches, 2);
 
     std::vector<cv::Point3f> objPts;
     std::vector<cv::Point2f> imgPts;
-    for (const auto& m : matches) {
-        if (m.distance < 50.0f && m.queryIdx < (int)targetPts.size()) {
-            objPts.push_back(targetPts[m.queryIdx]);
-            imgPts.push_back(kps[m.trainIdx].pt);
+    for (const auto& m : knnMatches) {
+        // Lowe ratio test — robust for both Hamming and L2 distances
+        if (m.size() == 2 && m[0].distance < 0.75f * m[1].distance
+                && m[0].queryIdx < (int)targetPts.size()) {
+            objPts.push_back(targetPts[m[0].queryIdx]);
+            imgPts.push_back(kps[m[0].trainIdx].pt);
         }
     }
 
@@ -430,7 +440,16 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color) {
 
     std::vector<cv::KeyPoint> allKps;
     cv::Mat allDescs;
-    mFeatureDetector->detectAndCompute(gray, cv::noArray(), allKps, allDescs);
+    // Fix 4: Prefer SuperPoint for fingerprint accumulation when available.
+    bool usedSP = mSuperPoint.isLoaded() && mSuperPoint.detect(gray, allKps, allDescs);
+    if (!usedSP) {
+        mFeatureDetector->detectAndCompute(gray, cv::noArray(), allKps, allDescs);
+    } else if (!mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U) {
+        // One-time transition: the Kotlin-seeded ORB fingerprint is binary.
+        // Clear it so SuperPoint float descriptors can accumulate cleanly.
+        mTargetDescriptors = cv::Mat();
+        mTargetKeypoints3D.clear();
+    }
     if (allDescs.empty()) return;
 
     // Peripheral-only sampling: 3x3 grid, skip center cell [1][1]
@@ -701,6 +720,11 @@ void MobileGS::setTargetFingerprint(const cv::Mat& descriptors, const std::vecto
     std::lock_guard<std::mutex> lock(mMutex);
     mTargetDescriptors = descriptors.clone();
     mTargetKeypoints3D = points3d;
+}
+
+// Fix 4: Load the SuperPoint ONNX model.  Thread-safe (SuperPointDetector has internal mutex).
+bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) {
+    return mSuperPoint.load(onnxBytes);
 }
 
 void MobileGS::updateAnchorTransform(float* transformMat) {
