@@ -155,10 +155,12 @@ class ArViewModelTest {
 
         // Enter AR mode, but activity is paused
         viewModel.setArMode(true, context)
+        testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
 
         // Resume activity
         viewModel.onActivityResumed()
+        testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(getPrivateField(viewModel, "isSessionResumed") as Boolean)
         verify { session.resume() }
     }
@@ -167,18 +169,23 @@ class ArViewModelTest {
     fun `session pauses when activity is paused or not in AR mode`() = runTest {
         setPrivateField(viewModel, "session", session)
         viewModel.setArMode(true, context)
+        testDispatcher.scheduler.advanceUntilIdle()
         viewModel.onActivityResumed()
+        testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(getPrivateField(viewModel, "isSessionResumed") as Boolean)
 
         // Pause activity
         viewModel.onActivityPaused()
+        testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
         verify { session.pause() }
 
         // Resume activity, then exit AR mode
         viewModel.onActivityResumed()
+        testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(getPrivateField(viewModel, "isSessionResumed") as Boolean)
         viewModel.setArMode(false, context)
+        testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
         verify { session.pause() }
     }
