@@ -32,6 +32,7 @@ class ArRenderer(
     private var frameCount = 0
 
     fun attachSession(session: Session?) {
+        Log.i("ArRenderer", "attachSession: session is ${if (session != null) "NOT null" else "null"}")
         this.session = session
         if (session != null) {
             displayRotationHelper.onResume()
@@ -41,6 +42,7 @@ class ArRenderer(
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        Log.i("ArRenderer", "onSurfaceCreated")
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
@@ -48,13 +50,19 @@ class ArRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        Log.i("ArRenderer", "onSurfaceChanged: ${width}x${height}")
         GLES30.glViewport(0, 0, width, height)
         displayRotationHelper.onSurfaceChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
-        val activeSession = session ?: return
+        val activeSession = session
+        if (activeSession == null) {
+            if (frameCount % 100 == 0) Log.w("ArRenderer", "onDrawFrame: session is null")
+            frameCount++
+            return
+        }
 
         if (!cameraTextureNameSet) {
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
@@ -65,6 +73,8 @@ class ArRenderer(
         val frame: Frame = try {
             activeSession.update()
         } catch (e: SessionPausedException) {
+            if (frameCount % 100 == 0) Log.w("ArRenderer", "onDrawFrame: session paused")
+            frameCount++
             return
         }
         val camera = frame.camera
@@ -74,18 +84,17 @@ class ArRenderer(
         val isTracking = camera.trackingState == TrackingState.TRACKING
         slamManager.setArCoreTrackingState(isTracking)
 
-        // Throttle the expensive Kotlin YUV→RGBA conversion to ~20fps.
-        // At 60fps this loop consumes ~100% CPU and causes ANRs.
-        val shouldFeedColorFrame = (frameCount++ % 3 == 0)
+        // Always update camera matrices so the engine knows the view/proj
+        camera.getViewMatrix(viewMatrix, 0)
+        camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
+        slamManager.updateCamera(viewMatrix, projMatrix)
+
+        // Throttle color frame ingestion, but keep depth/draw active
+        val shouldFeedColorFrame = (frameCount % 3 == 0)
+        frameCount++
 
         if (isTracking) {
-            camera.getViewMatrix(viewMatrix, 0)
-            camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
-            slamManager.updateCamera(viewMatrix, projMatrix)
-
             try {
-                // To avoid the JNI bridge returning early because it hasn't seen a color frame yet,
-                // we'll feed a color frame FIRST if we're doing both this frame.
                 if (shouldFeedColorFrame) {
                     val cameraImage = frame.acquireCameraImage()
                     val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
@@ -100,25 +109,22 @@ class ArRenderer(
 
             } catch (e: NotYetAvailableException) {
                 // Normal during ARCore initialization — depth data not yet ready.
-                if (frameCount % 100 == 0) Log.d("ArRenderer", "Depth not yet available...")
             } catch (e: UnsupportedOperationException) {
-                // Depth API not supported on this device / session not configured for depth.
                 Log.w("ArRenderer", "Depth API unavailable: ${e.message}")
             } catch (e: Exception) {
-                Log.e("ArRenderer", "Depth frame error: ${e.message}")
+                Log.e("ArRenderer", "Frame processing error", e)
             }
         } else if (shouldFeedColorFrame) {
+            // Relocalization mode: feed color frames to MobileGS even if not tracking
             try {
                 val cameraImage = frame.acquireCameraImage()
                 val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(cameraImage)
                 slamManager.feedColorFrame(rgbaBuffer, cameraImage.width, cameraImage.height)
                 cameraImage.close()
-                if (frameCount % 100 == 0) Log.d("ArRenderer", "Feeding color frame while not tracking (reloc mode)")
-            } catch (e: Exception) {
-                // Ignore
-            }
+            } catch (e: Exception) { }
         }
 
+        // Draw the SLAM overlays (splats, mesh)
         slamManager.draw()
 
         onTrackingUpdated(isTracking)
