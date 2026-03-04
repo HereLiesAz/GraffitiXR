@@ -14,8 +14,10 @@ import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import timber.log.Timber
+import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.concurrent.withLock
 
 class ArRenderer(
     private val context: Context,
@@ -23,7 +25,7 @@ class ArRenderer(
     private val onTrackingUpdated: (Boolean) -> Unit
 ) : GLSurfaceView.Renderer {
 
-    private val sessionLock = Any()
+    private val sessionLock = ReentrantLock()
     var session: Session? = null
         private set
         
@@ -37,7 +39,7 @@ class ArRenderer(
     private var pendingFlashlightMode: Boolean? = null
 
     fun attachSession(session: Session?) {
-        synchronized(sessionLock) {
+        sessionLock.withLock {
             Timber.i("attachSession: session is ${if (session != null) "NOT null" else "null"}")
             this.session = session
             if (session != null) {
@@ -71,7 +73,7 @@ class ArRenderer(
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
         slamManager.initGl()
-        synchronized(sessionLock) {
+        sessionLock.withLock {
             session?.setCameraTextureName(backgroundRenderer.textureId)
         }
     }
@@ -89,7 +91,7 @@ class ArRenderer(
 
         var isTracking = false
         
-        synchronized(sessionLock) {
+        sessionLock.withLock {
             val activeSession = session ?: return
 
             pendingFlashlightMode?.let { isOn ->
@@ -114,7 +116,10 @@ class ArRenderer(
             } catch (e: SessionPausedException) {
                 return
             } catch (e: Exception) {
-                Timber.e(e, "Session update failed")
+                // Avoid logging spam for common paused state errors
+                if (e.message?.contains("paused") != true) {
+                    Timber.e(e, "Session update failed")
+                }
                 return
             }
 

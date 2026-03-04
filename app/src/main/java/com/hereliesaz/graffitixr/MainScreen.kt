@@ -14,7 +14,10 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -41,6 +44,7 @@ fun MainScreen(
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
     val isImageLocked = activeLayer?.isImageLocked ?: false
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
     // 1. Render Backgrounds (Camera or Mockup)
@@ -53,8 +57,18 @@ fun MainScreen(
                     arViewModel.setArMode(true, context)
                 }
 
-                DisposableEffect(Unit) {
+                // Sync GLSurfaceView lifecycle with Activity lifecycle
+                DisposableEffect(lifecycleOwner, glView) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_RESUME -> glView?.onResume()
+                            Lifecycle.Event.ON_PAUSE -> glView?.onPause()
+                            else -> {}
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
                     onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
                         glView?.onPause()
                         arViewModel.setArMode(false, context)
                     }

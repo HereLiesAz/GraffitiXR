@@ -1,3 +1,4 @@
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
@@ -152,6 +153,9 @@ class ArViewModel @Inject constructor(
         if (!isSessionResumed) return
         isSessionResumed = false
         try {
+            // Unlink renderer BEFORE pausing to avoid "Session is paused" errors from the render thread
+            renderer?.attachSession(null)
+            
             session?.pause()
             slamManager.setRelocEnabled(false)
             Log.d("ArViewModel", "AR Session Paused")
@@ -201,10 +205,15 @@ class ArViewModel @Inject constructor(
      * Force immediate cleanup when Activity is destroyed.
      */
     fun destroyArSession() {
+        // We use Main.immediate to ensure this starts before the process is killed,
+        // but performFullCleanupLocked still needs to happen sequentially.
         viewModelScope.launch(Dispatchers.Main.immediate) {
             sessionMutex.withLock {
+                if (session == null) return@withLock
                 isInArMode = false
+                isDestroying = true
                 performFullCleanupLocked()
+                isDestroying = false
             }
         }
     }
@@ -273,6 +282,9 @@ class ArViewModel @Inject constructor(
 
     fun attachSessionToRenderer(arRenderer: ArRenderer?) {
         this.renderer = arRenderer
-        renderer?.attachSession(session)
+        // If we already have a session, attach it now
+        if (arRenderer != null && session != null) {
+            arRenderer.attachSession(session)
+        }
     }
 }
