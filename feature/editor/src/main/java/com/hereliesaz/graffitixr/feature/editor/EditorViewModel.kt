@@ -83,7 +83,31 @@ class EditorViewModel @Inject constructor(
                             _uiState.update { it.copy(layers = layersWithBitmaps) }
                         }
                     }
-                    project.backgroundImageUri?.let { setBackgroundImage(it) }
+
+                    project.backgroundImageUri?.let { uri ->
+                        viewModelScope.launch(dispatchers.io) {
+                            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
+                            withContext(dispatchers.main) {
+                                _uiState.update { it.copy(backgroundBitmap = bitmap) }
+                            }
+                        }
+                    }
+                } else {
+                    _uiState.update { it.copy(projectId = null, layers = emptyList(), backgroundBitmap = null) }
+                    slamManager.clearMap()
+                }
+            }
+        }
+
+        // Background SLAM autosave loop to capture ongoing AR world data
+        viewModelScope.launch(dispatchers.io) {
+            while(true) {
+                kotlinx.coroutines.delay(10000) // Auto-save every 10 seconds
+                val project = projectRepository.currentProject.value
+                val isArMode = _uiState.value.editorMode == EditorMode.AR
+                if (project != null && isArMode) {
+                    val mapPath = projectManager.getMapPath(context, project.id)
+                    slamManager.saveModel(mapPath)
                 }
             }
         }
@@ -124,11 +148,17 @@ class EditorViewModel @Inject constructor(
         pushHistory()
         viewModelScope.launch(dispatchers.io) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
-            if (bitmap != null) {
+            val projectId = _uiState.value.projectId
+            if (bitmap != null && projectId != null) {
+                // Ensure image is persisted securely within the project directory
+                val filename = "layer_${UUID.randomUUID()}.png"
+                val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
+                val localUri = Uri.parse("file://$path")
+
                 val newLayer = Layer(
                     id = UUID.randomUUID().toString(),
                     name = "Layer ${_uiState.value.layers.size + 1}",
-                    uri = uri,
+                    uri = localUri,
                     bitmap = bitmap,
                     isVisible = true
                 )
@@ -138,7 +168,7 @@ class EditorViewModel @Inject constructor(
                 }
             } else {
                 withContext(dispatchers.main) {
-                    Toast.makeText(context, "Invalid image format", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Invalid image format or missing project", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -146,15 +176,56 @@ class EditorViewModel @Inject constructor(
 
     fun onAddBlankLayer() {
         pushHistory()
-        val newLayer = Layer(id = UUID.randomUUID().toString(), name = "Sketch", isSketch = true)
-        _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
+        val projectId = _uiState.value.projectId ?: return
+        viewModelScope.launch(dispatchers.io) {
+            val metrics = context.resources.displayMetrics
+            val width = metrics.widthPixels.takeIf { it > 0 } ?: 1080
+            val height = metrics.heightPixels.takeIf { it > 0 } ?: 1920
+            val blankBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+            // Persist the blank canvas layer into the project directory
+            val filename = "layer_${UUID.randomUUID()}.png"
+            val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(blankBitmap))
+            val localUri = Uri.parse("file://$path")
+
+            val newLayer = Layer(
+                id = UUID.randomUUID().toString(),
+                name = "Sketch",
+                isSketch = true,
+                bitmap = blankBitmap,
+                uri = localUri
+            )
+            withContext(dispatchers.main) {
+                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
+                saveProject()
+            }
+        }
     }
 
     fun setBackgroundImage(uri: Uri) {
+        val projectId = _uiState.value.projectId ?: return
         viewModelScope.launch(dispatchers.io) {
             _uiState.update { it.copy(isLoading = true) }
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
-            _uiState.update { it.copy(backgroundBitmap = bitmap, isLoading = false) }
+            if (bitmap != null) {
+                // Ensure background wall image is stored securely with the project container
+                val filename = "bg_${UUID.randomUUID()}.png"
+                val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
+                val localUri = Uri.parse("file://$path")
+
+                val project = projectRepository.currentProject.value
+                if (project != null) {
+                    projectRepository.updateProject(project.copy(backgroundImageUri = localUri))
+                }
+
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(backgroundBitmap = bitmap, isLoading = false) }
+                }
+            } else {
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            }
         }
     }
 
@@ -272,6 +343,7 @@ class EditorViewModel @Inject constructor(
             val map = state.layers.associateBy { it.id }
             state.copy(layers = newIds.mapNotNull { map[it] })
         }
+        saveProject()
     }
 
     override fun onRemoveBackgroundClicked() {
@@ -339,7 +411,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    override fun onMagicClicked() { pushHistory(); updateActiveLayer { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) } }
+    override fun onMagicClicked() { pushHistory(); updateActiveLayer { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }; saveProject() }
     override fun onAdjustClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST) } }
     fun onBalanceClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR) } }
     override fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
@@ -350,7 +422,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onGestureEnd() { saveProject(); _uiState.update { it.copy(gestureInProgress = false) } }
     override fun onGestureStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
-    override fun toggleImageLock() { pushHistory(); updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) } }
+    override fun toggleImageLock() { pushHistory(); updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }; saveProject() }
     override fun onOpacityChanged(value: Float) = updateActiveLayer { it.copy(opacity = value) }
     override fun onBrightnessChanged(value: Float) = updateActiveLayer { it.copy(brightness = value) }
     override fun onContrastChanged(value: Float) = updateActiveLayer { it.copy(contrast = value) }
@@ -371,10 +443,22 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onAdjustmentStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
-    override fun onAdjustmentEnd() = _uiState.update { it.copy(gestureInProgress = false) }
 
-    override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) { updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) } }
-    override fun onLayerWarpChanged(layerId: String, mesh: List<Float>) { _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(warpMesh = mesh) else it }) } }
+    override fun onAdjustmentEnd() {
+        _uiState.update { it.copy(gestureInProgress = false) }
+        saveProject()
+    }
+
+    override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
+        updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
+        saveProject()
+    }
+
+    override fun onLayerWarpChanged(layerId: String, mesh: List<Float>) {
+        _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(warpMesh = mesh) else it }) }
+        saveProject()
+    }
+
     override fun copyLayerModifications(id: String) { copiedLayerState = _uiState.value.layers.find { it.id == id } }
 
     override fun pasteLayerModifications(id: String) {
@@ -384,11 +468,34 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
-    override fun onCycleBlendMode() { pushHistory(); updateActiveLayer { layer -> val domainModes = com.hereliesaz.graffitixr.common.model.BlendMode.values(); val currentDomainMode = layer.blendMode.toModelBlendMode(); val nextIndex = (domainModes.indexOf(currentDomainMode) + 1) % domainModes.size; layer.copy(blendMode = domainModes[nextIndex].toComposeBlendMode()) } }
-    override fun onLayerDuplicated(id: String) { val layer = _uiState.value.layers.find { it.id == id } ?: return; pushHistory(); val duplicated = layer.copy(id = UUID.randomUUID().toString(), name = "${layer.name} Copy"); _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id) }; saveProject() }
-    override fun onLayerRenamed(id: String, name: String) { pushHistory(); _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it }) }; saveProject() }
+    override fun onCycleBlendMode() {
+        pushHistory()
+        updateActiveLayer { layer ->
+            val domainModes = com.hereliesaz.graffitixr.common.model.BlendMode.values()
+            val currentDomainMode = layer.blendMode.toModelBlendMode()
+            val nextIndex = (domainModes.indexOf(currentDomainMode) + 1) % domainModes.size
+            layer.copy(blendMode = domainModes[nextIndex].toComposeBlendMode())
+        }
+        saveProject()
+    }
 
-    private fun updateActiveLayer(transform: (Layer) -> Layer) { _uiState.update { state -> val id = state.activeLayerId ?: return@update state; state.copy(layers = state.layers.map { if (it.id == id) transform(it) else it }) } }
+    override fun onLayerDuplicated(id: String) {
+        val layer = _uiState.value.layers.find { it.id == id } ?: return
+        pushHistory()
+        val duplicated = layer.copy(id = UUID.randomUUID().toString(), name = "${layer.name} Copy")
+        _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id) }
+        saveProject()
+    }
+
+    override fun onLayerRenamed(id: String, name: String) {
+        pushHistory()
+        _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it }) }
+        saveProject()
+    }
+
+    private fun updateActiveLayer(transform: (Layer) -> Layer) {
+        _uiState.update { state -> val id = state.activeLayerId ?: return@update state; state.copy(layers = state.layers.map { if (it.id == id) transform(it) else it }) }
+    }
 
     override fun onFeedbackShown() { _uiState.update { it.copy(showRotationAxisFeedback = false) } }
     override fun onDoubleTapHintDismissed() {}

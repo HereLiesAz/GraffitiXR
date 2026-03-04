@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
 
     var use3dBackground by mutableStateOf(false)
     var showSaveDialog by mutableStateOf(false)
-    var showLibrary by mutableStateOf(false)
+    var showLibrary by mutableStateOf(true) // Ensure library is shown by default at startup
     var showSettings by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
 
@@ -160,7 +160,6 @@ class MainActivity : ComponentActivity() {
                                 captureStep = mainUiState.captureStep,
                                 onPhotoCaptured = { bitmap ->
                                     arViewModel.setTempCapture(bitmap)
-                                    // FIX: Advance to Rectify automatically once photo is taken
                                     mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
                                 },
                                 onCaptureConsumed = { arViewModel.onCaptureConsumed() },
@@ -200,7 +199,6 @@ class MainActivity : ComponentActivity() {
                                     onRetake = { mainViewModel.onRetakeCapture() },
                                     onCancel = { mainViewModel.onCancelCaptureClicked() },
                                     onUnwarpConfirm = { points ->
-                                        // FIX: Actually unwarp the image before moving to MASK
                                         val currentBitmap = arUiState.tempCaptureBitmap
                                         if (currentBitmap != null && points.size == 4) {
                                             lifecycleScope.launch(Dispatchers.Default) {
@@ -255,14 +253,15 @@ class MainActivity : ComponentActivity() {
                             }
 
                             if (showSettings) {
+                                val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                                 SettingsScreen(
                                     currentVersion = BuildConfig.VERSION_NAME,
-                                    updateStatus = "Up to date",
-                                    isCheckingForUpdate = false,
+                                    updateStatus = dashboardUiState.updateStatusMessage,
+                                    isCheckingForUpdate = dashboardUiState.isCheckingForUpdate,
                                     isRightHanded = editorUiState.isRightHanded,
                                     onHandednessChanged = { editorViewModel.toggleHandedness() },
-                                    onCheckForUpdates = {},
-                                    onInstallUpdate = {},
+                                    onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
+                                    onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
                                     onClose = { showSettings = false }
                                 )
                             }

@@ -1,10 +1,14 @@
+// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModelExt.kt
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.toArgb
 
 /**
@@ -32,6 +36,24 @@ fun EditorViewModel.applyStrokeToActiveLayer(stroke: List<Offset>) {
             brushSize = currentState.brushSize,
             brushColor = currentState.activeColor.toArgb()
         )
+
+        // Persist the updated bitmap over its local file immediately so manual saves aren't needed
+        val activeUri = activeLayer.uri
+        if (activeUri != null) {
+            val path = activeUri.path
+            if (path != null) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val file = java.io.File(path)
+                        java.io.FileOutputStream(file).use { out ->
+                            processedBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
 
         // Update the state flow with the newly mutated bitmap
         val updatedLayers = currentState.layers.toMutableList().apply {
