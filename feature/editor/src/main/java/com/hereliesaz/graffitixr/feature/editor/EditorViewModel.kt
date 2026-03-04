@@ -12,9 +12,11 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.data.ProjectManager
+import com.hereliesaz.graffitixr.feature.editor.export.ExportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,7 @@ import javax.inject.Inject
 class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
     private val projectManager: ProjectManager,
+    private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
     private val backgroundRemover: BackgroundRemover,
     private val slamManager: SlamManager,
@@ -181,24 +184,30 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
-    fun setActiveTool(tool: Tool) = _uiState.update { it.copy(activeTool = tool) }
-    override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
+    fun exportImage() {
+        viewModelScope.launch(dispatchers.default) {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                // Generates the flat output image
+                val compositeBitmap = exportManager.compositeLayers(_uiState.value.layers)
 
-    override fun onLayerRemoved(id: String) {
-        pushHistory()
-        _uiState.update { state ->
-            val updated = state.layers.filter { it.id != id }
-            state.copy(layers = updated, activeLayerId = if (state.activeLayerId == id) updated.firstOrNull()?.id else state.activeLayerId)
-        }
-        saveProject()
-    }
+                // Uses common MediaStore utility to dump it to Gallery
+                val success = saveBitmapToGallery(context, compositeBitmap)
 
-    override fun onLayerReordered(newIds: List<String>) {
-        pushHistory()
-        _uiState.update { state ->
-            val map = state.layers.associateBy { it.id }
-            state.copy(layers = newIds.mapNotNull { map[it] })
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    if (success) {
+                        Toast.makeText(context, "Image saved to gallery", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "Failed to save image", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    Toast.makeText(context, "Export error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -241,6 +250,27 @@ class EditorViewModel @Inject constructor(
                     Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
+    fun setActiveTool(tool: Tool) = _uiState.update { it.copy(activeTool = tool) }
+    override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
+
+    override fun onLayerRemoved(id: String) {
+        pushHistory()
+        _uiState.update { state ->
+            val updated = state.layers.filter { it.id != id }
+            state.copy(layers = updated, activeLayerId = if (state.activeLayerId == id) updated.firstOrNull()?.id else state.activeLayerId)
+        }
+        saveProject()
+    }
+
+    override fun onLayerReordered(newIds: List<String>) {
+        pushHistory()
+        _uiState.update { state ->
+            val map = state.layers.associateBy { it.id }
+            state.copy(layers = newIds.mapNotNull { map[it] })
         }
     }
 
@@ -364,7 +394,6 @@ class EditorViewModel @Inject constructor(
     override fun onDoubleTapHintDismissed() {}
     override fun onOnboardingComplete(mode: Any) {}
 
-    // Core Ext Routing
     override fun onDrawingPathFinished(path: List<Offset>) {
         applyStrokeToActiveLayer(path)
     }

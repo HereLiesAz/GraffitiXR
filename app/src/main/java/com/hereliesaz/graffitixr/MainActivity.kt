@@ -427,15 +427,19 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
+
         azRailHostItem(id = "project_host", text = navStrings.project)
         azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, shape = AzButtonShape.NONE) { showSaveDialog = true }
         azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToLibrary() }
-        azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, shape = AzButtonShape.NONE) { editorViewModel.exportProject() }
+
+        // Split Export menu
+        azRailSubItem(id = "export_img", hostId = "project_host", text = "Image", shape = AzButtonShape.NONE) { editorViewModel.exportImage() }
+        azRailSubItem(id = "export_proj", hostId = "project_host", text = "Project", shape = AzButtonShape.NONE) { editorViewModel.exportProject() }
+        azHelpRailItem(id = "help", text = "Help")
         azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToSettings() }
 
         azDivider()
 
-        azHelpRailItem(id = "help", text = "Help")
         if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
             azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
         }
