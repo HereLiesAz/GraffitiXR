@@ -37,6 +37,7 @@ class ArRenderer(
     private var frameCount = 0
 
     private var pendingFlashlightMode: Boolean? = null
+    private var isSurfaceCreated = false
 
     fun attachSession(session: Session?) {
         sessionLock.withLock {
@@ -44,8 +45,10 @@ class ArRenderer(
             this.session = session
             if (session != null) {
                 displayRotationHelper.onResume()
-                // Ensure texture is set if surface was already created
-                session.setCameraTextureName(backgroundRenderer.textureId)
+                // If surface is already created, we must bind the texture immediately
+                if (isSurfaceCreated) {
+                    session.setCameraTextureName(backgroundRenderer.textureId)
+                }
             } else {
                 displayRotationHelper.onPause()
             }
@@ -69,11 +72,13 @@ class ArRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Timber.i("onSurfaceCreated")
-        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f) // Changed to opaque black for safety
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
         slamManager.initGl()
+        
         sessionLock.withLock {
+            isSurfaceCreated = true
             session?.setCameraTextureName(backgroundRenderer.textureId)
         }
     }
@@ -82,17 +87,20 @@ class ArRenderer(
         Timber.i("onSurfaceChanged: ${width}x${height}")
         GLES30.glViewport(0, 0, width, height)
         displayRotationHelper.onSurfaceChanged(width, height)
-        // Issue 4: lightweight viewport update; does not reinitialize the engine or wipe map data
         slamManager.setViewportSize(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        // Clear with black to avoid flickering if session is not ready
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
         var isTracking = false
         
         sessionLock.withLock {
             val activeSession = session ?: return
+
+            // Ensure texture is set (sometimes ARCore resets it)
+            activeSession.setCameraTextureName(backgroundRenderer.textureId)
 
             pendingFlashlightMode?.let { isOn ->
                 getFlashlightModeEnum(isOn)?.let { mode ->
@@ -116,7 +124,6 @@ class ArRenderer(
             } catch (e: SessionPausedException) {
                 return
             } catch (e: Exception) {
-                // Avoid logging spam for common paused state errors
                 if (e.message?.contains("paused") != true) {
                     Timber.e(e, "Session update failed")
                 }

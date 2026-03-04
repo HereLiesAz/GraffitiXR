@@ -141,6 +141,10 @@ class ArViewModel @Inject constructor(
             isSessionResumed = true
             _isCameraInUseByAr.value = true
             slamManager.setRelocEnabled(true)
+            
+            // Re-link renderer on resume
+            renderer?.attachSession(s)
+            
             Log.d("ArViewModel", "AR Session Resumed")
         } catch (e: CameraNotAvailableException) {
             Log.e("ArViewModel", "Camera not available on resume", e)
@@ -205,8 +209,6 @@ class ArViewModel @Inject constructor(
      * Force immediate cleanup when Activity is destroyed.
      */
     fun destroyArSession() {
-        // We use Main.immediate to ensure this starts before the process is killed,
-        // but performFullCleanupLocked still needs to happen sequentially.
         viewModelScope.launch(Dispatchers.Main.immediate) {
             sessionMutex.withLock {
                 if (session == null) return@withLock
@@ -283,7 +285,7 @@ class ArViewModel @Inject constructor(
     fun attachSessionToRenderer(arRenderer: ArRenderer?) {
         this.renderer = arRenderer
         // If we already have a session, attach it now
-        if (arRenderer != null && session != null) {
+        if (arRenderer != null && session != null && isSessionResumed) {
             arRenderer.attachSession(session)
         }
     }
