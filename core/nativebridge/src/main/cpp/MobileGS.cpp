@@ -15,6 +15,8 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
+extern JavaVM* gJvm; // Defined in GraffitiJNI.cpp
+
 static constexpr size_t MAX_SPLATS = 500000;
 static constexpr float VOXEL_SIZE = 0.02f; // 20mm voxels
 
@@ -182,7 +184,6 @@ void MobileGS::clearMap() {
     mPointCount = 0;
     mTargetDescriptors = cv::Mat();
     mTargetKeypoints3D.clear();
-    mLastDepthFrame = cv::Mat();
 
     memset(mAnchorMatrix, 0, sizeof(mAnchorMatrix));
     memset(mTargetAnchorMatrix, 0, sizeof(mTargetAnchorMatrix));
@@ -224,6 +225,13 @@ cv::Point3f MobileGS::getCameraWorldPosition() const {
 
 // Background Thread: Sorts splats back-to-front based on camera position
 void MobileGS::sortThreadFunc() {
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        gJvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+
     while (mSortRunning) {
         std::vector<cv::Point3f> positions;
         cv::Point3f camPos;
@@ -261,6 +269,10 @@ void MobileGS::sortThreadFunc() {
             mDrawIndices = std::move(indices);
             mIndicesDirty = true;
         }
+    }
+
+    if (attached && gJvm) {
+        gJvm->DetachCurrentThread();
     }
 }
 
@@ -326,18 +338,52 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
 }
 
 void MobileGS::relocThreadFunc() {
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        gJvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+
     while (mRelocRunning) {
-        cv::Mat frame;
+        cv::Mat relocFrame;
+        cv::Mat fpColor;
+        cv::Mat fpDepth;
+        float fpView[16];
+        float fpProj[16];
+        bool doReloc = false;
+        bool doFp = false;
+
         {
             std::unique_lock<std::mutex> lock(mRelocMutex);
-            mRelocCv.wait(lock, [this] { return mRelocRequested || !mRelocRunning; });
+            mRelocCv.wait(lock, [this] { return mRelocRequested || mFingerprintRequested || !mRelocRunning; });
             if (!mRelocRunning) break;
-            frame = mRelocColorFrame.clone();
-            mRelocRequested = false;
+
+            if (mRelocRequested) {
+                relocFrame = mRelocColorFrame.clone();
+                mRelocRequested = false;
+                doReloc = true;
+            }
+            if (mFingerprintRequested) {
+                fpColor = mFingerprintColorFrame.clone();
+                fpDepth = mFingerprintDepthFrame.clone();
+                memcpy(fpView, mFingerprintViewMatrix, 16 * sizeof(float));
+                memcpy(fpProj, mFingerprintProjMatrix, 16 * sizeof(float));
+                mFingerprintRequested = false;
+                doFp = true;
+            }
         }
-        if (!frame.empty()) {
-            runPnPMatch(frame);
+
+        if (doReloc && !relocFrame.empty()) {
+            runPnPMatch(relocFrame);
         }
+        if (doFp && !fpColor.empty() && !fpDepth.empty()) {
+            tryUpdateFingerprint(fpColor, fpDepth, fpView, fpProj);
+        }
+    }
+
+    if (attached && gJvm) {
+        gJvm->DetachCurrentThread();
     }
 }
 
@@ -378,7 +424,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
 
     // Runtime matcher: Hamming for binary ORB, L2 for float SuperPoint
     auto matcher = cv::BFMatcher::create(
-        descs.type() == CV_8U ? cv::NORM_HAMMING : cv::NORM_L2);
+            descs.type() == CV_8U ? cv::NORM_HAMMING : cv::NORM_L2);
 
     std::vector<std::vector<cv::DMatch>> knnMatches;
     matcher->knnMatch(targetDesc, descs, knnMatches, 2);
@@ -388,7 +434,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     for (const auto& m : knnMatches) {
         // Lowe ratio test — robust for both Hamming and L2 distances
         if (m.size() == 2 && m[0].distance < 0.75f * m[1].distance
-                && m[0].queryIdx < (int)targetPts.size()) {
+            && m[0].queryIdx < (int)targetPts.size()) {
             objPts.push_back(targetPts[m[0].queryIdx]);
             imgPts.push_back(kps[m[0].trainIdx].pt);
         }
@@ -418,8 +464,8 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
 
     // Only apply correction if drift exceeds threshold OR tracking is lost.
     float drift = glm::length(
-        glm::vec3(T.at<float>(0, 3), T.at<float>(1, 3), T.at<float>(2, 3)) -
-        glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
+            glm::vec3(T.at<float>(0, 3), T.at<float>(1, 3), T.at<float>(2, 3)) -
+            glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
     );
 
     if (drift > DRIFT_THRESHOLD_M || !isTracking) {
@@ -430,10 +476,9 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     }
 }
 
-// ─── Fix 3: Dynamic fingerprint accumulation ──────────────────────────────────
-// Must be called while holding mMutex (processDepthFrame guarantees this).
-void MobileGS::tryUpdateFingerprint(const cv::Mat& color) {
-    if (mLastDepthFrame.empty() || color.empty()) return;
+// ─── Fix 3: Dynamic fingerprint accumulation (Now completely asynchronous) ──────
+void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat) {
+    if (depth.empty() || color.empty()) return;
 
     cv::Mat gray;
     cv::cvtColor(color, gray, cv::COLOR_RGB2GRAY);
@@ -444,11 +489,6 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color) {
     bool usedSP = mSuperPoint.isLoaded() && mSuperPoint.detect(gray, allKps, allDescs);
     if (!usedSP) {
         mFeatureDetector->detectAndCompute(gray, cv::noArray(), allKps, allDescs);
-    } else if (!mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U) {
-        // One-time transition: the Kotlin-seeded ORB fingerprint is binary.
-        // Clear it so SuperPoint float descriptors can accumulate cleanly.
-        mTargetDescriptors = cv::Mat();
-        mTargetKeypoints3D.clear();
     }
     if (allDescs.empty()) return;
 
@@ -461,13 +501,13 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color) {
         return !(row == 1 && col == 1);
     };
 
-    const float* V  = mViewMatrix;
-    float fx  = mProjMatrix[0];
-    float fy  = mProjMatrix[5];
-    float px  = mProjMatrix[8];
-    float py  = mProjMatrix[9];
-    float halfW = mLastDepthFrame.cols / 2.0f;
-    float halfH = mLastDepthFrame.rows / 2.0f;
+    const float* V  = viewMat;
+    float fx  = projMat[0];
+    float fy  = projMat[5];
+    float px  = projMat[8];
+    float py  = projMat[9];
+    float halfW = depth.cols / 2.0f;
+    float halfH = depth.rows / 2.0f;
 
     std::vector<cv::Point3f> newPts;
     cv::Mat newDescs;
@@ -478,17 +518,17 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color) {
 
         int u = (int)kp.pt.x;
         int v = (int)kp.pt.y;
-        if (u < 0 || u >= mLastDepthFrame.cols || v < 0 || v >= mLastDepthFrame.rows) continue;
+        if (u < 0 || u >= depth.cols || v < 0 || v >= depth.rows) continue;
 
-        float depth = mLastDepthFrame.at<float>(v, u);
-        if (depth <= 0.0f || depth > 5.0f) continue;
+        float d = depth.at<float>(v, u);
+        if (d <= 0.0f || d > 5.0f) continue;
 
-        // Unproject pixel to camera space (same formula as processDepthFrame)
+        // Unproject pixel to camera space
         float x_ndc = (u - halfW) / halfW;
         float y_ndc = -(v - halfH) / halfH;
-        float xc = (x_ndc + px) * depth / fx;
-        float yc = (y_ndc + py) * depth / fy;
-        float zc = -depth;
+        float xc = (x_ndc + px) * d / fx;
+        float yc = (y_ndc + py) * d / fy;
+        float zc = -d;
 
         float xw, yw, zw;
         camToWorld(V, xc, yc, zc, xw, yw, zw);
@@ -499,12 +539,27 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color) {
 
     if (newPts.empty()) return;
 
-    // Append to existing fingerprint
+    // Thread-safe update of the fingerprint data
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (usedSP && !mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U) {
+        // One-time transition: the Kotlin-seeded ORB fingerprint is binary.
+        // Clear it so SuperPoint float descriptors can accumulate cleanly.
+        mTargetDescriptors = cv::Mat();
+        mTargetKeypoints3D.clear();
+    }
+
     mTargetKeypoints3D.insert(mTargetKeypoints3D.end(), newPts.begin(), newPts.end());
+
     if (mTargetDescriptors.empty()) {
         mTargetDescriptors = newDescs.clone();
     } else {
-        cv::vconcat(mTargetDescriptors, newDescs, mTargetDescriptors);
+        if (mTargetDescriptors.type() == newDescs.type()) {
+            cv::vconcat(mTargetDescriptors, newDescs, mTargetDescriptors);
+        } else {
+            mTargetDescriptors = newDescs.clone();
+            mTargetKeypoints3D = newPts;
+        }
     }
 
     // Trim oldest entries if over the cap
@@ -513,17 +568,14 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color) {
         mTargetKeypoints3D.erase(mTargetKeypoints3D.begin(),
                                  mTargetKeypoints3D.begin() + excess);
         mTargetDescriptors = mTargetDescriptors
-                                 .rowRange((int)excess, mTargetDescriptors.rows)
-                                 .clone();
+                .rowRange((int)excess, mTargetDescriptors.rows)
+                .clone();
     }
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mIsArCoreTracking || depth.empty() || color.empty() || !mCameraReady) return;
-
-    // Fix 3: Store latest depth frame for dynamic fingerprint updates
-    mLastDepthFrame = depth.clone();
 
     const float* V = mViewMatrix;
     float fx = mProjMatrix[0];
@@ -640,11 +692,18 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     }
 
     // Issue 5: Grow (or auto-seed) the fingerprint with peripheral keypoints.
-    // Runs even when no explicit fingerprint has been set — tryUpdateFingerprint()
-    // will auto-initialize mTargetDescriptors on the first successful call.
+    // Offload to background thread to prevent starving the GL thread.
     if (mIsArCoreTracking &&
         (mFrameCounter - mLastFingerprintUpdateFrame) >= FINGERPRINT_UPDATE_INTERVAL) {
-        tryUpdateFingerprint(color);
+        {
+            std::lock_guard<std::mutex> lk(mRelocMutex);
+            mFingerprintColorFrame = color.clone();
+            mFingerprintDepthFrame = depth.clone();
+            memcpy(mFingerprintViewMatrix, mViewMatrix, 16 * sizeof(float));
+            memcpy(mFingerprintProjMatrix, mProjMatrix, 16 * sizeof(float));
+            mFingerprintRequested = true;
+        }
+        mRelocCv.notify_one();
         mLastFingerprintUpdateFrame = mFrameCounter;
     }
 }

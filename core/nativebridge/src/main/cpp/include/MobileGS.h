@@ -82,8 +82,8 @@ private:
     void relocThreadFunc();
     void runPnPMatch(const cv::Mat& frame);
 
-    // Fix 3: Dynamic fingerprint accumulation (caller must hold mMutex)
-    void tryUpdateFingerprint(const cv::Mat& color);
+    // Fix 3: Dynamic fingerprint accumulation
+    void tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat);
 
     std::mutex mMutex;
     bool mIsArCoreTracking = false;
@@ -130,7 +130,12 @@ private:
     static constexpr float    DRIFT_THRESHOLD_M     = 0.003f; // 3 mm
 
     // Fix 3: Dynamic fingerprint accumulation
-    cv::Mat  mLastDepthFrame;
+    std::atomic<bool>       mFingerprintRequested{false};
+    cv::Mat                 mFingerprintColorFrame;
+    cv::Mat                 mFingerprintDepthFrame;
+    float                   mFingerprintViewMatrix[16];
+    float                   mFingerprintProjMatrix[16];
+
     uint64_t mLastFingerprintUpdateFrame = 0;
     static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 300; // ~5 s at 60 fps
     static constexpr size_t   MAX_FINGERPRINT_KEYPOINTS   = 2000;
