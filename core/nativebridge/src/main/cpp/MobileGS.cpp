@@ -1,5 +1,6 @@
 // ~~~ FILE: ./core/nativebridge/src/main/cpp/MobileGS.cpp ~~~
 #include "include/MobileGS.h"
+#include <jni.h> // FIX: Added missing JNI header for JavaVM and JNIEnv
 #include <algorithm>
 #include <android/log.h>
 #include <cstring>
@@ -105,7 +106,7 @@ void MobileGS::initialize(int width, int height) {
         mSortThread = std::thread(&MobileGS::sortThreadFunc, this);
     }
 
-    // Fix 2: Start Background Reloc Thread
+    // Start Background Reloc Thread
     if (!mRelocRunning) {
         mRelocRunning = true;
         mRelocThread = std::thread(&MobileGS::relocThreadFunc, this);
@@ -131,7 +132,7 @@ void MobileGS::destroy() {
         }
     }
 
-    // Fix 2: Stop Reloc Thread cleanly
+    // Stop Reloc Thread cleanly
     if (mRelocRunning) {
         mRelocRunning = false;
         mRelocCv.notify_all();
@@ -175,7 +176,7 @@ void MobileGS::setArCoreTrackingState(bool isTracking) {
     mIsArCoreTracking = isTracking;
 }
 
-// ─── Issue 2: Reset all SLAM state for a new project ─────────────────────────
+// Reset all SLAM state for a new project
 // Must NOT call any GL functions — safe to call from any thread.
 void MobileGS::clearMap() {
     std::lock_guard<std::mutex> lock(mMutex);
@@ -198,14 +199,14 @@ void MobileGS::clearMap() {
     LOGI("MobileGS: map cleared for new project");
 }
 
-// ─── Issue 4: Lightweight viewport update (does not reinitialize the engine) ──
+// Lightweight viewport update (does not reinitialize the engine)
 void MobileGS::setViewportSize(int width, int height) {
     std::lock_guard<std::mutex> lock(mMutex);
     mScreenWidth = width;
     mScreenHeight = height;
 }
 
-// ─── Issue 3: Enable/disable the background reloc thread ─────────────────────
+// Enable/disable the background reloc thread
 void MobileGS::setRelocEnabled(bool enabled) {
     mRelocEnabled = enabled;
 }
@@ -297,7 +298,7 @@ static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
     nzw = R[2]*nxc + R[5]*nyc + R[8]*nzc;
 }
 
-// ─── Fix 1: Smooth anchor interpolation ──────────────────────────────────────
+// Smooth anchor interpolation
 // Must be called while holding mMutex (draw() guarantees this).
 void MobileGS::interpolateAnchorStep() {
     if (!mAnchorInterpolating) return;
@@ -319,9 +320,9 @@ void MobileGS::interpolateAnchorStep() {
     if (t >= 1.0f) mAnchorInterpolating = false;
 }
 
-// ─── Fix 2 + Issue 3: Background relocalization / loop-closure thread ─────────
+// Background relocalization / loop-closure thread
 void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
-    if (!mRelocEnabled) return;  // Issue 3: paused when not in AR mode
+    if (!mRelocEnabled) return;
     {
         std::lock_guard<std::mutex> lk(mRelocMutex);
         colorFrame.copyTo(mRelocColorFrame);
@@ -356,7 +357,7 @@ void MobileGS::relocThreadFunc() {
 
         {
             std::unique_lock<std::mutex> lock(mRelocMutex);
-            mRelocCv.wait(lock, [this] { return mRelocRequested || mFingerprintRequested || !mRelocRunning; });
+            mRelocCv.wait(lock,[this] { return mRelocRequested || mFingerprintRequested || !mRelocRunning; });
             if (!mRelocRunning) break;
 
             if (mRelocRequested) {
@@ -409,7 +410,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     cv::Mat gray;
     cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
 
-    // Fix 4: Use SuperPoint when the stored fingerprint is float-typed (post-transition).
+    // Use SuperPoint when the stored fingerprint is float-typed (post-transition).
     // Use ORB when the fingerprint is binary (initial ORB seed from Kotlin) or SP is absent.
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
@@ -476,7 +477,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     }
 }
 
-// ─── Fix 3: Dynamic fingerprint accumulation (Now completely asynchronous) ──────
+// Dynamic fingerprint accumulation (Now completely asynchronous)
 void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat) {
     if (depth.empty() || color.empty()) return;
 
@@ -485,7 +486,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
 
     std::vector<cv::KeyPoint> allKps;
     cv::Mat allDescs;
-    // Fix 4: Prefer SuperPoint for fingerprint accumulation when available.
+    // Prefer SuperPoint for fingerprint accumulation when available.
     bool usedSP = mSuperPoint.isLoaded() && mSuperPoint.detect(gray, allKps, allDescs);
     if (!usedSP) {
         mFeatureDetector->detectAndCompute(gray, cv::noArray(), allKps, allDescs);
@@ -691,7 +692,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
         mSortCv.notify_one();
     }
 
-    // Issue 5: Grow (or auto-seed) the fingerprint with peripheral keypoints.
+    // Grow (or auto-seed) the fingerprint with peripheral keypoints.
     // Offload to background thread to prevent starving the GL thread.
     if (mIsArCoreTracking &&
         (mFrameCounter - mLastFingerprintUpdateFrame) >= FINGERPRINT_UPDATE_INTERVAL) {
@@ -781,7 +782,7 @@ void MobileGS::setTargetFingerprint(const cv::Mat& descriptors, const std::vecto
     mTargetKeypoints3D = points3d;
 }
 
-// Fix 4: Load the SuperPoint ONNX model.  Thread-safe (SuperPointDetector has internal mutex).
+// Load the SuperPoint ONNX model.  Thread-safe.
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) {
     return mSuperPoint.load(onnxBytes);
 }
