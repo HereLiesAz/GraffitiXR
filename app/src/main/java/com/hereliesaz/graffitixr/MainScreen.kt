@@ -53,7 +53,7 @@ fun MainScreen(
     // 1. Render Backgrounds (Camera, Trace, or Mockup)
     if (uiState.editorMode == EditorMode.TRACE) {
         androidx.compose.foundation.layout.Spacer(
-            modifier = Modifier.fillMaxSize().background(Color.White)
+            modifier = Modifier.fillMaxSize().background(Color.Black)
         )
     } else if (hasCameraPermission) {
         when (uiState.editorMode) {
