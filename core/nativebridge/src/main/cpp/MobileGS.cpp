@@ -1,6 +1,6 @@
 // ~~~ FILE: ./core/nativebridge/src/main/cpp/MobileGS.cpp ~~~
 #include "include/MobileGS.h"
-#include <jni.h> // FIX: Added missing JNI header for JavaVM and JNIEnv
+#include <jni.h>
 #include <algorithm>
 #include <android/log.h>
 #include <cstring>
@@ -21,7 +21,7 @@ extern JavaVM* gJvm; // Defined in GraffitiJNI.cpp
 static constexpr size_t MAX_SPLATS = 500000;
 static constexpr float VOXEL_SIZE = 0.02f; // 20mm voxels
 
-// ANISOTROPIC SHADER: Accepts Normal and Radius, calculates View Angle (NdotV)
+// --- SPLAT SHADERS ---
 static const char* kVertexShader =
         "#version 300 es\n"
         "layout(location = 0) in vec3 aPosition;\n"
@@ -43,7 +43,6 @@ static const char* kVertexShader =
         "  vColor = aColor;\n"
         "}\n";
 
-// ANISOTROPIC SHADER: Flattens splat edge-on using NdotV
 static const char* kFragmentShader =
         "#version 300 es\n"
         "precision mediump float;\n"
@@ -57,6 +56,24 @@ static const char* kFragmentShader =
         "  float alpha = exp(-4.0 * r2);\n"
         "  float finalAlpha = alpha * vColor.a * vNdotV * 0.9;\n"
         "  oColor = vec4(vColor.rgb, finalAlpha);\n"
+        "}\n";
+
+// --- MESH (WIREFRAME) SHADERS ---
+static const char* kMeshVertexShader =
+        "#version 300 es\n"
+        "layout(location = 0) in vec3 aPosition;\n"
+        "uniform mat4 uMvp;\n"
+        "void main() {\n"
+        "  gl_Position = uMvp * vec4(aPosition, 1.0);\n"
+        "}\n";
+
+static const char* kMeshFragmentShader =
+        "#version 300 es\n"
+        "precision mediump float;\n"
+        "uniform vec4 uColor;\n"
+        "out vec4 oColor;\n"
+        "void main() {\n"
+        "  oColor = uColor;\n"
         "}\n";
 
 static GLuint compileShader(GLenum type, const char* source) {
@@ -100,13 +117,11 @@ void MobileGS::initialize(int width, int height) {
     splatData.reserve(MAX_SPLATS);
     mDrawIndices.reserve(MAX_SPLATS);
 
-    // Start Background Sorter Thread
     if (!mSortRunning) {
         mSortRunning = true;
         mSortThread = std::thread(&MobileGS::sortThreadFunc, this);
     }
 
-    // Start Background Reloc Thread
     if (!mRelocRunning) {
         mRelocRunning = true;
         mRelocThread = std::thread(&MobileGS::relocThreadFunc, this);
@@ -123,7 +138,6 @@ void MobileGS::initGl() {
 }
 
 void MobileGS::destroy() {
-    // Stop Sort Thread cleanly
     if (mSortRunning) {
         mSortRunning = false;
         mSortCv.notify_all();
@@ -132,7 +146,6 @@ void MobileGS::destroy() {
         }
     }
 
-    // Stop Reloc Thread cleanly
     if (mRelocRunning) {
         mRelocRunning = false;
         mRelocCv.notify_all();
@@ -145,27 +158,47 @@ void MobileGS::destroy() {
     if (mProgram) { glDeleteProgram(mProgram); mProgram = 0; }
     if (mPointVbo) { glDeleteBuffers(1, &mPointVbo); mPointVbo = 0; }
     if (mIndexVbo) { glDeleteBuffers(1, &mIndexVbo); mIndexVbo = 0; }
+
+    if (mMeshProgram) { glDeleteProgram(mMeshProgram); mMeshProgram = 0; }
+    if (mMeshVbo) { glDeleteBuffers(1, &mMeshVbo); mMeshVbo = 0; }
+    if (mMeshIbo) { glDeleteBuffers(1, &mMeshIbo); mMeshIbo = 0; }
 }
 
 void MobileGS::initShaders() {
+    // 1. Splat Shaders
     GLuint vertexShader = compileShader(GL_VERTEX_SHADER, kVertexShader);
     GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
-    if (!vertexShader || !fragmentShader) return;
+    if (vertexShader && fragmentShader) {
+        mProgram = glCreateProgram();
+        glAttachShader(mProgram, vertexShader);
+        glAttachShader(mProgram, fragmentShader);
+        glLinkProgram(mProgram);
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
 
-    mProgram = glCreateProgram();
-    glAttachShader(mProgram, vertexShader);
-    glAttachShader(mProgram, fragmentShader);
-    glLinkProgram(mProgram);
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+        glGenBuffers(1, &mPointVbo);
+        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+        glBufferData(GL_ARRAY_BUFFER, MAX_SPLATS * sizeof(Splat), nullptr, GL_DYNAMIC_DRAW);
 
-    glGenBuffers(1, &mPointVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-    glBufferData(GL_ARRAY_BUFFER, MAX_SPLATS * sizeof(Splat), nullptr, GL_DYNAMIC_DRAW);
+        glGenBuffers(1, &mIndexVbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_SPLATS * sizeof(uint32_t), nullptr, GL_DYNAMIC_DRAW);
+    }
 
-    glGenBuffers(1, &mIndexVbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_SPLATS * sizeof(uint32_t), nullptr, GL_DYNAMIC_DRAW);
+    // 2. Mesh Shaders
+    GLuint meshVs = compileShader(GL_VERTEX_SHADER, kMeshVertexShader);
+    GLuint meshFs = compileShader(GL_FRAGMENT_SHADER, kMeshFragmentShader);
+    if (meshVs && meshFs) {
+        mMeshProgram = glCreateProgram();
+        glAttachShader(mMeshProgram, meshVs);
+        glAttachShader(mMeshProgram, meshFs);
+        glLinkProgram(mMeshProgram);
+        glDeleteShader(meshVs);
+        glDeleteShader(meshFs);
+
+        glGenBuffers(1, &mMeshVbo);
+        glGenBuffers(1, &mMeshIbo);
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -176,8 +209,6 @@ void MobileGS::setArCoreTrackingState(bool isTracking) {
     mIsArCoreTracking = isTracking;
 }
 
-// Reset all SLAM state for a new project
-// Must NOT call any GL functions — safe to call from any thread.
 void MobileGS::clearMap() {
     std::lock_guard<std::mutex> lock(mMutex);
     splatData.clear();
@@ -199,19 +230,16 @@ void MobileGS::clearMap() {
     LOGI("MobileGS: map cleared for new project");
 }
 
-// Lightweight viewport update (does not reinitialize the engine)
 void MobileGS::setViewportSize(int width, int height) {
     std::lock_guard<std::mutex> lock(mMutex);
     mScreenWidth = width;
     mScreenHeight = height;
 }
 
-// Enable/disable the background reloc thread
 void MobileGS::setRelocEnabled(bool enabled) {
     mRelocEnabled = enabled;
 }
 
-// Extracts world position of camera from View Matrix (Camera-to-World translation)
 cv::Point3f MobileGS::getCameraWorldPosition() const {
     float r00 = mViewMatrix[0], r10 = mViewMatrix[1], r20 = mViewMatrix[2];
     float r01 = mViewMatrix[4], r11 = mViewMatrix[5], r21 = mViewMatrix[6];
@@ -224,7 +252,6 @@ cv::Point3f MobileGS::getCameraWorldPosition() const {
     return cv::Point3f(cx, cy, cz);
 }
 
-// Background Thread: Sorts splats back-to-front based on camera position
 void MobileGS::sortThreadFunc() {
     JNIEnv* env = nullptr;
     bool attached = false;
@@ -258,7 +285,6 @@ void MobileGS::sortThreadFunc() {
         std::vector<uint32_t> indices(currentCount);
         std::iota(indices.begin(), indices.end(), 0);
 
-        // Sort descending (furthest first) for correct Alpha Blending
         std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
             cv::Point3f da = positions[a] - camPos;
             cv::Point3f db = positions[b] - camPos;
@@ -291,15 +317,12 @@ static void camToWorld(const float* V, float xc, float yc, float zc,
 
 static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
                              float& nxw, float& nyw, float& nzw) {
-    // Transform normal using only the Rotation matrix
     float R[9] = { V[0], V[4], V[8], V[1], V[5], V[9], V[2], V[6], V[10] };
     nxw = R[0]*nxc + R[3]*nyc + R[6]*nzc;
     nyw = R[1]*nxc + R[4]*nyc + R[7]*nzc;
     nzw = R[2]*nxc + R[5]*nyc + R[8]*nzc;
 }
 
-// Smooth anchor interpolation
-// Must be called while holding mMutex (draw() guarantees this).
 void MobileGS::interpolateAnchorStep() {
     if (!mAnchorInterpolating) return;
     mInterpolationProgress = std::min(1.0f, mInterpolationProgress + INTERP_STEP);
@@ -320,15 +343,12 @@ void MobileGS::interpolateAnchorStep() {
     if (t >= 1.0f) mAnchorInterpolating = false;
 }
 
-// Background relocalization / loop-closure thread
 void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
     if (!mRelocEnabled) return;
     {
         std::lock_guard<std::mutex> lk(mRelocMutex);
         colorFrame.copyTo(mRelocColorFrame);
     }
-    // mIsArCoreTracking and mFrameCounter are read without mMutex — acceptable
-    // for this non-critical gating check (both live on the GL thread anyway).
     bool triggerNow = !mIsArCoreTracking ||
                       (mFrameCounter - mLastRelocTriggerFrame >= LOOP_CLOSURE_INTERVAL);
     if (triggerNow) {
@@ -389,7 +409,6 @@ void MobileGS::relocThreadFunc() {
 }
 
 void MobileGS::runPnPMatch(const cv::Mat& frame) {
-    // Snapshot shared data under lock so PnP computation runs lock-free.
     cv::Mat targetDesc;
     std::vector<cv::Point3f> targetPts;
     float projMat[16], anchorMat[16];
@@ -410,8 +429,6 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     cv::Mat gray;
     cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
 
-    // Use SuperPoint when the stored fingerprint is float-typed (post-transition).
-    // Use ORB when the fingerprint is binary (initial ORB seed from Kotlin) or SP is absent.
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
     bool usedSP = mSuperPoint.isLoaded() && (targetDesc.type() != CV_8U)
@@ -420,10 +437,8 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
     }
     if (descs.empty()) return;
-    // Guard against a mid-transition type mismatch (very brief window while fingerprint resets)
     if (descs.type() != targetDesc.type()) return;
 
-    // Runtime matcher: Hamming for binary ORB, L2 for float SuperPoint
     auto matcher = cv::BFMatcher::create(
             descs.type() == CV_8U ? cv::NORM_HAMMING : cv::NORM_L2);
 
@@ -433,7 +448,6 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     std::vector<cv::Point3f> objPts;
     std::vector<cv::Point2f> imgPts;
     for (const auto& m : knnMatches) {
-        // Lowe ratio test — robust for both Hamming and L2 distances
         if (m.size() == 2 && m[0].distance < 0.75f * m[1].distance
             && m[0].queryIdx < (int)targetPts.size()) {
             objPts.push_back(targetPts[m[0].queryIdx]);
@@ -463,7 +477,6 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         T.at<float>(i, 3) = tvec.at<double>(i, 0);
     }
 
-    // Only apply correction if drift exceeds threshold OR tracking is lost.
     float drift = glm::length(
             glm::vec3(T.at<float>(0, 3), T.at<float>(1, 3), T.at<float>(2, 3)) -
             glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
@@ -477,7 +490,6 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     }
 }
 
-// Dynamic fingerprint accumulation (Now completely asynchronous)
 void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat) {
     if (depth.empty() || color.empty()) return;
 
@@ -486,14 +498,12 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
 
     std::vector<cv::KeyPoint> allKps;
     cv::Mat allDescs;
-    // Prefer SuperPoint for fingerprint accumulation when available.
     bool usedSP = mSuperPoint.isLoaded() && mSuperPoint.detect(gray, allKps, allDescs);
     if (!usedSP) {
         mFeatureDetector->detectAndCompute(gray, cv::noArray(), allKps, allDescs);
     }
     if (allDescs.empty()) return;
 
-    // Peripheral-only sampling: 3x3 grid, skip center cell [1][1]
     int cellW = gray.cols / 3;
     int cellH = gray.rows / 3;
     auto isPeripheral = [&](const cv::KeyPoint& kp) {
@@ -524,7 +534,6 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
         float d = depth.at<float>(v, u);
         if (d <= 0.0f || d > 5.0f) continue;
 
-        // Unproject pixel to camera space
         float x_ndc = (u - halfW) / halfW;
         float y_ndc = -(v - halfH) / halfH;
         float xc = (x_ndc + px) * d / fx;
@@ -540,12 +549,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
 
     if (newPts.empty()) return;
 
-    // Thread-safe update of the fingerprint data
     std::lock_guard<std::mutex> lock(mMutex);
 
     if (usedSP && !mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U) {
-        // One-time transition: the Kotlin-seeded ORB fingerprint is binary.
-        // Clear it so SuperPoint float descriptors can accumulate cleanly.
         mTargetDescriptors = cv::Mat();
         mTargetKeypoints3D.clear();
     }
@@ -563,7 +569,6 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
         }
     }
 
-    // Trim oldest entries if over the cap
     if (mTargetKeypoints3D.size() > MAX_FINGERPRINT_KEYPOINTS) {
         size_t excess = mTargetKeypoints3D.size() - MAX_FINGERPRINT_KEYPOINTS;
         mTargetKeypoints3D.erase(mTargetKeypoints3D.begin(),
@@ -596,6 +601,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
         return cv::Point3f((x_ndc + cx) * d / fx, (y_ndc + cy) * d / fy, -d);
     };
 
+    // --- 1. Generate Splats from Depth Map ---
     for (int r = 0; r < depth.rows - step; r += step) {
         for (int c = 0; c < depth.cols - step; c += step) {
             float d = depth.at<float>(r, c);
@@ -603,7 +609,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
             float d_d = depth.at<float>(r + step, c);
 
             if (d > 0.1f && d < 5.0f && d_r > 0.1f && d_d > 0.1f) {
-                // NORMAL ESTIMATION (Cross Product of depth gradients)
                 cv::Point3f p_cam = unproject(r, c, d);
                 cv::Point3f p_r_cam = unproject(r, c + step, d_r);
                 cv::Point3f p_d_cam = unproject(r + step, c, d_d);
@@ -612,10 +617,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
                 cv::Point3f v2 = p_d_cam - p_cam;
                 cv::Point3f n_cam = v1.cross(v2);
 
-                // Ensure normal faces camera (camera is at 0,0,0 in cam space)
-                if (n_cam.dot(p_cam) > 0) {
-                    n_cam = -n_cam;
-                }
+                if (n_cam.dot(p_cam) > 0) n_cam = -n_cam;
 
                 float n_len = cv::norm(n_cam);
                 if (n_len > 0.0001f) n_cam /= n_len;
@@ -654,7 +656,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
                     s.g = s.g * alpha + g_f * (1.0f - alpha);
                     s.b = s.b * alpha + b_f * (1.0f - alpha);
 
-                    // Slerp normal (simplified lerp + normalize for speed)
                     s.nx = s.nx * alpha + nx_w * (1.0f - alpha);
                     s.ny = s.ny * alpha + ny_w * (1.0f - alpha);
                     s.nz = s.nz * alpha + nz_w * (1.0f - alpha);
@@ -682,9 +683,65 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
+    // --- 2. Generate Live Surface Mesh (Wireframe) ---
+    mMeshVertices.clear();
+    mMeshIndices.clear();
+
+    int gridW = depth.cols / step;
+    int gridH = depth.rows / step;
+    std::vector<int> vIndex(gridW * gridH, -1);
+
+    for (int r = 0; r < depth.rows - step; r += step) {
+        for (int c = 0; c < depth.cols - step; c += step) {
+            float d = depth.at<float>(r, c);
+            if (d > 0.1f && d < 5.0f) {
+                cv::Point3f p_cam = unproject(r, c, d);
+                float xw, yw, zw;
+                camToWorld(V, p_cam.x, p_cam.y, p_cam.z, xw, yw, zw);
+
+                int idx = mMeshVertices.size() / 3;
+                mMeshVertices.push_back(xw);
+                mMeshVertices.push_back(yw);
+                mMeshVertices.push_back(zw);
+                vIndex[(r / step) * gridW + (c / step)] = idx;
+            }
+        }
+    }
+
+    // Connect valid neighboring vertices to form lines
+    for (int r = 0; r < gridH - 1; ++r) {
+        for (int c = 0; c < gridW - 1; ++c) {
+            int idx = vIndex[r * gridW + c];
+            int right = vIndex[r * gridW + c + 1];
+            int down = vIndex[(r + 1) * gridW + c];
+
+            if (idx != -1) {
+                if (right != -1) {
+                    mMeshIndices.push_back(idx);
+                    mMeshIndices.push_back(right);
+                }
+                if (down != -1) {
+                    mMeshIndices.push_back(idx);
+                    mMeshIndices.push_back(down);
+                }
+            }
+        }
+    }
+
+    mMeshIndexCount = mMeshIndices.size();
+    if (mMeshIndexCount > 0 && mMeshVbo != 0) {
+        glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
+        glBufferData(GL_ARRAY_BUFFER, mMeshVertices.size() * sizeof(float), mMeshVertices.data(), GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mMeshIndices.size() * sizeof(uint32_t), mMeshIndices.data(), GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    }
+
+
+    // --- 3. Background Optimization Triggers ---
     if (++mFrameCounter % 30 == 0) {
         continuousOptimize();
-        // Wake up the sorter thread
         {
             std::lock_guard<std::mutex> sortLock(mSortMutex);
             mSortRequested = true;
@@ -692,8 +749,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
         mSortCv.notify_one();
     }
 
-    // Grow (or auto-seed) the fingerprint with peripheral keypoints.
-    // Offload to background thread to prevent starving the GL thread.
     if (mIsArCoreTracking &&
         (mFrameCounter - mLastFingerprintUpdateFrame) >= FINGERPRINT_UPDATE_INTERVAL) {
         {
@@ -782,7 +837,6 @@ void MobileGS::setTargetFingerprint(const cv::Mat& descriptors, const std::vecto
     mTargetKeypoints3D = points3d;
 }
 
-// Load the SuperPoint ONNX model.  Thread-safe.
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) {
     return mSuperPoint.load(onnxBytes);
 }
@@ -825,12 +879,10 @@ void MobileGS::loadModel(const std::string& path) {
     in.read((char*)&numSplats, 4);
     in.read((char*)&keyframes, 4);
 
-    // Backward compatibility handles
     if (version == 3) {
         splatData.resize(numSplats);
         in.read((char*)splatData.data(), numSplats * sizeof(Splat));
     } else if (version == 2) {
-        // Upgrade legacy 32-byte structs to 48-byte structs
         struct LegacySplat { float x,y,z, r,g,b,a, conf; };
         std::vector<LegacySplat> legacy(numSplats);
         in.read((char*)legacy.data(), numSplats * sizeof(LegacySplat));
@@ -839,10 +891,10 @@ void MobileGS::loadModel(const std::string& path) {
             splatData[i] = {legacy[i].x, legacy[i].y, legacy[i].z,
                             legacy[i].r, legacy[i].g, legacy[i].b, legacy[i].a,
                             legacy[i].conf,
-                            0.0f, 0.0f, 1.0f, 1.0f}; // Default forward normal
+                            0.0f, 0.0f, 1.0f, 1.0f};
         }
     } else {
-        return; // Unsupported format
+        return;
     }
 
     in.read((char*)mAnchorMatrix, 16 * sizeof(float));
@@ -869,10 +921,9 @@ void MobileGS::loadModel(const std::string& path) {
 
 void MobileGS::draw() {
     std::lock_guard<std::mutex> lock(mMutex);
-    interpolateAnchorStep();  // Fix 1: advance smooth anchor interpolation
+    interpolateAnchorStep();
     if (!mProgram || !mCameraReady || mPointCount == 0) return;
 
-    // Check if sorter thread finished a new batch
     {
         std::lock_guard<std::mutex> sortLock(mSortMutex);
         if (mIndicesDirty) {
@@ -884,7 +935,6 @@ void MobileGS::draw() {
     }
 
     glEnable(GL_DEPTH_TEST);
-    glUseProgram(mProgram);
 
     // Apply Teleological Anchor to View
     float va[16];
@@ -906,6 +956,9 @@ void MobileGS::draw() {
         }
     }
 
+    // --- 1. Draw Splats ---
+    glUseProgram(mProgram);
+
     GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
     glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp);
 
@@ -915,41 +968,33 @@ void MobileGS::draw() {
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE); // Critical: Depth test is ON, but depth WRITE is OFF for soft transparency.
+    glDepthMask(GL_FALSE); // Soft transparency
 
     glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
 
-    // Wire up the 48-byte Splat struct
-    glEnableVertexAttribArray(0); // aPosition (vec3)
+    glEnableVertexAttribArray(0); // aPosition
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
 
-    glEnableVertexAttribArray(1); // aColor (vec4)
+    glEnableVertexAttribArray(1); // aColor
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
 
-    glEnableVertexAttribArray(2); // aConfidence (float)
+    glEnableVertexAttribArray(2); // aConfidence
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
 
-    glEnableVertexAttribArray(3); // aNormal (vec3)
+    glEnableVertexAttribArray(3); // aNormal
     glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(32));
 
-    glEnableVertexAttribArray(4); // aRadius (float)
+    glEnableVertexAttribArray(4); // aRadius
     glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(44));
 
-    // RENDER USING SORTED INDEX BUFFER
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
 
-    // We only draw up to the number of indices that have been sorted.
-    // If mDrawIndices is smaller than mPointCount (due to rapid creation), it's fine, we catch up next sort cycle.
     int elementsToDraw = std::min(mPointCount, static_cast<int>(mDrawIndices.size()));
     if (elementsToDraw > 0) {
         glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
     } else {
-        // Fallback if thread hasn't sorted the first batch yet
         glDrawArrays(GL_POINTS, 0, mPointCount);
     }
-
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
@@ -957,6 +1002,31 @@ void MobileGS::draw() {
     glDisableVertexAttribArray(3);
     glDisableVertexAttribArray(4);
 
+    // --- 2. Draw Wireframe Mesh ---
+    if (mMeshProgram != 0 && mMeshIndexCount > 0) {
+        glUseProgram(mMeshProgram);
+
+        GLint meshMvpLoc = glGetUniformLocation(mMeshProgram, "uMvp");
+        glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, mvp);
+
+        GLint colorLoc = glGetUniformLocation(mMeshProgram, "uColor");
+        glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f); // Cyan, 20% alpha
+
+        glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
+
+        glLineWidth(2.0f);
+        glDrawElements(GL_LINES, mMeshIndexCount, GL_UNSIGNED_INT, (void*)0);
+
+        glDisableVertexAttribArray(0);
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
 }
