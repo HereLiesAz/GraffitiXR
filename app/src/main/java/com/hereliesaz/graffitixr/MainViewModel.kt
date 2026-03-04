@@ -105,9 +105,12 @@ class MainViewModel @Inject constructor(
         }
         bitmap ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            val currentProject = projectRepository.currentProject.value ?: return@launch
+
+            // 1. Generate Fingerprint
             val fp = ImageProcessingUtils.generateFingerprint(bitmap)
-            val project = projectRepository.currentProject.value ?: return@launch
-            projectRepository.updateProject(project.copy(fingerprint = fp))
+
+            // 2. Register with SLAM engine immediately
             slamManager.setTargetFingerprint(
                 fp.descriptorsData,
                 fp.descriptorsRows,
@@ -115,6 +118,16 @@ class MainViewModel @Inject constructor(
                 fp.descriptorsType,
                 fp.points3d.toFloatArray()
             )
+
+            // 3. FIX: ACTUALLY SAVE THE BITMAP TO DISK
+            projectManager.saveProject(
+                context = context, // Need to inject ApplicationContext to MainViewModel
+                projectData = currentProject.copy(fingerprint = fp),
+                targetImages = listOf(bitmap) // This appends it to targetImageUris
+            )
+
+            // 4. Update the active repository state
+            projectRepository.loadProject(currentProject.id)
         }
     }
 

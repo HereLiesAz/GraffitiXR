@@ -51,6 +51,7 @@ import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -157,7 +158,11 @@ class MainActivity : ComponentActivity() {
                             TargetCreationBackground(
                                 uiState = arUiState,
                                 captureStep = mainUiState.captureStep,
-                                onPhotoCaptured = { arViewModel.setTempCapture(it) },
+                                onPhotoCaptured = { bitmap ->
+                                    arViewModel.setTempCapture(bitmap)
+                                    // FIX: Advance to Rectify automatically once photo is taken
+                                    mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                                },
                                 onCaptureConsumed = { arViewModel.onCaptureConsumed() },
                                 onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
                                 arViewModel = arViewModel
@@ -195,8 +200,19 @@ class MainActivity : ComponentActivity() {
                                     onRetake = { mainViewModel.onRetakeCapture() },
                                     onCancel = { mainViewModel.onCancelCaptureClicked() },
                                     onUnwarpConfirm = { points ->
-                                        arViewModel.setUnwarpPoints(points)
-                                        mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                        // FIX: Actually unwarp the image before moving to MASK
+                                        val currentBitmap = arUiState.tempCaptureBitmap
+                                        if (currentBitmap != null && points.size == 4) {
+                                            lifecycleScope.launch(Dispatchers.Default) {
+                                                val unwarped = com.hereliesaz.graffitixr.common.util.ImageProcessor.unwarpImage(currentBitmap, points)
+                                                if (unwarped != null) {
+                                                    arViewModel.setTempCapture(unwarped)
+                                                }
+                                                mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                            }
+                                        } else {
+                                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                        }
                                     },
                                     onMaskConfirmed = { bitmap ->
                                         arViewModel.setTempCapture(bitmap)
