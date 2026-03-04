@@ -1,10 +1,12 @@
 package com.hereliesaz.graffitixr.feature.dashboard
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -80,4 +82,27 @@ class DashboardViewModel @Inject constructor(
     fun navigateToLibrary() { _navigationTrigger.value = "project_library" }
     fun navigateToSettings() { _navigationTrigger.value = "settings" }
     fun onNavigationConsumed() { _navigationTrigger.value = null }
+
+    /**
+     * Placeholder for checking for updates.
+     */
+    fun checkForUpdates(currentVersion: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCheckingForUpdate = true, updateStatusMessage = "Checking...") }
+            delay(1500) // Simulate network delay
+            _uiState.update { 
+                it.copy(
+                    isCheckingForUpdate = false, 
+                    updateStatusMessage = "You are on the latest experimental build."
+                )
+            }
+        }
+    }
+
+    /**
+     * Placeholder for installing an update.
+     */
+    fun installUpdate(context: Context) {
+        // Implementation for downloading/installing the APK would go here
+    }
 }
