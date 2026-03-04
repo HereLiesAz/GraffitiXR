@@ -170,6 +170,7 @@ class MainActivity : ComponentActivity() {
                             MainScreen(
                                 uiState = editorUiState,
                                 arUiState = arUiState,
+                                isTouchLocked = mainUiState.isTouchLocked,
                                 editorViewModel = editorViewModel,
                                 arViewModel = arViewModel,
                                 slamManager = slamManager,
