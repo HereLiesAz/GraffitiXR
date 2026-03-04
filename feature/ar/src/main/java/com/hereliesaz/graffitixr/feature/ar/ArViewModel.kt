@@ -178,7 +178,7 @@ class ArViewModel @Inject constructor(
         
         // 3. Wait for HAL to stabilize and stop repeating requests.
         // This helps avoid "Function not implemented (-38)" cancelRequest errors.
-        delay(150)
+        delay(500)
         
         // 4. Close session and release camera
         val s = session
