@@ -1,9 +1,6 @@
+// FILE: core/design/src/main/java/com/hereliesaz/graffitixr/design/components/Overlays.kt
 package com.hereliesaz.graffitixr.design.components
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -99,7 +96,6 @@ fun CaptureAnimation() {
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = `as`)).zIndex(10f))
-    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = af)).zIndex(11f))
 }
 
 @Composable
@@ -107,7 +103,7 @@ fun UnlockInstructionsPopup(visible: Boolean) {
     AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut() + slideOutVertically { it / 2 }, modifier = Modifier.fillMaxSize().zIndex(200f)) {
         Box(Modifier.fillMaxSize().padding(bottom = 120.dp), contentAlignment = Alignment.BottomCenter) {
             Box(Modifier.background(Color.Black.copy(0.8f), RoundedCornerShape(16.dp)).padding(24.dp, 16.dp)) {
-                Text("Press Volume Up & Down to unlock", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text("Tap 4 times to unlock", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             }
         }
     }

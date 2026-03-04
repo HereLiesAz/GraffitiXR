@@ -4,11 +4,13 @@ package com.hereliesaz.graffitixr
 import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,6 +37,7 @@ import kotlinx.coroutines.coroutineScope
 fun MainScreen(
     uiState: EditorUiState,
     arUiState: ArUiState,
+    isTouchLocked: Boolean,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     slamManager: SlamManager,
@@ -47,8 +50,12 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
-    // 1. Render Backgrounds (Camera or Mockup)
-    if (hasCameraPermission) {
+    // 1. Render Backgrounds (Camera, Trace, or Mockup)
+    if (uiState.editorMode == EditorMode.TRACE) {
+        androidx.compose.foundation.layout.Spacer(
+            modifier = Modifier.fillMaxSize().background(Color.White)
+        )
+    } else if (hasCameraPermission) {
         when (uiState.editorMode) {
             EditorMode.AR -> {
                 var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
@@ -129,8 +136,8 @@ fun MainScreen(
     // 2. Render Layers & Handle Gestures
     Canvas(modifier = Modifier
         .fillMaxSize()
-        .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, "tap") {
-            if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
+        .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "tap") {
+            if (!isTouchLocked && !isImageLocked && activeLayer != null) {
                 // Only allow double tap for axis rotation if NO drawing tool is selected
                 if (uiState.activeTool == Tool.NONE) {
                     detectTapGestures(
@@ -141,8 +148,8 @@ fun MainScreen(
                 }
             }
         }
-        .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, "transform") {
-            if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
+        .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "transform") {
+            if (!isTouchLocked && !isImageLocked && activeLayer != null) {
                 // Only allow image transform gestures if NO drawing tool is selected
                 if (uiState.activeTool == Tool.NONE) {
                     coroutineScope {
@@ -172,7 +179,7 @@ fun MainScreen(
     }
 
     // 3. Render Active Stroke (DrawingCanvas)
-    if (!isImageLocked && activeLayer != null && uiState.editorMode != EditorMode.TRACE) {
+    if (!isTouchLocked && !isImageLocked && activeLayer != null) {
         // If an active tool is selected, the DrawingCanvas overlay intercepts strokes
         if (uiState.activeTool != Tool.NONE) {
             DrawingCanvas(
