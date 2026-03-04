@@ -28,6 +28,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.common.GoogleApiAvailability
+import com.hereliesaz.aznavrail.AzComposableContent
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHost
 import com.hereliesaz.aznavrail.AzNavHostScope
@@ -293,7 +294,6 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    @Composable
     private fun AzNavHostScope.configureRail(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -371,46 +371,39 @@ class MainActivity : ComponentActivity() {
                 nestedContent = {
                     val activate = { editorViewModel.onLayerActivated(layer.id) }
 
-                    // Explicitly typed as @Composable () -> Unit to satisfy compiler
-                    val addSizeItem: () -> Unit = {
-                        val sizeContent: @Composable () -> Unit = {
-                            val liveState by editorViewModel.uiState.collectAsState()
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        detectVerticalDragGestures { change, dragAmount ->
-                                            change.consume()
-                                            // dragAmount is positive down; user pulls UP to increase size
-                                            val currentSize = editorViewModel.uiState.value.brushSize
-                                            editorViewModel.setBrushSize(currentSize - dragAmount * 0.5f)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                // Visual preview of the circle size updates reactively
-                                Box(
-                                    modifier = Modifier
-                                        .size((liveState.brushSize / 2f).coerceIn(4f, 36f).dp)
-                                        .background(Color.White, CircleShape)
-                                )
-                            }
-                        }
-
-                        azRailItem(
-                            id = "size_${layer.id}",
-                            text = "Size",
-                            content = sizeContent
-                        ) {}
-                    }
-
                     if (layer.isSketch) {
                         azRailItem(id = "brush_${layer.id}", text = "Brush") { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
                         azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
                         azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
                         azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
 
-                        addSizeItem()
+                        azRailItem(
+                            id = "size_${layer.id}",
+                            text = "Size",
+                            content = AzComposableContent {
+                                val liveState by editorViewModel.uiState.collectAsState()
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .pointerInput(Unit) {
+                                            detectVerticalDragGestures { change, dragAmount ->
+                                                change.consume()
+                                                // dragAmount is positive down; user pulls UP to increase size
+                                                val currentSize = editorViewModel.uiState.value.brushSize
+                                                editorViewModel.setBrushSize(currentSize - dragAmount * 0.5f)
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Visual preview of the circle size updates reactively
+                                    Box(
+                                        modifier = Modifier
+                                            .size((liveState.brushSize / 2f).coerceIn(4f, 36f).dp)
+                                            .background(Color.White, CircleShape)
+                                    )
+                                }
+                            }
+                        ) {}
 
                         azRailItem(id = "color_${layer.id}", text = "Color", content = editorUiState.activeColor) {
                             activate()
@@ -427,7 +420,31 @@ class MainActivity : ComponentActivity() {
                         azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
                         azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
 
-                        addSizeItem()
+                        azRailItem(
+                            id = "size_${layer.id}",
+                            text = "Size",
+                            content = AzComposableContent {
+                                val liveState by editorViewModel.uiState.collectAsState()
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .pointerInput(Unit) {
+                                            detectVerticalDragGestures { change, dragAmount ->
+                                                change.consume()
+                                                val currentSize = editorViewModel.uiState.value.brushSize
+                                                editorViewModel.setBrushSize(currentSize - dragAmount * 0.5f)
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size((liveState.brushSize / 2f).coerceIn(4f, 36f).dp)
+                                            .background(Color.White, CircleShape)
+                                    )
+                                }
+                            }
+                        ) {}
 
                         azRailItem(id = "balance_${layer.id}", text = "Balance") { activate(); editorViewModel.onBalanceClicked() }
                         azRailItem(id = "move_${layer.id}", text = "Move") { activate(); editorViewModel.setActiveTool(Tool.NONE) }
