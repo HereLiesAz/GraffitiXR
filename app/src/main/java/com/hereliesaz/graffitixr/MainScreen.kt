@@ -58,17 +58,24 @@ fun MainScreen(
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
     if (uiState.editorMode == EditorMode.TRACE) {
+        // True black background for trace mode to eliminate glare
         Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
     } else if (hasCameraPermission) {
         when (uiState.editorMode) {
             EditorMode.AR -> {
                 var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-                LaunchedEffect(Unit) {
+                // Properly decouple the AR mode toggle from the UI surface instantiation loop
+                DisposableEffect(uiState.editorMode) {
                     arViewModel.setArMode(true, context)
+                    onDispose {
+                        arViewModel.setArMode(false, context)
+                    }
                 }
 
+                // Handle GL context pausing based solely on activity lifecycle events
                 DisposableEffect(lifecycleOwner, glView) {
+                    if (glView == null) return@DisposableEffect onDispose {}
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
                             Lifecycle.Event.ON_RESUME -> glView?.onResume()
@@ -79,8 +86,6 @@ fun MainScreen(
                     lifecycleOwner.lifecycle.addObserver(observer)
                     onDispose {
                         lifecycleOwner.lifecycle.removeObserver(observer)
-                        glView?.onPause()
-                        arViewModel.setArMode(false, context)
                     }
                 }
 

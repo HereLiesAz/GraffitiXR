@@ -96,6 +96,9 @@ class ArRenderer(
         sessionLock.withLock {
             val activeSession = session ?: return
 
+            // BULLETPROOF: Ensure the texture is bound every frame so the camera feed doesn't drop
+            activeSession.setCameraTextureName(backgroundRenderer.textureId)
+
             pendingFlashlightMode?.let { isOn ->
                 getFlashlightModeEnum(isOn)?.let { mode ->
                     try {

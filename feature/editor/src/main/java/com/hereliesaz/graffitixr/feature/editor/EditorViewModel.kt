@@ -55,36 +55,39 @@ class EditorViewModel @Inject constructor(
                 if (project != null) {
                     val projectIdChanged = _uiState.value.projectId != project.id
 
-                    val currentLayers = _uiState.value.layers
-                    val layers = project.layers.map { overlayLayer ->
-                        val existingLayer = currentLayers.find { it.id == overlayLayer.id }
-                        val layer = overlayLayer.toLayer()
-                        if (existingLayer != null && existingLayer.uri == layer.uri) {
-                            layer.copy(bitmap = existingLayer.bitmap)
-                        } else {
-                            layer
+                    // Only completely overwrite layers and reload from disk when switching projects.
+                    // Otherwise, the active UI is the singular source of truth for all drawing/slider edits.
+                    if (projectIdChanged) {
+                        val currentLayers = _uiState.value.layers
+                        val layers = project.layers.map { overlayLayer ->
+                            val existingLayer = currentLayers.find { it.id == overlayLayer.id }
+                            val layer = overlayLayer.toLayer()
+                            if (existingLayer != null && existingLayer.uri == layer.uri) {
+                                layer.copy(bitmap = existingLayer.bitmap)
+                            } else {
+                                layer
+                            }
                         }
-                    }
-                    _uiState.update { it.copy(projectId = project.id, layers = layers) }
 
-                    val layersToLoad = layers.filter { it.bitmap == null && it.uri != null }
-                    if (layersToLoad.isNotEmpty()) {
-                        viewModelScope.launch(dispatchers.io) {
-                            val loadedLayers = layers.map { layer ->
-                                val layerUri = layer.uri
-                                if (layer.bitmap == null && layerUri != null) {
-                                    layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, layerUri))
-                                } else {
-                                    layer
+                        _uiState.update { it.copy(projectId = project.id, layers = layers) }
+
+                        val layersToLoad = layers.filter { it.bitmap == null && it.uri != null }
+                        if (layersToLoad.isNotEmpty()) {
+                            viewModelScope.launch(dispatchers.io) {
+                                val loadedLayers = layers.map { layer ->
+                                    val layerUri = layer.uri
+                                    if (layer.bitmap == null && layerUri != null) {
+                                        layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, layerUri))
+                                    } else {
+                                        layer
+                                    }
+                                }
+                                withContext(dispatchers.main) {
+                                    _uiState.update { it.copy(layers = loadedLayers) }
                                 }
                             }
-                            withContext(dispatchers.main) {
-                                _uiState.update { it.copy(layers = loadedLayers) }
-                            }
                         }
-                    }
 
-                    if (projectIdChanged) {
                         viewModelScope.launch(dispatchers.io) {
                             slamManager.clearMap()
                             val mapPath = projectManager.getMapPath(context, project.id)
@@ -102,14 +105,14 @@ class EditorViewModel @Inject constructor(
                                 )
                             }
                         }
-                    }
 
-                    project.backgroundImageUri?.let { uri ->
-                        if (_uiState.value.backgroundBitmap == null || projectIdChanged) {
-                            viewModelScope.launch(dispatchers.io) {
-                                val bitmap = ImageUtils.loadBitmapAsync(context, uri)
-                                withContext(dispatchers.main) {
-                                    _uiState.update { it.copy(backgroundBitmap = bitmap) }
+                        project.backgroundImageUri?.let { uri ->
+                            if (_uiState.value.backgroundBitmap == null || projectIdChanged) {
+                                viewModelScope.launch(dispatchers.io) {
+                                    val bitmap = ImageUtils.loadBitmapAsync(context, uri)
+                                    withContext(dispatchers.main) {
+                                        _uiState.update { it.copy(backgroundBitmap = bitmap) }
+                                    }
                                 }
                             }
                         }
