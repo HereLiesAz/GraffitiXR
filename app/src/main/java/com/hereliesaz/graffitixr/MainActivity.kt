@@ -466,7 +466,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             ) {
-                inputItem(text = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
+                // FIXED: Changed 'text' to 'hint' for the AzNavRail inputItem parameter.
+                inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
                 listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
                 listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
                 listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
