@@ -58,7 +58,7 @@ fun MainScreen(
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
     if (uiState.editorMode == EditorMode.TRACE) {
-        Spacer(modifier = Modifier.fillMaxSize().background(Color.White))
+        Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
     } else if (hasCameraPermission) {
         when (uiState.editorMode) {
             EditorMode.AR -> {

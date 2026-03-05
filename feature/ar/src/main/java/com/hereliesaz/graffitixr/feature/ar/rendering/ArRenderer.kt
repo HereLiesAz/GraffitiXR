@@ -96,8 +96,6 @@ class ArRenderer(
         sessionLock.withLock {
             val activeSession = session ?: return
 
-            activeSession.setCameraTextureName(backgroundRenderer.textureId)
-
             pendingFlashlightMode?.let { isOn ->
                 getFlashlightModeEnum(isOn)?.let { mode ->
                     try {
@@ -118,6 +116,7 @@ class ArRenderer(
             } catch (e: SessionPausedException) {
                 return
             } catch (e: Exception) {
+                Timber.e(e, "ARCore session update failed")
                 return
             }
 

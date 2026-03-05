@@ -19,6 +19,7 @@ import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.feature.editor.export.ExportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -52,43 +53,63 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.main) {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
-                    val layers = project.layers.map { it.toLayer() }
+                    val projectIdChanged = _uiState.value.projectId != project.id
+
+                    val currentLayers = _uiState.value.layers
+                    val layers = project.layers.map { overlayLayer ->
+                        val existingLayer = currentLayers.find { it.id == overlayLayer.id }
+                        val layer = overlayLayer.toLayer()
+                        if (existingLayer != null && existingLayer.uri == layer.uri) {
+                            layer.copy(bitmap = existingLayer.bitmap)
+                        } else {
+                            layer
+                        }
+                    }
                     _uiState.update { it.copy(projectId = project.id, layers = layers) }
 
-                    viewModelScope.launch(dispatchers.io) {
-                        val layersWithBitmaps = layers.map { layer ->
-                            val localUri = layer.uri
-                            if (localUri != null) {
-                                layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, localUri))
-                            } else layer
+                    val layersToLoad = layers.filter { it.bitmap == null && it.uri != null }
+                    if (layersToLoad.isNotEmpty()) {
+                        viewModelScope.launch(dispatchers.io) {
+                            val loadedLayers = layers.map { layer ->
+                                if (layer.bitmap == null && layer.uri != null) {
+                                    layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, layer.uri))
+                                } else {
+                                    layer
+                                }
+                            }
+                            withContext(dispatchers.main) {
+                                _uiState.update { it.copy(layers = loadedLayers) }
+                            }
                         }
+                    }
 
-                        slamManager.clearMap()
-                        val mapPath = projectManager.getMapPath(context, project.id)
-                        if (File(mapPath).exists()) {
-                            slamManager.loadModel(mapPath)
-                        }
+                    if (projectIdChanged) {
+                        viewModelScope.launch(dispatchers.io) {
+                            slamManager.clearMap()
+                            val mapPath = projectManager.getMapPath(context, project.id)
+                            if (File(mapPath).exists()) {
+                                slamManager.loadModel(mapPath)
+                            }
 
-                        project.fingerprint?.let { fp ->
-                            slamManager.setTargetFingerprint(
-                                fp.descriptorsData,
-                                fp.descriptorsRows,
-                                fp.descriptorsCols,
-                                fp.descriptorsType,
-                                fp.points3d.toFloatArray()
-                            )
-                        }
-
-                        withContext(dispatchers.main) {
-                            _uiState.update { it.copy(layers = layersWithBitmaps) }
+                            project.fingerprint?.let { fp ->
+                                slamManager.setTargetFingerprint(
+                                    fp.descriptorsData,
+                                    fp.descriptorsRows,
+                                    fp.descriptorsCols,
+                                    fp.descriptorsType,
+                                    fp.points3d.toFloatArray()
+                                )
+                            }
                         }
                     }
 
                     project.backgroundImageUri?.let { uri ->
-                        viewModelScope.launch(dispatchers.io) {
-                            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
-                            withContext(dispatchers.main) {
-                                _uiState.update { it.copy(backgroundBitmap = bitmap) }
+                        if (_uiState.value.backgroundBitmap == null || projectIdChanged) {
+                            viewModelScope.launch(dispatchers.io) {
+                                val bitmap = ImageUtils.loadBitmapAsync(context, uri)
+                                withContext(dispatchers.main) {
+                                    _uiState.update { it.copy(backgroundBitmap = bitmap) }
+                                }
                             }
                         }
                     }
@@ -185,14 +206,15 @@ class EditorViewModel @Inject constructor(
             val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(blankBitmap))
             val localUri = Uri.parse("file://$path")
 
-            val newLayer = Layer(
-                id = UUID.randomUUID().toString(),
-                name = "Sketch",
-                isSketch = true,
-                bitmap = blankBitmap,
-                uri = localUri
-            )
             withContext(dispatchers.main) {
+                val sketchCount = _uiState.value.layers.count { it.isSketch }
+                val newLayer = Layer(
+                    id = UUID.randomUUID().toString(),
+                    name = "Sketch ${sketchCount + 1}",
+                    isSketch = true,
+                    bitmap = blankBitmap,
+                    uri = localUri
+                )
                 _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
                 saveProject()
             }
@@ -248,6 +270,45 @@ class EditorViewModel @Inject constructor(
 
             val mapPath = projectManager.getMapPath(context, projectToSave.id)
             slamManager.saveModel(mapPath)
+
+            // ONLY EXPORT IF EXPLICITLY SAVED BY USER (name != null)
+            if (name != null) {
+                exportProjectInternal(projectToSave)
+            }
+        }
+    }
+
+    private suspend fun exportProjectInternal(project: GraffitiProject) {
+        val filename = "${project.name.replace(" ", "_")}_export.gxr"
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                }
+                val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    projectManager.exportProjectToUri(context, project.id, uri)
+                    withContext(dispatchers.main) {
+                        Toast.makeText(context, "Project saved and exported to Downloads", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    throw java.io.IOException("Failed to create MediaStore entry")
+                }
+            } else {
+                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                val file = File(downloadsDir, filename)
+                val uri = Uri.fromFile(file)
+                projectManager.exportProjectToUri(context, project.id, uri)
+                withContext(dispatchers.main) {
+                    Toast.makeText(context, "Project saved and exported to ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                }
+            }
+        } catch (e: Exception) {
+            withContext(dispatchers.main) {
+                Toast.makeText(context, "Project saved locally. Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -276,48 +337,6 @@ class EditorViewModel @Inject constructor(
                 withContext(dispatchers.main) {
                     _uiState.update { it.copy(isLoading = false) }
                     Toast.makeText(context, "Export error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-
-    fun exportProject() {
-        val project = projectRepository.currentProject.value ?: return
-        val filename = "${project.name.replace(" ", "_")}_export.gxr"
-
-        viewModelScope.launch(dispatchers.io) {
-            _uiState.update { it.copy(isLoading = true) }
-            try {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                    val contentValues = android.content.ContentValues().apply {
-                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")
-                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
-                    }
-                    val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-                    if (uri != null) {
-                        projectManager.exportProjectToUri(context, project.id, uri)
-                        withContext(dispatchers.main) {
-                            _uiState.update { it.copy(isLoading = false) }
-                            Toast.makeText(context, "Project exported to Downloads", Toast.LENGTH_LONG).show()
-                        }
-                    } else {
-                        throw java.io.IOException("Failed to create MediaStore entry")
-                    }
-                } else {
-                    val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-                    val file = File(downloadsDir, filename)
-                    val uri = Uri.fromFile(file)
-                    projectManager.exportProjectToUri(context, project.id, uri)
-                    withContext(dispatchers.main) {
-                        _uiState.update { it.copy(isLoading = false) }
-                        Toast.makeText(context, "Project exported to ${file.absolutePath}", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(dispatchers.main) {
-                    _uiState.update { it.copy(isLoading = false) }
-                    Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -498,10 +517,29 @@ class EditorViewModel @Inject constructor(
 
     override fun onLayerDuplicated(id: String) {
         val layer = _uiState.value.layers.find { it.id == id } ?: return
+        val projectId = _uiState.value.projectId ?: return
         pushHistory()
-        val duplicated = layer.copy(id = UUID.randomUUID().toString(), name = "${layer.name} Copy")
-        _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id) }
-        saveProject()
+
+        viewModelScope.launch(dispatchers.io) {
+            val newBitmap = layer.bitmap?.copy(layer.bitmap.config ?: Bitmap.Config.ARGB_8888, true)
+            val newUri = newBitmap?.let { bmp ->
+                val filename = "layer_dup_${UUID.randomUUID()}.png"
+                val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bmp))
+                Uri.parse("file://$path")
+            } ?: layer.uri
+
+            val duplicated = layer.copy(
+                id = UUID.randomUUID().toString(),
+                name = "${layer.name} Copy",
+                bitmap = newBitmap,
+                uri = newUri
+            )
+
+            withContext(dispatchers.main) {
+                _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id) }
+                saveProject()
+            }
+        }
     }
 
     override fun onLayerRenamed(id: String, name: String) {

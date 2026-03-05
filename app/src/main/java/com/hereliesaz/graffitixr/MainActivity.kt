@@ -466,20 +466,23 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             ) {
+                inputItem(text = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
+                listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
+                listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
+                listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
                 listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
             }
         }
 
         azDivider()
 
-
         azRailHostItem(id = "project_host", text = navStrings.project)
         azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, shape = AzButtonShape.NONE) { showSaveDialog = true }
         azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToLibrary() }
 
-        // Split Export menu
-        azRailSubItem(id = "export_img", hostId = "project_host", text = "Image", shape = AzButtonShape.NONE) { editorViewModel.exportImage() }
-        azRailSubItem(id = "export_proj", hostId = "project_host", text = "Export .gxr", shape = AzButtonShape.NONE) { editorViewModel.exportProject() }
+        // Export menu
+        azRailSubItem(id = "export_img", hostId = "project_host", text = "Export", shape = AzButtonShape.NONE) { editorViewModel.exportImage() }
+
         // Adding the Help option beneath Project
         azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", shape = AzButtonShape.NONE) { showHelpDialog = true }
 
