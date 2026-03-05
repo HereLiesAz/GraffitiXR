@@ -104,6 +104,7 @@ class MainActivity : ComponentActivity() {
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
+                val cameraController = com.hereliesaz.graffitixr.feature.ar.rememberCameraController()
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
@@ -162,13 +163,7 @@ class MainActivity : ComponentActivity() {
                             TargetCreationBackground(
                                 uiState = arUiState,
                                 captureStep = mainUiState.captureStep,
-                                onPhotoCaptured = { bitmap ->
-                                    arViewModel.setTempCapture(bitmap)
-                                    mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
-                                },
-                                onCaptureConsumed = { arViewModel.onCaptureConsumed() },
-                                onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
-                                arViewModel = arViewModel
+                                onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) }
                             )
                         } else {
                             MainScreen(
@@ -179,6 +174,7 @@ class MainActivity : ComponentActivity() {
                                 arViewModel = arViewModel,
                                 slamManager = slamManager,
                                 hasCameraPermission = hasCameraPermission,
+                                cameraController = cameraController,
                                 onRendererCreated = { renderer ->
                                     renderRefState.value = renderer
                                 }
