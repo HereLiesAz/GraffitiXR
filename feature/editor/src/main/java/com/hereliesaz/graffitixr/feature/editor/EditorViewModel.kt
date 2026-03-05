@@ -71,8 +71,9 @@ class EditorViewModel @Inject constructor(
                     if (layersToLoad.isNotEmpty()) {
                         viewModelScope.launch(dispatchers.io) {
                             val loadedLayers = layers.map { layer ->
-                                if (layer.bitmap == null && layer.uri != null) {
-                                    layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, layer.uri))
+                                val layerUri = layer.uri
+                                if (layer.bitmap == null && layerUri != null) {
+                                    layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, layerUri))
                                 } else {
                                     layer
                                 }
@@ -521,7 +522,8 @@ class EditorViewModel @Inject constructor(
         pushHistory()
 
         viewModelScope.launch(dispatchers.io) {
-            val newBitmap = layer.bitmap?.copy(layer.bitmap.config ?: Bitmap.Config.ARGB_8888, true)
+            val currentBitmap = layer.bitmap
+            val newBitmap = currentBitmap?.copy(currentBitmap.config ?: Bitmap.Config.ARGB_8888, true)
             val newUri = newBitmap?.let { bmp ->
                 val filename = "layer_dup_${UUID.randomUUID()}.png"
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bmp))
