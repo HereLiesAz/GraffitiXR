@@ -38,6 +38,9 @@ import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
+import com.hereliesaz.graffitixr.design.components.InfoDialog
+import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
+import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
@@ -68,6 +71,7 @@ class MainActivity : ComponentActivity() {
     var showSaveDialog by mutableStateOf(false)
     var showLibrary by mutableStateOf(true) // Ensure library is shown by default at startup
     var showSettings by mutableStateOf(false)
+    var showHelpDialog by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
@@ -128,7 +132,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked && !mainUiState.isCapturingTarget
+                val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked && !mainUiState.isCapturingTarget && !showLibrary && !showSettings
 
                 LaunchedEffect(Unit) {
                     if (!hasCameraPermission) {
@@ -191,6 +195,21 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
                             }
 
+                            if (mainUiState.isTouchLocked) {
+                                var showUnlockInstructions by remember(mainUiState.isTouchLocked) { mutableStateOf(true) }
+                                LaunchedEffect(mainUiState.isTouchLocked) {
+                                    if (mainUiState.isTouchLocked) {
+                                        kotlinx.coroutines.delay(3000)
+                                        showUnlockInstructions = false
+                                    }
+                                }
+                                TouchLockOverlay(
+                                    isLocked = true,
+                                    onUnlockRequested = { mainViewModel.setTouchLocked(false) }
+                                )
+                                UnlockInstructionsPopup(visible = showUnlockInstructions)
+                            }
+
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
                                     uiState = arUiState,
@@ -233,6 +252,14 @@ class MainActivity : ComponentActivity() {
                                         editorViewModel.saveProject(name)
                                         showSaveDialog = false
                                     }
+                                )
+                            }
+
+                            if (showHelpDialog) {
+                                InfoDialog(
+                                    title = "GraffitiXR Guide",
+                                    content = "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, select the 'Transform' tool. Double tap the screen to cycle between X, Y, and Z rotation axes.",
+                                    onDismiss = { showHelpDialog = false }
                                 )
                             }
 
@@ -315,14 +342,14 @@ class MainActivity : ComponentActivity() {
     ) {
         val navStrings = NavStrings()
         val activeHighlightColor = when (editorUiState.activeRotationAxis) {
-            RotationAxis.X -> Color.Red
-            RotationAxis.Y -> Color.Green
-            RotationAxis.Z -> Color.Blue
+            RotationAxis.X -> Color.Cyan
+            RotationAxis.Y -> Color(0xFFFF69B4) // Pink
+            RotationAxis.Z -> Color.Green
         }
 
         azTheme(activeColor = activeHighlightColor, defaultShape = AzButtonShape.RECTANGLE, headerIconShape = AzHeaderIconShape.ROUNDED)
         azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
-        azAdvanced(helpEnabled = true)
+        azAdvanced(helpEnabled = true) // DSL injects footer items natively
 
         val requestPermissions = {
             permissionLauncher.launch(
@@ -373,7 +400,8 @@ class MainActivity : ComponentActivity() {
                 nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
                 onClick = {
                     editorViewModel.onLayerActivated(layer.id)
-                    editorViewModel.setActiveTool(Tool.NONE)
+                    // Automatically activate a drawing tool when opening the layer options, locking out transformations
+                    editorViewModel.setActiveTool(Tool.BRUSH)
                 },
                 onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
                 nestedContent = {
@@ -383,6 +411,7 @@ class MainActivity : ComponentActivity() {
                         azRailItem(
                             id = "size_${layer.id}",
                             text = "Size",
+                            shape = AzButtonShape.RECTANGLE,
                             content = AzComposableContent {
                                 val liveState by editorViewModel.uiState.collectAsState()
                                 Box(
@@ -399,7 +428,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size((liveState.brushSize / 2f).coerceIn(4f, 36f).dp)
+                                            .size((liveState.brushSize / 2f).coerceIn(4f, 64f).dp)
                                             .background(Color.White, CircleShape)
                                     )
                                 }
@@ -408,32 +437,36 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (layer.isSketch) {
-                        azRailItem(id = "brush_${layer.id}", text = "Brush") { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
-                        azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                        azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                        azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                        azRailItem(id = "brush_${layer.id}", text = "Brush", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
+                        azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                        azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                        azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                        azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
 
                         addSizeItem()
 
-                        azRailItem(id = "color_${layer.id}", text = "Color", content = editorUiState.activeColor) {
+                        azRailItem(id = "color_${layer.id}", text = "Color", shape = AzButtonShape.RECTANGLE, content = editorUiState.activeColor) {
                             activate()
                             editorViewModel.setActiveTool(Tool.COLOR)
                             editorViewModel.onColorClicked()
                         }
-                        azRailItem(id = "adj_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
-                        azRailItem(id = "move_${layer.id}", text = "Move") { activate(); editorViewModel.setActiveTool(Tool.NONE) }
+                        azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
+                        // Setting Tool.NONE enables image transformations and disables editing
+                        azRailItem(id = "move_${layer.id}", text = "Transform", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.NONE) }
                     } else {
-                        azRailItem(id = "iso_${layer.id}", text = "Isolate") { activate(); editorViewModel.onRemoveBackgroundClicked() }
-                        azRailItem(id = "line_${layer.id}", text = "Outline") { activate(); editorViewModel.onLineDrawingClicked() }
-                        azRailItem(id = "adj_${layer.id}", text = "Adjust") { activate(); editorViewModel.onAdjustClicked() }
-                        azRailItem(id = "eraser_${layer.id}", text = "Eraser") { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                        azRailItem(id = "blur_${layer.id}", text = "Blur") { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                        azRailItem(id = "liquify_${layer.id}", text = "Liquify") { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                        azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
+                        azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onLineDrawingClicked() }
+                        azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
+                        azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                        azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                        azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                        azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
 
                         addSizeItem()
 
-                        azRailItem(id = "balance_${layer.id}", text = "Balance") { activate(); editorViewModel.onBalanceClicked() }
-                        azRailItem(id = "move_${layer.id}", text = "Move") { activate(); editorViewModel.setActiveTool(Tool.NONE) }
+                        azRailItem(id = "balance_${layer.id}", text = "Balance", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onBalanceClicked() }
+                        // Setting Tool.NONE enables image transformations and disables editing
+                        azRailItem(id = "move_${layer.id}", text = "Transform", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.NONE) }
                     }
                 }
             ) {
@@ -450,17 +483,17 @@ class MainActivity : ComponentActivity() {
 
         // Split Export menu
         azRailSubItem(id = "export_img", hostId = "project_host", text = "Image", shape = AzButtonShape.NONE) { editorViewModel.exportImage() }
-        azRailSubItem(id = "export_proj", hostId = "project_host", text = "Project", shape = AzButtonShape.NONE) { editorViewModel.exportProject() }
-        azHelpRailItem(id = "help", text = "Help")
-        azRailSubItem(id = "settings_sub", hostId = "project_host", text = navStrings.settings, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToSettings() }
+        azRailSubItem(id = "export_proj", hostId = "project_host", text = "Export .gxr", shape = AzButtonShape.NONE) { editorViewModel.exportProject() }
+        // Adding the Help option beneath Project
+        azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", shape = AzButtonShape.NONE) { showHelpDialog = true }
 
         azDivider()
 
         if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
             azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
         }
-        if (editorUiState.editorMode == EditorMode.TRACE) {
-            azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
-        }
+
+        // Touch Lock allows placing physical material against the screen (locks out transformations)
+        azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
     }
 }

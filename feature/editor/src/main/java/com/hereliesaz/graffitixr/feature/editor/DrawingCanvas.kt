@@ -1,3 +1,4 @@
+// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/DrawingCanvas.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import androidx.compose.foundation.Canvas
@@ -20,13 +21,13 @@ fun DrawingCanvas(
     activeTool: Tool,
     brushSize: Float,
     activeColor: Color,
+    modifier: Modifier = Modifier,
     onPathFinished: (List<Offset>, Tool) -> Unit
 ) {
     var currentPoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
 
     Canvas(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier
             .pointerInput(activeTool) {
                 if (activeTool == Tool.NONE) return@pointerInput
 

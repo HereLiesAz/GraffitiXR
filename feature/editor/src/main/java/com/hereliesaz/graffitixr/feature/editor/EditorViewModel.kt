@@ -416,8 +416,27 @@ class EditorViewModel @Inject constructor(
     fun onBalanceClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR) } }
     override fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
 
-    fun onTransformGesture(pan: Offset, zoom: Float, rotation: Float) {
-        updateActiveLayer { layer -> layer.copy(scale = layer.scale * zoom, offset = layer.offset + pan, rotationZ = layer.rotationZ + rotation) }
+    fun onTransformGesture(pan: Offset, zoom: Float, rotationDelta: Float) {
+        updateActiveLayer { layer ->
+            var rx = layer.rotationX
+            var ry = layer.rotationY
+            var rz = layer.rotationZ
+
+            // Route the two-finger rotation to the actively selected 3D axis
+            when (_uiState.value.activeRotationAxis) {
+                RotationAxis.X -> rx += rotationDelta
+                RotationAxis.Y -> ry += rotationDelta
+                RotationAxis.Z -> rz += rotationDelta
+            }
+
+            layer.copy(
+                scale = layer.scale * zoom,
+                offset = layer.offset + pan,
+                rotationX = rx,
+                rotationY = ry,
+                rotationZ = rz
+            )
+        }
     }
 
     override fun onGestureEnd() { saveProject(); _uiState.update { it.copy(gestureInProgress = false) } }

@@ -4,22 +4,28 @@ package com.hereliesaz.graffitixr
 import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -47,13 +53,13 @@ fun MainScreen(
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
     val isImageLocked = activeLayer?.isImageLocked ?: false
     val context = LocalContext.current
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
     // 1. Render Backgrounds (Camera, Trace, or Mockup)
     if (uiState.editorMode == EditorMode.TRACE) {
-        androidx.compose.foundation.layout.Spacer(
-            modifier = Modifier.fillMaxSize().background(Color.Black)
+        Spacer(
+            modifier = Modifier.fillMaxSize().background(Color.White)
         )
     } else if (hasCameraPermission) {
         when (uiState.editorMode) {
@@ -125,7 +131,7 @@ fun MainScreen(
     }
 
     uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }?.let { bmp ->
-        androidx.compose.foundation.Image(
+        Image(
             bitmap = bmp.asImageBitmap(),
             contentDescription = "Background Mockup",
             modifier = Modifier.fillMaxSize(),
@@ -134,11 +140,11 @@ fun MainScreen(
     }
 
     // 2. Render Layers & Handle Gestures
-    Canvas(modifier = Modifier
+    Box(modifier = Modifier
         .fillMaxSize()
         .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "tap") {
             if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-                // Only allow double tap for axis rotation if NO drawing tool is selected
+                // Double tap cycles the 3D rotation axis
                 if (uiState.activeTool == Tool.NONE) {
                     detectTapGestures(
                         onDoubleTap = {
@@ -150,7 +156,7 @@ fun MainScreen(
         }
         .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "transform") {
             if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-                // Only allow image transform gestures if NO drawing tool is selected
+                // If Tool.NONE is explicitly selected, the user intends to pinch/pan/rotate the image
                 if (uiState.activeTool == Tool.NONE) {
                     coroutineScope {
                         detectTransformGestures { _, pan, zoom, rotation ->
@@ -163,33 +169,56 @@ fun MainScreen(
     ) {
         uiState.layers.filter { it.isVisible }.forEach { layer ->
             layer.bitmap?.let { bmp ->
-                withTransform({
-                    translate(layer.offset.x, layer.offset.y)
-                    scale(layer.scale, layer.scale)
-                    rotate(layer.rotationZ)
-                }) {
-                    drawImage(
-                        image = bmp.asImageBitmap(),
-                        alpha = layer.opacity,
-                        blendMode = layer.blendMode
-                    )
-                }
+                // Image layer utilizing graphicsLayer for 3D center pivots
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize() // Forces TransformOrigin.Center to align with screen center natively
+                        .graphicsLayer {
+                            translationX = layer.offset.x
+                            translationY = layer.offset.y
+                            scaleX = layer.scale
+                            scaleY = layer.scale
+                            rotationX = layer.rotationX
+                            rotationY = layer.rotationY
+                            rotationZ = layer.rotationZ
+                            alpha = layer.opacity
+                            transformOrigin = TransformOrigin.Center
+                            blendMode = layer.blendMode
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                        },
+                    contentScale = ContentScale.Fit
+                )
             }
         }
-    }
 
-    // 3. Render Active Stroke (DrawingCanvas)
-    if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-        // If an active tool is selected, the DrawingCanvas overlay intercepts strokes
-        if (uiState.activeTool != Tool.NONE) {
-            DrawingCanvas(
-                activeTool = uiState.activeTool,
-                brushSize = uiState.brushSize,
-                activeColor = uiState.activeColor,
-                onPathFinished = { path, _ ->
-                    editorViewModel.onDrawingPathFinished(path)
-                }
-            )
+        // 3. Render Active Stroke (DrawingCanvas)
+        if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+            // If an active tool is selected, the DrawingCanvas overlay intercepts strokes.
+            // Graphics layer explicitly maps drawing events to the 3D transformed space.
+            if (uiState.activeTool != Tool.NONE) {
+                DrawingCanvas(
+                    activeTool = uiState.activeTool,
+                    brushSize = uiState.brushSize,
+                    activeColor = uiState.activeColor,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationX = activeLayer.offset.x
+                            translationY = activeLayer.offset.y
+                            scaleX = activeLayer.scale
+                            scaleY = activeLayer.scale
+                            rotationX = activeLayer.rotationX
+                            rotationY = activeLayer.rotationY
+                            rotationZ = activeLayer.rotationZ
+                            transformOrigin = TransformOrigin.Center
+                        },
+                    onPathFinished = { path, _ ->
+                        editorViewModel.onDrawingPathFinished(path)
+                    }
+                )
+            }
         }
     }
 }

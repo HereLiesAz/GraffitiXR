@@ -28,7 +28,7 @@ class ArRenderer(
     private val sessionLock = ReentrantLock()
     var session: Session? = null
         private set
-        
+
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
 
@@ -62,7 +62,8 @@ class ArRenderer(
     private fun getFlashlightModeEnum(isOn: Boolean): Any? {
         return try {
             val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
-            val fieldName = if (isOn) "ON" else "OFF"
+            // CRITICAL FIX: The ARCore enum property for flashlight on is "TORCH", not "ON"
+            val fieldName = if (isOn) "TORCH" else "OFF"
             flashlightModeClass.getField(fieldName).get(null)
         } catch (e: Exception) {
             Timber.e(e, "Failed to get FlashlightMode enum via reflection")
@@ -76,7 +77,7 @@ class ArRenderer(
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
         slamManager.initGl()
-        
+
         sessionLock.withLock {
             isSurfaceCreated = true
             session?.setCameraTextureName(backgroundRenderer.textureId)
@@ -95,7 +96,7 @@ class ArRenderer(
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
         var isTracking = false
-        
+
         sessionLock.withLock {
             val activeSession = session ?: return
 
@@ -164,7 +165,7 @@ class ArRenderer(
 
             slamManager.draw()
         }
-        
+
         onTrackingUpdated(isTracking)
     }
 }
