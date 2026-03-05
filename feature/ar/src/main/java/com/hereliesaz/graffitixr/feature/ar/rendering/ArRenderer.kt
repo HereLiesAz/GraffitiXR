@@ -1,7 +1,7 @@
-// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import com.google.ar.core.Config
@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import timber.log.Timber
+import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -22,7 +23,9 @@ import kotlin.concurrent.withLock
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
-    private val onTrackingUpdated: (Boolean) -> Unit
+    private val isCaptureRequested: () -> Boolean,
+    private val onTargetCaptured: (Bitmap, ByteBuffer?, Int, Int, FloatArray?) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int) -> Unit
 ) : GLSurfaceView.Renderer {
 
     private val sessionLock = ReentrantLock()
@@ -41,11 +44,9 @@ class ArRenderer(
 
     fun attachSession(session: Session?) {
         sessionLock.withLock {
-            Timber.i("attachSession: session is ${if (session != null) "NOT null" else "null"}")
             this.session = session
             if (session != null) {
                 displayRotationHelper.onResume()
-                // If surface is already created, we must bind the texture immediately
                 if (isSurfaceCreated) {
                     session.setCameraTextureName(backgroundRenderer.textureId)
                 }
@@ -65,14 +66,12 @@ class ArRenderer(
             val fieldName = if (isOn) "TORCH" else "OFF"
             flashlightModeClass.getField(fieldName).get(null)
         } catch (e: Exception) {
-            Timber.e(e, "Failed to get FlashMode enum via reflection")
             null
         }
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        Timber.i("onSurfaceCreated")
-        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f) // Changed to opaque black for safety
+        GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
         slamManager.ensureInitialized()
         slamManager.initGl()
@@ -84,14 +83,12 @@ class ArRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        Timber.i("onSurfaceChanged: ${width}x${height}")
         GLES30.glViewport(0, 0, width, height)
         displayRotationHelper.onSurfaceChanged(width, height)
         slamManager.setViewportSize(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        // Clear with black to avoid flickering if session is not ready
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
         var isTracking = false
@@ -99,7 +96,6 @@ class ArRenderer(
         sessionLock.withLock {
             val activeSession = session ?: return
 
-            // Ensure texture is set (sometimes ARCore resets it)
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
 
             pendingFlashlightMode?.let { isOn ->
@@ -110,9 +106,7 @@ class ArRenderer(
                         val method = config.javaClass.getMethod("setFlashMode", flashlightModeClass)
                         method.invoke(config, mode)
                         activeSession.configure(config)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Failed to apply flashlight configuration")
-                    }
+                    } catch (e: Exception) {}
                 }
                 pendingFlashlightMode = null
             }
@@ -124,9 +118,6 @@ class ArRenderer(
             } catch (e: SessionPausedException) {
                 return
             } catch (e: Exception) {
-                if (e.message?.contains("paused") != true) {
-                    Timber.e(e, "Session update failed")
-                }
                 return
             }
 
@@ -139,6 +130,42 @@ class ArRenderer(
             slamManager.setArCoreTrackingState(isTracking)
             slamManager.updateCamera(viewMatrix, projMatrix)
 
+            if (isCaptureRequested()) {
+                try {
+                    val image = frame.acquireCameraImage()
+                    val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
+                    val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                    bitmap.copyPixelsFromBuffer(rgbaBuffer)
+                    image.close()
+
+                    var depthBuffer: ByteBuffer? = null
+                    var depthWidth = 0
+                    var depthHeight = 0
+
+                    if (activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                        val depthImage = frame.acquireDepthImage16Bits()
+                        val plane = depthImage.planes[0]
+                        val limit = plane.buffer.limit()
+                        depthBuffer = ByteBuffer.allocateDirect(limit)
+                        depthBuffer.put(plane.buffer)
+                        depthBuffer.rewind()
+                        depthWidth = depthImage.width
+                        depthHeight = depthImage.height
+                        depthImage.close()
+                    }
+
+                    val intrinsics = frame.camera.imageIntrinsics
+                    val fx = intrinsics.focalLength[0]
+                    val fy = intrinsics.focalLength[1]
+                    val cx = intrinsics.principalPoint[0]
+                    val cy = intrinsics.principalPoint[1]
+
+                    onTargetCaptured(bitmap, depthBuffer, depthWidth, depthHeight, floatArrayOf(fx, fy, cx, cy))
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to capture target frame")
+                }
+            }
+
             if (frameCount++ % 2 == 0) {
                 try {
                     frame.acquireCameraImage().use { image ->
@@ -146,25 +173,24 @@ class ArRenderer(
                         slamManager.feedColorFrame(rgbaBuffer, image.width, image.height)
                     }
 
-                    frame.acquireDepthImage16Bits().use { depthImage ->
-                        val depthPlane = depthImage.planes[0]
-                        slamManager.feedArCoreDepth(
-                            depthPlane.buffer,
-                            depthImage.width,
-                            depthImage.height,
-                            depthPlane.rowStride
-                        )
+                    if (activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                        frame.acquireDepthImage16Bits().use { depthImage ->
+                            val depthPlane = depthImage.planes[0]
+                            slamManager.feedArCoreDepth(
+                                depthPlane.buffer,
+                                depthImage.width,
+                                depthImage.height,
+                                depthPlane.rowStride
+                            )
+                        }
                     }
                 } catch (e: NotYetAvailableException) {
-                    // Expected at the beginning of a session
-                } catch (e: Exception) {
-                    Timber.e(e, "Error processing frame data")
-                }
+                } catch (e: Exception) {}
             }
 
             slamManager.draw()
         }
 
-        onTrackingUpdated(isTracking)
+        onTrackingUpdated(isTracking, slamManager.getSplatCount())
     }
 }

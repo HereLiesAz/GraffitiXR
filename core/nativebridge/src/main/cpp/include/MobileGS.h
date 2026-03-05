@@ -1,4 +1,3 @@
-// ~~~ FILE: ./core/nativebridge/src/main/cpp/include/MobileGS.h ~~~
 #pragma once
 #include <opencv2/opencv.hpp>
 #include "SuperPointDetector.h"
@@ -56,6 +55,9 @@ public:
     void clearMap();
     void setViewportSize(int width, int height);
     void setRelocEnabled(bool enabled);
+
+    // HUD Data
+    int getSplatCount() const { return mPointCount; }
 
     // Project Data I/O
     void saveModel(const std::string& path);

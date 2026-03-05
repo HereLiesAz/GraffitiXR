@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt
 package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
@@ -31,6 +30,7 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.ar.CameraController
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
@@ -48,6 +48,7 @@ fun MainScreen(
     arViewModel: ArViewModel,
     slamManager: SlamManager,
     hasCameraPermission: Boolean,
+    cameraController: CameraController,
     onRendererCreated: (ArRenderer) -> Unit
 ) {
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
@@ -56,11 +57,8 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
-    // 1. Render Backgrounds (Camera, Trace, or Mockup)
     if (uiState.editorMode == EditorMode.TRACE) {
-        Spacer(
-            modifier = Modifier.fillMaxSize().background(Color.White)
-        )
+        Spacer(modifier = Modifier.fillMaxSize().background(Color.White))
     } else if (hasCameraPermission) {
         when (uiState.editorMode) {
             EditorMode.AR -> {
@@ -70,7 +68,6 @@ fun MainScreen(
                     arViewModel.setArMode(true, context)
                 }
 
-                // Sync GLSurfaceView lifecycle with Activity lifecycle
                 DisposableEffect(lifecycleOwner, glView) {
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
@@ -93,9 +90,17 @@ fun MainScreen(
 
                 AndroidView(
                     factory = { ctx ->
-                        val renderer = ArRenderer(ctx, slamManager) { isTracking ->
-                            arViewModel.setTrackingState(isTracking)
-                        }
+                        val renderer = ArRenderer(
+                            context = ctx,
+                            slamManager = slamManager,
+                            isCaptureRequested = { arUiState.isCaptureRequested },
+                            onTargetCaptured = { bmp, depth, w, h, int ->
+                                arViewModel.onTargetCaptured(bmp, depth, w, h, int)
+                            },
+                            onTrackingUpdated = { isTracking, splatCount ->
+                                arViewModel.setTrackingState(isTracking, splatCount)
+                            }
+                        )
                         rendererRef.value = renderer
                         arViewModel.attachSessionToRenderer(renderer)
                         onRendererCreated(renderer)
@@ -113,13 +118,12 @@ fun MainScreen(
                 )
             }
             EditorMode.OVERLAY -> {
-                val controller = rememberCameraController()
                 LaunchedEffect(arUiState.isFlashlightOn) {
-                    controller.enableTorch(arUiState.isFlashlightOn)
+                    cameraController.enableTorch(arUiState.isFlashlightOn)
                 }
                 CameraPreview(
-                    controller = controller,
-                    onPhotoCaptured = {},
+                    controller = cameraController,
+                    onPhotoCaptured = { arViewModel.setTempCapture(it) },
                     onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
                     onLightUpdate = arViewModel::updateLightLevel,
                     modifier = Modifier.fillMaxSize(),
@@ -139,24 +143,17 @@ fun MainScreen(
         )
     }
 
-    // 2. Render Layers & Handle Gestures
     Box(modifier = Modifier
         .fillMaxSize()
         .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "tap") {
             if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-                // Double tap cycles the 3D rotation axis
                 if (uiState.activeTool == Tool.NONE) {
-                    detectTapGestures(
-                        onDoubleTap = {
-                            editorViewModel.onCycleRotationAxis()
-                        }
-                    )
+                    detectTapGestures(onDoubleTap = { editorViewModel.onCycleRotationAxis() })
                 }
             }
         }
         .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "transform") {
             if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-                // If Tool.NONE is explicitly selected, the user intends to pinch/pan/rotate the image
                 if (uiState.activeTool == Tool.NONE) {
                     coroutineScope {
                         detectTransformGestures { _, pan, zoom, rotation ->
@@ -169,12 +166,11 @@ fun MainScreen(
     ) {
         uiState.layers.filter { it.isVisible }.forEach { layer ->
             layer.bitmap?.let { bmp ->
-                // Image layer utilizing graphicsLayer for 3D center pivots
                 Image(
                     bitmap = bmp.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier
-                        .fillMaxSize() // Forces TransformOrigin.Center to align with screen center natively
+                        .fillMaxSize()
                         .graphicsLayer {
                             translationX = layer.offset.x
                             translationY = layer.offset.y
@@ -193,10 +189,7 @@ fun MainScreen(
             }
         }
 
-        // 3. Render Active Stroke (DrawingCanvas)
         if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-            // If an active tool is selected, the DrawingCanvas overlay intercepts strokes.
-            // Graphics layer explicitly maps drawing events to the 3D transformed space.
             if (uiState.activeTool != Tool.NONE) {
                 DrawingCanvas(
                     activeTool = uiState.activeTool,
@@ -214,8 +207,8 @@ fun MainScreen(
                             rotationZ = activeLayer.rotationZ
                             transformOrigin = TransformOrigin.Center
                         },
-                    onPathFinished = { path, _ ->
-                        editorViewModel.onDrawingPathFinished(path)
+                    onPathFinished = { path, _, size ->
+                        editorViewModel.onDrawingPathFinished(path, size)
                     }
                 )
             }

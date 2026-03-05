@@ -1,4 +1,3 @@
-// FILE: core/design/src/main/java/com/hereliesaz/graffitixr/design/components/Overlays.kt
 package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.animation.AnimatedVisibility
@@ -58,7 +57,7 @@ fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
 }
 
 @Composable
-fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: Boolean, isTargetCreated: Boolean, modifier: Modifier) {
+fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: Boolean, isTargetCreated: Boolean, splatCount: Int, modifier: Modifier) {
     AnimatedVisibility(true, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         val bg = if (qualityWarning != null) Color.Red.copy(0.8f) else Color.Black.copy(0.5f)
         val txt = when {
@@ -67,7 +66,7 @@ fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: B
             arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."
             arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."
             arState == ArState.LOCKED -> "Looking for your Grid..."
-            arState == ArState.PLACED -> "Ready."
+            arState == ArState.PLACED -> "Ready. ($splatCount pts)"
             else -> ""
         }
         if (txt.isNotEmpty()) {

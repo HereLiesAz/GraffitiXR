@@ -1,4 +1,3 @@
-// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/DrawingCanvas.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import androidx.compose.foundation.Canvas
@@ -14,6 +13,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import com.hereliesaz.graffitixr.common.model.Tool
 
 @Composable
@@ -22,12 +23,14 @@ fun DrawingCanvas(
     brushSize: Float,
     activeColor: Color,
     modifier: Modifier = Modifier,
-    onPathFinished: (List<Offset>, Tool) -> Unit
+    onPathFinished: (List<Offset>, Tool, IntSize) -> Unit
 ) {
     var currentPoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
     Canvas(
         modifier = modifier
+            .onSizeChanged { canvasSize = it }
             .pointerInput(activeTool) {
                 if (activeTool == Tool.NONE) return@pointerInput
 
@@ -40,7 +43,7 @@ fun DrawingCanvas(
                     },
                     onDragEnd = {
                         if (currentPoints.isNotEmpty()) {
-                            onPathFinished(currentPoints, activeTool)
+                            onPathFinished(currentPoints, activeTool, canvasSize)
                         }
                         currentPoints = emptyList()
                     }

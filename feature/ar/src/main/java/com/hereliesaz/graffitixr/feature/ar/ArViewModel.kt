@@ -1,4 +1,3 @@
-// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
@@ -36,10 +35,6 @@ class ArViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     private val _isCameraInUseByAr = MutableStateFlow(false)
-    /**
-     * True if ARCore is currently holding or initializing the camera hardware.
-     * CameraX consumers should wait for this to be false before attempting to bind.
-     */
     val isCameraInUseByAr = _isCameraInUseByAr.asStateFlow()
 
     private var renderer: ArRenderer? = null
@@ -48,11 +43,9 @@ class ArViewModel @Inject constructor(
     private var isActivityResumed = false
     private var isInArMode = false
     private var isSessionResumed = false
-    
+
     private val sessionMutex = Mutex()
     private var isDestroying = false
-
-    // ==================== Session Lifecycle Management ====================
 
     fun onActivityResumed() {
         viewModelScope.launch {
@@ -75,7 +68,6 @@ class ArViewModel @Inject constructor(
     fun setArMode(enabled: Boolean, context: Context) {
         viewModelScope.launch {
             sessionMutex.withLock {
-                Log.d("ArViewModel", "setArMode: $enabled (current: $isInArMode)")
                 if (isInArMode == enabled) return@withLock
                 isInArMode = enabled
 
@@ -109,27 +101,22 @@ class ArViewModel @Inject constructor(
                 val config = session!!.config
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                
-                // Flashlight support (best effort)
+
                 try {
                     val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
                     val offMode = flashlightModeClass.getField("OFF").get(null)
                     val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
                     method.invoke(config, offMode)
                 } catch (e: Exception) {}
-                
+
                 session!!.configure(config)
                 renderer?.attachSession(session)
-                Log.d("ArViewModel", "AR Session Initialized")
 
-                // Fix 4: Load SuperPoint model asynchronously on first session creation.
                 viewModelScope.launch(Dispatchers.IO) {
-                    val loaded = slamManager.loadSuperPoint(context.assets)
-                    Log.d("ArViewModel", "SuperPoint: ${if (loaded) "ready" else "ORB fallback"}")
+                    slamManager.loadSuperPoint(context.assets)
                 }
             } catch (e: Throwable) {
                 _isCameraInUseByAr.value = false
-                Log.e("ArViewModel", "Failed to initialize AR session", e)
             }
         }
     }
@@ -141,73 +128,38 @@ class ArViewModel @Inject constructor(
             isSessionResumed = true
             _isCameraInUseByAr.value = true
             slamManager.setRelocEnabled(true)
-            
-            // Re-link renderer on resume
             renderer?.attachSession(s)
-            
-            Log.d("ArViewModel", "AR Session Resumed")
         } catch (e: CameraNotAvailableException) {
-            Log.e("ArViewModel", "Camera not available on resume", e)
-        } catch (e: Exception) {
-            Log.e("ArViewModel", "Unexpected error during AR resume", e)
-        }
+        } catch (e: IllegalStateException) {
+        } catch (e: Exception) {}
     }
 
     private fun pauseArSessionInternal() {
         if (!isSessionResumed) return
         isSessionResumed = false
         try {
-            // Unlink renderer BEFORE pausing to avoid "Session is paused" errors from the render thread
             renderer?.attachSession(null)
-            
             session?.pause()
             slamManager.setRelocEnabled(false)
-            Log.d("ArViewModel", "AR Session Paused")
-        } catch (e: Exception) {
-            Log.e("ArViewModel", "Failed to pause AR session", e)
-        }
+        } catch (e: Exception) {}
     }
 
     private suspend fun performFullCleanupLocked() {
-        Log.d("ArViewModel", "Starting full cleanup")
-        
-        // 1. Unlink renderer to stop update() calls
         renderer?.attachSession(null)
-        
-        // 2. Pause if needed
         if (isSessionResumed) {
-            try {
-                session?.pause()
-            } catch (e: Exception) {
-                Log.e("ArViewModel", "Pause failed during cleanup", e)
-            }
+            try { session?.pause() } catch (e: Exception) {}
             isSessionResumed = false
         }
-        
-        // 3. Wait for HAL to stabilize and stop repeating requests.
-        // This helps avoid "Function not implemented (-38)" cancelRequest errors.
         delay(500)
-        
-        // 4. Close session and release camera
         val s = session
         session = null
         s?.let {
-            try {
-                it.close()
-                Log.d("ArViewModel", "AR Session Closed")
-            } catch (e: Exception) {
-                Log.e("ArViewModel", "Close failed during cleanup", e)
-            }
+            try { it.close() } catch (e: Exception) {}
         }
-        
         _isCameraInUseByAr.value = false
         slamManager.setRelocEnabled(false)
-        Log.d("ArViewModel", "AR Session Cleanup Complete")
     }
 
-    /**
-     * Force immediate cleanup when Activity is destroyed.
-     */
     fun destroyArSession() {
         viewModelScope.launch(Dispatchers.Main.immediate) {
             sessionMutex.withLock {
@@ -220,15 +172,25 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // ==================== UI State & Capture ====================
-
-    fun setTrackingState(isTracking: Boolean) {
-        if (_uiState.value.isScanning == isTracking) return
-        _uiState.update { it.copy(isScanning = isTracking) }
+    fun setTrackingState(isTracking: Boolean, splatCount: Int) {
+        _uiState.update { it.copy(isScanning = isTracking, splatCount = splatCount) }
     }
 
     fun setTempCapture(bitmap: Bitmap) {
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
+    }
+
+    fun onTargetCaptured(bitmap: Bitmap, depthBuffer: ByteBuffer?, width: Int, height: Int, intrinsics: FloatArray?) {
+        _uiState.update {
+            it.copy(
+                tempCaptureBitmap = bitmap,
+                targetDepthBuffer = depthBuffer,
+                targetDepthWidth = width,
+                targetDepthHeight = height,
+                targetIntrinsics = intrinsics,
+                isCaptureRequested = false
+            )
+        }
     }
 
     fun onCaptureConsumed() {
@@ -259,9 +221,7 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isCaptureRequested = false) }
     }
 
-    fun captureKeyframe() {
-        // Native engine handles this
-    }
+    fun captureKeyframe() {}
 
     fun toggleFlashlight() {
         val isOn = !_uiState.value.isFlashlightOn
@@ -284,7 +244,6 @@ class ArViewModel @Inject constructor(
 
     fun attachSessionToRenderer(arRenderer: ArRenderer?) {
         this.renderer = arRenderer
-        // If we already have a session, attach it now
         if (arRenderer != null && session != null && isSessionResumed) {
             arRenderer.attachSession(session)
         }

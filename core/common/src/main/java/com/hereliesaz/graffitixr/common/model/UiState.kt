@@ -4,13 +4,19 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import java.nio.ByteBuffer
 
 data class ArUiState(
     val isScanning: Boolean = false,
+    val splatCount: Int = 0,
     val isTargetDetected: Boolean = false,
     val isFlashlightOn: Boolean = false,
     val lightLevel: Float = 1.0f,
     val tempCaptureBitmap: Bitmap? = null,
+    val targetDepthBuffer: ByteBuffer? = null,
+    val targetDepthWidth: Int = 0,
+    val targetDepthHeight: Int = 0,
+    val targetIntrinsics: FloatArray? = null,
     val capturedTargetUris: List<Uri> = emptyList(),
     val capturedTargetImages: List<Bitmap> = emptyList(),
     val gpsData: GpsData? = null,
@@ -29,12 +35,9 @@ enum class Tool {
     NONE, BRUSH, ERASER, BLUR, HEAL, BURN, DODGE, LIQUIFY, COLOR
 }
 
-
-
 enum class CaptureStep {
     NONE, CAPTURE, RECTIFY, MASK, REVIEW
 }
-
 
 enum class BlendMode {
     SrcOver, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn,

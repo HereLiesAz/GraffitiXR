@@ -1,4 +1,3 @@
-// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModel.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
@@ -7,6 +6,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.DispatcherProvider
@@ -35,7 +35,7 @@ class EditorViewModel @Inject constructor(
     private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
     private val backgroundRemover: BackgroundRemover,
-    private val slamManager: SlamManager,
+    internal val slamManager: SlamManager, // Required for JNI calls in Extension
     private val dispatchers: DispatcherProvider
 ) : ViewModel(), EditorActions {
 
@@ -99,10 +99,9 @@ class EditorViewModel @Inject constructor(
             }
         }
 
-        // Background SLAM autosave loop to capture ongoing AR world data
         viewModelScope.launch(dispatchers.io) {
             while(true) {
-                kotlinx.coroutines.delay(10000) // Auto-save every 10 seconds
+                kotlinx.coroutines.delay(10000)
                 val project = projectRepository.currentProject.value
                 val isArMode = _uiState.value.editorMode == EditorMode.AR
                 if (project != null && isArMode) {
@@ -150,7 +149,6 @@ class EditorViewModel @Inject constructor(
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             val projectId = _uiState.value.projectId
             if (bitmap != null && projectId != null) {
-                // Ensure image is persisted securely within the project directory
                 val filename = "layer_${UUID.randomUUID()}.png"
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
                 val localUri = Uri.parse("file://$path")
@@ -183,7 +181,6 @@ class EditorViewModel @Inject constructor(
             val height = metrics.heightPixels.takeIf { it > 0 } ?: 1920
             val blankBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
-            // Persist the blank canvas layer into the project directory
             val filename = "layer_${UUID.randomUUID()}.png"
             val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(blankBitmap))
             val localUri = Uri.parse("file://$path")
@@ -208,7 +205,6 @@ class EditorViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
-                // Ensure background wall image is stored securely with the project container
                 val filename = "bg_${UUID.randomUUID()}.png"
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
                 val localUri = Uri.parse("file://$path")
@@ -259,10 +255,13 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                // Generates the flat output image
-                val compositeBitmap = exportManager.compositeLayers(_uiState.value.layers)
+                val metrics = context.resources.displayMetrics
+                val compositeBitmap = exportManager.compositeLayers(
+                    _uiState.value.layers,
+                    metrics.widthPixels,
+                    metrics.heightPixels
+                )
 
-                // Uses common MediaStore utility to dump it to Gallery
                 val success = saveBitmapToGallery(context, compositeBitmap)
 
                 withContext(dispatchers.main) {
@@ -422,7 +421,6 @@ class EditorViewModel @Inject constructor(
             var ry = layer.rotationY
             var rz = layer.rotationZ
 
-            // Route the two-finger rotation to the actively selected 3D axis
             when (_uiState.value.activeRotationAxis) {
                 RotationAxis.X -> rx += rotationDelta
                 RotationAxis.Y -> ry += rotationDelta
@@ -520,8 +518,8 @@ class EditorViewModel @Inject constructor(
     override fun onDoubleTapHintDismissed() {}
     override fun onOnboardingComplete(mode: Any) {}
 
-    override fun onDrawingPathFinished(path: List<Offset>) {
-        applyStrokeToActiveLayer(path)
+    override fun onDrawingPathFinished(path: List<Offset>, canvasSize: IntSize) {
+        applyStrokeToActiveLayer(path, canvasSize, slamManager)
     }
 
     override fun onColorClicked() {
