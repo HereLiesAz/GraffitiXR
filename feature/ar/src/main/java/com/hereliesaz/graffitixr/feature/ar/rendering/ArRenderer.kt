@@ -61,12 +61,11 @@ class ArRenderer(
 
     private fun getFlashlightModeEnum(isOn: Boolean): Any? {
         return try {
-            val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
-            // CRITICAL FIX: The ARCore enum property for flashlight on is "TORCH", not "ON"
+            val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashMode")
             val fieldName = if (isOn) "TORCH" else "OFF"
             flashlightModeClass.getField(fieldName).get(null)
         } catch (e: Exception) {
-            Timber.e(e, "Failed to get FlashlightMode enum via reflection")
+            Timber.e(e, "Failed to get FlashMode enum via reflection")
             null
         }
     }
@@ -107,8 +106,8 @@ class ArRenderer(
                 getFlashlightModeEnum(isOn)?.let { mode ->
                     try {
                         val config = activeSession.config
-                        val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
-                        val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
+                        val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashMode")
+                        val method = config.javaClass.getMethod("setFlashMode", flashlightModeClass)
                         method.invoke(config, mode)
                         activeSession.configure(config)
                     } catch (e: Exception) {
