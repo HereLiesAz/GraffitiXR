@@ -91,6 +91,9 @@ azMenuItem(id = "multi-line", text = "This is a\nmulti-line item", route = "mult
 // Help trigger rail item
 azHelpRailItem(id = "help-trigger", text = "Get Help")
 
+// Help trigger as a sub-item
+azHelpSubItem(id = "help-sub-trigger", hostId = "rail-host", text = "Get Help Here")
+
 // Rail item with Color content
 azRailItem(id = "color-item", text = "Color", content = Color.Red)
 
@@ -199,6 +202,7 @@ azMenuSubToggle(id = "sub-toggle", hostId = "menu-host", isChecked = true, toggl
 // Rail Host
 azRailHostItem(id = "rail-host", text = "Rail Host")
 azRailSubItem(id = "rail-sub-1", hostId = "rail-host", text = "Rail Sub 1")
+azHelpSubItem(id = "help-sub-item", hostId = "rail-host", text = "Help Sub")
 azRailSubCycler(id = "sub-cycler", hostId = "rail-host", options = listOf("A", "B"), selectedOption = "A")
 ```
 
