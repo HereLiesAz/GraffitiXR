@@ -34,7 +34,8 @@ class ArRenderer(
     private val slamManager: SlamManager,
     private val isCaptureRequested: () -> Boolean,
     private val onTargetCaptured: (Bitmap?, ByteBuffer?, Int, Int, FloatArray?) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int) -> Unit
+    private val onTrackingUpdated: (Boolean, Int) -> Unit,
+    private val onLightUpdated: (Float) -> Unit
 ) : GLSurfaceView.Renderer {
 
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -151,7 +152,12 @@ class ArRenderer(
             camera.getViewMatrix(viewMatrix, 0)
             camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
 
-            slamManager.updateCamera(viewMatrix, projMatrix)
+            slamManager.updateCamera(viewMatrix, projMatrix, frame.timestamp)
+
+            val lightEstimate = frame.lightEstimate
+            if (lightEstimate.state == com.google.ar.core.LightEstimate.State.VALID) {
+                onLightUpdated(lightEstimate.pixelIntensity)
+            }
 
             isTracking = camera.trackingState == TrackingState.TRACKING
             frameChannel.trySend(isTracking)
@@ -197,7 +203,7 @@ class ArRenderer(
                 try {
                     frame.acquireCameraImage().use { image ->
                         val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
-                        slamManager.feedColorFrame(rgbaBuffer, image.width, image.height)
+                        slamManager.feedColorFrame(rgbaBuffer, image.width, image.height, frame.timestamp)
                     }
 
                     if (activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {

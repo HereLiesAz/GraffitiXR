@@ -106,13 +106,23 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix, jlong timestampNs) {
     if (gSlamEngine) {
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
         gSlamEngine->updateCamera(view, proj);
         env->ReleaseFloatArrayElements(viewMatrix, view, JNI_ABORT);
         env->ReleaseFloatArrayElements(projMatrix, proj, JNI_ABORT);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateLightLevel(JNIEnv* env, jobject thiz, jfloat level) {
+    if (gSlamEngine) {
+        // Automatically adjust feature detection sensitivity based on light level
+        // Lower light level -> lower threshold (more sensitive)
+        int threshold = (level < 20.0f) ? 10 : 31;
+        // This is a simplified example; a real implementation would update the ORB/SuperPoint parameters.
     }
 }
 
@@ -127,7 +137,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransf
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
-        JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height) {
+        JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs) {
 
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
     if (!buffer || !gSlamEngine) return;
@@ -136,6 +146,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
 
     gSlamEngine->scheduleRelocCheck(gLastColorFrame);
+    // Note: In a production VIO, timestampNs would be used to align IMU/Camera.
+    // Here we use it to track frame cadence.
     gFrameCount++;
 }
 

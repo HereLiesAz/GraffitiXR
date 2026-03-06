@@ -11,7 +11,7 @@ import javax.inject.Singleton
 class SlamManager @Inject constructor() {
 
     init {
-        System.loadLibrary("mobilegs")
+        System.loadLibrary("graffitixr")
     }
 
     private var isInitialized = false
@@ -37,8 +37,8 @@ class SlamManager @Inject constructor() {
         nativeInitGl()
     }
 
-    fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
-        nativeUpdateCamera(viewMatrix, projectionMatrix)
+    fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray, timestampNs: Long) {
+        nativeUpdateCamera(viewMatrix, projectionMatrix, timestampNs)
     }
 
     fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int) {
@@ -47,9 +47,9 @@ class SlamManager @Inject constructor() {
         }
     }
 
-    fun feedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int) {
+    fun feedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long) {
         if (colorBuffer.isDirect) {
-            nativeFeedColorFrame(colorBuffer, width, height)
+            nativeFeedColorFrame(colorBuffer, width, height, timestampNs)
         }
     }
 
@@ -115,11 +115,16 @@ class SlamManager @Inject constructor() {
         // Handled via native bridge directly if implemented
     }
 
+    fun updateLightLevel(level: Float) {
+        nativeUpdateLightLevel(level)
+    }
+
     // Native methods
     private external fun nativeInitialize()
     private external fun nativeInitGl()
     private external fun nativeSetViewportSize(width: Int, height: Int)
-    private external fun nativeUpdateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray)
+    private external fun nativeUpdateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray, timestampNs: Long)
+    private external fun nativeUpdateLightLevel(level: Float)
     private external fun nativeDraw()
     private external fun nativeProcessFrame(yuvData: ByteArray, width: Int, height: Int, poseMatrix: FloatArray, timestamp: Long): Boolean
     private external fun nativeGetSplatCount(): Int
@@ -131,7 +136,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int)
-    private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int)
+    private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long)
     private external fun nativeApplyLiquify(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float)
     private external fun nativeApplyHeal(bitmap: Bitmap, points: FloatArray, radius: Float)
     private external fun nativeApplyBurnDodge(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float, isBurn: Boolean)

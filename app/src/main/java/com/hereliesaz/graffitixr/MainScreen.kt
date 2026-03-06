@@ -122,6 +122,10 @@ fun MainScreen(
                                 },
                                 onTrackingUpdated = { isTracking, splatCount ->
                                     arViewModel.setTrackingState(isTracking, splatCount)
+                                },
+                                onLightUpdated = { level ->
+                                    arViewModel.updateLightLevel(level)
+                                    slamManager.updateLightLevel(level)
                                 }
                             )
                             rendererRef.value = renderer

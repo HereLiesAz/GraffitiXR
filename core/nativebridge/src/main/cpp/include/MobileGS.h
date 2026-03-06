@@ -39,6 +39,7 @@ public:
     void initialize(int width, int height);
     void initGl();
     void updateCamera(float* viewMat, float* projMat);
+    void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
     void processDepthFrame(const cv::Mat& depth, const cv::Mat& color);
 
