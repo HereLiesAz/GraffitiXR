@@ -14,6 +14,8 @@ import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import java.util.ArrayList
 import kotlin.math.min
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 
 object ImageProcessor {
 
@@ -24,7 +26,7 @@ object ImageProcessor {
         val ratio = min(MAX_DIMENSION.toFloat() / bitmap.width, MAX_DIMENSION.toFloat() / bitmap.height)
         val width = (bitmap.width * ratio).toInt()
         val height = (bitmap.height * ratio).toInt()
-        return Bitmap.createScaledBitmap(bitmap, width, height, true)
+        return bitmap.scale(width, height)
     }
 
     fun detectEdges(bitmap: Bitmap): Bitmap? {
@@ -61,7 +63,7 @@ object ImageProcessor {
 
             Core.merge(channels, dest)
 
-            val resultBitmap = Bitmap.createBitmap(safeBitmap.width, safeBitmap.height, Bitmap.Config.ARGB_8888)
+            val resultBitmap = createBitmap(safeBitmap.width, safeBitmap.height)
             Utils.matToBitmap(dest, resultBitmap)
             return resultBitmap
         } catch (e: Exception) {
@@ -103,7 +105,7 @@ object ImageProcessor {
 
             Imgproc.warpPerspective(src, dest, perspectiveTransform, Size(w, h))
 
-            val resultBitmap = Bitmap.createBitmap(safeBitmap.width, safeBitmap.height, Bitmap.Config.ARGB_8888)
+            val resultBitmap = createBitmap(safeBitmap.width, safeBitmap.height)
             Utils.matToBitmap(dest, resultBitmap)
             return resultBitmap
         } catch (e: Exception) {

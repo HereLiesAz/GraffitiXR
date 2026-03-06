@@ -1,81 +1,129 @@
-// FILE: common/src/main/java/com/hereliesaz/graffitixr/common/util/ImageProcessingUtils.kt
-package com.hereliesaz.graffitixr.common.util
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt
+package com.hereliesaz.graffitixr.feature.ar.rendering
 
+import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
-import android.graphics.Rect
-import android.graphics.YuvImage
-import android.media.Image
-import java.io.ByteArrayOutputStream
+import android.opengl.GLES30
+import android.opengl.GLSurfaceView
+import android.view.Surface
+import com.google.ar.core.Config
+import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
+import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.launch
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
 
-/**
- * Translates the raw, unpalatable YUV_420_888 data of the camera sensor
- * into the comforting illusion of an ARGB_8888 Bitmap.
- */
-object ImageProcessingUtils {
+class ArRenderer(
+    private val context: Context,
+    private val slamManager: SlamManager,
+    private val isCaptureRequested: () -> Boolean,
+    private val onTargetCaptured: (Bitmap?, FloatArray?, Int, Int, FloatArray?) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int) -> Unit
+) : GLSurfaceView.Renderer {
 
-    /**
-     * Surgically extracts the flesh of the camera frame, respecting the
-     * hardware's arbitrary row strides, because Android fragmentation
-     * guarantees reality is never contiguous.
-     *
-     * @param image The raw camera image buffer.
-     * @return A strictly formatted RGB Bitmap.
-     */
-    fun yuvToRgbBitmap(image: Image): Bitmap {
-        val yPlane = image.planes[0]
-        val uPlane = image.planes[1]
-        val vPlane = image.planes[2]
+    private var session: Session? = null
+    private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val backgroundRenderer = BackgroundRenderer()
 
-        val yBuffer = yPlane.buffer
-        val uBuffer = uPlane.buffer
-        val vBuffer = vPlane.buffer
+    private val frameChannel = Channel<Boolean>(
+        capacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
 
-        yBuffer.rewind()
-        uBuffer.rewind()
-        vBuffer.rewind()
-
-        val ySize = yBuffer.remaining()
-        val nv21 = ByteArray(ySize + (image.width * image.height / 2))
-
-        var pos = 0
-        if (yPlane.rowStride == image.width) {
-            yBuffer.get(nv21, 0, ySize)
-            pos = ySize
-        } else {
-            var yBufferPos = 0
-            for (row in 0 until image.height) {
-                yBuffer.position(yBufferPos)
-                yBuffer.get(nv21, pos, image.width)
-                pos += image.width
-                yBufferPos += yPlane.rowStride
+    init {
+        backgroundScope.launch {
+            frameChannel.consumeAsFlow().collect { isTracking ->
+                slamManager.setArCoreTrackingState(isTracking)
+                val splatCount = slamManager.getSplatCount()
+                onTrackingUpdated(isTracking, splatCount)
             }
         }
+    }
 
-        val rowStride = vPlane.rowStride
-        val pixelStride = vPlane.pixelStride
+    fun setSession(session: Session) {
+        this.session = session
+    }
 
-        if (pixelStride == 2 && rowStride == image.width && uBuffer.get(0) == vBuffer.get(1)) {
-            val vuSize = vBuffer.remaining()
-            vBuffer.get(nv21, pos, vuSize)
-        } else {
-            for (row in 0 until image.height / 2) {
-                var vBufferPos = row * rowStride
-                var uBufferPos = row * uPlane.rowStride
-                for (col in 0 until image.width / 2) {
-                    nv21[pos++] = vBuffer.get(vBufferPos)
-                    nv21[pos++] = uBuffer.get(uBufferPos)
-                    vBufferPos += pixelStride
-                    uBufferPos += uPlane.pixelStride
+    fun updateFlashlight(isOn: Boolean) {
+        try {
+            session?.let { activeSession ->
+                val config = activeSession.config
+                config.focusMode = Config.FocusMode.AUTO
+                val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashMode")
+                val method = config.javaClass.getMethod("setFlashMode", flashlightModeClass)
+
+                val flashModeEnum = if (isOn) {
+                    flashlightModeClass.getField("TORCH").get(null)
+                } else {
+                    flashlightModeClass.getField("OFF").get(null)
+                }
+
+                method.invoke(config, flashModeEnum)
+                activeSession.configure(config)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        GLES30.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
+        backgroundRenderer.createOnGlThread(context)
+        slamManager.initGl()
+    }
+
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        GLES30.glViewport(0, 0, width, height)
+        session?.setDisplayGeometry(Surface.ROTATION_0, width, height)
+    }
+
+    override fun onDrawFrame(gl: GL10?) {
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+
+        val currentSession = session ?: return
+
+        try {
+            currentSession.setCameraTextureName(backgroundRenderer.textureId)
+            val frame = currentSession.update()
+            val camera = frame.camera
+
+            backgroundRenderer.draw(frame)
+
+            val viewMatrix = FloatArray(16)
+            val projMatrix = FloatArray(16)
+            camera.getViewMatrix(viewMatrix, 0)
+            camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
+
+            slamManager.updateCamera(viewMatrix, projMatrix)
+
+            val isTracking = camera.trackingState == TrackingState.TRACKING
+            frameChannel.trySend(isTracking)
+
+            slamManager.draw()
+
+            if (isCaptureRequested()) {
+                frame.acquireCameraImage().use { image ->
+                    val bmp = ImageProcessingUtils.yuvToRgbBitmap(image)
+                    onTargetCaptured(bmp, null, image.width, image.height, null)
                 }
             }
-        }
 
-        val yuvImage = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
-        val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 100, out)
-        val imageBytes = out.toByteArray()
-        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun destroy() {
+        backgroundScope.cancel("Renderer detached and destroyed.")
+        session = null
     }
 }
