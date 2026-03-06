@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.nio.ByteBuffer
 import javax.inject.Inject
@@ -136,59 +137,71 @@ class ArViewModel @Inject constructor(
         val s = session ?: return
         var retries = 5
         while (retries > 0) {
-            try {
-                s.resume()
+            // Offload camera hardware binding to IO thread to prevent skipped frames
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    s.resume()
+                    true
+                } catch (e: CameraNotAvailableException) {
+                    false
+                } catch (e: IllegalStateException) {
+                    true // Already resumed
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to resume ARCore session")
+                    false
+                }
+            }
+
+            if (success) {
                 isSessionResumed = true
                 _isCameraInUseByAr.value = true
                 slamManager.setRelocEnabled(true)
                 renderer?.attachSession(s)
                 return
-            } catch (e: CameraNotAvailableException) {
+            } else {
                 retries--
                 if (retries > 0) {
                     delay(300)
                 } else {
-                    Timber.e(e, "Camera not available to resume ARCore session")
+                    Timber.e(Exception("Timeout"), "Camera not available to resume ARCore session after retries")
                     _isCameraInUseByAr.value = false
                 }
-            } catch (e: IllegalStateException) {
-                // Already resumed
-                isSessionResumed = true
-                _isCameraInUseByAr.value = true
-                slamManager.setRelocEnabled(true)
-                renderer?.attachSession(s)
-                return
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to resume ARCore session")
-                return
             }
         }
     }
 
-    private fun pauseArSessionInternal() {
+    private suspend fun pauseArSessionInternal() {
         if (!isSessionResumed) return
         isSessionResumed = false
-        try {
-            renderer?.attachSession(null)
-            session?.pause()
-            slamManager.setRelocEnabled(false)
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to pause ARCore session")
+        val s = session
+
+        // Detaching from renderer locks the GL thread and ensures it stops calling session.update()
+        // before we pause, preventing the MediaPipe RET_CHECK crash.
+        renderer?.attachSession(null)
+        slamManager.setRelocEnabled(false)
+
+        // Offload hardware release to IO thread
+        withContext(Dispatchers.IO) {
+            try {
+                s?.pause()
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to pause ARCore session")
+            }
         }
     }
 
     private suspend fun performFullCleanupLocked() {
-        renderer?.attachSession(null)
-        if (isSessionResumed) {
-            try { session?.pause() } catch (e: Exception) {}
-            isSessionResumed = false
-        }
-        delay(200)
         val s = session
+        renderer?.attachSession(null)
         session = null
-        s?.let {
-            try { it.close() } catch (e: Exception) {}
+        isSessionResumed = false
+
+        // Offload hardware teardown to IO thread to prevent main thread freezing
+        withContext(Dispatchers.IO) {
+            try { s?.pause() } catch (e: Exception) {}
+            try { s?.close() } catch (e: Exception) {}
         }
+
         _isCameraInUseByAr.value = false
         slamManager.setRelocEnabled(false)
     }

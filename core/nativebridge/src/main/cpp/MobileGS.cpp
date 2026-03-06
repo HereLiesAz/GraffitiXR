@@ -1,6 +1,7 @@
 // ~~~ FILE: ./core/nativebridge/src/main/cpp/MobileGS.cpp ~~~
 #include "include/MobileGS.h"
 #include <jni.h>
+#include <EGL/egl.h>
 #include <algorithm>
 #include <android/log.h>
 #include <cstring>
@@ -178,13 +179,23 @@ void MobileGS::destroy() {
     }
 
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mProgram) { glDeleteProgram(mProgram); mProgram = 0; }
-    if (mPointVbo) { glDeleteBuffers(1, &mPointVbo); mPointVbo = 0; }
-    if (mIndexVbo) { glDeleteBuffers(1, &mIndexVbo); mIndexVbo = 0; }
 
-    if (mMeshProgram) { glDeleteProgram(mMeshProgram); mMeshProgram = 0; }
-    if (mMeshVbo) { glDeleteBuffers(1, &mMeshVbo); mMeshVbo = 0; }
-    if (mMeshIbo) { glDeleteBuffers(1, &mMeshIbo); mMeshIbo = 0; }
+    // Only attempt to manually delete OpenGL objects if we are on a thread that actually has an EGL context.
+    // If the Activity is destroyed, the OS reclaims the GL memory automatically. Attempting to call glDeleteProgram
+    // from the main thread will throw a fatal EGL_NO_CONTEXT error.
+    if (eglGetCurrentContext() != EGL_NO_CONTEXT) {
+        if (mProgram) { glDeleteProgram(mProgram); mProgram = 0; }
+        if (mPointVbo) { glDeleteBuffers(1, &mPointVbo); mPointVbo = 0; }
+        if (mIndexVbo) { glDeleteBuffers(1, &mIndexVbo); mIndexVbo = 0; }
+
+        if (mMeshProgram) { glDeleteProgram(mMeshProgram); mMeshProgram = 0; }
+        if (mMeshVbo) { glDeleteBuffers(1, &mMeshVbo); mMeshVbo = 0; }
+        if (mMeshIbo) { glDeleteBuffers(1, &mMeshIbo); mMeshIbo = 0; }
+    } else {
+        // Discard handles since the context is already dead.
+        mProgram = 0; mPointVbo = 0; mIndexVbo = 0;
+        mMeshProgram = 0; mMeshVbo = 0; mMeshIbo = 0;
+    }
 }
 
 void MobileGS::initShaders() {

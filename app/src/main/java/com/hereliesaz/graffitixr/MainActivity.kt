@@ -159,25 +159,28 @@ class MainActivity : ComponentActivity() {
                     }
 
                     background(weight = 0) {
+                        // ALWAYS mount MainScreen so the camera runs, unless we are in the Library menu.
+                        MainScreen(
+                            uiState = editorUiState,
+                            arUiState = arUiState,
+                            isTouchLocked = mainUiState.isTouchLocked,
+                            isCameraActive = !showLibrary,
+                            editorViewModel = editorViewModel,
+                            arViewModel = arViewModel,
+                            slamManager = slamManager,
+                            hasCameraPermission = hasCameraPermission,
+                            cameraController = cameraController,
+                            onRendererCreated = { renderer ->
+                                renderRefState.value = renderer
+                            }
+                        )
+
+                        // Render the target creation background ON TOP of the camera feed during capture
                         if (mainUiState.isCapturingTarget) {
                             TargetCreationBackground(
                                 uiState = arUiState,
                                 captureStep = mainUiState.captureStep,
                                 onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) }
-                            )
-                        } else {
-                            MainScreen(
-                                uiState = editorUiState,
-                                arUiState = arUiState,
-                                isTouchLocked = mainUiState.isTouchLocked,
-                                editorViewModel = editorViewModel,
-                                arViewModel = arViewModel,
-                                slamManager = slamManager,
-                                hasCameraPermission = hasCameraPermission,
-                                cameraController = cameraController,
-                                onRendererCreated = { renderer ->
-                                    renderRefState.value = renderer
-                                }
                             )
                         }
                     }
@@ -466,7 +469,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             ) {
-                // FIXED: Changed 'text' to 'hint' for the AzNavRail inputItem parameter.
                 inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
                 listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
                 listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
@@ -481,7 +483,7 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, shape = AzButtonShape.NONE) { showSaveDialog = true }
         azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToLibrary() }
 
-        // Export menu
+        // Consolidated Export action
         azRailSubItem(id = "export_img", hostId = "project_host", text = "Export", shape = AzButtonShape.NONE) { editorViewModel.exportImage() }
 
         // Adding the Help option beneath Project

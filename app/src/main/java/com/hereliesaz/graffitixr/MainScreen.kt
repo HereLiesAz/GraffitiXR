@@ -45,6 +45,7 @@ fun MainScreen(
     uiState: EditorUiState,
     arUiState: ArUiState,
     isTouchLocked: Boolean,
+    isCameraActive: Boolean,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     slamManager: SlamManager,
@@ -61,9 +62,9 @@ fun MainScreen(
     if (uiState.editorMode == EditorMode.TRACE) {
         // True black background for trace mode to eliminate glare
         Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
-    } else if (hasCameraPermission) {
-        // Strict separation: Only mount the AR view if we are actually in AR mode.
-        // This ensures the GLSurfaceView and CameraX PreviewView never exist at the same time.
+    } else if (hasCameraPermission && isCameraActive) {
+        // Strict separation: Only mount the AR view if we are actually in AR mode,
+        // and only if the camera is permitted to be active (e.g. not behind the library).
         if (uiState.editorMode == EditorMode.AR) {
             var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
