@@ -21,6 +21,29 @@ extern JavaVM* gJvm; // Defined in GraffitiJNI.cpp
 static constexpr size_t MAX_SPLATS = 500000;
 static constexpr float VOXEL_SIZE = 0.02f; // 20mm voxels
 
+// Helper RAII struct to guarantee JVM attachment for background threads
+struct JniThreadAttacher {
+    JNIEnv* env = nullptr;
+    bool didAttach = false;
+
+    JniThreadAttacher() {
+        if (gJvm) {
+            jint res = gJvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+            if (res == JNI_EDETACHED) {
+                if (gJvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+                    didAttach = true;
+                }
+            }
+        }
+    }
+
+    ~JniThreadAttacher() {
+        if (didAttach && gJvm) {
+            gJvm->DetachCurrentThread();
+        }
+    }
+};
+
 // --- SPLAT SHADERS ---
 static const char* kVertexShader =
         "#version 300 es\n"
@@ -253,12 +276,7 @@ cv::Point3f MobileGS::getCameraWorldPosition() const {
 }
 
 void MobileGS::sortThreadFunc() {
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
-        gJvm->AttachCurrentThread(&env, nullptr);
-        attached = true;
-    }
+    JniThreadAttacher attacher; // Explicitly ties JVM to thread scope
 
     while (mSortRunning) {
         std::vector<cv::Point3f> positions;
@@ -296,10 +314,6 @@ void MobileGS::sortThreadFunc() {
             mDrawIndices = std::move(indices);
             mIndicesDirty = true;
         }
-    }
-
-    if (attached && gJvm) {
-        gJvm->DetachCurrentThread();
     }
 }
 
@@ -359,12 +373,7 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
 }
 
 void MobileGS::relocThreadFunc() {
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
-        gJvm->AttachCurrentThread(&env, nullptr);
-        attached = true;
-    }
+    JniThreadAttacher attacher; // Explicitly ties JVM to thread scope
 
     while (mRelocRunning) {
         cv::Mat relocFrame;
@@ -401,10 +410,6 @@ void MobileGS::relocThreadFunc() {
         if (doFp && !fpColor.empty() && !fpDepth.empty()) {
             tryUpdateFingerprint(fpColor, fpDepth, fpView, fpProj);
         }
-    }
-
-    if (attached && gJvm) {
-        gJvm->DetachCurrentThread();
     }
 }
 

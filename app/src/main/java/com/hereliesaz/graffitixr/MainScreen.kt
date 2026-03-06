@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -61,81 +62,91 @@ fun MainScreen(
         // True black background for trace mode to eliminate glare
         Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
     } else if (hasCameraPermission) {
-        when (uiState.editorMode) {
-            EditorMode.AR -> {
-                var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
+        // Strict separation: Only mount the AR view if we are actually in AR mode.
+        // This ensures the GLSurfaceView and CameraX PreviewView never exist at the same time.
+        if (uiState.editorMode == EditorMode.AR) {
+            var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-                // Properly decouple the AR mode toggle from the UI surface instantiation loop
-                DisposableEffect(uiState.editorMode) {
-                    arViewModel.setArMode(true, context)
-                    onDispose {
-                        arViewModel.setArMode(false, context)
-                    }
+            DisposableEffect(Unit) {
+                arViewModel.setArMode(true, context)
+                onDispose {
+                    arViewModel.setArMode(false, context)
                 }
-
-                // Handle GL context pausing based solely on activity lifecycle events
-                DisposableEffect(lifecycleOwner, glView) {
-                    if (glView == null) return@DisposableEffect onDispose {}
-                    val observer = LifecycleEventObserver { _, event ->
-                        when (event) {
-                            Lifecycle.Event.ON_RESUME -> glView?.onResume()
-                            Lifecycle.Event.ON_PAUSE -> glView?.onPause()
-                            else -> {}
-                        }
-                    }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose {
-                        lifecycleOwner.lifecycle.removeObserver(observer)
-                    }
-                }
-
-                LaunchedEffect(arUiState.isFlashlightOn) {
-                    rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
-                }
-
-                AndroidView(
-                    factory = { ctx ->
-                        val renderer = ArRenderer(
-                            context = ctx,
-                            slamManager = slamManager,
-                            isCaptureRequested = { arUiState.isCaptureRequested },
-                            onTargetCaptured = { bmp, depth, w, h, int ->
-                                arViewModel.onTargetCaptured(bmp, depth, w, h, int)
-                            },
-                            onTrackingUpdated = { isTracking, splatCount ->
-                                arViewModel.setTrackingState(isTracking, splatCount)
-                            }
-                        )
-                        rendererRef.value = renderer
-                        arViewModel.attachSessionToRenderer(renderer)
-                        onRendererCreated(renderer)
-                        val view = GLSurfaceView(ctx).apply {
-                            setEGLContextClientVersion(3)
-                            setZOrderMediaOverlay(true)
-                            holder.setFormat(PixelFormat.TRANSLUCENT)
-                            setRenderer(renderer)
-                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                        }
-                        glView = view
-                        view
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
             }
-            EditorMode.OVERLAY -> {
-                LaunchedEffect(arUiState.isFlashlightOn) {
-                    cameraController.enableTorch(arUiState.isFlashlightOn)
+
+            DisposableEffect(lifecycleOwner, glView) {
+                if (glView == null) return@DisposableEffect onDispose {}
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> glView?.onResume()
+                        Lifecycle.Event.ON_PAUSE -> glView?.onPause()
+                        else -> {}
+                    }
                 }
-                CameraPreview(
-                    controller = cameraController,
-                    onPhotoCaptured = { arViewModel.setTempCapture(it) },
-                    onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
-                    onLightUpdate = arViewModel::updateLightLevel,
-                    modifier = Modifier.fillMaxSize(),
-                    arViewModel = arViewModel
-                )
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
             }
-            else -> {}
+
+            LaunchedEffect(arUiState.isFlashlightOn) {
+                rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
+            }
+
+            AndroidView(
+                factory = { ctx ->
+                    val renderer = ArRenderer(
+                        context = ctx,
+                        slamManager = slamManager,
+                        isCaptureRequested = { arUiState.isCaptureRequested },
+                        onTargetCaptured = { bmp, depth, w, h, int ->
+                            arViewModel.onTargetCaptured(bmp, depth, w, h, int)
+                        },
+                        onTrackingUpdated = { isTracking, splatCount ->
+                            arViewModel.setTrackingState(isTracking, splatCount)
+                        }
+                    )
+                    rendererRef.value = renderer
+                    arViewModel.attachSessionToRenderer(renderer)
+                    onRendererCreated(renderer)
+                    val view = GLSurfaceView(ctx).apply {
+                        setEGLContextClientVersion(3)
+                        setZOrderMediaOverlay(true)
+                        holder.setFormat(PixelFormat.TRANSLUCENT)
+                        setRenderer(renderer)
+                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                    }
+                    glView = view
+                    view
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (uiState.editorMode == EditorMode.OVERLAY) {
+            LaunchedEffect(arUiState.isFlashlightOn) {
+                cameraController.enableTorch(arUiState.isFlashlightOn)
+            }
+
+            // Guaranteed teardown for CameraX hardware locks
+            DisposableEffect(Unit) {
+                onDispose {
+                    try {
+                        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+                        val provider = cameraProviderFuture.get()
+                        provider.unbindAll()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            CameraPreview(
+                controller = cameraController,
+                onPhotoCaptured = { arViewModel.setTempCapture(it) },
+                onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
+                onLightUpdate = arViewModel::updateLightLevel,
+                modifier = Modifier.fillMaxSize(),
+                arViewModel = arViewModel
+            )
         }
     }
 
