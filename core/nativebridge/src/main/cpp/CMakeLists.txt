@@ -30,11 +30,12 @@ target_include_directories(graffitixr PRIVATE
 # Find required Android libraries
 find_library(log-lib log)
 
-# Link libraries - OpenGL ES 3.0 for splat rendering
+# Link libraries - OpenGL ES 3.0 for splat rendering, jnigraphics for Bitmap manipulation
 target_link_libraries(graffitixr
     ${log-lib}
     ${OpenCV_LIBS}
     GLESv3
     EGL
     android
+    jnigraphics
 )

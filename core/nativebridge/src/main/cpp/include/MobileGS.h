@@ -1,4 +1,3 @@
-// ~~~ FILE: ./core/nativebridge/src/main/cpp/include/MobileGS.h ~~~
 #pragma once
 #include <opencv2/opencv.hpp>
 #include "SuperPointDetector.h"
@@ -49,14 +48,16 @@ public:
     void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     void scheduleRelocCheck(const cv::Mat& colorFrame);
 
-    // Fix 4: AI feature matching — load SuperPoint ONNX from bytes (AssetManager buffer).
-    // Returns false if model cannot be parsed; ORB fallback stays active.
+    // AI feature matching — load SuperPoint ONNX from bytes
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
 
     // Lifecycle helpers
-    void clearMap();                         // Reset all SLAM state (safe from any thread, no GL)
-    void setViewportSize(int width, int height); // Lightweight; does not reinitialize the engine
-    void setRelocEnabled(bool enabled);      // Pause/resume background reloc thread
+    void clearMap();
+    void setViewportSize(int width, int height);
+    void setRelocEnabled(bool enabled);
+
+    // HUD Data
+    int getSplatCount() const { return mPointCount; }
 
     // Project Data I/O
     void saveModel(const std::string& path);
@@ -75,15 +76,15 @@ private:
     void sortThreadFunc();
     cv::Point3f getCameraWorldPosition() const;
 
-    // Fix 1: Smooth anchor interpolation (caller must hold mMutex)
+    // Smooth anchor interpolation
     void interpolateAnchorStep();
 
-    // Fix 2: Background relocalization thread
+    // Background relocalization thread
     void relocThreadFunc();
     void runPnPMatch(const cv::Mat& frame);
 
-    // Fix 3: Dynamic fingerprint accumulation (caller must hold mMutex)
-    void tryUpdateFingerprint(const cv::Mat& color);
+    // Dynamic fingerprint accumulation
+    void tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat);
 
     std::mutex mMutex;
     bool mIsArCoreTracking = false;
@@ -91,8 +92,6 @@ private:
     cv::Ptr<cv::ORB> mFeatureDetector;
     cv::Ptr<cv::DescriptorMatcher> mMatcher;
 
-    // Fix 4: SuperPoint neural detector (OpenCV DNN / ONNX).
-    // isLoaded() == false until loadSuperPoint() succeeds; ORB is the fallback.
     SuperPointDetector mSuperPoint;
 
     cv::Mat mTargetDescriptors;
@@ -110,7 +109,7 @@ private:
     std::vector<uint32_t> mDrawIndices;
     bool mIndicesDirty = false;
 
-    // Fix 1: Smooth anchor interpolation state
+    // Smooth anchor interpolation state
     float mTargetAnchorMatrix[16];
     bool  mAnchorInterpolating   = false;
     float mInterpolationProgress = 0.0f;
@@ -123,24 +122,36 @@ private:
     std::condition_variable mRelocCv;
     std::atomic<bool>       mRelocRunning{false};
     std::atomic<bool>       mRelocRequested{false};
-    std::atomic<bool>       mRelocEnabled{true};  // Issue 3: gate for non-AR modes
+    std::atomic<bool>       mRelocEnabled{true};
     cv::Mat                 mRelocColorFrame;
     uint64_t                mLastRelocTriggerFrame = 0;
-    static constexpr uint64_t LOOP_CLOSURE_INTERVAL = 60;   // ~1 s at 60 fps
-    static constexpr float    DRIFT_THRESHOLD_M     = 0.003f; // 3 mm
+    static constexpr uint64_t LOOP_CLOSURE_INTERVAL = 60;
+    static constexpr float    DRIFT_THRESHOLD_M     = 0.003f;
 
-    // Fix 3: Dynamic fingerprint accumulation
-    cv::Mat  mLastDepthFrame;
+    // Dynamic fingerprint accumulation
+    std::atomic<bool>       mFingerprintRequested{false};
+    cv::Mat                 mFingerprintColorFrame;
+    cv::Mat                 mFingerprintDepthFrame;
+    float                   mFingerprintViewMatrix[16];
+    float                   mFingerprintProjMatrix[16];
+
     uint64_t mLastFingerprintUpdateFrame = 0;
-    static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 300; // ~5 s at 60 fps
+    static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 300;
     static constexpr size_t   MAX_FINGERPRINT_KEYPOINTS   = 2000;
 
-    // GLES handles
+    // GLES handles - Splats
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
-    GLuint mIndexVbo = 0;  // NEW: Element Buffer for sorted rendering
-
+    GLuint mIndexVbo = 0;
     int mPointCount = 0;
+
+    // NEW: GLES handles - Surface Mesh (Wireframe)
+    GLuint mMeshProgram = 0;
+    GLuint mMeshVbo = 0;
+    GLuint mMeshIbo = 0;
+    int mMeshIndexCount = 0;
+    std::vector<float> mMeshVertices;
+    std::vector<uint32_t> mMeshIndices;
 
     // Optimization State
     uint64_t mFrameCounter = 0;

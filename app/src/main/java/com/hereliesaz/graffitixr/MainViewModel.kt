@@ -1,13 +1,16 @@
 package com.hereliesaz.graffitixr
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
+import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +44,9 @@ data class MainUiState(
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
-    private val slamManager: SlamManager
+    private val slamManager: SlamManager,
+    private val projectManager: ProjectManager,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -105,9 +110,12 @@ class MainViewModel @Inject constructor(
         }
         bitmap ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            val currentProject = projectRepository.currentProject.value ?: return@launch
+
+            // 1. Generate Fingerprint
             val fp = ImageProcessingUtils.generateFingerprint(bitmap)
-            val project = projectRepository.currentProject.value ?: return@launch
-            projectRepository.updateProject(project.copy(fingerprint = fp))
+
+            // 2. Register with SLAM engine immediately
             slamManager.setTargetFingerprint(
                 fp.descriptorsData,
                 fp.descriptorsRows,
@@ -115,6 +123,16 @@ class MainViewModel @Inject constructor(
                 fp.descriptorsType,
                 fp.points3d.toFloatArray()
             )
+
+            // 3. FIX: ACTUALLY SAVE THE BITMAP TO DISK
+            projectManager.saveProject(
+                context = context,
+                projectData = currentProject.copy(fingerprint = fp),
+                targetImages = listOf(bitmap) // This appends it to targetImageUris
+            )
+
+            // 4. Update the active repository state
+            projectRepository.loadProject(currentProject.id)
         }
     }
 

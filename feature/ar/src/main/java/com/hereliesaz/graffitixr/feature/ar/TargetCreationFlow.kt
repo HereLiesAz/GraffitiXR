@@ -1,4 +1,3 @@
-
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
@@ -15,42 +14,19 @@ import com.hereliesaz.graffitixr.feature.ar.masking.MaskingUi
 import com.hereliesaz.graffitixr.feature.ar.masking.applyAutoMask
 import kotlinx.coroutines.launch
 
-/**
- * Manages the UI flow for creating a new AR target (fingerprint).
- *
- * This composable acts as a state machine controller, switching between:
- * 1. [CaptureStep.CAPTURE]: Showing the camera feed and a shutter button.
- * 2. [CaptureStep.RECTIFY]: Showing the captured image with 4 draggable corners to unwarp perspective.
- * 3. [CaptureStep.MASK]: Masking the image.
- * 4. [CaptureStep.REVIEW]: Showing the final unwarped target for confirmation.
- */
-
 @Composable
 fun TargetCreationBackground(
     uiState: ArUiState,
     captureStep: CaptureStep,
-    onPhotoCaptured: (Bitmap) -> Unit,
-    onCaptureConsumed: () -> Unit,
-    onInitUnwarpPoints: (List<Offset>) -> Unit,
-    arViewModel: ArViewModel? = null
+    onInitUnwarpPoints: (List<Offset>) -> Unit
 ) {
-    val cameraController = rememberCameraController()
-
-    // Handle capture request
-    LaunchedEffect(uiState.isCaptureRequested) {
-        if (uiState.isCaptureRequested) {
-            cameraController.takePicture()
-        }
-    }
-
-    // Initialize unwarp points when image changes
     LaunchedEffect(uiState.tempCaptureBitmap) {
         if (uiState.unwarpPoints.isEmpty() && uiState.tempCaptureBitmap != null) {
             val points = listOf(
-                Offset(0.2f, 0.2f), // TL
-                Offset(0.8f, 0.2f), // TR
-                Offset(0.8f, 0.8f), // BR
-                Offset(0.2f, 0.8f)  // BL
+                Offset(0.2f, 0.2f),
+                Offset(0.8f, 0.2f),
+                Offset(0.8f, 0.8f),
+                Offset(0.2f, 0.8f)
             )
             onInitUnwarpPoints(points)
         }
@@ -58,14 +34,6 @@ fun TargetCreationBackground(
 
     when (captureStep) {
         CaptureStep.CAPTURE -> {
-            CameraPreview(
-                controller = cameraController,
-                onPhotoCaptured = {
-                    onPhotoCaptured(it)
-                    onCaptureConsumed()
-                },
-                arViewModel = arViewModel
-            )
             TargetCreationOverlayBackground(uiState, CaptureStep.CAPTURE)
         }
         CaptureStep.RECTIFY -> {
@@ -73,15 +41,15 @@ fun TargetCreationBackground(
                 targetImage = uiState.tempCaptureBitmap,
                 points = uiState.unwarpPoints,
                 activePointIndex = uiState.activeUnwarpPointIndex,
-                onPointIndexChanged = { /* Background doesn't handle input */ },
-                onMagnifierPositionChanged = { /* Background doesn't handle input */ }
+                onPointIndexChanged = { },
+                onMagnifierPositionChanged = { }
             )
         }
         CaptureStep.MASK -> {
             MaskingBackground(
                 targetImage = uiState.tempCaptureBitmap,
                 maskPath = uiState.maskPath ?: Path(),
-                currentPath = null // UI handles live drawing
+                currentPath = null
             )
         }
         CaptureStep.REVIEW -> {
@@ -109,7 +77,6 @@ fun TargetCreationUi(
 ) {
     val scope = rememberCoroutineScope()
     var isProcessingMask by remember { mutableStateOf(false) }
-    // Local state for live mask drawing
     var currentMaskPath by remember { mutableStateOf<Path?>(null) }
 
     when (captureStep) {

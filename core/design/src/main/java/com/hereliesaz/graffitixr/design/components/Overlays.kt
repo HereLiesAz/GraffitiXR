@@ -1,9 +1,5 @@
 package com.hereliesaz.graffitixr.design.components
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -61,7 +57,7 @@ fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
 }
 
 @Composable
-fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: Boolean, isTargetCreated: Boolean, modifier: Modifier) {
+fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: Boolean, isTargetCreated: Boolean, splatCount: Int, modifier: Modifier) {
     AnimatedVisibility(true, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         val bg = if (qualityWarning != null) Color.Red.copy(0.8f) else Color.Black.copy(0.5f)
         val txt = when {
@@ -70,7 +66,7 @@ fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: B
             arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."
             arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."
             arState == ArState.LOCKED -> "Looking for your Grid..."
-            arState == ArState.PLACED -> "Ready."
+            arState == ArState.PLACED -> "Ready. ($splatCount pts)"
             else -> ""
         }
         if (txt.isNotEmpty()) {
@@ -99,7 +95,6 @@ fun CaptureAnimation() {
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = `as`)).zIndex(10f))
-    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = af)).zIndex(11f))
 }
 
 @Composable
@@ -107,7 +102,7 @@ fun UnlockInstructionsPopup(visible: Boolean) {
     AnimatedVisibility(visible, enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut() + slideOutVertically { it / 2 }, modifier = Modifier.fillMaxSize().zIndex(200f)) {
         Box(Modifier.fillMaxSize().padding(bottom = 120.dp), contentAlignment = Alignment.BottomCenter) {
             Box(Modifier.background(Color.Black.copy(0.8f), RoundedCornerShape(16.dp)).padding(24.dp, 16.dp)) {
-                Text("Press Volume Up & Down to unlock", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text("Tap 4 times to unlock", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             }
         }
     }

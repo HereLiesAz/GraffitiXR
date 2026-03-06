@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import com.hereliesaz.graffitixr.common.model.Tool
 
 @Composable
@@ -20,13 +22,15 @@ fun DrawingCanvas(
     activeTool: Tool,
     brushSize: Float,
     activeColor: Color,
-    onPathFinished: (List<Offset>, Tool) -> Unit
+    modifier: Modifier = Modifier,
+    onPathFinished: (List<Offset>, Tool, IntSize) -> Unit
 ) {
     var currentPoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
     Canvas(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier
+            .onSizeChanged { canvasSize = it }
             .pointerInput(activeTool) {
                 if (activeTool == Tool.NONE) return@pointerInput
 
@@ -39,7 +43,7 @@ fun DrawingCanvas(
                     },
                     onDragEnd = {
                         if (currentPoints.isNotEmpty()) {
-                            onPathFinished(currentPoints, activeTool)
+                            onPathFinished(currentPoints, activeTool, canvasSize)
                         }
                         currentPoints = emptyList()
                     }

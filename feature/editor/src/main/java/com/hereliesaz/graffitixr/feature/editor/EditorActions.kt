@@ -1,9 +1,9 @@
-// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorActions.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntSize
 
 interface EditorActions {
     fun onOpacityChanged(v: Float)
@@ -52,7 +52,9 @@ interface EditorActions {
     fun onFeedbackShown()
     fun onDoubleTapHintDismissed()
     fun onOnboardingComplete(mode: Any)
-    fun onDrawingPathFinished(path: List<Offset>)
+
+    // Add canvas size to route strokes appropriately
+    fun onDrawingPathFinished(path: List<Offset>, canvasSize: IntSize)
 
     fun onAdjustClicked()
     fun onColorClicked()
