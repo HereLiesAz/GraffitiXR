@@ -340,11 +340,9 @@ class MainActivity : ComponentActivity() {
         editorUiState: EditorUiState
     ) {
         val navStrings = NavStrings()
-        val hotPink = Color(0xFFFF69B4)
 
         azTheme(
-            activeColor = hotPink,
-            defaultColor = hotPink,
+            activeColor = Color.Cyan,
             defaultShape = AzButtonShape.RECTANGLE,
             headerIconShape = AzHeaderIconShape.ROUNDED
         )
