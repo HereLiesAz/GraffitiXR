@@ -170,7 +170,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
 
     gSlamEngine->scheduleRelocCheck(gLastColorFrame);
-    gFrameCount++;
 }
 
 JNIEXPORT void JNICALL
@@ -185,8 +184,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
     gSlamEngine->scheduleRelocCheck(gLastColorFrame);
     // Note: In a production VIO, timestampNs would be used to align IMU/Camera.
-    // Here we use it to track frame cadence.
-    gFrameCount++;
 }
 
 JNIEXPORT void JNICALL
@@ -216,7 +213,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         cv::resize(depthMap, depthMap, gLastColorFrame.size(), 0, 0, cv::INTER_NEAREST);
     }
 
-    gSlamEngine->processDepthFrame(depthMap, gLastColorFrame);
+    gSlamEngine->pushFrame(depthMap, gLastColorFrame);
 }
 
 JNIEXPORT void JNICALL
@@ -244,7 +241,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
         // Normalize disparity to metric depth (simplified)
         // Focal length and baseline would be required for true metric depth.
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0); // StereoSGBM uses 16x fixed point
-        gSlamEngine->processDepthFrame(depthFromStereo, gLastColorFrame);
+        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame);
     }
 }
 

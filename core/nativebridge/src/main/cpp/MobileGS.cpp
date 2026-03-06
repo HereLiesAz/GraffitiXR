@@ -151,6 +151,11 @@ void MobileGS::initialize(int width, int height) {
         mRelocThread = std::thread(&MobileGS::relocThreadFunc, this);
     }
 
+    if (!mMapRunning) {
+        mMapRunning = true;
+        mMapThread = std::thread(&MobileGS::mapThreadFunc, this);
+    }
+
     LOGI("MobileGS initialized (CPU side) with %dx%d", width, height);
 }
 
@@ -162,6 +167,12 @@ void MobileGS::initGl() {
 }
 
 void MobileGS::destroy() {
+    if (mMapRunning) {
+        mMapRunning = false;
+        mQueueCv.notify_all();
+        if (mMapThread.joinable()) mMapThread.join();
+    }
+
     if (mSortRunning) {
         mSortRunning = false;
         mSortCv.notify_all();
@@ -617,8 +628,34 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     }
 }
 
+void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color) {
+    {
+        std::lock_guard<std::mutex> lock(mQueueMutex);
+        // Limit queue size to prevent OOM if processing is slow
+        if (mFrameQueue.size() > 2) {
+            mFrameQueue.erase(mFrameQueue.begin());
+        }
+        mFrameQueue.push_back({depth.clone(), color.clone()});
+    }
+    mQueueCv.notify_one();
+}
+
+void MobileGS::mapThreadFunc() {
+    while (mMapRunning) {
+        FrameData frame;
+        {
+            std::unique_lock<std::mutex> lock(mQueueMutex);
+            mQueueCv.wait(lock, [this] { return !mFrameQueue.empty() || !mMapRunning; });
+            if (!mMapRunning) break;
+            frame = std::move(mFrameQueue.front());
+            mFrameQueue.erase(mFrameQueue.begin());
+        }
+        processDepthFrame(frame.depth, frame.color);
+    }
+}
+
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::unique_lock<std::mutex> lock(mMutex);
     if (!mIsArCoreTracking || depth.empty() || color.empty() || !mCameraReady) return;
 
     const float* V = mViewMatrix;
@@ -715,15 +752,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     }
 
     mPointCount = static_cast<int>(splatData.size());
-    if (mPointVbo != 0 && mapModified) {
-        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, splatData.size() * sizeof(Splat), splatData.data());
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
 
     // --- 2. Generate Live Surface Mesh (Wireframe) ---
-    mMeshVertices.clear();
-    mMeshIndices.clear();
+    std::vector<float> meshVertices;
+    std::vector<uint32_t> meshIndices;
 
     int gridW = depth.cols / step;
     int gridH = depth.rows / step;
@@ -737,10 +769,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
                 float xw, yw, zw;
                 camToWorld(V, p_cam.x, p_cam.y, p_cam.z, xw, yw, zw);
 
-                int idx = mMeshVertices.size() / 3;
-                mMeshVertices.push_back(xw);
-                mMeshVertices.push_back(yw);
-                mMeshVertices.push_back(zw);
+                int idx = meshVertices.size() / 3;
+                meshVertices.push_back(xw);
+                meshVertices.push_back(yw);
+                meshVertices.push_back(zw);
                 vIndex[(r / step) * gridW + (c / step)] = idx;
             }
         }
@@ -755,29 +787,27 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
 
             if (idx != -1) {
                 if (right != -1) {
-                    mMeshIndices.push_back(idx);
-                    mMeshIndices.push_back(right);
+                    meshIndices.push_back(idx);
+                    meshIndices.push_back(right);
                 }
                 if (down != -1) {
-                    mMeshIndices.push_back(idx);
-                    mMeshIndices.push_back(down);
+                    meshIndices.push_back(idx);
+                    meshIndices.push_back(down);
                 }
             }
         }
     }
 
-    mMeshIndexCount = mMeshIndices.size();
-    if (mMeshIndexCount > 0 && mMeshVbo != 0) {
-        glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
-        glBufferData(GL_ARRAY_BUFFER, mMeshVertices.size() * sizeof(float), mMeshVertices.data(), GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mMeshIndices.size() * sizeof(uint32_t), mMeshIndices.data(), GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    // --- 3. Double buffer the GL data ---
+    {
+        std::lock_guard<std::mutex> glLock(mGlDataMutex);
+        mPendingSplatData = splatData;
+        mPendingMeshVertices = std::move(meshVertices);
+        mPendingMeshIndices = std::move(meshIndices);
+        mGlDataDirty = true;
     }
 
-
-    // --- 3. Background Optimization Triggers ---
+    // --- 4. Background Optimization Triggers ---
     if (++mFrameCounter % 30 == 0) {
         continuousOptimize();
         {
@@ -973,6 +1003,28 @@ void MobileGS::loadModel(const std::string& path) {
 }
 
 void MobileGS::draw() {
+    {
+        std::lock_guard<std::mutex> glLock(mGlDataMutex);
+        if (mGlDataDirty) {
+            if (mPointVbo != 0 && !mPendingSplatData.empty()) {
+                glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+                glBufferData(GL_ARRAY_BUFFER, mPendingSplatData.size() * sizeof(Splat), mPendingSplatData.data(), GL_DYNAMIC_DRAW);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+            }
+
+            if (mMeshVbo != 0 && !mPendingMeshVertices.empty()) {
+                glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
+                glBufferData(GL_ARRAY_BUFFER, mPendingMeshVertices.size() * sizeof(float), mPendingMeshVertices.data(), GL_DYNAMIC_DRAW);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, mPendingMeshIndices.size() * sizeof(uint32_t), mPendingMeshIndices.data(), GL_DYNAMIC_DRAW);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+                mMeshIndexCount = mPendingMeshIndices.size();
+            }
+            mGlDataDirty = false;
+        }
+    }
+
     std::lock_guard<std::mutex> lock(mMutex);
     interpolateAnchorStep();
     if (!mProgram || !mCameraReady || mPointCount == 0) return;
@@ -1042,7 +1094,7 @@ void MobileGS::draw() {
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
 
-    int elementsToDraw = std::min(mPointCount, static_cast<int>(mDrawIndices.size()));
+    int elementsToDraw = std::min(mPointCount.load(), static_cast<int>(mDrawIndices.size()));
     if (elementsToDraw > 0) {
         glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
     } else {

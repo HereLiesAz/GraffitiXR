@@ -42,6 +42,7 @@ public:
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
     void processDepthFrame(const cv::Mat& depth, const cv::Mat& color);
+    void pushFrame(const cv::Mat& depth, const cv::Mat& color);
 
     void setArCoreTrackingState(bool isTracking);
 
@@ -72,6 +73,21 @@ private:
     void pruneMap();
     void continuousOptimize();
     void initShaders();
+
+    // Map data protection
+    std::mutex mMapMutex;
+
+    // Background Map Processing Thread
+    void mapThreadFunc();
+    struct FrameData {
+        cv::Mat depth;
+        cv::Mat color;
+    };
+    std::thread mMapThread;
+    std::mutex mQueueMutex;
+    std::condition_variable mQueueCv;
+    std::vector<FrameData> mFrameQueue;
+    std::atomic<bool> mMapRunning{false};
 
     // Background Sorter Thread
     void sortThreadFunc();
@@ -144,15 +160,22 @@ private:
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
     GLuint mIndexVbo = 0;
-    int mPointCount = 0;
+    std::atomic<int> mPointCount{0};
 
     // NEW: GLES handles - Surface Mesh (Wireframe)
     GLuint mMeshProgram = 0;
     GLuint mMeshVbo = 0;
     GLuint mMeshIbo = 0;
-    int mMeshIndexCount = 0;
+    std::atomic<int> mMeshIndexCount{0};
     std::vector<float> mMeshVertices;
     std::vector<uint32_t> mMeshIndices;
+
+    // Double buffering for GL data
+    std::mutex mGlDataMutex;
+    std::vector<Splat> mPendingSplatData;
+    std::vector<float> mPendingMeshVertices;
+    std::vector<uint32_t> mPendingMeshIndices;
+    bool mGlDataDirty = false;
 
     // Optimization State
     uint64_t mFrameCounter = 0;
