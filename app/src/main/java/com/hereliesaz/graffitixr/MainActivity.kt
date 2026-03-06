@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
 package com.hereliesaz.graffitixr
 
 import android.Manifest
@@ -59,6 +60,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * The panopticon. Orchestrates the UI reality and hardware lifecycle.
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -368,7 +372,7 @@ class MainActivity : ComponentActivity() {
 
         if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
             azRailHostItem(id = "target_host", text = navStrings.grid)
-            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "create", hostId = "target_host", text = "Scan Wall", shape = AzButtonShape.NONE) {
                 if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
             }
             azRailSubItem(id = "key", hostId = "target_host", text = "Keyframe", shape = AzButtonShape.NONE) {
@@ -436,14 +440,20 @@ class MainActivity : ComponentActivity() {
                             text = "Size",
                             shape = AzButtonShape.RECTANGLE,
                             content = AzComposableContent {
+                                // Tie tool activation directly to the visual presence of the tools menu.
                                 DisposableEffect(Unit) {
                                     if (editorViewModel.uiState.value.activeTool == Tool.NONE) {
                                         editorViewModel.setActiveTool(Tool.BRUSH)
                                     }
                                     onDispose {
-                                        editorViewModel.setActiveTool(Tool.NONE)
+                                        // Guard against race conditions when switching between layers.
+                                        // Only reset the tool to NONE if we are actually closing the menu for THIS layer.
+                                        if (editorViewModel.uiState.value.activeLayerId == layer.id) {
+                                            editorViewModel.setActiveTool(Tool.NONE)
+                                        }
                                     }
                                 }
+
                                 val liveState by editorViewModel.uiState.collectAsState()
                                 Box(
                                     modifier = Modifier
