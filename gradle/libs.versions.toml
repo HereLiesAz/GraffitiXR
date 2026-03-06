@@ -10,7 +10,6 @@ camerax = "1.5.3"
 coil = "2.7.0"
 constraintlayout = "2.2.1"
 coreKtx = "1.17.0"
-coreKtxVersion = "1.13.1"
 coroutines = "1.10.2"
 espressoCore = "3.7.0"
 firebaseBom = "34.10.0"
@@ -31,7 +30,6 @@ navigation = "2.9.7"
 opencv = "4.13.0"
 playServicesBase = "18.10.0"
 playServicesLocation = "21.3.0"
-playServicesLocationVersion = "21.3.0"
 segmentationSelfie = "16.0.0-beta6"
 timber = "5.0.1"
 uiGeometry = "1.10.4"
@@ -44,7 +42,6 @@ inkBrush = "1.0.0"
 [libraries]
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
-androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }

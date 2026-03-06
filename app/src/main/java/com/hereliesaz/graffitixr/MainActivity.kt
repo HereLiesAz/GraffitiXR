@@ -340,13 +340,14 @@ class MainActivity : ComponentActivity() {
         editorUiState: EditorUiState
     ) {
         val navStrings = NavStrings()
-        val activeHighlightColor = when (editorUiState.activeRotationAxis) {
-            RotationAxis.X -> Color.Cyan
-            RotationAxis.Y -> Color(0xFFFF69B4) // Pink
-            RotationAxis.Z -> Color.Green
-        }
+        val hotPink = Color(0xFFFF69B4)
 
-        azTheme(activeColor = activeHighlightColor, defaultShape = AzButtonShape.RECTANGLE, headerIconShape = AzHeaderIconShape.ROUNDED)
+        azTheme(
+            activeColor = hotPink,
+            defaultColor = hotPink,
+            defaultShape = AzButtonShape.RECTANGLE,
+            headerIconShape = AzHeaderIconShape.ROUNDED
+        )
         azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
         azAdvanced(helpEnabled = true)
 
