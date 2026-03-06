@@ -41,7 +41,7 @@ class ArViewModel @Inject constructor(
 
     private var session: Session? = null
     private var renderer: ArRenderer? = null
-    
+
     private val _isCameraInUseByAr = MutableStateFlow(false)
     val isCameraInUseByAr = _isCameraInUseByAr.asStateFlow()
 
@@ -116,7 +116,7 @@ class ArViewModel @Inject constructor(
                     depthMode = Config.DepthMode.AUTOMATIC
                     focusMode = Config.FocusMode.AUTO
                 }
-                
+
                 try {
                     val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
                     val offMode = flashlightModeClass.getField("OFF").get(null)
@@ -127,7 +127,7 @@ class ArViewModel @Inject constructor(
                 newSession.configure(config)
                 session = newSession
                 renderer?.attachSession(newSession)
-                
+
                 viewModelScope.launch(Dispatchers.IO) {
                     slamManager.loadSuperPoint(context.assets)
                 }
@@ -235,7 +235,8 @@ class ArViewModel @Inject constructor(
     }
 
     fun requestCapture() {
-        _uiState.update { it.copy(isCaptureRequested = true) }
+        // Clear the old capture bitmap so Compose detects the UI transition cleanly when the new one arrives.
+        _uiState.update { it.copy(isCaptureRequested = true, tempCaptureBitmap = null) }
     }
 
     fun onCaptureRequestHandled() {
@@ -255,7 +256,6 @@ class ArViewModel @Inject constructor(
     }
 
     fun captureKeyframe() {
-        // Handled via native bridge directly if implemented
     }
 
     fun toggleFlashlight() {

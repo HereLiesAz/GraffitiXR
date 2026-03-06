@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
 package com.hereliesaz.graffitixr
 
 import android.Manifest
@@ -60,9 +59,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * The panopticon. Orchestrates the UI reality and hardware lifecycle.
- */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -108,12 +104,21 @@ class MainActivity : ComponentActivity() {
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
-                val cameraController = com.hereliesaz.graffitixr.feature.ar.rememberCameraController()
+                val cameraController = rememberCameraController()
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
+
+                // Automatically advance the target creation flow when the camera frame returns from the native layer
+                val currentTempCapture = arUiState.tempCaptureBitmap
+                val currentCaptureStep = mainUiState.captureStep
+                LaunchedEffect(currentTempCapture, currentCaptureStep) {
+                    if (currentTempCapture != null && currentCaptureStep == CaptureStep.CAPTURE) {
+                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                    }
+                }
 
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
@@ -173,9 +178,7 @@ class MainActivity : ComponentActivity() {
                             slamManager = slamManager,
                             hasCameraPermission = hasCameraPermission,
                             cameraController = cameraController,
-                            onRendererCreated = { renderer ->
-                                // UI threads have no business holding executioner rights.
-                            }
+                            onRendererCreated = { renderer -> }
                         )
 
                         if (mainUiState.isCapturingTarget) {

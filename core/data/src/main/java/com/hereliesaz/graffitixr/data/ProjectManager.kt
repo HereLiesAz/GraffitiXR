@@ -23,16 +23,10 @@ import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Interface for providing URIs for files. Abstraction allows for easier testing.
- */
 interface UriProvider {
     fun getUriForFile(file: File): Uri
 }
 
-/**
- * Default implementation using [Uri.fromFile].
- */
 class DefaultUriProvider @Inject constructor() : UriProvider {
     override fun getUriForFile(file: File): Uri {
         return Uri.fromFile(file)
@@ -70,14 +64,10 @@ class ProjectManager @Inject constructor(
         return File(root, "map.bin").absolutePath
     }
 
-    /**
-     * Saves project metadata and optional assets to disk.
-     */
     suspend fun saveProject(context: Context, projectData: GraffitiProject, targetImages: List<Bitmap>? = null, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
-        // 1. Save Thumbnail (if provided)
         val thumbnailUri = if (thumbnail != null) {
             val file = File(root, "thumbnail.png")
             FileOutputStream(file).use { out ->
@@ -91,7 +81,7 @@ class ProjectManager @Inject constructor(
             }
         }
 
-        // FIX: Append new target images rather than clobbering the old ones.
+        // Properly append new targets to the existing list
         val savedTargetUris = if (targetImages != null) {
             val existingCount = projectData.targetImageUris.size
             val newUris = targetImages.mapIndexed { index, bitmap ->
@@ -112,7 +102,6 @@ class ProjectManager @Inject constructor(
             lastModified = System.currentTimeMillis()
         )
 
-        // 3. Save GraffitiProject to JSON
         val jsonString = json.encodeToString(updatedGraffitiProject)
         File(root, "project.json").writeText(jsonString)
     }
@@ -126,7 +115,6 @@ class ProjectManager @Inject constructor(
             val jsonString = projectFile.readText()
             val projectData = migrateIfNeeded(context, json.decodeFromString<GraffitiProject>(jsonString))
 
-            // Load Target Bitmaps
             val targetBitmaps = projectData.targetImageUris.mapNotNull { uri ->
                 ImageUtils.loadBitmapSync(context, uri)
             }
@@ -156,7 +144,7 @@ class ProjectManager @Inject constructor(
     private suspend fun migrateIfNeeded(context: Context, project: GraffitiProject): GraffitiProject {
         val lv = project.legacyVisuals
         val defaults = LegacyVisuals()
-        if (lv == defaults) return project // Nothing to migrate
+        if (lv == defaults) return project
 
         val migratedLayers: List<OverlayLayer> = when {
             project.layers.isEmpty() && project.overlayImageUri != null -> {
@@ -209,19 +197,9 @@ class ProjectManager @Inject constructor(
     }
 
     private fun OverlayLayer.hasDefaultVisuals(): Boolean {
-        return scale == 1f &&
-                offset == Offset.Zero &&
-                rotationX == 0f &&
-                rotationY == 0f &&
-                rotationZ == 0f &&
-                opacity == 1f &&
-                blendMode == ModelBlendMode.SrcOver &&
-                brightness == 0f &&
-                contrast == 1f &&
-                saturation == 1f &&
-                colorBalanceR == 1f &&
-                colorBalanceG == 1f &&
-                colorBalanceB == 1f
+        return scale == 1f && offset == Offset.Zero && rotationX == 0f && rotationY == 0f && rotationZ == 0f &&
+                opacity == 1f && blendMode == ModelBlendMode.SrcOver && brightness == 0f && contrast == 1f &&
+                saturation == 1f && colorBalanceR == 1f && colorBalanceG == 1f && colorBalanceB == 1f
     }
 
     fun exportProjectToUri(context: Context, projectId: String, uri: Uri) {

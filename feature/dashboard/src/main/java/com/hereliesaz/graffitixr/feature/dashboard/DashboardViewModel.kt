@@ -17,10 +17,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 
-/**
- * ViewModel for the Dashboard feature, primarily managing the Project Library.
- * Handles loading, creating, deleting, and opening projects, as well as OTA updates.
- */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val repository: ProjectRepository
@@ -68,9 +64,6 @@ class DashboardViewModel @Inject constructor(
     fun navigateToSettings() { _navigationTrigger.value = "settings" }
     fun onNavigationConsumed() { _navigationTrigger.value = null }
 
-    /**
-     * Checks GitHub for the latest release and compares it to the installed version.
-     */
     fun checkForUpdates(currentVersion: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isCheckingForUpdate = true, updateStatusMessage = "Checking for updates...") }
@@ -101,9 +94,6 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Initiates the APK download using Android's native DownloadManager.
-     */
     fun installUpdate(context: Context) {
         val apkUrl = _uiState.value.pendingUpdateApkUrl ?: return
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -115,7 +105,6 @@ class DashboardViewModel @Inject constructor(
         }
         val downloadId = downloadManager.enqueue(request)
 
-        // Save ID so ApkInstallReceiver knows when our specific download completes
         context.getSharedPreferences("secure_prefs", Context.MODE_PRIVATE)
             .edit().putLong("update_download_id", downloadId).apply()
 

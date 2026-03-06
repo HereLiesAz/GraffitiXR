@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
@@ -16,16 +17,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-/**
- * State representing the global application status, distinct from specific features.
- *
- * @property isTouchLocked Whether the screen touch input is disabled (Trace Mode).
- * @property showUnlockInstructions Whether to show the "how to unlock" hint.
- * @property isCapturingTarget Whether the global target creation flow is active.
- * @property captureStep The current step in the target creation wizard.
- */
 data class MainUiState(
     val isTouchLocked: Boolean = false,
     val showUnlockInstructions: Boolean = false,
@@ -33,13 +27,6 @@ data class MainUiState(
     val captureStep: CaptureStep = CaptureStep.NONE
 )
 
-/**
- * The top-level ViewModel for the application.
- * Manages cross-cutting concerns like touch locking, global navigation states (Target Creation Flow),
- * and app-wide UI overlays.
- *
- * This ViewModel is scoped to the [MainActivity] lifecycle and survives navigation changes.
- */
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
@@ -51,26 +38,14 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    /**
-     * Enables or disables the touch lock (used in Trace Mode).
-     * When locked, most UI interactions are intercepted.
-     */
     fun setTouchLocked(locked: Boolean) {
         _uiState.update { it.copy(isTouchLocked = locked) }
     }
 
-    /**
-     * Shows or hides the unlock instructions dialog.
-     * Triggered when the user attempts to interact with a locked screen.
-     */
     fun showUnlockInstructions(show: Boolean) {
         _uiState.update { it.copy(showUnlockInstructions = show) }
     }
 
-    /**
-     * Initiates the AR Target Creation flow.
-     * Sets the state to capture mode.
-     */
     fun startTargetCapture() {
         _uiState.update {
             it.copy(
@@ -80,29 +55,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Advances or regresses the target creation step manually.
-     * @param step The new [CaptureStep].
-     */
     fun setCaptureStep(step: CaptureStep) {
         _uiState.update { it.copy(captureStep = step) }
     }
 
-    /**
-     * Resets the capture flow to the initial capture step (e.g., from Review back to Capture).
-     */
     fun onRetakeCapture() {
         _uiState.update { it.copy(captureStep = CaptureStep.CAPTURE) }
     }
 
-    /**
-     * Finalizes the target creation flow.
-     *
-     * If [bitmap] is provided (the masked/warped target image), generates an ORB fingerprint,
-     * persists it to the current project, and registers it with the SLAM engine so
-     * relocalization works from the very first session — even before [tryUpdateFingerprint]
-     * has had a chance to accumulate depth-backed keypoints.
-     */
     fun onConfirmTargetCreation(bitmap: Bitmap? = null) {
         _uiState.update {
             it.copy(isCapturingTarget = false, captureStep = CaptureStep.NONE)
@@ -111,10 +71,16 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val currentProject = projectRepository.currentProject.value ?: return@launch
 
-            // 1. Generate Fingerprint
-            val fp = slamManager.generateFingerprint(bitmap) ?: return@launch
+            val fp = slamManager.generateFingerprint(bitmap)
 
-            // 2. Register with SLAM engine immediately
+            // If the user pointed at a blank wall with no texture, ORB will fail to find points.
+            if (fp == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Target lacks visual detail. Please use a surface with more contrast.", Toast.LENGTH_LONG).show()
+                }
+                return@launch
+            }
+
             slamManager.setTargetFingerprint(
                 fp.descriptorsData,
                 fp.descriptorsRows,
@@ -123,21 +89,20 @@ class MainViewModel @Inject constructor(
                 fp.points3d.toFloatArray()
             )
 
-            // 3. FIX: ACTUALLY SAVE THE BITMAP TO DISK
             projectManager.saveProject(
                 context = context,
                 projectData = currentProject.copy(fingerprint = fp),
-                targetImages = listOf(bitmap) // This appends it to targetImageUris
+                targetImages = listOf(bitmap)
             )
 
-            // 4. Update the active repository state
             projectRepository.loadProject(currentProject.id)
+
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    /**
-     * Cancels the target creation and exits the flow.
-     */
     fun onCancelCaptureClicked() {
         _uiState.update {
             it.copy(

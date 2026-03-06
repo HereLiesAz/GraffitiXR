@@ -1,4 +1,3 @@
-// FILE: core/nativebridge/src/main/cpp/GraffitiJNI.cpp
 #include <jni.h>
 #include <android/log.h>
 #include <android/asset_manager_jni.h>
@@ -17,9 +16,6 @@ cv::Mat gLastColorFrame;
 int gFrameCount = 0;
 JavaVM* gJvm = nullptr;
 
-// ---------------------------------------------------------
-// Bitmap Conversion Helpers for Native Image Processing
-// ---------------------------------------------------------
 void bitmapToMat(JNIEnv * env, jobject bitmap, cv::Mat& dst) {
     AndroidBitmapInfo info;
     void* pixels = 0;
@@ -78,7 +74,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* en
         delete gSlamEngine;
         gSlamEngine = nullptr;
     }
-    // FIX: Memory leak stopped. Destroy the stereo processor if it was instantiated.
     if (gStereoProcessor) {
         LOGD("Destroying StereoProcessor");
         delete gStereoProcessor;
@@ -112,7 +107,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
-// Global cache for camera matrices to synchronize with depth/color frames
 float gLastViewMatrix[16];
 float gLastProjMatrix[16];
 bool gHasCameraMatrices = false;
@@ -160,7 +154,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
 
     if (!yData || !uData || !vData) return;
 
-    // Efficient YUV420 to RGB conversion using OpenCV
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
     cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvStride);
     cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvStride);
@@ -169,24 +162,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         gLastColorFrame = cv::Mat(height, width, CV_8UC3);
     }
 
-    // ARCore YUV_420_888 to RGB
-    // If uvPixelStride is 1, it's planar (I420). If 2, it's interleaved (NV12/NV21).
-    // For simplicity and speed, we manually reconstruct the YUV420P buffer for OpenCV.
     cv::Mat yuv(height + height / 2, width, CV_8UC1);
     yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
 
     if (uvPixelStride == 1) {
-        // Planar YUV420 (I420)
         uMat.copyTo(yuv(cv::Rect(0, height, width / 2, height / 4)));
         vMat.copyTo(yuv(cv::Rect(width / 2, height, width / 2, height / 4)));
         cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_I420);
     } else if (uvPixelStride == 2) {
-        // Interleaved (NV12 or NV21)
-        // In ARCore, U and V buffers often point to the same interleaved plane with different offsets.
-        // We can use the V buffer for NV21/NV12 conversion.
         cv::Mat uvInterleaved(height / 2, width, CV_8UC1, vData, uvStride);
         uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
-        gLastColorFrame = yuv.clone(); // Keep as NV21 for pushFrame
+        gLastColorFrame = yuv.clone();
     } else {
         cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
     }
@@ -194,7 +180,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     if (gLastColorFrame.type() == CV_8UC3) {
         gSlamEngine->scheduleRelocCheck(gLastColorFrame);
     } else if (uvPixelStride == 2) {
-        // For NV21, we'd need to convert to RGB for reloc check if not already done
         cv::Mat rgb;
         cv::cvtColor(gLastColorFrame, rgb, cv::COLOR_YUV2RGB_NV21);
         gSlamEngine->scheduleRelocCheck(rgb);
@@ -242,7 +227,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
     }
 
     if (gHasCameraMatrices) {
-        bool isYuv = (gLastColorFrame.rows > height); // Simplified check for NV21 buffer
+        bool isYuv = (gLastColorFrame.rows > height);
         gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, isYuv);
     }
 }
@@ -269,7 +254,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
 
     if (!disparity.empty() && !gLastColorFrame.empty() && gHasCameraMatrices) {
         cv::Mat depthFromStereo;
-        disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0); // StereoSGBM uses 16x fixed point
+        disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0);
         bool isYuv = (gLastColorFrame.rows > height);
         gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, isYuv);
     }

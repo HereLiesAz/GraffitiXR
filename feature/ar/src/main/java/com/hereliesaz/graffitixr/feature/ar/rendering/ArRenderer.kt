@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.view.Surface
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
@@ -32,7 +31,6 @@ import kotlin.concurrent.withLock
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
-    private val isCaptureRequested: () -> Boolean,
     private val onTargetCaptured: (Bitmap?, ByteBuffer?, Int, Int, FloatArray?) -> Unit,
     private val onTrackingUpdated: (Boolean, Int) -> Unit,
     private val onLightUpdated: (Float) -> Unit
@@ -40,8 +38,10 @@ class ArRenderer(
 
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val sessionLock = ReentrantLock()
-    private var session: Session? = null
-    
+
+    var session: Session? = null
+        private set
+
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
 
@@ -53,6 +53,9 @@ class ArRenderer(
     private var frameCount = 0
     private var pendingFlashlightMode: Boolean? = null
     private var isSurfaceCreated = false
+
+    // Thread-safe flag updated directly by Compose's AndroidView update block
+    @Volatile var captureRequested: Boolean = false
 
     init {
         backgroundScope.launch {
@@ -97,7 +100,7 @@ class ArRenderer(
         backgroundRenderer.createOnGlThread(context)
         slamManager.initGl()
         isSurfaceCreated = true
-        
+
         sessionLock.withLock {
             session?.setCameraTextureName(backgroundRenderer.textureId)
         }
@@ -116,7 +119,6 @@ class ArRenderer(
         sessionLock.withLock {
             val activeSession = session ?: return
 
-            // BULLETPROOF: Ensure the texture is bound every frame
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
 
             pendingFlashlightMode?.let { isOn ->
@@ -162,7 +164,9 @@ class ArRenderer(
             isTracking = camera.trackingState == TrackingState.TRACKING
             frameChannel.trySend(isTracking)
 
-            if (isCaptureRequested()) {
+            // Safely consume the flag and acquire the image
+            if (captureRequested) {
+                captureRequested = false
                 try {
                     frame.acquireCameraImage().use { image ->
                         val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
@@ -204,32 +208,20 @@ class ArRenderer(
                     frame.acquireCameraImage().use { image ->
                         val planes = image.planes
                         slamManager.feedYuvFrame(
-                            planes[0].buffer,
-                            planes[1].buffer,
-                            planes[2].buffer,
-                            image.width,
-                            image.height,
-                            planes[0].rowStride,
-                            planes[1].rowStride,
-                            planes[1].pixelStride,
+                            planes[0].buffer, planes[1].buffer, planes[2].buffer,
+                            image.width, image.height,
+                            planes[0].rowStride, planes[1].rowStride, planes[1].pixelStride,
                             frame.timestamp
                         )
                     }
-
                     if (activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                         try {
                             frame.acquireDepthImage16Bits().use { depthImage ->
                                 val depthPlane = depthImage.planes[0]
-                                slamManager.feedArCoreDepth(
-                                    depthPlane.buffer,
-                                    depthImage.width,
-                                    depthImage.height,
-                                    depthPlane.rowStride
-                                )
+                                slamManager.feedArCoreDepth(depthPlane.buffer, depthImage.width, depthImage.height, depthPlane.rowStride)
                             }
                         } catch (e: NotYetAvailableException) {}
                     }
-                } catch (e: NotYetAvailableException) {
                 } catch (e: Exception) {}
             }
 

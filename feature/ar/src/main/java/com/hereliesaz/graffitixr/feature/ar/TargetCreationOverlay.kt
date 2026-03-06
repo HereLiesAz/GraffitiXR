@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,18 +28,16 @@ fun TargetCreationOverlayBackground(
     Box(modifier = Modifier.fillMaxSize()) {
         when (step) {
             CaptureStep.CAPTURE -> {
-                Box(
-                    modifier = Modifier
-                        .size(300.dp)
-                        .background(Color.White.copy(alpha = 0.2f))
-                        .align(Alignment.Center)
-                ) {
-                    Text(
-                        text = "Align Target Here",
-                        color = Color.White,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
+                // Display the alignment guide over the camera feed.
+                // The artist draws this pattern on the wall to create a high-contrast tracking target.
+                val guideBitmap = remember { GuideGenerator.generateFourXs() }
+                Image(
+                    bitmap = guideBitmap.asImageBitmap(),
+                    contentDescription = "Target Alignment Guide",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    alpha = 0.6f
+                )
             }
             CaptureStep.RECTIFY -> {
                 uiState.tempCaptureBitmap?.let { bitmap ->

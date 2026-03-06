@@ -1,4 +1,3 @@
-// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModelExt.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.graphics.Bitmap
@@ -33,7 +32,6 @@ fun EditorViewModel.applyStrokeToActiveLayer(stroke: List<Offset>, canvasSize: I
     val bitmap = activeLayer.bitmap ?: return
 
     viewModelScope.launch {
-        // Map Compose offsets back to raw bitmap pixels
         val mappedStroke = ImageProcessor.mapScreenToBitmap(
             stroke,
             canvasSize.width,
@@ -42,7 +40,6 @@ fun EditorViewModel.applyStrokeToActiveLayer(stroke: List<Offset>, canvasSize: I
             bitmap.height
         )
 
-        // Offload pixel manipulation to background/C++ thread
         val processedBitmap = ImageProcessor.applyToolToBitmap(
             originalBitmap = bitmap,
             stroke = mappedStroke,
@@ -53,13 +50,11 @@ fun EditorViewModel.applyStrokeToActiveLayer(stroke: List<Offset>, canvasSize: I
             slamManager = slamManager
         )
 
-        // FIX: Update the UI Layer instantly so the user doesn't experience stutter while painting
         val updatedLayers = currentState.layers.toMutableList().apply {
             this[activeLayerIndex] = activeLayer.copy(bitmap = processedBitmap)
         }
         updateLayersInternal(updatedLayers)
 
-        // Then asynchronously persist the updated bitmap to disk without blocking the next stroke
         val activeUri = activeLayer.uri
         if (activeUri != null) {
             val path = activeUri.path

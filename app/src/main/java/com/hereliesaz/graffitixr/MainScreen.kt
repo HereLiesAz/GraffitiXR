@@ -60,7 +60,6 @@ fun MainScreen(
                 EditorMode.AR -> {
                     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-                    // Properly decouple the AR mode toggle from the UI surface instantiation loop
                     DisposableEffect(uiState.editorMode) {
                         arViewModel.setArMode(true, context)
                         onDispose {
@@ -68,8 +67,6 @@ fun MainScreen(
                         }
                     }
 
-                    // Handle GL context pausing based solely on activity lifecycle events.
-                    // FIX: Removed the duplicate, dangerous DisposableEffect that was double-calling glView.onResume().
                     DisposableEffect(lifecycleOwner, glView) {
                         if (glView == null) return@DisposableEffect onDispose {}
                         val observer = LifecycleEventObserver { _, event ->
@@ -100,7 +97,6 @@ fun MainScreen(
                             val renderer = ArRenderer(
                                 context = ctx,
                                 slamManager = slamManager,
-                                isCaptureRequested = { arUiState.isCaptureRequested },
                                 onTargetCaptured = { bmp, depth, w, h, int ->
                                     bmp?.let { arViewModel.onTargetCaptured(it, depth, w, h, int) }
                                 },
@@ -124,6 +120,9 @@ fun MainScreen(
                             }
                             glView = view
                             view
+                        },
+                        update = { view ->
+                            rendererRef.value?.captureRequested = arUiState.isCaptureRequested
                         },
                         modifier = Modifier.fillMaxSize()
                     )
