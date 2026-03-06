@@ -1,3 +1,4 @@
+// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModel.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
@@ -19,7 +20,6 @@ import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.feature.editor.export.ExportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -28,6 +28,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
+import androidx.core.net.toUri
+import androidx.core.graphics.createBitmap
 
 @HiltViewModel
 class EditorViewModel @Inject constructor(
@@ -36,7 +38,7 @@ class EditorViewModel @Inject constructor(
     private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
     private val backgroundRemover: BackgroundRemover,
-    internal val slamManager: SlamManager, // Required for JNI calls in Extension
+    internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider
 ) : ViewModel(), EditorActions {
 
@@ -45,7 +47,7 @@ class EditorViewModel @Inject constructor(
 
     private val undoStack = ArrayDeque<List<Layer>>()
     private val redoStack = ArrayDeque<List<Layer>>()
-    private val MAX_STACK_SIZE = 20
+    private val maxStackSize = 20
 
     private var copiedLayerState: Layer? = null
 
@@ -55,8 +57,6 @@ class EditorViewModel @Inject constructor(
                 if (project != null) {
                     val projectIdChanged = _uiState.value.projectId != project.id
 
-                    // Only completely overwrite layers and reload from disk when switching projects.
-                    // Otherwise, the active UI is the singular source of truth for all drawing/slider edits.
                     if (projectIdChanged) {
                         val currentLayers = _uiState.value.layers
                         val layers = project.layers.map { overlayLayer ->
@@ -69,7 +69,8 @@ class EditorViewModel @Inject constructor(
                             }
                         }
 
-                        _uiState.update { it.copy(projectId = project.id, layers = layers) }
+                        // Reset tool to NONE when opening a project
+                        _uiState.update { it.copy(projectId = project.id, layers = layers, activeTool = Tool.NONE) }
 
                         val layersToLoad = layers.filter { it.bitmap == null && it.uri != null }
                         if (layersToLoad.isNotEmpty()) {
@@ -107,18 +108,16 @@ class EditorViewModel @Inject constructor(
                         }
 
                         project.backgroundImageUri?.let { uri ->
-                            if (_uiState.value.backgroundBitmap == null || projectIdChanged) {
-                                viewModelScope.launch(dispatchers.io) {
-                                    val bitmap = ImageUtils.loadBitmapAsync(context, uri)
-                                    withContext(dispatchers.main) {
-                                        _uiState.update { it.copy(backgroundBitmap = bitmap) }
-                                    }
+                            viewModelScope.launch(dispatchers.io) {
+                                val bitmap = ImageUtils.loadBitmapAsync(context, uri)
+                                withContext(dispatchers.main) {
+                                    _uiState.update { it.copy(backgroundBitmap = bitmap) }
                                 }
                             }
                         }
                     }
                 } else {
-                    _uiState.update { it.copy(projectId = null, layers = emptyList(), backgroundBitmap = null) }
+                    _uiState.update { it.copy(projectId = null, layers = emptyList(), backgroundBitmap = null, activeTool = Tool.NONE) }
                     slamManager.clearMap()
                 }
             }
@@ -143,7 +142,7 @@ class EditorViewModel @Inject constructor(
         val currentLayers = _uiState.value.layers
         if (undoStack.isNotEmpty() && undoStack.last() == currentLayers) return
         undoStack.addLast(currentLayers)
-        if (undoStack.size > MAX_STACK_SIZE) undoStack.removeFirst()
+        if (undoStack.size > maxStackSize) undoStack.removeFirst()
         redoStack.clear()
         updateHistoryCounts()
     }
@@ -175,8 +174,11 @@ class EditorViewModel @Inject constructor(
             val projectId = _uiState.value.projectId
             if (bitmap != null && projectId != null) {
                 val filename = "layer_${UUID.randomUUID()}.png"
-                val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
-                val localUri = Uri.parse("file://$path")
+                val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(
+                    bitmap
+                )
+                )
+                val localUri = "file://$path".toUri()
 
                 val newLayer = Layer(
                     id = UUID.randomUUID().toString(),
@@ -186,7 +188,8 @@ class EditorViewModel @Inject constructor(
                     isVisible = true
                 )
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
+                    // FIX: Reset tool to NONE so transforming the new image is the immediate default
+                    _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE) }
                     saveProject()
                 }
             } else {
@@ -204,11 +207,11 @@ class EditorViewModel @Inject constructor(
             val metrics = context.resources.displayMetrics
             val width = metrics.widthPixels.takeIf { it > 0 } ?: 1080
             val height = metrics.heightPixels.takeIf { it > 0 } ?: 1920
-            val blankBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val blankBitmap = createBitmap(width, height)
 
             val filename = "layer_${UUID.randomUUID()}.png"
             val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(blankBitmap))
-            val localUri = Uri.parse("file://$path")
+            val localUri = "file://$path".toUri()
 
             withContext(dispatchers.main) {
                 val sketchCount = _uiState.value.layers.count { it.isSketch }
@@ -219,7 +222,8 @@ class EditorViewModel @Inject constructor(
                     bitmap = blankBitmap,
                     uri = localUri
                 )
-                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id) }
+                // FIX: Reset tool to NONE
+                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE) }
                 saveProject()
             }
         }
@@ -233,7 +237,7 @@ class EditorViewModel @Inject constructor(
             if (bitmap != null) {
                 val filename = "bg_${UUID.randomUUID()}.png"
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
-                val localUri = Uri.parse("file://$path")
+                val localUri = "file://$path".toUri()
 
                 val project = projectRepository.currentProject.value
                 if (project != null) {
@@ -275,7 +279,6 @@ class EditorViewModel @Inject constructor(
             val mapPath = projectManager.getMapPath(context, projectToSave.id)
             slamManager.saveModel(mapPath)
 
-            // ONLY EXPORT IF EXPLICITLY SAVED BY USER (name != null)
             if (name != null) {
                 exportProjectInternal(projectToSave)
             }
@@ -348,22 +351,24 @@ class EditorViewModel @Inject constructor(
 
     fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     fun setActiveTool(tool: Tool) = _uiState.update { it.copy(activeTool = tool) }
-    override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id) }
+
+    // FIX: Ensure switching layers forces a reset to transform mode
+    override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id, activeTool = Tool.NONE) }
 
     override fun onLayerRemoved(id: String) {
         pushHistory()
         _uiState.update { state ->
             val updated = state.layers.filter { it.id != id }
-            state.copy(layers = updated, activeLayerId = if (state.activeLayerId == id) updated.firstOrNull()?.id else state.activeLayerId)
+            state.copy(layers = updated, activeLayerId = if (state.activeLayerId == id) updated.firstOrNull()?.id else state.activeLayerId, activeTool = Tool.NONE)
         }
         saveProject()
     }
 
-    override fun onLayerReordered(newIds: List<String>) {
+    override fun onLayerReordered(newOrder: List<String>) {
         pushHistory()
         _uiState.update { state ->
             val map = state.layers.associateBy { it.id }
-            state.copy(layers = newIds.mapNotNull { map[it] })
+            state.copy(layers = newOrder.mapNotNull { map[it] })
         }
         saveProject()
     }
@@ -384,7 +389,7 @@ class EditorViewModel @Inject constructor(
                 val result = backgroundRemover.removeBackground(bitmap)
                 result.onSuccess { fgBitmap ->
                     val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(fgBitmap))
-                    updateLayerUri(layerId, Uri.parse("file://$path"))
+                    updateLayerUri(layerId, "file://$path".toUri())
                 }
             }
             withContext(dispatchers.main) {
@@ -409,7 +414,7 @@ class EditorViewModel @Inject constructor(
                 val resultBitmap = com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(bitmap)
                 if (resultBitmap != null) {
                     val path = projectRepository.saveArtifact(projectId, "line_art_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(resultBitmap))
-                    updateLayerUri(layerId, Uri.parse("file://$path"))
+                    updateLayerUri(layerId, "file://$path".toUri())
                 }
             }
             withContext(dispatchers.main) {
@@ -463,19 +468,19 @@ class EditorViewModel @Inject constructor(
     override fun onGestureEnd() { saveProject(); _uiState.update { it.copy(gestureInProgress = false) } }
     override fun onGestureStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
     override fun toggleImageLock() { pushHistory(); updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }; saveProject() }
-    override fun onOpacityChanged(value: Float) = updateActiveLayer { it.copy(opacity = value) }
-    override fun onBrightnessChanged(value: Float) = updateActiveLayer { it.copy(brightness = value) }
-    override fun onContrastChanged(value: Float) = updateActiveLayer { it.copy(contrast = value) }
-    override fun onSaturationChanged(value: Float) = updateActiveLayer { it.copy(saturation = value) }
-    override fun onColorBalanceRChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceR = value) }
-    override fun onColorBalanceGChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceG = value) }
-    override fun onColorBalanceBChanged(value: Float) = updateActiveLayer { it.copy(colorBalanceB = value) }
-    override fun onScaleChanged(value: Float) = updateActiveLayer { it.copy(scale = value) }
-    override fun onOffsetChanged(value: Offset) = updateActiveLayer { it.copy(offset = it.offset + value) }
+    override fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
+    override fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
+    override fun onContrastChanged(v: Float) = updateActiveLayer { it.copy(contrast = v) }
+    override fun onSaturationChanged(v: Float) = updateActiveLayer { it.copy(saturation = v) }
+    override fun onColorBalanceRChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceR = v) }
+    override fun onColorBalanceGChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceG = v) }
+    override fun onColorBalanceBChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceB = v) }
+    override fun onScaleChanged(s: Float) = updateActiveLayer { it.copy(scale = s) }
+    override fun onOffsetChanged(o: Offset) = updateActiveLayer { it.copy(offset = it.offset + o) }
 
-    override fun onRotationXChanged(value: Float) { updateActiveLayer { it.copy(rotationX = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.X) } }
-    override fun onRotationYChanged(value: Float) { updateActiveLayer { it.copy(rotationY = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Y) } }
-    override fun onRotationZChanged(value: Float) { updateActiveLayer { it.copy(rotationZ = value) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Z) } }
+    override fun onRotationXChanged(d: Float) { updateActiveLayer { it.copy(rotationX = d) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.X) } }
+    override fun onRotationYChanged(d: Float) { updateActiveLayer { it.copy(rotationY = d) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Y) } }
+    override fun onRotationZChanged(d: Float) { updateActiveLayer { it.copy(rotationZ = d) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Z) } }
 
     override fun onCycleRotationAxis() {
         val next = when (_uiState.value.activeRotationAxis) { RotationAxis.X -> RotationAxis.Y; RotationAxis.Y -> RotationAxis.Z; RotationAxis.Z -> RotationAxis.X }
@@ -511,7 +516,7 @@ class EditorViewModel @Inject constructor(
     override fun onCycleBlendMode() {
         pushHistory()
         updateActiveLayer { layer ->
-            val domainModes = com.hereliesaz.graffitixr.common.model.BlendMode.values()
+            val domainModes = BlendMode.entries.toTypedArray()
             val currentDomainMode = layer.blendMode.toModelBlendMode()
             val nextIndex = (domainModes.indexOf(currentDomainMode) + 1) % domainModes.size
             layer.copy(blendMode = domainModes[nextIndex].toComposeBlendMode())
@@ -530,7 +535,7 @@ class EditorViewModel @Inject constructor(
             val newUri = newBitmap?.let { bmp ->
                 val filename = "layer_dup_${UUID.randomUUID()}.png"
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bmp))
-                Uri.parse("file://$path")
+                "file://$path".toUri()
             } ?: layer.uri
 
             val duplicated = layer.copy(
@@ -541,7 +546,8 @@ class EditorViewModel @Inject constructor(
             )
 
             withContext(dispatchers.main) {
-                _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id) }
+                // FIX: Duplication resets to NONE as well
+                _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id, activeTool = Tool.NONE) }
                 saveProject()
             }
         }

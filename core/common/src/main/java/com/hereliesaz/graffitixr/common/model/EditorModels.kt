@@ -65,7 +65,6 @@ enum class RotationAxis {
     Z
 }
 
-
 /**
  * The global state for the Editor UI, including AR and Gesture feedback flags.
  */
@@ -76,7 +75,8 @@ data class EditorUiState(
     val activeLayerId: String? = null,
     val activePanel: EditorPanel = EditorPanel.NONE,
     val editorMode: EditorMode = EditorMode.AR,
-    val activeTool: Tool = Tool.BRUSH,
+    // FIX: Default to NONE so transform gestures are always the baseline
+    val activeTool: Tool = Tool.NONE,
     val hideUiForCapture: Boolean = false,
     val isRightHanded: Boolean = true,
     val gestureInProgress: Boolean = false,
