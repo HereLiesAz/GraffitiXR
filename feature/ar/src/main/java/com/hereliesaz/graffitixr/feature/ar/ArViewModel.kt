@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import timber.log.Timber
 import java.nio.ByteBuffer
 import javax.inject.Inject
 
@@ -42,6 +43,7 @@ class ArViewModel @Inject constructor(
 
     private var isActivityResumed = false
     private var isInArMode = false
+    private var requestedArMode = false
     private var isSessionResumed = false
 
     private val sessionMutex = Mutex()
@@ -66,8 +68,15 @@ class ArViewModel @Inject constructor(
     }
 
     fun setArMode(enabled: Boolean, context: Context) {
+        requestedArMode = enabled
         viewModelScope.launch {
+            if (enabled) {
+                // Give CameraX time to release the camera hardware asynchronously
+                delay(600)
+            }
             sessionMutex.withLock {
+                // Ensure we don't start AR if the user quickly navigated away during the delay
+                if (requestedArMode != enabled) return@withLock
                 if (isInArMode == enabled) return@withLock
                 isInArMode = enabled
 
@@ -84,7 +93,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun updateSessionStateLocked() {
+    private suspend fun updateSessionStateLocked() {
         val shouldBeRunning = isActivityResumed && isInArMode && !isDestroying
         if (shouldBeRunning && !isSessionResumed) {
             resumeArSessionInternal()
@@ -116,22 +125,44 @@ class ArViewModel @Inject constructor(
                     slamManager.loadSuperPoint(context.assets)
                 }
             } catch (e: Throwable) {
+                Timber.e(e, "Failed to create ARCore Session")
                 _isCameraInUseByAr.value = false
+                session = null
             }
         }
     }
 
-    private fun resumeArSessionInternal() {
+    private suspend fun resumeArSessionInternal() {
         val s = session ?: return
-        try {
-            s.resume()
-            isSessionResumed = true
-            _isCameraInUseByAr.value = true
-            slamManager.setRelocEnabled(true)
-            renderer?.attachSession(s)
-        } catch (e: CameraNotAvailableException) {
-        } catch (e: IllegalStateException) {
-        } catch (e: Exception) {}
+        var retries = 5
+        while (retries > 0) {
+            try {
+                s.resume()
+                isSessionResumed = true
+                _isCameraInUseByAr.value = true
+                slamManager.setRelocEnabled(true)
+                renderer?.attachSession(s)
+                return
+            } catch (e: CameraNotAvailableException) {
+                retries--
+                if (retries > 0) {
+                    delay(300)
+                } else {
+                    Timber.e(e, "Camera not available to resume ARCore session")
+                    _isCameraInUseByAr.value = false
+                }
+            } catch (e: IllegalStateException) {
+                // Already resumed
+                isSessionResumed = true
+                _isCameraInUseByAr.value = true
+                slamManager.setRelocEnabled(true)
+                renderer?.attachSession(s)
+                return
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to resume ARCore session")
+                return
+            }
+        }
     }
 
     private fun pauseArSessionInternal() {
@@ -141,7 +172,9 @@ class ArViewModel @Inject constructor(
             renderer?.attachSession(null)
             session?.pause()
             slamManager.setRelocEnabled(false)
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to pause ARCore session")
+        }
     }
 
     private suspend fun performFullCleanupLocked() {
@@ -150,7 +183,7 @@ class ArViewModel @Inject constructor(
             try { session?.pause() } catch (e: Exception) {}
             isSessionResumed = false
         }
-        delay(500)
+        delay(200)
         val s = session
         session = null
         s?.let {
