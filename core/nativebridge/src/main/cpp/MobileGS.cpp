@@ -675,8 +675,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
 
-    const float scaleX = (float)color.cols / depth.cols;
-    const float scaleY = (float)color.rows / depth.rows;
+    const float scaleX = (float)colorRGB.cols / depth.cols;
+    const float scaleY = (float)colorRGB.rows / depth.rows;
 
     bool mapModified = false;
     // Optimized step: 8 for high-res, 4 for 640x480
@@ -727,7 +727,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                         static_cast<int>(std::floor(zw / VOXEL_SIZE))
                 };
 
-                cv::Vec3b col = colorRGB.at<cv::Vec3b>(static_cast<int>(r * scaleY), static_cast<int>(c * scaleX));
+                int colorR = static_cast<int>(r * scaleY);
+                int colorC = static_cast<int>(c * scaleX);
+                if (colorR < 0 || colorR >= colorRGB.rows || colorC < 0 || colorC >= colorRGB.cols) continue;
+
+                cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
                 newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, nx_w, ny_w, nz_w, 1.5f}});
