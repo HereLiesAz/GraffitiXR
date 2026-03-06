@@ -631,7 +631,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     }
 }
 
-void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color) {
+void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
     if (!mMapRunning) return;
     {
         std::lock_guard<std::mutex> lock(mQueueMutex);
@@ -639,7 +639,12 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color) {
         if (mFrameQueue.size() >= 2) {
             mFrameQueue.erase(mFrameQueue.begin());
         }
-        mFrameQueue.push_back({depth.clone(), color.clone()});
+        FrameData data;
+        data.depth = depth.clone();
+        data.color = color.clone();
+        memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
+        memcpy(data.projMatrix, projMat, 16 * sizeof(float));
+        mFrameQueue.push_back(std::move(data));
     }
     mQueueCv.notify_one();
 }
@@ -655,19 +660,19 @@ void MobileGS::mapThreadFunc() {
             frame = std::move(mFrameQueue.front());
             mFrameQueue.erase(mFrameQueue.begin());
         }
-        processDepthFrame(frame.depth, frame.color);
+        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix);
     }
 }
 
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
+void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
     std::unique_lock<std::mutex> lock(mMutex);
     if (!mIsArCoreTracking || depth.empty() || color.empty() || !mCameraReady) return;
 
-    const float* V = mViewMatrix;
-    float fx = mProjMatrix[0];
-    float fy = mProjMatrix[5];
-    float cx = mProjMatrix[8];
-    float cy = mProjMatrix[9];
+    const float* V = viewMat;
+    float fx = projMat[0];
+    float fy = projMat[5];
+    float cx = projMat[8];
+    float cy = projMat[9];
 
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
@@ -1041,7 +1046,7 @@ void MobileGS::draw() {
         std::lock_guard<std::mutex> sortLock(mSortMutex);
         if (mIndicesDirty) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
-            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, mDrawIndices.size() * sizeof(uint32_t), mDrawIndices.data());
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, mDrawIndices.size() * sizeof(uint32_t), mDrawIndices.data(), GL_DYNAMIC_DRAW);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
             mIndicesDirty = false;
         }

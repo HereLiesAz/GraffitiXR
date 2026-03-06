@@ -105,12 +105,20 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
+// Global cache for camera matrices to synchronize with depth/color frames
+float gLastViewMatrix[16];
+float gLastProjMatrix[16];
+bool gHasCameraMatrices = false;
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix, jlong timestampNs) {
     if (gSlamEngine) {
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
         gSlamEngine->updateCamera(view, proj);
+        memcpy(gLastViewMatrix, view, 16 * sizeof(float));
+        memcpy(gLastProjMatrix, proj, 16 * sizeof(float));
+        gHasCameraMatrices = true;
         env->ReleaseFloatArrayElements(viewMatrix, view, JNI_ABORT);
         env->ReleaseFloatArrayElements(projMatrix, proj, JNI_ABORT);
     }
@@ -223,7 +231,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         cv::resize(depthMap, depthMap, gLastColorFrame.size(), 0, 0, cv::INTER_NEAREST);
     }
 
-    gSlamEngine->pushFrame(depthMap, gLastColorFrame);
+    if (gHasCameraMatrices) {
+        gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix);
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -246,12 +256,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
     gStereoProcessor->processStereo(leftData, rightData, width, height);
     cv::Mat disparity = gStereoProcessor->getDisparityMap();
 
-    if (!disparity.empty() && !gLastColorFrame.empty()) {
+    if (!disparity.empty() && !gLastColorFrame.empty() && gHasCameraMatrices) {
         cv::Mat depthFromStereo;
         // Normalize disparity to metric depth (simplified)
         // Focal length and baseline would be required for true metric depth.
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0); // StereoSGBM uses 16x fixed point
-        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame);
+        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix);
     }
 }
 
