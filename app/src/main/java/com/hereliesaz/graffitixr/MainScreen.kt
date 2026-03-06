@@ -68,22 +68,8 @@ fun MainScreen(
                         }
                     }
 
-                    // Handle GL context pausing based solely on activity lifecycle events
-                    DisposableEffect(lifecycleOwner, glView) {
-                        if (glView == null) return@DisposableEffect onDispose {}
-                        val observer = LifecycleEventObserver { _, event ->
-                            when (event) {
-                                Lifecycle.Event.ON_RESUME -> glView?.onResume()
-                                Lifecycle.Event.ON_PAUSE -> glView?.onPause()
-                                else -> {}
-                            }
-                        }
-                        lifecycleOwner.lifecycle.addObserver(observer)
-                        onDispose {
-                            lifecycleOwner.lifecycle.removeObserver(observer)
-                        }
-                    }
-
+                    // Handle GL context pausing based solely on activity lifecycle events.
+                    // FIX: Removed the duplicate, dangerous DisposableEffect that was double-calling glView.onResume().
                     DisposableEffect(lifecycleOwner, glView) {
                         if (glView == null) return@DisposableEffect onDispose {}
                         val observer = LifecycleEventObserver { _, event ->
@@ -92,12 +78,10 @@ fun MainScreen(
                                     arViewModel.onActivityResumed()
                                     glView?.onResume()
                                 }
-
                                 Lifecycle.Event.ON_PAUSE -> {
                                     glView?.onPause()
                                     arViewModel.onActivityPaused()
                                 }
-
                                 else -> {}
                             }
                         }

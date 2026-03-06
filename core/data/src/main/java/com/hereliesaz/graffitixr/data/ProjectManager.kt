@@ -39,17 +39,6 @@ class DefaultUriProvider @Inject constructor() : UriProvider {
     }
 }
 
-/**
- * Manages the low-level file system operations for GraffitiXR projects.
- * Handles saving/loading JSON metadata and image assets (thumbnails, targets).
- *
- * Project Structure:
- * - /files/projects/{projectId}/
- *   - project.json (Metadata)
- *   - thumbnail.png (Preview)
- *   - target_0.png (Target images)
- *   - map.bin (SLAM map)
- */
 @Singleton
 class ProjectManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -62,18 +51,12 @@ class ProjectManager @Inject constructor(
         encodeDefaults = true
     }
 
-    /**
-     * Returns a list of project IDs (directory names) found in storage.
-     */
     fun getProjectList(context: Context): List<String> {
         val projectsDir = File(context.filesDir, "projects")
         if (!projectsDir.exists()) return emptyList()
         return projectsDir.listFiles()?.filter { it.isDirectory }?.map { it.name } ?: emptyList()
     }
 
-    /**
-     * Deletes a project directory and all its contents.
-     */
     fun deleteProject(context: Context, projectName: String) {
         val projectDir = File(context.filesDir, "projects/$projectName")
         if (projectDir.exists()) {
@@ -81,10 +64,6 @@ class ProjectManager @Inject constructor(
         }
     }
 
-    /**
-     * Returns the absolute path to the map.bin file for a given project.
-     * Ensures the project directory exists.
-     */
     fun getMapPath(context: Context, projectId: String): String {
         val root = File(context.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()
@@ -93,11 +72,6 @@ class ProjectManager @Inject constructor(
 
     /**
      * Saves project metadata and optional assets to disk.
-     *
-     * @param context Application context.
-     * @param projectData The project metadata to serialize.
-     * @param targetImages Optional list of bitmaps to save as target images.
-     * @param thumbnail Optional bitmap to save as the project thumbnail.
      */
     suspend fun saveProject(context: Context, projectData: GraffitiProject, targetImages: List<Bitmap>? = null, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
@@ -111,22 +85,23 @@ class ProjectManager @Inject constructor(
             }
             uriProvider.getUriForFile(file)
         } else {
-            // Keep existing or check file
-             projectData.thumbnailUri ?: run {
+            projectData.thumbnailUri ?: run {
                 val file = File(root, "thumbnail.png")
                 if (file.exists()) uriProvider.getUriForFile(file) else null
             }
         }
 
-        // 2. Save Target Images (Bitmaps) -> URIs
+        // FIX: Append new target images rather than clobbering the old ones.
         val savedTargetUris = if (targetImages != null) {
-            targetImages.mapIndexed { index, bitmap ->
-                val file = File(root, "target_$index.png")
+            val existingCount = projectData.targetImageUris.size
+            val newUris = targetImages.mapIndexed { index, bitmap ->
+                val file = File(root, "target_${existingCount + index}.png")
                 FileOutputStream(file).use { out ->
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 }
                 uriProvider.getUriForFile(file)
             }
+            projectData.targetImageUris + newUris
         } else {
             projectData.targetImageUris
         }
@@ -142,9 +117,6 @@ class ProjectManager @Inject constructor(
         File(root, "project.json").writeText(jsonString)
     }
 
-    /**
-     * Loads a full project including bitmaps into memory.
-     */
     suspend fun loadProject(context: Context, projectId: String): LoadedProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         val projectFile = File(root, "project.json")
@@ -166,9 +138,6 @@ class ProjectManager @Inject constructor(
         }
     }
 
-    /**
-     * Loads only the metadata for a project (faster than full load).
-     */
     suspend fun loadProjectMetadata(context: Context, projectId: String): GraffitiProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         val projectFile = File(root, "project.json")
@@ -184,18 +153,12 @@ class ProjectManager @Inject constructor(
         }
     }
 
-    /**
-     * Migrates [GraffitiProject.legacyVisuals] into the first [OverlayLayer] (or creates one from
-     * [GraffitiProject.overlayImageUri]) when the legacy field carries non-default values.
-     * Saves the updated project back to disk so migration only runs once.
-     */
     private suspend fun migrateIfNeeded(context: Context, project: GraffitiProject): GraffitiProject {
         val lv = project.legacyVisuals
         val defaults = LegacyVisuals()
         if (lv == defaults) return project // Nothing to migrate
 
         val migratedLayers: List<OverlayLayer> = when {
-            // Case 1: no layers yet — promote overlayImageUri + legacyVisuals into a new layer
             project.layers.isEmpty() && project.overlayImageUri != null -> {
                 val uri = project.overlayImageUri!!
                 listOf(
@@ -218,7 +181,6 @@ class ProjectManager @Inject constructor(
                     )
                 )
             }
-            // Case 2: layers exist but first one still has all-default visual values — apply legacyVisuals to it
             project.layers.isNotEmpty() && project.layers.first().hasDefaultVisuals() -> {
                 val first = project.layers.first().copy(
                     scale = lv.scale,
@@ -248,23 +210,20 @@ class ProjectManager @Inject constructor(
 
     private fun OverlayLayer.hasDefaultVisuals(): Boolean {
         return scale == 1f &&
-            offset == Offset.Zero &&
-            rotationX == 0f &&
-            rotationY == 0f &&
-            rotationZ == 0f &&
-            opacity == 1f &&
-            blendMode == ModelBlendMode.SrcOver &&
-            brightness == 0f &&
-            contrast == 1f &&
-            saturation == 1f &&
-            colorBalanceR == 1f &&
-            colorBalanceG == 1f &&
-            colorBalanceB == 1f
+                offset == Offset.Zero &&
+                rotationX == 0f &&
+                rotationY == 0f &&
+                rotationZ == 0f &&
+                opacity == 1f &&
+                blendMode == ModelBlendMode.SrcOver &&
+                brightness == 0f &&
+                contrast == 1f &&
+                saturation == 1f &&
+                colorBalanceR == 1f &&
+                colorBalanceG == 1f &&
+                colorBalanceB == 1f
     }
 
-    /**
-     * Zips the project folder into a single file at the specified URI.
-     */
     fun exportProjectToUri(context: Context, projectId: String, uri: Uri) {
         val sourceFolder = File(context.filesDir, "projects/$projectId")
         if (!sourceFolder.exists()) return
@@ -280,27 +239,19 @@ class ProjectManager @Inject constructor(
         }
     }
 
-    /**
-     * Imports a project from a .gxr zip file at the given URI.
-     * Extracts into /files/projects/{projectId}/ and returns the loaded metadata.
-     * Returns null if the zip is invalid or missing project.json.
-     */
     suspend fun importProjectFromUri(context: Context, uri: Uri): GraffitiProject? = withContext(Dispatchers.IO) {
         return@withContext try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 ZipInputStream(inputStream).use { zis ->
-                    // First pass: find project.json to get the project ID
                     var projectData: GraffitiProject? = null
                     val extractedFiles = mutableMapOf<String, File>()
 
                     var entry = zis.nextEntry
                     while (entry != null) {
                         val name = entry.name
-                        // Strip top-level folder prefix if present (e.g. "projectId/file" -> "file")
                         val relativeName = if (name.contains('/')) name.substringAfter('/') else name
 
                         if (!entry.isDirectory && relativeName.isNotEmpty()) {
-                            // Buffer entry data (can't seek in ZipInputStream)
                             val bytes = zis.readBytes()
                             if (relativeName == "project.json") {
                                 try {
@@ -309,7 +260,6 @@ class ProjectManager @Inject constructor(
                                     Log.e("ProjectManager", "Failed to parse project.json", e)
                                 }
                             }
-                            // Store all files for extraction after we know the project ID
                             extractedFiles[relativeName] = File.createTempFile("gxr_", null, context.cacheDir).also {
                                 it.writeBytes(bytes)
                             }
@@ -321,7 +271,6 @@ class ProjectManager @Inject constructor(
                     val project = projectData ?: return@use null
                     val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
 
-                    // Move extracted files into the project directory
                     for ((name, tmpFile) in extractedFiles) {
                         val dest = File(destDir, name)
                         dest.parentFile?.mkdirs()

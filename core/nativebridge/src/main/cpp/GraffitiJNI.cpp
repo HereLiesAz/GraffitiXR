@@ -1,3 +1,4 @@
+// FILE: core/nativebridge/src/main/cpp/GraffitiJNI.cpp
 #include <jni.h>
 #include <android/log.h>
 #include <android/asset_manager_jni.h>
@@ -76,6 +77,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* en
         LOGD("Destroying MobileGS engine");
         delete gSlamEngine;
         gSlamEngine = nullptr;
+    }
+    // FIX: Memory leak stopped. Destroy the stereo processor if it was instantiated.
+    if (gStereoProcessor) {
+        LOGD("Destroying StereoProcessor");
+        delete gStereoProcessor;
+        gStereoProcessor = nullptr;
     }
 }
 
@@ -205,7 +212,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
 
     gSlamEngine->scheduleRelocCheck(gLastColorFrame);
-    // Note: In a production VIO, timestampNs would be used to align IMU/Camera.
 }
 
 JNIEXPORT void JNICALL
@@ -263,8 +269,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
 
     if (!disparity.empty() && !gLastColorFrame.empty() && gHasCameraMatrices) {
         cv::Mat depthFromStereo;
-        // Normalize disparity to metric depth (simplified)
-        // Focal length and baseline would be required for true metric depth.
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0); // StereoSGBM uses 16x fixed point
         bool isYuv = (gLastColorFrame.rows > height);
         gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, isYuv);
@@ -351,11 +355,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
 
     if (descs.empty()) return nullptr;
 
-    // Create Fingerprint object
     jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
     jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
 
-    // Convert keypoints to List<KeyPoint>
     jclass kpClass = env->FindClass("org/opencv/core/KeyPoint");
     jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(fffffffII)V");
     jclass listClass = env->FindClass("java/util/ArrayList");
@@ -369,10 +371,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
         env->DeleteLocalRef(jkp);
     }
 
-    // points3d (empty for initial capture)
     jobject ptsList = env->NewObject(listClass, listCtor, 0);
 
-    // descriptorsData
     jsize descSize = descs.total() * descs.elemSize();
     jbyteArray jDescArray = env->NewByteArray(descSize);
     env->SetByteArrayRegion(jDescArray, 0, descSize, (const jbyte*)descs.data);
@@ -381,10 +381,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
 
     return fpObj;
 }
-
-// ---------------------------------------------------------
-// Advanced Image Processing Tools (Liquify, Heal, Burn)
-// ---------------------------------------------------------
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyLiquify(
@@ -461,7 +457,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyHeal(
     std::vector<cv::Mat> srcChannels, dstChannels;
     cv::split(src, srcChannels);
     cv::split(dstRGBA, dstChannels);
-    dstChannels[3] = srcChannels[3]; // Restore original alpha
+    dstChannels[3] = srcChannels[3];
     cv::merge(dstChannels, dstRGBA);
 
     matToBitmap(env, dstRGBA, bitmap);

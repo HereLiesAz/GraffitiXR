@@ -10,5 +10,6 @@ data class DashboardUiState(
     val gpsData: GpsData? = null,
     val isLoading: Boolean = false,
     val updateStatusMessage: String? = null,
-    val isCheckingForUpdate: Boolean = false
+    val isCheckingForUpdate: Boolean = false,
+    val pendingUpdateApkUrl: String? = null
 )
