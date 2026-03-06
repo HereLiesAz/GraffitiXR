@@ -37,7 +37,6 @@ captures/
 /app/debug/
 /.kotlin/sessions/
 
-backup.ps1
 project_backup_*
 google-services.json
 

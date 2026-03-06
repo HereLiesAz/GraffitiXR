@@ -35,9 +35,9 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.Tool
-import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
+import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import com.hereliesaz.graffitixr.design.components.InfoDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
@@ -45,6 +45,8 @@ import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
+import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
+import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
@@ -59,7 +61,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * The panopticon.
+ * The panopticon. Orchestrates the UI reality and hardware lifecycle.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -102,12 +104,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             GraffitiXRTheme {
                 val navController = rememberNavController()
-                val renderRefState = remember { mutableStateOf<ArRenderer?>(null) }
 
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
-                val cameraController = com.hereliesaz.graffitixr.feature.ar.rememberCameraController()
+                val cameraController = rememberCameraController()
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
@@ -173,7 +174,7 @@ class MainActivity : ComponentActivity() {
                             hasCameraPermission = hasCameraPermission,
                             cameraController = cameraController,
                             onRendererCreated = { renderer ->
-                                renderRefState.value = renderer
+                                // UI threads have no business holding executioner rights.
                             }
                         )
 
@@ -222,7 +223,7 @@ class MainActivity : ComponentActivity() {
                                         val currentBitmap = arUiState.tempCaptureBitmap
                                         if (currentBitmap != null && points.size == 4) {
                                             lifecycleScope.launch(Dispatchers.Default) {
-                                                val unwarped = com.hereliesaz.graffitixr.common.util.ImageProcessor.unwarpImage(currentBitmap, points)
+                                                val unwarped = ImageProcessor.unwarpImage(currentBitmap, points)
                                                 if (unwarped != null) {
                                                     arViewModel.setTempCapture(unwarped)
                                                 }
@@ -325,22 +326,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-
-        // Grab the renderer reference if it exists
-        val renderer = renderRefState.value
-
-        if (renderer != null) {
-            // Signal the renderer to execute the AR session teardown
-            // safely within the GL thread before we kill the Activity
-            renderer.executeDestructionSafely {
-                arViewModel.destroyArSession()
-                if (isFinishing) slamManager.destroy()
-            }
-        } else {
-            // Fallback if the renderer wasn't initialized yet
-            arViewModel.destroyArSession()
-            if (isFinishing) slamManager.destroy()
-        }
+        arViewModel.destroyArSession()
+        if (isFinishing) slamManager.destroy()
     }
 
     private fun AzNavHostScope.configureRail(
@@ -410,8 +397,6 @@ class MainActivity : ComponentActivity() {
                 hostId = "design_host",
                 text = layer.name,
                 nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
-                keepNestedRailOpen = true, // Remains open until parent is tapped again
-
                 onClick = {
                     editorViewModel.onLayerActivated(layer.id)
                     editorViewModel.setActiveTool(Tool.BRUSH)
