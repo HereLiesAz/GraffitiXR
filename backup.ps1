@@ -22,7 +22,7 @@ $AllowedExtensions = @(
 )
 
 # Universal Blackholes (To speed up traversal)
-$HardExcludedDirs = @(".git", ".gradle", ".idea", "build", ".cxx", "node_modules", ".ralph")
+$HardExcludedDirs = @(".git", ".gradle", ".idea", "build", ".cxx", "node_modules", ".ralph", "libs")
 
 $CustomExcludedPaths = @()
 

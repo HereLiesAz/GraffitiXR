@@ -63,3 +63,4 @@ build_output*.txt
 
 .gemini/
 gha-creds-*.json
+/project_source_*.txt

@@ -259,7 +259,7 @@ class MainActivity : ComponentActivity() {
                             if (showHelpDialog) {
                                 InfoDialog(
                                     title = "GraffitiXR Guide",
-                                    content = "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, select the 'Transform' tool. Double tap the screen to cycle between X, Y, and Z rotation axes.",
+                                    content = "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes.",
                                     onDismiss = { showHelpDialog = false }
                                 )
                             }
@@ -397,10 +397,9 @@ class MainActivity : ComponentActivity() {
                 hostId = "design_host",
                 text = layer.name,
                 nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
+                keepNestedRailOpen = true,
                 onClick = {
                     editorViewModel.onLayerActivated(layer.id)
-                    // Automatically activate a drawing tool when opening the layer options, locking out transformations
-                    editorViewModel.setActiveTool(Tool.BRUSH)
                 },
                 onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
                 nestedContent = {
@@ -412,6 +411,14 @@ class MainActivity : ComponentActivity() {
                             text = "Size",
                             shape = AzButtonShape.RECTANGLE,
                             content = AzComposableContent {
+                                DisposableEffect(Unit) {
+                                    if (editorViewModel.uiState.value.activeTool == Tool.NONE) {
+                                        editorViewModel.setActiveTool(Tool.BRUSH)
+                                    }
+                                    onDispose {
+                                        editorViewModel.setActiveTool(Tool.NONE)
+                                    }
+                                }
                                 val liveState by editorViewModel.uiState.collectAsState()
                                 Box(
                                     modifier = Modifier
@@ -450,7 +457,6 @@ class MainActivity : ComponentActivity() {
                             editorViewModel.onColorClicked()
                         }
                         azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
-                        azRailItem(id = "move_${layer.id}", text = "Transform", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.NONE) }
                     } else {
                         azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
                         azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onLineDrawingClicked() }
@@ -463,7 +469,6 @@ class MainActivity : ComponentActivity() {
                         addSizeItem()
 
                         azRailItem(id = "balance_${layer.id}", text = "Balance", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onBalanceClicked() }
-                        azRailItem(id = "move_${layer.id}", text = "Transform", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.NONE) }
                     }
                 }
             ) {
