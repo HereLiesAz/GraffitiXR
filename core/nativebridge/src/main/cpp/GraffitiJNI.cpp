@@ -150,24 +150,34 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
 
     // Efficient YUV420 to RGB conversion using OpenCV
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
-
-    // For UV planes, we often have interleaved (NV21/NV12) or planar data.
-    // ARCore typically provides planar YUV_420_888.
-    // Simplification: if uvPixelStride is 2, it's likely NV21/NV12-like.
-    // For a robust implementation, we'd handle all strides, but let's do a fast path for common ARCore output.
+    cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvStride);
+    cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvStride);
 
     if (gLastColorFrame.empty() || gLastColorFrame.cols != width || gLastColorFrame.rows != height) {
         gLastColorFrame = cv::Mat(height, width, CV_8UC3);
     }
 
-    // Direct YUV to RGB conversion is much faster than the JPEG path.
-    // Here we use a slightly simplified approach for the YUV_420_888 mapping.
-    // In a production app, we'd use a dedicated shader or a highly optimized NEON kernel.
-    cv::Mat yuv420;
-    // ... (logic to merge planes into a format cv::cvtColor can handle)
-    // For now, let's just use the Y plane as grayscale to verify it stops freezing,
-    // then implement the full chrominance merge.
-    cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
+    // ARCore YUV_420_888 to RGB
+    // If uvPixelStride is 1, it's planar (I420). If 2, it's interleaved (NV12/NV21).
+    // For simplicity and speed, we manually reconstruct the YUV420P buffer for OpenCV.
+    cv::Mat yuv(height + height / 2, width, CV_8UC1);
+    yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
+
+    if (uvPixelStride == 1) {
+        // Planar YUV420 (I420)
+        uMat.copyTo(yuv(cv::Rect(0, height, width / 2, height / 4)));
+        vMat.copyTo(yuv(cv::Rect(width / 2, height, width / 2, height / 4)));
+        cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_I420);
+    } else if (uvPixelStride == 2) {
+        // Interleaved (NV12 or NV21)
+        // In ARCore, U and V buffers often point to the same interleaved plane with different offsets.
+        // We can use the V buffer for NV21/NV12 conversion.
+        cv::Mat uvInterleaved(height / 2, width, CV_8UC1, vData, uvStride);
+        uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
+        cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_NV21);
+    } else {
+        cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
+    }
 
     gSlamEngine->scheduleRelocCheck(gLastColorFrame);
 }

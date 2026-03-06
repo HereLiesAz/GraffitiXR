@@ -9,6 +9,7 @@
 #include <fstream>
 #include <cmath>
 #include <numeric>
+#include <sys/resource.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -298,6 +299,7 @@ cv::Point3f MobileGS::getCameraWorldPosition() const {
 }
 
 void MobileGS::sortThreadFunc() {
+    setpriority(PRIO_PROCESS, 0, 15);
     JNIEnv* env = nullptr;
     bool attached = false;
     if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
@@ -406,6 +408,7 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
 }
 
 void MobileGS::relocThreadFunc() {
+    setpriority(PRIO_PROCESS, 0, 10);
     JniThreadAttacher attacher; // Explicitly ties JVM to thread scope
 
     JNIEnv* env = nullptr;
@@ -629,10 +632,11 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
 }
 
 void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color) {
+    if (!mMapRunning) return;
     {
         std::lock_guard<std::mutex> lock(mQueueMutex);
-        // Limit queue size to prevent OOM if processing is slow
-        if (mFrameQueue.size() > 2) {
+        // Throttle: If queue is already full, replace oldest work to keep it fresh
+        if (mFrameQueue.size() >= 2) {
             mFrameQueue.erase(mFrameQueue.begin());
         }
         mFrameQueue.push_back({depth.clone(), color.clone()});
@@ -641,6 +645,7 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color) {
 }
 
 void MobileGS::mapThreadFunc() {
+    setpriority(PRIO_PROCESS, 0, 10);
     while (mMapRunning) {
         FrameData frame;
         {
@@ -667,8 +672,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
 
+    const float scaleX = (float)color.cols / depth.cols;
+    const float scaleY = (float)color.rows / depth.rows;
+
     bool mapModified = false;
-    int step = 8;
+    int step = (depth.cols > 640) ? 8 : 2;
 
     auto unproject = [&](int r, int c, float d) {
         float x_ndc = (c - halfW) / halfW;
@@ -709,7 +717,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color) {
                         static_cast<int>(std::floor(zw / VOXEL_SIZE))
                 };
 
-                cv::Vec3b col = color.at<cv::Vec3b>(r, c);
+                cv::Vec3b col = color.at<cv::Vec3b>(static_cast<int>(r * scaleY), static_cast<int>(c * scaleX));
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
                 auto it = mVoxelGrid.find(key);
