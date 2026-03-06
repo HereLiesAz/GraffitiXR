@@ -45,6 +45,7 @@ class EditorViewModelTest {
     private val context: Context = mockk(relaxed = true)
     private val backgroundRemover: BackgroundRemover = mockk(relaxed = true)
     private val projectManager: ProjectManager = mockk(relaxed = true)
+    private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
@@ -89,7 +90,7 @@ class EditorViewModelTest {
             override val unconfined: CoroutineDispatcher = testDispatcher
         }
 
-        viewModel = EditorViewModel(projectRepository, projectManager, context, backgroundRemover, slamManager, testDispatcherProvider)
+        viewModel = EditorViewModel(projectRepository, projectManager, exportManager, context, backgroundRemover, slamManager, testDispatcherProvider)
     }
 
     @After

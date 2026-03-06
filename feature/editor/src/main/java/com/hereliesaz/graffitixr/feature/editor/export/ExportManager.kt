@@ -1,23 +1,26 @@
-package com.hereliesaz.graffitixr.editor
+package com.hereliesaz.graffitixr.feature.editor.export
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.BlendMode as NativeBlendMode
 import androidx.compose.ui.graphics.BlendMode
+import com.hereliesaz.graffitixr.common.model.Layer
+import javax.inject.Inject
 
-data class Layer(val bitmap: Bitmap, val opacity: Float, val blendMode: BlendMode)
-
-object ExportManager {
+class ExportManager @Inject constructor() {
     fun compositeLayers(layers: List<Layer>, width: Int, height: Int): Bitmap {
         val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         for (layer in layers) {
+            val bitmap = layer.bitmap ?: continue
             paint.alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
-            paint.blendMode = layer.blendMode.toNativeBlendMode()
-            canvas.drawBitmap(layer.bitmap, 0f, 0f, paint)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                paint.blendMode = layer.blendMode.toNativeBlendMode()
+            }
+            canvas.drawBitmap(bitmap, 0f, 0f, paint)
         }
 
         return result
