@@ -22,10 +22,11 @@ class StereoDepthProviderTest {
         val right = ByteArray(10)
         val w = 640
         val h = 480
+        val ts = 12345L
 
-        provider.processStereoFrames(left, right, w, h)
+        provider.processStereoFrames(left, right, w, h, ts)
 
-        verify { slamManager.feedStereoData(any(), any(), w, h) }
+        verify { slamManager.feedStereoData(any(), any(), w, h, ts) }
     }
 
     @Test
@@ -34,9 +35,10 @@ class StereoDepthProviderTest {
         val right = ByteArray(0)
         val w = 640
         val h = 480
+        val ts = 12345L
 
-        provider.processStereoFrames(left, right, w, h)
+        provider.processStereoFrames(left, right, w, h, ts)
 
-        verify(exactly = 0) { slamManager.feedStereoData(any(), any(), any(), any()) }
+        verify(exactly = 0) { slamManager.feedStereoData(any(), any(), any(), any(), any()) }
     }
 }

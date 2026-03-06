@@ -431,27 +431,7 @@ void MobileGS::relocThreadFunc() {
                 mFingerprintRequested = false;
                 doFp = true;
             }
-
-            if (mRelocRequested) {
-                relocFrame = mRelocColorFrame.clone();
-                mRelocRequested = false;
-                doReloc = true;
-            }
-            if (mFingerprintRequested) {
-                fpColor = mFingerprintColorFrame.clone();
-                fpDepth = mFingerprintDepthFrame.clone();
-                memcpy(fpView, mFingerprintViewMatrix, 16 * sizeof(float));
-                memcpy(fpProj, mFingerprintProjMatrix, 16 * sizeof(float));
-                mFingerprintRequested = false;
-                doFp = true;
-            }
         }
-
-        if (doReloc && !relocFrame.empty()) {
-            runPnPMatch(relocFrame);
-        }
-        if (doFp && !fpColor.empty() && !fpDepth.empty()) {
-            tryUpdateFingerprint(fpColor, fpDepth, fpView, fpProj);
 
         if (doReloc && !relocFrame.empty()) {
             runPnPMatch(relocFrame);

@@ -78,4 +78,22 @@ object ImageProcessingUtils {
         val imageBytes = out.toByteArray()
         return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
     }
+
+    /**
+     * Extracts a direct ARGB_8888 ByteBuffer from a YUV_420_888 Image.
+     * Useful for zero-copy JNI ingestion.
+     */
+    fun convertYuvToRgbaDirect(image: Image): java.nio.ByteBuffer {
+        val width = image.width
+        val height = image.height
+        val rgba = java.nio.ByteBuffer.allocateDirect(width * height * 4)
+        
+        // Fast path: reuse existing YuvToRgbConverter logic if available or implement simplified version here.
+        // For now, we'll use a standard Bitmap-based conversion and copy to satisfy the immediate API need,
+        // though a direct native implementation is preferred for performance.
+        val bitmap = yuvToRgbBitmap(image)
+        bitmap.copyPixelsToBuffer(rgba)
+        rgba.rewind()
+        return rgba
+    }
 }

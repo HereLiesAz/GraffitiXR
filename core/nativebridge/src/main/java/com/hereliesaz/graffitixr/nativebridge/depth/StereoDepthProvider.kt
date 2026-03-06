@@ -34,7 +34,7 @@ class StereoDepthProvider @Inject constructor(
      * @param width Frame width.
      * @param height Frame height.
      */
-    fun processStereoFrames(left: ByteArray, right: ByteArray, width: Int, height: Int) {
+    fun processStereoFrames(left: ByteArray, right: ByteArray, width: Int, height: Int, timestamp: Long) {
         if (left.isEmpty() || right.isEmpty()) return
         val requiredSize = left.size
 
@@ -56,7 +56,7 @@ class StereoDepthProvider @Inject constructor(
             it.rewind()
         }
 
-        slamManager.feedStereoData(directLeftBuffer!!, directRightBuffer!!, width, height)
+        slamManager.feedStereoData(directLeftBuffer!!, directRightBuffer!!, width, height, timestamp)
     }
 
     /**
@@ -67,7 +67,7 @@ class StereoDepthProvider @Inject constructor(
      * @param width  Frame width.
      * @param height Frame height.
      */
-    fun submitFrame(yPlane: ByteBuffer, width: Int, height: Int) {
+    fun submitFrame(yPlane: ByteBuffer, width: Int, height: Int, timestamp: Long) {
         val snapshot = yPlane.duplicate()  // independent position, shared backing data
         val frameSize = snapshot.remaining()
 
@@ -107,6 +107,6 @@ class StereoDepthProvider @Inject constructor(
         prevFrameBuffer!!.put(stereoRight!!.duplicate().also { it.rewind() })
         prevFrameBuffer!!.rewind()
 
-        slamManager.feedStereoData(stereoLeft!!, stereoRight!!, width, height)
+        slamManager.feedStereoData(stereoLeft!!, stereoRight!!, width, height, timestamp)
     }
 }

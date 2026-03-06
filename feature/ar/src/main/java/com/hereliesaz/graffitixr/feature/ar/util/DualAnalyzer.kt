@@ -13,7 +13,7 @@ import java.nio.ByteBuffer
  */
 class DualAnalyzer(
     private val onLightUpdate: (Float) -> Unit,
-    private val onSlamFrame: ((ByteBuffer, Int, Int) -> Unit)? = null,
+    private val onSlamFrame: ((ByteBuffer, Int, Int, Long) -> Unit)? = null,
     private val clock: () -> Long = System::currentTimeMillis
 ) : ImageAnalysis.Analyzer {
 
@@ -26,7 +26,7 @@ class DualAnalyzer(
         // 1. SLAM Tracking (Every Frame - primarily for Stereo Depth fallback)
         if (onSlamFrame != null && image.planes.isNotEmpty()) {
             val yBuffer = image.planes[0].buffer
-            onSlamFrame.invoke(yBuffer, image.width, image.height)
+            onSlamFrame.invoke(yBuffer, image.width, image.height, image.imageInfo.timestamp)
         }
 
         // 2. Light Estimation

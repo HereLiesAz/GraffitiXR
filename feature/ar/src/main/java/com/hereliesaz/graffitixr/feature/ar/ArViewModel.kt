@@ -1,4 +1,3 @@
-// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
@@ -12,9 +11,11 @@ import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.Config
 import com.google.ar.core.Session
+import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -23,66 +24,41 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.nio.ByteBuffer
 import java.util.EnumSet
 import javax.inject.Inject
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
-    private val slamManager: SlamManager
+    private val slamManager: SlamManager,
+    private val stereoProvider: StereoDepthProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
 
-    private var arSession: Session? = null
-    private var arRenderer: ArRenderer? = null
+    private var session: Session? = null
+    private var renderer: ArRenderer? = null
+    
     private val _isCameraInUseByAr = MutableStateFlow(false)
     val isCameraInUseByAr = _isCameraInUseByAr.asStateFlow()
-
-    fun setArMode(isActive: Boolean, context: Context) {
-        if (isActive) {
-            if (arSession == null) {
-                try {
-                    arSession = Session(context).apply {
-                        val filter = CameraConfigFilter(this).apply {
-                            targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-                        }
-                        val supportedConfigs = getSupportedCameraConfigs(filter)
-                        if (supportedConfigs.isNotEmpty()) {
-                            cameraConfig = supportedConfigs[0]
-                        }
 
     private var isActivityResumed = false
     private var isInArMode = false
     private var isSessionResumed = false
+    private var isDestroying = false
 
     private val sessionMutex = Mutex()
-    private var isDestroying = false
-                        val config = Config(this).apply {
-                            updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                            depthMode = Config.DepthMode.AUTOMATIC
-                            focusMode = Config.FocusMode.AUTO
-                        }
-                        configure(config)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    return
-                }
-            }
-            arSession?.resume()
-        } else {
-            arSession?.pause()
-        }
-    }
-
-    fun attachSessionToRenderer(renderer: ArRenderer) {
-        arRenderer = renderer
-        arSession?.let { renderer.setSession(it) }
-    }
 
     fun onActivityResumed() {
-        arSession?.resume()
+        viewModelScope.launch {
+            sessionMutex.withLock {
+                isActivityResumed = true
+                updateSessionStateLocked()
+            }
+        }
     }
 
     fun onActivityPaused() {
@@ -120,24 +96,27 @@ class ArViewModel @Inject constructor(
         } else if (!shouldBeRunning && isSessionResumed) {
             pauseArSessionInternal()
         }
-        arSession?.pause()
     }
 
-    fun destroyArSession() {
-        val dyingSession = arSession
-        arSession = null
-
-        arRenderer?.destroy()
-        arRenderer = null
     private fun initArSessionLocked(context: Context) {
         if (session == null) {
             try {
                 _isCameraInUseByAr.value = true
-                session = Session(context)
-                val config = session!!.config
-                config.depthMode = Config.DepthMode.AUTOMATIC
-                config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                val newSession = Session(context)
+                val filter = CameraConfigFilter(newSession).apply {
+                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                }
+                val supportedConfigs = newSession.getSupportedCameraConfigs(filter)
+                if (supportedConfigs.isNotEmpty()) {
+                    newSession.cameraConfig = supportedConfigs[0]
+                }
 
+                val config = Config(newSession).apply {
+                    updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                    depthMode = Config.DepthMode.AUTOMATIC
+                    focusMode = Config.FocusMode.AUTO
+                }
+                
                 try {
                     val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
                     val offMode = flashlightModeClass.getField("OFF").get(null)
@@ -145,22 +124,15 @@ class ArViewModel @Inject constructor(
                     method.invoke(config, offMode)
                 } catch (e: Exception) {}
 
-                session!!.configure(config)
-                renderer?.attachSession(session)
-
-        // Banish the closure to the IO thread so the MediaPipe graph
-        // doesn't deadlock the Main Thread waiting for the GL context to drop.
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                dyingSession?.pause()
-                delay(150) // Yield to allow internal C++ threads to acknowledge the pause
-                dyingSession?.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
+                newSession.configure(config)
+                session = newSession
+                renderer?.attachSession(newSession)
+                
                 viewModelScope.launch(Dispatchers.IO) {
                     slamManager.loadSuperPoint(context.assets)
                 }
-            } catch (e: Throwable) {
+            } catch (e: Exception) {
+                e.printStackTrace()
                 _isCameraInUseByAr.value = false
             }
         }
@@ -175,8 +147,12 @@ class ArViewModel @Inject constructor(
             slamManager.setRelocEnabled(true)
             renderer?.attachSession(s)
         } catch (e: CameraNotAvailableException) {
+            e.printStackTrace()
         } catch (e: IllegalStateException) {
-        } catch (e: Exception) {}
+            e.printStackTrace()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun pauseArSessionInternal() {
@@ -186,7 +162,9 @@ class ArViewModel @Inject constructor(
             renderer?.attachSession(null)
             session?.pause()
             slamManager.setRelocEnabled(false)
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private suspend fun performFullCleanupLocked() {
@@ -195,7 +173,7 @@ class ArViewModel @Inject constructor(
             try { session?.pause() } catch (e: Exception) {}
             isSessionResumed = false
         }
-        delay(500)
+        delay(150)
         val s = session
         session = null
         s?.let {
@@ -217,17 +195,18 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    fun attachSessionToRenderer(arRenderer: ArRenderer?) {
+        this.renderer = arRenderer
+        if (arRenderer != null && session != null && isSessionResumed) {
+            arRenderer.attachSession(session)
+        }
+    }
+
     fun setTrackingState(isTracking: Boolean, splatCount: Int) {
         _uiState.update { it.copy(
             isScanning = isTracking,
             splatCount = splatCount
         )}
-    fun setTrackingState(isTracking: Boolean, splatCount: Int) {
-        _uiState.update { it.copy(isScanning = isTracking, splatCount = splatCount) }
-    }
-
-    fun setTempCapture(bitmap: Bitmap) {
-        _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
     }
 
     fun onTargetCaptured(bitmap: Bitmap, depthBuffer: ByteBuffer?, width: Int, height: Int, intrinsics: FloatArray?) {
@@ -259,6 +238,10 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isCaptureRequested = true) }
     }
 
+    fun onCaptureRequestHandled() {
+        _uiState.update { it.copy(isCaptureRequested = false) }
+    }
+
     fun setActiveUnwarpPoint(index: Int) {
         _uiState.update { it.copy(activeUnwarpPointIndex = index) }
     }
@@ -271,15 +254,9 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(maskPath = path) }
     }
 
-    fun requestCapture() {
-        _uiState.update { it.copy(isCaptureRequested = true) }
+    fun captureKeyframe() {
+        // Handled via native bridge directly if implemented
     }
-
-    fun onCaptureRequestHandled() {
-        _uiState.update { it.copy(isCaptureRequested = false) }
-    }
-
-    fun captureKeyframe() {}
 
     fun toggleFlashlight() {
         val isOn = !_uiState.value.isFlashlightOn
@@ -292,34 +269,15 @@ class ArViewModel @Inject constructor(
     }
 
     fun onCameraFrameForStereo(buffer: ByteBuffer, width: Int, height: Int) {
-        stereoProvider.submitFrame(buffer, width, height)
+        stereoProvider.submitFrame(buffer, width, height, System.currentTimeMillis())
+    }
+
+    fun onCameraFrameForStereo(image: ImageProxy) {
+        stereoProvider.submitFrame(image.planes[0].buffer, image.width, image.height, System.currentTimeMillis())
+        image.close()
     }
 
     fun updateLightLevel(level: Float) {
         _uiState.update { it.copy(lightLevel = level) }
-    }
-
-    fun toggleFlashlight() {
-        _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
-    fun attachSessionToRenderer(arRenderer: ArRenderer?) {
-        this.renderer = arRenderer
-        if (arRenderer != null && session != null && isSessionResumed) {
-            arRenderer.attachSession(session)
-        }
-    }
-
-    fun captureKeyframe() {
-        // Handled via native bridge directly if implemented
-    }
-
-    fun onTargetCaptured(bmp: Bitmap?, depth: FloatArray?, w: Int, h: Int, intrinsics: FloatArray?) {
-        _uiState.update { it.copy(
-            isCaptureRequested = false,
-            tempCaptureBitmap = bmp
-        )}
-    }
-
-    fun onCameraFrameForStereo(image: ImageProxy) {
-        image.close()
     }
 }

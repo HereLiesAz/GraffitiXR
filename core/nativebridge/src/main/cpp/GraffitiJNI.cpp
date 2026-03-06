@@ -54,7 +54,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_ensureInitialized(JNIEnv* env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv* env, jobject thiz) {
     if (!gSlamEngine) {
         LOGD("Initializing MobileGS engine (CPU)");
         gSlamEngine = new MobileGS();
@@ -63,7 +63,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_ensureInitialized(JNIEnv
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initGl(JNIEnv* env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitGl(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {
         LOGD("Initializing MobileGS GL context");
         gSlamEngine->initGl();
@@ -71,7 +71,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_initGl(JNIEnv* env, jobj
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_destroy(JNIEnv* env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {
         LOGD("Destroying MobileGS engine");
         delete gSlamEngine;
@@ -86,7 +86,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetSplatCount(JNIE
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_setArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
     if (gSlamEngine) gSlamEngine->setArCoreTrackingState(isTracking);
 }
 
@@ -106,7 +106,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_updateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix) {
     if (gSlamEngine) {
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
@@ -170,22 +170,30 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_draw(JNIEnv* env, jobject thiz) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDraw(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) gSlamEngine->draw();
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
-        JNIEnv* env, jobject thiz, jobject leftBuffer, jobject rightBuffer, jint width, jint height) {
+        JNIEnv* env, jobject thiz, jobject leftBuffer, jobject rightBuffer, jint width, jint height, jlong timestamp) {
+
+    if (!gSlamEngine) return;
+
     if (!gStereoProcessor) gStereoProcessor = new StereoProcessor();
+
     auto* leftData = static_cast<int8_t*>(env->GetDirectBufferAddress(leftBuffer));
     auto* rightData = static_cast<int8_t*>(env->GetDirectBufferAddress(rightBuffer));
     if (!leftData || !rightData) return;
+
     gStereoProcessor->processStereo(leftData, rightData, width, height);
     cv::Mat disparity = gStereoProcessor->getDisparityMap();
-    if (!disparity.empty() && gSlamEngine && !gLastColorFrame.empty()) {
+
+    if (!disparity.empty() && !gLastColorFrame.empty()) {
         cv::Mat depthFromStereo;
-        disparity.convertTo(depthFromStereo, CV_32F);
+        // Normalize disparity to metric depth (simplified)
+        // Focal length and baseline would be required for true metric depth.
+        disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0); // StereoSGBM uses 16x fixed point
         gSlamEngine->processDepthFrame(depthFromStereo, gLastColorFrame);
     }
 }
@@ -250,6 +258,55 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTargetFingerpri
         env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
         env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
     }
+}
+
+JNIEXPORT jobject JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprint(
+        JNIEnv* env, jobject thiz, jobject bitmap) {
+
+    cv::Mat frame;
+    bitmapToMat(env, bitmap, frame);
+    if (frame.empty()) return nullptr;
+
+    cv::Mat gray;
+    cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
+
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+    cv::Ptr<cv::ORB> detector = cv::ORB::create(500);
+    detector->detectAndCompute(gray, cv::noArray(), kps, descs);
+
+    if (descs.empty()) return nullptr;
+
+    // Create Fingerprint object
+    jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
+    jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
+
+    // Convert keypoints to List<KeyPoint>
+    jclass kpClass = env->FindClass("org/opencv/core/KeyPoint");
+    jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(fffffffII)V");
+    jclass listClass = env->FindClass("java/util/ArrayList");
+    jmethodID listCtor = env->GetMethodID(listClass, "<init>", "(I)V");
+    jmethodID addMethod = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");
+
+    jobject kpList = env->NewObject(listClass, listCtor, (jint)kps.size());
+    for (const auto& kp : kps) {
+        jobject jkp = env->NewObject(kpClass, kpCtor, kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response, (jfloat)kp.octave, (jfloat)kp.class_id);
+        env->CallBooleanMethod(kpList, addMethod, jkp);
+        env->DeleteLocalRef(jkp);
+    }
+
+    // points3d (empty for initial capture)
+    jobject ptsList = env->NewObject(listClass, listCtor, 0);
+
+    // descriptorsData
+    jsize descSize = descs.total() * descs.elemSize();
+    jbyteArray jDescArray = env->NewByteArray(descSize);
+    env->SetByteArrayRegion(jDescArray, 0, descSize, (const jbyte*)descs.data);
+
+    jobject fpObj = env->NewObject(fpClass, fpCtor, kpList, ptsList, jDescArray, descs.rows, descs.cols, descs.type());
+
+    return fpObj;
 }
 
 // ---------------------------------------------------------

@@ -26,7 +26,7 @@ class DualAnalyzerTest {
         lightCallCount = 0
         analyzer = DualAnalyzer(
             onLightUpdate = { lightCallCount++ },
-            onSlamFrame = { _, _, _ -> slamCallCount++ },
+            onSlamFrame = { _, _, _, _ -> slamCallCount++ },
             clock = { 0L }  // fixed clock: all frames appear instantaneous
         )
     }
@@ -44,6 +44,7 @@ class DualAnalyzerTest {
         }
         val imageInfo = mockk<ImageInfo> {
             every { rotationDegrees } returns 0
+            every { timestamp } returns 123456789L
         }
         return mockk {
             every { planes } returns arrayOf(plane)
@@ -70,7 +71,7 @@ class DualAnalyzerTest {
         var capturedHeight = 0
         val a = DualAnalyzer(
             onLightUpdate = {},
-            onSlamFrame = { _, w, h -> capturedWidth = w; capturedHeight = h }
+            onSlamFrame = { _, w, h, _ -> capturedWidth = w; capturedHeight = h }
         )
         a.analyze(mockImageProxy(width = 1280, height = 720))
         assertEquals(1280, capturedWidth)
