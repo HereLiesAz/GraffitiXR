@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
 
     var use3dBackground by mutableStateOf(false)
     var showSaveDialog by mutableStateOf(false)
-    var showLibrary by mutableStateOf(true) // Ensure library is shown by default at startup
+    var showLibrary by mutableStateOf(true)
     var showSettings by mutableStateOf(false)
     var showHelpDialog by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
@@ -159,7 +159,6 @@ class MainActivity : ComponentActivity() {
                     }
 
                     background(weight = 0) {
-                        // ALWAYS mount MainScreen so the camera runs, unless we are in the Library menu.
                         MainScreen(
                             uiState = editorUiState,
                             arUiState = arUiState,
@@ -175,7 +174,6 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
-                        // Render the target creation background ON TOP of the camera feed during capture
                         if (mainUiState.isCapturingTarget) {
                             TargetCreationBackground(
                                 uiState = arUiState,
@@ -316,12 +314,10 @@ class MainActivity : ComponentActivity() {
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
-        arViewModel.onActivityResumed()
     }
 
     override fun onPause() {
         super.onPause()
-        arViewModel.onActivityPaused()
     }
 
     override fun onDestroy() {
@@ -342,13 +338,13 @@ class MainActivity : ComponentActivity() {
         val navStrings = NavStrings()
         val activeHighlightColor = when (editorUiState.activeRotationAxis) {
             RotationAxis.X -> Color.Cyan
-            RotationAxis.Y -> Color(0xFFFF69B4) // Pink
+            RotationAxis.Y -> Color(0xFFFF69B4)
             RotationAxis.Z -> Color.Green
         }
 
         azTheme(activeColor = activeHighlightColor, defaultShape = AzButtonShape.RECTANGLE, headerIconShape = AzHeaderIconShape.ROUNDED)
         azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
-        azAdvanced(helpEnabled = true) // DSL injects footer items natively
+        azAdvanced(helpEnabled = true)
 
         val requestPermissions = {
             permissionLauncher.launch(
@@ -399,7 +395,6 @@ class MainActivity : ComponentActivity() {
                 nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
                 onClick = {
                     editorViewModel.onLayerActivated(layer.id)
-                    // Automatically activate a drawing tool when opening the layer options, locking out transformations
                     editorViewModel.setActiveTool(Tool.BRUSH)
                 },
                 onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
@@ -450,7 +445,6 @@ class MainActivity : ComponentActivity() {
                             editorViewModel.onColorClicked()
                         }
                         azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
-                        // Setting Tool.NONE enables image transformations and disables editing
                         azRailItem(id = "move_${layer.id}", text = "Transform", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.NONE) }
                     } else {
                         azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
@@ -464,7 +458,6 @@ class MainActivity : ComponentActivity() {
                         addSizeItem()
 
                         azRailItem(id = "balance_${layer.id}", text = "Balance", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onBalanceClicked() }
-                        // Setting Tool.NONE enables image transformations and disables editing
                         azRailItem(id = "move_${layer.id}", text = "Transform", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.NONE) }
                     }
                 }
@@ -482,11 +475,7 @@ class MainActivity : ComponentActivity() {
         azRailHostItem(id = "project_host", text = navStrings.project)
         azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, shape = AzButtonShape.NONE) { showSaveDialog = true }
         azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToLibrary() }
-
-        // Consolidated Export action
         azRailSubItem(id = "export_img", hostId = "project_host", text = "Export", shape = AzButtonShape.NONE) { editorViewModel.exportImage() }
-
-        // Adding the Help option beneath Project
         azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", shape = AzButtonShape.NONE) { showHelpDialog = true }
 
         azDivider()
@@ -495,7 +484,6 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
         }
 
-        // Touch Lock allows placing physical material against the screen (locks out transformations)
         azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
     }
 }

@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt
 package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
@@ -59,14 +60,9 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
-    // Foundational Base Layer:
-    // This guarantees that ANY empty space, inactive camera, or mode without a background
-    // (like Trace mode or an uninitialized AR view) will always fall back to pure black.
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
-            // Strict separation: Only mount the AR view if we are actually in AR mode,
-            // and only if the camera is permitted to be active (e.g. not behind the library).
             if (uiState.editorMode == EditorMode.AR) {
                 var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
@@ -81,8 +77,14 @@ fun MainScreen(
                     if (glView == null) return@DisposableEffect onDispose {}
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
-                            Lifecycle.Event.ON_RESUME -> glView?.onResume()
-                            Lifecycle.Event.ON_PAUSE -> glView?.onPause()
+                            Lifecycle.Event.ON_RESUME -> {
+                                arViewModel.onActivityResumed()
+                                glView?.onResume()
+                            }
+                            Lifecycle.Event.ON_PAUSE -> {
+                                glView?.onPause()
+                                arViewModel.onActivityPaused()
+                            }
                             else -> {}
                         }
                     }
@@ -129,7 +131,6 @@ fun MainScreen(
                     cameraController.enableTorch(arUiState.isFlashlightOn)
                 }
 
-                // Guaranteed teardown for CameraX hardware locks
                 DisposableEffect(Unit) {
                     onDispose {
                         try {

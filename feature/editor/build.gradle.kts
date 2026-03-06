@@ -1,3 +1,4 @@
+// FILE: feature/editor/build.gradle.kts
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -28,7 +29,6 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:design"))
 
-    // ADDED: Required for GsViewer / SlamManager
     implementation(project(":core:nativebridge"))
 
     implementation(libs.androidx.compose.ui)
@@ -40,21 +40,17 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.coil.compose)
 
-    // CameraX
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    // MLKit
-    implementation(libs.mlkit.subject.segmentation)
     implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.hilt.android)
     implementation(libs.androidx.ink.brush)
     ksp(libs.hilt.compiler)
 
-    // AZ Nav Rail (Ensure this is available if used in Editor, though usually in App)
     implementation(libs.az.nav.rail)
 
     testImplementation(libs.junit)
