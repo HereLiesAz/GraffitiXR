@@ -287,6 +287,13 @@ cv::Point3f MobileGS::getCameraWorldPosition() const {
 }
 
 void MobileGS::sortThreadFunc() {
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        gJvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+
     JniThreadAttacher attacher; // Explicitly ties JVM to thread scope
 
     while (mSortRunning) {
@@ -325,6 +332,10 @@ void MobileGS::sortThreadFunc() {
             mDrawIndices = std::move(indices);
             mIndicesDirty = true;
         }
+    }
+
+    if (attached && gJvm) {
+        gJvm->DetachCurrentThread();
     }
 }
 
@@ -386,6 +397,13 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
 void MobileGS::relocThreadFunc() {
     JniThreadAttacher attacher; // Explicitly ties JVM to thread scope
 
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        gJvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+
     while (mRelocRunning) {
         cv::Mat relocFrame;
         cv::Mat fpColor;
@@ -413,6 +431,20 @@ void MobileGS::relocThreadFunc() {
                 mFingerprintRequested = false;
                 doFp = true;
             }
+
+            if (mRelocRequested) {
+                relocFrame = mRelocColorFrame.clone();
+                mRelocRequested = false;
+                doReloc = true;
+            }
+            if (mFingerprintRequested) {
+                fpColor = mFingerprintColorFrame.clone();
+                fpDepth = mFingerprintDepthFrame.clone();
+                memcpy(fpView, mFingerprintViewMatrix, 16 * sizeof(float));
+                memcpy(fpProj, mFingerprintProjMatrix, 16 * sizeof(float));
+                mFingerprintRequested = false;
+                doFp = true;
+            }
         }
 
         if (doReloc && !relocFrame.empty()) {
@@ -420,7 +452,17 @@ void MobileGS::relocThreadFunc() {
         }
         if (doFp && !fpColor.empty() && !fpDepth.empty()) {
             tryUpdateFingerprint(fpColor, fpDepth, fpView, fpProj);
+
+        if (doReloc && !relocFrame.empty()) {
+            runPnPMatch(relocFrame);
         }
+        if (doFp && !fpColor.empty() && !fpDepth.empty()) {
+            tryUpdateFingerprint(fpColor, fpDepth, fpView, fpProj);
+        }
+    }
+
+    if (attached && gJvm) {
+        gJvm->DetachCurrentThread();
     }
 }
 

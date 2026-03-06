@@ -10,8 +10,28 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.hereliesaz.graffitixr.common.util.YuvToRgbConverter
+import com.hereliesaz.graffitixr.feature.ar.util.DualAnalyzer
+import java.nio.ByteBuffer
+import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+
+class CameraController {
+    internal var onCaptureRequested: (() -> Unit)? = null
+    private var cameraControl: CameraControl? = null
+
+    fun takePicture() {
+        onCaptureRequested?.invoke()
+    }
+
+    /** Called by CameraPreview once the camera is bound. */
+    internal fun onCameraReady(control: CameraControl) {
+        cameraControl = control
+    }
 
 typealias CameraController = LifecycleCameraController
 
@@ -37,7 +57,7 @@ fun CameraPreview(
     modifier: Modifier = Modifier,
     arViewModel: ArViewModel
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner, controller) {
         controller.bindToLifecycle(lifecycleOwner)

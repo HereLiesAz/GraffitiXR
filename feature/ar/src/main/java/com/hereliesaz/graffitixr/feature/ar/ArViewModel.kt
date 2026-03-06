@@ -36,6 +36,8 @@ class ArViewModel @Inject constructor(
 
     private var arSession: Session? = null
     private var arRenderer: ArRenderer? = null
+    private val _isCameraInUseByAr = MutableStateFlow(false)
+    val isCameraInUseByAr = _isCameraInUseByAr.asStateFlow()
 
     fun setArMode(isActive: Boolean, context: Context) {
         if (isActive) {
@@ -50,6 +52,12 @@ class ArViewModel @Inject constructor(
                             cameraConfig = supportedConfigs[0]
                         }
 
+    private var isActivityResumed = false
+    private var isInArMode = false
+    private var isSessionResumed = false
+
+    private val sessionMutex = Mutex()
+    private var isDestroying = false
                         val config = Config(this).apply {
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                             depthMode = Config.DepthMode.AUTOMATIC
@@ -78,6 +86,40 @@ class ArViewModel @Inject constructor(
     }
 
     fun onActivityPaused() {
+        viewModelScope.launch {
+            sessionMutex.withLock {
+                isActivityResumed = false
+                updateSessionStateLocked()
+            }
+        }
+    }
+
+    fun setArMode(enabled: Boolean, context: Context) {
+        viewModelScope.launch {
+            sessionMutex.withLock {
+                if (isInArMode == enabled) return@withLock
+                isInArMode = enabled
+
+                if (enabled) {
+                    isDestroying = false
+                    initArSessionLocked(context)
+                    updateSessionStateLocked()
+                } else {
+                    isDestroying = true
+                    performFullCleanupLocked()
+                    isDestroying = false
+                }
+            }
+        }
+    }
+
+    private fun updateSessionStateLocked() {
+        val shouldBeRunning = isActivityResumed && isInArMode && !isDestroying
+        if (shouldBeRunning && !isSessionResumed) {
+            resumeArSessionInternal()
+        } else if (!shouldBeRunning && isSessionResumed) {
+            pauseArSessionInternal()
+        }
         arSession?.pause()
     }
 
@@ -87,6 +129,24 @@ class ArViewModel @Inject constructor(
 
         arRenderer?.destroy()
         arRenderer = null
+    private fun initArSessionLocked(context: Context) {
+        if (session == null) {
+            try {
+                _isCameraInUseByAr.value = true
+                session = Session(context)
+                val config = session!!.config
+                config.depthMode = Config.DepthMode.AUTOMATIC
+                config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+
+                try {
+                    val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
+                    val offMode = flashlightModeClass.getField("OFF").get(null)
+                    val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
+                    method.invoke(config, offMode)
+                } catch (e: Exception) {}
+
+                session!!.configure(config)
+                renderer?.attachSession(session)
 
         // Banish the closure to the IO thread so the MediaPipe graph
         // doesn't deadlock the Main Thread waiting for the GL context to drop.
@@ -97,6 +157,62 @@ class ArViewModel @Inject constructor(
                 dyingSession?.close()
             } catch (e: Exception) {
                 e.printStackTrace()
+                viewModelScope.launch(Dispatchers.IO) {
+                    slamManager.loadSuperPoint(context.assets)
+                }
+            } catch (e: Throwable) {
+                _isCameraInUseByAr.value = false
+            }
+        }
+    }
+
+    private fun resumeArSessionInternal() {
+        val s = session ?: return
+        try {
+            s.resume()
+            isSessionResumed = true
+            _isCameraInUseByAr.value = true
+            slamManager.setRelocEnabled(true)
+            renderer?.attachSession(s)
+        } catch (e: CameraNotAvailableException) {
+        } catch (e: IllegalStateException) {
+        } catch (e: Exception) {}
+    }
+
+    private fun pauseArSessionInternal() {
+        if (!isSessionResumed) return
+        isSessionResumed = false
+        try {
+            renderer?.attachSession(null)
+            session?.pause()
+            slamManager.setRelocEnabled(false)
+        } catch (e: Exception) {}
+    }
+
+    private suspend fun performFullCleanupLocked() {
+        renderer?.attachSession(null)
+        if (isSessionResumed) {
+            try { session?.pause() } catch (e: Exception) {}
+            isSessionResumed = false
+        }
+        delay(500)
+        val s = session
+        session = null
+        s?.let {
+            try { it.close() } catch (e: Exception) {}
+        }
+        _isCameraInUseByAr.value = false
+        slamManager.setRelocEnabled(false)
+    }
+
+    fun destroyArSession() {
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            sessionMutex.withLock {
+                if (session == null) return@withLock
+                isInArMode = false
+                isDestroying = true
+                performFullCleanupLocked()
+                isDestroying = false
             }
         }
     }
@@ -106,6 +222,29 @@ class ArViewModel @Inject constructor(
             isScanning = isTracking,
             splatCount = splatCount
         )}
+    fun setTrackingState(isTracking: Boolean, splatCount: Int) {
+        _uiState.update { it.copy(isScanning = isTracking, splatCount = splatCount) }
+    }
+
+    fun setTempCapture(bitmap: Bitmap) {
+        _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
+    }
+
+    fun onTargetCaptured(bitmap: Bitmap, depthBuffer: ByteBuffer?, width: Int, height: Int, intrinsics: FloatArray?) {
+        _uiState.update {
+            it.copy(
+                tempCaptureBitmap = bitmap,
+                targetDepthBuffer = depthBuffer,
+                targetDepthWidth = width,
+                targetDepthHeight = height,
+                targetIntrinsics = intrinsics,
+                isCaptureRequested = false
+            )
+        }
+    }
+
+    fun onCaptureConsumed() {
+        _uiState.update { it.copy(tempCaptureBitmap = null) }
     }
 
     fun setUnwarpPoints(points: List<Offset>) {
@@ -132,12 +271,41 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(maskPath = path) }
     }
 
+    fun requestCapture() {
+        _uiState.update { it.copy(isCaptureRequested = true) }
+    }
+
+    fun onCaptureRequestHandled() {
+        _uiState.update { it.copy(isCaptureRequested = false) }
+    }
+
+    fun captureKeyframe() {}
+
+    fun toggleFlashlight() {
+        val isOn = !_uiState.value.isFlashlightOn
+        _uiState.update { it.copy(isFlashlightOn = isOn) }
+        renderer?.updateFlashlight(isOn)
+    }
+
+    fun ensureEngineInitialized() {
+        slamManager.ensureInitialized()
+    }
+
+    fun onCameraFrameForStereo(buffer: ByteBuffer, width: Int, height: Int) {
+        stereoProvider.submitFrame(buffer, width, height)
+    }
+
     fun updateLightLevel(level: Float) {
         _uiState.update { it.copy(lightLevel = level) }
     }
 
     fun toggleFlashlight() {
         _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
+    fun attachSessionToRenderer(arRenderer: ArRenderer?) {
+        this.renderer = arRenderer
+        if (arRenderer != null && session != null && isSessionResumed) {
+            arRenderer.attachSession(session)
+        }
     }
 
     fun captureKeyframe() {

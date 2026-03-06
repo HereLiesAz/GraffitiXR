@@ -108,7 +108,7 @@ class MainActivity : ComponentActivity() {
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
-                val cameraController = rememberCameraController()
+                val cameraController = com.hereliesaz.graffitixr.feature.ar.rememberCameraController()
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
@@ -232,6 +232,18 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             mainViewModel.setCaptureStep(CaptureStep.MASK)
                                         }
+                                        val currentBitmap = arUiState.tempCaptureBitmap
+                                        if (currentBitmap != null && points.size == 4) {
+                                            lifecycleScope.launch(Dispatchers.Default) {
+                                                val unwarped = com.hereliesaz.graffitixr.common.util.ImageProcessor.unwarpImage(currentBitmap, points)
+                                                if (unwarped != null) {
+                                                    arViewModel.setTempCapture(unwarped)
+                                                }
+                                                mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                            }
+                                        } else {
+                                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                        }
                                     },
                                     onMaskConfirmed = { bitmap ->
                                         arViewModel.setTempCapture(bitmap)
@@ -342,7 +354,7 @@ class MainActivity : ComponentActivity() {
         val navStrings = NavStrings()
         val activeHighlightColor = when (editorUiState.activeRotationAxis) {
             RotationAxis.X -> Color.Cyan
-            RotationAxis.Y -> Color(0xFFFF69B4)
+            RotationAxis.Y -> Color(0xFFFF69B4) // Pink
             RotationAxis.Z -> Color.Green
         }
 
@@ -399,6 +411,7 @@ class MainActivity : ComponentActivity() {
                 nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
                 onClick = {
                     editorViewModel.onLayerActivated(layer.id)
+                    // Automatically activate a drawing tool when opening the layer options, locking out transformations
                     editorViewModel.setActiveTool(Tool.BRUSH)
                 },
                 onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
@@ -481,6 +494,88 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToLibrary() }
         azRailSubItem(id = "export_img", hostId = "project_host", text = "Export", shape = AzButtonShape.NONE) { editorViewModel.exportImage() }
         azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", shape = AzButtonShape.NONE) { showHelpDialog = true }
+                        azRailItem(
+                            id = "size_${layer.id}",
+                            text = "Size",
+                            shape = AzButtonShape.RECTANGLE,
+                            content = AzComposableContent {
+                                val liveState by editorViewModel.uiState.collectAsState()
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .pointerInput(Unit) {
+                                            detectVerticalDragGestures { change, dragAmount ->
+                                                change.consume()
+                                                val currentSize = editorViewModel.uiState.value.brushSize
+                                                editorViewModel.setBrushSize(currentSize - dragAmount * 0.5f)
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size((liveState.brushSize / 2f).coerceIn(4f, 64f).dp)
+                                            .background(Color.White, CircleShape)
+                                    )
+                                }
+                            }
+                        )
+                    }
+
+                    if (layer.isSketch) {
+                        azRailItem(id = "brush_${layer.id}", text = "Brush", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
+                        azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                        azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                        azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                        azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
+
+                        addSizeItem()
+
+                        azRailItem(id = "color_${layer.id}", text = "Color", shape = AzButtonShape.RECTANGLE, content = editorUiState.activeColor) {
+                            activate()
+                            editorViewModel.setActiveTool(Tool.COLOR)
+                            editorViewModel.onColorClicked()
+                        }
+                        azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
+                        // Setting Tool.NONE enables image transformations and disables editing
+                        azRailItem(id = "move_${layer.id}", text = "Transform", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.NONE) }
+                    } else {
+                        azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
+                        azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onLineDrawingClicked() }
+                        azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
+                        azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                        azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                        azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                        azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
+
+                        addSizeItem()
+
+                        azRailItem(id = "balance_${layer.id}", text = "Balance", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onBalanceClicked() }
+                        // Setting Tool.NONE enables image transformations and disables editing
+                        azRailItem(id = "move_${layer.id}", text = "Transform", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.NONE) }
+                    }
+                }
+            ) {
+                // FIXED: Changed 'text' to 'hint' for the AzNavRail inputItem parameter.
+                inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
+                listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
+                listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
+                listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
+                listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
+            }
+        }
+
+        azDivider()
+
+        azRailHostItem(id = "project_host", text = navStrings.project)
+        azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, shape = AzButtonShape.NONE) { showSaveDialog = true }
+        azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) { dashboardViewModel.navigateToLibrary() }
+
+        // Export menu
+        azRailSubItem(id = "export_img", hostId = "project_host", text = "Export", shape = AzButtonShape.NONE) { editorViewModel.exportImage() }
+
+        // Adding the Help option beneath Project
+        azRailSubItem(id = "help_sub", hostId = "project_host", text = "Help", shape = AzButtonShape.NONE) { showHelpDialog = true }
 
         azDivider()
 
@@ -488,6 +583,14 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
         }
 
+        azDivider()
+
+        if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
+            azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
+        }
+
+        azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
+        // Touch Lock allows placing physical material against the screen (locks out transformations)
         azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
     }
 }

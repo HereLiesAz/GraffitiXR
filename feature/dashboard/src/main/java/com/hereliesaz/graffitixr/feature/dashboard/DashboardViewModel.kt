@@ -90,9 +90,9 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isCheckingForUpdate = true, updateStatusMessage = "Checking...") }
             delay(1500) // Simulate network delay
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
-                    isCheckingForUpdate = false, 
+                    isCheckingForUpdate = false,
                     updateStatusMessage = "You are on the latest experimental build."
                 )
             }

@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt
 package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
@@ -64,12 +63,35 @@ fun MainScreen(
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
             if (uiState.editorMode == EditorMode.AR) {
+    if (uiState.editorMode == EditorMode.TRACE) {
+        // True black background for trace mode to eliminate glare
+        Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
+    } else if (hasCameraPermission) {
+        when (uiState.editorMode) {
+            EditorMode.AR -> {
                 var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-                DisposableEffect(Unit) {
+                // Properly decouple the AR mode toggle from the UI surface instantiation loop
+                DisposableEffect(uiState.editorMode) {
                     arViewModel.setArMode(true, context)
                     onDispose {
                         arViewModel.setArMode(false, context)
+                    }
+                }
+
+                // Handle GL context pausing based solely on activity lifecycle events
+                DisposableEffect(lifecycleOwner, glView) {
+                    if (glView == null) return@DisposableEffect onDispose {}
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_RESUME -> glView?.onResume()
+                            Lifecycle.Event.ON_PAUSE -> glView?.onPause()
+                            else -> {}
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
                     }
                 }
 
@@ -152,7 +174,9 @@ fun MainScreen(
                     arViewModel = arViewModel
                 )
             }
+            else -> {}
         }
+    }
 
         uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }?.let { bmp ->
             Image(
@@ -208,6 +232,8 @@ fun MainScreen(
                     )
                 }
             }
+        }
+    }
 
             if (!isTouchLocked && !isImageLocked && activeLayer != null) {
                 if (uiState.activeTool != Tool.NONE) {

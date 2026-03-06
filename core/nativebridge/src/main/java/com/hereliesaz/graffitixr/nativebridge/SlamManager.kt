@@ -1,4 +1,3 @@
-// FILE: core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt
 package com.hereliesaz.graffitixr.nativebridge
 
 import android.graphics.Bitmap
@@ -22,6 +21,11 @@ class SlamManager @Inject constructor() {
         }
     }
 
+    fun getSplatCount(): Int = nativeGetSplatCount()
+    fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
+    fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
+    fun clearMap() = nativeClearMap()
+    fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
     fun initGl() {
         nativeInitGl()
     }
@@ -32,8 +36,12 @@ class SlamManager @Inject constructor() {
 
     fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
         nativeUpdateCamera(viewMatrix, projectionMatrix)
+    fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int) {
+        if (depthBuffer.isDirect) nativeFeedArCoreDepth(depthBuffer, width, height, rowStride)
     }
 
+    fun feedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int) {
+        if (colorBuffer.isDirect) nativeFeedColorFrame(colorBuffer, width, height)
     fun draw() {
         nativeDraw()
     }
@@ -42,6 +50,8 @@ class SlamManager @Inject constructor() {
         return nativeProcessFrame(yuvData, width, height, poseMatrix, timestamp)
     }
 
+    fun feedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int) {
+        if (leftBuffer.isDirect && rightBuffer.isDirect) nativeFeedStereoData(leftBuffer, rightBuffer, width, height)
     fun getSplatCount(): Int {
         return nativeGetSplatCount()
     }
@@ -58,10 +68,19 @@ class SlamManager @Inject constructor() {
         nativeSaveModel(path)
     }
 
+    fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
     fun loadModel(path: String) {
         nativeLoadModel(path)
     }
 
+    // Advanced Image Editing Tools
+    fun applyLiquify(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float) = nativeApplyLiquify(bitmap, points, radius, intensity)
+    fun applyHeal(bitmap: Bitmap, points: FloatArray, radius: Float) = nativeApplyHeal(bitmap, points, radius)
+    fun applyBurnDodge(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float, isBurn: Boolean) = nativeApplyBurnDodge(bitmap, points, radius, intensity, isBurn)
+
+    private external fun nativeGetSplatCount(): Int
+    private external fun nativeUpdateAnchorTransform(transform: FloatArray)
+    private external fun nativeClearMap()
     fun setTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
         nativeSetTargetFingerprint(descriptorsData, rows, cols, type, points3d)
     }
@@ -100,6 +119,12 @@ class SlamManager @Inject constructor() {
     private external fun nativeClearMap()
     private external fun nativeSaveModel(path: String)
     private external fun nativeLoadModel(path: String)
+    private external fun nativeSetTargetFingerprint(descriptors: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray)
+    private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
+
+    private external fun nativeApplyLiquify(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float)
+    private external fun nativeApplyHeal(bitmap: Bitmap, points: FloatArray, radius: Float)
+    private external fun nativeApplyBurnDodge(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float, isBurn: Boolean)
     private external fun nativeSetTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray)
     private external fun nativeDestroy()
     private external fun nativeGenerateFingerprint(bitmap: Bitmap): Fingerprint?
