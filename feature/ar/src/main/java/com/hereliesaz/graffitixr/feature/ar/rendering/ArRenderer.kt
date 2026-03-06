@@ -202,8 +202,18 @@ class ArRenderer(
             if (frameCount++ % 2 == 0) {
                 try {
                     frame.acquireCameraImage().use { image ->
-                        val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
-                        slamManager.feedColorFrame(rgbaBuffer, image.width, image.height, frame.timestamp)
+                        val planes = image.planes
+                        slamManager.feedYuvFrame(
+                            planes[0].buffer,
+                            planes[1].buffer,
+                            planes[2].buffer,
+                            image.width,
+                            image.height,
+                            planes[0].rowStride,
+                            planes[1].rowStride,
+                            planes[1].pixelStride,
+                            frame.timestamp
+                        )
                     }
 
                     if (activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {

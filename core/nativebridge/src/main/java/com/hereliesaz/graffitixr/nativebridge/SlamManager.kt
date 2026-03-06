@@ -47,6 +47,22 @@ class SlamManager @Inject constructor() {
         }
     }
 
+    fun feedYuvFrame(
+        yBuffer: ByteBuffer,
+        uBuffer: ByteBuffer,
+        vBuffer: ByteBuffer,
+        width: Int,
+        height: Int,
+        yStride: Int,
+        uvStride: Int,
+        uvPixelStride: Int,
+        timestampNs: Long
+    ) {
+        if (yBuffer.isDirect && uBuffer.isDirect && vBuffer.isDirect) {
+            nativeFeedYuvFrame(yBuffer, uBuffer, vBuffer, width, height, yStride, uvStride, uvPixelStride, timestampNs)
+        }
+    }
+
     fun feedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long) {
         if (colorBuffer.isDirect) {
             nativeFeedColorFrame(colorBuffer, width, height, timestampNs)
@@ -136,6 +152,17 @@ class SlamManager @Inject constructor() {
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int)
+    private external fun nativeFeedYuvFrame(
+        yBuffer: ByteBuffer,
+        uBuffer: ByteBuffer,
+        vBuffer: ByteBuffer,
+        width: Int,
+        height: Int,
+        yStride: Int,
+        uvStride: Int,
+        uvPixelStride: Int,
+        timestampNs: Long
+    )
     private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long)
     private external fun nativeApplyLiquify(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float)
     private external fun nativeApplyHeal(bitmap: Bitmap, points: FloatArray, radius: Float)

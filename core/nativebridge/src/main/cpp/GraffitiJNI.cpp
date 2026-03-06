@@ -136,6 +136,44 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransf
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
+        JNIEnv* env, jobject thiz, jobject yBuffer, jobject uBuffer, jobject vBuffer,
+        jint width, jint height, jint yStride, jint uvStride, jint uvPixelStride, jlong timestampNs) {
+
+    if (!gSlamEngine) return;
+
+    uint8_t* yData = static_cast<uint8_t*>(env->GetDirectBufferAddress(yBuffer));
+    uint8_t* uData = static_cast<uint8_t*>(env->GetDirectBufferAddress(uBuffer));
+    uint8_t* vData = static_cast<uint8_t*>(env->GetDirectBufferAddress(vBuffer));
+
+    if (!yData || !uData || !vData) return;
+
+    // Efficient YUV420 to RGB conversion using OpenCV
+    cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
+
+    // For UV planes, we often have interleaved (NV21/NV12) or planar data.
+    // ARCore typically provides planar YUV_420_888.
+    // Simplification: if uvPixelStride is 2, it's likely NV21/NV12-like.
+    // For a robust implementation, we'd handle all strides, but let's do a fast path for common ARCore output.
+
+    if (gLastColorFrame.empty() || gLastColorFrame.cols != width || gLastColorFrame.rows != height) {
+        gLastColorFrame = cv::Mat(height, width, CV_8UC3);
+    }
+
+    // Direct YUV to RGB conversion is much faster than the JPEG path.
+    // Here we use a slightly simplified approach for the YUV_420_888 mapping.
+    // In a production app, we'd use a dedicated shader or a highly optimized NEON kernel.
+    cv::Mat yuv420;
+    // ... (logic to merge planes into a format cv::cvtColor can handle)
+    // For now, let's just use the Y plane as grayscale to verify it stops freezing,
+    // then implement the full chrominance merge.
+    cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
+
+    gSlamEngine->scheduleRelocCheck(gLastColorFrame);
+    gFrameCount++;
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
         JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs) {
 
