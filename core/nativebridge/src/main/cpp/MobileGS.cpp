@@ -871,22 +871,17 @@ void MobileGS::updateCamera(float* viewMat, float* projMat) {
 
 void MobileGS::updateLightLevel(float level) {
     std::lock_guard<std::mutex> lock(mMutex);
-    // Automatically adjust feature detection sensitivity based on light level.
-    // In low light, we lower the detection threshold to find more features.
-    // In bright light, we raise it to avoid noisy/unstable points.
 
-    // Normal indoor light is ~50-100 lux. Outdoor is 10k+.
-    // ARCore pixelIntensity is usually [0, 1] but can be higher.
     float normalizedLight = std::clamp(level, 0.0f, 1.0f);
-
-    // Adjust ORB threshold (0-255, default 31)
     int orbThreshold = (normalizedLight < 0.2f) ? 10 : (normalizedLight > 0.8f ? 45 : 31);
-    mFeatureDetector = cv::ORB::create(500, 1.2f, 8, orbThreshold);
 
-    // Adjust SuperPoint threshold (default 0.005)
-    // We'll store this to be used in detect() if we were to expose it,
-    // but for now we'll just log the adjustment or apply to future frames.
-    LOGI("Auto-adjusting sensitivity: light=%.2f, ORB threshold=%d", level, orbThreshold);
+    // Only re-create if the threshold has actually changed to save CPU
+    static int lastThreshold = -1;
+    if (orbThreshold != lastThreshold) {
+        mFeatureDetector = cv::ORB::create(500, 1.2f, 8, orbThreshold);
+        lastThreshold = orbThreshold;
+        LOGI("Sensitivity adjusted: light=%.2f, new ORB threshold=%d", level, orbThreshold);
+    }
 }
 
 void MobileGS::setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d) {
