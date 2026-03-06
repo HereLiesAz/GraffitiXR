@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
-import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -113,7 +112,7 @@ class MainViewModel @Inject constructor(
             val currentProject = projectRepository.currentProject.value ?: return@launch
 
             // 1. Generate Fingerprint
-            val fp = ImageProcessingUtils.generateFingerprint(bitmap)
+            val fp = slamManager.generateFingerprint(bitmap) ?: return@launch
 
             // 2. Register with SLAM engine immediately
             slamManager.setTargetFingerprint(
