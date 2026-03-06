@@ -89,7 +89,7 @@ azMenuItem(
 azMenuItem(id = "multi-line", text = "This is a\nmulti-line item", route = "multi-line")
 
 // Help trigger rail item
-azHelpRailItem(id = "help-trigger", text = "Get Help")
+azHelpRailItem(id = "help-trigger", text = "Help")
 
 // Help trigger as a sub-item
 azHelpSubItem(id = "help-sub-trigger", hostId = "rail-host", text = "Get Help Here")

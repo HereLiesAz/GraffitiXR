@@ -407,9 +407,7 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, shape = AzButtonShape.NONE) {
             editorViewModel.exportImage()
         }
-        azRailSubItem(id = "help_sub", hostId = "project_host", text = navStrings.help, shape = AzButtonShape.NONE) {
-            showHelpDialog = true
-        }
+        azHelpSubItem(id = "help_sub", hostId = "project_host", text = navStrings.help, shape = AzButtonShape.NONE)
         azRailSubItem(id = "settings", hostId = "project_host", text = navStrings.settings, shape = AzButtonShape.NONE) {
             showSettings = true
         }
