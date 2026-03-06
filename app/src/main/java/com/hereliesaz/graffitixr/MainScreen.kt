@@ -59,175 +59,178 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
-    if (uiState.editorMode == EditorMode.TRACE) {
-        // True black background for trace mode to eliminate glare
-        Spacer(modifier = Modifier.fillMaxSize().background(Color.Black))
-    } else if (hasCameraPermission && isCameraActive) {
-        // Strict separation: Only mount the AR view if we are actually in AR mode,
-        // and only if the camera is permitted to be active (e.g. not behind the library).
-        if (uiState.editorMode == EditorMode.AR) {
-            var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
+    // Foundational Base Layer:
+    // This guarantees that ANY empty space, inactive camera, or mode without a background
+    // (like Trace mode or an uninitialized AR view) will always fall back to pure black.
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
-            DisposableEffect(Unit) {
-                arViewModel.setArMode(true, context)
-                onDispose {
-                    arViewModel.setArMode(false, context)
-                }
-            }
+        if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
+            // Strict separation: Only mount the AR view if we are actually in AR mode,
+            // and only if the camera is permitted to be active (e.g. not behind the library).
+            if (uiState.editorMode == EditorMode.AR) {
+                var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
-            DisposableEffect(lifecycleOwner, glView) {
-                if (glView == null) return@DisposableEffect onDispose {}
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_RESUME -> glView?.onResume()
-                        Lifecycle.Event.ON_PAUSE -> glView?.onPause()
-                        else -> {}
+                DisposableEffect(Unit) {
+                    arViewModel.setArMode(true, context)
+                    onDispose {
+                        arViewModel.setArMode(false, context)
                     }
                 }
-                lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose {
-                    lifecycleOwner.lifecycle.removeObserver(observer)
+
+                DisposableEffect(lifecycleOwner, glView) {
+                    if (glView == null) return@DisposableEffect onDispose {}
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_RESUME -> glView?.onResume()
+                            Lifecycle.Event.ON_PAUSE -> glView?.onPause()
+                            else -> {}
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
+
+                LaunchedEffect(arUiState.isFlashlightOn) {
+                    rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
+                }
+
+                AndroidView(
+                    factory = { ctx ->
+                        val renderer = ArRenderer(
+                            context = ctx,
+                            slamManager = slamManager,
+                            isCaptureRequested = { arUiState.isCaptureRequested },
+                            onTargetCaptured = { bmp, depth, w, h, int ->
+                                arViewModel.onTargetCaptured(bmp, depth, w, h, int)
+                            },
+                            onTrackingUpdated = { isTracking, splatCount ->
+                                arViewModel.setTrackingState(isTracking, splatCount)
+                            }
+                        )
+                        rendererRef.value = renderer
+                        arViewModel.attachSessionToRenderer(renderer)
+                        onRendererCreated(renderer)
+                        val view = GLSurfaceView(ctx).apply {
+                            setEGLContextClientVersion(3)
+                            setZOrderMediaOverlay(true)
+                            holder.setFormat(PixelFormat.TRANSLUCENT)
+                            setRenderer(renderer)
+                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                        }
+                        glView = view
+                        view
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (uiState.editorMode == EditorMode.OVERLAY) {
+                LaunchedEffect(arUiState.isFlashlightOn) {
+                    cameraController.enableTorch(arUiState.isFlashlightOn)
+                }
+
+                // Guaranteed teardown for CameraX hardware locks
+                DisposableEffect(Unit) {
+                    onDispose {
+                        try {
+                            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+                            val provider = cameraProviderFuture.get()
+                            provider.unbindAll()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+
+                CameraPreview(
+                    controller = cameraController,
+                    onPhotoCaptured = { arViewModel.setTempCapture(it) },
+                    onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
+                    onLightUpdate = arViewModel::updateLightLevel,
+                    modifier = Modifier.fillMaxSize(),
+                    arViewModel = arViewModel
+                )
+            }
+        }
+
+        uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }?.let { bmp ->
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = "Background Mockup",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "tap") {
+                if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+                    if (uiState.activeTool == Tool.NONE) {
+                        detectTapGestures(onDoubleTap = { editorViewModel.onCycleRotationAxis() })
+                    }
+                }
+            }
+            .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "transform") {
+                if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+                    if (uiState.activeTool == Tool.NONE) {
+                        coroutineScope {
+                            detectTransformGestures { _, pan, zoom, rotation ->
+                                editorViewModel.onTransformGesture(pan, zoom, rotation)
+                            }
+                        }
+                    }
+                }
+            }
+        ) {
+            uiState.layers.filter { it.isVisible }.forEach { layer ->
+                layer.bitmap?.let { bmp ->
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = layer.offset.x
+                                translationY = layer.offset.y
+                                scaleX = layer.scale
+                                scaleY = layer.scale
+                                rotationX = layer.rotationX
+                                rotationY = layer.rotationY
+                                rotationZ = layer.rotationZ
+                                alpha = layer.opacity
+                                transformOrigin = TransformOrigin.Center
+                                blendMode = layer.blendMode
+                                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                            },
+                        contentScale = ContentScale.Fit
+                    )
                 }
             }
 
-            LaunchedEffect(arUiState.isFlashlightOn) {
-                rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
-            }
-
-            AndroidView(
-                factory = { ctx ->
-                    val renderer = ArRenderer(
-                        context = ctx,
-                        slamManager = slamManager,
-                        isCaptureRequested = { arUiState.isCaptureRequested },
-                        onTargetCaptured = { bmp, depth, w, h, int ->
-                            arViewModel.onTargetCaptured(bmp, depth, w, h, int)
-                        },
-                        onTrackingUpdated = { isTracking, splatCount ->
-                            arViewModel.setTrackingState(isTracking, splatCount)
+            if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+                if (uiState.activeTool != Tool.NONE) {
+                    DrawingCanvas(
+                        activeTool = uiState.activeTool,
+                        brushSize = uiState.brushSize,
+                        activeColor = uiState.activeColor,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = activeLayer.offset.x
+                                translationY = activeLayer.offset.y
+                                scaleX = activeLayer.scale
+                                scaleY = activeLayer.scale
+                                rotationX = activeLayer.rotationX
+                                rotationY = activeLayer.rotationY
+                                rotationZ = activeLayer.rotationZ
+                                transformOrigin = TransformOrigin.Center
+                            },
+                        onPathFinished = { path, _, size ->
+                            editorViewModel.onDrawingPathFinished(path, size)
                         }
                     )
-                    rendererRef.value = renderer
-                    arViewModel.attachSessionToRenderer(renderer)
-                    onRendererCreated(renderer)
-                    val view = GLSurfaceView(ctx).apply {
-                        setEGLContextClientVersion(3)
-                        setZOrderMediaOverlay(true)
-                        holder.setFormat(PixelFormat.TRANSLUCENT)
-                        setRenderer(renderer)
-                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                    }
-                    glView = view
-                    view
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        } else if (uiState.editorMode == EditorMode.OVERLAY) {
-            LaunchedEffect(arUiState.isFlashlightOn) {
-                cameraController.enableTorch(arUiState.isFlashlightOn)
-            }
-
-            // Guaranteed teardown for CameraX hardware locks
-            DisposableEffect(Unit) {
-                onDispose {
-                    try {
-                        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                        val provider = cameraProviderFuture.get()
-                        provider.unbindAll()
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
                 }
-            }
-
-            CameraPreview(
-                controller = cameraController,
-                onPhotoCaptured = { arViewModel.setTempCapture(it) },
-                onAnalyzerFrame = arViewModel::onCameraFrameForStereo,
-                onLightUpdate = arViewModel::updateLightLevel,
-                modifier = Modifier.fillMaxSize(),
-                arViewModel = arViewModel
-            )
-        }
-    }
-
-    uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }?.let { bmp ->
-        Image(
-            bitmap = bmp.asImageBitmap(),
-            contentDescription = "Background Mockup",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-    }
-
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "tap") {
-            if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-                if (uiState.activeTool == Tool.NONE) {
-                    detectTapGestures(onDoubleTap = { editorViewModel.onCycleRotationAxis() })
-                }
-            }
-        }
-        .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isTouchLocked, "transform") {
-            if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-                if (uiState.activeTool == Tool.NONE) {
-                    coroutineScope {
-                        detectTransformGestures { _, pan, zoom, rotation ->
-                            editorViewModel.onTransformGesture(pan, zoom, rotation)
-                        }
-                    }
-                }
-            }
-        }
-    ) {
-        uiState.layers.filter { it.isVisible }.forEach { layer ->
-            layer.bitmap?.let { bmp ->
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            translationX = layer.offset.x
-                            translationY = layer.offset.y
-                            scaleX = layer.scale
-                            scaleY = layer.scale
-                            rotationX = layer.rotationX
-                            rotationY = layer.rotationY
-                            rotationZ = layer.rotationZ
-                            alpha = layer.opacity
-                            transformOrigin = TransformOrigin.Center
-                            blendMode = layer.blendMode
-                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                        },
-                    contentScale = ContentScale.Fit
-                )
-            }
-        }
-
-        if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-            if (uiState.activeTool != Tool.NONE) {
-                DrawingCanvas(
-                    activeTool = uiState.activeTool,
-                    brushSize = uiState.brushSize,
-                    activeColor = uiState.activeColor,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            translationX = activeLayer.offset.x
-                            translationY = activeLayer.offset.y
-                            scaleX = activeLayer.scale
-                            scaleY = activeLayer.scale
-                            rotationX = activeLayer.rotationX
-                            rotationY = activeLayer.rotationY
-                            rotationZ = activeLayer.rotationZ
-                            transformOrigin = TransformOrigin.Center
-                        },
-                    onPathFinished = { path, _, size ->
-                        editorViewModel.onDrawingPathFinished(path, size)
-                    }
-                )
             }
         }
     }
