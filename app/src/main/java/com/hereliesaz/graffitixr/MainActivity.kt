@@ -232,18 +232,6 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             mainViewModel.setCaptureStep(CaptureStep.MASK)
                                         }
-                                        val currentBitmap = arUiState.tempCaptureBitmap
-                                        if (currentBitmap != null && points.size == 4) {
-                                            lifecycleScope.launch(Dispatchers.Default) {
-                                                val unwarped = com.hereliesaz.graffitixr.common.util.ImageProcessor.unwarpImage(currentBitmap, points)
-                                                if (unwarped != null) {
-                                                    arViewModel.setTempCapture(unwarped)
-                                                }
-                                                mainViewModel.setCaptureStep(CaptureStep.MASK)
-                                            }
-                                        } else {
-                                            mainViewModel.setCaptureStep(CaptureStep.MASK)
-                                        }
                                     },
                                     onMaskConfirmed = { bitmap ->
                                         arViewModel.setTempCapture(bitmap)
@@ -583,14 +571,6 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
         }
 
-        azDivider()
-
-        if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
-            azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
-        }
-
-        azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
-        // Touch Lock allows placing physical material against the screen (locks out transformations)
         azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
     }
 }
