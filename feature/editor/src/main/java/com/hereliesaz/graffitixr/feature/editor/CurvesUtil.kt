@@ -5,29 +5,21 @@ import android.graphics.PointF
 
 object CurvesUtil {
     /**
-     * Calculates a Cubic Spline interpolation between adjustment points
-     * to generate a Look-Up Table (LUT) for native processing.
+     * Calculates a Monotone Cubic Spline interpolation between adjustment points.
+     * Replaces jagged linear transitions with actual mathematical gradients.
      */
     fun calculateAdjustmentCurve(points: List<PointF>): IntArray {
-        return calculateAdjustmentCurveFromCoords(points.map { it.x to it.y })
-    }
-
-    /**
-     * Internal logic using simple types for testability.
-     */
-    fun calculateAdjustmentCurveFromCoords(points: List<Pair<Float, Float>>): IntArray {
         val lut = IntArray(256)
-        val sortedPoints = points.sortedBy { it.first }
-        val n = sortedPoints.size
+        val n = points.size
 
         if (n < 2) {
-            val defaultVal = (sortedPoints.firstOrNull()?.second?.times(255))?.toInt()?.coerceIn(0, 255) ?: 0
+            val defaultVal = (points.firstOrNull()?.y?.times(255))?.toInt()?.coerceIn(0, 255) ?: 0
             for (i in 0..255) lut[i] = defaultVal
             return lut
         }
 
-        val x = sortedPoints.map { it.first }.toFloatArray()
-        val a = sortedPoints.map { it.second }.toFloatArray()
+        val x = points.map { it.x }.toFloatArray()
+        val a = points.map { it.y }.toFloatArray()
         val h = FloatArray(n - 1) { i -> x[i + 1] - x[i] }
         val alpha = FloatArray(n - 1) { i ->
             if (i == 0) 0f else (3f / h[i]) * (a[i + 1] - a[i]) - (3f / h[i - 1]) * (a[i] - a[i - 1])

@@ -58,6 +58,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * The panopticon.
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -237,7 +240,7 @@ class MainActivity : ComponentActivity() {
                                     onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
                                     onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPoint(it) },
                                     onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
-                                    onUpdateMaskPath = { arViewModel.updateMaskPath(it) }
+                                    onUpdateMaskPath = { path -> path?.let { arViewModel.updateMaskPath(it) } }
                                 )
                             }
 
@@ -322,8 +325,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        arViewModel.destroyArSession()
-        if (isFinishing) slamManager.destroy()
+
+        // Grab the renderer reference if it exists
+        val renderer = renderRefState.value
+
+        if (renderer != null) {
+            // Signal the renderer to execute the AR session teardown
+            // safely within the GL thread before we kill the Activity
+            renderer.executeDestructionSafely {
+                arViewModel.destroyArSession()
+                if (isFinishing) slamManager.destroy()
+            }
+        } else {
+            // Fallback if the renderer wasn't initialized yet
+            arViewModel.destroyArSession()
+            if (isFinishing) slamManager.destroy()
+        }
     }
 
     private fun AzNavHostScope.configureRail(
@@ -393,6 +410,8 @@ class MainActivity : ComponentActivity() {
                 hostId = "design_host",
                 text = layer.name,
                 nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
+                keepNestedRailOpen = true, // Remains open until parent is tapped again
+
                 onClick = {
                     editorViewModel.onLayerActivated(layer.id)
                     editorViewModel.setActiveTool(Tool.BRUSH)

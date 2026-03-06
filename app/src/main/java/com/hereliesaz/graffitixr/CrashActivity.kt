@@ -1,93 +1,57 @@
-
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/crash/CrashActivity.kt
 package com.hereliesaz.graffitixr
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
+import android.app.Activity
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
+import androidx.core.net.toUri
 
-class CrashActivity : ComponentActivity() {
+class CrashActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val trace = intent.getStringExtra("STACK_TRACE") ?: "The void offers no explanation."
 
-        val stackTrace = intent.getStringExtra("EXTRA_STACK_TRACE") ?: "Unknown Error occurred."
+        val sanitizedTrace = preserveTheAutopsy(trace)
 
-        setContent {
-            MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "GraffitiXR Encountered an Error",
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "We apologize for the interruption. Helping us report this will make the app better for all artists.",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Spacer(modifier = Modifier.height(32.dp))
-                        Button(
-                            onClick = {
-                                copyToClipboard(stackTrace)
-                                reportIssue(stackTrace)
-                            }
-                        ) {
-                            Text("Copy Log & Report Issue on GitHub")
-                        }
-                    }
-                }
+        val uri = "https://github.com/hereliesaz/GraffitiXR/issues/new".toUri()
+            .buildUpon()
+            .appendQueryParameter("body", "```\n$sanitizedTrace\n```")
+            .build()
+
+        startActivity(Intent(Intent.ACTION_VIEW, uri))
+        finish()
+    }
+
+    private fun preserveTheAutopsy(trace: String): String {
+        if (trace.length <= 2000) return trace
+
+        val lines = trace.lines()
+        val topFrames = lines.take(15).joinToString("\n")
+
+        val causes = StringBuilder()
+        var parsingCause = false
+        var causeLines = 0
+
+        for (line in lines) {
+            if (line.trimStart().startsWith("Caused by:")) {
+                parsingCause = true
+                causeLines = 0
+                causes.append("\n...[FRAMEWORK NOISE EXCISED]...\n")
+            }
+            if (parsingCause && causeLines < 8) {
+                causes.append(line).append("\n")
+                causeLines++
+            } else if (parsingCause && causeLines == 8) {
+                parsingCause = false
             }
         }
-    }
 
-    private fun copyToClipboard(text: String) {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("Crash Log", text)
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(this, "Full crash log copied to clipboard!", Toast.LENGTH_LONG).show()
-    }
-
-    private fun reportIssue(body: String) {
-        val repoOwner = "HereLiesAz"
-        val repoName = "GraffitiXR"
-
-        // Prevent ActivityNotFoundException by keeping the URL under ~2000 chars,
-        // while preserving BOTH the top of the stack trace and the critical "Caused by" at the bottom.
-        val safeBody = if (body.length > 1500) {
-            val top = body.substring(0, 500)
-            val bottom = body.substring(body.length - 900)
-            "$top\n\n... [Log truncated for URL limit. Please paste the FULL log from your clipboard!] ...\n\n$bottom"
+        val finalTrace = if (causes.isEmpty()) {
+            trace.substring(0, 1000) + "\n\n...[AMPUTATED]...\n\n" + trace.substring(trace.length - 900)
         } else {
-            body
+            topFrames + causes.toString()
         }
 
-        val encodedBody = URLEncoder.encode(safeBody, StandardCharsets.UTF_8.toString())
-        val url = "https://github.com/$repoOwner/$repoName/issues/new?labels=crash&body=$encodedBody"
-
-        try {
-            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            startActivity(browserIntent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Could not open browser. Please paste the log manually.", Toast.LENGTH_LONG).show()
-        }
+        return if (finalTrace.length > 2000) finalTrace.substring(0, 1990) + "..." else finalTrace
     }
 }

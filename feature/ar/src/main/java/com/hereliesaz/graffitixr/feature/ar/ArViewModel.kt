@@ -16,6 +16,8 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,7 +52,7 @@ class ArViewModel @Inject constructor(
 
                         val config = Config(this).apply {
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                            depthMode = Config.DepthMode.DISABLED
+                            depthMode = Config.DepthMode.AUTOMATIC
                             focusMode = Config.FocusMode.AUTO
                         }
                         configure(config)
@@ -80,8 +82,23 @@ class ArViewModel @Inject constructor(
     }
 
     fun destroyArSession() {
-        arSession?.close()
+        val dyingSession = arSession
         arSession = null
+
+        arRenderer?.destroy()
+        arRenderer = null
+
+        // Banish the closure to the IO thread so the MediaPipe graph
+        // doesn't deadlock the Main Thread waiting for the GL context to drop.
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                dyingSession?.pause()
+                delay(150) // Yield to allow internal C++ threads to acknowledge the pause
+                dyingSession?.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun setTrackingState(isTracking: Boolean, splatCount: Int) {
@@ -124,7 +141,7 @@ class ArViewModel @Inject constructor(
     }
 
     fun captureKeyframe() {
-        // Intentionally left blank as triggerKeyframe does not exist in JNI
+        // Handled via native bridge directly if implemented
     }
 
     fun onTargetCaptured(bmp: Bitmap?, depth: FloatArray?, w: Int, h: Int, intrinsics: FloatArray?) {

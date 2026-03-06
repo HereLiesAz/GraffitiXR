@@ -1,3 +1,4 @@
+// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModelExt.kt
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.graphics.Bitmap
@@ -10,7 +11,11 @@ import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+private val writeMutex = Mutex()
 
 /**
  * Extension for EditorViewModel to seamlessly integrate the UI-layer 2D drawing tools.
@@ -56,8 +61,10 @@ fun EditorViewModel.applyStrokeToActiveLayer(stroke: List<Offset>, canvasSize: I
                 withContext(Dispatchers.IO) {
                     try {
                         val file = java.io.File(path)
-                        java.io.FileOutputStream(file).use { out ->
-                            processedBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                        writeMutex.withLock {
+                            java.io.FileOutputStream(file).use { out ->
+                                processedBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                            }
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
