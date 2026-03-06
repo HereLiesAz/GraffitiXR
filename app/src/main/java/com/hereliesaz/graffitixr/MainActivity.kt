@@ -391,6 +391,29 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
+        azRailHostItem(id = "project_host", text = navStrings.project)
+        azRailSubItem(id = "new", hostId = "project_host", text = navStrings.new, shape = AzButtonShape.NONE) {
+            dashboardViewModel.onNewProject(editorUiState.isRightHanded)
+            showLibrary = false
+        }
+        azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, shape = AzButtonShape.NONE) {
+            showSaveDialog = true
+        }
+        azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, shape = AzButtonShape.NONE) {
+            showLibrary = true
+        }
+        azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, shape = AzButtonShape.NONE) {
+            editorViewModel.exportImage()
+        }
+        azRailSubItem(id = "help_sub", hostId = "project_host", text = navStrings.help, shape = AzButtonShape.NONE) {
+            showHelpDialog = true
+        }
+        azRailSubItem(id = "settings", hostId = "project_host", text = navStrings.settings, shape = AzButtonShape.NONE) {
+            showSettings = true
+        }
+
+        azDivider()
+
         editorUiState.layers.reversed().forEach { layer ->
             azRailRelocItem(
                 id = "layer_${layer.id}",
