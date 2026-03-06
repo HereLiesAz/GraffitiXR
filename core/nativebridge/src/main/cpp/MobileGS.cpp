@@ -300,14 +300,7 @@ cv::Point3f MobileGS::getCameraWorldPosition() const {
 
 void MobileGS::sortThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 15);
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
-        gJvm->AttachCurrentThread(&env, nullptr);
-        attached = true;
-    }
-
-    JniThreadAttacher attacher; // Explicitly ties JVM to thread scope
+    JniThreadAttacher attacher;
 
     while (mSortRunning) {
         std::vector<cv::Point3f> positions;
@@ -319,13 +312,19 @@ void MobileGS::sortThreadFunc() {
             mSortCv.wait(lock, [this] { return mSortRequested || !mSortRunning; });
             if (!mSortRunning) break;
 
-            std::lock_guard<std::mutex> mainLock(mMutex);
-            currentCount = mPointCount;
-            positions.resize(currentCount);
-            for (int i = 0; i < currentCount; ++i) {
-                positions[i] = cv::Point3f(splatData[i].x, splatData[i].y, splatData[i].z);
+            {
+                std::lock_guard<std::mutex> mainLock(mMutex);
+                camPos = getCameraWorldPosition();
             }
-            camPos = getCameraWorldPosition();
+
+            {
+                std::lock_guard<std::mutex> mapLock(mMapMutex);
+                currentCount = mPointCount;
+                positions.resize(currentCount);
+                for (int i = 0; i < currentCount; ++i) {
+                    positions[i] = cv::Point3f(splatData[i].x, splatData[i].y, splatData[i].z);
+                }
+            }
             mSortRequested = false;
         }
 
@@ -345,10 +344,6 @@ void MobileGS::sortThreadFunc() {
             mDrawIndices = std::move(indices);
             mIndicesDirty = true;
         }
-    }
-
-    if (attached && gJvm) {
-        gJvm->DetachCurrentThread();
     }
 }
 
@@ -409,14 +404,7 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
 
 void MobileGS::relocThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 10);
-    JniThreadAttacher attacher; // Explicitly ties JVM to thread scope
-
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    if (gJvm && gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
-        gJvm->AttachCurrentThread(&env, nullptr);
-        attached = true;
-    }
+    JniThreadAttacher attacher;
 
     while (mRelocRunning) {
         cv::Mat relocFrame;
@@ -453,10 +441,6 @@ void MobileGS::relocThreadFunc() {
         if (doFp && !fpColor.empty() && !fpDepth.empty()) {
             tryUpdateFingerprint(fpColor, fpDepth, fpView, fpProj);
         }
-    }
-
-    if (attached && gJvm) {
-        gJvm->DetachCurrentThread();
     }
 }
 
@@ -631,7 +615,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     }
 }
 
-void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
+void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, bool isYuv) {
     if (!mMapRunning) return;
     {
         std::lock_guard<std::mutex> lock(mQueueMutex);
@@ -642,6 +626,7 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
         FrameData data;
         data.depth = depth.clone();
         data.color = color.clone();
+        data.isYuv = isYuv;
         memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
         memcpy(data.projMatrix, projMat, 16 * sizeof(float));
         mFrameQueue.push_back(std::move(data));
@@ -651,6 +636,7 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
 
 void MobileGS::mapThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 10);
+    JniThreadAttacher attacher;
     while (mMapRunning) {
         FrameData frame;
         {
@@ -660,13 +646,25 @@ void MobileGS::mapThreadFunc() {
             frame = std::move(mFrameQueue.front());
             mFrameQueue.erase(mFrameQueue.begin());
         }
-        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix);
+        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix, frame.isYuv);
     }
 }
 
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
-    std::unique_lock<std::mutex> lock(mMutex);
-    if (!mIsArCoreTracking || depth.empty() || color.empty() || !mCameraReady) return;
+void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, bool isYuv) {
+    bool isTrackingState = false;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (depth.empty() || color.empty() || !mCameraReady) return;
+        isTrackingState = mIsArCoreTracking;
+    }
+    if (!isTrackingState) return;
+
+    cv::Mat colorRGB;
+    if (isYuv) {
+        cv::cvtColor(color, colorRGB, cv::COLOR_YUV2RGB_NV21);
+    } else {
+        colorRGB = color;
+    }
 
     const float* V = viewMat;
     float fx = projMat[0];
@@ -681,7 +679,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     const float scaleY = (float)color.rows / depth.rows;
 
     bool mapModified = false;
-    int step = (depth.cols > 640) ? 8 : 2;
+    // Optimized step: 8 for high-res, 4 for 640x480
+    int step = (depth.cols > 640) ? 8 : 4;
 
     auto unproject = [&](int r, int c, float d) {
         float x_ndc = (c - halfW) / halfW;
@@ -690,11 +689,17 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     };
 
     // --- 1. Generate Splats from Depth Map ---
+    std::vector<std::pair<VoxelKey, Splat>> newVoxelUpdates;
+    newVoxelUpdates.reserve((depth.rows / step) * (depth.cols / step));
+
     for (int r = 0; r < depth.rows - step; r += step) {
+        const float* depthRow = depth.ptr<float>(r);
+        const float* depthRowD = depth.ptr<float>(r + step);
+
         for (int c = 0; c < depth.cols - step; c += step) {
-            float d = depth.at<float>(r, c);
-            float d_r = depth.at<float>(r, c + step);
-            float d_d = depth.at<float>(r + step, c);
+            float d = depthRow[c];
+            float d_r = depthRow[c + step];
+            float d_d = depthRowD[c];
 
             if (d > 0.1f && d < 5.0f && d_r > 0.1f && d_d > 0.1f) {
                 cv::Point3f p_cam = unproject(r, c, d);
@@ -722,49 +727,56 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                         static_cast<int>(std::floor(zw / VOXEL_SIZE))
                 };
 
-                cv::Vec3b col = color.at<cv::Vec3b>(static_cast<int>(r * scaleY), static_cast<int>(c * scaleX));
+                cv::Vec3b col = colorRGB.at<cv::Vec3b>(static_cast<int>(r * scaleY), static_cast<int>(c * scaleX));
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                auto it = mVoxelGrid.find(key);
-                if (it != mVoxelGrid.end()) {
-                    Splat& s = splatData[it->second];
-
-                    float colorDist = std::abs(s.r - r_f) + std::abs(s.g - g_f) + std::abs(s.b - b_f);
-                    float alpha = s.confidence / (s.confidence + 1.0f);
-
-                    if (colorDist > 0.8f) {
-                        s.confidence *= 0.5f;
-                        alpha = 0.2f;
-                    }
-
-                    s.x = s.x * alpha + xw * (1.0f - alpha);
-                    s.y = s.y * alpha + yw * (1.0f - alpha);
-                    s.z = s.z * alpha + zw * (1.0f - alpha);
-                    s.r = s.r * alpha + r_f * (1.0f - alpha);
-                    s.g = s.g * alpha + g_f * (1.0f - alpha);
-                    s.b = s.b * alpha + b_f * (1.0f - alpha);
-
-                    s.nx = s.nx * alpha + nx_w * (1.0f - alpha);
-                    s.ny = s.ny * alpha + ny_w * (1.0f - alpha);
-                    s.nz = s.nz * alpha + nz_w * (1.0f - alpha);
-                    float len = std::sqrt(s.nx*s.nx + s.ny*s.ny + s.nz*s.nz);
-                    if(len > 0) { s.nx/=len; s.ny/=len; s.nz/=len; }
-
-                    s.confidence = std::min(1.0f, s.confidence + 0.05f);
-                } else {
-                    splatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, nx_w, ny_w, nz_w, 1.5f});
-                    mVoxelGrid[key] = splatData.size() - 1;
-                }
+                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, nx_w, ny_w, nz_w, 1.5f}});
                 mapModified = true;
             }
         }
     }
 
-    if (splatData.size() >= MAX_SPLATS) {
-        pruneMap();
-    }
+    if (mapModified) {
+        std::lock_guard<std::mutex> mapLock(mMapMutex);
+        for (const auto& update : newVoxelUpdates) {
+            auto it = mVoxelGrid.find(update.first);
+            if (it != mVoxelGrid.end()) {
+                Splat& s = splatData[it->second];
+                const Splat& nu = update.second;
 
-    mPointCount = static_cast<int>(splatData.size());
+                float colorDist = std::abs(s.r - nu.r) + std::abs(s.g - nu.g) + std::abs(s.b - nu.b);
+                float alpha = s.confidence / (s.confidence + 1.0f);
+
+                if (colorDist > 0.8f) {
+                    s.confidence *= 0.5f;
+                    alpha = 0.2f;
+                }
+
+                s.x = s.x * alpha + nu.x * (1.0f - alpha);
+                s.y = s.y * alpha + nu.y * (1.0f - alpha);
+                s.z = s.z * alpha + nu.z * (1.0f - alpha);
+                s.r = s.r * alpha + nu.r * (1.0f - alpha);
+                s.g = s.g * alpha + nu.g * (1.0f - alpha);
+                s.b = s.b * alpha + nu.b * (1.0f - alpha);
+
+                s.nx = s.nx * alpha + nu.nx * (1.0f - alpha);
+                s.ny = s.ny * alpha + nu.ny * (1.0f - alpha);
+                s.nz = s.nz * alpha + nu.nz * (1.0f - alpha);
+                float len = std::sqrt(s.nx*s.nx + s.ny*s.ny + s.nz*s.nz);
+                if(len > 0) { s.nx/=len; s.ny/=len; s.nz/=len; }
+
+                s.confidence = std::min(1.0f, s.confidence + 0.05f);
+            } else {
+                splatData.push_back(update.second);
+                mVoxelGrid[update.first] = splatData.size() - 1;
+            }
+        }
+
+        if (splatData.size() >= MAX_SPLATS) {
+            pruneMap();
+        }
+        mPointCount = static_cast<int>(splatData.size());
+    }
 
     // --- 2. Generate Live Surface Mesh (Wireframe) ---
     std::vector<float> meshVertices;
@@ -791,7 +803,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         }
     }
 
-    // Connect valid neighboring vertices to form lines
     for (int r = 0; r < gridH - 1; ++r) {
         for (int c = 0; c < gridW - 1; ++c) {
             int idx = vIndex[r * gridW + c];
@@ -814,7 +825,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     // --- 3. Double buffer the GL data ---
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
-        mPendingSplatData = splatData;
+        if (mapModified) {
+            std::lock_guard<std::mutex> mapLock(mMapMutex);
+            mPendingSplatData = splatData;
+        }
         mPendingMeshVertices = std::move(meshVertices);
         mPendingMeshIndices = std::move(meshIndices);
         mGlDataDirty = true;
@@ -830,14 +844,13 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         mSortCv.notify_one();
     }
 
-    if (mIsArCoreTracking &&
-        (mFrameCounter - mLastFingerprintUpdateFrame) >= FINGERPRINT_UPDATE_INTERVAL) {
+    if (isTrackingState && (mFrameCounter - mLastFingerprintUpdateFrame) >= FINGERPRINT_UPDATE_INTERVAL) {
         {
             std::lock_guard<std::mutex> lk(mRelocMutex);
-            mFingerprintColorFrame = color.clone();
+            mFingerprintColorFrame = colorRGB.clone();
             mFingerprintDepthFrame = depth.clone();
-            memcpy(mFingerprintViewMatrix, mViewMatrix, 16 * sizeof(float));
-            memcpy(mFingerprintProjMatrix, mProjMatrix, 16 * sizeof(float));
+            memcpy(mFingerprintViewMatrix, viewMat, 16 * sizeof(float));
+            memcpy(mFingerprintProjMatrix, projMat, 16 * sizeof(float));
             mFingerprintRequested = true;
         }
         mRelocCv.notify_one();
@@ -846,6 +859,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 }
 
 void MobileGS::continuousOptimize() {
+    std::lock_guard<std::mutex> mapLock(mMapMutex);
     if (splatData.empty()) return;
 
     bool needsRebuild = false;
@@ -880,6 +894,7 @@ void MobileGS::continuousOptimize() {
 }
 
 void MobileGS::pruneMap() {
+    // Assumes mMapMutex is already held by caller (processDepthFrame)
     if (splatData.size() < MAX_SPLATS) return;
 
     const size_t evictCount = MAX_SPLATS / 10;
@@ -997,20 +1012,23 @@ void MobileGS::loadModel(const std::string& path) {
     in.close();
 
     mPointCount = numSplats;
-    mVoxelGrid.clear();
-    for (size_t i = 0; i < splatData.size(); ++i) {
-        const auto& s = splatData[i];
-        VoxelKey key{
-                static_cast<int>(std::floor(s.x / VOXEL_SIZE)),
-                static_cast<int>(std::floor(s.y / VOXEL_SIZE)),
-                static_cast<int>(std::floor(s.z / VOXEL_SIZE))
-        };
-        mVoxelGrid[key] = i;
+    {
+        std::lock_guard<std::mutex> mapLock(mMapMutex);
+        mVoxelGrid.clear();
+        for (size_t i = 0; i < splatData.size(); ++i) {
+            const auto& s = splatData[i];
+            VoxelKey key{
+                    static_cast<int>(std::floor(s.x / VOXEL_SIZE)),
+                    static_cast<int>(std::floor(s.y / VOXEL_SIZE)),
+                    static_cast<int>(std::floor(s.z / VOXEL_SIZE))
+            };
+            mVoxelGrid[key] = i;
+        }
     }
 
     if (mPointVbo != 0 && mPointCount > 0) {
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, splatData.size() * sizeof(Splat), splatData.data());
+        glBufferData(GL_ARRAY_BUFFER, splatData.size() * sizeof(Splat), splatData.data(), GL_DYNAMIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 }
@@ -1054,31 +1072,17 @@ void MobileGS::draw() {
 
     glEnable(GL_DEPTH_TEST);
 
-    // Apply Teleological Anchor to View
-    float va[16];
-    for (int col = 0; col < 4; col++) {
-        for (int row = 0; row < 4; row++) {
-            float s = 0;
-            for (int k = 0; k < 4; k++) s += mViewMatrix[k*4 + row] * mAnchorMatrix[col*4 + k];
-            va[col*4 + row] = s;
-        }
-    }
-
-    // Apply Projection
-    float mvp[16];
-    for (int col = 0; col < 4; col++) {
-        for (int row = 0; row < 4; row++) {
-            float s = 0;
-            for (int k = 0; k < 4; k++) s += mProjMatrix[k*4 + row] * va[col*4 + k];
-            mvp[col*4 + row] = s;
-        }
-    }
+    // Apply Teleological Anchor to View using GLM for speed
+    glm::mat4 V = glm::make_mat4(mViewMatrix);
+    glm::mat4 A = glm::make_mat4(mAnchorMatrix);
+    glm::mat4 P = glm::make_mat4(mProjMatrix);
+    glm::mat4 mvp = P * V * A;
 
     // --- 1. Draw Splats ---
     glUseProgram(mProgram);
 
     GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
-    glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp);
+    glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
 
     cv::Point3f camPos = getCameraWorldPosition();
     GLint camLoc = glGetUniformLocation(mProgram, "uCameraPos");
@@ -1125,7 +1129,7 @@ void MobileGS::draw() {
         glUseProgram(mMeshProgram);
 
         GLint meshMvpLoc = glGetUniformLocation(mMeshProgram, "uMvp");
-        glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, mvp);
+        glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
 
         GLint colorLoc = glGetUniformLocation(mMeshProgram, "uColor");
         glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f); // Cyan, 20% alpha

@@ -42,8 +42,31 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
     if (mNet.empty()) return false;
 
     // Build a float blob [1, 1, H, W] normalized to [0, 1]
+    // NEW: Downsample high-res input to 640x480 for real-time performance on mobile
+    cv::Mat input;
+    float scaleX = 1.0f, scaleY = 1.0f;
+    if (gray.cols > 640 || gray.rows > 480) {
+        // Ensure dimensions are multiples of 8 for SuperPoint architecture
+        int targetW = 640;
+        int targetH = 480;
+        cv::resize(gray, input, cv::Size(targetW, targetH), 0, 0, cv::INTER_AREA);
+        scaleX = (float)gray.cols / (float)targetW;
+        scaleY = (float)gray.rows / (float)targetH;
+    } else {
+        // Even for small images, ensure multiples of 8
+        int targetW = (gray.cols / 8) * 8;
+        int targetH = (gray.rows / 8) * 8;
+        if (targetW != gray.cols || targetH != gray.rows) {
+            cv::resize(gray, input, cv::Size(targetW, targetH), 0, 0, cv::INTER_AREA);
+            scaleX = (float)gray.cols / (float)targetW;
+            scaleY = (float)gray.rows / (float)targetH;
+        } else {
+            input = gray;
+        }
+    }
+
     cv::Mat f;
-    gray.convertTo(f, CV_32F, 1.0 / 255.0);
+    input.convertTo(f, CV_32F, 1.0 / 255.0);
     cv::Mat blob = cv::dnn::blobFromImage(f);  // NCHW
 
     try {
@@ -58,6 +81,7 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
         const cv::Mat* descPtr = nullptr;
         for (const cv::Mat& o : outputs) {
             if (o.dims < 4) continue;
+            // OpenCV NCHW: size[1] is channels
             if (o.size[1] == 65)  semiPtr = &o;
             if (o.size[1] == 256) descPtr = &o;
         }
@@ -68,6 +92,15 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
 
         kps.clear();
         extractKeypoints(*semiPtr, kps, scoreThresh, maxKps);
+
+        // Upscale keypoints back to original resolution
+        if (scaleX != 1.0f || scaleY != 1.0f) {
+            for (auto& kp : kps) {
+                kp.pt.x *= scaleX;
+                kp.pt.y *= scaleY;
+            }
+        }
+
         if (kps.empty()) return false;
 
         descs = cv::Mat();

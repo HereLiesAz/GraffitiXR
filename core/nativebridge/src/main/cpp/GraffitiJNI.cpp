@@ -127,10 +127,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEn
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateLightLevel(JNIEnv* env, jobject thiz, jfloat level) {
     if (gSlamEngine) {
-        // Automatically adjust feature detection sensitivity based on light level
-        // Lower light level -> lower threshold (more sensitive)
-        int threshold = (level < 20.0f) ? 10 : 31;
-        // This is a simplified example; a real implementation would update the ORB/SuperPoint parameters.
+        gSlamEngine->updateLightLevel(level);
     }
 }
 
@@ -182,12 +179,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         // We can use the V buffer for NV21/NV12 conversion.
         cv::Mat uvInterleaved(height / 2, width, CV_8UC1, vData, uvStride);
         uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
-        cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_NV21);
+        gLastColorFrame = yuv.clone(); // Keep as NV21 for pushFrame
     } else {
         cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
     }
 
-    gSlamEngine->scheduleRelocCheck(gLastColorFrame);
+    if (gLastColorFrame.type() == CV_8UC3) {
+        gSlamEngine->scheduleRelocCheck(gLastColorFrame);
+    } else if (uvPixelStride == 2) {
+        // For NV21, we'd need to convert to RGB for reloc check if not already done
+        cv::Mat rgb;
+        cv::cvtColor(gLastColorFrame, rgb, cv::COLOR_YUV2RGB_NV21);
+        gSlamEngine->scheduleRelocCheck(rgb);
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -232,7 +236,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
     }
 
     if (gHasCameraMatrices) {
-        gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix);
+        bool isYuv = (gLastColorFrame.rows > height); // Simplified check for NV21 buffer
+        gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, isYuv);
     }
 }
 
@@ -261,7 +266,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
         // Normalize disparity to metric depth (simplified)
         // Focal length and baseline would be required for true metric depth.
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0); // StereoSGBM uses 16x fixed point
-        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix);
+        bool isYuv = (gLastColorFrame.rows > height);
+        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, isYuv);
     }
 }
 

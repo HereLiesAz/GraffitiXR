@@ -41,8 +41,8 @@ public:
     void updateCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
-    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
-    void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
+    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, bool isYuv);
+    void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, bool isYuv);
 
     void setArCoreTrackingState(bool isTracking);
 
@@ -82,6 +82,7 @@ private:
     struct FrameData {
         cv::Mat depth;
         cv::Mat color;
+        bool isYuv = false;
         float viewMatrix[16];
         float projMatrix[16];
     };
