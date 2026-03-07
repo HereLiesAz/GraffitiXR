@@ -1,4 +1,4 @@
-// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+
 package com.hereliesaz.graffitixr
 
 import android.Manifest
@@ -103,6 +103,652 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            GraffitiXRTheme {
+                val navController = rememberNavController()
+
+                val mainViewModel: MainViewModel = hiltViewModel()
+                val editorViewModel: EditorViewModel = hiltViewModel()
+                val dashboardViewModel: DashboardViewModel = hiltViewModel()
+                val cameraController = rememberCameraController()
+
+                val editorUiState by editorViewModel.uiState.collectAsState()
+                val mainUiState by mainViewModel.uiState.collectAsState()
+                val arUiState by arViewModel.uiState.collectAsState()
+                val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
+
+                var isProcessing by remember { mutableStateOf(false) }
+
+                val currentTempCapture = arUiState.tempCaptureBitmap
+                val currentCaptureStep = mainUiState.captureStep
+                LaunchedEffect(currentTempCapture, currentCaptureStep) {
+                    if (currentTempCapture != null && currentCaptureStep == CaptureStep.CAPTURE) {
+                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                    }
+                }
+
+                LaunchedEffect(dashboardNavigation) {
+                    dashboardNavigation?.let { destination ->
+                        when (destination) {
+                            "project_library" -> showLibrary = true
+                            "settings" -> showSettings = true
+                        }
+                        dashboardViewModel.onNavigationConsumed()
+                    }
+                }
+
+                LaunchedEffect(navController) {
+                    navController.currentBackStackEntryFlow.collect { entry ->
+                        val route = entry.destination.route
+                        if (route != null) {
+                            try {
+                                val mode = EditorMode.valueOf(route)
+                                if (editorUiState.editorMode != mode) editorViewModel.setEditorMode(mode)
+                            } catch (e: Exception) { }
+                        }
+                    }
+                }
+
+                val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked && !mainUiState.isCapturingTarget && !showLibrary && !showSettings
+
+                LaunchedEffect(Unit) {
+                    if (!hasCameraPermission) {
+                        permissionLauncher.launch(
+                            arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+                        )
+                    }
+                }
+
+                val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    uri?.let { editorViewModel.onAddLayer(it) }
+                }
+                val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    uri?.let { editorViewModel.setBackgroundImage(it) }
+                }
+
+                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
+                    if (isRailVisible) {
+                        configureRail(
+                            mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
+                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState
+                        )
+                    }
+
+                    background(weight = 0) {
+                        MainScreen(
+                            uiState = editorUiState,
+                            arUiState = arUiState,
+                            isTouchLocked = mainUiState.isTouchLocked,
+                            isCameraActive = !showLibrary,
+                            editorViewModel = editorViewModel,
+                            arViewModel = arViewModel,
+                            slamManager = slamManager,
+                            hasCameraPermission = hasCameraPermission,
+                            cameraController = cameraController,
+                            onRendererCreated = { renderer -> }
+                        )
+
+                        if (mainUiState.isCapturingTarget) {
+                            TargetCreationBackground(
+                                uiState = arUiState,
+                                captureStep = mainUiState.captureStep,
+                                onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) }
+                            )
+                        }
+                    }
+
+                    onscreen {
+                        Box(Modifier.fillMaxSize()) {
+                            AzNavHost(startDestination = EditorMode.AR.name) {
+                                composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState) }
+                                composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
+                                composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
+                                composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
+                            }
+
+                            if (mainUiState.isTouchLocked) {
+                                var showUnlockInstructions by remember(mainUiState.isTouchLocked) { mutableStateOf(true) }
+                                LaunchedEffect(mainUiState.isTouchLocked) {
+                                    if (mainUiState.isTouchLocked) {
+                                        kotlinx.coroutines.delay(3000)
+                                        showUnlockInstructions = false
+                                    }
+                                }
+                                TouchLockOverlay(
+                                    isLocked = true,
+                                    onUnlockRequested = { mainViewModel.setTouchLocked(false) }
+                                )
+                                UnlockInstructionsPopup(visible = showUnlockInstructions)
+                            }
+
+                            val isScanningPhase = editorUiState.editorMode == EditorMode.AR && arUiState.splatCount < 50000
+                            if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 72.dp)
+                                        .graphicsLayer()
+                                        .background(Color(0xFF1A1A1A), shape = RoundedCornerShape(16.dp))
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("Mapping Environment...", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        LinearProgressIndicator(
+                                            progress = { (arUiState.splatCount / 50000f).coerceIn(0f, 1f) },
+                                            modifier = Modifier.width(200.dp),
+                                            color = Color.Cyan
+                                        )
+                                        Text("${arUiState.splatCount} / 50000 Splats", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+
+                            if (mainUiState.isCapturingTarget) {
+                                TargetCreationUi(
+                                    uiState = arUiState,
+                                    isRightHanded = editorUiState.isRightHanded,
+                                    captureStep = mainUiState.captureStep,
+                                    isLoading = isProcessing,
+                                    onConfirm = {
+                                        mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap)
+                                    },
+                                    onRetake = { mainViewModel.onRetakeCapture() },
+                                    onCancel = { mainViewModel.onCancelCaptureClicked() },
+                                    onUnwarpConfirm = { points ->
+                                        val currentBitmap = arUiState.tempCaptureBitmap
+                                        if (currentBitmap != null && points.size == 4) {
+                                            isProcessing = true
+                                            lifecycleScope.launch(Dispatchers.Default) {
+                                                val unwarped = ImageProcessor.unwarpImage(currentBitmap, points)
+                                                if (unwarped != null) {
+                                                    arViewModel.setTempCapture(unwarped)
+                                                }
+                                                mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                                isProcessing = false
+                                            }
+                                        } else {
+                                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                        }
+                                    },
+                                    onMaskConfirmed = { bitmap ->
+                                        arViewModel.setTempCapture(bitmap)
+                                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                                    },
+                                    onRequestCapture = { arViewModel.requestCapture() },
+                                    onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
+                                    onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPoint(it) },
+                                    onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
+                                    onUpdateMaskPath = { path -> path?.let { arViewModel.updateMaskPath(it) } }
+                                )
+                            }
+
+                            if (showSaveDialog) {
+                                SaveProjectDialog(
+                                    initialName = editorUiState.projectId ?: "New Project",
+                                    onDismissRequest = { showSaveDialog = false },
+                                    onSaveRequest = { name ->
+                                        editorViewModel.saveProject(name)
+                                        showSaveDialog = false
+                                    }
+                                )
+                            }
+
+                            if (showHelpDialog) {
+                                InfoDialog(
+                                    title = "GraffitiXR Guide",
+                                    content = "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes.",
+                                    onDismiss = { showHelpDialog = false }
+                                )
+                            }
+
+                            if (showLibrary) {
+                                val dashboardState by dashboardViewModel.uiState.collectAsState()
+                                LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
+                                ProjectLibraryScreen(
+                                    projects = dashboardState.availableProjects,
+                                    onLoadProject = {
+                                        dashboardViewModel.openProject(it)
+                                        showLibrary = false
+                                    },
+                                    onDeleteProject = { dashboardViewModel.deleteProject(it) },
+                                    onNewProject = {
+                                        dashboardViewModel.onNewProject(editorUiState.isRightHanded)
+                                        showLibrary = false
+                                    }
+                                )
+                            }
+
+                            if (showSettings) {
+                                val dashboardUiState by dashboardViewModel.uiState.collectAsState()
+                                SettingsScreen(
+                                    currentVersion = BuildConfig.VERSION_NAME,
+                                    updateStatus = dashboardUiState.updateStatusMessage,
+                                    isCheckingForUpdate = dashboardUiState.isCheckingForUpdate,
+                                    isRightHanded = editorUiState.isRightHanded,
+                                    onHandednessChanged = { editorViewModel.toggleHandedness() },
+                                    onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
+                                    onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
+                                    onClose = { showSettings = false }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun EditorOverlay(viewModel: EditorViewModel, mainUiState: MainUiState) {
+        val uiState by viewModel.uiState.collectAsState()
+        EditorUi(
+            actions = viewModel,
+            uiState = uiState,
+            isTouchLocked = mainUiState.isTouchLocked,
+            showUnlockInstructions = mainUiState.showUnlockInstructions,
+            isCapturingTarget = mainUiState.isCapturingTarget
+        )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        hasCameraPermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    override fun onPause() {
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        arViewModel.destroyArSession()
+        if (isFinishing) slamManager.destroy()
+    }
+
+    private fun AzNavHostScope.configureRail(
+        mainViewModel: MainViewModel,
+        editorViewModel: EditorViewModel,
+        arViewModel: ArViewModel,
+        dashboardViewModel: DashboardViewModel,
+        overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMedia// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+package com.hereliesaz.graffitixr
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.google.android.gms.common.GoogleApiAvailability
+import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.model.*
+import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.model.Tool
+import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
+import com.hereliesaz.graffitixr.common.security.SecurityProviderState
+import com.hereliesaz.graffitixr.common.util.ImageProcessor
+import com.hereliesaz.graffitixr.design.components.InfoDialog
+import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
+import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
+import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
+import com.hereliesaz.graffitixr.design.theme.NavStrings
+import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
+import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
+import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
+import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
+import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
+import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
+import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
+import com.hereliesaz.graffitixr.feature.editor.EditorUi
+import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var slamManager: SlamManager
+    @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+    @Inject lateinit var securityProviderManager: SecurityProviderManager
+
+    private val arViewModel: ArViewModel by viewModels()
+
+    var use3dBackground by mutableStateOf(false)
+    var showSaveDialog by mutableStateOf(false)
+    var showLibrary by mutableStateOf(true)
+    var showSettings by mutableStateOf(false)
+    var showHelpDialog by mutableStateOf(false)
+    var hasCameraPermission by mutableStateOf(false)
+
+    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
+        hasCameraPermission = p[android.Manifest.permission.CAMERA] ?: false
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        hasCameraPermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        securityProviderManager.installAsync(this)
+        slamManager.ensureInitialized()
+
+        lifecycleScope.launch {
+            securityProviderManager.securityProviderState.collect { state ->
+                if (state is SecurityProviderState.RecoverableError) {
+                    GoogleApiAvailability.getInstance().getErrorDialog(this@MainActivity, state.errorCode, 9000)?.show()
+                }
+            }
+        }
+
+        setContent {
+            GraffitiXRTheme {
+                val navController = rememberNavController()
+
+                val mainViewModel: MainViewModel = hiltViewModel()
+                val editorViewModel: EditorViewModel = hiltViewModel()
+                val dashboardViewModel: DashboardViewModel = hiltViewModel()
+                val cameraController = rememberCameraController()
+
+                val editorUiState by editorViewModel.uiState.collectAsState()
+                val mainUiState by mainViewModel.uiState.collectAsState()
+                val arUiState by arViewModel.uiState.collectAsState()
+                val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
+
+                var isProcessing by remember { mutableStateOf(false) }
+
+                val currentTempCapture = arUiState.tempCaptureBitmap
+                val currentCaptureStep = mainUiState.captureStep
+                LaunchedEffect(currentTempCapture, currentCaptureStep) {
+                    if (currentTempCapture != null && currentCaptureStep == CaptureStep.CAPTURE) {
+                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                    }
+                }
+
+                LaunchedEffect(dashboardNavigation) {
+                    dashboardNavigation?.let { destination ->
+                        when (destination) {
+                            "project_library" -> showLibrary = true
+                            "settings" -> showSettings = true
+                        }
+                        dashboardViewModel.onNavigationConsumed()
+                    }
+                }
+
+                LaunchedEffect(navController) {
+                    navController.currentBackStackEntryFlow.collect { entry ->
+                        val route = entry.destination.route
+                        if (route != null) {
+                            try {
+                                val mode = EditorMode.valueOf(route)
+                                if (editorUiState.editorMode != mode) editorViewModel.setEditorMode(mode)
+                            } catch (e: Exception) { }
+                        }
+                    }
+                }
+
+                val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked && !mainUiState.isCapturingTarget && !showLibrary && !showSettings
+
+                LaunchedEffect(Unit) {
+                    if (!hasCameraPermission) {
+                        permissionLauncher.launch(
+                            arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+                        )
+                    }
+                }
+
+                val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    uri?.let { editorViewModel.onAddLayer(it) }
+                }
+                val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    uri?.let { editorViewModel.setBackgroundImage(it) }
+                }
+
+                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
+                    if (isRailVisible) {
+                        configureRail(
+                            mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
+                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState
+                        )
+                    }
+
+                    background(weight = 0) {
+                        MainScreen(
+                            uiState = editorUiState,
+                            arUiState = arUiState,
+                            isTouchLocked = mainUiState.isTouchLocked,
+                            isCameraActive = !showLibrary,
+                            editorViewModel = editorViewModel,
+                            arViewModel = arViewModel,
+                            slamManager = slamManager,
+                            hasCameraPermission = hasCameraPermission,
+                            cameraController = cameraController,
+                            onRendererCreated = { renderer -> }
+                        )
+
+                        if (mainUiState.isCapturingTarget) {
+                            TargetCreationBackground(
+                                uiState = arUiState,
+                                captureStep = mainUiState.captureStep,
+                                onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) }
+                            )
+                        }
+                    }
+
+                    onscreen {
+                        Box(Modifier.fillMaxSize()) {
+                            AzNavHost(startDestination = EditorMode.AR.name) {
+                                composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState) }
+                                composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
+                                composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
+                                composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
+                            }
+
+                            if (mainUiState.isTouchLocked) {
+                                var showUnlockInstructions by remember(mainUiState.isTouchLocked) { mutableStateOf(true) }
+                                LaunchedEffect(mainUiState.isTouchLocked) {
+                                    if (mainUiState.isTouchLocked) {
+                                        kotlinx.coroutines.delay(3000)
+                                        showUnlockInstructions = false
+                                    }
+                                }
+                                TouchLockOverlay(
+                                    isLocked = true,
+                                    onUnlockRequested = { mainViewModel.setTouchLocked(false) }
+                                )
+                                UnlockInstructionsPopup(visible = showUnlockInstructions)
+                            }
+
+                            val isScanningPhase = editorUiState.editorMode == EditorMode.AR && arUiState.splatCount < 50000
+                            if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 72.dp)
+                                        .graphicsLayer()
+                                        .background(Color(0xFF1A1A1A), shape = RoundedCornerShape(16.dp))
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("Mapping Environment...", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        LinearProgressIndicator(
+                                            progress = { (arUiState.splatCount / 50000f).coerceIn(0f, 1f) },
+                                            modifier = Modifier.width(200.dp),
+                                            color = Color.Cyan
+                                        )
+                                        Text("${arUiState.splatCount} / 50000 Splats", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+
+                            if (mainUiState.isCapturingTarget) {
+                                TargetCreationUi(
+                                    uiState = arUiState,
+                                    isRightHanded = editorUiState.isRightHanded,
+                                    captureStep = mainUiState.captureStep,
+                                    isLoading = isProcessing,
+                                    onConfirm = {
+                                        mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap)
+                                    },
+                                    onRetake = { mainViewModel.onRetakeCapture() },
+                                    onCancel = { mainViewModel.onCancelCaptureClicked() },
+                                    onUnwarpConfirm = { points ->
+                                        val currentBitmap = arUiState.tempCaptureBitmap
+                                        if (currentBitmap != null && points.size == 4) {
+                                            isProcessing = true
+                                            lifecycleScope.launch(Dispatchers.Default) {
+                                                val unwarped = ImageProcessor.unwarpImage(currentBitmap, points)
+                                                if (unwarped != null) {
+                                                    arViewModel.setTempCapture(unwarped)
+                                                }
+                                                mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                                isProcessing = false
+                                            }
+                                        } else {
+                                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                        }
+                                    },
+                                    onMaskConfirmed = { bitmap ->
+                                        arViewModel.setTempCapture(bitmap)
+                                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                                    },
+                                    onRequestCapture = { arViewModel.requestCapture() },
+                                    onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
+                                    onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPoint(it) },
+                                    onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
+                                    onUpdateMaskPath = { path -> path?.let { arViewModel.updateMaskPath(it) } }
+                                )
+                            }
+
+                            if (showSaveDialog) {
+                                SaveProjectDialog(
+                                    initialName = editorUiState.projectId ?: "New Project",
+                                    onDismissRequest = { showSaveDialog = false },
+                                    onSaveRequest = { name ->
+                                        editorViewModel.saveProject(name)
+                                        showSaveDialog = false
+                                    }
+                                )
+                            }
+
+                            if (showHelpDialog) {
+                                InfoDialog(
+                                    title = "GraffitiXR Guide",
+                                    content = "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes.",
+                                    onDismiss = { showHelpDialog = false }
+                                )
+                            }
+
+                            if (showLibrary) {
+                                val dashboardState by dashboardViewModel.uiState.collectAsState()
+                                LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
+                                ProjectLibraryScreen(
+                                    projects = dashboardState.availableProjects,
+                                    onLoadProject = {
+                                        dashboardViewModel.openProject(it)
+                                        showLibrary = false
+                                    },
+                                    onDeleteProject = { dashboardViewModel.deleteProject(it) },
+                                    onNewProject = {
+                                        dashboardViewModel.onNewProject(editorUiState.isRightHanded)
+                                        showLibrary = false
+                                    }
+                                )
+                            }
+
+                            if (showSettings) {
+                                val dashboardUiState by dashboardViewModel.uiState.collectAsState()
+                                SettingsScreen(
+                                    currentVersion = BuildConfig.VERSION_NAME,
+                                    updateStatus = dashboardUiState.updateStatusMessage,
+                                    isCheckingForUpdate = dashboardUiState.isCheckingForUpdate,
+                                    isRightHanded = editorUiState.isRightHanded,
+                                    onHandednessChanged = { editorViewModel.toggleHandedness() },
+                                    onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
+                                    onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
+                                    onClose = { showSettings = false }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun EditorOverlay(viewModel: EditorViewModel, mainUiState: MainUiState) {
+        val uiState by viewModel.uiState.collectAsState()
+        EditorUi(
+            actions = viewModel,
+            uiState = uiState,
+            isTouchLocked = mainUiState.isTouchLocked,
+            showUnlockInstructions = mainUiState.showUnlockInstructions,
+            isCapturingTarget = mainUiState.isCapturingTarget
+        )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        hasCameraPermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    override fun onPause() {
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        arViewModel.destroyArSession()
+        if (isFinishing) slamManager.destroy()
+    }
+
+    private fun AzNavHostScope.configureRail(
+        mainViewModel: MainViewModel,
+        editorViewModel: EditorViewModel,
+        arViewModel: ArViewModel,
+        dashboardViewModel: DashboardViewModel,
+        overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMedia        setContent {
             GraffitiXRTheme {
                 val navController = rememberNavController()
 
