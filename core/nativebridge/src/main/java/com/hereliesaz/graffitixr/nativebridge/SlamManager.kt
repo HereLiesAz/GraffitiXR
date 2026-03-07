@@ -44,24 +44,24 @@ class SlamManager @Inject constructor() {
     /**
      * Feed a depth frame for map construction.
      *
-     * @param depthBuffer   DEPTH16 buffer from acquireDepthImage16Bits()
-     * @param width         depth image width (sensor orientation)
-     * @param height        depth image height (sensor orientation)
-     * @param rowStride     row stride in bytes
-     * @param sensorViewMatrix  16-float column-major view matrix derived from camera.pose
-     *                          in SENSOR space (NOT display-rotation-corrected).
-     *                          Used for unprojecting depth pixels, which are always in
-     *                          sensor/landscape orientation regardless of display rotation.
+     * @param depthBuffer     DEPTH16 buffer from acquireDepthImage16Bits()
+     * @param width           depth image width (sensor orientation)
+     * @param height          depth image height (sensor orientation)
+     * @param rowStride       row stride in bytes
+     * @param displayRotation Surface.ROTATION_* value (0/1/2/3) from DisplayRotationHelper.
+     *                        Used to rotate the depth image from sensor orientation to
+     *                        display orientation before unprojection, so it aligns with
+     *                        the display-corrected view matrix from getViewMatrix().
      */
     fun feedArCoreDepth(
         depthBuffer: ByteBuffer,
         width: Int,
         height: Int,
         rowStride: Int,
-        sensorViewMatrix: FloatArray
+        displayRotation: Int
     ) {
         if (depthBuffer.isDirect) {
-            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, sensorViewMatrix)
+            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, displayRotation)
         }
     }
 
@@ -169,7 +169,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeSetRelocEnabled(enabled: Boolean)
-    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, sensorViewMatrix: FloatArray)
+    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, displayRotation: Int)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,
