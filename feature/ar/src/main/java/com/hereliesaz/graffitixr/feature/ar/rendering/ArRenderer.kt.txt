@@ -230,7 +230,15 @@ class ArRenderer(
                     try {
                         frame.acquireDepthImage16Bits().use { depthImage ->
                             val depthPlane = depthImage.planes[0]
-                            slamManager.feedArCoreDepth(depthPlane.buffer, depthImage.width, depthImage.height, depthPlane.rowStride)
+                            // Pass display rotation so C++ can rotate the depth image
+                            // from sensor orientation to display orientation before
+                            // unprojecting with the display-corrected view matrix.
+                            slamManager.feedArCoreDepth(
+                                depthPlane.buffer,
+                                depthImage.width, depthImage.height,
+                                depthPlane.rowStride,
+                                displayRotationHelper.getRotation()
+                            )
                             depthFed = true
                             lastDepthW = depthImage.width; lastDepthH = depthImage.height
                         }
