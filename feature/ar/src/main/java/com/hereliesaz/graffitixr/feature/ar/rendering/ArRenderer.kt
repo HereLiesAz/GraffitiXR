@@ -45,6 +45,7 @@ class ArRenderer(
 
     private var frameCount = 0
     private var diagFrameCount = 0
+    private var sensorOrientation = 90  // degrees; queried from CameraCharacteristics on session attach
     private var lastDepthSupported: Boolean? = null
     private var lastTrackingState: Boolean? = null
     private var lastDepthW = 0
@@ -63,6 +64,19 @@ class ArRenderer(
                 displayRotationHelper.onResume()
                 if (isSurfaceCreated) {
                     session.setCameraTextureName(backgroundRenderer.textureId)
+                }
+                // Query sensor orientation once per session so depth rotation is
+                // correct on any device, not just Pixel 5 (sensor_orientation=90).
+                try {
+                    val cameraId = session.cameraConfig.cameraId
+                    val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE)
+                            as android.hardware.camera2.CameraManager
+                    sensorOrientation = manager
+                        .getCameraCharacteristics(cameraId)
+                        .get(android.hardware.camera2.CameraCharacteristics.SENSOR_ORIENTATION)
+                        ?: 90
+                } catch (e: Exception) {
+                    sensorOrientation = 90  // safe fallback — correct for most rear cameras
                 }
             } else {
                 displayRotationHelper.onPause()
@@ -230,14 +244,22 @@ class ArRenderer(
                     try {
                         frame.acquireDepthImage16Bits().use { depthImage ->
                             val depthPlane = depthImage.planes[0]
-                            // Pass display rotation so C++ can rotate the depth image
-                            // from sensor orientation to display orientation before
-                            // unprojecting with the display-corrected view matrix.
+                            // Compute cv::RotateFlags (-1=none, 0=CW90, 1=180, 2=CCW90).
+                            // Depth pixels are in sensor orientation; we rotate to display
+                            // orientation so they align with the display-corrected view matrix.
+                            // Formula: (sensorOrientation - displayDegrees + 360) % 360
+                            val displayDegrees = displayRotationHelper.getRotation() * 90
+                            val cvRotateCode = when ((sensorOrientation - displayDegrees + 360) % 360) {
+                                90  -> 0  // cv::ROTATE_90_CLOCKWISE
+                                180 -> 1  // cv::ROTATE_180
+                                270 -> 2  // cv::ROTATE_90_COUNTERCLOCKWISE
+                                else -> -1 // no rotation needed
+                            }
                             slamManager.feedArCoreDepth(
                                 depthPlane.buffer,
                                 depthImage.width, depthImage.height,
                                 depthPlane.rowStride,
-                                displayRotationHelper.getRotation()
+                                cvRotateCode
                             )
                             depthFed = true
                             lastDepthW = depthImage.width; lastDepthH = depthImage.height
