@@ -58,10 +58,10 @@ class SlamManager @Inject constructor() {
         width: Int,
         height: Int,
         rowStride: Int,
-        displayRotation: Int
+        cvRotateCode: Int
     ) {
         if (depthBuffer.isDirect) {
-            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, displayRotation)
+            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, cvRotateCode)
         }
     }
 
@@ -169,7 +169,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeSetRelocEnabled(enabled: Boolean)
-    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, displayRotation: Int)
+    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, cvRotateCode: Int)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,
