@@ -41,9 +41,27 @@ class SlamManager @Inject constructor() {
         nativeUpdateCamera(viewMatrix, projectionMatrix, timestampNs)
     }
 
-    fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int) {
+    /**
+     * Feed a depth frame for map construction.
+     *
+     * @param depthBuffer   DEPTH16 buffer from acquireDepthImage16Bits()
+     * @param width         depth image width (sensor orientation)
+     * @param height        depth image height (sensor orientation)
+     * @param rowStride     row stride in bytes
+     * @param sensorViewMatrix  16-float column-major view matrix derived from camera.pose
+     *                          in SENSOR space (NOT display-rotation-corrected).
+     *                          Used for unprojecting depth pixels, which are always in
+     *                          sensor/landscape orientation regardless of display rotation.
+     */
+    fun feedArCoreDepth(
+        depthBuffer: ByteBuffer,
+        width: Int,
+        height: Int,
+        rowStride: Int,
+        sensorViewMatrix: FloatArray
+    ) {
         if (depthBuffer.isDirect) {
-            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride)
+            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, sensorViewMatrix)
         }
     }
 
@@ -151,7 +169,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeSetRelocEnabled(enabled: Boolean)
-    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int)
+    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, sensorViewMatrix: FloatArray)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,
