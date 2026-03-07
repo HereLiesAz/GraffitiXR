@@ -17,9 +17,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.nio.ByteBuffer
@@ -45,27 +42,12 @@ class ArRenderer(
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
 
-    private val frameChannel = Channel<Boolean>(
-        capacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-
     private var frameCount = 0
     private var pendingFlashlightMode: Boolean? = null
     private var isSurfaceCreated = false
 
     // Thread-safe flag updated directly by Compose's AndroidView update block
     @Volatile var captureRequested: Boolean = false
-
-    init {
-        backgroundScope.launch {
-            frameChannel.consumeAsFlow().collect { isTracking ->
-                slamManager.setArCoreTrackingState(isTracking)
-                val splatCount = slamManager.getSplatCount()
-                onTrackingUpdated(isTracking, splatCount)
-            }
-        }
-    }
 
     fun attachSession(session: Session?) {
         sessionLock.withLock {
@@ -115,7 +97,6 @@ class ArRenderer(
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
 
-        var isTracking = false
         sessionLock.withLock {
             val activeSession = session ?: return
 
@@ -161,8 +142,22 @@ class ArRenderer(
                 onLightUpdated(lightEstimate.pixelIntensity)
             }
 
-            isTracking = camera.trackingState == TrackingState.TRACKING
-            frameChannel.trySend(isTracking)
+            val isTracking = camera.trackingState == TrackingState.TRACKING
+
+            // FIX: Call setArCoreTrackingState synchronously here on the GL thread,
+            // BEFORE feeding depth data. The old code sent this via a coroutine channel,
+            // meaning processDepthFrame would check mIsArCoreTracking while it was still
+            // false (the async update hadn't fired yet), silently dropping every depth
+            // frame. Synchronous call guarantees the native tracking flag is set before
+            // any depth for this frame reaches the map thread queue.
+            slamManager.setArCoreTrackingState(isTracking)
+
+            // Report tracking + splat count to the ViewModel on a background thread
+            // so we don't block the GL thread on getSplatCount().
+            backgroundScope.launch {
+                val splatCount = slamManager.getSplatCount()
+                onTrackingUpdated(isTracking, splatCount)
+            }
 
             // Safely consume the flag and acquire the image
             if (captureRequested) {
