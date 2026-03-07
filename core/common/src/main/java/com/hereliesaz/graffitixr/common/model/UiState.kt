@@ -31,6 +31,9 @@ data class ArUiState(
     val undoCount: Int = 0,
     val gestureInProgress: Boolean = false,
 
+    // Live diagnostic log lines for in-app debugging (newest entry replaces old)
+    val diagLog: String? = null,
+
     // Contextual scan coaching hint. Non-null only during the scanning phase
     // (splatCount < 50000). Computed by ArViewModel based on what the user is
     // actually failing to do — low light, not moving, not pointing at surfaces.
