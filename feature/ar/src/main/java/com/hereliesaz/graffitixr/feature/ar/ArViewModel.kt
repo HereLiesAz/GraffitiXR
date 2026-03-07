@@ -202,15 +202,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // ─── DROP-IN REPLACEMENTS in ArViewModel.kt ───────────────────────────────
-//
-// Replace the existing setTrackingState() and updateLightLevel() methods with
-// these. Everything else in ArViewModel stays the same.
-//
-// The hint is computed whenever tracking state or light level changes.
-// It surfaces the single most actionable reason splats are not accumulating,
-// prioritised: darkness → lost tracking → too slow → not enough surface.
-
     fun setTrackingState(isTracking: Boolean, splatCount: Int) {
         _uiState.update {
             it.copy(
@@ -222,51 +213,6 @@ class ArViewModel @Inject constructor(
                     lightLevel = it.lightLevel
                 )
             )
-        }
-    }
-
-    fun updateLightLevel(level: Float) {
-        _uiState.update {
-            it.copy(
-                lightLevel = level,
-                scanHint = computeScanHint(
-                    isTracking = it.isScanning,
-                    splatCount = it.splatCount,
-                    lightLevel = level
-                )
-            )
-        }
-    }
-
-    /**
-     * Returns a short, specific coaching message during the scan phase, or null
-     * once 50 000 splats have been collected (scan complete).
-     *
-     * Priority order (most blocking issue first):
-     *   1. Too dark  → ARCore depth is unreliable and feature tracking fails
-     *   2. Not tracking → the user needs to move to re-acquire
-     *   3. Tracking but slow growth → not enough parallax / coverage
-     */
-    private fun computeScanHint(
-        isTracking: Boolean,
-        splatCount: Int,
-        lightLevel: Float
-    ): String? {
-        if (splatCount >= 50_000) return null   // scan complete, hide hint
-
-        return when {
-            lightLevel < 0.15f ->
-                "Too dark — move to a brighter area or use the flashlight"
-            lightLevel < 0.30f ->
-                "Low light — more light will improve depth accuracy"
-            !isTracking ->
-                "Tracking lost — move slowly and point at textured surfaces"
-            splatCount < 500 ->
-                "Point the camera at nearby walls, floors, or objects"
-            splatCount < 5_000 ->
-                "Keep moving — sweep the camera across all nearby surfaces"
-            else ->
-                "Good — keep scanning to cover more of the environment"
         }
     }
 
@@ -296,7 +242,6 @@ class ArViewModel @Inject constructor(
     }
 
     fun requestCapture() {
-        // Clear the old capture bitmap so Compose detects the UI transition cleanly when the new one arrives.
         _uiState.update { it.copy(isCaptureRequested = true, tempCaptureBitmap = null) }
     }
 
@@ -339,6 +284,46 @@ class ArViewModel @Inject constructor(
     }
 
     fun updateLightLevel(level: Float) {
-        _uiState.update { it.copy(lightLevel = level) }
+        _uiState.update {
+            it.copy(
+                lightLevel = level,
+                scanHint = computeScanHint(
+                    isTracking = it.isScanning,
+                    splatCount = it.splatCount,
+                    lightLevel = level
+                )
+            )
+        }
+    }
+
+    /**
+     * Returns a short, specific coaching message during the scan phase, or null
+     * once 50 000 splats have been collected (scan complete).
+     *
+     * Priority order (most blocking issue first):
+     *   1. Too dark  → ARCore depth is unreliable and feature tracking fails
+     *   2. Not tracking → the user needs to move to re-acquire
+     *   3. Tracking but slow growth → not enough parallax / coverage
+     */
+    private fun computeScanHint(
+        isTracking: Boolean,
+        splatCount: Int,
+        lightLevel: Float
+    ): String? {
+        if (splatCount >= 50_000) return null
+        return when {
+            lightLevel < 0.15f ->
+                "Too dark — move to a brighter area or use the flashlight"
+            lightLevel < 0.30f ->
+                "Low light — more light will improve depth accuracy"
+            !isTracking ->
+                "Tracking lost — move slowly and point at textured surfaces"
+            splatCount < 500 ->
+                "Point the camera at nearby walls, floors, or objects"
+            splatCount < 5_000 ->
+                "Keep moving — sweep the camera across all nearby surfaces"
+            else ->
+                "Good — keep scanning to cover more of the environment"
+        }
     }
 }
