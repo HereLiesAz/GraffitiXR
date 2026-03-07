@@ -26,6 +26,11 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -236,6 +241,14 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 96.dp)
+                                )
+                            }
+
+                            // Depth pipeline diagnostic popup — always visible in AR mode
+                            if (editorUiState.editorMode == EditorMode.AR) {
+                                DiagPopup(
+                                    diagLog = arUiState.diagLog,
+                                    modifier = Modifier.align(Alignment.TopStart)
                                 )
                             }
 
@@ -616,7 +629,69 @@ class MainActivity : ComponentActivity() {
 // the scan is. Below it, a hint line animates whenever the specific guidance
 // message changes — telling the user exactly what they need to do more of.
 
-@androidx.compose.runtime.Composable
+@Composable
+private fun DiagPopup(
+    diagLog: String?,
+    modifier: Modifier = Modifier
+) {
+    var offsetX by remember { mutableStateOf(16f) }
+    var offsetY by remember { mutableStateOf(80f) }
+    var visible by remember { mutableStateOf(true) }
+
+    if (!visible) return
+
+    Box(
+        modifier = modifier
+            .offset { IntOffset(offsetX.toInt(), offsetY.toInt()) }
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    offsetX += dragAmount.x
+                    offsetY += dragAmount.y
+                }
+            }
+            .background(Color(0xDD000000), RoundedCornerShape(8.dp))
+            .border(1.dp, Color.Cyan, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .widthIn(max = 300.dp)
+    ) {
+        androidx.compose.foundation.layout.Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "DEPTH DIAG",
+                    color = Color.Cyan,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    "✕",
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures { visible = false }
+                        }
+                )
+            }
+            Text(
+                text = diagLog ?: "Waiting for first frame…",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = MaterialTheme.typography.labelSmall.lineHeight
+            )
+        }
+    }
+}
+
+@Composable
 private fun ScanCoachingOverlay(
     splatCount: Int,
     hint: String?,
