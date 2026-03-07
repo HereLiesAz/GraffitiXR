@@ -296,6 +296,10 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    fun appendDiag(text: String) {
+        _uiState.update { it.copy(diagLog = text) }
+    }
+
     /**
      * Returns a short, specific coaching message during the scan phase, or null
      * once 50 000 splats have been collected (scan complete).
