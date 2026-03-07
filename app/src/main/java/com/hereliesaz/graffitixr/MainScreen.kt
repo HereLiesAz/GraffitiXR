@@ -116,7 +116,7 @@ fun MainScreen(
                                 setZOrderMediaOverlay(true)
                                 holder.setFormat(PixelFormat.TRANSLUCENT)
                                 setRenderer(renderer)
-                                renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+                                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                             }
                             glView = view
                             view
