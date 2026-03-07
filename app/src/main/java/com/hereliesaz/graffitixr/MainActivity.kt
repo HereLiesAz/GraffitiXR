@@ -12,10 +12,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -112,6 +114,8 @@ class MainActivity : ComponentActivity() {
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
+
+                var isProcessing by remember { mutableStateOf(false) }
 
                 val currentTempCapture = arUiState.tempCaptureBitmap
                 val currentCaptureStep = mainUiState.captureStep
@@ -215,23 +219,51 @@ class MainActivity : ComponentActivity() {
                                 UnlockInstructionsPopup(visible = showUnlockInstructions)
                             }
 
+                            val isScanningPhase = editorUiState.editorMode == EditorMode.AR && arUiState.splatCount < 50000
+                            if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 72.dp)
+                                        .background(Color.Black.copy(alpha = 0.7f), shape = RoundedCornerShape(16.dp))
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("Mapping Environment...", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        LinearProgressIndicator(
+                                            progress = { (arUiState.splatCount / 50000f).coerceIn(0f, 1f) },
+                                            modifier = Modifier.width(200.dp),
+                                            color = Color.Cyan
+                                        )
+                                        Text("${arUiState.splatCount} / 50000 Splats", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
                                     uiState = arUiState,
                                     isRightHanded = editorUiState.isRightHanded,
                                     captureStep = mainUiState.captureStep,
-                                    onConfirm = { mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap) },
+                                    isLoading = isProcessing,
+                                    onConfirm = {
+                                        mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap)
+                                    },
                                     onRetake = { mainViewModel.onRetakeCapture() },
                                     onCancel = { mainViewModel.onCancelCaptureClicked() },
                                     onUnwarpConfirm = { points ->
                                         val currentBitmap = arUiState.tempCaptureBitmap
                                         if (currentBitmap != null && points.size == 4) {
+                                            isProcessing = true
                                             lifecycleScope.launch(Dispatchers.Default) {
                                                 val unwarped = ImageProcessor.unwarpImage(currentBitmap, points)
                                                 if (unwarped != null) {
                                                     arViewModel.setTempCapture(unwarped)
                                                 }
                                                 mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                                isProcessing = false
                                             }
                                         } else {
                                             mainViewModel.setCaptureStep(CaptureStep.MASK)

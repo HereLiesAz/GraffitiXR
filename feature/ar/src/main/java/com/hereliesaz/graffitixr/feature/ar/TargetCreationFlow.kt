@@ -1,70 +1,42 @@
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/TargetCreationFlow.kt
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
-import com.hereliesaz.graffitixr.feature.ar.masking.MaskingBackground
-import com.hereliesaz.graffitixr.feature.ar.masking.MaskingUi
-import com.hereliesaz.graffitixr.feature.ar.masking.applyAutoMask
-import kotlinx.coroutines.launch
 
-@Composable
-fun TargetCreationBackground(
-    uiState: ArUiState,
-    captureStep: CaptureStep,
-    onInitUnwarpPoints: (List<Offset>) -> Unit
-) {
-    LaunchedEffect(uiState.tempCaptureBitmap) {
-        if (uiState.unwarpPoints.isEmpty() && uiState.tempCaptureBitmap != null) {
-            val points = listOf(
-                Offset(0.2f, 0.2f),
-                Offset(0.8f, 0.2f),
-                Offset(0.8f, 0.8f),
-                Offset(0.2f, 0.8f)
-            )
-            onInitUnwarpPoints(points)
-        }
-    }
-
-    when (captureStep) {
-        CaptureStep.CAPTURE -> {
-            TargetCreationOverlayBackground(uiState, CaptureStep.CAPTURE)
-        }
-        CaptureStep.RECTIFY -> {
-            UnwarpBackground(
-                targetImage = uiState.tempCaptureBitmap,
-                points = uiState.unwarpPoints,
-                activePointIndex = uiState.activeUnwarpPointIndex,
-                onPointIndexChanged = { },
-                onMagnifierPositionChanged = { }
-            )
-        }
-        CaptureStep.MASK -> {
-            MaskingBackground(
-                targetImage = uiState.tempCaptureBitmap,
-                maskPath = uiState.maskPath ?: Path(),
-                currentPath = null
-            )
-        }
-        CaptureStep.REVIEW -> {
-            TargetCreationOverlayBackground(uiState, CaptureStep.REVIEW)
-        }
-        else -> {}
-    }
-}
-
+/**
+ * Orchestrates the multi-step UI flow for capturing, rectifying, and masking physical targets.
+ */
 @Composable
 fun TargetCreationUi(
     uiState: ArUiState,
     isRightHanded: Boolean,
     captureStep: CaptureStep,
-    onConfirm: () -> Unit,
+    isLoading: Boolean,
+    onConfirm: (Bitmap?) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
     onUnwarpConfirm: (List<Offset>) -> Unit,
@@ -75,83 +47,144 @@ fun TargetCreationUi(
     onSetMagnifierPosition: (Offset) -> Unit,
     onUpdateMaskPath: (Path?) -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    var isProcessingMask by remember { mutableStateOf(false) }
-    var currentMaskPath by remember { mutableStateOf<Path?>(null) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (captureStep) {
+            CaptureStep.CAPTURE -> {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 48.dp)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    IconButton(
+                        onClick = onCancel,
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Cancel",
+                            tint = Color.White,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
 
-    when (captureStep) {
-        CaptureStep.CAPTURE -> {
-            Box(Modifier.fillMaxSize()) {
-                TargetCreationOverlayUi(
-                    uiState = uiState,
-                    step = CaptureStep.CAPTURE,
-                    onPrimaryAction = onRequestCapture,
-                    onCancel = onCancel
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .border(4.dp, Color.White, CircleShape)
+                            .padding(8.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable { onRequestCapture() }
+                    )
+                }
+            }
+            CaptureStep.RECTIFY -> {
+                UnwarpUi(
+                    isRightHanded = isRightHanded,
+                    targetImage = uiState.tempCaptureBitmap,
+                    points = uiState.unwarpPoints,
+                    activePointIndex = uiState.activeUnwarpPointIndex,
+                    magnifierPosition = uiState.magnifierPosition,
+                    onPointIndexChanged = onSetActiveUnwarpPoint,
+                    onUpdateUnwarpPoints = onUpdateUnwarpPoints,
+                    onMagnifierPositionChanged = onSetMagnifierPosition,
+                    onConfirm = onUnwarpConfirm,
+                    onRetake = onRetake
                 )
             }
-        }
-        CaptureStep.RECTIFY -> {
-            UnwarpUi(
-                isRightHanded = isRightHanded,
-                targetImage = uiState.tempCaptureBitmap,
-                points = uiState.unwarpPoints,
-                activePointIndex = uiState.activeUnwarpPointIndex,
-                magnifierPosition = uiState.magnifierPosition,
-                onPointIndexChanged = onSetActiveUnwarpPoint,
-                onPointMoved = { index, offset ->
-                    val newPoints = uiState.unwarpPoints.toMutableList()
-                    if (index in newPoints.indices) {
-                        newPoints[index] = offset
-                        onUpdateUnwarpPoints(newPoints)
+            CaptureStep.MASK -> {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    uiState.tempCaptureBitmap?.let { bmp ->
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = "Mask Target",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
                     }
-                },
-                onMagnifierPositionChanged = onSetMagnifierPosition,
-                onConfirm = onUnwarpConfirm,
-                onRetake = onRetake
-            )
-        }
-        CaptureStep.MASK -> {
-            MaskingUi(
-                targetImage = uiState.tempCaptureBitmap,
-                isProcessing = isProcessingMask,
-                maskPath = uiState.maskPath ?: Path(),
-                currentPath = currentMaskPath,
-                onPathStarted = {
-                    currentMaskPath = Path().apply { moveTo(it.x, it.y) }
-                },
-                onPathFinished = {
-                    val src = uiState.maskPath ?: Path()
-                    val newPath = Path()
-                    newPath.addPath(src)
-                    currentMaskPath?.let { newPath.addPath(it) }
-                    currentMaskPath = null
-                    onUpdateMaskPath(newPath)
-                },
-                onPathDragged = {
-                    currentMaskPath?.relativeLineTo(it.x, it.y)
-                },
-                onConfirm = onMaskConfirmed,
-                onRetake = onRetake,
-                onAutoMask = {
-                    uiState.tempCaptureBitmap?.let { bitmap ->
-                        scope.launch {
-                            isProcessingMask = true
-                            val masked = applyAutoMask(bitmap)
-                            isProcessingMask = false
-                            if (masked != null) onMaskConfirmed(masked)
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(32.dp)
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        FloatingActionButton(
+                            onClick = onRetake,
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Retake")
+                        }
+                        FloatingActionButton(
+                            onClick = { uiState.tempCaptureBitmap?.let { onMaskConfirmed(it) } },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = "Confirm Mask")
                         }
                     }
                 }
-            )
+            }
+            CaptureStep.REVIEW -> {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    uiState.tempCaptureBitmap?.let { bmp ->
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = "Review Target",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(32.dp)
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        FloatingActionButton(
+                            onClick = onRetake,
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Retake")
+                        }
+                        FloatingActionButton(
+                            onClick = { onConfirm(uiState.tempCaptureBitmap) },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = "Finish")
+                        }
+                    }
+                }
+            }
+            else -> {}
         }
-        CaptureStep.REVIEW -> {
-            TargetCreationOverlayUi(
-                uiState = uiState,
-                step = CaptureStep.REVIEW,
-                onPrimaryAction = onConfirm,
-                onCancel = onRetake
-            )
+
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .pointerInput(Unit) {},
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
         }
-        else -> {}
     }
+}
+
+/**
+ * Handles underlying background processes or visual indicators during target creation.
+ */
+@Composable
+fun TargetCreationBackground(
+    uiState: ArUiState,
+    captureStep: CaptureStep,
+    onInitUnwarpPoints: (List<Offset>) -> Unit
+) {
+    // Scaffold for background guide elements if needed
 }

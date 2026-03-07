@@ -1,6 +1,7 @@
 // FILE: app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt
 package com.hereliesaz.graffitixr
 
+import android.graphics.Matrix
 import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Image
@@ -98,7 +99,13 @@ fun MainScreen(
                                 context = ctx,
                                 slamManager = slamManager,
                                 onTargetCaptured = { bmp, depth, w, h, int ->
-                                    bmp?.let { arViewModel.onTargetCaptured(it, depth, w, h, int) }
+                                    bmp?.let { rawBitmap ->
+                                        val matrix = Matrix().apply { postRotate(90f) }
+                                        val rotatedBmp = android.graphics.Bitmap.createBitmap(
+                                            rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true
+                                        )
+                                        arViewModel.onTargetCaptured(rotatedBmp, depth, rotatedBmp.width, rotatedBmp.height, int)
+                                    }
                                 },
                                 onTrackingUpdated = { isTracking, splatCount ->
                                     arViewModel.setTrackingState(isTracking, splatCount)

@@ -83,7 +83,7 @@ fun UnwarpUi(
     activePointIndex: Int,
     magnifierPosition: Offset,
     onPointIndexChanged: (Int) -> Unit,
-    onPointMoved: (Int, Offset) -> Unit,
+    onUpdateUnwarpPoints: (List<Offset>) -> Unit,
     onMagnifierPositionChanged: (Offset) -> Unit,
     onConfirm: (List<Offset>) -> Unit,
     onRetake: () -> Unit
@@ -115,7 +115,9 @@ fun UnwarpUi(
                                 x = (currentPos.x + normalizedDrag.x).coerceIn(0f, 1f),
                                 y = (currentPos.y + normalizedDrag.y).coerceIn(0f, 1f)
                             )
-                            onPointMoved(activePointIndex, newPos)
+                            val newPoints = points.toMutableList()
+                            newPoints[activePointIndex] = newPos
+                            onUpdateUnwarpPoints(newPoints)
                             onMagnifierPositionChanged(change.position)
                         }
                     },
