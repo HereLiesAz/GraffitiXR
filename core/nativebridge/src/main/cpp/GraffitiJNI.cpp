@@ -114,8 +114,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
-float gLastViewMatrix[16];        // display-rotation-corrected, for rendering
-float gLastSensorViewMatrix[16];  // sensor-space, for depth unprojection
+float gLastViewMatrix[16];  // display-rotation-corrected, for both rendering and unprojection
 float gLastProjMatrix[16];
 bool gHasCameraMatrices = false;
 
@@ -213,20 +212,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride,
-        jfloatArray sensorViewMatrix) {
+        jint displayRotation) {
 
     LOGD("DEPTH_PIPE: feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
-
-    // Store the sensor-space view matrix for use in depth unprojection.
-    // This differs from gLastViewMatrix (display-rotation-corrected) which is used
-    // only for rendering. Depth pixels are in sensor (landscape) orientation.
-    {
-        jfloat* svm = env->GetFloatArrayElements(sensorViewMatrix, nullptr);
-        if (svm) {
-            memcpy(gLastSensorViewMatrix, svm, 16 * sizeof(float));
-            env->ReleaseFloatArrayElements(sensorViewMatrix, svm, JNI_ABORT);
-        }
-    }
 
     if (!gSlamEngine) { LOGD("DEPTH_PIPE: DROPPED - no engine"); return; }
     if (gLastColorFrame.empty()) { LOGD("DEPTH_PIPE: DROPPED - no color frame yet"); return; }
@@ -258,13 +246,47 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         }
     }
 
-    LOGD("DEPTH_PIPE: decoded valid=%d zeroConf=%d range=%.2f-%.2fm colorFrame=%dx%d",
+    LOGD("DEPTH_PIPE: decoded valid=%d zeroConf=%d range=%.2f-%.2fm colorFrame=%dx%d rotation=%d",
          validPixels, zeroConfPixels, minD, maxD,
-         gLastColorFrame.cols, gLastColorFrame.rows);
+         gLastColorFrame.cols, gLastColorFrame.rows, (int)displayRotation);
 
     if (validPixels == 0) {
         LOGD("DEPTH_PIPE: DROPPED - all pixels invalid (no depth data)");
         return;
+    }
+
+    // Rotate depth image to match display orientation.
+    // acquireDepthImage16Bits() always returns pixels in sensor/landscape orientation.
+    // getViewMatrix() (gLastViewMatrix) is corrected for display rotation via setDisplayGeometry.
+    // We must rotate the depth mat to match the display-corrected frame before unprojecting,
+    // otherwise the 3D points will be rotated by the sensor orientation (90° on Pixel 5 portrait).
+    //
+    // displayRotation is Surface.ROTATION_* (0=portrait, 1=landscape, 2=portrait-flipped, 3=landscape-flipped)
+    // Pixel 5 rear camera sensor_orientation=90. In portrait (ROTATION_0):
+    //   sensor image is landscape, needs 90° CW rotation → cv::ROTATE_90_CLOCKWISE
+    // In landscape (ROTATION_1): sensor matches display, no rotation needed.
+    // In portrait-flipped (ROTATION_2): needs 90° CCW → cv::ROTATE_90_COUNTERCLOCKWISE
+    // In landscape-flipped (ROTATION_3): needs 180° → cv::ROTATE_180
+    //
+    // General rule for rear camera with sensor_orientation=90:
+    //   required_rotation = (sensor_orientation - display_rotation_degrees + 360) % 360
+    //   ROTATION_0 (0°)  → (90 - 0)   % 360 = 90  → cv::ROTATE_90_CLOCKWISE
+    //   ROTATION_1 (90°) → (90 - 90)  % 360 = 0   → no rotation
+    //   ROTATION_2 (180°)→ (90 - 180) % 360 = 270 → cv::ROTATE_90_COUNTERCLOCKWISE
+    //   ROTATION_3 (270°)→ (90 - 270) % 360 = 180 → cv::ROTATE_180
+    switch (displayRotation) {
+        case 0:  // ROTATION_0: portrait
+            cv::rotate(depthMap, depthMap, cv::ROTATE_90_CLOCKWISE);
+            break;
+        case 2:  // ROTATION_2: portrait flipped
+            cv::rotate(depthMap, depthMap, cv::ROTATE_90_COUNTERCLOCKWISE);
+            break;
+        case 3:  // ROTATION_3: landscape flipped
+            cv::rotate(depthMap, depthMap, cv::ROTATE_180);
+            break;
+        case 1:  // ROTATION_1: landscape — sensor already matches, no rotation
+        default:
+            break;
     }
 
     if (gColorImageWidth > 0 && gColorImageHeight > 0) {
@@ -289,8 +311,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 
     LOGD("DEPTH_PIPE: pushing frame to map thread depthSize=%dx%d",
          depthMap.cols, depthMap.rows);
-    // Use sensor-space view matrix for depth unprojection (not display-rotation-corrected gLastViewMatrix)
-    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastSensorViewMatrix, gLastProjMatrix, /*isYuv=*/false);
+    // Use display-corrected view matrix. Depth is now rotated to display orientation.
+    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, /*isYuv=*/false);
 }
 
 JNIEXPORT void JNICALL
