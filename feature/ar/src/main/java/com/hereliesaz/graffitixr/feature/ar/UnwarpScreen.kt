@@ -1,13 +1,11 @@
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/UnwarpUi.kt
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
@@ -15,16 +13,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 @Composable
 fun UnwarpBackground(
@@ -35,62 +33,43 @@ fun UnwarpBackground(
     onMagnifierPositionChanged: (Offset) -> Unit
 ) {
     if (targetImage == null) return
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        val screenWidth = maxWidth
-        val screenHeight = maxHeight
-        val density = LocalDensity.current
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            bitmap = targetImage.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
 
-        val imageAspectRatio = targetImage.width.toFloat() / targetImage.height.toFloat()
-        val screenAspectRatio = with(density) { screenWidth.toPx() / screenHeight.toPx() }
-
-        val renderWidth: Float
-        val renderHeight: Float
-        val renderOffsetX: Float
-        val renderOffsetY: Float
-
-        if (imageAspectRatio > screenAspectRatio) {
-            renderWidth = with(density) { screenWidth.toPx() }
-            renderHeight = renderWidth / imageAspectRatio
-            renderOffsetX = 0f
-            renderOffsetY = (with(density) { screenHeight.toPx() } - renderHeight) / 2f
-        } else {
-            renderHeight = with(density) { screenHeight.toPx() }
-            renderWidth = renderHeight * imageAspectRatio
-            renderOffsetY = 0f
-            renderOffsetX = (with(density) { screenWidth.toPx() } - renderWidth) / 2f
-        }
-
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawImage(
-                image = targetImage.asImageBitmap(),
-                dstOffset = IntOffset(renderOffsetX.toInt(), renderOffsetY.toInt()),
-                dstSize = IntSize(renderWidth.toInt(), renderHeight.toInt())
-            )
-
-            // Draw connecting lines (Quadrilateral)
+        Canvas(modifier = Modifier.fillMaxSize().onSizeChanged { canvasSize = it }) {
             if (points.size == 4) {
-                val p0 = Offset(renderOffsetX + points[0].x * renderWidth, renderOffsetY + points[0].y * renderHeight)
-                val p1 = Offset(renderOffsetX + points[1].x * renderWidth, renderOffsetY + points[1].y * renderHeight)
-                val p2 = Offset(renderOffsetX + points[2].x * renderWidth, renderOffsetY + points[2].y * renderHeight)
-                val p3 = Offset(renderOffsetX + points[3].x * renderWidth, renderOffsetY + points[3].y * renderHeight)
+                val mappedPoints = points.map {
+                    Offset(it.x * size.width, it.y * size.height)
+                }
 
-                drawLine(Color.Cyan, p0, p1, strokeWidth = 5f)
-                drawLine(Color.Cyan, p1, p2, strokeWidth = 5f)
-                drawLine(Color.Cyan, p2, p3, strokeWidth = 5f)
-                drawLine(Color.Cyan, p3, p0, strokeWidth = 5f)
-            }
+                val path = Path().apply {
+                    moveTo(mappedPoints[0].x, mappedPoints[0].y)
+                    lineTo(mappedPoints[1].x, mappedPoints[1].y)
+                    lineTo(mappedPoints[2].x, mappedPoints[2].y)
+                    lineTo(mappedPoints[3].x, mappedPoints[3].y)
+                    close()
+                }
 
-            // Draw Corner Points
-            points.forEachIndexed { index, normalizedPoint ->
-                val px = renderOffsetX + normalizedPoint.x * renderWidth
-                val py = renderOffsetY + normalizedPoint.y * renderHeight
-
-                drawCircle(
-                    color = if (index == activePointIndex) Color.Yellow else Color.Red,
-                    radius = 20f,
-                    center = Offset(px, py)
+                drawPath(
+                    path = path,
+                    color = Color.Cyan,
+                    style = Stroke(width = 5f)
                 )
+
+                mappedPoints.forEachIndexed { index, offset ->
+                    drawCircle(
+                        color = if (index == activePointIndex) Color.Magenta else Color.Cyan,
+                        radius = if (index == activePointIndex) 30f else 20f,
+                        center = offset
+                    )
+                }
             }
         }
     }
@@ -109,167 +88,95 @@ fun UnwarpUi(
     onConfirm: (List<Offset>) -> Unit,
     onRetake: () -> Unit
 ) {
-    if (targetImage == null) return
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
-    val density = LocalDensity.current
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { startOffset ->
+                        val normalizedStart = Offset(startOffset.x / size.width, startOffset.y / size.height)
+                        val closestIndex = points.indices.minByOrNull {
+                            (points[it] - normalizedStart).getDistance()
+                        } ?: -1
 
-    // CRITICAL FIX: Use rememberUpdatedState so the gesture lambda always calls the latest function instance
-    val currentOnPointIndexChanged by rememberUpdatedState(onPointIndexChanged)
-    val currentOnPointMoved by rememberUpdatedState(onPointMoved)
-    val currentOnMagnifierPositionChanged by rememberUpdatedState(onMagnifierPositionChanged)
-    val currentPoints by rememberUpdatedState(points)
-
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val screenWidth = maxWidth
-        val screenHeight = maxHeight
-
-        val imageAspectRatio = targetImage.width.toFloat() / targetImage.height.toFloat()
-        val screenAspectRatio = with(density) { screenWidth.toPx() / screenHeight.toPx() }
-
-        val renderWidth: Float
-        val renderHeight: Float
-        val renderOffsetX: Float
-        val renderOffsetY: Float
-
-        if (imageAspectRatio > screenAspectRatio) {
-            renderWidth = with(density) { screenWidth.toPx() }
-            renderHeight = renderWidth / imageAspectRatio
-            renderOffsetX = 0f
-            renderOffsetY = (with(density) { screenHeight.toPx() } - renderHeight) / 2f
-        } else {
-            renderHeight = with(density) { screenHeight.toPx() }
-            renderWidth = renderHeight * imageAspectRatio
-            renderOffsetY = 0f
-            renderOffsetX = (with(density) { screenWidth.toPx() } - renderWidth) / 2f
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(renderWidth, renderHeight, renderOffsetX, renderOffsetY) {
-                    // FIX: Local variable strictly for this gesture session.
-                    // This persists between onDragStart and onDrag, solving the "stale state" bug.
-                    var draggedPointIndex = -1
-
-                    detectDragGestures(
-                        onDragStart = { touchPos ->
-                            var closestIndex = -1
-                            var minDst = Float.MAX_VALUE
-                            val threshold = 100f // Touch slop/radius
-
-                            currentPoints.forEachIndexed { index, normalizedPoint ->
-                                val px = renderOffsetX + normalizedPoint.x * renderWidth
-                                val py = renderOffsetY + normalizedPoint.y * renderHeight
-                                val dst = (touchPos - Offset(px, py)).getDistance()
-
-                                if (dst < minDst && dst < threshold) {
-                                    minDst = dst
-                                    closestIndex = index
-                                }
-                            }
-
-                            draggedPointIndex = closestIndex
-
-                            // Notify parent to highlight the point (UI feedback)
-                            if (draggedPointIndex != -1) {
-                                currentOnPointIndexChanged(draggedPointIndex)
-                            }
-                        },
-                        onDrag = { change, dragAmount ->
-                            if (draggedPointIndex != -1) {
-                                change.consume()
-
-                                val currentPoint = currentPoints[draggedPointIndex]
-
-                                // Convert drag pixels to normalized UV space (0..1)
-                                val dx = dragAmount.x / renderWidth
-                                val dy = dragAmount.y / renderHeight
-
-                                val newX = (currentPoint.x + dx).coerceIn(0f, 1f)
-                                val newY = (currentPoint.y + dy).coerceIn(0f, 1f)
-
-                                // Update via callback
-                                currentOnPointMoved(draggedPointIndex, Offset(newX, newY))
-
-                                // Calculate magnifier position (Screen space)
-                                val magX = renderOffsetX + newX * renderWidth
-                                val magY = renderOffsetY + newY * renderHeight
-                                currentOnMagnifierPositionChanged(Offset(magX, magY))
-                            }
-                        },
-                        onDragEnd = {
-                            draggedPointIndex = -1
-                            currentOnPointIndexChanged(-1)
-                        },
-                        onDragCancel = {
-                            draggedPointIndex = -1
-                            currentOnPointIndexChanged(-1)
+                        if (closestIndex != -1) {
+                            onPointIndexChanged(closestIndex)
+                            onMagnifierPositionChanged(startOffset)
                         }
-                    )
-                }
-        ) {
-            // Hint label
-            Text(
-                text = "Drag corners to unwarp perspective",
-                color = Color.White,
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.small)
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            )
-
-            // Magnifier indicator — visible while a corner is being dragged
-            if (activePointIndex != -1) {
-                val magRadiusPx = with(density) { 40.dp.roundToPx() }
-                Box(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                magnifierPosition.x.toInt() - magRadiusPx,
-                                magnifierPosition.y.toInt() - magRadiusPx * 2 - 8
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        if (activePointIndex in points.indices) {
+                            val normalizedDrag = Offset(dragAmount.x / size.width, dragAmount.y / size.height)
+                            val currentPos = points[activePointIndex]
+                            val newPos = Offset(
+                                x = (currentPos.x + normalizedDrag.x).coerceIn(0f, 1f),
+                                y = (currentPos.y + normalizedDrag.y).coerceIn(0f, 1f)
                             )
+                            onPointMoved(activePointIndex, newPos)
+                            onMagnifierPositionChanged(change.position)
                         }
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.75f))
-                        .border(2.dp, Color.Cyan, CircleShape)
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawLine(Color.Cyan, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), strokeWidth = 1.5f)
-                        drawLine(Color.Cyan, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), strokeWidth = 1.5f)
+                    },
+                    onDragEnd = {
+                        onPointIndexChanged(-1)
                     }
-                }
+                )
+            }
+            .onSizeChanged { canvasSize = it }
+    ) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(32.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FloatingActionButton(
+                onClick = onRetake,
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = "Retake")
             }
 
-            // Bottom controls: Retake | Next
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            FloatingActionButton(
+                onClick = {
+                    if (targetImage != null) {
+                        val imageAspect = targetImage.width.toFloat() / targetImage.height.toFloat()
+                        val screenAspect = canvasSize.width.toFloat() / canvasSize.height.toFloat()
+
+                        var renderWidth = canvasSize.width.toFloat()
+                        var renderHeight = canvasSize.height.toFloat()
+                        var offsetX = 0f
+                        var offsetY = 0f
+
+                        if (imageAspect > screenAspect) {
+                            renderHeight = renderWidth / imageAspect
+                            offsetY = (canvasSize.height - renderHeight) / 2f
+                        } else {
+                            renderWidth = renderHeight * imageAspect
+                            offsetX = (canvasSize.width - renderWidth) / 2f
+                        }
+
+                        val scaleX = targetImage.width / renderWidth
+                        val scaleY = targetImage.height / renderHeight
+
+                        val actualBitmapPoints = points.map { pt ->
+                            val screenX = pt.x * canvasSize.width
+                            val screenY = pt.y * canvasSize.height
+
+                            Offset(
+                                ((screenX - offsetX) * scaleX).coerceIn(0f, targetImage.width.toFloat()),
+                                ((screenY - offsetY) * scaleY).coerceIn(0f, targetImage.height.toFloat())
+                            )
+                        }
+                        onConfirm(actualBitmapPoints)
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.primaryContainer
             ) {
-                FilledTonalButton(
-                    onClick = onRetake,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Retake")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Retake")
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Button(
-                    onClick = { onConfirm(points) },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = "Next")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Next")
-                }
+                Icon(Icons.Default.Check, contentDescription = "Confirm")
             }
         }
     }

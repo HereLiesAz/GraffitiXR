@@ -31,6 +31,20 @@ import javax.inject.Inject
 import androidx.core.net.toUri
 import androidx.core.graphics.createBitmap
 
+data class StrokeCommand(
+    val path: List<Offset>,
+    val canvasSize: IntSize,
+    val tool: Tool,
+    val brushSize: Float,
+    val brushColor: Int,
+    val intensity: Float
+)
+
+sealed class EditCommand {
+    data class PropertyChange(val oldLayers: List<Layer>) : EditCommand()
+    data class Draw(val layerId: String, val command: StrokeCommand) : EditCommand()
+}
+
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
@@ -45,9 +59,13 @@ class EditorViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState = _uiState.asStateFlow()
 
-    private val undoStack = ArrayDeque<List<Layer>>()
-    private val redoStack = ArrayDeque<List<Layer>>()
+    private val undoStack = ArrayDeque<EditCommand>()
+    private val redoStack = ArrayDeque<EditCommand>()
     private val maxStackSize = 20
+
+    private val baseBitmaps = mutableMapOf<String, Bitmap>()
+    private val layerStrokes = mutableMapOf<String, MutableList<StrokeCommand>>()
+    private var pendingSaveJob: kotlinx.coroutines.Job? = null
 
     private var copiedLayerState: Layer? = null
 
@@ -69,7 +87,6 @@ class EditorViewModel @Inject constructor(
                             }
                         }
 
-                        // Reset tool to NONE when opening a project
                         _uiState.update { it.copy(projectId = project.id, layers = layers, activeTool = Tool.NONE) }
 
                         val layersToLoad = layers.filter { it.bitmap == null && it.uri != null }
@@ -78,7 +95,12 @@ class EditorViewModel @Inject constructor(
                                 val loadedLayers = layers.map { layer ->
                                     val layerUri = layer.uri
                                     if (layer.bitmap == null && layerUri != null) {
-                                        layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, layerUri))
+                                        val loadedBmp = ImageUtils.loadBitmapAsync(context, layerUri)
+                                        if (loadedBmp != null) {
+                                            baseBitmaps[layer.id] = loadedBmp.copy(Bitmap.Config.ARGB_8888, false)
+                                            layerStrokes[layer.id] = mutableListOf()
+                                        }
+                                        layer.copy(bitmap = loadedBmp)
                                     } else {
                                         layer
                                     }
@@ -119,18 +141,10 @@ class EditorViewModel @Inject constructor(
                 } else {
                     _uiState.update { it.copy(projectId = null, layers = emptyList(), backgroundBitmap = null, activeTool = Tool.NONE) }
                     slamManager.clearMap()
-                }
-            }
-        }
-
-        viewModelScope.launch(dispatchers.io) {
-            while(true) {
-                kotlinx.coroutines.delay(10000)
-                val project = projectRepository.currentProject.value
-                val isArMode = _uiState.value.editorMode == EditorMode.AR
-                if (project != null && isArMode) {
-                    val mapPath = projectManager.getMapPath(context, project.id)
-                    slamManager.saveModel(mapPath)
+                    baseBitmaps.clear()
+                    layerStrokes.clear()
+                    undoStack.clear()
+                    redoStack.clear()
                 }
             }
         }
@@ -139,9 +153,12 @@ class EditorViewModel @Inject constructor(
     fun setEditorMode(mode: EditorMode) = _uiState.update { it.copy(editorMode = mode) }
 
     private fun pushHistory() {
-        val currentLayers = _uiState.value.layers
-        if (undoStack.isNotEmpty() && undoStack.last() == currentLayers) return
-        undoStack.addLast(currentLayers)
+        val layersWithoutBitmaps = _uiState.value.layers.map { it.copy(bitmap = null) }
+        if (undoStack.isNotEmpty()) {
+            val last = undoStack.last()
+            if (last is EditCommand.PropertyChange && last.oldLayers == layersWithoutBitmaps) return
+        }
+        undoStack.addLast(EditCommand.PropertyChange(layersWithoutBitmaps))
         if (undoStack.size > maxStackSize) undoStack.removeFirst()
         redoStack.clear()
         updateHistoryCounts()
@@ -153,18 +170,124 @@ class EditorViewModel @Inject constructor(
 
     override fun onUndoClicked() {
         if (undoStack.isEmpty()) return
-        redoStack.addLast(_uiState.value.layers)
-        _uiState.update { it.copy(layers = undoStack.removeLast()) }
+        val command = undoStack.removeLast()
+
+        when(command) {
+            is EditCommand.Draw -> {
+                redoStack.addLast(command)
+                val strokes = layerStrokes[command.layerId] ?: return
+                strokes.removeLast()
+                rebuildLayerBitmap(command.layerId)
+            }
+            is EditCommand.PropertyChange -> {
+                val currentProps = _uiState.value.layers.map { it.copy(bitmap = null) }
+                redoStack.addLast(EditCommand.PropertyChange(currentProps))
+
+                val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
+                val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
+                _uiState.update { it.copy(layers = restoredLayers) }
+                saveProject()
+            }
+        }
         updateHistoryCounts()
-        saveProject()
     }
 
     override fun onRedoClicked() {
         if (redoStack.isEmpty()) return
-        undoStack.addLast(_uiState.value.layers)
-        _uiState.update { it.copy(layers = redoStack.removeLast()) }
+        val command = redoStack.removeLast()
+
+        when(command) {
+            is EditCommand.Draw -> {
+                undoStack.addLast(command)
+                val strokes = layerStrokes[command.layerId] ?: mutableListOf()
+                strokes.add(command.command)
+                layerStrokes[command.layerId] = strokes
+                rebuildLayerBitmap(command.layerId)
+            }
+            is EditCommand.PropertyChange -> {
+                val currentProps = _uiState.value.layers.map { it.copy(bitmap = null) }
+                undoStack.addLast(EditCommand.PropertyChange(currentProps))
+
+                val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
+                val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
+                _uiState.update { it.copy(layers = restoredLayers) }
+                saveProject()
+            }
+        }
         updateHistoryCounts()
-        saveProject()
+    }
+
+    private fun rebuildLayerBitmap(layerId: String) {
+        val base = baseBitmaps[layerId] ?: return
+        val strokes = layerStrokes[layerId] ?: emptyList()
+
+        viewModelScope.launch(dispatchers.default) {
+            var currentBitmap = base.copy(Bitmap.Config.ARGB_8888, true)
+
+            for (stroke in strokes) {
+                val mapped = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.mapScreenToBitmap(
+                    stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height
+                )
+                currentBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
+                    currentBitmap, mapped, stroke.tool, stroke.brushSize, stroke.brushColor, stroke.intensity, true
+                )
+            }
+
+            withContext(dispatchers.main) {
+                _uiState.update { state ->
+                    state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(bitmap = currentBitmap) else it })
+                }
+                val layer = _uiState.value.layers.find { it.id == layerId } ?: return@withContext
+                scheduleDiskSave(layerId, currentBitmap, layer.uri)
+            }
+        }
+    }
+
+    fun processNewStroke(layerId: String, activeBitmap: Bitmap, command: StrokeCommand, layer: Layer) {
+        val currentStrokes = layerStrokes[layerId] ?: mutableListOf()
+        currentStrokes.add(command)
+        layerStrokes[layerId] = currentStrokes
+
+        undoStack.addLast(EditCommand.Draw(layerId, command))
+        if (undoStack.size > maxStackSize) undoStack.removeFirst()
+        redoStack.clear()
+        updateHistoryCounts()
+
+        viewModelScope.launch(dispatchers.default) {
+            val mappedStroke = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.mapScreenToBitmap(
+                command.path,
+                command.canvasSize.width, command.canvasSize.height,
+                activeBitmap.width, activeBitmap.height
+            )
+
+            val newBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
+                activeBitmap, mappedStroke, command.tool, command.brushSize, command.brushColor, command.intensity, false
+            )
+
+            withContext(dispatchers.main) {
+                _uiState.update { state ->
+                    state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(bitmap = newBitmap) else it })
+                }
+            }
+
+            scheduleDiskSave(layerId, newBitmap, layer.uri)
+        }
+    }
+
+    private fun scheduleDiskSave(layerId: String, bitmap: Bitmap, uri: Uri?) {
+        val path = uri?.path ?: return
+        pendingSaveJob?.cancel()
+        pendingSaveJob = viewModelScope.launch(dispatchers.io) {
+            kotlinx.coroutines.delay(1500)
+            try {
+                val file = java.io.File(path)
+                java.io.FileOutputStream(file).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override fun onAddLayer(uri: Uri) {
@@ -174,10 +297,7 @@ class EditorViewModel @Inject constructor(
             val projectId = _uiState.value.projectId
             if (bitmap != null && projectId != null) {
                 val filename = "layer_${UUID.randomUUID()}.png"
-                val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(
-                    bitmap
-                )
-                )
+                val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
                 val localUri = "file://$path".toUri()
 
                 val newLayer = Layer(
@@ -187,8 +307,11 @@ class EditorViewModel @Inject constructor(
                     bitmap = bitmap,
                     isVisible = true
                 )
+
+                baseBitmaps[newLayer.id] = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                layerStrokes[newLayer.id] = mutableListOf()
+
                 withContext(dispatchers.main) {
-                    // FIX: Reset tool to NONE so transforming the new image is the immediate default
                     _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE) }
                     saveProject()
                 }
@@ -222,7 +345,10 @@ class EditorViewModel @Inject constructor(
                     bitmap = blankBitmap,
                     uri = localUri
                 )
-                // FIX: Reset tool to NONE
+
+                baseBitmaps[newLayer.id] = blankBitmap.copy(Bitmap.Config.ARGB_8888, false)
+                layerStrokes[newLayer.id] = mutableListOf()
+
                 _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE) }
                 saveProject()
             }
@@ -352,7 +478,6 @@ class EditorViewModel @Inject constructor(
     fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     fun setActiveTool(tool: Tool) = _uiState.update { it.copy(activeTool = tool) }
 
-    // FIX: Ensure switching layers forces a reset to transform mode
     override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id, activeTool = Tool.NONE) }
 
     override fun onLayerRemoved(id: String) {
@@ -361,6 +486,8 @@ class EditorViewModel @Inject constructor(
             val updated = state.layers.filter { it.id != id }
             state.copy(layers = updated, activeLayerId = if (state.activeLayerId == id) updated.firstOrNull()?.id else state.activeLayerId, activeTool = Tool.NONE)
         }
+        baseBitmaps.remove(id)
+        layerStrokes.remove(id)
         saveProject()
     }
 
@@ -429,7 +556,13 @@ class EditorViewModel @Inject constructor(
             withContext(dispatchers.main) {
                 _uiState.update { state ->
                     val updatedLayers = state.layers.map {
-                        if (it.id == id) it.copy(uri = uri, bitmap = bitmap) else it
+                        if (it.id == id) {
+                            bitmap?.let { bmp ->
+                                baseBitmaps[id] = bmp.copy(Bitmap.Config.ARGB_8888, false)
+                                layerStrokes[id] = mutableListOf()
+                            }
+                            it.copy(uri = uri, bitmap = bitmap)
+                        } else it
                     }
                     state.copy(layers = updatedLayers)
                 }
@@ -545,8 +678,12 @@ class EditorViewModel @Inject constructor(
                 uri = newUri
             )
 
+            newBitmap?.let { bmp ->
+                baseBitmaps[duplicated.id] = bmp.copy(Bitmap.Config.ARGB_8888, false)
+                layerStrokes[duplicated.id] = mutableListOf()
+            }
+
             withContext(dispatchers.main) {
-                // FIX: Duplication resets to NONE as well
                 _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id, activeTool = Tool.NONE) }
                 saveProject()
             }
@@ -568,7 +705,7 @@ class EditorViewModel @Inject constructor(
     override fun onOnboardingComplete(mode: Any) {}
 
     override fun onDrawingPathFinished(path: List<Offset>, canvasSize: IntSize) {
-        applyStrokeToActiveLayer(path, canvasSize, slamManager)
+        applyStrokeToActiveLayer(path, canvasSize)
     }
 
     override fun onColorClicked() {

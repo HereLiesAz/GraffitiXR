@@ -35,6 +35,7 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.Tool
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
@@ -163,7 +164,7 @@ class MainActivity : ComponentActivity() {
                     if (isRailVisible) {
                         configureRail(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
-                            overlayImagePicker, backgroundImagePicker, editorUiState
+                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState
                         )
                     }
 
@@ -340,7 +341,8 @@ class MainActivity : ComponentActivity() {
         dashboardViewModel: DashboardViewModel,
         overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
-        editorUiState: EditorUiState
+        editorUiState: EditorUiState,
+        arUiState: ArUiState
     ) {
         val navStrings = NavStrings()
 
@@ -366,32 +368,45 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
+        val isArOrOverlay = editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY
+        val hasSufficientSplats = arUiState.splatCount >= 50000
+
+        if (isArOrOverlay) {
             azRailHostItem(id = "target_host", text = navStrings.grid)
-            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
-                if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+
+            if (hasSufficientSplats) {
+                azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
+                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+                }
+            } else {
+                azRailSubItem(id = "scan_wait", hostId = "target_host", text = "Scan: ${arUiState.splatCount/1000}k/50k", shape = AzButtonShape.NONE) {}
             }
+
             azRailSubItem(id = "key", hostId = "target_host", text = "Keyframe", shape = AzButtonShape.NONE) {
                 arViewModel.captureKeyframe()
             }
             azDivider()
         }
 
-        azRailHostItem(id = "design_host", text = navStrings.design)
-        azRailSubItem(id = "add_img", hostId = "design_host", text = "Image", shape = AzButtonShape.NONE) {
-            overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-        }
-        azRailSubItem(id = "add_draw", hostId = "design_host", text = "Draw", shape = AzButtonShape.NONE) {
-            editorViewModel.onAddBlankLayer()
-        }
+        val canEdit = if (isArOrOverlay) arUiState.isScanning && hasSufficientSplats else true
 
-        if (editorUiState.editorMode == EditorMode.MOCKUP) {
-            azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, shape = AzButtonShape.NONE) {
-                backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        if (canEdit) {
+            azRailHostItem(id = "design_host", text = navStrings.design)
+            azRailSubItem(id = "add_img", hostId = "design_host", text = "Image", shape = AzButtonShape.NONE) {
+                overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
-        }
+            azRailSubItem(id = "add_draw", hostId = "design_host", text = "Draw", shape = AzButtonShape.NONE) {
+                editorViewModel.onAddBlankLayer()
+            }
 
-        azDivider()
+            if (editorUiState.editorMode == EditorMode.MOCKUP) {
+                azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, shape = AzButtonShape.NONE) {
+                    backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+            }
+
+            azDivider()
+        }
 
         azRailHostItem(id = "project_host", text = navStrings.project)
         azRailSubItem(id = "new", hostId = "project_host", text = navStrings.new, shape = AzButtonShape.NONE) {
@@ -414,84 +429,86 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        editorUiState.layers.reversed().forEach { layer ->
-            azRailRelocItem(
-                id = "layer_${layer.id}",
-                hostId = "design_host",
-                text = layer.name,
-                nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
-                keepNestedRailOpen = true,
-                onClick = {
-                    editorViewModel.onLayerActivated(layer.id)
-                },
-                onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
-                nestedContent = {
-                    val activate = { editorViewModel.onLayerActivated(layer.id) }
+        if (canEdit) {
+            editorUiState.layers.reversed().forEach { layer ->
+                azRailRelocItem(
+                    id = "layer_${layer.id}",
+                    hostId = "design_host",
+                    text = layer.name,
+                    nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
+                    keepNestedRailOpen = true,
+                    onClick = {
+                        editorViewModel.onLayerActivated(layer.id)
+                    },
+                    onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
+                    nestedContent = {
+                        val activate = { editorViewModel.onLayerActivated(layer.id) }
 
-                    val addSizeItem: () -> Unit = {
-                        azRailItem(
-                            id = "size_${layer.id}",
-                            text = "Size",
-                            shape = AzButtonShape.RECTANGLE,
-                            content = AzComposableContent {
-                                val liveState by editorViewModel.uiState.collectAsState()
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .pointerInput(Unit) {
-                                            detectVerticalDragGestures { change, dragAmount ->
-                                                change.consume()
-                                                val currentSize = editorViewModel.uiState.value.brushSize
-                                                editorViewModel.setBrushSize(currentSize - dragAmount * 0.5f)
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
+                        val addSizeItem: () -> Unit = {
+                            azRailItem(
+                                id = "size_${layer.id}",
+                                text = "Size",
+                                shape = AzButtonShape.RECTANGLE,
+                                content = AzComposableContent {
+                                    val liveState by editorViewModel.uiState.collectAsState()
                                     Box(
                                         modifier = Modifier
-                                            .size((liveState.brushSize / 2f).coerceIn(4f, 64f).dp)
-                                            .background(Color.White, CircleShape)
-                                    )
+                                            .fillMaxSize()
+                                            .pointerInput(Unit) {
+                                                detectVerticalDragGestures { change, dragAmount ->
+                                                    change.consume()
+                                                    val currentSize = editorViewModel.uiState.value.brushSize
+                                                    editorViewModel.setBrushSize(currentSize - dragAmount * 0.5f)
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size((liveState.brushSize / 2f).coerceIn(4f, 64f).dp)
+                                                .background(Color.White, CircleShape)
+                                        )
+                                    }
                                 }
-                            }
-                        )
-                    }
-
-                    if (layer.isSketch) {
-                        azRailItem(id = "brush_${layer.id}", text = "Brush", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
-                        azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                        azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                        azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                        azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
-
-                        addSizeItem()
-
-                        azRailItem(id = "color_${layer.id}", text = "Color", shape = AzButtonShape.RECTANGLE, content = editorUiState.activeColor) {
-                            activate()
-                            editorViewModel.setActiveTool(Tool.COLOR)
-                            editorViewModel.onColorClicked()
+                            )
                         }
-                        azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
-                    } else {
-                        azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
-                        azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onLineDrawingClicked() }
-                        azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
-                        azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                        azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                        azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                        azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
 
-                        addSizeItem()
+                        if (layer.isSketch) {
+                            azRailItem(id = "brush_${layer.id}", text = "Brush", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
+                            azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                            azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                            azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                            azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
 
-                        azRailItem(id = "balance_${layer.id}", text = "Balance", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onBalanceClicked() }
+                            addSizeItem()
+
+                            azRailItem(id = "color_${layer.id}", text = "Color", shape = AzButtonShape.RECTANGLE, content = editorUiState.activeColor) {
+                                activate()
+                                editorViewModel.setActiveTool(Tool.COLOR)
+                                editorViewModel.onColorClicked()
+                            }
+                            azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
+                        } else {
+                            azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
+                            azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onLineDrawingClicked() }
+                            azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
+                            azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                            azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                            azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                            azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
+
+                            addSizeItem()
+
+                            azRailItem(id = "balance_${layer.id}", text = "Balance", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onBalanceClicked() }
+                        }
                     }
+                ) {
+                    inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
+                    listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
+                    listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
+                    listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
+                    listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
                 }
-            ) {
-                inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
-                listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
-                listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
-                listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
-                listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
             }
         }
 

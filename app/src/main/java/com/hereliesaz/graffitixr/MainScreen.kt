@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt
 package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
@@ -22,6 +23,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.core.content.ContextCompat
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -116,7 +118,8 @@ fun MainScreen(
                                 setZOrderMediaOverlay(true)
                                 holder.setFormat(PixelFormat.TRANSLUCENT)
                                 setRenderer(renderer)
-                                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                                // Stop melting the GPU. Render only when requested.
+                                renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
                             }
                             glView = view
                             view
@@ -136,10 +139,16 @@ fun MainScreen(
                     DisposableEffect(Unit) {
                         onDispose {
                             try {
-                                val cameraProviderFuture =
-                                    ProcessCameraProvider.getInstance(context)
-                                val provider = cameraProviderFuture.get()
-                                provider.unbindAll()
+                                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+                                // Extract teardown from the UI thread block
+                                cameraProviderFuture.addListener({
+                                    try {
+                                        val provider = cameraProviderFuture.get()
+                                        provider.unbindAll()
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }, ContextCompat.getMainExecutor(context))
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }

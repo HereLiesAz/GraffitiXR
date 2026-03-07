@@ -4,118 +4,98 @@ package com.hereliesaz.graffitixr.common.util
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import org.opencv.android.Utils
-import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
-import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
-import java.util.ArrayList
-import kotlin.math.min
-import androidx.core.graphics.createBitmap
-import androidx.core.graphics.scale
+import kotlin.math.hypot
+import kotlin.math.max
 
 object ImageProcessor {
 
-    private const val MAX_DIMENSION = 2048
-
-    private fun resizeIfTooLarge(bitmap: Bitmap): Bitmap {
-        if (bitmap.width <= MAX_DIMENSION && bitmap.height <= MAX_DIMENSION) return bitmap
-        val ratio = min(MAX_DIMENSION.toFloat() / bitmap.width, MAX_DIMENSION.toFloat() / bitmap.height)
-        val width = (bitmap.width * ratio).toInt()
-        val height = (bitmap.height * ratio).toInt()
-        return bitmap.scale(width, height)
-    }
-
     fun detectEdges(bitmap: Bitmap): Bitmap? {
-        val src = Mat()
-        val edges = Mat()
-        val dest = Mat()
-        val gray = Mat()
-        val white = Mat()
-        var safeBitmap: Bitmap? = null
+        return try {
+            val srcMat = Mat()
+            Utils.bitmapToMat(bitmap, srcMat)
 
-        try {
-            safeBitmap = resizeIfTooLarge(bitmap)
-            Utils.bitmapToMat(safeBitmap, src)
+            val grayMat = Mat()
+            Imgproc.cvtColor(srcMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
 
-            if (src.channels() == 4) {
-                Imgproc.cvtColor(src, gray, Imgproc.COLOR_RGBA2GRAY)
-            } else {
-                Imgproc.cvtColor(src, gray, Imgproc.COLOR_RGB2GRAY)
-            }
+            val edgesMat = Mat()
+            Imgproc.Canny(grayMat, edgesMat, 50.0, 150.0)
 
-            Imgproc.Canny(gray, edges, 50.0, 150.0)
+            org.opencv.core.Core.bitwise_not(edgesMat, edgesMat)
 
-            val rows = src.rows()
-            val cols = src.cols()
+            val dstMat = Mat()
+            Imgproc.cvtColor(edgesMat, dstMat, Imgproc.COLOR_GRAY2RGBA)
 
-            white.create(rows, cols, CvType.CV_8UC1)
-            white.setTo(Scalar(255.0))
+            val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(dstMat, resultBitmap)
 
-            val channels = ArrayList<Mat>()
-            channels.add(white)
-            channels.add(white)
-            channels.add(white)
-            channels.add(edges)
+            srcMat.release()
+            grayMat.release()
+            edgesMat.release()
+            dstMat.release()
 
-            Core.merge(channels, dest)
-
-            val resultBitmap = createBitmap(safeBitmap.width, safeBitmap.height)
-            Utils.matToBitmap(dest, resultBitmap)
-            return resultBitmap
+            resultBitmap
         } catch (e: Exception) {
             e.printStackTrace()
-            return null
-        } finally {
-            src.release(); gray.release(); edges.release(); dest.release(); white.release()
-            if (safeBitmap != null && safeBitmap !== bitmap) {
-                safeBitmap.recycle()
-            }
+            null
         }
     }
 
     fun unwarpImage(bitmap: Bitmap, points: List<Offset>): Bitmap? {
         if (points.size != 4) return null
-        val src = Mat()
-        val dest = Mat()
-        val srcPoints = MatOfPoint2f()
-        val dstPoints = MatOfPoint2f()
-        val perspectiveTransform = Mat()
-        var safeBitmap: Bitmap? = null
 
-        try {
-            safeBitmap = resizeIfTooLarge(bitmap)
-            Utils.bitmapToMat(safeBitmap, src)
-            val w = src.width().toDouble()
-            val h = src.height().toDouble()
+        return try {
+            val srcMat = Mat()
+            Utils.bitmapToMat(bitmap, srcMat)
 
-            srcPoints.fromArray(
-                Point(points[0].x.toDouble() * w, points[0].y.toDouble() * h),
-                Point(points[1].x.toDouble() * w, points[1].y.toDouble() * h),
-                Point(points[2].x.toDouble() * w, points[2].y.toDouble() * h),
-                Point(points[3].x.toDouble() * w, points[3].y.toDouble() * h)
+            val p0 = Point(points[0].x.toDouble(), points[0].y.toDouble()) // TL
+            val p1 = Point(points[1].x.toDouble(), points[1].y.toDouble()) // TR
+            val p2 = Point(points[2].x.toDouble(), points[2].y.toDouble()) // BR
+            val p3 = Point(points[3].x.toDouble(), points[3].y.toDouble()) // BL
+
+            val widthA = hypot(p2.x - p3.x, p2.y - p3.y)
+            val widthB = hypot(p1.x - p0.x, p1.y - p0.y)
+            val maxWidth = max(widthA, widthB).toInt()
+
+            val heightA = hypot(p1.x - p2.x, p1.y - p2.y)
+            val heightB = hypot(p0.x - p3.x, p0.y - p3.y)
+            val maxHeight = max(heightA, heightB).toInt()
+
+            if (maxWidth <= 0 || maxHeight <= 0) {
+                srcMat.release()
+                return null
+            }
+
+            val srcPts = MatOfPoint2f(p0, p1, p2, p3)
+            val dstPts = MatOfPoint2f(
+                Point(0.0, 0.0),
+                Point(maxWidth.toDouble() - 1, 0.0),
+                Point(maxWidth.toDouble() - 1, maxHeight.toDouble() - 1),
+                Point(0.0, maxHeight.toDouble() - 1)
             )
-            dstPoints.fromArray(Point(0.0, 0.0), Point(w, 0.0), Point(w, h), Point(0.0, h))
 
-            val pTransform = Imgproc.getPerspectiveTransform(srcPoints, dstPoints)
-            pTransform.copyTo(perspectiveTransform)
+            val transform = Imgproc.getPerspectiveTransform(srcPts, dstPts)
+            val dstMat = Mat()
+            Imgproc.warpPerspective(srcMat, dstMat, transform, Size(maxWidth.toDouble(), maxHeight.toDouble()))
 
-            Imgproc.warpPerspective(src, dest, perspectiveTransform, Size(w, h))
+            val resultBitmap = Bitmap.createBitmap(maxWidth, maxHeight, Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(dstMat, resultBitmap)
 
-            val resultBitmap = createBitmap(safeBitmap.width, safeBitmap.height)
-            Utils.matToBitmap(dest, resultBitmap)
-            return resultBitmap
+            srcMat.release()
+            dstMat.release()
+            transform.release()
+            srcPts.release()
+            dstPts.release()
+
+            resultBitmap
         } catch (e: Exception) {
             e.printStackTrace()
-            return null
-        } finally {
-            src.release(); srcPoints.release(); dstPoints.release(); perspectiveTransform.release(); dest.release()
-            if (safeBitmap != null && safeBitmap !== bitmap) {
-                safeBitmap.recycle()
-            }
+            null
         }
     }
 }
