@@ -1076,11 +1076,16 @@ void MobileGS::draw() {
 
     glEnable(GL_DEPTH_TEST);
 
-    // Apply Teleological Anchor to View using GLM for speed
     glm::mat4 V = glm::make_mat4(mViewMatrix);
     glm::mat4 A = glm::make_mat4(mAnchorMatrix);
     glm::mat4 P = glm::make_mat4(mProjMatrix);
+
+    // Splats use the anchor (object is anchored to a tracked pose)
     glm::mat4 mvp = P * V * A;
+
+    // FIX: Wireframe mesh vertices are in world space — do NOT apply the anchor matrix.
+    // Applying A caused all lines to converge toward the anchor origin (screen center).
+    glm::mat4 meshMvp = P * V;
 
     // --- 1. Draw Splats ---
     glUseProgram(mProgram);
@@ -1133,7 +1138,7 @@ void MobileGS::draw() {
         glUseProgram(mMeshProgram);
 
         GLint meshMvpLoc = glGetUniformLocation(mMeshProgram, "uMvp");
-        glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+        glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, glm::value_ptr(meshMvp)); // uses P*V only
 
         GLint colorLoc = glGetUniformLocation(mMeshProgram, "uColor");
         glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f); // Cyan, 20% alpha
