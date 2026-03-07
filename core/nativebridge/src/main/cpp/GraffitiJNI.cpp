@@ -114,7 +114,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
-float gLastViewMatrix[16];
+float gLastViewMatrix[16];        // display-rotation-corrected, for rendering
+float gLastSensorViewMatrix[16];  // sensor-space, for depth unprojection
 float gLastProjMatrix[16];
 bool gHasCameraMatrices = false;
 
@@ -211,14 +212,33 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
-        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride) {
+        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride,
+        jfloatArray sensorViewMatrix) {
 
-    if (!gSlamEngine || gLastColorFrame.empty()) return;
+    LOGD("DEPTH_PIPE: feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
+
+    // Store the sensor-space view matrix for use in depth unprojection.
+    // This differs from gLastViewMatrix (display-rotation-corrected) which is used
+    // only for rendering. Depth pixels are in sensor (landscape) orientation.
+    {
+        jfloat* svm = env->GetFloatArrayElements(sensorViewMatrix, nullptr);
+        if (svm) {
+            memcpy(gLastSensorViewMatrix, svm, 16 * sizeof(float));
+            env->ReleaseFloatArrayElements(sensorViewMatrix, svm, JNI_ABORT);
+        }
+    }
+
+    if (!gSlamEngine) { LOGD("DEPTH_PIPE: DROPPED - no engine"); return; }
+    if (gLastColorFrame.empty()) { LOGD("DEPTH_PIPE: DROPPED - no color frame yet"); return; }
 
     auto* rawDepthBytes = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
-    if (!rawDepthBytes) return;
+    if (!rawDepthBytes) { LOGD("DEPTH_PIPE: DROPPED - null buffer"); return; }
 
     cv::Mat depthMap(height, width, CV_32F, cv::Scalar(0.0f));
+
+    int validPixels = 0;
+    int zeroConfPixels = 0;
+    float minD = 999.f, maxD = 0.f;
 
     for (int r = 0; r < height; r++) {
         auto* rowPtr = reinterpret_cast<const uint16_t*>(rawDepthBytes + (r * rowStride));
@@ -227,35 +247,50 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
             if (conf >= 1 && depthMm > 0) {
-                depthMap.at<float>(r, c) = depthMm / 1000.0f;
+                float d = depthMm / 1000.0f;
+                depthMap.at<float>(r, c) = d;
+                validPixels++;
+                if (d < minD) minD = d;
+                if (d > maxD) maxD = d;
+            } else if (conf == 0) {
+                zeroConfPixels++;
             }
         }
     }
 
-    // FIX: Resize depth to the true color image dimensions, not to gLastColorFrame's
-    // matrix size. Before this fix, if gLastColorFrame was an NV21 mat (rows = h*3/2),
-    // the depth was being stretched to match that inflated row count, completely
-    // corrupting the depth values passed to processDepthFrame.
+    LOGD("DEPTH_PIPE: decoded valid=%d zeroConf=%d range=%.2f-%.2fm colorFrame=%dx%d",
+         validPixels, zeroConfPixels, minD, maxD,
+         gLastColorFrame.cols, gLastColorFrame.rows);
+
+    if (validPixels == 0) {
+        LOGD("DEPTH_PIPE: DROPPED - all pixels invalid (no depth data)");
+        return;
+    }
+
     if (gColorImageWidth > 0 && gColorImageHeight > 0) {
         if (depthMap.cols != gColorImageWidth || depthMap.rows != gColorImageHeight) {
+            LOGD("DEPTH_PIPE: resizing depth %dx%d -> %dx%d",
+                 depthMap.cols, depthMap.rows, gColorImageWidth, gColorImageHeight);
             cv::resize(depthMap, depthMap, cv::Size(gColorImageWidth, gColorImageHeight),
                        0, 0, cv::INTER_NEAREST);
         }
     } else {
-        // Fallback: use gLastColorFrame dimensions (safe when frame is CV_8UC3).
         if (depthMap.cols != gLastColorFrame.cols || depthMap.rows != gLastColorFrame.rows) {
+            LOGD("DEPTH_PIPE: resizing depth (fallback) %dx%d -> %dx%d",
+                 depthMap.cols, depthMap.rows, gLastColorFrame.cols, gLastColorFrame.rows);
             cv::resize(depthMap, depthMap, gLastColorFrame.size(), 0, 0, cv::INTER_NEAREST);
         }
     }
 
-    if (gHasCameraMatrices) {
-        // FIX: gLastColorFrame is now always CV_8UC3 (RGB) — YUV conversion happens
-        // eagerly in nativeFeedYuvFrame. isYuv is therefore always false here.
-        // The old heuristic (gLastColorFrame.rows > height) was wrong for cases
-        // where depth and color have the same height, and catastrophically wrong
-        // when the color mat was an NV21 buffer with inflated row count.
-        gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, /*isYuv=*/false);
+    if (!gHasCameraMatrices) {
+        LOGD("DEPTH_PIPE: DROPPED - no camera matrices yet");
+        return;
     }
+
+    LOGD("DEPTH_PIPE: pushing frame to map thread depthSize=%dx%d",
+         depthMap.cols, depthMap.rows);
+    // Use sensor-space view matrix for depth unprojection (not display-rotation-corrected gLastViewMatrix)
+    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastSensorViewMatrix, gLastProjMatrix, /*isYuv=*/false);
 }
 
 JNIEXPORT void JNICALL
