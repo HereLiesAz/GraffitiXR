@@ -230,21 +230,14 @@ class ArRenderer(
                     try {
                         frame.acquireDepthImage16Bits().use { depthImage ->
                             val depthPlane = depthImage.planes[0]
-
-                            // Derive a sensor-space view matrix from camera.pose.
-                            // getViewMatrix() is display-rotation-corrected (for rendering).
-                            // Depth pixels are always in sensor/landscape orientation, so we
-                            // need the sensor-space inverse-pose matrix for correct unprojection.
-                            // camera.pose is the camera-to-world transform in sensor space.
-                            // Its inverse (world-to-camera) is the sensor-space view matrix.
-                            val sensorViewMatrix = FloatArray(16)
-                            camera.pose.inverse().toMatrix(sensorViewMatrix, 0)
-
+                            // Pass display rotation so C++ can rotate the depth image
+                            // from sensor orientation to display orientation before
+                            // unprojecting with the display-corrected view matrix.
                             slamManager.feedArCoreDepth(
                                 depthPlane.buffer,
                                 depthImage.width, depthImage.height,
                                 depthPlane.rowStride,
-                                sensorViewMatrix
+                                displayRotationHelper.getRotation()
                             )
                             depthFed = true
                             lastDepthW = depthImage.width; lastDepthH = depthImage.height
