@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr
 
 import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -23,7 +22,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.core.content.ContextCompat
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -118,7 +116,6 @@ fun MainScreen(
                                 setZOrderMediaOverlay(true)
                                 holder.setFormat(PixelFormat.TRANSLUCENT)
                                 setRenderer(renderer)
-                                // Stop melting the GPU. Render only when requested.
                                 renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
                             }
                             glView = view
@@ -134,25 +131,6 @@ fun MainScreen(
                 EditorMode.OVERLAY -> {
                     LaunchedEffect(arUiState.isFlashlightOn) {
                         cameraController.enableTorch(arUiState.isFlashlightOn)
-                    }
-
-                    DisposableEffect(Unit) {
-                        onDispose {
-                            try {
-                                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                                // Extract teardown from the UI thread block
-                                cameraProviderFuture.addListener({
-                                    try {
-                                        val provider = cameraProviderFuture.get()
-                                        provider.unbindAll()
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                    }
-                                }, ContextCompat.getMainExecutor(context))
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
                     }
 
                     CameraPreview(

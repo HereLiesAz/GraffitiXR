@@ -7,18 +7,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun rememberCameraController(): LifecycleCameraController {
     val context = LocalContext.current
     return remember {
         LifecycleCameraController(context).apply {
-            setEnabledUseCases(
-                LifecycleCameraController.IMAGE_CAPTURE or
-                        LifecycleCameraController.IMAGE_ANALYSIS
-            )
+            setEnabledUseCases(LifecycleCameraController.IMAGE_CAPTURE)
         }
     }
 }
@@ -31,20 +28,17 @@ fun CameraPreview(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     AndroidView(
-        factory = { ctx ->
-            PreviewView(ctx).apply {
+        factory = { context ->
+            PreviewView(context).apply {
                 this.controller = controller
-                controller.bindToLifecycle(lifecycleOwner)
-                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             }
         },
-        modifier = modifier,
         update = { view ->
-            if (view.controller != controller) {
-                view.controller = controller
-            }
-            // Bind required here so when switching modes it attaches properly. 
             controller.bindToLifecycle(lifecycleOwner)
+        },
+        modifier = modifier,
+        onRelease = {
+            controller.unbind()
         }
     )
 }
