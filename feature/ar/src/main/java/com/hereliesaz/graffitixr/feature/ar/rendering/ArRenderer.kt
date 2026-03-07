@@ -30,7 +30,8 @@ class ArRenderer(
     private val slamManager: SlamManager,
     private val onTargetCaptured: (Bitmap?, ByteBuffer?, Int, Int, FloatArray?) -> Unit,
     private val onTrackingUpdated: (Boolean, Int) -> Unit,
-    private val onLightUpdated: (Float) -> Unit
+    private val onLightUpdated: (Float) -> Unit,
+    private val onDiag: (String) -> Unit = {}
 ) : GLSurfaceView.Renderer {
 
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -43,6 +44,12 @@ class ArRenderer(
     private val displayRotationHelper = DisplayRotationHelper(context)
 
     private var frameCount = 0
+    private var diagFrameCount = 0
+    private var lastDepthSupported: Boolean? = null
+    private var lastTrackingState: Boolean? = null
+    private var lastDepthW = 0
+    private var lastDepthH = 0
+    private var lastDepthNotYetAvailable = false
     private var pendingFlashlightMode: Boolean? = null
     private var isSurfaceCreated = false
 
@@ -198,7 +205,11 @@ class ArRenderer(
                 }
             }
 
+            val depthSupported = activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+
             if (frameCount++ % 2 == 0) {
+                var colorFed = false
+                var colorW = 0; var colorH = 0
                 try {
                     frame.acquireCameraImage().use { image ->
                         val planes = image.planes
@@ -208,16 +219,56 @@ class ArRenderer(
                             planes[0].rowStride, planes[1].rowStride, planes[1].pixelStride,
                             frame.timestamp
                         )
-                    }
-                    if (activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
-                        try {
-                            frame.acquireDepthImage16Bits().use { depthImage ->
-                                val depthPlane = depthImage.planes[0]
-                                slamManager.feedArCoreDepth(depthPlane.buffer, depthImage.width, depthImage.height, depthPlane.rowStride)
-                            }
-                        } catch (e: NotYetAvailableException) {}
+                        colorFed = true
+                        colorW = image.width; colorH = image.height
                     }
                 } catch (e: Exception) {}
+
+                var depthFed = false
+                lastDepthNotYetAvailable = false
+                if (depthSupported) {
+                    try {
+                        frame.acquireDepthImage16Bits().use { depthImage ->
+                            val depthPlane = depthImage.planes[0]
+
+                            // Derive a sensor-space view matrix from camera.pose.
+                            // getViewMatrix() is display-rotation-corrected (for rendering).
+                            // Depth pixels are always in sensor/landscape orientation, so we
+                            // need the sensor-space inverse-pose matrix for correct unprojection.
+                            // camera.pose is the camera-to-world transform in sensor space.
+                            // Its inverse (world-to-camera) is the sensor-space view matrix.
+                            val sensorViewMatrix = FloatArray(16)
+                            camera.pose.inverse().toMatrix(sensorViewMatrix, 0)
+
+                            slamManager.feedArCoreDepth(
+                                depthPlane.buffer,
+                                depthImage.width, depthImage.height,
+                                depthPlane.rowStride,
+                                sensorViewMatrix
+                            )
+                            depthFed = true
+                            lastDepthW = depthImage.width; lastDepthH = depthImage.height
+                        }
+                    } catch (e: NotYetAvailableException) {
+                        lastDepthNotYetAvailable = true
+                    } catch (e: Exception) {}
+                }
+
+                // Emit diag every 30 fed frames (~2 seconds at 30fps/every-other)
+                diagFrameCount++
+                if (diagFrameCount % 30 == 0) {
+                    val splatCount = slamManager.getSplatCount()
+                    val sb = StringBuilder()
+                    sb.appendLine("=== Frame #$diagFrameCount ===")
+                    sb.appendLine("Tracking: $isTracking")
+                    sb.appendLine("DepthAPI: $depthSupported")
+                    sb.appendLine("Color fed: $colorFed  ${colorW}x${colorH}")
+                    sb.appendLine("Depth fed: $depthFed")
+                    if (!depthFed && depthSupported) sb.appendLine("  ↳ NotYetAvailable: $lastDepthNotYetAvailable")
+                    if (depthFed) sb.appendLine("  ↳ ${lastDepthW}x${lastDepthH}")
+                    sb.appendLine("Splats: $splatCount")
+                    onDiag(sb.toString().trimEnd())
+                }
             }
 
             slamManager.draw()
