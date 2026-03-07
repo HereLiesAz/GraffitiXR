@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -225,7 +226,8 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .align(Alignment.TopCenter)
                                         .padding(top = 72.dp)
-                                        .background(Color.Black.copy(alpha = 0.7f), shape = RoundedCornerShape(16.dp))
+                                        .graphicsLayer()
+                                        .background(Color(0xFF1A1A1A), shape = RoundedCornerShape(16.dp))
                                         .padding(16.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
