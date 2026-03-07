@@ -8,7 +8,8 @@ buildscript {
         "org.bitbucket.b_c:jose4j:0.9.6",
         "org.apache.commons:commons-lang3:3.20.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
-        "com.google.guava:guava:33.4.0-jre"
+        "com.google.guava:guava:33.4.0-jre",
+        "com.google.android.gms:play-services-basement:18.0.2"
     )
     val protobufModules = listOf(
         "com.google.protobuf:protobuf-java",
@@ -57,7 +58,8 @@ val commonForcedDependencies = listOf(
     "org.bitbucket.b_c:jose4j:0.9.6",
     "org.apache.commons:commons-lang3:3.20.0",
     "org.apache.httpcomponents:httpclient:4.5.14",
-    "com.google.guava:guava:33.4.0-jre"
+    "com.google.guava:guava:33.4.0-jre",
+    "com.google.android.gms:play-services-basement:18.0.2"
 )
 
 val protobufModules = listOf(
