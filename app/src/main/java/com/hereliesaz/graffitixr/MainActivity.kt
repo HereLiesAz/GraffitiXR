@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.font.FontFamily
@@ -628,7 +629,6 @@ class MainActivity : ComponentActivity() {
 // the scan is. Below it, a hint line animates whenever the specific guidance
 // message changes — telling the user exactly what they need to do more of.
 
-@androidx.compose.runtime.Composable
 @Composable
 private fun DiagPopup(
     diagLog: String?,
@@ -691,6 +691,7 @@ private fun DiagPopup(
     }
 }
 
+@Composable
 private fun ScanCoachingOverlay(
     splatCount: Int,
     hint: String?,
