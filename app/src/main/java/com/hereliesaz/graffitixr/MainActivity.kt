@@ -10,6 +10,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
@@ -24,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -222,26 +230,13 @@ class MainActivity : ComponentActivity() {
 
                             val isScanningPhase = editorUiState.editorMode == EditorMode.AR && arUiState.splatCount < 50000
                             if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
-                                Box(
+                                ScanCoachingOverlay(
+                                    splatCount = arUiState.splatCount,
+                                    hint = arUiState.scanHint,
                                     modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .padding(top = 72.dp)
-                                        .graphicsLayer()
-                                        .background(Color(0xFF1A1A1A), shape = RoundedCornerShape(16.dp))
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("Mapping Environment...", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        LinearProgressIndicator(
-                                            progress = { (arUiState.splatCount / 50000f).coerceIn(0f, 1f) },
-                                            modifier = Modifier.width(200.dp),
-                                            color = Color.Cyan
-                                        )
-                                        Text("${arUiState.splatCount} / 50000 Splats", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                }
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 96.dp)
+                                )
                             }
 
                             if (mainUiState.isCapturingTarget) {
@@ -613,5 +608,80 @@ class MainActivity : ComponentActivity() {
         }
 
         azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
+    }
+}
+
+// ─── Scan coaching overlay ────────────────────────────────────────────────────
+// Sits just above the bottom rail. A small progress pill shows how far along
+// the scan is. Below it, a hint line animates whenever the specific guidance
+// message changes — telling the user exactly what they need to do more of.
+
+@androidx.compose.runtime.Composable
+private fun ScanCoachingOverlay(
+    splatCount: Int,
+    hint: String?,
+    modifier: Modifier = Modifier
+) {
+    androidx.compose.foundation.layout.Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // Hint line — animates out when the message changes so updates feel deliberate
+        AnimatedVisibility(
+            visible = hint != null,
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit  = fadeOut() + slideOutVertically { it / 2 }
+        ) {
+            AnimatedContent(
+                targetState = hint ?: "",
+                transitionSpec = {
+                    (fadeIn() + slideInVertically { -it / 3 })
+                        .togetherWith(fadeOut() + slideOutVertically { it / 3 })
+                },
+                label = "scan_hint"
+            ) { text ->
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .background(
+                            Color(0xCC000000),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(horizontal = 16.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        text = text,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        // Slim progress pill — counts up without being distracting
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress = { (splatCount / 50_000f).coerceIn(0f, 1f) },
+                    modifier = Modifier.width(100.dp),
+                    color = Color.Cyan,
+                    trackColor = Color.White.copy(alpha = 0.2f)
+                )
+                Text(
+                    text = "${splatCount / 1000}k / 50k",
+                    color = Color.LightGray,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
     }
 }
