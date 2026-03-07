@@ -16,6 +16,13 @@ cv::Mat gLastColorFrame;
 int gFrameCount = 0;
 JavaVM* gJvm = nullptr;
 
+// FIX: Track the actual image pixel dimensions separately from gLastColorFrame's
+// matrix dimensions. When gLastColorFrame stores raw NV21 data, its rows =
+// imageHeight * 3/2, which is NOT the same as the camera image height.
+// These two ints always hold the true image resolution.
+static int gColorImageWidth  = 0;
+static int gColorImageHeight = 0;
+
 void bitmapToMat(JNIEnv * env, jobject bitmap, cv::Mat& dst) {
     AndroidBitmapInfo info;
     void* pixels = 0;
@@ -154,6 +161,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
 
     if (!yData || !uData || !vData) return;
 
+    // Record true image dimensions before any YUV packing.
+    gColorImageWidth  = width;
+    gColorImageHeight = height;
+
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
     cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvStride);
     cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvStride);
@@ -172,18 +183,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     } else if (uvPixelStride == 2) {
         cv::Mat uvInterleaved(height / 2, width, CV_8UC1, vData, uvStride);
         uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
-        gLastColorFrame = yuv.clone();
+        // Convert NV21 to RGB immediately so gLastColorFrame is always CV_8UC3.
+        // This avoids the ambiguous row-count isYuv heuristic in the depth path.
+        cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_NV21);
     } else {
         cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
     }
 
-    if (gLastColorFrame.type() == CV_8UC3) {
-        gSlamEngine->scheduleRelocCheck(gLastColorFrame);
-    } else if (uvPixelStride == 2) {
-        cv::Mat rgb;
-        cv::cvtColor(gLastColorFrame, rgb, cv::COLOR_YUV2RGB_NV21);
-        gSlamEngine->scheduleRelocCheck(rgb);
-    }
+    gSlamEngine->scheduleRelocCheck(gLastColorFrame);
 }
 
 JNIEXPORT void JNICALL
@@ -192,6 +199,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
     if (!buffer || !gSlamEngine) return;
+
+    gColorImageWidth  = width;
+    gColorImageHeight = height;
 
     cv::Mat frame(height, width, CV_8UC4, buffer);
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
@@ -222,13 +232,29 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         }
     }
 
-    if (depthMap.cols != gLastColorFrame.cols || depthMap.rows != gLastColorFrame.rows) {
-        cv::resize(depthMap, depthMap, gLastColorFrame.size(), 0, 0, cv::INTER_NEAREST);
+    // FIX: Resize depth to the true color image dimensions, not to gLastColorFrame's
+    // matrix size. Before this fix, if gLastColorFrame was an NV21 mat (rows = h*3/2),
+    // the depth was being stretched to match that inflated row count, completely
+    // corrupting the depth values passed to processDepthFrame.
+    if (gColorImageWidth > 0 && gColorImageHeight > 0) {
+        if (depthMap.cols != gColorImageWidth || depthMap.rows != gColorImageHeight) {
+            cv::resize(depthMap, depthMap, cv::Size(gColorImageWidth, gColorImageHeight),
+                       0, 0, cv::INTER_NEAREST);
+        }
+    } else {
+        // Fallback: use gLastColorFrame dimensions (safe when frame is CV_8UC3).
+        if (depthMap.cols != gLastColorFrame.cols || depthMap.rows != gLastColorFrame.rows) {
+            cv::resize(depthMap, depthMap, gLastColorFrame.size(), 0, 0, cv::INTER_NEAREST);
+        }
     }
 
     if (gHasCameraMatrices) {
-        bool isYuv = (gLastColorFrame.rows > height);
-        gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, isYuv);
+        // FIX: gLastColorFrame is now always CV_8UC3 (RGB) — YUV conversion happens
+        // eagerly in nativeFeedYuvFrame. isYuv is therefore always false here.
+        // The old heuristic (gLastColorFrame.rows > height) was wrong for cases
+        // where depth and color have the same height, and catastrophically wrong
+        // when the color mat was an NV21 buffer with inflated row count.
+        gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, /*isYuv=*/false);
     }
 }
 
@@ -255,8 +281,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
     if (!disparity.empty() && !gLastColorFrame.empty() && gHasCameraMatrices) {
         cv::Mat depthFromStereo;
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0);
-        bool isYuv = (gLastColorFrame.rows > height);
-        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, isYuv);
+        // Stereo depth is always paired with an RGB color frame (not raw YUV).
+        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, /*isYuv=*/false);
     }
 }
 
@@ -487,4 +513,4 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyBurnDodge(
     env->ReleaseFloatArrayElements(points, pts, JNI_ABORT);
 }
 
-}
+} // extern "C"

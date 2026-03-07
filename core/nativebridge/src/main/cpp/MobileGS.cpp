@@ -576,14 +576,14 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     };
 
     const float* V = viewMat;
-    float fx = projMat[0];
-    float fy = projMat[5];
-    // FIX (Bug 3): Use the same unproject convention as processDepthFrame.
-    // projMat[8/9] are NDC principal-point offsets (usually ~0 for ARCore).
-    float px = projMat[8];
-    float py = projMat[9];
-    float halfW = depth.cols / 2.0f;
-    float halfH = depth.rows / 2.0f;
+    // Recover pixel-space intrinsics from the OpenGL projection matrix.
+    // Same derivation as processDepthFrame — must stay in sync.
+    const float halfW_fp = depth.cols / 2.0f;
+    const float halfH_fp = depth.rows / 2.0f;
+    const float fx_fp = projMat[0] * halfW_fp;
+    const float fy_fp = projMat[5] * halfH_fp;
+    const float cx_fp = ( projMat[8]  + 1.0f) * halfW_fp;
+    const float cy_fp = (-projMat[9]  + 1.0f) * halfH_fp;
 
     std::vector<cv::Point3f> newPts;
     cv::Mat newDescs;
@@ -599,11 +599,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
         float d = depth.at<float>(v, u);
         if (d <= 0.0f || d > 5.0f) continue;
 
-        // Match processDepthFrame's unproject formula exactly:
-        float x_ndc = (u - halfW) / halfW;
-        float y_ndc = -(v - halfH) / halfH;
-        float xc = (x_ndc + px) * d / fx;
-        float yc = (y_ndc + py) * d / fy;
+        // Standard pinhole unproject — identical convention to processDepthFrame.
+        float xc = (u - cx_fp) * d / fx_fp;
+        float yc = -(v - cy_fp) * d / fy_fp;
         float zc = -d;
 
         float xw, yw, zw;
@@ -697,13 +695,25 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     }
 
     const float* V = viewMat;
-    float fx = projMat[0];
-    float fy = projMat[5];
-    float cx = projMat[8];
-    float cy = projMat[9];
 
+    // ARCore getProjectionMatrix returns a column-major OpenGL projection matrix where:
+    //   projMat[0]  = 2*fx_px / imageWidth    (NOT fx in pixels directly)
+    //   projMat[5]  = 2*fy_px / imageHeight
+    //   projMat[8]  = (2*cx_px / imageWidth)  - 1   (NDC principal point offset)
+    //   projMat[9]  = (2*cy_px / imageHeight) - 1   (negated for Y-down convention)
+    //
+    // We must recover pixel-space intrinsics from these NDC values using the
+    // depth image dimensions (the space in which we are unprojecting).
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
+
+    // fx_px = projMat[0] * halfW,  cx_px = (projMat[8] + 1) * halfW
+    // fy_px = projMat[5] * halfH,  cy_px = (projMat[9] + 1) * halfH
+    // (cy_px sign: ARCore [9] encodes -(2cy/h - 1) so we negate back)
+    const float fx_px = projMat[0] * halfW;
+    const float fy_px = projMat[5] * halfH;
+    const float cx_px = (projMat[8]  + 1.0f) * halfW;
+    const float cy_px = (-projMat[9] + 1.0f) * halfH;
 
     const float scaleX = (float)colorRGB.cols / depth.cols;
     const float scaleY = (float)colorRGB.rows / depth.rows;
@@ -712,10 +722,14 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     // Optimized step: 8 for high-res, 4 for 640x480
     int step = (depth.cols > 640) ? 8 : 4;
 
+    // Standard pinhole unproject: p_cam = [(c - cx) / fx, -(r - cy) / fy, -1] * d
+    // Y is negated because image rows increase downward but camera Y points up.
     auto unproject = [&](int r, int c, float d) {
-        float x_ndc = (c - halfW) / halfW;
-        float y_ndc = -(r - halfH) / halfH;
-        return cv::Point3f((x_ndc + cx) * d / fx, (y_ndc + cy) * d / fy, -d);
+        return cv::Point3f(
+            (c - cx_px) * d / fx_px,
+           -(r - cy_px) * d / fy_px,
+           -d
+        );
     };
 
     // --- 1. Generate Splats from Depth Map ---
