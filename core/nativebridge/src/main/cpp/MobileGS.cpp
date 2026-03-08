@@ -689,6 +689,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         gLastSplatTrace.clear();
         if (depth.empty()) { SPLAT_TRACE("DROPPED - depth empty"); return; }
         if (color.empty()) { SPLAT_TRACE("DROPPED - color empty"); return; }
+        SPLAT_TRACE("input depth=%dx%d color=%dx%d isYuv=%d", depth.cols, depth.rows, color.cols, color.rows, (int)isYuv);
         if (!mCameraReady) { SPLAT_TRACE("DROPPED - camera not ready"); return; }
         isTrackingState = mIsArCoreTracking;
     }

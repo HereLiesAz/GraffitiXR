@@ -242,7 +242,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
             uint16_t raw = rowPtr[c];
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
-            if (conf >= 1 && depthMm > 0) {
+            // Accept any pixel with non-zero depth regardless of confidence.
+            // ARCore on ToF devices (e.g. Pixel 5) reports conf=0 for all pixels
+            // because ToF doesn't populate the confidence field — conf=0 means
+            // "no confidence score" not "invalid depth". Gating on conf>=1 dropped
+            // every frame on those devices.
+            if (depthMm > 0) {
                 float d = depthMm / 1000.0f;
                 depthMap.at<float>(r, c) = d;
                 validPixels++;
