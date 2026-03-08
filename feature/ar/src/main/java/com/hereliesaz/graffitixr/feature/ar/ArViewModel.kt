@@ -26,14 +26,22 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.hereliesaz.graffitixr.data.ProjectManager
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import java.nio.ByteBuffer
 import java.util.EnumSet
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
     private val slamManager: SlamManager,
-    private val stereoProvider: StereoDepthProvider
+    private val stereoProvider: StereoDepthProvider,
+    private val projectManager: ProjectManager,
+    private val projectRepository: ProjectRepository,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
@@ -51,6 +59,11 @@ class ArViewModel @Inject constructor(
     private var isDestroying = false
 
     private val sessionMutex = Mutex()
+
+    // Auto-save: prevent concurrent saves and track last-saved splat count
+    private val isSaving = AtomicBoolean(false)
+    private var lastSavedSplatCount = 0
+    private var autoSaveJob: kotlinx.coroutines.Job? = null
 
     fun onActivityResumed() {
         viewModelScope.launch {
@@ -146,6 +159,8 @@ class ArViewModel @Inject constructor(
             _isCameraInUseByAr.value = true
             slamManager.setRelocEnabled(true)
             renderer?.attachSession(s)
+            loadMapIfExists()
+            startAutoSave()
         } catch (e: CameraNotAvailableException) {
             e.printStackTrace()
         } catch (e: IllegalStateException) {
@@ -165,6 +180,8 @@ class ArViewModel @Inject constructor(
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        stopAutoSave()
+        saveMapNow()  // persist on every background/screen-off
     }
 
     private suspend fun performFullCleanupLocked() {
@@ -181,6 +198,57 @@ class ArViewModel @Inject constructor(
         }
         _isCameraInUseByAr.value = false
         slamManager.setRelocEnabled(false)
+    }
+
+    // ── Map persistence ───────────────────────────────────────────────────────
+
+    /** Save the current map to the active project's map.bin. No-op if no project open. */
+    private fun saveMapNow() {
+        val project = projectRepository.currentProject.value ?: return
+        if (isSaving.getAndSet(true)) return  // already saving
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val mapPath = projectManager.getMapPath(appContext, project.id)
+                slamManager.saveModel(mapPath)
+                lastSavedSplatCount = slamManager.getSplatCount()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isSaving.set(false)
+            }
+        }
+    }
+
+    /** Load map.bin into native if the in-memory map is empty and a save exists. */
+    private fun loadMapIfExists() {
+        val project = projectRepository.currentProject.value ?: return
+        if (slamManager.getSplatCount() > 0) return  // already have live data, don't overwrite
+        viewModelScope.launch(Dispatchers.IO) {
+            val mapPath = projectManager.getMapPath(appContext, project.id)
+            if (File(mapPath).exists()) {
+                slamManager.loadModel(mapPath)
+                lastSavedSplatCount = slamManager.getSplatCount()
+            }
+        }
+    }
+
+    /** Start periodic auto-save every 30 seconds, and also when splat count grows by 2000. */
+    private fun startAutoSave() {
+        autoSaveJob?.cancel()
+        autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                delay(30_000)
+                val current = slamManager.getSplatCount()
+                if (current > 0 && current != lastSavedSplatCount) {
+                    saveMapNow()
+                }
+            }
+        }
+    }
+
+    private fun stopAutoSave() {
+        autoSaveJob?.cancel()
+        autoSaveJob = null
     }
 
     fun destroyArSession() {
