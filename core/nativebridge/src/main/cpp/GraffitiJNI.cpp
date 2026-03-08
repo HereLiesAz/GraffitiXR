@@ -14,7 +14,7 @@ static std::string gLastDepthTrace;
 
 // Declared in MobileGS.cpp — the splat pipeline trace from the last processDepthFrame call.
 extern std::string gLastSplatTrace;
-#define DEPTH_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     DEPTH_TRACE("%s", _buf);     gLastDepthTrace += std::string(_buf) + "\n"; } while(0)
+#define DEPTH_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGD("DEPTH_PIPE: %s", _buf);     gLastDepthTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 MobileGS* gSlamEngine = nullptr;

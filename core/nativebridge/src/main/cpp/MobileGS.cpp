@@ -19,7 +19,7 @@
 
 // Stores the last splat pipeline trace for in-app diagnostics (extern'd in GraffitiJNI.cpp).
 std::string gLastSplatTrace;
-#define SPLAT_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     SPLAT_TRACE("%s", _buf);     gLastSplatTrace += std::string(_buf) + "\n"; } while(0)
+#define SPLAT_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGI("SPLAT_PIPE: %s", _buf);     gLastSplatTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 extern JavaVM* gJvm; // Defined in GraffitiJNI.cpp
