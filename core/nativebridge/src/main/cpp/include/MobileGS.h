@@ -60,6 +60,7 @@ public:
 
     // HUD Data
     int getSplatCount() const { return mPointCount; }
+    void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
 
     // Project Data I/O
     void saveModel(const std::string& path);
@@ -164,6 +165,7 @@ private:
     GLuint mPointVbo = 0;
     GLuint mIndexVbo = 0;
     std::atomic<int> mPointCount{0};
+    bool mSplatsVisible{true};  // set false during target capture to show clean camera view
 
     // NEW: GLES handles - Surface Mesh (Wireframe)
     GLuint mMeshProgram = 0;
@@ -191,3 +193,6 @@ private:
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
 };
+
+
+
