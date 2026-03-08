@@ -8,14 +8,21 @@ buildscript {
         "org.bitbucket.b_c:jose4j:0.9.6",
         "org.apache.commons:commons-lang3:3.20.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
-        "com.google.guava:guava:33.4.0-jre"
+        "com.google.guava:guava:33.4.0-jre",
+        "com.google.android.gms:play-services-basement:18.0.2"
     )
+
     val protobufModules = listOf(
         "com.google.protobuf:protobuf-java",
         "com.google.protobuf:protobuf-javalite",
         "com.google.protobuf:protobuf-kotlin",
         "com.google.protobuf:protobuf-kotlin-lite"
     )
+
+    // Store in extra properties so allprojects can access it
+    extra["commonForcedDependencies"] = commonForcedDependencies
+    extra["protobufModules"] = protobufModules
+
     repositories {
         google()
         mavenCentral()
@@ -47,32 +54,17 @@ plugins {
     alias(libs.plugins.kotlin.parcelize) apply false
 }
 
-// Define common forced dependencies again for application/library scope
-val commonForcedDependencies = listOf(
-    "commons-beanutils:commons-beanutils:1.11.0",
-    "org.jdom:jdom2:2.0.6.1",
-    "io.netty:netty-codec:4.1.131.Final",
-    "io.netty:netty-codec-http2:4.1.131.Final",
-    "io.netty:netty-handler:4.1.131.Final",
-    "org.bitbucket.b_c:jose4j:0.9.6",
-    "org.apache.commons:commons-lang3:3.20.0",
-    "org.apache.httpcomponents:httpclient:4.5.14",
-    "com.google.guava:guava:33.4.0-jre"
-)
-
-val protobufModules = listOf(
-    "com.google.protobuf:protobuf-java",
-    "com.google.protobuf:protobuf-javalite",
-    "com.google.protobuf:protobuf-kotlin",
-    "com.google.protobuf:protobuf-kotlin-lite"
-)
-
 allprojects {
     apply(plugin = "checkstyle")
     configure<CheckstyleExtension> {
         toolVersion = "10.12.0"
         configFile = rootProject.file("config/checkstyle/checkstyle.xml")
     }
+
+    @Suppress("UNCHECKED_CAST")
+    val commonForcedDependencies = rootProject.extra["commonForcedDependencies"] as List<String>
+    @Suppress("UNCHECKED_CAST")
+    val protobufModules = rootProject.extra["protobufModules"] as List<String>
 
     configurations.all {
         resolutionStrategy {
