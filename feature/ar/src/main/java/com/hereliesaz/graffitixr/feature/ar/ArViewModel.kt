@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -39,7 +38,6 @@ import javax.inject.Inject
 class ArViewModel @Inject constructor(
     private val slamManager: SlamManager,
     private val stereoProvider: StereoDepthProvider,
-    private val projectManager: ProjectManager,
     private val projectRepository: ProjectRepository,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
@@ -208,7 +206,11 @@ class ArViewModel @Inject constructor(
         if (isSaving.getAndSet(true)) return  // already saving
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val mapPath = projectManager.getMapPath(appContext, project.id)
+                val mapPath = run {
+                    val root = java.io.File(appContext.filesDir, "projects/${project.id}")
+                    if (!root.exists()) root.mkdirs()
+                    java.io.File(root, "map.bin").absolutePath
+                }
                 slamManager.saveModel(mapPath)
                 lastSavedSplatCount = slamManager.getSplatCount()
             } catch (e: Exception) {
@@ -224,7 +226,11 @@ class ArViewModel @Inject constructor(
         val project = projectRepository.currentProject.value ?: return
         if (slamManager.getSplatCount() > 0) return  // already have live data, don't overwrite
         viewModelScope.launch(Dispatchers.IO) {
-            val mapPath = projectManager.getMapPath(appContext, project.id)
+            val mapPath = run {
+                val root = java.io.File(appContext.filesDir, "projects/${project.id}")
+                if (!root.exists()) root.mkdirs()
+                java.io.File(root, "map.bin").absolutePath
+            }
             if (File(mapPath).exists()) {
                 slamManager.loadModel(mapPath)
                 lastSavedSplatCount = slamManager.getSplatCount()
