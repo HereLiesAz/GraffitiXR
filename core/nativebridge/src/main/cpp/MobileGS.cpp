@@ -16,6 +16,10 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
+
+// Stores the last splat pipeline trace for in-app diagnostics (extern'd in GraffitiJNI.cpp).
+std::string gLastSplatTrace;
+#define SPLAT_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     SPLAT_TRACE("%s", _buf);     gLastSplatTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 extern JavaVM* gJvm; // Defined in GraffitiJNI.cpp
@@ -682,10 +686,13 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (depth.empty() || color.empty() || !mCameraReady) return;
+        gLastSplatTrace.clear();
+        if (depth.empty()) { SPLAT_TRACE("DROPPED - depth empty"); return; }
+        if (color.empty()) { SPLAT_TRACE("DROPPED - color empty"); return; }
+        if (!mCameraReady) { SPLAT_TRACE("DROPPED - camera not ready"); return; }
         isTrackingState = mIsArCoreTracking;
     }
-    if (!isTrackingState) return;
+    if (!isTrackingState) { SPLAT_TRACE("DROPPED - not tracking"); return; }
 
     cv::Mat colorRGB;
     if (isYuv) {
@@ -736,6 +743,14 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     std::vector<std::pair<VoxelKey, Splat>> newVoxelUpdates;
     newVoxelUpdates.reserve((depth.rows / step) * (depth.cols / step));
 
+    // Log a sample depth value on every 30th frame to verify values are in range
+    if (mFrameCounter % 30 == 0) {
+        int midR = depth.rows / 2, midC = depth.cols / 2;
+        float sampleD = depth.at<float>(midR, midC);
+        SPLAT_TRACE("sample depth[%d,%d]=%.3fm fx_px=%.1f fy_px=%.1f cx_px=%.1f cy_px=%.1f",
+             midR, midC, sampleD, fx_px, fy_px, cx_px, cy_px);
+    }
+
     for (int r = 0; r < depth.rows - step; r += step) {
         const float* depthRow = depth.ptr<float>(r);
         const float* depthRowD = depth.ptr<float>(r + step);
@@ -784,6 +799,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         }
     }
 
+    SPLAT_TRACE("frame processed depth=%dx%d step=%d candidates=%zu projMat[0]=%.4f projMat[5]=%.4f",
+         depth.cols, depth.rows, step, newVoxelUpdates.size(),
+         projMat[0], projMat[5]);
+
     if (mapModified) {
         std::lock_guard<std::mutex> mapLock(mMapMutex);
         for (const auto& update : newVoxelUpdates) {
@@ -824,6 +843,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
             pruneMap();
         }
         mPointCount = static_cast<int>(splatData.size());
+        SPLAT_TRACE("voxel insert done totalSplats=%d", mPointCount.load());
     }
 
     // --- 2. Generate Live Surface Mesh (Wireframe) ---

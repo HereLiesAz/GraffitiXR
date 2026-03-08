@@ -282,6 +282,16 @@ class ArRenderer(
                     if (!depthFed && depthSupported) sb.appendLine("  ↳ NotYetAvailable: $lastDepthNotYetAvailable")
                     if (depthFed) sb.appendLine("  ↳ ${lastDepthW}x${lastDepthH}")
                     sb.appendLine("Splats: $splatCount")
+                    val depthTrace = slamManager.getLastDepthTrace().trim()
+                    val splatTrace = slamManager.getLastSplatTrace().trim()
+                    if (depthTrace.isNotEmpty()) {
+                        sb.appendLine("--- DEPTH_PIPE ---")
+                        sb.appendLine(depthTrace)
+                    }
+                    if (splatTrace.isNotEmpty()) {
+                        sb.appendLine("--- SPLAT_PIPE ---")
+                        sb.appendLine(splatTrace)
+                    }
                     onDiag(sb.toString().trimEnd())
                 }
             }
