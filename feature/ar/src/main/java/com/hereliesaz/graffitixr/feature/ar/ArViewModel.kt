@@ -298,6 +298,7 @@ class ArViewModel @Inject constructor(
     }
 
     fun onCaptureConsumed() {
+        slamManager.setSplatsVisible(true)
         _uiState.update { it.copy(tempCaptureBitmap = null) }
     }
 
@@ -310,6 +311,7 @@ class ArViewModel @Inject constructor(
     }
 
     fun requestCapture() {
+        slamManager.setSplatsVisible(false)
         _uiState.update { it.copy(isCaptureRequested = true, tempCaptureBitmap = null) }
     }
 
@@ -327,6 +329,10 @@ class ArViewModel @Inject constructor(
 
     fun updateMaskPath(path: Path) {
         _uiState.update { it.copy(maskPath = path) }
+    }
+
+    fun restoreSplats() {
+        slamManager.setSplatsVisible(true)
     }
 
     fun captureKeyframe() {
