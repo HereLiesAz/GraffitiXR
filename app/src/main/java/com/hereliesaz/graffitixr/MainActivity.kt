@@ -420,12 +420,8 @@ class MainActivity : ComponentActivity() {
         if (isArOrOverlay) {
             azRailHostItem(id = "target_host", text = navStrings.grid)
 
-            if (hasSufficientSplats) {
-                azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
-                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
-                }
-            } else {
-                azRailSubItem(id = "scan_wait", hostId = "target_host", text = "Scan: ${arUiState.splatCount/1000}k/50k", shape = AzButtonShape.NONE) {}
+            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
+                if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
             }
 
             azRailSubItem(id = "key", hostId = "target_host", text = "Keyframe", shape = AzButtonShape.NONE) {
