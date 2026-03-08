@@ -139,7 +139,8 @@ class MainActivity : ComponentActivity() {
                 val currentCaptureStep = mainUiState.captureStep
                 LaunchedEffect(currentTempCapture, currentCaptureStep) {
                     if (currentTempCapture != null && currentCaptureStep == CaptureStep.CAPTURE) {
-                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                        // Skip rectify/mask — go straight to review
+                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                     }
                 }
 
@@ -264,9 +265,17 @@ class MainActivity : ComponentActivity() {
                                     isLoading = isProcessing,
                                     onConfirm = {
                                         mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap)
+                                        arViewModel.restoreSplats()
                                     },
-                                    onRetake = { mainViewModel.onRetakeCapture() },
-                                    onCancel = { mainViewModel.onCancelCaptureClicked() },
+                                    onRetake = {
+                                        mainViewModel.onRetakeCapture()
+                                        arViewModel.restoreSplats()
+                                        arViewModel.requestCapture()
+                                    },
+                                    onCancel = {
+                                        mainViewModel.onCancelCaptureClicked()
+                                        arViewModel.restoreSplats()
+                                    },
                                     onUnwarpConfirm = { points ->
                                         val currentBitmap = arUiState.tempCaptureBitmap
                                         if (currentBitmap != null && points.size == 4) {
