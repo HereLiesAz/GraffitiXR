@@ -573,4 +573,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastSplatTrace(
 }
 
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSplatsVisible(
+        JNIEnv* env, jobject, jboolean visible) {
+    if (gSlamEngine) gSlamEngine->setSplatsVisible(visible);
+}
+
 } // extern "C"

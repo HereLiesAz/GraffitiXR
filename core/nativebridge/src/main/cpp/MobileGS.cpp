@@ -1161,7 +1161,7 @@ void MobileGS::draw() {
     glm::mat4 meshMvp = P * V;
 
     // --- 1. Draw Splats ---
-    if (mPointCount > 0) {
+    if (mSplatsVisible && mPointCount > 0) {
         glUseProgram(mProgram);
 
         GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
