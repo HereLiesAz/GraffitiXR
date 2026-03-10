@@ -99,11 +99,11 @@ fun MainScreen(
                         rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
                     }
 
-                    // Composite all visible AR layers into a single bitmap and push to the
-                    // overlay renderer whenever layers change.
+                    // Composite visible layers into a bitmap for the GL overlay quad —
+                    // but ONLY once an anchor has been established (fingerprint saved to project).
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
-                    LaunchedEffect(visibleLayers) {
-                        if (visibleLayers.isEmpty()) {
+                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
+                        if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
                             rendererRef.value?.updateOverlayBitmap(null)
                             return@LaunchedEffect
                         }
@@ -221,6 +221,10 @@ fun MainScreen(
                         }
                     }
             ) {
+                // In AR mode, artwork is rendered by OverlayRenderer as a 3D-anchored
+                // GL texture — not as flat 2D Compose overlays (which would look identical
+                // to OVERLAY mode and aren't anchored to anything).
+                if (uiState.editorMode != EditorMode.AR) {
                 uiState.layers.filter { it.isVisible }.forEach { layer ->
                     layer.bitmap?.let { bmp ->
                         Image(
@@ -246,6 +250,7 @@ fun MainScreen(
                         )
                     }
                 }
+                } // end if (editorMode != AR)
             }
         }
 

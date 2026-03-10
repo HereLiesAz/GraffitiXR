@@ -63,6 +63,16 @@ class ArViewModel @Inject constructor(
     private var lastSavedSplatCount = 0
     private var autoSaveJob: kotlinx.coroutines.Job? = null
 
+    init {
+        // isAnchorEstablished tracks whether the current project has a saved fingerprint.
+        // Reacts to project loads, saves, and reloads without any manual wiring.
+        viewModelScope.launch {
+            projectRepository.currentProject.collect { project ->
+                _uiState.update { it.copy(isAnchorEstablished = project?.fingerprint != null) }
+            }
+        }
+    }
+
     fun onActivityResumed() {
         viewModelScope.launch {
             sessionMutex.withLock {

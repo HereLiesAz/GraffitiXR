@@ -11,6 +11,9 @@ data class ArUiState(
     val isScanning: Boolean = false,
     val splatCount: Int = 0,
     val isTargetDetected: Boolean = false,
+    // True once a target fingerprint has been saved to the current project.
+    // Controls whether artwork is rendered in AR space (via OverlayRenderer).
+    val isAnchorEstablished: Boolean = false,
     val isFlashlightOn: Boolean = false,
     val lightLevel: Float = 1.0f,
     val tempCaptureBitmap: Bitmap? = null,
