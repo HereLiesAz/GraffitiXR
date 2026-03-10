@@ -8,6 +8,13 @@
 #include "include/StereoProcessor.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
+
+// Stores the last depth pipeline trace for in-app diagnostics.
+static std::string gLastDepthTrace;
+
+// Declared in MobileGS.cpp — the splat pipeline trace from the last processDepthFrame call.
+extern std::string gLastSplatTrace;
+#define DEPTH_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGD("DEPTH_PIPE: %s", _buf);     gLastDepthTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 MobileGS* gSlamEngine = nullptr;
@@ -214,13 +221,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride,
         jint cvRotateCode) {  // cv::RotateFlags value, or -1 for no rotation
 
-    LOGD("DEPTH_PIPE: feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
+    gLastDepthTrace.clear();
+    DEPTH_TRACE("feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
 
-    if (!gSlamEngine) { LOGD("DEPTH_PIPE: DROPPED - no engine"); return; }
-    if (gLastColorFrame.empty()) { LOGD("DEPTH_PIPE: DROPPED - no color frame yet"); return; }
+    if (!gSlamEngine) { DEPTH_TRACE("DROPPED - no engine"); return; }
+    if (gLastColorFrame.empty()) { DEPTH_TRACE("DROPPED - no color frame yet"); return; }
 
     auto* rawDepthBytes = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
-    if (!rawDepthBytes) { LOGD("DEPTH_PIPE: DROPPED - null buffer"); return; }
+    if (!rawDepthBytes) { DEPTH_TRACE("DROPPED - null buffer"); return; }
 
     cv::Mat depthMap(height, width, CV_32F, cv::Scalar(0.0f));
 
@@ -234,7 +242,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
             uint16_t raw = rowPtr[c];
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
-            if (conf >= 1 && depthMm > 0) {
+            // Accept any pixel with non-zero depth regardless of confidence.
+            // ARCore on ToF devices (e.g. Pixel 5) reports conf=0 for all pixels
+            // because ToF doesn't populate the confidence field — conf=0 means
+            // "no confidence score" not "invalid depth". Gating on conf>=1 dropped
+            // every frame on those devices.
+            if (depthMm > 0) {
                 float d = depthMm / 1000.0f;
                 depthMap.at<float>(r, c) = d;
                 validPixels++;
@@ -246,12 +259,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         }
     }
 
-    LOGD("DEPTH_PIPE: decoded valid=%d zeroConf=%d range=%.2f-%.2fm colorFrame=%dx%d rotation=%d",
+    DEPTH_TRACE("decoded valid=%d zeroConf=%d range=%.2f-%.2fm colorFrame=%dx%d rotation=%d",
          validPixels, zeroConfPixels, minD, maxD,
          gLastColorFrame.cols, gLastColorFrame.rows, (int)cvRotateCode);
 
     if (validPixels == 0) {
-        LOGD("DEPTH_PIPE: DROPPED - all pixels invalid (no depth data)");
+        DEPTH_TRACE("DROPPED - all pixels invalid (no depth data)");
         return;
     }
 
@@ -266,25 +279,25 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 
     if (gColorImageWidth > 0 && gColorImageHeight > 0) {
         if (depthMap.cols != gColorImageWidth || depthMap.rows != gColorImageHeight) {
-            LOGD("DEPTH_PIPE: resizing depth %dx%d -> %dx%d",
+            DEPTH_TRACE("resizing depth %dx%d -> %dx%d",
                  depthMap.cols, depthMap.rows, gColorImageWidth, gColorImageHeight);
             cv::resize(depthMap, depthMap, cv::Size(gColorImageWidth, gColorImageHeight),
                        0, 0, cv::INTER_NEAREST);
         }
     } else {
         if (depthMap.cols != gLastColorFrame.cols || depthMap.rows != gLastColorFrame.rows) {
-            LOGD("DEPTH_PIPE: resizing depth (fallback) %dx%d -> %dx%d",
+            DEPTH_TRACE("resizing depth (fallback) %dx%d -> %dx%d",
                  depthMap.cols, depthMap.rows, gLastColorFrame.cols, gLastColorFrame.rows);
             cv::resize(depthMap, depthMap, gLastColorFrame.size(), 0, 0, cv::INTER_NEAREST);
         }
     }
 
     if (!gHasCameraMatrices) {
-        LOGD("DEPTH_PIPE: DROPPED - no camera matrices yet");
+        DEPTH_TRACE("DROPPED - no camera matrices yet");
         return;
     }
 
-    LOGD("DEPTH_PIPE: pushing frame to map thread depthSize=%dx%d",
+    DEPTH_TRACE("pushing frame to map thread depthSize=%dx%d",
          depthMap.cols, depthMap.rows);
     // Use display-corrected view matrix. Depth is now rotated to display orientation.
     gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, /*isYuv=*/false);
@@ -543,6 +556,27 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyBurnDodge(
 
     matToBitmap(env, src, bitmap);
     env->ReleaseFloatArrayElements(points, pts, JNI_ABORT);
+}
+
+// ─── In-app diagnostic trace getters ─────────────────────────────────────────
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastDepthTrace(
+        JNIEnv* env, jobject) {
+    return env->NewStringUTF(gLastDepthTrace.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastSplatTrace(
+        JNIEnv* env, jobject) {
+    return env->NewStringUTF(gLastSplatTrace.c_str());
+}
+
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSplatsVisible(
+        JNIEnv* env, jobject, jboolean visible) {
+    if (gSlamEngine) gSlamEngine->setSplatsVisible(visible);
 }
 
 } // extern "C"

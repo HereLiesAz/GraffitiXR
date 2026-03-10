@@ -26,6 +26,16 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,7 +79,6 @@ import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -130,7 +139,8 @@ class MainActivity : ComponentActivity() {
                 val currentCaptureStep = mainUiState.captureStep
                 LaunchedEffect(currentTempCapture, currentCaptureStep) {
                     if (currentTempCapture != null && currentCaptureStep == CaptureStep.CAPTURE) {
-                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                        // Skip rectify/mask — go straight to review
+                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                     }
                 }
 
@@ -239,6 +249,14 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            // Depth pipeline diagnostic popup — always visible in AR mode
+                            if (editorUiState.editorMode == EditorMode.AR) {
+                                DiagPopup(
+                                    diagLog = arUiState.diagLog,
+                                    modifier = Modifier.align(Alignment.TopStart)
+                                )
+                            }
+
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
                                     uiState = arUiState,
@@ -247,9 +265,17 @@ class MainActivity : ComponentActivity() {
                                     isLoading = isProcessing,
                                     onConfirm = {
                                         mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap)
+                                        arViewModel.restoreSplats()
                                     },
-                                    onRetake = { mainViewModel.onRetakeCapture() },
-                                    onCancel = { mainViewModel.onCancelCaptureClicked() },
+                                    onRetake = {
+                                        mainViewModel.onRetakeCapture()
+                                        arViewModel.restoreSplats()
+                                        arViewModel.requestCapture()
+                                    },
+                                    onCancel = {
+                                        mainViewModel.onCancelCaptureClicked()
+                                        arViewModel.restoreSplats()
+                                    },
                                     onUnwarpConfirm = { points ->
                                         val currentBitmap = arUiState.tempCaptureBitmap
                                         if (currentBitmap != null && points.size == 4) {
@@ -403,12 +429,8 @@ class MainActivity : ComponentActivity() {
         if (isArOrOverlay) {
             azRailHostItem(id = "target_host", text = navStrings.grid)
 
-            if (hasSufficientSplats) {
-                azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
-                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
-                }
-            } else {
-                azRailSubItem(id = "scan_wait", hostId = "target_host", text = "Scan: ${arUiState.splatCount/1000}k/50k", shape = AzButtonShape.NONE) {}
+            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
+                if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
             }
 
             azRailSubItem(id = "key", hostId = "target_host", text = "Keyframe", shape = AzButtonShape.NONE) {
@@ -616,7 +638,90 @@ class MainActivity : ComponentActivity() {
 // the scan is. Below it, a hint line animates whenever the specific guidance
 // message changes — telling the user exactly what they need to do more of.
 
-@androidx.compose.runtime.Composable
+@Composable
+private fun DiagPopup(
+    diagLog: String?,
+    modifier: Modifier = Modifier
+) {
+    var offsetX by remember { mutableStateOf(16f) }
+    var offsetY by remember { mutableStateOf(80f) }
+    var visible by remember { mutableStateOf(true) }
+    var copied by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+
+    if (!visible) return
+
+    Box(
+        modifier = modifier
+            .offset { IntOffset(offsetX.toInt(), offsetY.toInt()) }
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    offsetX += dragAmount.x
+                    offsetY += dragAmount.y
+                }
+            }
+            .pointerInput(diagLog) {
+                detectTapGestures {
+                    val text = diagLog ?: return@detectTapGestures
+                    clipboard.setText(AnnotatedString(text))
+                    copied = true
+                    scope.launch {
+                        kotlinx.coroutines.delay(1500)
+                        copied = false
+                    }
+                }
+            }
+            .background(
+                if (copied) Color(0xDD004444) else Color(0xDD000000),
+                RoundedCornerShape(8.dp)
+            )
+            .border(
+                1.dp,
+                if (copied) Color.Green else Color.Cyan,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .widthIn(max = 300.dp)
+    ) {
+        androidx.compose.foundation.layout.Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    if (copied) "COPIED ✓" else "DEPTH DIAG  (tap to copy)",
+                    color = if (copied) Color.Green else Color.Cyan,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    "✕",
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures { visible = false }
+                        }
+                )
+            }
+            Text(
+                text = diagLog ?: "Waiting for first frame…",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = MaterialTheme.typography.labelSmall.lineHeight
+            )
+        }
+    }
+}
+
+@Composable
 private fun ScanCoachingOverlay(
     splatCount: Int,
     hint: String?,

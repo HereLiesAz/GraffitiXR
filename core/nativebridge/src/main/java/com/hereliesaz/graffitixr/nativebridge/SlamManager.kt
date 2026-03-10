@@ -24,6 +24,9 @@ class SlamManager @Inject constructor() {
     }
 
     fun getSplatCount(): Int = nativeGetSplatCount()
+    fun setSplatsVisible(visible: Boolean) = nativeSetSplatsVisible(visible)
+    fun getLastDepthTrace(): String = nativeGetLastDepthTrace()
+    fun getLastSplatTrace(): String = nativeGetLastSplatTrace()
 
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
@@ -162,6 +165,9 @@ class SlamManager @Inject constructor() {
     private external fun nativeDraw()
     private external fun nativeProcessFrame(yuvData: ByteArray, width: Int, height: Int, poseMatrix: FloatArray, timestamp: Long): Boolean
     private external fun nativeGetSplatCount(): Int
+    private external fun nativeSetSplatsVisible(visible: Boolean)
+    private external fun nativeGetLastDepthTrace(): String
+    private external fun nativeGetLastSplatTrace(): String
     private external fun nativeSetArCoreTrackingState(isTracking: Boolean)
     private external fun nativeClearMap()
     private external fun nativeSaveModel(path: String)

@@ -113,6 +113,9 @@ fun MainScreen(
                                 onLightUpdated = { level ->
                                     arViewModel.updateLightLevel(level)
                                     slamManager.updateLightLevel(level)
+                                },
+                                onDiag = { text ->
+                                    arViewModel.appendDiag(text)
                                 }
                             )
                             rendererRef.value = renderer
