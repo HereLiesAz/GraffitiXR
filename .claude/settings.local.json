@@ -20,7 +20,10 @@
       "Bash(jar xf /home/az/StudioProjects/GraffitiXR/libs/opencv/sdk/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar org/opencv/core/KeyPoint.class)",
       "Bash(jar xf:*)",
       "Bash(git push:*)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(gh auth:*)",
+      "Bash(git config:*)",
+      "Bash(git credential:*)"
     ]
   }
 }
