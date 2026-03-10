@@ -249,8 +249,8 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Depth pipeline diagnostic popup — always visible in AR mode
-                            if (editorUiState.editorMode == EditorMode.AR) {
+                            // Depth pipeline diagnostic popup — toggled in Settings
+                            if (editorUiState.editorMode == EditorMode.AR && editorUiState.showDiagOverlay) {
                                 DiagPopup(
                                     diagLog = arUiState.diagLog,
                                     modifier = Modifier.align(Alignment.TopStart)
@@ -348,6 +348,8 @@ class MainActivity : ComponentActivity() {
                                     isCheckingForUpdate = dashboardUiState.isCheckingForUpdate,
                                     isRightHanded = editorUiState.isRightHanded,
                                     onHandednessChanged = { editorViewModel.toggleHandedness() },
+                                    showDiagOverlay = editorUiState.showDiagOverlay,
+                                    onDiagOverlayChanged = { editorViewModel.toggleDiagOverlay() },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
                                     onClose = { showSettings = false }

@@ -56,6 +56,8 @@ fun SettingsScreen(
     isCheckingForUpdate: Boolean,
     isRightHanded: Boolean,
     onHandednessChanged: (Boolean) -> Unit,
+    showDiagOverlay: Boolean,
+    onDiagOverlayChanged: () -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
     onClose: () -> Unit
@@ -141,6 +143,11 @@ fun SettingsScreen(
                                 label = "Dominant Hand",
                                 value = if (isRightHanded) "Right" else "Left",
                                 modifier = Modifier.clickable { onHandednessChanged(!isRightHanded) }
+                            )
+                            SettingsItem(
+                                label = "Depth Diagnostic Overlay",
+                                value = if (showDiagOverlay) "On" else "Off",
+                                modifier = Modifier.clickable { onDiagOverlayChanged() }
                             )
                         }
 

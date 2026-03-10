@@ -415,7 +415,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
     jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
 
     jclass kpClass = env->FindClass("org/opencv/core/KeyPoint");
-    jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(fffffII)V");
+    // JNI type descriptors use uppercase letters for primitives:
+    //   F = float, I = int, D = double, J = long, Z = boolean, etc.
+    // KeyPoint(float x, float y, float size, float angle, float response, int octave, int class_id)
+    jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(FFFFFII)V");
     jclass listClass = env->FindClass("java/util/ArrayList");
     jmethodID listCtor = env->GetMethodID(listClass, "<init>", "(I)V");
     jmethodID addMethod = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");

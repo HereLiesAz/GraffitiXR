@@ -476,6 +476,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
+    fun toggleDiagOverlay() = _uiState.update { it.copy(showDiagOverlay = !it.showDiagOverlay) }
     fun setActiveTool(tool: Tool) = _uiState.update { it.copy(activeTool = tool) }
 
     override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id, activeTool = Tool.NONE) }

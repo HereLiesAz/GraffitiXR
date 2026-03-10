@@ -87,5 +87,6 @@ data class EditorUiState(
     val isLoading: Boolean = false,
     val brushSize: Float = 50f,
     val activeColor: Color = Color.White,
-    val showColorPicker: Boolean = false
+    val showColorPicker: Boolean = false,
+    val showDiagOverlay: Boolean = false
 )
