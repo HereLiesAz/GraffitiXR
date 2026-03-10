@@ -144,6 +144,18 @@ class SlamManager @Inject constructor() {
         return nativeGenerateFingerprint(bitmap)
     }
 
+    /**
+     * Returns a copy of [bitmap] annotated with the ORB keypoints the fingerprinter sees:
+     * grayscale background, green rich-keypoint circles, and a feature count in the corner.
+     * The caller should show this during the target review step so the artist can judge
+     * whether the surface has enough visual texture for reliable tracking.
+     */
+    fun annotateKeypoints(bitmap: Bitmap): Bitmap {
+        val mutable = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+        nativeAnnotateKeypoints(mutable)
+        return mutable
+    }
+
     fun renderBackground(frame: com.google.ar.core.Frame) {
         // Native background rendering bypass
     }
@@ -194,5 +206,6 @@ class SlamManager @Inject constructor() {
     private external fun nativeSetTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray)
     private external fun nativeDestroy()
     private external fun nativeGenerateFingerprint(bitmap: Bitmap): Fingerprint?
+    private external fun nativeAnnotateKeypoints(bitmap: Bitmap)
     private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long)
 }

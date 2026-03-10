@@ -619,7 +619,13 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
 
     std::lock_guard<std::mutex> lock(mMutex);
 
-    if (usedSP && !mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U) {
+    // Clear when upgrading from ORB to SuperPoint, or when the descriptor and 3D-point
+    // vectors are misaligned (e.g. setTargetFingerprint was called with empty points3d).
+    // Appending into a misaligned state would cause runPnPMatch to map the wrong 3D
+    // points to the wrong descriptors, producing garbage PnP poses.
+    bool misaligned = !mTargetDescriptors.empty() &&
+                      (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
+    if (misaligned || (usedSP && !mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U)) {
         mTargetDescriptors = cv::Mat();
         mTargetKeypoints3D.clear();
     }

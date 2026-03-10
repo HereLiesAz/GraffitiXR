@@ -158,6 +158,7 @@ class ArViewModel @Inject constructor(
             slamManager.setRelocEnabled(true)
             renderer?.attachSession(s)
             loadMapIfExists()
+            loadFingerprintIfExists()
             startAutoSave()
         } catch (e: CameraNotAvailableException) {
             e.printStackTrace()
@@ -218,6 +219,20 @@ class ArViewModel @Inject constructor(
             } finally {
                 isSaving.set(false)
             }
+        }
+    }
+
+    /** Re-arm the native engine with the saved target fingerprint if the project has one. */
+    private fun loadFingerprintIfExists() {
+        val fp = projectRepository.currentProject.value?.fingerprint ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            slamManager.setTargetFingerprint(
+                fp.descriptorsData,
+                fp.descriptorsRows,
+                fp.descriptorsCols,
+                fp.descriptorsType,
+                fp.points3d.toFloatArray()
+            )
         }
     }
 
@@ -294,12 +309,17 @@ class ArViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = bitmap,
+                annotatedCaptureBitmap = null,  // cleared until annotation completes
                 targetDepthBuffer = depthBuffer,
                 targetDepthWidth = width,
                 targetDepthHeight = height,
                 targetIntrinsics = intrinsics,
                 isCaptureRequested = false
             )
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val annotated = slamManager.annotateKeypoints(bitmap)
+            _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
         }
     }
 
