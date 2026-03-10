@@ -39,6 +39,7 @@ import com.hereliesaz.graffitixr.feature.editor.DrawingCanvas
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.coroutineScope
+import android.graphics.Bitmap as AndroidBitmap
 
 @Composable
 fun MainScreen(
@@ -98,18 +99,37 @@ fun MainScreen(
                         rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
                     }
 
+                    // Composite all visible AR layers into a single bitmap and push to the
+                    // overlay renderer whenever layers change.
+                    val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
+                    LaunchedEffect(visibleLayers) {
+                        if (visibleLayers.isEmpty()) {
+                            rendererRef.value?.updateOverlayBitmap(null)
+                            return@LaunchedEffect
+                        }
+                        val composite = withContext(Dispatchers.Default) {
+                            compositeLayersForAr(visibleLayers)
+                        }
+                        rendererRef.value?.updateOverlayBitmap(composite)
+                    }
+
                     AndroidView(
                         factory = { ctx ->
                             val renderer = ArRenderer(
                                 context = ctx,
                                 slamManager = slamManager,
-                                onTargetCaptured = { bmp, depth, w, h, int ->
+                                onTargetCaptured = { bmp, depth, depthW, depthH, depthStride, intr, viewMat ->
                                     bmp?.let { rawBitmap ->
                                         val matrix = Matrix().apply { postRotate(90f) }
                                         val rotatedBmp = android.graphics.Bitmap.createBitmap(
                                             rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true
                                         )
-                                        arViewModel.onTargetCaptured(rotatedBmp, depth, rotatedBmp.width, rotatedBmp.height, int)
+                                        arViewModel.onTargetCaptured(
+                                            rotatedBmp, depth,
+                                            rotatedBmp.width, rotatedBmp.height,
+                                            depthW, depthH, depthStride,
+                                            intr, viewMat
+                                        )
                                     }
                                 },
                                 onTrackingUpdated = { isTracking, splatCount ->
