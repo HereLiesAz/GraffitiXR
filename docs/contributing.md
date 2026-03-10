@@ -5,14 +5,15 @@ We welcome pull requests, but this is a specialized tool with strict architectur
 ## ⛔ The Three Hard Rules
 
 1.  **NO CLOUD FEATURES.**
-    * Do not add Firebase, Analytics, Crashlytics, or any library that "phones home."
     * Do not add "Social Sharing" features that upload data.
     * This tool is designed for off-grid usage. PRs adding network dependencies will be closed immediately.
 
 2.  **PRESERVE THE RAIL.**
-    * Do not add a `Toolbar`, `FloatingActionButton`, or `BottomNavigationView`.
-    * All navigation must go through `AzNavRail`. If a feature doesn't fit on the rail, it's too complex for this app.
-
+    * Do not add a `Toolbar`, `FloatingActionButton`, or `BottomNavigationView` or make any attempt to bypass the demands of the AzNavRail.
+    * All navigation must go through `AzNavRail`. If a feature doesn't fit on the rail, you need to ask for that feature in a custom implementation.
+    * All UI elements must be handled by AzHostActivityLayout.
+    * Always check for the latest AzNavRail documentation. https://github.com/HereLiesAz/AzNavRail
+   
 3.  **NATIVE SAFETY.**
     * The C++ layer (`MobileGS.cpp`) manages its own memory.
     * If you touch the JNI bridge, you must verify that `delete` is called on the native side when the Kotlin `ViewModel` clears. Memory leaks here will crash the OS process.

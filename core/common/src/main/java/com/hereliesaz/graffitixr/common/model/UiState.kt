@@ -1,3 +1,4 @@
+// FILE: core/common/src/main/java/com/hereliesaz/graffitixr/common/model/UiState.kt
 package com.hereliesaz.graffitixr.common.model
 
 import android.graphics.Bitmap
@@ -28,7 +29,15 @@ data class ArUiState(
     val maskPath: androidx.compose.ui.graphics.Path? = null,
     val isCaptureRequested: Boolean = false,
     val undoCount: Int = 0,
-    val gestureInProgress: Boolean = false
+    val gestureInProgress: Boolean = false,
+
+    // Live diagnostic log lines for in-app debugging (newest entry replaces old)
+    val diagLog: String? = null,
+
+    // Contextual scan coaching hint. Non-null only during the scanning phase
+    // (splatCount < 50000). Computed by ArViewModel based on what the user is
+    // actually failing to do — low light, not moving, not pointing at surfaces.
+    val scanHint: String? = null
 )
 
 enum class Tool {

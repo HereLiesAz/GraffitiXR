@@ -16,6 +16,10 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
+
+// Stores the last splat pipeline trace for in-app diagnostics (extern'd in GraffitiJNI.cpp).
+std::string gLastSplatTrace;
+#define SPLAT_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGI("SPLAT_PIPE: %s", _buf);     gLastSplatTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 extern JavaVM* gJvm; // Defined in GraffitiJNI.cpp
@@ -273,6 +277,17 @@ void MobileGS::clearMap() {
     mFrameCounter = 0;
     mLastRelocTriggerFrame = 0;
     mLastFingerprintUpdateFrame = 0;
+
+    // FIX (Bug 5): Reset mesh state so stale wireframe geometry does not keep
+    // rendering after a map clear.
+    {
+        std::lock_guard<std::mutex> glLock(mGlDataMutex);
+        mPendingMeshVertices.clear();
+        mPendingMeshIndices.clear();
+        mGlDataDirty = true;
+    }
+    mMeshIndexCount = 0;
+
     LOGI("MobileGS: map cleared for new project");
 }
 
@@ -287,6 +302,7 @@ void MobileGS::setRelocEnabled(bool enabled) {
 }
 
 cv::Point3f MobileGS::getCameraWorldPosition() const {
+    // Column-major view matrix: camera world pos = -Rᵀ * t
     float r00 = mViewMatrix[0], r10 = mViewMatrix[1], r20 = mViewMatrix[2];
     float r01 = mViewMatrix[4], r11 = mViewMatrix[5], r21 = mViewMatrix[6];
     float r02 = mViewMatrix[8], r12 = mViewMatrix[9], r22 = mViewMatrix[10];
@@ -347,24 +363,39 @@ void MobileGS::sortThreadFunc() {
     }
 }
 
+// FIX (Bug 1): The original code computed R from the column-major view matrix and
+// then did R * (p_cam - t) where t = V[12..14]. This is wrong.
+//
+// A column-major OpenGL view matrix encodes:  p_cam = R * p_world + t
+// So the inverse is:  p_world = Rᵀ * p_cam - Rᵀ * t  =  Rᵀ * p_cam + camWorldPos
+//
+// The old code subtracted the view-space translation *before* rotating, which
+// double-counted the translation and placed every world-space point at the wrong
+// position (especially visible when the camera moves far from the origin).
 static void camToWorld(const float* V, float xc, float yc, float zc,
                        float& xw, float& yw, float& zw) {
-    float R[9] = { V[0], V[4], V[8], V[1], V[5], V[9], V[2], V[6], V[10] };
-    float t[3] = { V[12], V[13], V[14] };
-    float dx = xc - t[0];
-    float dy = yc - t[1];
-    float dz = zc - t[2];
-    xw = R[0]*dx + R[3]*dy + R[6]*dz;
-    yw = R[1]*dx + R[4]*dy + R[7]*dz;
-    zw = R[2]*dx + R[5]*dy + R[8]*dz;
+    // Rᵀ from column-major V:
+    //   R col0 = (V[0], V[1], V[2])
+    //   R col1 = (V[4], V[5], V[6])
+    //   R col2 = (V[8], V[9], V[10])
+    // Rᵀ row0 = (V[0], V[1], V[2]), etc.
+    float tx = V[12], ty = V[13], tz = V[14];
+    // Camera world position = -Rᵀ * t
+    float camX = -(V[0]*tx + V[1]*ty + V[2]*tz);
+    float camY = -(V[4]*tx + V[5]*ty + V[6]*tz);
+    float camZ = -(V[8]*tx + V[9]*ty + V[10]*tz);
+    // p_world = Rᵀ * p_cam + camWorldPos
+    xw = V[0]*xc + V[1]*yc + V[2]*zc + camX;
+    yw = V[4]*xc + V[5]*yc + V[6]*zc + camY;
+    zw = V[8]*xc + V[9]*yc + V[10]*zc + camZ;
 }
 
 static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
                              float& nxw, float& nyw, float& nzw) {
-    float R[9] = { V[0], V[4], V[8], V[1], V[5], V[9], V[2], V[6], V[10] };
-    nxw = R[0]*nxc + R[3]*nyc + R[6]*nzc;
-    nyw = R[1]*nxc + R[4]*nyc + R[7]*nzc;
-    nzw = R[2]*nxc + R[5]*nyc + R[8]*nzc;
+    // Normals transform by Rᵀ only (no translation component)
+    nxw = V[0]*nxc + V[1]*nyc + V[2]*nzc;
+    nyw = V[4]*nxc + V[5]*nyc + V[6]*nzc;
+    nzw = V[8]*nxc + V[9]*nyc + V[10]*nzc;
 }
 
 void MobileGS::interpolateAnchorStep() {
@@ -548,13 +579,15 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
         return !(row == 1 && col == 1);
     };
 
-    const float* V  = viewMat;
-    float fx  = projMat[0];
-    float fy  = projMat[5];
-    float px  = projMat[8];
-    float py  = projMat[9];
-    float halfW = depth.cols / 2.0f;
-    float halfH = depth.rows / 2.0f;
+    const float* V = viewMat;
+    // Recover pixel-space intrinsics from the OpenGL projection matrix.
+    // Same derivation as processDepthFrame — must stay in sync.
+    const float halfW_fp = depth.cols / 2.0f;
+    const float halfH_fp = depth.rows / 2.0f;
+    const float fx_fp = projMat[0] * halfW_fp;
+    const float fy_fp = projMat[5] * halfH_fp;
+    const float cx_fp = ( projMat[8]  + 1.0f) * halfW_fp;
+    const float cy_fp = (-projMat[9]  + 1.0f) * halfH_fp;
 
     std::vector<cv::Point3f> newPts;
     cv::Mat newDescs;
@@ -570,10 +603,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
         float d = depth.at<float>(v, u);
         if (d <= 0.0f || d > 5.0f) continue;
 
-        float x_ndc = (u - halfW) / halfW;
-        float y_ndc = -(v - halfH) / halfH;
-        float xc = (x_ndc + px) * d / fx;
-        float yc = (y_ndc + py) * d / fy;
+        // Standard pinhole unproject — identical convention to processDepthFrame.
+        float xc = (u - cx_fp) * d / fx_fp;
+        float yc = -(v - cy_fp) * d / fy_fp;
         float zc = -d;
 
         float xw, yw, zw;
@@ -654,10 +686,14 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (depth.empty() || color.empty() || !mCameraReady) return;
+        gLastSplatTrace.clear();
+        if (depth.empty()) { SPLAT_TRACE("DROPPED - depth empty"); return; }
+        if (color.empty()) { SPLAT_TRACE("DROPPED - color empty"); return; }
+        SPLAT_TRACE("input depth=%dx%d color=%dx%d isYuv=%d", depth.cols, depth.rows, color.cols, color.rows, (int)isYuv);
+        if (!mCameraReady) { SPLAT_TRACE("DROPPED - camera not ready"); return; }
         isTrackingState = mIsArCoreTracking;
     }
-    if (!isTrackingState) return;
+    if (!isTrackingState) { SPLAT_TRACE("DROPPED - not tracking"); return; }
 
     cv::Mat colorRGB;
     if (isYuv) {
@@ -667,13 +703,25 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     }
 
     const float* V = viewMat;
-    float fx = projMat[0];
-    float fy = projMat[5];
-    float cx = projMat[8];
-    float cy = projMat[9];
 
+    // ARCore getProjectionMatrix returns a column-major OpenGL projection matrix where:
+    //   projMat[0]  = 2*fx_px / imageWidth    (NOT fx in pixels directly)
+    //   projMat[5]  = 2*fy_px / imageHeight
+    //   projMat[8]  = (2*cx_px / imageWidth)  - 1   (NDC principal point offset)
+    //   projMat[9]  = (2*cy_px / imageHeight) - 1   (negated for Y-down convention)
+    //
+    // We must recover pixel-space intrinsics from these NDC values using the
+    // depth image dimensions (the space in which we are unprojecting).
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
+
+    // fx_px = projMat[0] * halfW,  cx_px = (projMat[8] + 1) * halfW
+    // fy_px = projMat[5] * halfH,  cy_px = (projMat[9] + 1) * halfH
+    // (cy_px sign: ARCore [9] encodes -(2cy/h - 1) so we negate back)
+    const float fx_px = projMat[0] * halfW;
+    const float fy_px = projMat[5] * halfH;
+    const float cx_px = (projMat[8]  + 1.0f) * halfW;
+    const float cy_px = (-projMat[9] + 1.0f) * halfH;
 
     const float scaleX = (float)colorRGB.cols / depth.cols;
     const float scaleY = (float)colorRGB.rows / depth.rows;
@@ -682,15 +730,27 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     // Optimized step: 8 for high-res, 4 for 640x480
     int step = (depth.cols > 640) ? 8 : 4;
 
+    // Standard pinhole unproject: p_cam = [(c - cx) / fx, -(r - cy) / fy, -1] * d
+    // Y is negated because image rows increase downward but camera Y points up.
     auto unproject = [&](int r, int c, float d) {
-        float x_ndc = (c - halfW) / halfW;
-        float y_ndc = -(r - halfH) / halfH;
-        return cv::Point3f((x_ndc + cx) * d / fx, (y_ndc + cy) * d / fy, -d);
+        return cv::Point3f(
+            (c - cx_px) * d / fx_px,
+           -(r - cy_px) * d / fy_px,
+           -d
+        );
     };
 
     // --- 1. Generate Splats from Depth Map ---
     std::vector<std::pair<VoxelKey, Splat>> newVoxelUpdates;
     newVoxelUpdates.reserve((depth.rows / step) * (depth.cols / step));
+
+    // Log a sample depth value on every 30th frame to verify values are in range
+    if (mFrameCounter % 30 == 0) {
+        int midR = depth.rows / 2, midC = depth.cols / 2;
+        float sampleD = depth.at<float>(midR, midC);
+        SPLAT_TRACE("sample depth[%d,%d]=%.3fm fx_px=%.1f fy_px=%.1f cx_px=%.1f cy_px=%.1f",
+             midR, midC, sampleD, fx_px, fy_px, cx_px, cy_px);
+    }
 
     for (int r = 0; r < depth.rows - step; r += step) {
         const float* depthRow = depth.ptr<float>(r);
@@ -740,6 +800,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         }
     }
 
+    SPLAT_TRACE("frame processed depth=%dx%d step=%d candidates=%zu projMat[0]=%.4f projMat[5]=%.4f",
+         depth.cols, depth.rows, step, newVoxelUpdates.size(),
+         projMat[0], projMat[5]);
+
     if (mapModified) {
         std::lock_guard<std::mutex> mapLock(mMapMutex);
         for (const auto& update : newVoxelUpdates) {
@@ -780,6 +844,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
             pruneMap();
         }
         mPointCount = static_cast<int>(splatData.size());
+        SPLAT_TRACE("voxel insert done totalSplats=%d", mPointCount.load());
     }
 
     // --- 2. Generate Live Surface Mesh (Wireframe) ---
@@ -1047,14 +1112,19 @@ void MobileGS::draw() {
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }
 
-            if (mMeshVbo != 0 && !mPendingMeshVertices.empty()) {
-                glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
-                glBufferData(GL_ARRAY_BUFFER, mPendingMeshVertices.size() * sizeof(float), mPendingMeshVertices.data(), GL_DYNAMIC_DRAW);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER, mPendingMeshIndices.size() * sizeof(uint32_t), mPendingMeshIndices.data(), GL_DYNAMIC_DRAW);
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-                mMeshIndexCount = mPendingMeshIndices.size();
+            if (mMeshVbo != 0) {
+                if (!mPendingMeshVertices.empty()) {
+                    glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
+                    glBufferData(GL_ARRAY_BUFFER, mPendingMeshVertices.size() * sizeof(float), mPendingMeshVertices.data(), GL_DYNAMIC_DRAW);
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
+                    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mPendingMeshIndices.size() * sizeof(uint32_t), mPendingMeshIndices.data(), GL_DYNAMIC_DRAW);
+                    glBindBuffer(GL_ARRAY_BUFFER, 0);
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+                    mMeshIndexCount = mPendingMeshIndices.size();
+                } else {
+                    // Empty pending data (e.g. after clearMap) — zero the draw count.
+                    mMeshIndexCount = 0;
+                }
             }
             mGlDataDirty = false;
         }
@@ -1062,7 +1132,10 @@ void MobileGS::draw() {
 
     std::lock_guard<std::mutex> lock(mMutex);
     interpolateAnchorStep();
-    if (!mProgram || !mCameraReady || mPointCount == 0) return;
+
+    // FIX (Bug 4): Removed mPointCount == 0 early-exit so the wireframe renders
+    // independently before any splats have accumulated.
+    if (!mProgram || !mCameraReady) return;
 
     {
         std::lock_guard<std::mutex> sortLock(mSortMutex);
@@ -1076,67 +1149,80 @@ void MobileGS::draw() {
 
     glEnable(GL_DEPTH_TEST);
 
-    // Apply Teleological Anchor to View using GLM for speed
     glm::mat4 V = glm::make_mat4(mViewMatrix);
     glm::mat4 A = glm::make_mat4(mAnchorMatrix);
     glm::mat4 P = glm::make_mat4(mProjMatrix);
+
+    // Splats are anchored to a tracked pose — include A.
     glm::mat4 mvp = P * V * A;
 
+    // FIX (Bug 0): Wireframe vertices are in world space; applying A collapsed all
+    // lines to the anchor origin. Use P*V only.
+    glm::mat4 meshMvp = P * V;
+
     // --- 1. Draw Splats ---
-    glUseProgram(mProgram);
+    if (mSplatsVisible && mPointCount > 0) {
+        glUseProgram(mProgram);
 
-    GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
-    glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+        GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
+        glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
 
-    cv::Point3f camPos = getCameraWorldPosition();
-    GLint camLoc = glGetUniformLocation(mProgram, "uCameraPos");
-    glUniform3f(camLoc, camPos.x, camPos.y, camPos.z);
+        cv::Point3f camPos = getCameraWorldPosition();
+        GLint camLoc = glGetUniformLocation(mProgram, "uCameraPos");
+        glUniform3f(camLoc, camPos.x, camPos.y, camPos.z);
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE); // Soft transparency
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
 
-    glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
 
-    glEnableVertexAttribArray(0); // aPosition
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
 
-    glEnableVertexAttribArray(1); // aColor
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
 
-    glEnableVertexAttribArray(2); // aConfidence
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
 
-    glEnableVertexAttribArray(3); // aNormal
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(32));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(32));
 
-    glEnableVertexAttribArray(4); // aRadius
-    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(44));
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(44));
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
 
-    int elementsToDraw = std::min(mPointCount.load(), static_cast<int>(mDrawIndices.size()));
-    if (elementsToDraw > 0) {
-        glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
-    } else {
-        glDrawArrays(GL_POINTS, 0, mPointCount);
+        int elementsToDraw = std::min(mPointCount.load(), static_cast<int>(mDrawIndices.size()));
+        if (elementsToDraw > 0) {
+            glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
+        } else {
+            glDrawArrays(GL_POINTS, 0, mPointCount);
+        }
+
+        glDisableVertexAttribArray(0);
+        glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(2);
+        glDisableVertexAttribArray(3);
+        glDisableVertexAttribArray(4);
+
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
     }
-
-    glDisableVertexAttribArray(0);
-    glDisableVertexAttribArray(1);
-    glDisableVertexAttribArray(2);
-    glDisableVertexAttribArray(3);
-    glDisableVertexAttribArray(4);
 
     // --- 2. Draw Wireframe Mesh ---
     if (mMeshProgram != 0 && mMeshIndexCount > 0) {
         glUseProgram(mMeshProgram);
 
         GLint meshMvpLoc = glGetUniformLocation(mMeshProgram, "uMvp");
-        glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+        glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, glm::value_ptr(meshMvp));
 
         GLint colorLoc = glGetUniformLocation(mMeshProgram, "uColor");
         glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f); // Cyan, 20% alpha
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
         glEnableVertexAttribArray(0);
@@ -1148,11 +1234,9 @@ void MobileGS::draw() {
         glDrawElements(GL_LINES, mMeshIndexCount, GL_UNSIGNED_INT, (void*)0);
 
         glDisableVertexAttribArray(0);
+        glDisable(GL_BLEND);
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
 }

@@ -10,6 +10,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
@@ -19,11 +26,22 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -61,7 +79,6 @@ import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -122,7 +139,8 @@ class MainActivity : ComponentActivity() {
                 val currentCaptureStep = mainUiState.captureStep
                 LaunchedEffect(currentTempCapture, currentCaptureStep) {
                     if (currentTempCapture != null && currentCaptureStep == CaptureStep.CAPTURE) {
-                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                        // Skip rectify/mask — go straight to review
+                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                     }
                 }
 
@@ -222,26 +240,21 @@ class MainActivity : ComponentActivity() {
 
                             val isScanningPhase = editorUiState.editorMode == EditorMode.AR && arUiState.splatCount < 50000
                             if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
-                                Box(
+                                ScanCoachingOverlay(
+                                    splatCount = arUiState.splatCount,
+                                    hint = arUiState.scanHint,
                                     modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .padding(top = 72.dp)
-                                        .graphicsLayer()
-                                        .background(Color(0xFF1A1A1A), shape = RoundedCornerShape(16.dp))
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("Mapping Environment...", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        LinearProgressIndicator(
-                                            progress = { (arUiState.splatCount / 50000f).coerceIn(0f, 1f) },
-                                            modifier = Modifier.width(200.dp),
-                                            color = Color.Cyan
-                                        )
-                                        Text("${arUiState.splatCount} / 50000 Splats", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                }
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 96.dp)
+                                )
+                            }
+
+                            // Depth pipeline diagnostic popup — always visible in AR mode
+                            if (editorUiState.editorMode == EditorMode.AR) {
+                                DiagPopup(
+                                    diagLog = arUiState.diagLog,
+                                    modifier = Modifier.align(Alignment.TopStart)
+                                )
                             }
 
                             if (mainUiState.isCapturingTarget) {
@@ -252,9 +265,17 @@ class MainActivity : ComponentActivity() {
                                     isLoading = isProcessing,
                                     onConfirm = {
                                         mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap)
+                                        arViewModel.restoreSplats()
                                     },
-                                    onRetake = { mainViewModel.onRetakeCapture() },
-                                    onCancel = { mainViewModel.onCancelCaptureClicked() },
+                                    onRetake = {
+                                        mainViewModel.onRetakeCapture()
+                                        arViewModel.restoreSplats()
+                                        arViewModel.requestCapture()
+                                    },
+                                    onCancel = {
+                                        mainViewModel.onCancelCaptureClicked()
+                                        arViewModel.restoreSplats()
+                                    },
                                     onUnwarpConfirm = { points ->
                                         val currentBitmap = arUiState.tempCaptureBitmap
                                         if (currentBitmap != null && points.size == 4) {
@@ -408,12 +429,8 @@ class MainActivity : ComponentActivity() {
         if (isArOrOverlay) {
             azRailHostItem(id = "target_host", text = navStrings.grid)
 
-            if (hasSufficientSplats) {
-                azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
-                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
-                }
-            } else {
-                azRailSubItem(id = "scan_wait", hostId = "target_host", text = "Scan: ${arUiState.splatCount/1000}k/50k", shape = AzButtonShape.NONE) {}
+            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
+                if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
             }
 
             azRailSubItem(id = "key", hostId = "target_host", text = "Keyframe", shape = AzButtonShape.NONE) {
@@ -465,12 +482,20 @@ class MainActivity : ComponentActivity() {
 
         if (canEdit) {
             editorUiState.layers.reversed().forEach { layer ->
+                // FIX: Capture activeTool for use inside the nested content lambda.
+                // The rail DSL rebuilds on each recomposition so this always reflects
+                // the current ViewModel state.
+                val activeTool = editorUiState.activeTool
+
                 azRailRelocItem(
                     id = "layer_${layer.id}",
                     hostId = "design_host",
                     text = layer.name,
                     nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
-                    keepNestedRailOpen = true,
+                    // FIX: keepNestedRailOpen = false so that tapping the layer item
+                    // again (which calls onLayerActivated -> activeTool = NONE) also
+                    // closes the nested tool rail, deactivating the active tool visually.
+                    keepNestedRailOpen = false,
                     onClick = {
                         editorViewModel.onLayerActivated(layer.id)
                     },
@@ -508,27 +533,79 @@ class MainActivity : ComponentActivity() {
                         }
 
                         if (layer.isSketch) {
-                            azRailItem(id = "brush_${layer.id}", text = "Brush", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
-                            azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                            azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                            azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                            // FIX: Use azRailToggle so the active tool stays visually highlighted.
+                            // isChecked reflects ViewModel state — persists across rail recompositions.
+                            // Tapping a different tool deactivates the previous one automatically.
+                            // The nested rail closes (and activeTool resets) when the layer item is tapped.
+                            azRailToggle(
+                                id = "brush_${layer.id}",
+                                isChecked = activeTool == Tool.BRUSH,
+                                toggleOnText = "Brush",
+                                toggleOffText = "Brush",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
+                            )
+                            azRailToggle(
+                                id = "eraser_${layer.id}",
+                                isChecked = activeTool == Tool.ERASER,
+                                toggleOnText = "Eraser",
+                                toggleOffText = "Eraser",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                            )
+                            azRailToggle(
+                                id = "blur_${layer.id}",
+                                isChecked = activeTool == Tool.BLUR,
+                                toggleOnText = "Blur",
+                                toggleOffText = "Blur",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                            )
+                            azRailToggle(
+                                id = "liquify_${layer.id}",
+                                isChecked = activeTool == Tool.LIQUIFY,
+                                toggleOnText = "Liquify",
+                                toggleOffText = "Liquify",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                            )
                             azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
 
                             addSizeItem()
 
-                            azRailItem(id = "color_${layer.id}", text = "Color", shape = AzButtonShape.RECTANGLE, content = editorUiState.activeColor) {
-                                activate()
-                                editorViewModel.setActiveTool(Tool.COLOR)
-                                editorViewModel.onColorClicked()
-                            }
+                            azRailToggle(
+                                id = "color_${layer.id}",
+                                isChecked = activeTool == Tool.COLOR,
+                                toggleOnText = "Color",
+                                toggleOffText = "Color",
+                                onClick = {
+                                    activate()
+                                    editorViewModel.setActiveTool(Tool.COLOR)
+                                    editorViewModel.onColorClicked()
+                                }
+                            )
                             azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
                         } else {
                             azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
                             azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onLineDrawingClicked() }
                             azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
-                            azRailItem(id = "eraser_${layer.id}", text = "Eraser", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                            azRailItem(id = "blur_${layer.id}", text = "Blur", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                            azRailItem(id = "liquify_${layer.id}", text = "Liquify", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                            azRailToggle(
+                                id = "eraser_${layer.id}",
+                                isChecked = activeTool == Tool.ERASER,
+                                toggleOnText = "Eraser",
+                                toggleOffText = "Eraser",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                            )
+                            azRailToggle(
+                                id = "blur_${layer.id}",
+                                isChecked = activeTool == Tool.BLUR,
+                                toggleOnText = "Blur",
+                                toggleOffText = "Blur",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                            )
+                            azRailToggle(
+                                id = "liquify_${layer.id}",
+                                isChecked = activeTool == Tool.LIQUIFY,
+                                toggleOnText = "Liquify",
+                                toggleOffText = "Liquify",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                            )
                             azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
 
                             addSizeItem()
@@ -553,5 +630,163 @@ class MainActivity : ComponentActivity() {
         }
 
         azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
+    }
+}
+
+// ─── Scan coaching overlay ────────────────────────────────────────────────────
+// Sits just above the bottom rail. A small progress pill shows how far along
+// the scan is. Below it, a hint line animates whenever the specific guidance
+// message changes — telling the user exactly what they need to do more of.
+
+@Composable
+private fun DiagPopup(
+    diagLog: String?,
+    modifier: Modifier = Modifier
+) {
+    var offsetX by remember { mutableStateOf(16f) }
+    var offsetY by remember { mutableStateOf(80f) }
+    var visible by remember { mutableStateOf(true) }
+    var copied by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+
+    if (!visible) return
+
+    Box(
+        modifier = modifier
+            .offset { IntOffset(offsetX.toInt(), offsetY.toInt()) }
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    offsetX += dragAmount.x
+                    offsetY += dragAmount.y
+                }
+            }
+            .pointerInput(diagLog) {
+                detectTapGestures {
+                    val text = diagLog ?: return@detectTapGestures
+                    clipboard.setText(AnnotatedString(text))
+                    copied = true
+                    scope.launch {
+                        kotlinx.coroutines.delay(1500)
+                        copied = false
+                    }
+                }
+            }
+            .background(
+                if (copied) Color(0xDD004444) else Color(0xDD000000),
+                RoundedCornerShape(8.dp)
+            )
+            .border(
+                1.dp,
+                if (copied) Color.Green else Color.Cyan,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .widthIn(max = 300.dp)
+    ) {
+        androidx.compose.foundation.layout.Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    if (copied) "COPIED ✓" else "DEPTH DIAG  (tap to copy)",
+                    color = if (copied) Color.Green else Color.Cyan,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    "✕",
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures { visible = false }
+                        }
+                )
+            }
+            Text(
+                text = diagLog ?: "Waiting for first frame…",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = MaterialTheme.typography.labelSmall.lineHeight
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScanCoachingOverlay(
+    splatCount: Int,
+    hint: String?,
+    modifier: Modifier = Modifier
+) {
+    androidx.compose.foundation.layout.Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // Hint line — animates out when the message changes so updates feel deliberate
+        AnimatedVisibility(
+            visible = hint != null,
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit  = fadeOut() + slideOutVertically { it / 2 }
+        ) {
+            AnimatedContent(
+                targetState = hint ?: "",
+                transitionSpec = {
+                    (fadeIn() + slideInVertically { -it / 3 })
+                        .togetherWith(fadeOut() + slideOutVertically { it / 3 })
+                },
+                label = "scan_hint"
+            ) { text ->
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .background(
+                            Color(0xCC000000),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(horizontal = 16.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        text = text,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        // Slim progress pill — counts up without being distracting
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress = { (splatCount / 50_000f).coerceIn(0f, 1f) },
+                    modifier = Modifier.width(100.dp),
+                    color = Color.Cyan,
+                    trackColor = Color.White.copy(alpha = 0.2f)
+                )
+                Text(
+                    text = "${splatCount / 1000}k / 50k",
+                    color = Color.LightGray,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
     }
 }

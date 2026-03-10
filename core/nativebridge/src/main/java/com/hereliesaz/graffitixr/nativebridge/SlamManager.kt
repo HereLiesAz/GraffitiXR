@@ -24,6 +24,9 @@ class SlamManager @Inject constructor() {
     }
 
     fun getSplatCount(): Int = nativeGetSplatCount()
+    fun setSplatsVisible(visible: Boolean) = nativeSetSplatsVisible(visible)
+    fun getLastDepthTrace(): String = nativeGetLastDepthTrace()
+    fun getLastSplatTrace(): String = nativeGetLastSplatTrace()
 
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
@@ -41,9 +44,27 @@ class SlamManager @Inject constructor() {
         nativeUpdateCamera(viewMatrix, projectionMatrix, timestampNs)
     }
 
-    fun feedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int) {
+    /**
+     * Feed a depth frame for map construction.
+     *
+     * @param depthBuffer     DEPTH16 buffer from acquireDepthImage16Bits()
+     * @param width           depth image width (sensor orientation)
+     * @param height          depth image height (sensor orientation)
+     * @param rowStride       row stride in bytes
+     * @param displayRotation Surface.ROTATION_* value (0/1/2/3) from DisplayRotationHelper.
+     *                        Used to rotate the depth image from sensor orientation to
+     *                        display orientation before unprojection, so it aligns with
+     *                        the display-corrected view matrix from getViewMatrix().
+     */
+    fun feedArCoreDepth(
+        depthBuffer: ByteBuffer,
+        width: Int,
+        height: Int,
+        rowStride: Int,
+        cvRotateCode: Int
+    ) {
         if (depthBuffer.isDirect) {
-            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride)
+            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, cvRotateCode)
         }
     }
 
@@ -144,6 +165,9 @@ class SlamManager @Inject constructor() {
     private external fun nativeDraw()
     private external fun nativeProcessFrame(yuvData: ByteArray, width: Int, height: Int, poseMatrix: FloatArray, timestamp: Long): Boolean
     private external fun nativeGetSplatCount(): Int
+    private external fun nativeSetSplatsVisible(visible: Boolean)
+    private external fun nativeGetLastDepthTrace(): String
+    private external fun nativeGetLastSplatTrace(): String
     private external fun nativeSetArCoreTrackingState(isTracking: Boolean)
     private external fun nativeClearMap()
     private external fun nativeSaveModel(path: String)
@@ -151,7 +175,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeSetRelocEnabled(enabled: Boolean)
-    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int)
+    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, cvRotateCode: Int)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,

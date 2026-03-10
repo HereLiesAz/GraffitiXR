@@ -1,0 +1,28 @@
+name: Check Code and Close Completed Issues
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gemini CLI to Check Issues
+        uses: 'google-github-actions/run-gemini-cli@v0'
+        with:
+          prompt: "Check the source code against the ${{ github.repository }} repository issues. If any open issue is completed or resolved by the current code, close the issue."
+          gemini_api_key: ${{ secrets.GOOGLE_API_KEY }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
