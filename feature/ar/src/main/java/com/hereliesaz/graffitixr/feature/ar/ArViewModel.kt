@@ -2,6 +2,9 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix as AndroidMatrix
+import android.graphics.Paint
 import androidx.camera.core.ImageProxy
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
@@ -305,21 +308,81 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun onTargetCaptured(bitmap: Bitmap, depthBuffer: ByteBuffer?, width: Int, height: Int, intrinsics: FloatArray?) {
+    fun onTargetCaptured(
+        bitmap: Bitmap,
+        depthBuffer: ByteBuffer?,
+        colorW: Int, colorH: Int,
+        depthBufW: Int, depthBufH: Int, depthBufStride: Int,
+        intrinsics: FloatArray?,
+        viewMatrix: FloatArray
+    ) {
+        val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics)
+        extent?.let { (halfW, halfH) -> renderer?.updateOverlayExtent(halfW, halfH) }
+
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = bitmap,
                 annotatedCaptureBitmap = null,  // cleared until annotation completes
                 targetDepthBuffer = depthBuffer,
-                targetDepthWidth = width,
-                targetDepthHeight = height,
+                targetDepthWidth = colorW,
+                targetDepthHeight = colorH,
+                targetDepthBufferWidth = depthBufW,
+                targetDepthBufferHeight = depthBufH,
+                targetDepthStride = depthBufStride,
                 targetIntrinsics = intrinsics,
+                targetCaptureViewMatrix = viewMatrix,
+                targetPhysicalExtent = extent,
                 isCaptureRequested = false
             )
         }
         viewModelScope.launch(Dispatchers.IO) {
             val annotated = slamManager.annotateKeypoints(bitmap)
             _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
+        }
+    }
+
+    /**
+     * Compute physical half-extents (meters) for the overlay quad from the center depth pixel.
+     * Returns null if depth data is unavailable.
+     */
+    private fun computePhysicalExtent(
+        depthBuffer: ByteBuffer?,
+        depthW: Int, depthH: Int,
+        colorW: Int, colorH: Int,
+        intrinsics: FloatArray?
+    ): Pair<Float, Float>? {
+        if (depthBuffer == null || intrinsics == null || depthW == 0 || depthH == 0) return null
+        val fx = intrinsics[0]; val fy = intrinsics[1]
+        if (fx == 0f || fy == 0f) return null
+
+        // Read DEPTH16 center pixel (little-endian, depth in mm in lower 13 bits)
+        val centerIdx = (depthH / 2 * depthW + depthW / 2) * 2
+        if (centerIdx + 1 >= depthBuffer.capacity()) return null
+        val lo = depthBuffer.get(centerIdx).toInt() and 0xFF
+        val hi = depthBuffer.get(centerIdx + 1).toInt() and 0xFF
+        val depthMm = (lo or (hi shl 8)) and 0x1FFF
+        if (depthMm == 0) return null
+        val d = depthMm / 1000f
+
+        return Pair((colorW / 2f) * d / fx, (colorH / 2f) * d / fy)
+    }
+
+    /**
+     * Bake the composited layer artwork into the target fingerprint so SLAM can relocalize to
+     * the finished artwork (not just bare wall texture). Call this after the user locks placement.
+     */
+    fun addLayerFeaturesToSLAM(composite: Bitmap) {
+        val state = _uiState.value
+        val depthBuffer = state.targetDepthBuffer ?: return
+        val intrinsics = state.targetIntrinsics ?: return
+        val viewMatrix = state.targetCaptureViewMatrix ?: return
+        val depthW = state.targetDepthBufferWidth
+        val depthH = state.targetDepthBufferHeight
+        val depthStride = if (state.targetDepthStride > 0) state.targetDepthStride else depthW * 2
+        if (depthW == 0 || depthH == 0) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            slamManager.addLayerFeatures(composite, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
         }
     }
 

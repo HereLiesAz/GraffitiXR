@@ -28,7 +28,8 @@ import kotlin.concurrent.withLock
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
-    private val onTargetCaptured: (Bitmap?, ByteBuffer?, Int, Int, FloatArray?) -> Unit,
+    // (bitmap, depthBuf, depthBufW, depthBufH, depthBufStride, intrinsics, viewMatrix)
+    private val onTargetCaptured: (Bitmap?, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray) -> Unit,
     private val onTrackingUpdated: (Boolean, Int) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
@@ -42,6 +43,11 @@ class ArRenderer(
 
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
+    private val overlayRenderer = OverlayRenderer(context)
+
+    // Pending overlay bitmap — set from any thread, consumed on GL thread in onDrawFrame.
+    @Volatile private var pendingOverlayBitmap: Bitmap? = null
+    @Volatile private var overlayBitmapDirty = false
 
     private var frameCount = 0
     private var diagFrameCount = 0
@@ -84,6 +90,23 @@ class ArRenderer(
         }
     }
 
+    /**
+     * Upload a new composite bitmap for the AR overlay quad.
+     * Thread-safe; actual GPU upload happens at the start of the next GL frame.
+     */
+    fun updateOverlayBitmap(bitmap: Bitmap?) {
+        pendingOverlayBitmap = bitmap
+        overlayBitmapDirty = true
+    }
+
+    /**
+     * Set the physical half-extents of the overlay quad (meters).
+     * Thread-safe; triggers VBO rebuild on the GL thread next frame.
+     */
+    fun updateOverlayExtent(halfW: Float, halfH: Float) {
+        overlayRenderer.setExtent(halfW, halfH)
+    }
+
     fun updateFlashlight(isOn: Boolean) {
         pendingFlashlightMode = isOn
     }
@@ -102,6 +125,7 @@ class ArRenderer(
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
         slamManager.initGl()
+        overlayRenderer.createOnGlThread()
         isSurfaceCreated = true
 
         sessionLock.withLock {
@@ -192,6 +216,7 @@ class ArRenderer(
                         var depthBuffer: ByteBuffer? = null
                         var depthWidth = 0
                         var depthHeight = 0
+                        var depthStride = 0
 
                         if (activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                             try {
@@ -202,6 +227,7 @@ class ArRenderer(
                                     depthBuffer!!.rewind()
                                     depthWidth = depthImage.width
                                     depthHeight = depthImage.height
+                                    depthStride = plane.rowStride
                                 }
                             } catch (e: Exception) {}
                         }
@@ -212,7 +238,11 @@ class ArRenderer(
                             intrinsics.principalPoint[0], intrinsics.principalPoint[1]
                         )
 
-                        onTargetCaptured(bitmap, depthBuffer, depthWidth, depthHeight, intrArr)
+                        onTargetCaptured(
+                            bitmap, depthBuffer,
+                            depthWidth, depthHeight, depthStride,
+                            intrArr, viewMatrix.copyOf()
+                        )
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to capture target frame")
@@ -297,6 +327,16 @@ class ArRenderer(
             }
 
             slamManager.draw()
+
+            // Upload pending overlay bitmap (texture upload must happen on GL thread).
+            if (overlayBitmapDirty) {
+                overlayBitmapDirty = false
+                pendingOverlayBitmap?.let { overlayRenderer.updateTexture(it) }
+            }
+
+            // Draw artwork quad locked to the AR anchor.
+            val anchorMatrix = slamManager.getAnchorTransform()
+            overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
         }
     }
 

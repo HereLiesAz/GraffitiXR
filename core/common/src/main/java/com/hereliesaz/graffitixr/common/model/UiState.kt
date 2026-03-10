@@ -40,7 +40,22 @@ data class ArUiState(
     // Contextual scan coaching hint. Non-null only during the scanning phase
     // (splatCount < 50000). Computed by ArViewModel based on what the user is
     // actually failing to do — low light, not moving, not pointing at surfaces.
-    val scanHint: String? = null
+    val scanHint: String? = null,
+
+    // ── Anchor overlay data (populated when target is captured) ──────────────
+
+    // Actual depth image dimensions (not color image dimensions).
+    val targetDepthBufferWidth: Int = 0,
+    val targetDepthBufferHeight: Int = 0,
+    val targetDepthStride: Int = 0,
+
+    // Column-major 4×4 view matrix captured at the moment the target was photographed.
+    // Used to unproject depth pixels to 3D world positions for layer feature baking.
+    val targetCaptureViewMatrix: FloatArray? = null,
+
+    // Physical half-extents of the overlay quad in meters (computed from depth center pixel).
+    // OverlayRenderer sizes its textured quad to (halfW*2) × (halfH*2) meters.
+    val targetPhysicalExtent: Pair<Float, Float>? = null
 )
 
 enum class Tool {

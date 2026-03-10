@@ -30,6 +30,26 @@ class SlamManager @Inject constructor() {
 
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
+    /** Returns the current PnP-driven anchor matrix (target-local → world, column-major 4×4). */
+    fun getAnchorTransform(): FloatArray = nativeGetAnchorTransform()
+
+    /**
+     * Bake features extracted from the composited layer artwork into the target fingerprint so
+     * teleological SLAM can relocalize to the artwork itself, not just the bare wall texture.
+     * Must be called after the user has locked layer placement.
+     */
+    fun addLayerFeatures(
+        bitmap: Bitmap,
+        depthBuffer: ByteBuffer,
+        depthW: Int, depthH: Int, depthStride: Int,
+        intrinsics: FloatArray,
+        viewMatrix: FloatArray
+    ) {
+        if (depthBuffer.isDirect) {
+            nativeAddLayerFeatures(bitmap, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+        }
+    }
+
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
 
     fun clearMap() = nativeClearMap()
@@ -186,6 +206,12 @@ class SlamManager @Inject constructor() {
     private external fun nativeLoadModel(path: String)
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
+    private external fun nativeGetAnchorTransform(): FloatArray
+    private external fun nativeAddLayerFeatures(
+        bitmap: Bitmap, depthBuffer: ByteBuffer,
+        depthW: Int, depthH: Int, depthStride: Int,
+        intrinsics: FloatArray, viewMatrix: FloatArray
+    )
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, cvRotateCode: Int)
     private external fun nativeFeedYuvFrame(
