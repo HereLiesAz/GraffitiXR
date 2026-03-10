@@ -119,7 +119,7 @@ private:
     // Dynamic fingerprint accumulation
     void tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat);
 
-    std::mutex mMutex;
+    mutable std::mutex mMutex;
     bool mIsArCoreTracking = false;
 
     cv::Ptr<cv::ORB> mFeatureDetector;
