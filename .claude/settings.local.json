@@ -13,7 +13,13 @@
       "Bash(git stash:*)",
       "WebSearch",
       "Bash(gh release:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(javap:*)",
+      "Bash(jar tf:*)",
+      "Read(//tmp/**)",
+      "Bash(jar xf /home/az/StudioProjects/GraffitiXR/libs/opencv/sdk/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar org/opencv/core/KeyPoint.class)",
+      "Bash(jar xf:*)",
+      "Bash(git push:*)"
     ]
   }
 }
