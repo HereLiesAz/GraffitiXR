@@ -57,8 +57,10 @@ class ArRenderer(
     private var lastDepthW = 0
     private var lastDepthH = 0
     private var lastDepthNotYetAvailable = false
-    private var pendingFlashlightMode: Boolean? = null
     private var isSurfaceCreated = false
+
+    // Camera ID saved from the ARCore session; used for CameraManager torch control.
+    private var arCameraId: String? = null
 
     // Thread-safe flag updated directly by Compose's AndroidView update block
     @Volatile var captureRequested: Boolean = false
@@ -75,6 +77,7 @@ class ArRenderer(
                 // correct on any device, not just Pixel 5 (sensor_orientation=90).
                 try {
                     val cameraId = session.cameraConfig.cameraId
+                    arCameraId = cameraId
                     val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE)
                             as android.hardware.camera2.CameraManager
                     sensorOrientation = manager
@@ -108,16 +111,15 @@ class ArRenderer(
     }
 
     fun updateFlashlight(isOn: Boolean) {
-        pendingFlashlightMode = isOn
-    }
-
-    private fun getFlashlightModeEnum(isOn: Boolean): Any? {
-        return try {
-            val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
-            val fieldName = if (isOn) "TORCH" else "OFF"
-            flashlightModeClass.getField(fieldName).get(null)
+        // Use CameraManager.setTorchMode() directly rather than the undocumented ARCore
+        // Config.FlashlightMode reflection path, which silently fails on most devices.
+        val cameraId = arCameraId ?: return
+        try {
+            val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE)
+                as android.hardware.camera2.CameraManager
+            manager.setTorchMode(cameraId, isOn)
         } catch (e: Exception) {
-            null
+            Timber.e(e, "Failed to set torch mode (cameraId=$cameraId, isOn=$isOn)")
         }
     }
 
@@ -146,20 +148,6 @@ class ArRenderer(
             val activeSession = session ?: return
 
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
-
-            pendingFlashlightMode?.let { isOn ->
-                getFlashlightModeEnum(isOn)?.let { mode ->
-                    try {
-                        val config = activeSession.config
-                        val method = config.javaClass.getMethod("setFlashlightMode", mode.javaClass)
-                        method.invoke(config, mode)
-                        activeSession.configure(config)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Failed to update flashlight mode")
-                    }
-                }
-                pendingFlashlightMode = null
-            }
 
             displayRotationHelper.updateSessionIfNeeded(activeSession)
 
