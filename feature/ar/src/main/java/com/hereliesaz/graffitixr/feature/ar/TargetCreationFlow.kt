@@ -373,7 +373,7 @@ private fun DrawScope.drawStrokes(
  */
 private fun rasterizeStrokes(strokes: List<SelectionStroke>, width: Int, height: Int): Bitmap {
     val mask = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(mask)
+    val canvas = AndroidCanvas(mask)
     canvas.drawColor(android.graphics.Color.WHITE)  // everything included by default
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     for (s in strokes) {
