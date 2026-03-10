@@ -11,7 +11,9 @@
       "WebFetch(domain:github.com)",
       "mcp__ide__getDiagnostics",
       "Bash(git stash:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(gh release:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
