@@ -275,3 +275,32 @@ fun MainScreen(
         }
     }
 }
+
+/**
+ * Composite all visible layers (those with bitmaps) into a single ARGB_8888 bitmap for the
+ * AR anchor overlay.  Applies each layer's 2D transform (offset, scale, Z-rotation, opacity).
+ * 3D perspective rotations (rotationX/rotationY) are intentionally ignored here — they are a
+ * Compose-only visual effect and cannot be reproduced in a flat android.graphics.Canvas.
+ *
+ * The canvas size is taken from the first layer's bitmap dimensions and all subsequent layers
+ * are drawn relative to that same coordinate space (center-aligned).
+ */
+private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
+    val w = layers.firstNotNullOfOrNull { it.bitmap?.width } ?: 1024
+    val h = layers.firstNotNullOfOrNull { it.bitmap?.height } ?: 1024
+    val result = AndroidBitmap.createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
+    val canvas = Canvas(result)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    for (layer in layers) {
+        val bmp = layer.bitmap ?: continue
+        paint.alpha = (layer.opacity.coerceIn(0f, 1f) * 255).toInt()
+        val matrix = Matrix()
+        // Pivot at bitmap center, then apply layer transform, then re-center on canvas
+        matrix.postTranslate(-bmp.width / 2f, -bmp.height / 2f)
+        matrix.postScale(layer.scale, layer.scale)
+        matrix.postRotate(layer.rotationZ)
+        matrix.postTranslate(w / 2f + layer.offset.x, h / 2f + layer.offset.y)
+        canvas.drawBitmap(bmp, matrix, paint)
+    }
+    return result
+}

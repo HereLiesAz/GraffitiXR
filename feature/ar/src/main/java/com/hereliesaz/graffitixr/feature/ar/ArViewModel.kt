@@ -2,9 +2,6 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Matrix as AndroidMatrix
-import android.graphics.Paint
 import androidx.camera.core.ImageProxy
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
