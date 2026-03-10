@@ -438,6 +438,48 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
     return fpObj;
 }
 
+// Renders what the ORB feature detector sees: grayscale bitmap with rich keypoint
+// circles (location, scale, orientation) and a feature count drawn in the corner.
+// The output is written back into the same mutable bitmap (which must be ARGB_8888).
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
+        JNIEnv* env, jobject thiz, jobject bitmap) {
+    cv::Mat frame;
+    bitmapToMat(env, bitmap, frame);
+    if (frame.empty()) return;
+
+    cv::Mat gray;
+    cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
+
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+    cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
+
+    // Draw on a gray RGBA canvas so keypoints pop clearly
+    cv::Mat annotated;
+    cv::cvtColor(gray, annotated, cv::COLOR_GRAY2RGBA);
+
+    cv::drawKeypoints(annotated, kps, annotated,
+                      cv::Scalar(0, 220, 0, 255),          // green circles
+                      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+    // Feature count text — yellow, top-left corner
+    std::string label = std::to_string(kps.size()) + " features";
+    int baseline = 0;
+    double scale = std::max(1.0, frame.cols / 640.0);
+    cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, scale, 2, &baseline);
+    cv::rectangle(annotated,
+                  cv::Point(8, 8),
+                  cv::Point(textSize.width + 16, textSize.height + baseline + 16),
+                  cv::Scalar(0, 0, 0, 180), cv::FILLED);
+    cv::putText(annotated, label,
+                cv::Point(12, textSize.height + 12),
+                cv::FONT_HERSHEY_SIMPLEX, scale,
+                cv::Scalar(255, 220, 0, 255), 2);   // yellow text in RGBA channel order
+
+    matToBitmap(env, annotated, bitmap);
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyLiquify(
         JNIEnv* env, jobject thiz, jobject bitmap, jfloatArray points, jfloat radius, jfloat intensity) {

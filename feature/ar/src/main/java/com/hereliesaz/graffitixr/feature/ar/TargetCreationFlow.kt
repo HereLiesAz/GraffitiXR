@@ -130,12 +130,24 @@ fun TargetCreationUi(
             }
             CaptureStep.REVIEW -> {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    uiState.tempCaptureBitmap?.let { bmp ->
+                    // Show the keypoint-annotated version while it's ready, so the artist
+                    // can judge texture quality before confirming. Falls back to the plain
+                    // capture bitmap while annotation is still computing.
+                    val displayBmp = uiState.annotatedCaptureBitmap ?: uiState.tempCaptureBitmap
+                    displayBmp?.let { bmp ->
                         Image(
                             bitmap = bmp.asImageBitmap(),
                             contentDescription = "Review Target",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit
+                        )
+                    }
+                    if (uiState.annotatedCaptureBitmap == null && uiState.tempCaptureBitmap != null) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 16.dp),
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                     Row(

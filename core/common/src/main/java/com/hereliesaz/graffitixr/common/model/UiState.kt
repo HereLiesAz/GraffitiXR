@@ -14,6 +14,9 @@ data class ArUiState(
     val isFlashlightOn: Boolean = false,
     val lightLevel: Float = 1.0f,
     val tempCaptureBitmap: Bitmap? = null,
+    // Grayscale + ORB keypoint overlay computed after capture so the artist can
+    // judge whether the surface has enough visual texture before confirming.
+    val annotatedCaptureBitmap: Bitmap? = null,
     val targetDepthBuffer: ByteBuffer? = null,
     val targetDepthWidth: Int = 0,
     val targetDepthHeight: Int = 0,
