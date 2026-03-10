@@ -50,6 +50,18 @@ public:
     void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     void scheduleRelocCheck(const cv::Mat& colorFrame);
 
+    // Read current anchor pose (target-local → world, column-major 4×4)
+    void getAnchorTransform(float* outMat16) const;
+
+    // Augment the fingerprint with features extracted from a placed artwork bitmap.
+    // depthData is a DEPTH16 byte array (same format as feedArCoreDepth).
+    // intrinsics = [fx, fy, cx, cy] in pixels for the depth/image space.
+    // viewMat is the column-major 4×4 world-to-camera matrix at capture time.
+    void addLayerFeatures(const cv::Mat& composite,
+                          const uint8_t* depthData, int depthW, int depthH, int depthStride,
+                          const float* intrinsics4,
+                          const float* viewMat16);
+
     // AI feature matching — load SuperPoint ONNX from bytes
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
 

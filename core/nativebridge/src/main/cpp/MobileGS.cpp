@@ -1032,6 +1032,87 @@ void MobileGS::updateAnchorTransform(float* transformMat) {
     memcpy(mAnchorMatrix, transformMat, 16 * sizeof(float));
 }
 
+void MobileGS::getAnchorTransform(float* outMat16) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    memcpy(outMat16, mAnchorMatrix, 16 * sizeof(float));
+}
+
+void MobileGS::addLayerFeatures(const cv::Mat& composite,
+                                const uint8_t* depthData, int depthW, int depthH, int depthStride,
+                                const float* intrinsics4,
+                                const float* viewMat16) {
+    if (composite.empty() || !depthData) return;
+
+    cv::Mat gray;
+    if (composite.channels() == 4) {
+        cv::cvtColor(composite, gray, cv::COLOR_RGBA2GRAY);
+    } else if (composite.channels() == 3) {
+        cv::cvtColor(composite, gray, cv::COLOR_RGB2GRAY);
+    } else {
+        gray = composite;
+    }
+
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+    cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
+    if (descs.empty()) return;
+
+    const float fx = intrinsics4[0], fy = intrinsics4[1];
+    const float cx = intrinsics4[2], cy = intrinsics4[3];
+
+    // Scale from image space to depth map space
+    const float scaleX = (float)depthW / composite.cols;
+    const float scaleY = (float)depthH / composite.rows;
+
+    std::vector<cv::Point3f> newPts;
+    cv::Mat newDescs;
+
+    for (int i = 0; i < (int)kps.size(); ++i) {
+        int du = (int)(kps[i].pt.x * scaleX);
+        int dv = (int)(kps[i].pt.y * scaleY);
+        if (du < 0 || du >= depthW || dv < 0 || dv >= depthH) continue;
+
+        const uint16_t raw = *reinterpret_cast<const uint16_t*>(
+                depthData + dv * depthStride + du * 2);
+        const uint16_t depthMm = raw & 0x1FFFu;
+        if (depthMm == 0) continue;
+
+        float d = depthMm / 1000.0f;
+        if (d > 5.0f) continue;
+
+        // Unproject using image-space intrinsics
+        float u = kps[i].pt.x;
+        float v = kps[i].pt.y;
+        float xc = (u - cx) * d / fx;
+        float yc = -(v - cy) * d / fy;
+        float zc = -d;
+
+        float xw, yw, zw;
+        camToWorld(viewMat16, xc, yc, zc, xw, yw, zw);
+        newPts.push_back(cv::Point3f(xw, yw, zw));
+        newDescs.push_back(descs.row(i));
+    }
+
+    if (newPts.empty()) return;
+
+    std::lock_guard<std::mutex> lock(mMutex);
+    // Append to the existing fingerprint using the same alignment guarantee
+    // (misalignment is re-checked and cleared if necessary).
+    bool misaligned = !mTargetDescriptors.empty() &&
+                      (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
+    if (misaligned) {
+        mTargetDescriptors = cv::Mat();
+        mTargetKeypoints3D.clear();
+    }
+    mTargetKeypoints3D.insert(mTargetKeypoints3D.end(), newPts.begin(), newPts.end());
+    if (mTargetDescriptors.empty()) {
+        mTargetDescriptors = newDescs.clone();
+    } else if (mTargetDescriptors.type() == newDescs.type()) {
+        cv::vconcat(mTargetDescriptors, newDescs, mTargetDescriptors);
+    }
+    LOGI("addLayerFeatures: added %zu new features, total=%d", newPts.size(), mTargetDescriptors.rows);
+}
+
 void MobileGS::saveModel(const std::string& path) {
     std::lock_guard<std::mutex> lock(mMutex);
     std::ofstream out(path, std::ios::binary);

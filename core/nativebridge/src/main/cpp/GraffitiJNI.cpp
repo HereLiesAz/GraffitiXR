@@ -624,4 +624,43 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSplatsVisible(
     if (gSlamEngine) gSlamEngine->setSplatsVisible(visible);
 }
 
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform(
+        JNIEnv* env, jobject) {
+    jfloatArray result = env->NewFloatArray(16);
+    if (gSlamEngine) {
+        float mat[16];
+        gSlamEngine->getAnchorTransform(mat);
+        env->SetFloatArrayRegion(result, 0, 16, mat);
+    }
+    return result;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAddLayerFeatures(
+        JNIEnv* env, jobject,
+        jobject bitmap,
+        jobject depthBuffer, jint depthW, jint depthH, jint depthStride,
+        jfloatArray intrinsicsArray,
+        jfloatArray viewMatArray) {
+
+    if (!gSlamEngine) return;
+
+    cv::Mat composite;
+    bitmapToMat(env, bitmap, composite);
+    if (composite.empty()) return;
+
+    auto* depthData = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
+    if (!depthData) return;
+
+    jfloat* intr = env->GetFloatArrayElements(intrinsicsArray, nullptr);
+    jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
+
+    gSlamEngine->addLayerFeatures(composite, depthData, depthW, depthH, depthStride,
+                                  intr, view);
+
+    env->ReleaseFloatArrayElements(intrinsicsArray, intr, JNI_ABORT);
+    env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
+}
+
 } // extern "C"
