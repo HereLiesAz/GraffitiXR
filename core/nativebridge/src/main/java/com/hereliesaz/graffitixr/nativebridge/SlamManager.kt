@@ -165,6 +165,17 @@ class SlamManager @Inject constructor() {
     }
 
     /**
+     * Like [generateFingerprint] but restricts ORB to areas the user selected.
+     * [mask] is an ARGB_8888 bitmap the same size as [bitmap]:
+     *   white pixels = include this region, black = exclude.
+     * Falls back to unmasked detection if [mask] is null.
+     */
+    fun generateFingerprintMasked(bitmap: Bitmap, mask: Bitmap?): Fingerprint? {
+        return if (mask != null) nativeGenerateFingerprintMasked(bitmap, mask)
+               else nativeGenerateFingerprint(bitmap)
+    }
+
+    /**
      * Returns a copy of [bitmap] annotated with the ORB keypoints the fingerprinter sees:
      * grayscale background, green rich-keypoint circles, and a feature count in the corner.
      * The caller should show this during the target review step so the artist can judge
@@ -232,6 +243,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeSetTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray)
     private external fun nativeDestroy()
     private external fun nativeGenerateFingerprint(bitmap: Bitmap): Fingerprint?
+    private external fun nativeGenerateFingerprintMasked(bitmap: Bitmap, mask: Bitmap): Fingerprint?
     private external fun nativeAnnotateKeypoints(bitmap: Bitmap)
     private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long)
 }

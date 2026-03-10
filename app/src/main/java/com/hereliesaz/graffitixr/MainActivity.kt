@@ -263,8 +263,8 @@ class MainActivity : ComponentActivity() {
                                     isRightHanded = editorUiState.isRightHanded,
                                     captureStep = mainUiState.captureStep,
                                     isLoading = isProcessing,
-                                    onConfirm = {
-                                        mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap)
+                                    onConfirm = { _, mask ->
+                                        mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap, mask)
                                         arViewModel.restoreSplats()
                                     },
                                     onRetake = {

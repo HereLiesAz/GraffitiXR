@@ -63,7 +63,7 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(captureStep = CaptureStep.CAPTURE) }
     }
 
-    fun onConfirmTargetCreation(bitmap: Bitmap? = null) {
+    fun onConfirmTargetCreation(bitmap: Bitmap? = null, selectionMask: Bitmap? = null) {
         _uiState.update {
             it.copy(isCapturingTarget = false, captureStep = CaptureStep.NONE)
         }
@@ -71,7 +71,8 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val currentProject = projectRepository.currentProject.value ?: return@launch
 
-            val fp = slamManager.generateFingerprint(bitmap)
+            // Use masked detection if the user refined the selection, otherwise detect everywhere.
+            val fp = slamManager.generateFingerprintMasked(bitmap, selectionMask)
 
             // If the user pointed at a blank wall with no texture, ORB will fail to find points.
             if (fp == null) {

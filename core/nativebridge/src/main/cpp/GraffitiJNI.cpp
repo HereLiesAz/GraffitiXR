@@ -393,6 +393,45 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTargetFingerpri
     }
 }
 
+// Helper: construct a Fingerprint JVM object from ORB results.
+static jobject buildFingerprintObject(JNIEnv* env,
+                                      const std::vector<cv::KeyPoint>& kps,
+                                      const cv::Mat& descs) {
+    if (descs.empty()) return nullptr;
+
+    jclass fpClass  = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
+    jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
+
+    jclass kpClass   = env->FindClass("org/opencv/core/KeyPoint");
+    // JNI type descriptors use uppercase letters for primitives:
+    //   F = float, I = int, D = double, J = long, Z = boolean, etc.
+    // KeyPoint(float x, float y, float size, float angle, float response, int octave, int class_id)
+    jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(FFFFFII)V");
+
+    jclass listClass    = env->FindClass("java/util/ArrayList");
+    jmethodID listCtor  = env->GetMethodID(listClass, "<init>", "(I)V");
+    jmethodID addMethod = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");
+
+    jobject kpList = env->NewObject(listClass, listCtor, (jint)kps.size());
+    for (const auto& kp : kps) {
+        jobject jkp = env->NewObject(kpClass, kpCtor,
+                                     kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response,
+                                     (jint)kp.octave, (jint)kp.class_id);
+        env->CallBooleanMethod(kpList, addMethod, jkp);
+        env->DeleteLocalRef(jkp);
+    }
+
+    jobject ptsList = env->NewObject(listClass, listCtor, 0);
+
+    jsize descSize = descs.total() * descs.elemSize();
+    jbyteArray jDescArray = env->NewByteArray(descSize);
+    env->SetByteArrayRegion(jDescArray, 0, descSize, (const jbyte*)descs.data);
+
+    return env->NewObject(fpClass, fpCtor,
+                          kpList, ptsList, jDescArray,
+                          descs.rows, descs.cols, descs.type());
+}
+
 JNIEXPORT jobject JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprint(
         JNIEnv* env, jobject thiz, jobject bitmap) {
@@ -406,44 +445,50 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
 
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
-    cv::Ptr<cv::ORB> detector = cv::ORB::create(500);
-    detector->detectAndCompute(gray, cv::noArray(), kps, descs);
+    cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
 
-    if (descs.empty()) return nullptr;
-
-    jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
-    jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
-
-    jclass kpClass = env->FindClass("org/opencv/core/KeyPoint");
-    // JNI type descriptors use uppercase letters for primitives:
-    //   F = float, I = int, D = double, J = long, Z = boolean, etc.
-    // KeyPoint(float x, float y, float size, float angle, float response, int octave, int class_id)
-    jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(FFFFFII)V");
-    jclass listClass = env->FindClass("java/util/ArrayList");
-    jmethodID listCtor = env->GetMethodID(listClass, "<init>", "(I)V");
-    jmethodID addMethod = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");
-
-    jobject kpList = env->NewObject(listClass, listCtor, (jint)kps.size());
-    for (const auto& kp : kps) {
-        jobject jkp = env->NewObject(kpClass, kpCtor, kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response, (jint)kp.octave, (jint)kp.class_id);
-        env->CallBooleanMethod(kpList, addMethod, jkp);
-        env->DeleteLocalRef(jkp);
-    }
-
-    jobject ptsList = env->NewObject(listClass, listCtor, 0);
-
-    jsize descSize = descs.total() * descs.elemSize();
-    jbyteArray jDescArray = env->NewByteArray(descSize);
-    env->SetByteArrayRegion(jDescArray, 0, descSize, (const jbyte*)descs.data);
-
-    jobject fpObj = env->NewObject(fpClass, fpCtor, kpList, ptsList, jDescArray, descs.rows, descs.cols, descs.type());
-
-    return fpObj;
+    return buildFingerprintObject(env, kps, descs);
 }
 
-// Renders what the ORB feature detector sees: grayscale bitmap with rich keypoint
-// circles (location, scale, orientation) and a feature count drawn in the corner.
-// The output is written back into the same mutable bitmap (which must be ARGB_8888).
+// Like nativeGenerateFingerprint but filters features to areas the user selected.
+// maskBitmap is ARGB_8888: white pixels = include this region, black = exclude.
+// ORB natively supports a mask argument so no manual filtering is needed.
+JNIEXPORT jobject JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprintMasked(
+        JNIEnv* env, jobject thiz, jobject bitmap, jobject maskBitmap) {
+
+    cv::Mat frame;
+    bitmapToMat(env, bitmap, frame);
+    if (frame.empty()) return nullptr;
+
+    cv::Mat gray;
+    cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
+
+    // Convert the user-drawn mask to a single-channel ORB mask.
+    // ORB treats non-zero pixels as "detect here", zero as "skip".
+    cv::Mat orbMask;
+    if (maskBitmap != nullptr) {
+        cv::Mat maskRgba;
+        bitmapToMat(env, maskBitmap, maskRgba);
+        if (!maskRgba.empty()) {
+            cv::cvtColor(maskRgba, orbMask, cv::COLOR_RGBA2GRAY);
+            if (orbMask.size() != gray.size()) {
+                cv::resize(orbMask, orbMask, gray.size(), 0, 0, cv::INTER_NEAREST);
+            }
+        }
+    }
+
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+    // Pass orbMask to ORB — it will only detect/compute in non-zero regions.
+    cv::ORB::create(500)->detectAndCompute(gray, orbMask, kps, descs);
+
+    return buildFingerprintObject(env, kps, descs);
+}
+
+// Renders what the ORB feature detector sees: color bitmap with semi-transparent
+// green blob highlights over each detected keypoint region.  The feature count is
+// shown in the corner.  Output is written back into the same mutable ARGB_8888 bitmap.
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
@@ -458,29 +503,31 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     cv::Mat descs;
     cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
 
-    // Draw on a gray RGBA canvas so keypoints pop clearly
-    cv::Mat annotated;
-    cv::cvtColor(gray, annotated, cv::COLOR_GRAY2RGBA);
+    // Overlay filled green blobs on the COLOR image (alpha-blended so wall texture shows through).
+    cv::Mat overlay = frame.clone();
+    for (const auto& kp : kps) {
+        int r = std::max(6, (int)(kp.size * 2.0f));
+        cv::circle(overlay, cv::Point((int)kp.pt.x, (int)kp.pt.y),
+                   r, cv::Scalar(0, 210, 50, 255), cv::FILLED);
+    }
+    // Blend: 55% original colour, 45% green blob overlay
+    cv::addWeighted(frame, 0.55, overlay, 0.45, 0, frame);
 
-    cv::drawKeypoints(annotated, kps, annotated,
-                      cv::Scalar(0, 220, 0, 255),          // green circles
-                      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-
-    // Feature count text — yellow, top-left corner
+    // Feature count badge — yellow text on dark background, top-left corner
     std::string label = std::to_string(kps.size()) + " features";
-    int baseline = 0;
     double scale = std::max(1.0, frame.cols / 640.0);
+    int baseline = 0;
     cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, scale, 2, &baseline);
-    cv::rectangle(annotated,
+    cv::rectangle(frame,
                   cv::Point(8, 8),
                   cv::Point(textSize.width + 16, textSize.height + baseline + 16),
-                  cv::Scalar(0, 0, 0, 180), cv::FILLED);
-    cv::putText(annotated, label,
+                  cv::Scalar(0, 0, 0, 200), cv::FILLED);
+    cv::putText(frame, label,
                 cv::Point(12, textSize.height + 12),
                 cv::FONT_HERSHEY_SIMPLEX, scale,
-                cv::Scalar(255, 220, 0, 255), 2);   // yellow text in RGBA channel order
+                cv::Scalar(255, 220, 0, 255), 2);
 
-    matToBitmap(env, annotated, bitmap);
+    matToBitmap(env, frame, bitmap);
 }
 
 JNIEXPORT void JNICALL
