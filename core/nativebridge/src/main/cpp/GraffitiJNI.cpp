@@ -344,14 +344,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
     jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
 
     jclass kpClass = env->FindClass("org/opencv/core/KeyPoint");
-    jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(fffffffII)V");
+    jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(fffffII)V");
     jclass listClass = env->FindClass("java/util/ArrayList");
     jmethodID listCtor = env->GetMethodID(listClass, "<init>", "(I)V");
     jmethodID addMethod = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");
 
     jobject kpList = env->NewObject(listClass, listCtor, (jint)kps.size());
     for (const auto& kp : kps) {
-        jobject jkp = env->NewObject(kpClass, kpCtor, kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response, (jfloat)kp.octave, (jfloat)kp.class_id);
+        jobject jkp = env->NewObject(kpClass, kpCtor, kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response, (jint)kp.octave, (jint)kp.class_id);
         env->CallBooleanMethod(kpList, addMethod, jkp);
         env->DeleteLocalRef(jkp);
     }
