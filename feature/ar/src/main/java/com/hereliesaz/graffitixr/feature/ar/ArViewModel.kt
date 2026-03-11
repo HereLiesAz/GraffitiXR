@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -67,6 +68,9 @@ class ArViewModel @Inject constructor(
     private val isSaving = AtomicBoolean(false)
     private var lastSavedSplatCount = 0
     private var autoSaveJob: kotlinx.coroutines.Job? = null
+    // Tracks which project's map data is currently loaded into native memory.
+    // Used to decide whether loadMapIfExists() can skip the disk read.
+    private var loadedProjectId: String? = null
 
     @Volatile
     private var pendingTapPosition: Pair<Float, Float>? = null
@@ -84,6 +88,11 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
                 _uiState.update { it.copy(isAnchorEstablished = project?.fingerprint != null) }
+                // When the active project changes, invalidate the in-memory map cache so the
+                // next session resume always loads the correct project's data from disk.
+                if (project?.id != loadedProjectId) {
+                    loadedProjectId = null
+                }
             }
         }
 
@@ -210,9 +219,19 @@ class ArViewModel @Inject constructor(
             slamManager.setRelocEnabled(true)
             renderer?.attachSession(s)
 
-            // Reset scan phase guidance on each session resume.
+            // If a map already exists (either in-memory or on disk), go straight to COMPLETE
+            // so the user doesn't need to re-scan a world they already built.
+            val projectId = projectRepository.currentProject.value?.id
+            val hasExistingData = slamManager.getSplatCount() > 0
+                || File(appContext.filesDir, "projects/$projectId/map.bin").exists()
+                || File(appContext.filesDir, "projects/$projectId/cloud_points.bin").exists()
             visitedSectors.fill(false)
-            _uiState.update { it.copy(scanPhase = ScanPhase.AMBIENT, ambientSectorsCovered = 0) }
+            _uiState.update {
+                it.copy(
+                    scanPhase = if (hasExistingData) ScanPhase.COMPLETE else ScanPhase.AMBIENT,
+                    ambientSectorsCovered = if (hasExistingData) 12 else 0
+                )
+            }
 
             loadMapIfExists()
             loadCloudPointsIfExists()
@@ -243,38 +262,62 @@ class ArViewModel @Inject constructor(
     }
 
     private suspend fun performFullCleanupLocked() {
+        stopAutoSave()
+        // Pause rendering before saving so no new frames corrupt the data mid-write.
         renderer?.attachSession(null)
         if (isSessionResumed) {
-            try {
-                session?.pause()
-            } catch (e: Exception) {}
+            try { session?.pause() } catch (e: Exception) {}
             isSessionResumed = false
         }
-        delay(150)
+        slamManager.setRelocEnabled(false)
+        // Blocking saves — must complete before the session is closed.
+        saveMapBlocking()
+        saveCloudPointsBlocking()
+        delay(100)
         val s = session
         session = null
-        s?.let {
-            try {
-                it.close()
-            } catch (e: Exception) {}
-        }
+        s?.let { try { it.close() } catch (e: Exception) {} }
         _isCameraInUseByAr.value = false
-        slamManager.setRelocEnabled(false)
+    }
+
+    /** Suspending save that blocks until the native map is written to disk. */
+    private suspend fun saveMapBlocking() {
+        val project = projectRepository.currentProject.value ?: return
+        if (slamManager.getSplatCount() <= 0) return   // never overwrite a good map with empty data
+        withContext(Dispatchers.IO) {
+            try {
+                val root = File(appContext.filesDir, "projects/${project.id}")
+                if (!root.exists()) root.mkdirs()
+                slamManager.saveModel(File(root, "map.bin").absolutePath)
+                lastSavedSplatCount = slamManager.getSplatCount()
+                loadedProjectId = project.id
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
+
+    /** Suspending save that blocks until the point-cloud buffer is written to disk. */
+    private suspend fun saveCloudPointsBlocking() {
+        val project = projectRepository.currentProject.value ?: return
+        if (_uiState.value.arScanMode != ArScanMode.CLOUD_POINTS) return
+        val r = renderer ?: return
+        withContext(Dispatchers.IO) {
+            try { r.saveCloudPoints(cloudPointsPath(project.id)) }
+            catch (e: Exception) { e.printStackTrace() }
+        }
     }
 
     private fun saveMapNow() {
         val project = projectRepository.currentProject.value ?: return
+        if (slamManager.getSplatCount() <= 0) return  // never overwrite a good map with empty data
         if (isSaving.getAndSet(true)) return
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val mapPath = run {
-                    val root = java.io.File(appContext.filesDir, "projects/${project.id}")
-                    if (!root.exists()) root.mkdirs()
-                    java.io.File(root, "map.bin").absolutePath
-                }
-                slamManager.saveModel(mapPath)
+                val root = File(appContext.filesDir, "projects/${project.id}")
+                if (!root.exists()) root.mkdirs()
+                slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount = slamManager.getSplatCount()
+                loadedProjectId = project.id
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -328,17 +371,17 @@ class ArViewModel @Inject constructor(
 
     private fun loadMapIfExists() {
         val project = projectRepository.currentProject.value ?: return
-        if (slamManager.getSplatCount() > 0) return
+        // Skip the disk read only if this exact project's data is already hot in native memory.
+        if (project.id == loadedProjectId && slamManager.getSplatCount() > 0) return
 
         viewModelScope.launch(Dispatchers.IO) {
-            val mapPath = run {
-                val root = java.io.File(appContext.filesDir, "projects/${project.id}")
-                if (!root.exists()) root.mkdirs()
-                java.io.File(root, "map.bin").absolutePath
-            }
-            if (File(mapPath).exists()) {
-                slamManager.loadModel(mapPath)
+            val root = File(appContext.filesDir, "projects/${project.id}")
+            if (!root.exists()) root.mkdirs()
+            val mapFile = File(root, "map.bin")
+            if (mapFile.exists()) {
+                slamManager.loadModel(mapFile.absolutePath)
                 lastSavedSplatCount = slamManager.getSplatCount()
+                loadedProjectId = project.id
             }
         }
     }
@@ -347,7 +390,7 @@ class ArViewModel @Inject constructor(
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                delay(30_000)
+                delay(10_000)
                 val current = slamManager.getSplatCount()
                 if (current > 0 && current != lastSavedSplatCount) {
                     saveMapNow()
