@@ -26,7 +26,9 @@ data class MainUiState(
     val isCapturingTarget: Boolean = false,
     val captureStep: CaptureStep = CaptureStep.NONE,
     // Phase 4: True while the user is in "tap your painted marks" mode.
-    val isWaitingForTap: Boolean = false
+    val isWaitingForTap: Boolean = false,
+    // True after target creation until user confirms the overlay is on the right wall.
+    val planeConfirmationPending: Boolean = false
 )
 
 @HiltViewModel
@@ -86,9 +88,17 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(captureStep = CaptureStep.CAPTURE) }
     }
 
+    fun confirmPlane() {
+        _uiState.update { it.copy(planeConfirmationPending = false) }
+    }
+
+    fun requestPlaneRedetect() {
+        // planeConfirmationPending stays true; caller must also invoke arViewModel.retriggerPlaneDetection()
+    }
+
     fun onConfirmTargetCreation(bitmap: Bitmap? = null, selectionMask: Bitmap? = null) {
         _uiState.update {
-            it.copy(isCapturingTarget = false, captureStep = CaptureStep.NONE)
+            it.copy(isCapturingTarget = false, captureStep = CaptureStep.NONE, planeConfirmationPending = true)
         }
         bitmap ?: return
         viewModelScope.launch(Dispatchers.IO) {

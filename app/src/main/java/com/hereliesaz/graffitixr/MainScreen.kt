@@ -136,8 +136,8 @@ fun MainScreen(
                                         )
                                     }
                                 },
-                                onTrackingUpdated = { isTracking, splatCount, isDepthSupported ->
-                                    arViewModel.setTrackingState(isTracking, splatCount, isDepthSupported)
+                                onTrackingUpdated = { isTracking, splatCount, isDepthSupported, yaw ->
+                                    arViewModel.setTrackingState(isTracking, splatCount, isDepthSupported, yaw)
                                 },
                                 onLightUpdated = { level ->
                                     arViewModel.updateLightLevel(level)

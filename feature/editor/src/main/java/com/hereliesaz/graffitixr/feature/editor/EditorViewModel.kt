@@ -721,6 +721,23 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(activeColor = color, showColorPicker = false) }
     }
 
+    override fun adjustColorLightness(delta: Float) {
+        _uiState.update { state ->
+            val c = state.activeColor
+            val hsv = FloatArray(3)
+            android.graphics.Color.RGBToHSV(
+                (c.red * 255).toInt(),
+                (c.green * 255).toInt(),
+                (c.blue * 255).toInt(),
+                hsv
+            )
+            hsv[2] = (hsv[2] + delta).coerceIn(0f, 1f)
+            val newArgb = android.graphics.Color.HSVToColor(hsv)
+            val newColor = Color(newArgb).copy(alpha = c.alpha)
+            state.copy(activeColor = newColor)
+        }
+    }
+
     override fun onColorPickerDismissed() {
         _uiState.update { it.copy(showColorPicker = false) }
     }

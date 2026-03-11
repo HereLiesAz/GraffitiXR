@@ -49,6 +49,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
@@ -59,6 +61,7 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.RotationAxis
@@ -256,11 +259,13 @@ class MainActivity : ComponentActivity() {
 
                             val isScanningPhase = editorUiState.editorMode == EditorMode.AR
                                     && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
-                                    && arUiState.splatCount < 50000
+                                    && arUiState.scanPhase != ScanPhase.COMPLETE
                             if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
                                 ScanCoachingOverlay(
                                     splatCount = arUiState.splatCount,
                                     hint = arUiState.scanHint,
+                                    scanPhase = arUiState.scanPhase,
+                                    ambientSectorsCovered = arUiState.ambientSectorsCovered,
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 96.dp)
@@ -285,6 +290,21 @@ class MainActivity : ComponentActivity() {
                                         mainViewModel.cancelTapMode()
                                         arViewModel.clearTapHighlights()
                                         arViewModel.restoreSplats()
+                                    },
+                                    modifier = Modifier.align(Alignment.BottomCenter)
+                                )
+                            }
+
+                            val showPlaneConfirm = mainUiState.planeConfirmationPending
+                                    && arUiState.isAnchorEstablished
+                                    && editorUiState.editorMode == EditorMode.AR
+                                    && !showLibrary && !showSettings
+                            if (showPlaneConfirm) {
+                                PlaneConfirmOverlay(
+                                    onConfirm = { mainViewModel.confirmPlane() },
+                                    onRedetect = {
+                                        mainViewModel.requestPlaneRedetect()
+                                        arViewModel.retriggerPlaneDetection()
                                     },
                                     modifier = Modifier.align(Alignment.BottomCenter)
                                 )
@@ -359,29 +379,46 @@ class MainActivity : ComponentActivity() {
                                 )
 
                                 if (mainUiState.captureStep == CaptureStep.REVIEW && fullSize != IntSize.Zero) {
+                                    // Use rememberUpdatedState so the pointerInput(Unit) closure
+                                    // always sees the latest ViewModel reference without restarting gestures.
+                                    val latestArViewModel by rememberUpdatedState(arViewModel)
+                                    val latestArUiState by rememberUpdatedState(arUiState)
+
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .fillMaxHeight(0.8f)
                                             .pointerInput(Unit) {
-                                                detectTapGestures { offset ->
-                                                    val bmp = arUiState.tempCaptureBitmap ?: return@detectTapGestures
-                                                    val mapped = EditorImageProcessor.mapScreenToBitmap(
-                                                        listOf(offset),
-                                                        fullSize.width, fullSize.height,
-                                                        bmp.width, bmp.height
-                                                    )
-                                                    if (mapped.isNotEmpty()) {
-                                                        val pt = mapped.first()
-                                                        val nx = pt.x / bmp.width.toFloat()
-                                                        val ny = pt.y / bmp.height.toFloat()
-                                                        arViewModel.eraseMaskedMark(nx, ny)
+                                                // Capture bitmap dimensions once per drag so mapping is stable.
+                                                var dragBmpW = 1
+                                                var dragBmpH = 1
+                                                detectDragGestures(
+                                                    onDragStart = { _ ->
+                                                        val bmp = latestArUiState.tempCaptureBitmap
+                                                        dragBmpW = bmp?.width ?: 1
+                                                        dragBmpH = bmp?.height ?: 1
+                                                        latestArViewModel.beginErase()
+                                                    },
+                                                    onDrag = { change, _ ->
+                                                        change.consume()
+                                                        val mapped = EditorImageProcessor.mapScreenToBitmap(
+                                                            listOf(change.position),
+                                                            fullSize.width, fullSize.height,
+                                                            dragBmpW, dragBmpH
+                                                        )
+                                                        if (mapped.isNotEmpty()) {
+                                                            val pt = mapped.first()
+                                                            latestArViewModel.eraseAtPoint(
+                                                                pt.x / dragBmpW.toFloat(),
+                                                                pt.y / dragBmpH.toFloat()
+                                                            )
+                                                        }
                                                     }
-                                                }
+                                                )
                                             }
                                     ) {
                                         Text(
-                                            text = "Tap any mark to exclude it.",
+                                            text = "Drag over marks to remove them.",
                                             color = Color.White,
                                             modifier = Modifier
                                                 .align(Alignment.TopCenter)
@@ -390,6 +427,23 @@ class MainActivity : ComponentActivity() {
                                                 .border(1.dp, Color.Cyan, RoundedCornerShape(8.dp))
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                         )
+                                        Row(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .padding(bottom = 12.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = { arViewModel.undoErase() },
+                                                enabled = arUiState.canUndoErase,
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                                            ) { Text("Undo") }
+                                            OutlinedButton(
+                                                onClick = { arViewModel.redoErase() },
+                                                enabled = arUiState.canRedoErase,
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                                            ) { Text("Redo") }
+                                        }
                                     }
                                 }
                             }
@@ -585,9 +639,10 @@ class MainActivity : ComponentActivity() {
                     hostId = "design_host",
                     text = layer.name,
                     nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
-                    keepNestedRailOpen = false,
+                    keepNestedRailOpen = true,
                     onClick = {
                         editorViewModel.onLayerActivated(layer.id)
+                        editorViewModel.setActiveTool(Tool.NONE)
                     },
                     onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
                     nestedContent = {
@@ -600,21 +655,29 @@ class MainActivity : ComponentActivity() {
                                 shape = AzButtonShape.RECTANGLE,
                                 content = AzComposableContent {
                                     val liveState by editorViewModel.uiState.collectAsState()
+                                    var itemRadiusPx by remember { mutableFloatStateOf(100f) }
+                                    val density = LocalDensity.current
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
+                                            .onSizeChanged { size -> itemRadiusPx = size.width / 2f }
                                             .pointerInput(Unit) {
                                                 detectVerticalDragGestures { change, dragAmount ->
                                                     change.consume()
                                                     val currentSize = editorViewModel.uiState.value.brushSize
-                                                    editorViewModel.setBrushSize(currentSize - dragAmount * 0.5f)
+                                                    editorViewModel.setBrushSize(
+                                                        (currentSize - dragAmount * 0.5f).coerceIn(1f, itemRadiusPx)
+                                                    )
                                                 }
                                             },
                                         contentAlignment = Alignment.Center
                                     ) {
+                                        val displayDp = with(density) {
+                                            liveState.brushSize.coerceIn(1f, itemRadiusPx).toDp()
+                                        }
                                         Box(
                                             modifier = Modifier
-                                                .size((liveState.brushSize / 2f).coerceIn(4f, 64f).dp)
+                                                .size(displayDp)
                                                 .background(Color.White, CircleShape)
                                         )
                                     }
@@ -651,26 +714,62 @@ class MainActivity : ComponentActivity() {
                                 toggleOffText = "Liquify",
                                 onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
                             )
-                            azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
+                            azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
 
                             addSizeItem()
 
-                            azRailToggle(
+                            azRailItem(
                                 id = "color_${layer.id}",
-                                isChecked = activeTool == Tool.COLOR,
-                                toggleOnText = "Color",
-                                toggleOffText = "Color",
+                                text = "Color",
+                                shape = AzButtonShape.RECTANGLE,
                                 onClick = {
                                     activate()
                                     editorViewModel.setActiveTool(Tool.COLOR)
                                     editorViewModel.onColorClicked()
+                                },
+                                content = AzComposableContent {
+                                    val liveState by editorViewModel.uiState.collectAsState()
+                                    val isActive = liveState.activeTool == Tool.COLOR
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                if (isActive) Color.White.copy(alpha = 0.15f)
+                                                else Color.Transparent
+                                            )
+                                            .pointerInput(Unit) {
+                                                detectVerticalDragGestures { change, dragAmount ->
+                                                    change.consume()
+                                                    editorViewModel.adjustColorLightness(-dragAmount * 0.002f)
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(20.dp)
+                                                    .background(liveState.activeColor, CircleShape)
+                                                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                            )
+                                            Text(
+                                                text = "Color",
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
                                 }
                             )
-                            azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
+                            azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onAdjustClicked() })
                         } else {
-                            azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
-                            azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onLineDrawingClicked() }
-                            azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onAdjustClicked() }
+                            azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
+                            azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onLineDrawingClicked() })
+                            azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onAdjustClicked() })
                             azRailToggle(
                                 id = "eraser_${layer.id}",
                                 isChecked = activeTool == Tool.ERASER,
@@ -692,11 +791,11 @@ class MainActivity : ComponentActivity() {
                                 toggleOffText = "Liquify",
                                 onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
                             )
-                            azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onCycleBlendMode() }
+                            azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
 
                             addSizeItem()
 
-                            azRailItem(id = "balance_${layer.id}", text = "Balance", shape = AzButtonShape.RECTANGLE) { activate(); editorViewModel.onBalanceClicked() }
+                            azRailItem(id = "balance_${layer.id}", text = "Balance", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onBalanceClicked() })
                         }
                     }
                 ) {
@@ -863,8 +962,15 @@ private fun DiagPopup(
 private fun ScanCoachingOverlay(
     splatCount: Int,
     hint: String?,
+    scanPhase: ScanPhase = ScanPhase.AMBIENT,
+    ambientSectorsCovered: Int = 0,
     modifier: Modifier = Modifier
 ) {
+    val phaseLabel = when (scanPhase) {
+        ScanPhase.AMBIENT -> "Step 1: Map your surroundings"
+        ScanPhase.WALL -> "Step 2: Scan the target wall"
+        ScanPhase.COMPLETE -> null
+    }
     androidx.compose.foundation.layout.Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -907,21 +1013,93 @@ private fun ScanCoachingOverlay(
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
-            androidx.compose.foundation.layout.Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            androidx.compose.foundation.layout.Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                LinearProgressIndicator(
-                    progress = { (splatCount / 50_000f).coerceIn(0f, 1f) },
-                    modifier = Modifier.width(100.dp),
-                    color = Color.Cyan,
-                    trackColor = Color.White.copy(alpha = 0.2f)
-                )
+                if (phaseLabel != null) {
+                    Text(
+                        text = phaseLabel,
+                        color = Color.Cyan,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (scanPhase == ScanPhase.AMBIENT) {
+                        LinearProgressIndicator(
+                            progress = { (ambientSectorsCovered / 12f).coerceIn(0f, 1f) },
+                            modifier = Modifier.width(100.dp),
+                            color = Color.Cyan,
+                            trackColor = Color.White.copy(alpha = 0.2f)
+                        )
+                        Text(
+                            text = "${ambientSectorsCovered * 30}° / 360°",
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { (splatCount / 50_000f).coerceIn(0f, 1f) },
+                            modifier = Modifier.width(100.dp),
+                            color = Color.Cyan,
+                            trackColor = Color.White.copy(alpha = 0.2f)
+                        )
+                        Text(
+                            text = "${splatCount / 1000}k / 50k",
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaneConfirmOverlay(
+    onConfirm: () -> Unit,
+    onRedetect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(bottom = 96.dp).padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .background(Color(0xEE000000), RoundedCornerShape(16.dp))
+                .border(2.dp, Color(0xFFFF8C00), RoundedCornerShape(16.dp))
+                .padding(20.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "${splatCount / 1000}k / 50k",
-                    color = Color.LightGray,
-                    style = MaterialTheme.typography.labelSmall
+                    text = "Is the artwork on the correct wall?",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
                 )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = onConfirm,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                    ) {
+                        Text("Looks correct")
+                    }
+                    OutlinedButton(
+                        onClick = onRedetect,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8C00))
+                    ) {
+                        Text("Re-detect")
+                    }
+                }
             }
         }
     }

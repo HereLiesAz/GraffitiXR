@@ -30,7 +30,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int, Boolean) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int, Boolean, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
 ) : GLSurfaceView.Renderer {
@@ -105,13 +105,20 @@ class ArRenderer(
     }
 
     fun updateFlashlight(isOn: Boolean) {
-        val cameraId = arCameraId ?: return
         try {
             val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE)
                 as android.hardware.camera2.CameraManager
+            // Prefer back-facing camera with flash over ARCore's camera ID, which may not
+            // have FLASH_INFO_AVAILABLE on all devices.
+            val cameraId = manager.cameraIdList.firstOrNull { id ->
+                val chars = manager.getCameraCharacteristics(id)
+                chars.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) ==
+                    android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK &&
+                chars.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } ?: arCameraId ?: return
             manager.setTorchMode(cameraId, isOn)
         } catch (e: Exception) {
-            Timber.e(e, "Failed to set torch mode (cameraId=$cameraId, isOn=$isOn)")
+            Timber.e(e, "Failed to set torch mode (isOn=$isOn)")
         }
     }
 
@@ -205,7 +212,12 @@ class ArRenderer(
 
             val isTracking = camera.trackingState == TrackingState.TRACKING
             val depthSupported = activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
-            
+
+            // Extract camera yaw (horizontal heading) from the view matrix.
+            // View matrix row 2 = camera backward in world space; forward = negation.
+            val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
+            val yawDeg = Math.toDegrees(yawRad).toFloat()
+
             slamManager.setArCoreTrackingState(isTracking)
 
             val currentScanMode = scanMode
@@ -215,7 +227,7 @@ class ArRenderer(
                 } else {
                     slamManager.getSplatCount()
                 }
-                onTrackingUpdated(isTracking, count, depthSupported)
+                onTrackingUpdated(isTracking, count, depthSupported, yawDeg)
             }
 
             if (captureRequested) {

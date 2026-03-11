@@ -64,5 +64,6 @@ interface EditorActions {
 
     fun setBrushSize(size: Float)
     fun setActiveColor(color: Color)
+    fun adjustColorLightness(delta: Float)
     fun onColorPickerDismissed()
 }

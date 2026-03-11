@@ -15,6 +15,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.eraseColorBlob
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
@@ -70,6 +71,15 @@ class ArViewModel @Inject constructor(
     @Volatile
     private var pendingTapPosition: Pair<Float, Float>? = null
 
+    // 12 sectors of 30° each; tracks which headings have been visited during AMBIENT phase.
+    private val visitedSectors = BooleanArray(12)
+
+    // Erase history for the REVIEW step mark-removal tool.
+    private val eraseUndoStack = ArrayDeque<Bitmap>()
+    private val eraseRedoStack = ArrayDeque<Bitmap>()
+    private val eraseOpMutex = Mutex()
+    private val MAX_ERASE_UNDO = 10
+
     init {
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
@@ -81,6 +91,9 @@ class ArViewModel @Inject constructor(
             settingsRepository.arScanMode.collect { mode ->
                 _uiState.update { it.copy(arScanMode = mode) }
                 renderer?.scanMode = mode
+                // Reset scan phase guidance when switching modes.
+                visitedSectors.fill(false)
+                _uiState.update { it.copy(scanPhase = ScanPhase.AMBIENT, ambientSectorsCovered = 0) }
             }
         }
 
@@ -196,6 +209,10 @@ class ArViewModel @Inject constructor(
             _isCameraInUseByAr.value = true
             slamManager.setRelocEnabled(true)
             renderer?.attachSession(s)
+
+            // Reset scan phase guidance on each session resume.
+            visitedSectors.fill(false)
+            _uiState.update { it.copy(scanPhase = ScanPhase.AMBIENT, ambientSectorsCovered = 0) }
 
             loadMapIfExists()
             loadCloudPointsIfExists()
@@ -367,18 +384,34 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean) {
+    fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
-        _uiState.update {
-            it.copy(
+
+        // Update ambient sector coverage.
+        val sector = (((cameraYaw % 360f) + 360f) % 360f / 30f).toInt().coerceIn(0, 11)
+        visitedSectors[sector] = true
+        val sectorsCovered = visitedSectors.count { it }
+
+        _uiState.update { state ->
+            // Phase transitions.
+            val newPhase = when (state.scanPhase) {
+                ScanPhase.AMBIENT -> if (sectorsCovered >= 6) ScanPhase.WALL else ScanPhase.AMBIENT
+                ScanPhase.WALL -> if (splatCount >= 30_000) ScanPhase.COMPLETE else ScanPhase.WALL
+                ScanPhase.COMPLETE -> ScanPhase.COMPLETE
+            }
+            state.copy(
                 isScanning = isTracking,
                 splatCount = splatCount,
                 isDepthApiSupported = isDepthApiSupported,
                 paintingProgress = progress,
+                scanPhase = newPhase,
+                ambientSectorsCovered = sectorsCovered,
                 scanHint = computeScanHint(
                     isTracking = isTracking,
                     splatCount = splatCount,
-                    lightLevel = it.lightLevel
+                    lightLevel = state.lightLevel,
+                    scanPhase = newPhase,
+                    sectorsCovered = sectorsCovered
                 )
             )
         }
@@ -466,12 +499,56 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun eraseMaskedMark(nx: Float, ny: Float) {
-        val currentBmp = _uiState.value.tempCaptureBitmap ?: return
+    /** Called on drag start — saves current bitmap as a single undo entry for the whole gesture. */
+    fun beginErase() {
+        val current = _uiState.value.tempCaptureBitmap ?: return
+        if (eraseUndoStack.size >= MAX_ERASE_UNDO) eraseUndoStack.removeFirst()
+        eraseUndoStack.addLast(current)
+        eraseRedoStack.clear()
+        _uiState.update { it.copy(canUndoErase = true, canRedoErase = false) }
+    }
+
+    /** Called for each drag position — flood-fills the blob under the finger, serialized via mutex. */
+    fun eraseAtPoint(nx: Float, ny: Float) {
         viewModelScope.launch(Dispatchers.Default) {
-            val updated = currentBmp.eraseColorBlob(nx, ny)
-            _uiState.update { it.copy(tempCaptureBitmap = updated) }
+            eraseOpMutex.withLock {
+                val currentBmp = _uiState.value.tempCaptureBitmap ?: return@withLock
+                val updated = currentBmp.eraseColorBlob(nx, ny)
+                _uiState.update { it.copy(tempCaptureBitmap = updated) }
+            }
         }
+    }
+
+    fun undoErase() {
+        val prev = eraseUndoStack.removeLastOrNull() ?: return
+        val current = _uiState.value.tempCaptureBitmap
+        if (current != null && eraseRedoStack.size < MAX_ERASE_UNDO) eraseRedoStack.addLast(current)
+        _uiState.update {
+            it.copy(
+                tempCaptureBitmap = prev,
+                canUndoErase = eraseUndoStack.isNotEmpty(),
+                canRedoErase = eraseRedoStack.isNotEmpty()
+            )
+        }
+    }
+
+    fun redoErase() {
+        val next = eraseRedoStack.removeLastOrNull() ?: return
+        val current = _uiState.value.tempCaptureBitmap
+        if (current != null && eraseUndoStack.size < MAX_ERASE_UNDO) eraseUndoStack.addLast(current)
+        _uiState.update {
+            it.copy(
+                tempCaptureBitmap = next,
+                canUndoErase = eraseUndoStack.isNotEmpty(),
+                canRedoErase = eraseRedoStack.isNotEmpty()
+            )
+        }
+    }
+
+    private fun clearEraseHistory() {
+        eraseUndoStack.clear()
+        eraseRedoStack.clear()
+        _uiState.update { it.copy(canUndoErase = false, canRedoErase = false) }
     }
 
     fun onScreenTap(nx: Float, ny: Float) {
@@ -481,6 +558,7 @@ class ArViewModel @Inject constructor(
 
     fun clearTapHighlights() {
         pendingTapPosition = null
+        clearEraseHistory()
         _uiState.update {
             it.copy(
                 tapHighlightKeypoints = emptyList(),
@@ -501,6 +579,7 @@ class ArViewModel @Inject constructor(
     }
 
     fun setTempCapture(bitmap: Bitmap?) {
+        clearEraseHistory()
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
     }
 
@@ -685,13 +764,29 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun computeScanHint(isTracking: Boolean, splatCount: Int, lightLevel: Float): String? {
+    private fun computeScanHint(
+        isTracking: Boolean,
+        splatCount: Int,
+        lightLevel: Float,
+        scanPhase: ScanPhase = ScanPhase.AMBIENT,
+        sectorsCovered: Int = 0
+    ): String? {
         if (!isTracking) return "Move device slowly to recover tracking"
-        if (lightLevel < 0.3f) return "Too dark. Turn on the flashlight."
-        if (splatCount < 5000) return "Walk left and right to build map"
-        if (splatCount < 20000) return "Move closer to the wall"
-        if (splatCount < 40000) return "Scan higher and lower"
-        return null
+        return when (scanPhase) {
+            ScanPhase.AMBIENT -> "Slowly rotate 360° to map your surroundings (${sectorsCovered * 30}°)"
+            ScanPhase.WALL -> {
+                if (lightLevel < 0.3f) "Too dark. Turn on the flashlight."
+                else if (splatCount < 5000) "Walk left and right to build map"
+                else if (splatCount < 20000) "Move closer to the wall"
+                else if (splatCount < 40000) "Scan higher and lower"
+                else null
+            }
+            ScanPhase.COMPLETE -> null
+        }
+    }
+
+    fun retriggerPlaneDetection() {
+        viewModelScope.launch { setInitialAnchorFromCapture() }
     }
 
     override fun onCleared() {

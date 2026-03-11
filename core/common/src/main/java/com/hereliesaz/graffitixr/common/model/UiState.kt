@@ -81,7 +81,16 @@ data class ArUiState(
     // Teleological SLAM — fraction [0,1] of locked artwork guide features currently visible
     // on the wall.  0 until addLayerFeaturesToSLAM has been called (layers locked as guide).
     // Updated after every PnP relocalisation pass inside the native engine (~1–2 Hz).
-    val paintingProgress: Float = 0f
+    val paintingProgress: Float = 0f,
+
+    // Guided scan phase: AMBIENT (rotate 360°) → WALL (scan the target) → COMPLETE.
+    val scanPhase: ScanPhase = ScanPhase.AMBIENT,
+    // How many 30° sectors (0..12) the user has swept during the AMBIENT phase.
+    val ambientSectorsCovered: Int = 0,
+
+    // Erase history — whether undo/redo are available during the REVIEW mark-removal step.
+    val canUndoErase: Boolean = false,
+    val canRedoErase: Boolean = false
 )
 
 enum class Tool {
@@ -98,6 +107,8 @@ enum class ArScanMode {
     /** Use the MobileGS depth-to-voxel-splat pipeline (richer spatial map, but slower to build). */
     GAUSSIAN_SPLATS
 }
+
+enum class ScanPhase { AMBIENT, WALL, COMPLETE }
 
 enum class BlendMode {
     SrcOver, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn,
