@@ -51,6 +51,7 @@ import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
+import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -238,7 +239,13 @@ class MainActivity : ComponentActivity() {
                                 UnlockInstructionsPopup(visible = showUnlockInstructions)
                             }
 
-                            val isScanningPhase = editorUiState.editorMode == EditorMode.AR && arUiState.splatCount < 50000
+                            // Scan coaching only applies to Gaussian Splats mode (which requires
+                            // 50k splats before the target-creation workflow is unblocked).
+                            // Cloud Points mode has no scan phase — ARCore accumulates feature
+                            // points immediately and the user can create a target right away.
+                            val isScanningPhase = editorUiState.editorMode == EditorMode.AR
+                                && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
+                                && arUiState.splatCount < 50000
                             if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
                                 ScanCoachingOverlay(
                                     splatCount = arUiState.splatCount,
@@ -350,6 +357,8 @@ class MainActivity : ComponentActivity() {
                                     onHandednessChanged = { editorViewModel.toggleHandedness() },
                                     showDiagOverlay = editorUiState.showDiagOverlay,
                                     onDiagOverlayChanged = { editorViewModel.toggleDiagOverlay() },
+                                    arScanMode = arUiState.arScanMode,
+                                    onArScanModeChanged = { arViewModel.setArScanMode(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
                                     onClose = { showSettings = false }

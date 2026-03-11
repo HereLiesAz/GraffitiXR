@@ -18,7 +18,8 @@ class PointCloudRenderer {
     private var pointSizeHandle: Int = 0
 
     private val maxPoints = 50000
-    private var accumulatedPointCount = 0
+    @Volatile var accumulatedPointCount = 0
+        private set
     private var vboId = 0
 
     // Local buffer to store accumulated points (x, y, z, confidence)

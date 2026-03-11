@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.hereliesaz.aznavrail.AzLoad
+import com.hereliesaz.graffitixr.common.model.ArScanMode
 
 @Composable
 fun SettingsScreen(
@@ -58,6 +59,8 @@ fun SettingsScreen(
     onHandednessChanged: (Boolean) -> Unit,
     showDiagOverlay: Boolean,
     onDiagOverlayChanged: () -> Unit,
+    arScanMode: ArScanMode,
+    onArScanModeChanged: (ArScanMode) -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
     onClose: () -> Unit
@@ -148,6 +151,16 @@ fun SettingsScreen(
                                 label = "Depth Diagnostic Overlay",
                                 value = if (showDiagOverlay) "On" else "Off",
                                 modifier = Modifier.clickable { onDiagOverlayChanged() }
+                            )
+                            val nextMode = if (arScanMode == ArScanMode.CLOUD_POINTS) {
+                                ArScanMode.GAUSSIAN_SPLATS
+                            } else {
+                                ArScanMode.CLOUD_POINTS
+                            }
+                            SettingsItem(
+                                label = "AR Scan Mode",
+                                value = if (arScanMode == ArScanMode.CLOUD_POINTS) "Cloud Points" else "Gaussian Splats",
+                                modifier = Modifier.clickable { onArScanModeChanged(nextMode) }
                             )
                         }
 

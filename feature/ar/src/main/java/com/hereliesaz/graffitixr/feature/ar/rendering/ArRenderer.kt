@@ -10,6 +10,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
+import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -44,6 +45,10 @@ class ArRenderer(
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
     private val overlayRenderer = OverlayRenderer(context)
+    private val pointCloudRenderer = PointCloudRenderer()
+
+    /** Updated from ArViewModel whenever the user changes the setting. */
+    @Volatile var scanMode: ArScanMode = ArScanMode.CLOUD_POINTS
 
     // Pending overlay bitmap — set from any thread, consumed on GL thread in onDrawFrame.
     @Volatile private var pendingOverlayBitmap: Bitmap? = null
@@ -128,6 +133,7 @@ class ArRenderer(
         backgroundRenderer.createOnGlThread(context)
         slamManager.initGl()
         overlayRenderer.createOnGlThread()
+        pointCloudRenderer.createOnGlThread(context)
         isSurfaceCreated = true
 
         sessionLock.withLock {
@@ -185,11 +191,17 @@ class ArRenderer(
             // any depth for this frame reaches the map thread queue.
             slamManager.setArCoreTrackingState(isTracking)
 
-            // Report tracking + splat count to the ViewModel on a background thread
-            // so we don't block the GL thread on getSplatCount().
+            // Report tracking + point count to the ViewModel on a background thread.
+            // In CLOUD_POINTS mode report the accumulated ARCore feature-point count;
+            // in GAUSSIAN_SPLATS mode report the native splat count.
+            val currentScanMode = scanMode
             backgroundScope.launch {
-                val splatCount = slamManager.getSplatCount()
-                onTrackingUpdated(isTracking, splatCount)
+                val count = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                    pointCloudRenderer.accumulatedPointCount
+                } else {
+                    slamManager.getSplatCount()
+                }
+                onTrackingUpdated(isTracking, count)
             }
 
             // Safely consume the flag and acquire the image
@@ -245,6 +257,8 @@ class ArRenderer(
                 try {
                     frame.acquireCameraImage().use { image ->
                         val planes = image.planes
+                        // Always feed YUV so the reloc/fingerprint pipeline keeps running
+                        // regardless of scan mode.
                         slamManager.feedYuvFrame(
                             planes[0].buffer, planes[1].buffer, planes[2].buffer,
                             image.width, image.height,
@@ -256,65 +270,87 @@ class ArRenderer(
                     }
                 } catch (e: Exception) {}
 
-                var depthFed = false
-                lastDepthNotYetAvailable = false
-                if (depthSupported) {
+                if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                    // ── Cloud Points mode ─────────────────────────────────────
+                    // Use ARCore's built-in visual feature points (tracked by the
+                    // visual-inertial odometry). No depth API required.
                     try {
-                        frame.acquireDepthImage16Bits().use { depthImage ->
-                            val depthPlane = depthImage.planes[0]
-                            // Compute cv::RotateFlags (-1=none, 0=CW90, 1=180, 2=CCW90).
-                            // Depth pixels are in sensor orientation; we rotate to display
-                            // orientation so they align with the display-corrected view matrix.
-                            // Formula: (sensorOrientation - displayDegrees + 360) % 360
-                            val displayDegrees = displayRotationHelper.getRotation() * 90
-                            val cvRotateCode = when ((sensorOrientation - displayDegrees + 360) % 360) {
-                                90  -> 0  // cv::ROTATE_90_CLOCKWISE
-                                180 -> 1  // cv::ROTATE_180
-                                270 -> 2  // cv::ROTATE_90_COUNTERCLOCKWISE
-                                else -> -1 // no rotation needed
-                            }
-                            slamManager.feedArCoreDepth(
-                                depthPlane.buffer,
-                                depthImage.width, depthImage.height,
-                                depthPlane.rowStride,
-                                cvRotateCode
-                            )
-                            depthFed = true
-                            lastDepthW = depthImage.width; lastDepthH = depthImage.height
+                        frame.acquirePointCloud().use { pointCloud ->
+                            pointCloudRenderer.update(pointCloud)
                         }
-                    } catch (e: NotYetAvailableException) {
-                        lastDepthNotYetAvailable = true
                     } catch (e: Exception) {}
-                }
 
-                // Emit diag every 30 fed frames (~2 seconds at 30fps/every-other)
-                diagFrameCount++
-                if (diagFrameCount % 30 == 0) {
-                    val splatCount = slamManager.getSplatCount()
-                    val sb = StringBuilder()
-                    sb.appendLine("=== Frame #$diagFrameCount ===")
-                    sb.appendLine("Tracking: $isTracking")
-                    sb.appendLine("DepthAPI: $depthSupported")
-                    sb.appendLine("Color fed: $colorFed  ${colorW}x${colorH}")
-                    sb.appendLine("Depth fed: $depthFed")
-                    if (!depthFed && depthSupported) sb.appendLine("  ↳ NotYetAvailable: $lastDepthNotYetAvailable")
-                    if (depthFed) sb.appendLine("  ↳ ${lastDepthW}x${lastDepthH}")
-                    sb.appendLine("Splats: $splatCount")
-                    val depthTrace = slamManager.getLastDepthTrace().trim()
-                    val splatTrace = slamManager.getLastSplatTrace().trim()
-                    if (depthTrace.isNotEmpty()) {
-                        sb.appendLine("--- DEPTH_PIPE ---")
-                        sb.appendLine(depthTrace)
+                    diagFrameCount++
+                    if (diagFrameCount % 30 == 0) {
+                        val sb = StringBuilder()
+                        sb.appendLine("=== Frame #$diagFrameCount [CLOUD_POINTS] ===")
+                        sb.appendLine("Tracking: $isTracking")
+                        sb.appendLine("Color fed: $colorFed  ${colorW}x${colorH}")
+                        sb.appendLine("ARCore pts: ${pointCloudRenderer.accumulatedPointCount}")
+                        onDiag(sb.toString().trimEnd())
                     }
-                    if (splatTrace.isNotEmpty()) {
-                        sb.appendLine("--- SPLAT_PIPE ---")
-                        sb.appendLine(splatTrace)
+                } else {
+                    // ── Gaussian Splats mode ──────────────────────────────────
+                    var depthFed = false
+                    lastDepthNotYetAvailable = false
+                    if (depthSupported) {
+                        try {
+                            frame.acquireDepthImage16Bits().use { depthImage ->
+                                val depthPlane = depthImage.planes[0]
+                                val displayDegrees = displayRotationHelper.getRotation() * 90
+                                val cvRotateCode = when ((sensorOrientation - displayDegrees + 360) % 360) {
+                                    90  -> 0  // cv::ROTATE_90_CLOCKWISE
+                                    180 -> 1  // cv::ROTATE_180
+                                    270 -> 2  // cv::ROTATE_90_COUNTERCLOCKWISE
+                                    else -> -1
+                                }
+                                slamManager.feedArCoreDepth(
+                                    depthPlane.buffer,
+                                    depthImage.width, depthImage.height,
+                                    depthPlane.rowStride,
+                                    cvRotateCode
+                                )
+                                depthFed = true
+                                lastDepthW = depthImage.width; lastDepthH = depthImage.height
+                            }
+                        } catch (e: NotYetAvailableException) {
+                            lastDepthNotYetAvailable = true
+                        } catch (e: Exception) {}
                     }
-                    onDiag(sb.toString().trimEnd())
+
+                    diagFrameCount++
+                    if (diagFrameCount % 30 == 0) {
+                        val splatCount = slamManager.getSplatCount()
+                        val sb = StringBuilder()
+                        sb.appendLine("=== Frame #$diagFrameCount [GAUSSIAN_SPLATS] ===")
+                        sb.appendLine("Tracking: $isTracking")
+                        sb.appendLine("DepthAPI: $depthSupported")
+                        sb.appendLine("Color fed: $colorFed  ${colorW}x${colorH}")
+                        sb.appendLine("Depth fed: $depthFed")
+                        if (!depthFed && depthSupported) sb.appendLine("  ↳ NotYetAvailable: $lastDepthNotYetAvailable")
+                        if (depthFed) sb.appendLine("  ↳ ${lastDepthW}x${lastDepthH}")
+                        sb.appendLine("Splats: $splatCount")
+                        val depthTrace = slamManager.getLastDepthTrace().trim()
+                        val splatTrace = slamManager.getLastSplatTrace().trim()
+                        if (depthTrace.isNotEmpty()) {
+                            sb.appendLine("--- DEPTH_PIPE ---")
+                            sb.appendLine(depthTrace)
+                        }
+                        if (splatTrace.isNotEmpty()) {
+                            sb.appendLine("--- SPLAT_PIPE ---")
+                            sb.appendLine(splatTrace)
+                        }
+                        onDiag(sb.toString().trimEnd())
+                    }
                 }
             }
 
-            slamManager.draw()
+            // Render the 3D point cloud
+            if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                pointCloudRenderer.draw(viewMatrix, projMatrix)
+            } else {
+                slamManager.draw()
+            }
 
             // Upload pending overlay bitmap (texture upload must happen on GL thread).
             if (overlayBitmapDirty) {

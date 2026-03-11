@@ -12,10 +12,12 @@ import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -39,6 +41,7 @@ class ArViewModel @Inject constructor(
     private val slamManager: SlamManager,
     private val stereoProvider: StereoDepthProvider,
     private val projectRepository: ProjectRepository,
+    private val settingsRepository: SettingsRepository,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -65,11 +68,23 @@ class ArViewModel @Inject constructor(
 
     init {
         // isAnchorEstablished tracks whether the current project has a saved fingerprint.
-        // Reacts to project loads, saves, and reloads without any manual wiring.
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
                 _uiState.update { it.copy(isAnchorEstablished = project?.fingerprint != null) }
             }
+        }
+        // Keep arScanMode in sync with the persisted setting and propagate to the renderer.
+        viewModelScope.launch {
+            settingsRepository.arScanMode.collect { mode ->
+                _uiState.update { it.copy(arScanMode = mode) }
+                renderer?.scanMode = mode
+            }
+        }
+    }
+
+    fun setArScanMode(mode: ArScanMode) {
+        viewModelScope.launch {
+            settingsRepository.setArScanMode(mode)
         }
     }
 
@@ -296,8 +311,11 @@ class ArViewModel @Inject constructor(
 
     fun attachSessionToRenderer(arRenderer: ArRenderer?) {
         this.renderer = arRenderer
-        if (arRenderer != null && session != null && isSessionResumed) {
-            arRenderer.attachSession(session)
+        if (arRenderer != null) {
+            arRenderer.scanMode = _uiState.value.arScanMode
+            if (session != null && isSessionResumed) {
+                arRenderer.attachSession(session)
+            }
         }
     }
 

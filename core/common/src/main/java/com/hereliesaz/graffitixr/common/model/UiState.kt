@@ -58,7 +58,10 @@ data class ArUiState(
 
     // Physical half-extents of the overlay quad in meters (computed from depth center pixel).
     // OverlayRenderer sizes its textured quad to (halfW*2) × (halfH*2) meters.
-    val targetPhysicalExtent: Pair<Float, Float>? = null
+    val targetPhysicalExtent: Pair<Float, Float>? = null,
+
+    // Which 3-D mapping mode is active. Defaults to CLOUD_POINTS (more reliable).
+    val arScanMode: ArScanMode = ArScanMode.CLOUD_POINTS
 )
 
 enum class Tool {
@@ -67,6 +70,13 @@ enum class Tool {
 
 enum class CaptureStep {
     NONE, CAPTURE, RECTIFY, MASK, REVIEW
+}
+
+enum class ArScanMode {
+    /** Use ARCore's built-in feature-point cloud (reliable, no depth API required). */
+    CLOUD_POINTS,
+    /** Use the MobileGS depth-to-voxel-splat pipeline (richer spatial map, but slower to build). */
+    GAUSSIAN_SPLATS
 }
 
 enum class BlendMode {

@@ -3,7 +3,9 @@ package com.hereliesaz.graffitixr.data.di
 import com.hereliesaz.graffitixr.data.DefaultUriProvider
 import com.hereliesaz.graffitixr.data.UriProvider
 import com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
+import com.hereliesaz.graffitixr.data.repository.SettingsRepositoryImpl
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -19,6 +21,12 @@ abstract class DataModule {
     abstract fun bindProjectRepository(
         projectRepositoryImpl: ProjectRepositoryImpl
     ): ProjectRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSettingsRepository(
+        settingsRepositoryImpl: SettingsRepositoryImpl
+    ): SettingsRepository
 
     @Binds
     @Singleton

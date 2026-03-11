@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.domain.repository
 
+import com.hereliesaz.graffitixr.common.model.ArScanMode
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -18,4 +19,9 @@ interface SettingsRepository {
      * @param isRight True for right-handed, False for left-handed.
      */
     suspend fun setRightHanded(isRight: Boolean)
+
+    /** Which AR depth/mapping mode the user has selected. Defaults to [ArScanMode.CLOUD_POINTS]. */
+    val arScanMode: Flow<ArScanMode>
+
+    suspend fun setArScanMode(mode: ArScanMode)
 }
