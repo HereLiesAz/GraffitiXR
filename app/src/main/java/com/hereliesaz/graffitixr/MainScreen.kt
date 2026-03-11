@@ -124,17 +124,13 @@ fun MainScreen(
                             val renderer = ArRenderer(
                                 context = ctx,
                                 slamManager = slamManager,
-                                onTargetCaptured = { bmp, depth, depthW, depthH, depthStride, intr, viewMat ->
-                                    bmp?.let { rawBitmap ->
-                                        val matrix = Matrix().apply { postRotate(90f) }
-                                        val rotatedBmp = android.graphics.Bitmap.createBitmap(
-                                            rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true
-                                        )
+                                onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rotation ->
+                                    bmp?.let { rawBmp ->
                                         arViewModel.onTargetCaptured(
-                                            rotatedBmp, depth,
-                                            rotatedBmp.width, rotatedBmp.height,
-                                            depthW, depthH, depthStride,
-                                            intr, viewMat
+                                            rawBmp, depth,
+                                            cw, ch,
+                                            dw, dh, stride,
+                                            intr, viewMat, rotation
                                         )
                                     }
                                 },

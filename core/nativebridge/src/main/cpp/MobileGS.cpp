@@ -490,9 +490,9 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         if (mTargetDescriptors.empty() || mTargetKeypoints3D.empty()) return;
         targetDesc = mTargetDescriptors.clone();
         targetPts  = mTargetKeypoints3D;
-        memcpy(projMat,   mProjMatrix,   16 * sizeof(float));
-        memcpy(anchorMat, mAnchorMatrix, 16 * sizeof(float));
-        memcpy(viewMat,   mViewMatrix,   16 * sizeof(float));
+        memcpy(projMat,   mMappingProjMatrix, 16 * sizeof(float));
+        memcpy(anchorMat, mAnchorMatrix,       16 * sizeof(float));
+        memcpy(viewMat,   mMappingViewMatrix, 16 * sizeof(float));
         screenW    = mScreenWidth;
         screenH    = mScreenHeight;
         isTracking = mIsArCoreTracking;
@@ -672,7 +672,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     }
 }
 
-void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, bool isYuv) {
+void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
     if (!mMapRunning) return;
     {
         std::lock_guard<std::mutex> lock(mQueueMutex);
@@ -685,6 +685,12 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
         data.isYuv = isYuv;
         memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
         memcpy(data.projMatrix, projMat, 16 * sizeof(float));
+        if (intrinsics) {
+            memcpy(data.intrinsics, intrinsics, 4 * sizeof(float));
+            data.hasIntrinsics = true;
+        } else {
+            data.hasIntrinsics = false;
+        }
         mFrameQueue.push_back(std::move(data));
     }
     mQueueCv.notify_one();
@@ -702,11 +708,12 @@ void MobileGS::mapThreadFunc() {
             frame = std::move(mFrameQueue.front());
             mFrameQueue.erase(mFrameQueue.begin());
         }
-        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix, frame.isYuv);
+        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix,
+                          frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv);
     }
 }
 
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, bool isYuv) {
+void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -727,16 +734,25 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     const float* V = viewMat;
     
-    // We must use the true physical intrinsics derived from the camera.
-    // The projection matrix is for the *display* and is cropped/scaled.
-    // By passing the unrotated depth map and the unrotated view matrix,
-    // we bypass the display skew completely.
-    const float halfW = depth.cols / 2.0f;
-    const float halfH = depth.rows / 2.0f;
-    const float fx_px = projMat[0] * halfW;
-    const float fy_px = projMat[5] * halfH;
-    const float cx_px = (projMat[8]  + 1.0f) * halfW;
-    const float cy_px = (-projMat[9] + 1.0f) * halfH;
+    // Use physical intrinsics if provided, otherwise derive from projection matrix.
+    float fx_px, fy_px, cx_px, cy_px;
+    if (intrinsics) {
+        fx_px = intrinsics[0];
+        fy_px = intrinsics[1];
+        cx_px = intrinsics[2];
+        cy_px = intrinsics[3];
+    } else {
+        // We must use the true physical intrinsics derived from the camera.
+        // The projection matrix is for the *display* and is cropped/scaled.
+        // By passing the unrotated depth map and the unrotated view matrix,
+        // we bypass the display skew completely.
+        const float halfW = depth.cols / 2.0f;
+        const float halfH = depth.rows / 2.0f;
+        fx_px = projMat[0] * halfW;
+        fy_px = projMat[5] * halfH;
+        cx_px = (projMat[8]  + 1.0f) * halfW;
+        cy_px = (-projMat[9] + 1.0f) * halfH;
+    }
 
     const float scaleX = (float)colorRGB.cols / depth.cols;
     const float scaleY = (float)colorRGB.rows / depth.rows;
@@ -992,6 +1008,12 @@ void MobileGS::updateCamera(float* viewMat, float* projMat) {
     memcpy(mViewMatrix, viewMat, 16 * sizeof(float));
     memcpy(mProjMatrix, projMat, 16 * sizeof(float));
     mCameraReady = true;
+}
+
+void MobileGS::updateMappingCamera(float* viewMat, float* projMat) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    memcpy(mMappingViewMatrix, viewMat, 16 * sizeof(float));
+    memcpy(mMappingProjMatrix, projMat, 16 * sizeof(float));
 }
 
 void MobileGS::updateLightLevel(float level) {

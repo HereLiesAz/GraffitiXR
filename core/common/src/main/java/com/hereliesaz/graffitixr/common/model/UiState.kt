@@ -56,6 +56,11 @@ data class ArUiState(
     // Used to unproject depth pixels to 3D world positions for layer feature baking.
     val targetCaptureViewMatrix: FloatArray? = null,
 
+    // Store the raw sensor-aligned bitmap for addLayerFeatures mapping
+    val targetRawBitmap: Bitmap? = null,
+    // Store the rotation applied to the display bitmap
+    val targetDisplayRotation: Int = 0,
+
     // Physical half-extents of the overlay quad in meters (computed from depth center pixel).
     // OverlayRenderer sizes its textured quad to (halfW*2) × (halfH*2) meters.
     val targetPhysicalExtent: Pair<Float, Float>? = null,

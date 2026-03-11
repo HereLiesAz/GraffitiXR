@@ -60,8 +60,14 @@ class SlamManager @Inject constructor() {
         nativeResetGlContext()
     }
 
-    fun updateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray, timestampNs: Long) {
-        nativeUpdateCamera(viewMatrix, projectionMatrix, timestampNs)
+    fun updateCamera(
+        viewMatrix: FloatArray,
+        projectionMatrix: FloatArray,
+        mappingViewMatrix: FloatArray,
+        mappingProjectionMatrix: FloatArray,
+        timestampNs: Long
+    ) {
+        nativeUpdateCamera(viewMatrix, projectionMatrix, mappingViewMatrix, mappingProjectionMatrix, timestampNs)
     }
 
     fun feedArCoreDepth(
@@ -163,7 +169,13 @@ class SlamManager @Inject constructor() {
     private external fun nativeInitGl()
     private external fun nativeResetGlContext()
     private external fun nativeSetViewportSize(width: Int, height: Int)
-    private external fun nativeUpdateCamera(viewMatrix: FloatArray, projectionMatrix: FloatArray, timestampNs: Long)
+    private external fun nativeUpdateCamera(
+        viewMatrix: FloatArray,
+        projectionMatrix: FloatArray,
+        mappingViewMatrix: FloatArray,
+        mappingProjectionMatrix: FloatArray,
+        timestampNs: Long
+    )
     private external fun nativeUpdateLightLevel(level: Float)
     private external fun nativeDraw()
     private external fun nativeGetSplatCount(): Int

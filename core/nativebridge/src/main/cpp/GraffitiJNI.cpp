@@ -121,19 +121,35 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
 
 float gLastViewMatrix[16];
 float gLastProjMatrix[16];
+float gLastMappingViewMatrix[16];
+float gLastMappingProjMatrix[16];
 bool gHasCameraMatrices = false;
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(JNIEnv* env, jobject thiz, jfloatArray viewMatrix, jfloatArray projMatrix, jlong timestampNs) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
+        JNIEnv* env, jobject thiz,
+        jfloatArray viewMatrix, jfloatArray projMatrix,
+        jfloatArray mappingViewMatrix, jfloatArray mappingProjMatrix,
+        jlong timestampNs) {
     if (gSlamEngine) {
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
+        jfloat* mView = env->GetFloatArrayElements(mappingViewMatrix, nullptr);
+        jfloat* mProj = env->GetFloatArrayElements(mappingProjMatrix, nullptr);
+
         gSlamEngine->updateCamera(view, proj);
+        gSlamEngine->updateMappingCamera(mView, mProj);
+
         memcpy(gLastViewMatrix, view, 16 * sizeof(float));
         memcpy(gLastProjMatrix, proj, 16 * sizeof(float));
+        memcpy(gLastMappingViewMatrix, mView, 16 * sizeof(float));
+        memcpy(gLastMappingProjMatrix, mProj, 16 * sizeof(float));
         gHasCameraMatrices = true;
+
         env->ReleaseFloatArrayElements(viewMatrix, view, JNI_ABORT);
         env->ReleaseFloatArrayElements(projMatrix, proj, JNI_ABORT);
+        env->ReleaseFloatArrayElements(mappingViewMatrix, mView, JNI_ABORT);
+        env->ReleaseFloatArrayElements(mappingProjMatrix, mProj, JNI_ABORT);
     }
 }
 
@@ -270,7 +286,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
     }
 
     DEPTH_TRACE("pushing frame to map thread depthSize=%dx%d", depthMap.cols, depthMap.rows);
-    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, finalIntrinsics, false);
+    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, finalIntrinsics, false);
 }
 
 JNIEXPORT void JNICALL
@@ -296,7 +312,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
     if (!disparity.empty() && !gLastColorFrame.empty() && gHasCameraMatrices) {
         cv::Mat depthFromStereo;
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0);
-        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, nullptr, false);
+        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, nullptr, false);
     }
 }
 

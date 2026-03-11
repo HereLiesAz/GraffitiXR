@@ -394,19 +394,30 @@ class ArViewModel @Inject constructor(
         colorW: Int, colorH: Int,
         depthBufW: Int, depthBufH: Int, depthBufStride: Int,
         intrinsics: FloatArray?,
-        viewMatrix: FloatArray
+        viewMatrix: FloatArray,
+        displayRotation: Int
     ) {
         val tapPos = pendingTapPosition
+        val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics)
+
         if (tapPos != null) {
-            // Phase 4 — Tap capture: accumulate the tap point and run ORB detection so the user
-            // sees green-highlighted features proving the app recognizes the painted mark.
+            // Display rotation support: rotate the sensor-oriented raw bitmap 
+            // for the user's editing screen, but keep the raw data (intrinsics/depth) 
+            // sensor-aligned for the SLAM engine's addLayerFeatures() call.
+            val rotatedBmp = if (displayRotation != 0) {
+                val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
+                Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            } else bitmap
+
             pendingTapPosition = null
             _uiState.update {
                 it.copy(
-                    tempCaptureBitmap = bitmap,
-                    annotatedCaptureBitmap = null,
+                    tempCaptureBitmap = rotatedBmp,
+                    annotatedCaptureBitmap = null,  // cleared until annotation completes
                     tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
-                    // Store depth/intrinsics for the eventual fingerprint generation.
+                    // Store mapping-aligned data for future addLayerFeaturesToSLAM call
+                    targetRawBitmap = bitmap,
+                    targetDisplayRotation = displayRotation,
                     targetDepthBuffer = depthBuffer,
                     targetDepthWidth = colorW,
                     targetDepthHeight = colorH,
@@ -415,13 +426,11 @@ class ArViewModel @Inject constructor(
                     targetDepthStride = depthBufStride,
                     targetIntrinsics = intrinsics,
                     targetCaptureViewMatrix = viewMatrix,
-                    targetPhysicalExtent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics),
+                    targetPhysicalExtent = extent,
                     isCaptureRequested = false
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
-                // Annotated bitmap has ORB feature circles drawn on it; displayed green-tinted
-                // in the AR viewport so the user sees that the painted marks were recognized.
                 val annotated = slamManager.annotateKeypoints(bitmap)
                 _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
             }
@@ -429,13 +438,19 @@ class ArViewModel @Inject constructor(
         }
 
         // Normal (non-tap) capture flow.
-        val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics)
+        val rotatedBmp = if (displayRotation != 0) {
+            val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        } else bitmap
+
         extent?.let { (halfW, halfH) -> renderer?.updateOverlayExtent(halfW, halfH) }
 
         _uiState.update {
             it.copy(
-                tempCaptureBitmap = bitmap,
-                annotatedCaptureBitmap = null,  // cleared until annotation completes
+                tempCaptureBitmap = rotatedBmp,
+                annotatedCaptureBitmap = null,
+                targetRawBitmap = bitmap,
+                targetDisplayRotation = displayRotation,
                 targetDepthBuffer = depthBuffer,
                 targetDepthWidth = colorW,
                 targetDepthHeight = colorH,
@@ -568,16 +583,26 @@ class ArViewModel @Inject constructor(
      */
     fun addLayerFeaturesToSLAM(composite: Bitmap) {
         val state = _uiState.value
+        val rawBitmap = state.targetRawBitmap ?: return
         val depthBuffer = state.targetDepthBuffer ?: return
         val intrinsics = state.targetIntrinsics ?: return
         val viewMatrix = state.targetCaptureViewMatrix ?: return
+        val rotation = state.targetDisplayRotation
         val depthW = state.targetDepthBufferWidth
         val depthH = state.targetDepthBufferHeight
         val depthStride = if (state.targetDepthStride > 0) state.targetDepthStride else depthW * 2
         if (depthW == 0 || depthH == 0) return
 
         viewModelScope.launch(Dispatchers.IO) {
-            slamManager.addLayerFeatures(composite, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+            // For SLAM feature baking, we need to match the composite (which the user edited 
+            // in display orientation) back to the sensor-oriented depth/VIO map.
+            // We do this by un-rotating the composite back to the sensor orientation.
+            val mappingComposite = if (rotation != 0) {
+                val matrix = android.graphics.Matrix().apply { postRotate(-rotation.toFloat()) }
+                Bitmap.createBitmap(composite, 0, 0, composite.width, composite.height, matrix, true)
+            } else composite
+
+            slamManager.addLayerFeatures(mappingComposite, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
         }
     }
 

@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import com.google.ar.core.Config
@@ -30,7 +29,7 @@ import kotlin.concurrent.withLock
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
-    private val onTargetCaptured: (Bitmap?, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray) -> Unit,
+    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
     private val onTrackingUpdated: (Boolean, Int, Boolean) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
@@ -174,7 +173,30 @@ class ArRenderer(
             camera.getViewMatrix(viewMatrix, 0)
             camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
 
-            slamManager.updateCamera(viewMatrix, projMatrix, frame.timestamp)
+            // Mapping matrices: use the unrotated sensor pose and sensor-aligned projection.
+            // This ensures processDepthFrame and other native mapping functions
+            // receive view matrices aligned with the sensor-oriented depth/color frames.
+            val mappingViewMatrix = FloatArray(16)
+            val mappingProjMatrix = FloatArray(16)
+            camera.pose.inverse().toMatrix(mappingViewMatrix, 0)
+
+            // Construct sensor-aligned projection matrix from image intrinsics.
+            // This bypasses display rotation/aspect-ratio-scaling.
+            val intrinsics = camera.imageIntrinsics
+            val focalLength = intrinsics.focalLength
+            val principalPoint = intrinsics.principalPoint
+            val dims = intrinsics.imageDimensions
+            
+            mappingProjMatrix[0] = 2.0f * focalLength[0] / dims[0]
+            mappingProjMatrix[5] = 2.0f * focalLength[1] / dims[1]
+            mappingProjMatrix[8] = 2.0f * principalPoint[0] / dims[0] - 1.0f
+            mappingProjMatrix[9] = 1.0f - 2.0f * principalPoint[1] / dims[1]
+            mappingProjMatrix[10] = -(100.1f) / (99.9f) // far+near / near-far (0.1, 100)
+            mappingProjMatrix[11] = -1.0f
+            mappingProjMatrix[14] = -(2.0f * 100.0f * 0.1f) / (99.9f)
+            mappingProjMatrix[15] = 0.0f
+
+            slamManager.updateCamera(viewMatrix, projMatrix, mappingViewMatrix, mappingProjMatrix, frame.timestamp)
 
             val lightEstimate = frame.lightEstimate
             if (lightEstimate.state == com.google.ar.core.LightEstimate.State.VALID) {
@@ -206,10 +228,6 @@ class ArRenderer(
 
                         val displayDegrees = displayRotationHelper.getRotation() * 90
                         val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
-                        val rotatedBitmap = if (rotationNeeded != 0) {
-                            val matrix = Matrix().apply { postRotate(rotationNeeded.toFloat()) }
-                            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-                        } else bitmap
 
                         var depthBuffer: ByteBuffer? = null
                         var depthWidth = 0
@@ -237,9 +255,11 @@ class ArRenderer(
                         )
 
                         onTargetCaptured(
-                            rotatedBitmap, depthBuffer,
+                            bitmap, image.width, image.height,
+                            depthBuffer,
                             depthWidth, depthHeight, depthStride,
-                            intrArr, viewMatrix.copyOf()
+                            intrArr, mappingViewMatrix.copyOf(),
+                            rotationNeeded
                         )
                     }
                 } catch (e: Exception) {

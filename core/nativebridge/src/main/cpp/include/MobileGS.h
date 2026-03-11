@@ -40,10 +40,11 @@ public:
     void initGl();
     void resetGlContext(); // Fixes map disappearing on rotate
     void updateCamera(float* viewMat, float* projMat);
+    void updateMappingCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
-    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, bool isYuv);
-    void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, bool isYuv);
+    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
+    void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
 
     void setArCoreTrackingState(bool isTracking);
 
@@ -89,6 +90,8 @@ private:
         bool isYuv = false;
         float viewMatrix[16];
         float projMatrix[16];
+        float intrinsics[4];
+        bool hasIntrinsics = false;
     };
     std::thread mMapThread;
     std::mutex mQueueMutex;
@@ -182,6 +185,8 @@ private:
 
     float mViewMatrix[16];
     float mProjMatrix[16];
+    float mMappingViewMatrix[16];
+    float mMappingProjMatrix[16];
     float mAnchorMatrix[16];
     bool mCameraReady = false;
 
