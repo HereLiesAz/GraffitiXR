@@ -710,4 +710,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAddLayerFeatures(
     env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
 }
 
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgress(
+        JNIEnv*, jobject) {
+    return gSlamEngine ? gSlamEngine->getPaintingProgress() : 0.0f;
+}
+
 } // extern "C"

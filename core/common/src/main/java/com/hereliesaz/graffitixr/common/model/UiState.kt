@@ -71,7 +71,12 @@ data class ArUiState(
     val tapHighlightKeypoints: List<Pair<Float, Float>> = emptyList(),
 
     // Phase 5 — When true, OverlayRenderer draws an orange line-loop around the anchor quad boundary.
-    val showAnchorBoundary: Boolean = false
+    val showAnchorBoundary: Boolean = false,
+
+    // Teleological SLAM — fraction [0,1] of locked artwork guide features currently visible
+    // on the wall.  0 until addLayerFeaturesToSLAM has been called (layers locked as guide).
+    // Updated after every PnP relocalisation pass inside the native engine (~1–2 Hz).
+    val paintingProgress: Float = 0f
 )
 
 enum class Tool {

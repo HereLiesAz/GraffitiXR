@@ -359,11 +359,15 @@ class ArViewModel @Inject constructor(
     }
 
     fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean) {
+        // getPaintingProgress is a single atomic-float read on the native side — cheap.
+        val progress = if (isTracking) slamManager.getPaintingProgress()
+                       else _uiState.value.paintingProgress
         _uiState.update {
             it.copy(
                 isScanning = isTracking,
                 splatCount = splatCount,
                 isDepthApiSupported = isDepthApiSupported,
+                paintingProgress = progress,
                 scanHint = computeScanHint(
                     isTracking = isTracking,
                     splatCount = splatCount,
@@ -371,6 +375,17 @@ class ArViewModel @Inject constructor(
                 )
             )
         }
+    }
+
+    /**
+     * Register the composite of all visible artwork layers as the teleological painting guide.
+     * Call this whenever the user enters AR mode with an established anchor and layers present,
+     * and again whenever layer content changes while the anchor is active.
+     * The native engine stores these features in a separate bank and compares each PnP frame
+     * against them to estimate how much of the mural has been painted so far.
+     */
+    fun updatePaintingGuide(composite: android.graphics.Bitmap) {
+        addLayerFeaturesToSLAM(composite)
     }
 
     fun onTargetCaptured(

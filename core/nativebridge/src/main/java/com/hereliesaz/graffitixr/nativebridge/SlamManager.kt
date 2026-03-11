@@ -30,6 +30,13 @@ class SlamManager @Inject constructor() {
 
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
+    /**
+     * Returns the fraction [0,1] of locked artwork features currently visible in the
+     * live camera feed.  Updated after every PnP relocalisation pass (~1–2 Hz).
+     * Returns 0 until [addLayerFeatures] has been called at least once.
+     */
+    fun getPaintingProgress(): Float = nativeGetPaintingProgress()
+
     /** Returns the current PnP-driven anchor matrix (target-local → world, column-major 4×4). */
     fun getAnchorTransform(): FloatArray = nativeGetAnchorTransform()
 
@@ -218,6 +225,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
+    private external fun nativeGetPaintingProgress(): Float
     private external fun nativeAddLayerFeatures(
         bitmap: Bitmap, depthBuffer: ByteBuffer,
         depthW: Int, depthH: Int, depthStride: Int,

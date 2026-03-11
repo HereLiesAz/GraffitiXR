@@ -481,6 +481,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     float projMat[16], anchorMat[16], viewMat[16];
     int screenW, screenH;
     bool isTracking;
+    cv::Mat artworkDesc;
     {
         std::lock_guard<std::mutex> lk(mMutex);
         if (mTargetDescriptors.empty() || mTargetKeypoints3D.empty()) return;
@@ -492,6 +493,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         screenW    = mScreenWidth;
         screenH    = mScreenHeight;
         isTracking = mIsArCoreTracking;
+        if (!mArtworkDescriptors.empty()) artworkDesc = mArtworkDescriptors.clone();
     }
 
     cv::Mat gray;
@@ -563,6 +565,26 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         memcpy(mTargetAnchorMatrix, glm::value_ptr(world_T_obj), 16 * sizeof(float));
         mInterpolationProgress = 0.0f;
         mAnchorInterpolating   = true;
+    }
+
+    // ── Teleological progress estimation ──────────────────────────────────────
+    // Reuse the already-detected current-frame features (descs) to check how
+    // many of the locked artwork features are now visible on the wall.
+    // This is the "how far along is the mural" measurement.
+    if (!artworkDesc.empty() && !descs.empty() && artworkDesc.type() == descs.type()) {
+        auto artMatcher = cv::BFMatcher::create(
+                artworkDesc.type() == CV_8U ? cv::NORM_HAMMING : cv::NORM_L2);
+        std::vector<std::vector<cv::DMatch>> artMatches;
+        artMatcher->knnMatch(artworkDesc, descs, artMatches, 2);
+
+        int matched = 0;
+        for (const auto& m : artMatches) {
+            if (m.size() == 2 && m[0].distance < 0.75f * m[1].distance) ++matched;
+        }
+        float progress = (artworkDesc.rows > 0)
+                         ? std::min(1.0f, (float)matched / (float)artworkDesc.rows)
+                         : 0.0f;
+        mPaintingProgress.store(progress, std::memory_order_relaxed);
     }
 }
 
@@ -1119,7 +1141,16 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
     } else if (mTargetDescriptors.type() == newDescs.type()) {
         cv::vconcat(mTargetDescriptors, newDescs, mTargetDescriptors);
     }
-    LOGI("addLayerFeatures: added %zu new features, total=%d", newPts.size(), mTargetDescriptors.rows);
+
+    // Store a clean copy of the artwork features for teleological progress tracking.
+    // This bank is overwritten each time layers are locked so it always reflects
+    // the current "finished mural" goal — independent of the reloc fingerprint.
+    mArtworkDescriptors  = newDescs.clone();
+    mArtworkKeypoints3D  = newPts;
+    mPaintingProgress.store(0.0f, std::memory_order_relaxed);  // reset: new guide loaded
+
+    LOGI("addLayerFeatures: added %zu new features, total=%d, artwork bank=%d",
+         newPts.size(), mTargetDescriptors.rows, mArtworkDescriptors.rows);
 }
 
 void MobileGS::saveModel(const std::string& path) {

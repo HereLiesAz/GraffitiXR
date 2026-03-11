@@ -74,6 +74,10 @@ public:
     int getSplatCount() const { return mPointCount; }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
 
+    // Teleological painting progress — fraction [0,1] of artwork guide features
+    // currently visible in the live camera feed.  Updated inside runPnPMatch.
+    float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
+
     // Project Data I/O
     void saveModel(const std::string& path);
     void loadModel(const std::string& path);
@@ -129,6 +133,12 @@ private:
 
     cv::Mat mTargetDescriptors;
     std::vector<cv::Point3f> mTargetKeypoints3D;
+
+    // Teleological guide: features of the artwork-as-projected (locked layers composite).
+    // Separate from mTargetDescriptors so relocation and progress use independent banks.
+    cv::Mat mArtworkDescriptors;
+    std::vector<cv::Point3f> mArtworkKeypoints3D;
+    std::atomic<float> mPaintingProgress{0.0f};
 
     std::vector<Splat> splatData;
     std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;

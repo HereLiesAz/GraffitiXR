@@ -112,6 +112,11 @@ fun MainScreen(
                             compositeLayersForAr(visibleLayers)
                         }
                         rendererRef.value?.updateOverlayBitmap(composite)
+
+                        // Register the composited artwork as the teleological painting guide so
+                        // the engine knows what features should appear when the mural is finished.
+                        // This runs on the IO dispatcher inside addLayerFeaturesToSLAM.
+                        arViewModel.updatePaintingGuide(composite)
                     }
 
                     AndroidView(

@@ -296,6 +296,22 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            // Teleological painting progress — shown once the artwork guide
+                            // has been registered and the engine has made at least one estimate.
+                            val showProgress = editorUiState.editorMode == EditorMode.AR
+                                && arUiState.isAnchorEstablished
+                                && arUiState.paintingProgress > 0.01f
+                                && !mainUiState.isCapturingTarget
+                                && !showLibrary && !showSettings
+                            if (showProgress) {
+                                PaintingProgressIndicator(
+                                    progress = arUiState.paintingProgress,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 16.dp, end = 16.dp)
+                                )
+                            }
+
                             // Depth pipeline diagnostic popup — toggled in Settings
                             if (editorUiState.editorMode == EditorMode.AR && editorUiState.showDiagOverlay) {
                                 DiagPopup(
@@ -918,6 +934,47 @@ private fun ScanCoachingOverlay(
                     style = MaterialTheme.typography.labelSmall
                 )
             }
+        }
+    }
+}
+
+/**
+ * Compact overlay shown in AR mode once the user has locked their artwork layers as a
+ * painting guide.  Displays the fraction of guide features currently visible on the wall
+ * so the artist knows how far along the mural is.
+ */
+@Composable
+private fun PaintingProgressIndicator(
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    val pct = (progress * 100f).toInt().coerceIn(0, 100)
+    val barColor = when {
+        pct >= 80 -> Color(0xFF66BB6A)   // green — nearly done
+        pct >= 40 -> Color(0xFFFFCA28)   // amber — halfway
+        else      -> Color(0xFFEF5350)   // red   — just started
+    }
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier
+            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.foundation.layout.Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier.width(90.dp),
+                color = barColor,
+                trackColor = Color.White.copy(alpha = 0.2f)
+            )
+            Text(
+                text = "$pct%",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
