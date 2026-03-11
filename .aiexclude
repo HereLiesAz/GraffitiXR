@@ -48,9 +48,6 @@ refactor*.sh
 *.hprof
 
 # Documentation Meta
-AGENTS.md
-docs/architecture.md
-docs/TODO.md
 # (Other docs are okay for context, but keep it lean)
 
 # Backups

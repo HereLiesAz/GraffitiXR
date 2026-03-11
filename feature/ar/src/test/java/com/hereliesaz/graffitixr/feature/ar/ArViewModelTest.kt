@@ -168,6 +168,27 @@ class ArViewModelTest {
     }
 
     @Test
+    fun `onScreenTap triggers capture request and onTargetCaptured clears it`() = runTest {
+        assertFalse(viewModel.uiState.value.isCaptureRequested)
+
+        viewModel.onScreenTap(0.5f, 0.5f)
+        assertTrue(viewModel.uiState.value.isCaptureRequested)
+
+        // Simulate frame arrival for a tap (non-null depth buffer to trigger logic)
+        viewModel.onTargetCaptured(
+            bitmap = mockk(relaxed = true),
+            depthBuffer = java.nio.ByteBuffer.allocate(10),
+            colorW = 100, colorH = 100,
+            depthBufW = 100, depthBufH = 100, depthBufStride = 200,
+            intrinsics = null,
+            viewMatrix = FloatArray(16)
+        )
+
+        assertFalse(viewModel.uiState.value.isCaptureRequested)
+        assertEquals(1, viewModel.uiState.value.tapHighlightKeypoints.size)
+    }
+
+    @Test
     fun `clearTapHighlights clears keypoints and bitmaps`() = runTest {
         viewModel.clearTapHighlights()
         val state = viewModel.uiState.value

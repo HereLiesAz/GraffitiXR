@@ -235,9 +235,10 @@ fun MainScreen(
                         isImageLocked,
                         uiState.activeTool,
                         isTouchLocked,
+                        isWaitingForTap,
                         "tap"
                     ) {
-                        if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+                        if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
                             if (uiState.activeTool == Tool.NONE) {
                                 detectTapGestures(onDoubleTap = { editorViewModel.onCycleRotationAxis() })
                             }
@@ -248,9 +249,10 @@ fun MainScreen(
                         isImageLocked,
                         uiState.activeTool,
                         isTouchLocked,
+                        isWaitingForTap,
                         "transform"
                     ) {
-                        if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+                        if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
                             if (uiState.activeTool == Tool.NONE) {
                                 coroutineScope {
                                     detectTransformGestures { _, pan, zoom, rotation ->

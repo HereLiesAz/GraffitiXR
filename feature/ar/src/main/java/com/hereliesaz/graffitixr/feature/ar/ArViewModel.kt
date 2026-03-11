@@ -415,7 +415,8 @@ class ArViewModel @Inject constructor(
                     targetDepthStride = depthBufStride,
                     targetIntrinsics = intrinsics,
                     targetCaptureViewMatrix = viewMatrix,
-                    targetPhysicalExtent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics)
+                    targetPhysicalExtent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics),
+                    isCaptureRequested = false
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
@@ -460,7 +461,7 @@ class ArViewModel @Inject constructor(
      */
     fun onScreenTap(nx: Float, ny: Float) {
         pendingTapPosition = Pair(nx, ny)
-        renderer?.captureRequested = true
+        _uiState.update { it.copy(isCaptureRequested = true) }
     }
 
     /** Phase 4: Clear all accumulated tap highlight positions (called by "Retake" / "Clear"). */
