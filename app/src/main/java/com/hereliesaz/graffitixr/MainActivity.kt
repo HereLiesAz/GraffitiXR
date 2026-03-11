@@ -70,6 +70,7 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
+import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.InfoDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
@@ -149,7 +150,6 @@ class MainActivity : ComponentActivity() {
                 val currentCaptureStep = mainUiState.captureStep
                 LaunchedEffect(currentTempCapture, currentCaptureStep) {
                     if (currentTempCapture != null && currentCaptureStep == CaptureStep.CAPTURE) {
-                        // Skip rectify/mask — go straight to review
                         mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                     }
                 }
@@ -249,10 +249,6 @@ class MainActivity : ComponentActivity() {
                                 UnlockInstructionsPopup(visible = showUnlockInstructions)
                             }
 
-                            // Scan coaching only applies to Gaussian Splats mode (which requires
-                            // 50k splats before the target-creation workflow is unblocked).
-                            // Cloud Points mode has no scan phase — ARCore accumulates feature
-                            // points immediately and the user can create a target right away.
                             val isScanningPhase = editorUiState.editorMode == EditorMode.AR
                                     && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
                                     && arUiState.splatCount < 50000
@@ -266,12 +262,10 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Phase 3: Banner when Gaussian Splats mode is active but device
-                            // doesn't support the Depth API — user should switch modes.
                             val showDepthWarning = editorUiState.editorMode == EditorMode.AR
                                     && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
                                     && !arUiState.isDepthApiSupported
-                                    && arUiState.splatCount == 0  // hide once we have live data
+                                    && arUiState.splatCount == 0
                             if (showDepthWarning && !showLibrary && !showSettings) {
                                 DepthApiUnsupportedBanner(
                                     modifier = Modifier
@@ -280,7 +274,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Phase 4: Tap-target mode — instruction banner + confirm/clear buttons.
                             if (mainUiState.isWaitingForTap && !showLibrary && !showSettings) {
                                 TapTargetOverlay(
                                     hasTaps = arUiState.tapHighlightKeypoints.isNotEmpty(),
@@ -297,8 +290,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Teleological painting progress — shown once the artwork guide
-                            // has been registered and the engine has made at least one estimate.
                             val showProgress = editorUiState.editorMode == EditorMode.AR
                                     && arUiState.isAnchorEstablished
                                     && arUiState.paintingProgress > 0.01f
@@ -313,7 +304,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Depth pipeline diagnostic popup — toggled in Settings
                             if (editorUiState.editorMode == EditorMode.AR && editorUiState.showDiagOverlay) {
                                 DiagPopup(
                                     diagLog = arUiState.diagLog,
@@ -348,7 +338,7 @@ class MainActivity : ComponentActivity() {
                                             lifecycleScope.launch(Dispatchers.Default) {
                                                 val unwarped = ImageProcessor.unwarpImage(currentBitmap, points)
                                                 if (unwarped != null) {
-                                                    arViewModel.setTempCapture(unwarped)
+                                                    arViewModel.setTempCapture(unwarped.isolateMarkings())
                                                 }
                                                 mainViewModel.setCaptureStep(CaptureStep.MASK)
                                                 isProcessing = false
@@ -553,9 +543,6 @@ class MainActivity : ComponentActivity() {
 
         if (canEdit) {
             editorUiState.layers.reversed().forEach { layer ->
-                // FIX: Capture activeTool for use inside the nested content lambda.
-                // The rail DSL rebuilds on each recomposition so this always reflects
-                // the current ViewModel state.
                 val activeTool = editorUiState.activeTool
 
                 azRailRelocItem(
@@ -563,9 +550,6 @@ class MainActivity : ComponentActivity() {
                     hostId = "design_host",
                     text = layer.name,
                     nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
-                    // FIX: keepNestedRailOpen = false so that tapping the layer item
-                    // again (which calls onLayerActivated -> activeTool = NONE) also
-                    // closes the nested tool rail, deactivating the active tool visually.
                     keepNestedRailOpen = false,
                     onClick = {
                         editorViewModel.onLayerActivated(layer.id)
@@ -604,10 +588,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         if (layer.isSketch) {
-                            // FIX: Use azRailToggle so the active tool stays visually highlighted.
-                            // isChecked reflects ViewModel state — persists across rail recompositions.
-                            // Tapping a different tool deactivates the previous one automatically.
-                            // The nested rail closes (and activeTool resets) when the layer item is tapped.
                             azRailToggle(
                                 id = "brush_${layer.id}",
                                 isChecked = activeTool == Tool.BRUSH,
@@ -704,8 +684,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ─── Phase 3: Depth API unsupported banner ───────────────────────────────────
-
 @Composable
 private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
     Box(
@@ -721,8 +699,6 @@ private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
         )
     }
 }
-
-// ─── Phase 4: Tap-target mode overlay ────────────────────────────────────────
 
 @Composable
 private fun TapTargetOverlay(
@@ -805,11 +781,6 @@ private fun TapTargetOverlay(
         }
     }
 }
-
-// ─── Scan coaching overlay ────────────────────────────────────────────────────
-// Sits just above the bottom rail. A small progress pill shows how far along
-// the scan is. Below it, a hint line animates whenever the specific guidance
-// message changes — telling the user exactly what they need to do more of.
 
 @Composable
 private fun DiagPopup(
@@ -905,7 +876,6 @@ private fun ScanCoachingOverlay(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Hint line — animates out when the message changes so updates feel deliberate
         AnimatedVisibility(
             visible = hint != null,
             enter = fadeIn() + slideInVertically { it / 2 },
@@ -937,7 +907,6 @@ private fun ScanCoachingOverlay(
             }
         }
 
-        // Slim progress pill — counts up without being distracting
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .background(Color(0xCC000000), RoundedCornerShape(20.dp))
@@ -964,11 +933,6 @@ private fun ScanCoachingOverlay(
     }
 }
 
-/**
- * Compact overlay shown in AR mode once the user has locked their artwork layers as a
- * painting guide.  Displays the fraction of guide features currently visible on the wall
- * so the artist knows how far along the mural is.
- */
 @Composable
 private fun PaintingProgressIndicator(
     progress: Float,
@@ -976,9 +940,9 @@ private fun PaintingProgressIndicator(
 ) {
     val pct = (progress * 100f).toInt().coerceIn(0, 100)
     val barColor = when {
-        pct >= 80 -> Color(0xFF66BB6A)   // green — nearly done
-        pct >= 40 -> Color(0xFFFFCA28)   // amber — halfway
-        else      -> Color(0xFFEF5350)   // red   — just started
+        pct >= 80 -> Color(0xFF66BB6A)
+        pct >= 40 -> Color(0xFFFFCA28)
+        else      -> Color(0xFFEF5350)
     }
     androidx.compose.foundation.layout.Box(
         modifier = modifier

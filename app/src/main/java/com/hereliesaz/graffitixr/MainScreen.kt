@@ -41,6 +41,11 @@ import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.coroutineScope
 import android.graphics.Bitmap as AndroidBitmap
 
+/**
+ * The main stage where reality is augmented and screen touches are translated into either
+ * teleological AR tracking actions or 2D canvas manipulations, depending on which illusion
+ * the user is currently buying into.
+ */
 @Composable
 fun MainScreen(
     uiState: EditorUiState,
@@ -100,8 +105,6 @@ fun MainScreen(
                         rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
                     }
 
-                    // Composite visible layers into a bitmap for the GL overlay quad —
-                    // but ONLY once an anchor has been established (fingerprint saved to project).
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
                     LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
                         if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
@@ -112,10 +115,6 @@ fun MainScreen(
                             compositeLayersForAr(visibleLayers)
                         }
                         rendererRef.value?.updateOverlayBitmap(composite)
-
-                        // Register the composited artwork as the teleological painting guide so
-                        // the engine knows what features should appear when the mural is finished.
-                        // This runs on the IO dispatcher inside addLayerFeaturesToSLAM.
                         arViewModel.updatePaintingGuide(composite)
                     }
 
@@ -126,11 +125,12 @@ fun MainScreen(
                                 slamManager = slamManager,
                                 onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rotation ->
                                     bmp?.let { rawBmp ->
+                                        val correctedRotation = if (rawBmp.width > rawBmp.height) rotation + 90 else rotation
                                         arViewModel.onTargetCaptured(
                                             rawBmp, depth,
                                             cw, ch,
                                             dw, dh, stride,
-                                            intr, viewMat, rotation
+                                            intr, viewMat, correctedRotation
                                         )
                                     }
                                 },
@@ -164,9 +164,6 @@ fun MainScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // Phase 4: Green-highlighted annotated bitmap overlay.
-                    // Shown over the camera feed while in tap mode so the artist can see
-                    // which features on their painted mark the app has recognized.
                     val annotated = arUiState.annotatedCaptureBitmap
                     if (isWaitingForTap && annotated != null) {
                         Image(
@@ -175,7 +172,6 @@ fun MainScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
-                                    // Green tint to signal "recognized" — overlaid semi-transparently
                                     alpha = 0.65f
                                     colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
                                         Color(0x8800CC44),
@@ -253,9 +249,6 @@ fun MainScreen(
                         }
                     }
             ) {
-                // In AR mode, artwork is rendered by OverlayRenderer as a 3D-anchored
-                // GL texture — not as flat 2D Compose overlays (which would look identical
-                // to OVERLAY mode and aren't anchored to anything).
                 if (uiState.editorMode != EditorMode.AR) {
                     uiState.layers.filter { it.isVisible }.forEach { layer ->
                         layer.bitmap?.let { bmp ->
@@ -282,7 +275,7 @@ fun MainScreen(
                             )
                         }
                     }
-                } // end if (editorMode != AR)
+                }
             }
         }
 
@@ -315,12 +308,9 @@ fun MainScreen(
 
 /**
  * Composite all visible layers (those with bitmaps) into a single ARGB_8888 bitmap for the
- * AR anchor overlay.  Applies each layer's 2D transform (offset, scale, Z-rotation, opacity).
+ * AR anchor overlay. Applies each layer's 2D transform (offset, scale, Z-rotation, opacity).
  * 3D perspective rotations (rotationX/rotationY) are intentionally ignored here — they are a
  * Compose-only visual effect and cannot be reproduced in a flat android.graphics.Canvas.
- *
- * The canvas size is taken from the first layer's bitmap dimensions and all subsequent layers
- * are drawn relative to that same coordinate space (center-aligned).
  */
 private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
     val w = layers.firstNotNullOfOrNull { it.bitmap?.width } ?: 1024
@@ -332,7 +322,6 @@ private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
         val bmp = layer.bitmap ?: continue
         paint.alpha = (layer.opacity.coerceIn(0f, 1f) * 255).toInt()
         val matrix = Matrix()
-        // Pivot at bitmap center, then apply layer transform, then re-center on canvas
         matrix.postTranslate(-bmp.width / 2f, -bmp.height / 2f)
         matrix.postScale(layer.scale, layer.scale)
         matrix.postRotate(layer.rotationZ)
