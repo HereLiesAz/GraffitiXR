@@ -161,19 +161,7 @@ fun MainScreen(
                         update = { view ->
                             rendererRef.value?.captureRequested = arUiState.isCaptureRequested
                         },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(isWaitingForTap) {
-                                // Phase 4: In tap-target mode, forward normalized taps to ArViewModel
-                                // so the app can capture a frame and run ORB detection on the mark.
-                                if (isWaitingForTap) {
-                                    detectTapGestures { offset ->
-                                        val nx = offset.x / size.width
-                                        val ny = offset.y / size.height
-                                        arViewModel.onScreenTap(nx, ny)
-                                    }
-                                }
-                            }
+                        modifier = Modifier.fillMaxSize()
                     )
 
                     // Phase 4: Green-highlighted annotated bitmap overlay.
@@ -234,7 +222,13 @@ fun MainScreen(
                         isWaitingForTap,
                         "tap"
                     ) {
-                        if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
+                        if (isWaitingForTap) {
+                            detectTapGestures { offset ->
+                                val nx = offset.x / size.width
+                                val ny = offset.y / size.height
+                                arViewModel.onScreenTap(nx, ny)
+                            }
+                        } else if (!isTouchLocked && !isImageLocked && activeLayer != null) {
                             if (uiState.activeTool == Tool.NONE) {
                                 detectTapGestures(onDoubleTap = { editorViewModel.onCycleRotationAxis() })
                             }
@@ -263,31 +257,31 @@ fun MainScreen(
                 // GL texture — not as flat 2D Compose overlays (which would look identical
                 // to OVERLAY mode and aren't anchored to anything).
                 if (uiState.editorMode != EditorMode.AR) {
-                uiState.layers.filter { it.isVisible }.forEach { layer ->
-                    layer.bitmap?.let { bmp ->
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    translationX = layer.offset.x
-                                    translationY = layer.offset.y
-                                    scaleX = layer.scale
-                                    scaleY = layer.scale
-                                    rotationX = layer.rotationX
-                                    rotationY = layer.rotationY
-                                    rotationZ = layer.rotationZ
-                                    alpha = layer.opacity
-                                    transformOrigin = TransformOrigin.Center
-                                    blendMode = layer.blendMode
-                                    compositingStrategy =
-                                        androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                                },
-                            contentScale = ContentScale.Fit
-                        )
+                    uiState.layers.filter { it.isVisible }.forEach { layer ->
+                        layer.bitmap?.let { bmp ->
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        translationX = layer.offset.x
+                                        translationY = layer.offset.y
+                                        scaleX = layer.scale
+                                        scaleY = layer.scale
+                                        rotationX = layer.rotationX
+                                        rotationY = layer.rotationY
+                                        rotationZ = layer.rotationZ
+                                        alpha = layer.opacity
+                                        transformOrigin = TransformOrigin.Center
+                                        blendMode = layer.blendMode
+                                        compositingStrategy =
+                                            androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                                    },
+                                contentScale = ContentScale.Fit
+                            )
+                        }
                     }
-                }
                 } // end if (editorMode != AR)
             }
         }

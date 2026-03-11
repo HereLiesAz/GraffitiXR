@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.border
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -253,8 +254,8 @@ class MainActivity : ComponentActivity() {
                             // Cloud Points mode has no scan phase — ARCore accumulates feature
                             // points immediately and the user can create a target right away.
                             val isScanningPhase = editorUiState.editorMode == EditorMode.AR
-                                && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
-                                && arUiState.splatCount < 50000
+                                    && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
+                                    && arUiState.splatCount < 50000
                             if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
                                 ScanCoachingOverlay(
                                     splatCount = arUiState.splatCount,
@@ -268,9 +269,9 @@ class MainActivity : ComponentActivity() {
                             // Phase 3: Banner when Gaussian Splats mode is active but device
                             // doesn't support the Depth API — user should switch modes.
                             val showDepthWarning = editorUiState.editorMode == EditorMode.AR
-                                && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
-                                && !arUiState.isDepthApiSupported
-                                && arUiState.splatCount == 0  // hide once we have live data
+                                    && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
+                                    && !arUiState.isDepthApiSupported
+                                    && arUiState.splatCount == 0  // hide once we have live data
                             if (showDepthWarning && !showLibrary && !showSettings) {
                                 DepthApiUnsupportedBanner(
                                     modifier = Modifier
@@ -299,10 +300,10 @@ class MainActivity : ComponentActivity() {
                             // Teleological painting progress — shown once the artwork guide
                             // has been registered and the engine has made at least one estimate.
                             val showProgress = editorUiState.editorMode == EditorMode.AR
-                                && arUiState.isAnchorEstablished
-                                && arUiState.paintingProgress > 0.01f
-                                && !mainUiState.isCapturingTarget
-                                && !showLibrary && !showSettings
+                                    && arUiState.isAnchorEstablished
+                                    && arUiState.paintingProgress > 0.01f
+                                    && !mainUiState.isCapturingTarget
+                                    && !showLibrary && !showSettings
                             if (showProgress) {
                                 PaintingProgressIndicator(
                                     progress = arUiState.paintingProgress,
@@ -732,25 +733,50 @@ private fun TapTargetOverlay(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(bottom = 96.dp),
+        modifier = modifier.padding(bottom = 96.dp).padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .background(Color(0xCC000000), RoundedCornerShape(20.dp))
-                .padding(horizontal = 18.dp, vertical = 8.dp)
-        ) {
-            Text(
-                text = if (hasTaps) "Tap more marks, or confirm when done"
-                       else "Tap your painted reference marks",
-                color = Color.White,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
-            )
+        if (!hasTaps) {
+            Box(
+                modifier = Modifier
+                    .background(Color(0xEE000000), RoundedCornerShape(16.dp))
+                    .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
+                    .padding(20.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "TARGET CREATION",
+                        color = Color.Cyan,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "1. Look at the wall where you painted your reference marks.\n2. Tap directly on those marks on your screen.\n3. The app will lock the digital sketch to the real wall.",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Start
+                    )
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 18.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Tap more marks, or confirm when done",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
 
+        Spacer(Modifier.height(16.dp))
+
         if (hasTaps) {
-            Spacer(Modifier.height(8.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -768,9 +794,9 @@ private fun TapTargetOverlay(
                     Text("Confirm Target")
                 }
             }
+            Spacer(Modifier.height(4.dp))
         }
 
-        Spacer(Modifier.height(4.dp))
         OutlinedButton(
             onClick = onCancel,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
