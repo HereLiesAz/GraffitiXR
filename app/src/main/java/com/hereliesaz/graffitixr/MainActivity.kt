@@ -311,6 +311,7 @@ class MainActivity : ComponentActivity() {
                                     captureStep = mainUiState.captureStep,
                                     isLoading = isProcessing,
                                     onConfirm = { _, mask ->
+                                        arViewModel.setInitialAnchorFromCapture()
                                         mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap, mask)
                                         arViewModel.restoreSplats()
                                     },

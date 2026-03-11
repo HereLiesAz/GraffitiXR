@@ -460,6 +460,59 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Compute an initial world-space anchor matrix from the captured depth frame and place the
+     * overlay quad at that position. Call this immediately when the user confirms target creation.
+     *
+     * The anchor matrix is inv(viewMatrix) (camera→world rotation) with the translation replaced
+     * by the world-space position of the wall center point (unprojected from the depth buffer).
+     * This makes the quad face the camera and sit at the wall depth, acting like a projector.
+     */
+    fun setInitialAnchorFromCapture() {
+        val state = _uiState.value
+        val viewMatrix = state.targetCaptureViewMatrix ?: return
+        val depthBuffer = state.targetDepthBuffer
+        val depthW = state.targetDepthBufferWidth
+        val depthH = state.targetDepthBufferHeight
+
+        // Read center depth pixel (DEPTH16: lower 13 bits = depth in mm, little-endian).
+        val d: Float = if (depthBuffer != null && depthW > 0 && depthH > 0) {
+            val centerIdx = (depthH / 2 * depthW + depthW / 2) * 2
+            if (centerIdx + 1 < depthBuffer.capacity()) {
+                val lo = depthBuffer.get(centerIdx).toInt() and 0xFF
+                val hi = depthBuffer.get(centerIdx + 1).toInt() and 0xFF
+                val depthMm = (lo or (hi shl 8)) and 0x1FFF
+                if (depthMm > 0) depthMm / 1000f else 1.5f
+            } else 1.5f
+        } else 1.5f
+
+        // In ARCore's OpenGL camera space the camera looks down -Z.
+        // The center ray at depth d hits the wall at (0, 0, -d) in camera space.
+        val pCam = floatArrayOf(0f, 0f, -d, 1f)
+
+        // inv(view) = camera-to-world matrix: rotates/translates camera space → world space.
+        val invView = FloatArray(16)
+        android.opengl.Matrix.invertM(invView, 0, viewMatrix, 0)
+
+        // Transform the camera-space wall point to world space.
+        val pWorld = FloatArray(4)
+        android.opengl.Matrix.multiplyMV(pWorld, 0, invView, 0, pCam, 0)
+
+        // Build anchor: same orientation as camera (quad faces viewer) but positioned at wall.
+        // invView[12..14] is the camera world position; we overwrite it with the wall position.
+        val anchorMatrix = invView.copyOf()
+        anchorMatrix[12] = pWorld[0]
+        anchorMatrix[13] = pWorld[1]
+        anchorMatrix[14] = pWorld[2]
+
+        // Propagate physical extent to the renderer (it may have been computed during capture).
+        state.targetPhysicalExtent?.let { (halfW, halfH) ->
+            renderer?.updateOverlayExtent(halfW, halfH)
+        }
+
+        slamManager.updateAnchorTransform(anchorMatrix)
+    }
+
     /** Phase 5: Toggle the anchor boundary overlay. */
     fun setShowAnchorBoundary(show: Boolean) {
         viewModelScope.launch {

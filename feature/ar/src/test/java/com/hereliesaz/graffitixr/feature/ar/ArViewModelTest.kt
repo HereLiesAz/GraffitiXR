@@ -4,6 +4,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Session
+import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import io.mockk.every
@@ -11,7 +14,9 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -20,7 +25,7 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import java.lang.reflect.Field
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArViewModelTest {
@@ -28,6 +33,8 @@ class ArViewModelTest {
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
     private val stereoProvider: StereoDepthProvider = mockk(relaxed = true)
+    private val projectRepository: ProjectRepository = mockk(relaxed = true)
+    private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val session: Session = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
@@ -35,7 +42,12 @@ class ArViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = ArViewModel(slamManager, stereoProvider)
+        every { settingsRepository.arScanMode } returns flowOf(ArScanMode.CLOUD_POINTS)
+        every { settingsRepository.isRightHanded } returns flowOf(true)
+        every { settingsRepository.showAnchorBoundary } returns flowOf(false)
+        every { projectRepository.currentProject } returns MutableStateFlow(null)
+        every { context.filesDir } returns File("/tmp")
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
     }
 
     @After
@@ -61,7 +73,7 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState with true sets correct state`() = runTest {
-        viewModel.setTrackingState(true)
+        viewModel.setTrackingState(true, 0, false)
 
         val state = viewModel.uiState.value
         assertTrue(state.isScanning)
@@ -69,10 +81,19 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState with false sets correct state`() = runTest {
-        viewModel.setTrackingState(false)
+        viewModel.setTrackingState(false, 0, false)
 
         val state = viewModel.uiState.value
         assertFalse(state.isScanning)
+    }
+
+    @Test
+    fun `setTrackingState propagates isDepthApiSupported`() = runTest {
+        viewModel.setTrackingState(true, 100, true)
+        assertTrue(viewModel.uiState.value.isDepthApiSupported)
+
+        viewModel.setTrackingState(true, 100, false)
+        assertFalse(viewModel.uiState.value.isDepthApiSupported)
     }
 
     // Skipping ensureEngineInitialized test because SlamManager loads native library in init block
@@ -144,6 +165,15 @@ class ArViewModelTest {
 
         viewModel.onCaptureRequestHandled()
         assertFalse(viewModel.uiState.value.isCaptureRequested)
+    }
+
+    @Test
+    fun `clearTapHighlights clears keypoints and bitmaps`() = runTest {
+        viewModel.clearTapHighlights()
+        val state = viewModel.uiState.value
+        assertTrue(state.tapHighlightKeypoints.isEmpty())
+        assertNull(state.annotatedCaptureBitmap)
+        assertNull(state.tempCaptureBitmap)
     }
 
     // ==================== Session Lifecycle Tests ====================

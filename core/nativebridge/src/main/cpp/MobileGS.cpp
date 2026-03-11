@@ -478,7 +478,7 @@ void MobileGS::relocThreadFunc() {
 void MobileGS::runPnPMatch(const cv::Mat& frame) {
     cv::Mat targetDesc;
     std::vector<cv::Point3f> targetPts;
-    float projMat[16], anchorMat[16];
+    float projMat[16], anchorMat[16], viewMat[16];
     int screenW, screenH;
     bool isTracking;
     {
@@ -488,6 +488,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         targetPts  = mTargetKeypoints3D;
         memcpy(projMat,   mProjMatrix,   16 * sizeof(float));
         memcpy(anchorMat, mAnchorMatrix, 16 * sizeof(float));
+        memcpy(viewMat,   mViewMatrix,   16 * sizeof(float));
         screenW    = mScreenWidth;
         screenH    = mScreenHeight;
         isTracking = mIsArCoreTracking;
@@ -544,14 +545,22 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         T.at<float>(i, 3) = tvec.at<double>(i, 0);
     }
 
+    // T (from solvePnPRansac) is OpenCV row-major, representing cam_T_obj.
+    // glm::make_mat4 reads column-major, so it interprets the row-major data as T-transposed;
+    // glm::transpose reverses that, giving us cam_T_obj in GLM column-major form.
+    // Then world_T_obj = inv(view) × cam_T_obj (stable world-space anchor, not camera-relative).
+    glm::mat4 cam_T_obj  = glm::transpose(glm::make_mat4(T.ptr<float>()));
+    glm::mat4 V          = glm::make_mat4(viewMat);
+    glm::mat4 world_T_obj = glm::inverse(V) * cam_T_obj;
+
     float drift = glm::length(
-            glm::vec3(T.at<float>(0, 3), T.at<float>(1, 3), T.at<float>(2, 3)) -
+            glm::vec3(world_T_obj[3]) -
             glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
     );
 
     if (drift > DRIFT_THRESHOLD_M || !isTracking) {
         std::lock_guard<std::mutex> lk(mMutex);
-        memcpy(mTargetAnchorMatrix, T.data, 16 * sizeof(float));
+        memcpy(mTargetAnchorMatrix, glm::value_ptr(world_T_obj), 16 * sizeof(float));
         mInterpolationProgress = 0.0f;
         mAnchorInterpolating   = true;
     }
