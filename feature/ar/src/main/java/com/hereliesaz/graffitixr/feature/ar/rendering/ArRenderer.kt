@@ -49,6 +49,7 @@ class ArRenderer(
 
     @Volatile var scanMode: ArScanMode = ArScanMode.CLOUD_POINTS
     @Volatile var showAnchorBoundary: Boolean = false
+    @Volatile var anchorEstablished: Boolean = false
 
     fun saveCloudPoints(path: String) {
         pointCloudRenderer.saveToFile(path)
@@ -339,7 +340,7 @@ class ArRenderer(
             val anchorMatrix = slamManager.getAnchorTransform()
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
 
-            if (showAnchorBoundary) {
+            if (showAnchorBoundary && anchorEstablished) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
         }

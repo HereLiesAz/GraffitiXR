@@ -811,10 +811,10 @@ class MainActivity : ComponentActivity() {
         azDivider()
 
         if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
-            azRailItem(id = "light", text = navStrings.light) { arViewModel.toggleFlashlight() }
+            azRailItem(id = "light", text = navStrings.light, onClick = { arViewModel.toggleFlashlight() })
         }
 
-        azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
+        azRailItem(id = "lock_trace", text = navStrings.lock, onClick = { mainViewModel.setTouchLocked(true) })
     }
 }
 

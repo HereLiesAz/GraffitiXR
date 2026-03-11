@@ -87,7 +87,9 @@ class ArViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
-                _uiState.update { it.copy(isAnchorEstablished = project?.fingerprint != null) }
+                val established = project?.fingerprint != null
+                _uiState.update { it.copy(isAnchorEstablished = established) }
+                renderer?.anchorEstablished = established
                 // When the active project changes, invalidate the in-memory map cache so the
                 // next session resume always loads the correct project's data from disk.
                 if (project?.id != loadedProjectId) {
@@ -421,6 +423,7 @@ class ArViewModel @Inject constructor(
         if (arRenderer != null) {
             arRenderer.scanMode = _uiState.value.arScanMode
             arRenderer.showAnchorBoundary = _uiState.value.showAnchorBoundary
+            arRenderer.anchorEstablished = _uiState.value.isAnchorEstablished
             if (session != null && isSessionResumed) {
                 arRenderer.attachSession(session)
             }
@@ -741,6 +744,7 @@ class ArViewModel @Inject constructor(
                 targetCaptureViewMatrix = flatViewMat
             )
         }
+        renderer?.anchorEstablished = true
     }
 
     fun requestCapture() {
