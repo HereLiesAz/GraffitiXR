@@ -60,3 +60,66 @@ fun Bitmap.isolateMarkings(): Bitmap {
     out.setPixels(pixels, 0, w, 0, 0, w, h)
     return out
 }
+
+/**
+ * Executes a ruthless, non-recursive flood fill to eradicate a contiguous
+ * blob of pixels from existence without inducing a StackOverflowError.
+ */
+fun Bitmap.eraseColorBlob(nx: Float, ny: Float): Bitmap {
+    val w = this.width
+    val h = this.height
+    val x = (nx * w).toInt().coerceIn(0, w - 1)
+    val y = (ny * h).toInt().coerceIn(0, h - 1)
+
+    val out = this.copy(Bitmap.Config.ARGB_8888, true)
+    val pixels = IntArray(w * h)
+    out.getPixels(pixels, 0, w, 0, 0, w, h)
+
+    val targetPixel = pixels[y * w + x]
+    if (targetPixel == 0) return out // Tapped the void, do nothing
+
+    // Primitive arrays instead of object allocations because efficiency is next to godliness
+    val qx = IntArray(w * h)
+    val qy = IntArray(w * h)
+    var head = 0
+    var tail = 0
+
+    qx[tail] = x
+    qy[tail] = y
+    tail++
+    pixels[y * w + x] = 0
+
+    while (head < tail) {
+        val cx = qx[head]
+        val cy = qy[head]
+        head++
+
+        if (cx > 0 && pixels[cy * w + (cx - 1)] != 0) {
+            pixels[cy * w + (cx - 1)] = 0
+            qx[tail] = cx - 1
+            qy[tail] = cy
+            tail++
+        }
+        if (cx < w - 1 && pixels[cy * w + (cx + 1)] != 0) {
+            pixels[cy * w + (cx + 1)] = 0
+            qx[tail] = cx + 1
+            qy[tail] = cy
+            tail++
+        }
+        if (cy > 0 && pixels[(cy - 1) * w + cx] != 0) {
+            pixels[(cy - 1) * w + cx] = 0
+            qx[tail] = cx
+            qy[tail] = cy - 1
+            tail++
+        }
+        if (cy < h - 1 && pixels[(cy + 1) * w + cx] != 0) {
+            pixels[(cy + 1) * w + cx] = 0
+            qx[tail] = cx
+            qy[tail] = cy + 1
+            tail++
+        }
+    }
+
+    out.setPixels(pixels, 0, w, 0, 0, w, h)
+    return out
+}

@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
@@ -14,6 +15,8 @@ import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.util.isolateMarkings
+import com.hereliesaz.graffitixr.common.util.eraseColorBlob
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
@@ -58,32 +61,29 @@ class ArViewModel @Inject constructor(
     private var isInArMode = false
     private var isSessionResumed = false
     private var isDestroying = false
-
     private val sessionMutex = Mutex()
 
-    // Auto-save: prevent concurrent saves and track last-saved splat count
     private val isSaving = AtomicBoolean(false)
     private var lastSavedSplatCount = 0
     private var autoSaveJob: kotlinx.coroutines.Job? = null
 
-    // Phase 4: tap position stored here; consumed when the next onTargetCaptured fires.
-    @Volatile private var pendingTapPosition: Pair<Float, Float>? = null
+    @Volatile
+    private var pendingTapPosition: Pair<Float, Float>? = null
 
     init {
-        // isAnchorEstablished tracks whether the current project has a saved fingerprint.
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
                 _uiState.update { it.copy(isAnchorEstablished = project?.fingerprint != null) }
             }
         }
-        // Keep arScanMode in sync with the persisted setting and propagate to the renderer.
+
         viewModelScope.launch {
             settingsRepository.arScanMode.collect { mode ->
                 _uiState.update { it.copy(arScanMode = mode) }
                 renderer?.scanMode = mode
             }
         }
-        // Phase 5: propagate showAnchorBoundary to renderer.
+
         viewModelScope.launch {
             settingsRepository.showAnchorBoundary.collect { show ->
                 _uiState.update { it.copy(showAnchorBoundary = show) }
@@ -93,9 +93,11 @@ class ArViewModel @Inject constructor(
     }
 
     fun setArScanMode(mode: ArScanMode) {
-        viewModelScope.launch {
-            settingsRepository.setArScanMode(mode)
-        }
+        viewModelScope.launch { settingsRepository.setArScanMode(mode) }
+    }
+
+    fun setShowAnchorBoundary(show: Boolean) {
+        viewModelScope.launch { settingsRepository.setShowAnchorBoundary(show) }
     }
 
     fun onActivityResumed() {
@@ -137,6 +139,7 @@ class ArViewModel @Inject constructor(
 
     private fun updateSessionStateLocked() {
         val shouldBeRunning = isActivityResumed && isInArMode && !isDestroying
+
         if (shouldBeRunning && !isSessionResumed) {
             resumeArSessionInternal()
         } else if (!shouldBeRunning && isSessionResumed) {
@@ -149,6 +152,7 @@ class ArViewModel @Inject constructor(
             try {
                 _isCameraInUseByAr.value = true
                 val newSession = Session(context)
+
                 val filter = CameraConfigFilter(newSession).apply {
                     targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
                 }
@@ -192,6 +196,7 @@ class ArViewModel @Inject constructor(
             _isCameraInUseByAr.value = true
             slamManager.setRelocEnabled(true)
             renderer?.attachSession(s)
+
             loadMapIfExists()
             loadCloudPointsIfExists()
             loadFingerprintIfExists()
@@ -216,32 +221,34 @@ class ArViewModel @Inject constructor(
             e.printStackTrace()
         }
         stopAutoSave()
-        saveMapNow()           // persist SLAM splats on every background/screen-off
-        saveCloudPointsNow()   // Phase 2: persist ARCore feature points
+        saveMapNow()
+        saveCloudPointsNow()
     }
 
     private suspend fun performFullCleanupLocked() {
         renderer?.attachSession(null)
         if (isSessionResumed) {
-            try { session?.pause() } catch (e: Exception) {}
+            try {
+                session?.pause()
+            } catch (e: Exception) {}
             isSessionResumed = false
         }
         delay(150)
         val s = session
         session = null
         s?.let {
-            try { it.close() } catch (e: Exception) {}
+            try {
+                it.close()
+            } catch (e: Exception) {}
         }
         _isCameraInUseByAr.value = false
         slamManager.setRelocEnabled(false)
     }
 
-    // ── Map persistence ───────────────────────────────────────────────────────
-
-    /** Save the current map to the active project's map.bin. No-op if no project open. */
     private fun saveMapNow() {
         val project = projectRepository.currentProject.value ?: return
-        if (isSaving.getAndSet(true)) return  // already saving
+        if (isSaving.getAndSet(true)) return
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val mapPath = run {
@@ -259,7 +266,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /** Re-arm the native engine with the saved target fingerprint if the project has one. */
     private fun loadFingerprintIfExists() {
         val fp = projectRepository.currentProject.value?.fingerprint ?: return
         viewModelScope.launch(Dispatchers.IO) {
@@ -273,8 +279,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // ── Cloud points persistence (Phase 2) ───────────────────────────────────
-
     private fun cloudPointsPath(projectId: String): String {
         val root = java.io.File(appContext.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()
@@ -285,24 +289,30 @@ class ArViewModel @Inject constructor(
         val project = projectRepository.currentProject.value ?: return
         val r = renderer ?: return
         if (_uiState.value.arScanMode != com.hereliesaz.graffitixr.common.model.ArScanMode.CLOUD_POINTS) return
+
         viewModelScope.launch(Dispatchers.IO) {
-            try { r.saveCloudPoints(cloudPointsPath(project.id)) } catch (e: Exception) { e.printStackTrace() }
+            try {
+                r.saveCloudPoints(cloudPointsPath(project.id))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     private fun loadCloudPointsIfExists() {
         val project = projectRepository.currentProject.value ?: return
         if (_uiState.value.arScanMode != com.hereliesaz.graffitixr.common.model.ArScanMode.CLOUD_POINTS) return
+
         val path = cloudPointsPath(project.id)
         if (java.io.File(path).exists()) {
             renderer?.scheduleCloudPointsLoad(path)
         }
     }
 
-    /** Load map.bin into native if the in-memory map is empty and a save exists. */
     private fun loadMapIfExists() {
         val project = projectRepository.currentProject.value ?: return
-        if (slamManager.getSplatCount() > 0) return  // already have live data, don't overwrite
+        if (slamManager.getSplatCount() > 0) return
+
         viewModelScope.launch(Dispatchers.IO) {
             val mapPath = run {
                 val root = java.io.File(appContext.filesDir, "projects/${project.id}")
@@ -316,7 +326,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /** Start periodic auto-save every 30 seconds, and also when splat count grows by 2000. */
     private fun startAutoSave() {
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
@@ -359,9 +368,7 @@ class ArViewModel @Inject constructor(
     }
 
     fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean) {
-        // getPaintingProgress is a single atomic-float read on the native side — cheap.
-        val progress = if (isTracking) slamManager.getPaintingProgress()
-                       else _uiState.value.paintingProgress
+        val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
         _uiState.update {
             it.copy(
                 isScanning = isTracking,
@@ -377,13 +384,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Register the composite of all visible artwork layers as the teleological painting guide.
-     * Call this whenever the user enters AR mode with an established anchor and layers present,
-     * and again whenever layer content changes while the anchor is active.
-     * The native engine stores these features in a separate bank and compares each PnP frame
-     * against them to estimate how much of the mural has been painted so far.
-     */
     fun updatePaintingGuide(composite: android.graphics.Bitmap) {
         addLayerFeaturesToSLAM(composite)
     }
@@ -391,8 +391,11 @@ class ArViewModel @Inject constructor(
     fun onTargetCaptured(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer?,
-        colorW: Int, colorH: Int,
-        depthBufW: Int, depthBufH: Int, depthBufStride: Int,
+        colorW: Int,
+        colorH: Int,
+        depthBufW: Int,
+        depthBufH: Int,
+        depthBufStride: Int,
         intrinsics: FloatArray?,
         viewMatrix: FloatArray,
         displayRotation: Int
@@ -401,49 +404,47 @@ class ArViewModel @Inject constructor(
         val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics)
 
         if (tapPos != null) {
-            // Display rotation support: rotate the sensor-oriented raw bitmap 
-            // for the user's editing screen, but keep the raw data (intrinsics/depth) 
-            // sensor-aligned for the SLAM engine's addLayerFeatures() call.
             val rotatedBmp = if (displayRotation != 0) {
                 val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
                 Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
             } else bitmap
 
             pendingTapPosition = null
-            _uiState.update {
-                it.copy(
-                    tempCaptureBitmap = rotatedBmp,
-                    annotatedCaptureBitmap = null,  // cleared until annotation completes
-                    tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
-                    // Store mapping-aligned data for future addLayerFeaturesToSLAM call
-                    targetRawBitmap = bitmap,
-                    targetDisplayRotation = displayRotation,
-                    targetDepthBuffer = depthBuffer,
-                    targetDepthWidth = colorW,
-                    targetDepthHeight = colorH,
-                    targetDepthBufferWidth = depthBufW,
-                    targetDepthBufferHeight = depthBufH,
-                    targetDepthStride = depthBufStride,
-                    targetIntrinsics = intrinsics,
-                    targetCaptureViewMatrix = viewMatrix,
-                    targetPhysicalExtent = extent,
-                    isCaptureRequested = false
-                )
-            }
-            viewModelScope.launch(Dispatchers.IO) {
-                val annotated = slamManager.annotateKeypoints(bitmap)
-                _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
+
+            viewModelScope.launch(Dispatchers.Default) {
+                val maskedBmp = rotatedBmp.isolateMarkings()
+
+                _uiState.update {
+                    it.copy(
+                        tempCaptureBitmap = maskedBmp,
+                        annotatedCaptureBitmap = null,
+                        tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
+                        targetRawBitmap = bitmap,
+                        targetDisplayRotation = displayRotation,
+                        targetDepthBuffer = depthBuffer,
+                        targetDepthWidth = colorW,
+                        targetDepthHeight = colorH,
+                        targetDepthBufferWidth = depthBufW,
+                        targetDepthBufferHeight = depthBufH,
+                        targetDepthStride = depthBufStride,
+                        targetIntrinsics = intrinsics,
+                        targetCaptureViewMatrix = viewMatrix,
+                        targetPhysicalExtent = extent,
+                        isCaptureRequested = false
+                    )
+                }
             }
             return
         }
 
-        // Normal (non-tap) capture flow.
         val rotatedBmp = if (displayRotation != 0) {
             val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
             Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
         } else bitmap
 
-        extent?.let { (halfW, halfH) -> renderer?.updateOverlayExtent(halfW, halfH) }
+        extent?.let { (halfW, halfH) ->
+            renderer?.updateOverlayExtent(halfW, halfH)
+        }
 
         _uiState.update {
             it.copy(
@@ -463,23 +464,21 @@ class ArViewModel @Inject constructor(
                 isCaptureRequested = false
             )
         }
-        viewModelScope.launch(Dispatchers.IO) {
-            val annotated = slamManager.annotateKeypoints(bitmap)
-            _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
+    }
+
+    fun eraseMaskedMark(nx: Float, ny: Float) {
+        val currentBmp = _uiState.value.tempCaptureBitmap ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            val updated = currentBmp.eraseColorBlob(nx, ny)
+            _uiState.update { it.copy(tempCaptureBitmap = updated) }
         }
     }
 
-    /**
-     * Phase 4: Called when the user taps a painted reference mark in the live camera view.
-     * Triggers an immediate frame capture; when it arrives via [onTargetCaptured], the position
-     * is added to [ArUiState.tapHighlightKeypoints] and ORB detection runs to show green highlights.
-     */
     fun onScreenTap(nx: Float, ny: Float) {
         pendingTapPosition = Pair(nx, ny)
         _uiState.update { it.copy(isCaptureRequested = true) }
     }
 
-    /** Phase 4: Clear all accumulated tap highlight positions (called by "Retake" / "Clear"). */
     fun clearTapHighlights() {
         pendingTapPosition = null
         _uiState.update {
@@ -491,226 +490,212 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Compute an initial world-space anchor matrix from the captured depth frame and place the
-     * overlay quad at that position. Call this immediately when the user confirms target creation.
-     *
-     * The anchor matrix is inv(viewMatrix) (camera→world rotation) with the translation replaced
-     * by the world-space position of the wall center point (unprojected from the depth buffer).
-     * This makes the quad face the camera and sit at the wall depth, acting like a projector.
-     */
-    fun setInitialAnchorFromCapture() {
-        val state = _uiState.value
-        val viewMatrix = state.targetCaptureViewMatrix ?: return
-        val depthBuffer = state.targetDepthBuffer
-        val depthW = state.targetDepthBufferWidth
-        val depthH = state.targetDepthBufferHeight
-
-        // Read center depth pixel (DEPTH16: lower 13 bits = depth in mm, little-endian).
-        val d: Float = if (depthBuffer != null && depthW > 0 && depthH > 0) {
-            val centerIdx = (depthH / 2 * depthW + depthW / 2) * 2
-            if (centerIdx + 1 < depthBuffer.capacity()) {
-                val lo = depthBuffer.get(centerIdx).toInt() and 0xFF
-                val hi = depthBuffer.get(centerIdx + 1).toInt() and 0xFF
-                val depthMm = (lo or (hi shl 8)) and 0x1FFF
-                if (depthMm > 0) depthMm / 1000f else 1.5f
-            } else 1.5f
-        } else 1.5f
-
-        // In ARCore's OpenGL camera space the camera looks down -Z.
-        // The center ray at depth d hits the wall at (0, 0, -d) in camera space.
-        val pCam = floatArrayOf(0f, 0f, -d, 1f)
-
-        // inv(view) = camera-to-world matrix: rotates/translates camera space → world space.
-        val invView = FloatArray(16)
-        android.opengl.Matrix.invertM(invView, 0, viewMatrix, 0)
-
-        // Transform the camera-space wall point to world space.
-        val pWorld = FloatArray(4)
-        android.opengl.Matrix.multiplyMV(pWorld, 0, invView, 0, pCam, 0)
-
-        // Build anchor: same orientation as camera (quad faces viewer) but positioned at wall.
-        // invView[12..14] is the camera world position; we overwrite it with the wall position.
-        val anchorMatrix = invView.copyOf()
-        anchorMatrix[12] = pWorld[0]
-        anchorMatrix[13] = pWorld[1]
-        anchorMatrix[14] = pWorld[2]
-
-        // Propagate physical extent to the renderer (it may have been computed during capture).
-        state.targetPhysicalExtent?.let { (halfW, halfH) ->
-            renderer?.updateOverlayExtent(halfW, halfH)
-        }
-
-        slamManager.updateAnchorTransform(anchorMatrix)
-    }
-
-    /** Phase 5: Toggle the anchor boundary overlay. */
-    fun setShowAnchorBoundary(show: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setShowAnchorBoundary(show)
-        }
-    }
-
-    /**
-     * Compute physical half-extents (meters) for the overlay quad from the center depth pixel.
-     * Returns null if depth data is unavailable.
-     */
     private fun computePhysicalExtent(
         depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int,
         colorW: Int, colorH: Int,
         intrinsics: FloatArray?
     ): Pair<Float, Float>? {
-        if (depthBuffer == null || intrinsics == null || depthW == 0 || depthH == 0) return null
-        val fx = intrinsics[0]; val fy = intrinsics[1]
-        if (fx == 0f || fy == 0f) return null
-
-        // Read DEPTH16 center pixel (little-endian, depth in mm in lower 13 bits)
-        val centerIdx = (depthH / 2 * depthW + depthW / 2) * 2
-        if (centerIdx + 1 >= depthBuffer.capacity()) return null
-        val lo = depthBuffer.get(centerIdx).toInt() and 0xFF
-        val hi = depthBuffer.get(centerIdx + 1).toInt() and 0xFF
-        val depthMm = (lo or (hi shl 8)) and 0x1FFF
-        if (depthMm == 0) return null
-        val d = depthMm / 1000f
-
-        return Pair((colorW / 2f) * d / fx, (colorH / 2f) * d / fy)
-    }
-
-    /**
-     * Bake the composited layer artwork into the target fingerprint so SLAM can relocalize to
-     * the finished artwork (not just bare wall texture). Call this after the user locks placement.
-     */
-    fun addLayerFeaturesToSLAM(composite: Bitmap) {
-        val state = _uiState.value
-        val rawBitmap = state.targetRawBitmap ?: return
-        val depthBuffer = state.targetDepthBuffer ?: return
-        val intrinsics = state.targetIntrinsics ?: return
-        val viewMatrix = state.targetCaptureViewMatrix ?: return
-        val rotation = state.targetDisplayRotation
-        val depthW = state.targetDepthBufferWidth
-        val depthH = state.targetDepthBufferHeight
-        val depthStride = if (state.targetDepthStride > 0) state.targetDepthStride else depthW * 2
-        if (depthW == 0 || depthH == 0) return
-
-        viewModelScope.launch(Dispatchers.IO) {
-            // For SLAM feature baking, we need to match the composite (which the user edited 
-            // in display orientation) back to the sensor-oriented depth/VIO map.
-            // We do this by un-rotating the composite back to the sensor orientation.
-            val mappingComposite = if (rotation != 0) {
-                val matrix = android.graphics.Matrix().apply { postRotate(-rotation.toFloat()) }
-                Bitmap.createBitmap(composite, 0, 0, composite.width, composite.height, matrix, true)
-            } else composite
-
-            slamManager.addLayerFeatures(mappingComposite, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
-        }
-    }
-
-    fun onCaptureConsumed() {
-        slamManager.setSplatsVisible(true)
-        _uiState.update { it.copy(tempCaptureBitmap = null) }
-    }
-
-    fun setUnwarpPoints(points: List<Offset>) {
-        _uiState.update { it.copy(unwarpPoints = points) }
+        // Scaled down to an unobtrusive 20 centimeters by default.
+        return Pair(0.2f, 0.2f)
     }
 
     fun setTempCapture(bitmap: Bitmap?) {
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
     }
 
+    fun onCaptureConsumed() {
+        _uiState.update { it.copy(tempCaptureBitmap = null) }
+    }
+
+    fun setInitialAnchorFromCapture() {
+        val state = _uiState.value
+        val originalViewMat = state.targetCaptureViewMatrix ?: return
+
+        var flatViewMat = originalViewMat
+
+        session?.let { s ->
+            try {
+                // Interrogate the mesh for its most prominent vertical plane
+                val planes = s.getAllTrackables(com.google.ar.core.Plane::class.java)
+
+                val cameraPose = FloatArray(16)
+                android.opengl.Matrix.invertM(cameraPose, 0, originalViewMat, 0)
+                val camX = cameraPose[12]
+                val camY = cameraPose[13]
+                val camZ = cameraPose[14]
+
+                val fwdX = -cameraPose[8]
+                val fwdY = -cameraPose[9]
+                val fwdZ = -cameraPose[10]
+
+                var bestPlane: com.google.ar.core.Plane? = null
+                var maxDot = -1f
+
+                for (plane in planes) {
+                    if (plane.trackingState == com.google.ar.core.TrackingState.TRACKING &&
+                        plane.type == com.google.ar.core.Plane.Type.VERTICAL) {
+
+                        val pose = plane.centerPose
+                        val dx = pose.tx() - camX
+                        val dy = pose.ty() - camY
+                        val dz = pose.tz() - camZ
+
+                        val len = Math.sqrt((dx*dx + dy*dy + dz*dz).toDouble()).toFloat()
+                        if (len > 0.01f) {
+                            val dot = (dx * fwdX + dy * fwdY + dz * fwdZ) / len
+                            if (dot > maxDot) {
+                                maxDot = dot
+                                bestPlane = plane
+                            }
+                        }
+                    }
+                }
+
+                bestPlane?.let { plane ->
+                    // Extract the absolute normal of the plane we're staring at.
+                    val planePoseMatrix = FloatArray(16)
+                    plane.centerPose.toMatrix(planePoseMatrix, 0)
+
+                    val normalX = planePoseMatrix[4]
+                    val normalY = planePoseMatrix[5]
+                    val normalZ = planePoseMatrix[6]
+
+                    // We forcefully align the camera's Z axis to perfectly oppose the plane's normal,
+                    // guaranteeing the 2D image lays flush against physical reality.
+                    val zx = normalX
+                    val zy = normalY
+                    val zz = normalZ
+
+                    val ux = 0f
+                    val uy = 1f
+                    val uz = 0f
+
+                    var xx = uy * zz - uz * zy
+                    var xy = uz * zx - ux * zz
+                    var xz = ux * zy - uy * zx
+
+                    val xLen = Math.sqrt((xx*xx + xy*xy + xz*xz).toDouble()).toFloat()
+                    if (xLen > 0.0001f) {
+                        xx /= xLen
+                        xy /= xLen
+                        xz /= xLen
+
+                        val yx = zy * xz - zz * xy
+                        val yy = zz * xx - zx * xz
+                        val yz = zx * xy - zy * xx
+
+                        val newCamPose = FloatArray(16)
+                        android.opengl.Matrix.setIdentityM(newCamPose, 0)
+                        newCamPose[0] = xx
+                        newCamPose[1] = xy
+                        newCamPose[2] = xz
+
+                        newCamPose[4] = yx
+                        newCamPose[5] = yy
+                        newCamPose[6] = yz
+
+                        newCamPose[8] = zx
+                        newCamPose[9] = zy
+                        newCamPose[10] = zz
+
+                        newCamPose[12] = camX
+                        newCamPose[13] = camY
+                        newCamPose[14] = camZ
+
+                        val newViewMat = FloatArray(16)
+                        android.opengl.Matrix.invertM(newViewMat, 0, newCamPose, 0)
+                        flatViewMat = newViewMat
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                isAnchorEstablished = true,
+                targetCaptureViewMatrix = flatViewMat
+            )
+        }
+    }
+
     fun requestCapture() {
-        slamManager.setSplatsVisible(false)
-        _uiState.update { it.copy(isCaptureRequested = true, tempCaptureBitmap = null) }
+        _uiState.update { it.copy(isCaptureRequested = true) }
+    }
+
+    fun captureKeyframe() {
+        requestCapture()
     }
 
     fun onCaptureRequestHandled() {
         _uiState.update { it.copy(isCaptureRequested = false) }
     }
 
+    fun restoreSplats() {}
+
+    fun setUnwarpPoints(points: List<Offset>) {
+        _uiState.update { it.copy(unwarpPoints = points) }
+    }
+
     fun setActiveUnwarpPoint(index: Int) {
         _uiState.update { it.copy(activeUnwarpPointIndex = index) }
     }
 
-    fun setMagnifierPosition(offset: Offset) {
-        _uiState.update { it.copy(magnifierPosition = offset) }
+    fun setMagnifierPosition(position: Offset) {
+        _uiState.update { it.copy(magnifierPosition = position) }
     }
 
     fun updateMaskPath(path: Path) {
         _uiState.update { it.copy(maskPath = path) }
     }
 
-    fun restoreSplats() {
-        slamManager.setSplatsVisible(true)
-    }
-
-    fun captureKeyframe() {
-    }
-
     fun toggleFlashlight() {
-        val isOn = !_uiState.value.isFlashlightOn
-        _uiState.update { it.copy(isFlashlightOn = isOn) }
-        renderer?.updateFlashlight(isOn)
-    }
-
-    fun ensureEngineInitialized() {
-        slamManager.ensureInitialized()
-    }
-
-    fun onCameraFrameForStereo(buffer: ByteBuffer, width: Int, height: Int) {
-        stereoProvider.submitFrame(buffer, width, height, System.currentTimeMillis())
-    }
-
-    fun onCameraFrameForStereo(image: ImageProxy) {
-        stereoProvider.submitFrame(image.planes[0].buffer, image.width, image.height, System.currentTimeMillis())
-        image.close()
+        _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
     }
 
     fun updateLightLevel(level: Float) {
-        _uiState.update {
-            it.copy(
-                lightLevel = level,
-                scanHint = computeScanHint(
-                    isTracking = it.isScanning,
-                    splatCount = it.splatCount,
-                    lightLevel = level
-                )
-            )
-        }
+        _uiState.update { it.copy(lightLevel = level) }
     }
 
     fun appendDiag(text: String) {
         _uiState.update { it.copy(diagLog = text) }
     }
 
-    /**
-     * Returns a short, specific coaching message during the scan phase, or null
-     * once 50 000 splats have been collected (scan complete).
-     *
-     * Priority order (most blocking issue first):
-     *   1. Too dark  → ARCore depth is unreliable and feature tracking fails
-     *   2. Not tracking → the user needs to move to re-acquire
-     *   3. Tracking but slow growth → not enough parallax / coverage
-     */
-    private fun computeScanHint(
-        isTracking: Boolean,
-        splatCount: Int,
-        lightLevel: Float
-    ): String? {
-        if (splatCount >= 50_000) return null
-        return when {
-            lightLevel < 0.15f ->
-                "Too dark — move to a brighter area or use the flashlight"
-            lightLevel < 0.30f ->
-                "Low light — more light will improve depth accuracy"
-            !isTracking ->
-                "Tracking lost — move slowly and point at textured surfaces"
-            splatCount < 500 ->
-                "Point the camera at nearby walls, floors, or objects"
-            splatCount < 5_000 ->
-                "Keep moving — sweep the camera across all nearby surfaces"
-            else ->
-                "Good — keep scanning to cover more of the environment"
+    private fun addLayerFeaturesToSLAM(bitmap: Bitmap) {
+        val state = _uiState.value
+        val viewMat = state.targetCaptureViewMatrix ?: return
+        val depthBuffer = state.targetDepthBuffer ?: ByteBuffer.allocateDirect(0)
+        val depthW = state.targetDepthBufferWidth ?: 0
+        val depthH = state.targetDepthBufferHeight ?: 0
+        val depthStride = state.targetDepthStride ?: 0
+        val intrinsics = state.targetIntrinsics ?: FloatArray(0)
+
+        viewModelScope.launch(Dispatchers.IO) {
+            slamManager.addLayerFeatures(
+                bitmap = bitmap,
+                depthBuffer = depthBuffer,
+                depthW = depthW,
+                depthH = depthH,
+                depthStride = depthStride,
+                intrinsics = intrinsics,
+                viewMatrix = viewMat
+            )
         }
+    }
+
+    private fun computeScanHint(isTracking: Boolean, splatCount: Int, lightLevel: Float): String? {
+        if (!isTracking) return "Move device slowly to recover tracking"
+        if (lightLevel < 0.3f) return "Too dark. Turn on the flashlight."
+        if (splatCount < 5000) return "Walk left and right to build map"
+        if (splatCount < 20000) return "Move closer to the wall"
+        if (splatCount < 40000) return "Scan higher and lower"
+        return null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopAutoSave()
     }
 }

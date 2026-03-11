@@ -22,11 +22,6 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -50,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -70,7 +67,6 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
-import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.InfoDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
@@ -87,6 +83,7 @@ import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -148,9 +145,15 @@ class MainActivity : ComponentActivity() {
 
                 val currentTempCapture = arUiState.tempCaptureBitmap
                 val currentCaptureStep = mainUiState.captureStep
-                LaunchedEffect(currentTempCapture, currentCaptureStep) {
-                    if (currentTempCapture != null && currentCaptureStep == CaptureStep.CAPTURE) {
-                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                val isWaitingForTap = mainUiState.isWaitingForTap
+
+                LaunchedEffect(currentTempCapture, currentCaptureStep, isWaitingForTap) {
+                    if (currentTempCapture != null) {
+                        if (currentCaptureStep == CaptureStep.CAPTURE) {
+                            mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                        } else if (isWaitingForTap) {
+                            mainViewModel.confirmTapCapture()
+                        }
                     }
                 }
 
@@ -226,7 +229,9 @@ class MainActivity : ComponentActivity() {
                     }
 
                     onscreen {
-                        Box(Modifier.fillMaxSize()) {
+                        var fullSize by remember { mutableStateOf(IntSize.Zero) }
+
+                        Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
                             AzNavHost(startDestination = EditorMode.AR.name) {
                                 composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
@@ -276,11 +281,6 @@ class MainActivity : ComponentActivity() {
 
                             if (mainUiState.isWaitingForTap && !showLibrary && !showSettings) {
                                 TapTargetOverlay(
-                                    hasTaps = arUiState.tapHighlightKeypoints.isNotEmpty(),
-                                    onConfirm = { mainViewModel.confirmTapCapture() },
-                                    onClear = {
-                                        arViewModel.clearTapHighlights()
-                                    },
                                     onCancel = {
                                         mainViewModel.cancelTapMode()
                                         arViewModel.clearTapHighlights()
@@ -338,7 +338,7 @@ class MainActivity : ComponentActivity() {
                                             lifecycleScope.launch(Dispatchers.Default) {
                                                 val unwarped = ImageProcessor.unwarpImage(currentBitmap, points)
                                                 if (unwarped != null) {
-                                                    arViewModel.setTempCapture(unwarped.isolateMarkings())
+                                                    arViewModel.setTempCapture(unwarped)
                                                 }
                                                 mainViewModel.setCaptureStep(CaptureStep.MASK)
                                                 isProcessing = false
@@ -357,6 +357,41 @@ class MainActivity : ComponentActivity() {
                                     onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
                                     onUpdateMaskPath = { path -> path?.let { arViewModel.updateMaskPath(it) } }
                                 )
+
+                                if (mainUiState.captureStep == CaptureStep.REVIEW && fullSize != IntSize.Zero) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight(0.8f)
+                                            .pointerInput(Unit) {
+                                                detectTapGestures { offset ->
+                                                    val bmp = arUiState.tempCaptureBitmap ?: return@detectTapGestures
+                                                    val mapped = EditorImageProcessor.mapScreenToBitmap(
+                                                        listOf(offset),
+                                                        fullSize.width, fullSize.height,
+                                                        bmp.width, bmp.height
+                                                    )
+                                                    if (mapped.isNotEmpty()) {
+                                                        val pt = mapped.first()
+                                                        val nx = pt.x / bmp.width.toFloat()
+                                                        val ny = pt.y / bmp.height.toFloat()
+                                                        arViewModel.eraseMaskedMark(nx, ny)
+                                                    }
+                                                }
+                                            }
+                                    ) {
+                                        Text(
+                                            text = "Tap any mark to exclude it.",
+                                            color = Color.White,
+                                            modifier = Modifier
+                                                .align(Alignment.TopCenter)
+                                                .padding(top = 100.dp)
+                                                .background(Color(0xBB000000), RoundedCornerShape(8.dp))
+                                                .border(1.dp, Color.Cyan, RoundedCornerShape(8.dp))
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                    }
+                                }
                             }
 
                             if (showSaveDialog) {
@@ -702,9 +737,6 @@ private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
 
 @Composable
 private fun TapTargetOverlay(
-    hasTaps: Boolean,
-    onConfirm: () -> Unit,
-    onClear: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -712,67 +744,29 @@ private fun TapTargetOverlay(
         modifier = modifier.padding(bottom = 96.dp).padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (!hasTaps) {
-            Box(
-                modifier = Modifier
-                    .background(Color(0xEE000000), RoundedCornerShape(16.dp))
-                    .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
-                    .padding(20.dp)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "TARGET CREATION",
-                        color = Color.Cyan,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = "1. Look at the wall where you painted your reference marks.\n2. Tap directly on those marks on your screen.\n3. The app will lock the digital sketch to the real wall.",
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Start
-                    )
-                }
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .background(Color(0xCC000000), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 18.dp, vertical = 8.dp)
-            ) {
+        Box(
+            modifier = Modifier
+                .background(Color(0xEE000000), RoundedCornerShape(16.dp))
+                .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
+                .padding(20.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Tap more marks, or confirm when done",
+                    text = "TARGET CREATION",
+                    color = Color.Cyan,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Tap directly on your painted reference marks on the screen. The app will immediately isolate them.",
                     color = Color.White,
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Start
                 )
             }
         }
-
         Spacer(Modifier.height(16.dp))
-
-        if (hasTaps) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedButton(
-                    onClick = onClear,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                ) {
-                    Text("Clear")
-                }
-                Button(
-                    onClick = onConfirm,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00CC44))
-                ) {
-                    Text("Confirm Target")
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-        }
-
         OutlinedButton(
             onClick = onCancel,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)

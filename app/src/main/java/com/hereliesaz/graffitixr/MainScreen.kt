@@ -123,9 +123,11 @@ fun MainScreen(
                             val renderer = ArRenderer(
                                 context = ctx,
                                 slamManager = slamManager,
-                                onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rotation ->
+                                onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, _ ->
                                     bmp?.let { rawBmp ->
-                                        val correctedRotation = if (rawBmp.width > rawBmp.height) rotation + 90 else rotation
+                                        // The camera sensor provides horizontal raw data natively.
+                                        // A 90-degree clockwise turn is structurally demanded for portrait orientation.
+                                        val correctedRotation = if (rawBmp.width > rawBmp.height) 90 else 0
                                         arViewModel.onTargetCaptured(
                                             rawBmp, depth,
                                             cw, ch,
@@ -163,24 +165,6 @@ fun MainScreen(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
-
-                    val annotated = arUiState.annotatedCaptureBitmap
-                    if (isWaitingForTap && annotated != null) {
-                        Image(
-                            bitmap = annotated.asImageBitmap(),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    alpha = 0.65f
-                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
-                                        Color(0x8800CC44),
-                                        androidx.compose.ui.graphics.BlendMode.SrcAtop
-                                    )
-                                },
-                            contentScale = ContentScale.Fit
-                        )
-                    }
                 }
 
                 EditorMode.OVERLAY -> {
@@ -306,12 +290,6 @@ fun MainScreen(
     }
 }
 
-/**
- * Composite all visible layers (those with bitmaps) into a single ARGB_8888 bitmap for the
- * AR anchor overlay. Applies each layer's 2D transform (offset, scale, Z-rotation, opacity).
- * 3D perspective rotations (rotationX/rotationY) are intentionally ignored here — they are a
- * Compose-only visual effect and cannot be reproduced in a flat android.graphics.Canvas.
- */
 private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
     val w = layers.firstNotNullOfOrNull { it.bitmap?.width } ?: 1024
     val h = layers.firstNotNullOfOrNull { it.bitmap?.height } ?: 1024
