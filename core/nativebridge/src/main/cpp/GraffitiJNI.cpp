@@ -9,10 +9,7 @@
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
 
-// Stores the last depth pipeline trace for in-app diagnostics.
 static std::string gLastDepthTrace;
-
-// Declared in MobileGS.cpp — the splat pipeline trace from the last processDepthFrame call.
 extern std::string gLastSplatTrace;
 #define DEPTH_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGD("DEPTH_PIPE: %s", _buf);     gLastDepthTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
@@ -22,13 +19,6 @@ StereoProcessor* gStereoProcessor = nullptr;
 cv::Mat gLastColorFrame;
 int gFrameCount = 0;
 JavaVM* gJvm = nullptr;
-
-// FIX: Track the actual image pixel dimensions separately from gLastColorFrame's
-// matrix dimensions. When gLastColorFrame stores raw NV21 data, its rows =
-// imageHeight * 3/2, which is NOT the same as the camera image height.
-// These two ints always hold the true image resolution.
-static int gColorImageWidth  = 0;
-static int gColorImageHeight = 0;
 
 void bitmapToMat(JNIEnv * env, jobject bitmap, cv::Mat& dst) {
     AndroidBitmapInfo info;
@@ -82,6 +72,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitGl(JNIEnv* env
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeResetGlContext(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) {
+        LOGD("Resetting MobileGS GL context");
+        gSlamEngine->resetGlContext();
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {
         LOGD("Destroying MobileGS engine");
@@ -121,7 +119,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
-float gLastViewMatrix[16];  // display-rotation-corrected, for both rendering and unprojection
+float gLastViewMatrix[16];
 float gLastProjMatrix[16];
 bool gHasCameraMatrices = false;
 
@@ -168,10 +166,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
 
     if (!yData || !uData || !vData) return;
 
-    // Record true image dimensions before any YUV packing.
-    gColorImageWidth  = width;
-    gColorImageHeight = height;
-
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
     cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvStride);
     cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvStride);
@@ -190,8 +184,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     } else if (uvPixelStride == 2) {
         cv::Mat uvInterleaved(height / 2, width, CV_8UC1, vData, uvStride);
         uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
-        // Convert NV21 to RGB immediately so gLastColorFrame is always CV_8UC3.
-        // This avoids the ambiguous row-count isYuv heuristic in the depth path.
         cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_NV21);
     } else {
         cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
@@ -207,9 +199,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
     if (!buffer || !gSlamEngine) return;
 
-    gColorImageWidth  = width;
-    gColorImageHeight = height;
-
     cv::Mat frame(height, width, CV_8UC4, buffer);
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
 
@@ -218,8 +207,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
-        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride,
-        jint cvRotateCode) {  // cv::RotateFlags value, or -1 for no rotation
+        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH) { 
 
     gLastDepthTrace.clear();
     DEPTH_TRACE("feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
@@ -242,11 +230,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
             uint16_t raw = rowPtr[c];
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
-            // Accept any pixel with non-zero depth regardless of confidence.
-            // ARCore on ToF devices (e.g. Pixel 5) reports conf=0 for all pixels
-            // because ToF doesn't populate the confidence field — conf=0 means
-            // "no confidence score" not "invalid depth". Gating on conf>=1 dropped
-            // every frame on those devices.
             if (depthMm > 0) {
                 float d = depthMm / 1000.0f;
                 depthMap.at<float>(r, c) = d;
@@ -259,48 +242,35 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         }
     }
 
-    DEPTH_TRACE("decoded valid=%d zeroConf=%d range=%.2f-%.2fm colorFrame=%dx%d rotation=%d",
-         validPixels, zeroConfPixels, minD, maxD,
-         gLastColorFrame.cols, gLastColorFrame.rows, (int)cvRotateCode);
+    DEPTH_TRACE("decoded valid=%d zeroConf=%d range=%.2f-%.2fm", validPixels, zeroConfPixels, minD, maxD);
 
     if (validPixels == 0) {
         DEPTH_TRACE("DROPPED - all pixels invalid (no depth data)");
         return;
     }
 
-    // Rotate depth image from sensor orientation to display orientation.
-    // Kotlin passes cvRotateCode = cv::RotateFlags value computed as:
-    //   (sensorOrientation - displayDegrees + 360) % 360
-    //   mapped to: 90→ROTATE_90_CLOCKWISE(0), 180→ROTATE_180(1), 270→ROTATE_90_CCW(2), 0→-1(skip)
-    // This works correctly on any device regardless of sensor_orientation.
-    if (cvRotateCode >= 0) {
-        cv::rotate(depthMap, depthMap, static_cast<cv::RotateFlags>(cvRotateCode));
+    jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
+    float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
+    env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
+
+    if (cpuW > 0 && cpuH > 0) {
+        float scaleX = (float)depthMap.cols / cpuW;
+        float scaleY = (float)depthMap.rows / cpuH;
+        fx *= scaleX;
+        fy *= scaleY;
+        cx *= scaleX;
+        cy *= scaleY;
     }
 
-    if (gColorImageWidth > 0 && gColorImageHeight > 0) {
-        if (depthMap.cols != gColorImageWidth || depthMap.rows != gColorImageHeight) {
-            DEPTH_TRACE("resizing depth %dx%d -> %dx%d",
-                 depthMap.cols, depthMap.rows, gColorImageWidth, gColorImageHeight);
-            cv::resize(depthMap, depthMap, cv::Size(gColorImageWidth, gColorImageHeight),
-                       0, 0, cv::INTER_NEAREST);
-        }
-    } else {
-        if (depthMap.cols != gLastColorFrame.cols || depthMap.rows != gLastColorFrame.rows) {
-            DEPTH_TRACE("resizing depth (fallback) %dx%d -> %dx%d",
-                 depthMap.cols, depthMap.rows, gLastColorFrame.cols, gLastColorFrame.rows);
-            cv::resize(depthMap, depthMap, gLastColorFrame.size(), 0, 0, cv::INTER_NEAREST);
-        }
-    }
+    float finalIntrinsics[4] = {fx, fy, cx, cy};
 
     if (!gHasCameraMatrices) {
         DEPTH_TRACE("DROPPED - no camera matrices yet");
         return;
     }
 
-    DEPTH_TRACE("pushing frame to map thread depthSize=%dx%d",
-         depthMap.cols, depthMap.rows);
-    // Use display-corrected view matrix. Depth is now rotated to display orientation.
-    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, /*isYuv=*/false);
+    DEPTH_TRACE("pushing frame to map thread depthSize=%dx%d", depthMap.cols, depthMap.rows);
+    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, finalIntrinsics, false);
 }
 
 JNIEXPORT void JNICALL
@@ -326,8 +296,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
     if (!disparity.empty() && !gLastColorFrame.empty() && gHasCameraMatrices) {
         cv::Mat depthFromStereo;
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0);
-        // Stereo depth is always paired with an RGB color frame (not raw YUV).
-        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, /*isYuv=*/false);
+        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastViewMatrix, gLastProjMatrix, nullptr, false);
     }
 }
 
@@ -393,7 +362,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTargetFingerpri
     }
 }
 
-// Helper: construct a Fingerprint JVM object from ORB results.
 static jobject buildFingerprintObject(JNIEnv* env,
                                       const std::vector<cv::KeyPoint>& kps,
                                       const cv::Mat& descs) {
@@ -403,9 +371,6 @@ static jobject buildFingerprintObject(JNIEnv* env,
     jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
 
     jclass kpClass   = env->FindClass("org/opencv/core/KeyPoint");
-    // JNI type descriptors use uppercase letters for primitives:
-    //   F = float, I = int, D = double, J = long, Z = boolean, etc.
-    // KeyPoint(float x, float y, float size, float angle, float response, int octave, int class_id)
     jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(FFFFFII)V");
 
     jclass listClass    = env->FindClass("java/util/ArrayList");
@@ -450,9 +415,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
     return buildFingerprintObject(env, kps, descs);
 }
 
-// Like nativeGenerateFingerprint but filters features to areas the user selected.
-// maskBitmap is ARGB_8888: white pixels = include this region, black = exclude.
-// ORB natively supports a mask argument so no manual filtering is needed.
 JNIEXPORT jobject JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprintMasked(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject maskBitmap) {
@@ -464,8 +426,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
     cv::Mat gray;
     cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
 
-    // Convert the user-drawn mask to a single-channel ORB mask.
-    // ORB treats non-zero pixels as "detect here", zero as "skip".
     cv::Mat orbMask;
     if (maskBitmap != nullptr) {
         cv::Mat maskRgba;
@@ -480,15 +440,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
 
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
-    // Pass orbMask to ORB — it will only detect/compute in non-zero regions.
     cv::ORB::create(500)->detectAndCompute(gray, orbMask, kps, descs);
 
     return buildFingerprintObject(env, kps, descs);
 }
 
-// Renders what the ORB feature detector sees: color bitmap with semi-transparent
-// green blob highlights over each detected keypoint region.  The feature count is
-// shown in the corner.  Output is written back into the same mutable ARGB_8888 bitmap.
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
@@ -503,17 +459,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     cv::Mat descs;
     cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
 
-    // Overlay filled green blobs on the COLOR image (alpha-blended so wall texture shows through).
     cv::Mat overlay = frame.clone();
     for (const auto& kp : kps) {
         int r = std::max(6, (int)(kp.size * 2.0f));
         cv::circle(overlay, cv::Point((int)kp.pt.x, (int)kp.pt.y),
                    r, cv::Scalar(0, 210, 50, 255), cv::FILLED);
     }
-    // Blend: 55% original colour, 45% green blob overlay
     cv::addWeighted(frame, 0.55, overlay, 0.45, 0, frame);
 
-    // Feature count badge — yellow text on dark background, top-left corner
     std::string label = std::to_string(kps.size()) + " features";
     double scale = std::max(1.0, frame.cols / 640.0);
     int baseline = 0;
@@ -650,8 +603,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyBurnDodge(
     env->ReleaseFloatArrayElements(points, pts, JNI_ABORT);
 }
 
-// ─── In-app diagnostic trace getters ─────────────────────────────────────────
-
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastDepthTrace(
         JNIEnv* env, jobject) {
@@ -663,7 +614,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastSplatTrace(
         JNIEnv* env, jobject) {
     return env->NewStringUTF(gLastSplatTrace.c_str());
 }
-
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSplatsVisible(

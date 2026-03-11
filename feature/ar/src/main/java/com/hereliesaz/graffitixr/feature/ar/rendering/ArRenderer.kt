@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import com.google.ar.core.Config
@@ -29,9 +30,7 @@ import kotlin.concurrent.withLock
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
-    // (bitmap, depthBuf, depthBufW, depthBufH, depthBufStride, intrinsics, viewMatrix)
     private val onTargetCaptured: (Bitmap?, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray) -> Unit,
-    // (isTracking, pointCount, isDepthApiSupported)
     private val onTrackingUpdated: (Boolean, Int, Boolean) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
@@ -47,47 +46,28 @@ class ArRenderer(
     private val displayRotationHelper = DisplayRotationHelper(context)
     private val overlayRenderer = OverlayRenderer(context)
     private val pointCloudRenderer = PointCloudRenderer()
+    private val planeRenderer = PlaneRenderer()
 
-    /** Updated from ArViewModel whenever the user changes the setting. */
     @Volatile var scanMode: ArScanMode = ArScanMode.CLOUD_POINTS
-
-    /** Phase 5: When true, the orange anchor boundary rectangle is drawn each frame. */
     @Volatile var showAnchorBoundary: Boolean = false
 
-    /**
-     * Phase 2: Save accumulated cloud points to disk (any thread).
-     * No-op in GAUSSIAN_SPLATS mode — that pipeline uses slamManager.saveModel().
-     */
     fun saveCloudPoints(path: String) {
         pointCloudRenderer.saveToFile(path)
     }
 
-    /**
-     * Phase 2: Schedule a cloud-points load on the GL thread (sets a flag that draw() picks up).
-     * The actual GL buffer upload happens in the next [onDrawFrame] call via [PointCloudRenderer.pendingLoadPath].
-     */
     fun scheduleCloudPointsLoad(path: String) {
         pointCloudRenderer.pendingLoadPath = path
     }
 
-    // Pending overlay bitmap — set from any thread, consumed on GL thread in onDrawFrame.
     @Volatile private var pendingOverlayBitmap: Bitmap? = null
     @Volatile private var overlayBitmapDirty = false
 
     private var frameCount = 0
     private var diagFrameCount = 0
-    private var sensorOrientation = 90  // degrees; queried from CameraCharacteristics on session attach
-    private var lastDepthSupported: Boolean? = null
-    private var lastTrackingState: Boolean? = null
-    private var lastDepthW = 0
-    private var lastDepthH = 0
-    private var lastDepthNotYetAvailable = false
+    private var sensorOrientation = 90  
     private var isSurfaceCreated = false
-
-    // Camera ID saved from the ARCore session; used for CameraManager torch control.
     private var arCameraId: String? = null
 
-    // Thread-safe flag updated directly by Compose's AndroidView update block
     @Volatile var captureRequested: Boolean = false
 
     fun attachSession(session: Session?) {
@@ -98,8 +78,6 @@ class ArRenderer(
                 if (isSurfaceCreated) {
                     session.setCameraTextureName(backgroundRenderer.textureId)
                 }
-                // Query sensor orientation once per session so depth rotation is
-                // correct on any device, not just Pixel 5 (sensor_orientation=90).
                 try {
                     val cameraId = session.cameraConfig.cameraId
                     arCameraId = cameraId
@@ -110,7 +88,7 @@ class ArRenderer(
                         .get(android.hardware.camera2.CameraCharacteristics.SENSOR_ORIENTATION)
                         ?: 90
                 } catch (e: Exception) {
-                    sensorOrientation = 90  // safe fallback — correct for most rear cameras
+                    sensorOrientation = 90
                 }
             } else {
                 displayRotationHelper.onPause()
@@ -118,26 +96,16 @@ class ArRenderer(
         }
     }
 
-    /**
-     * Upload a new composite bitmap for the AR overlay quad.
-     * Thread-safe; actual GPU upload happens at the start of the next GL frame.
-     */
     fun updateOverlayBitmap(bitmap: Bitmap?) {
         pendingOverlayBitmap = bitmap
         overlayBitmapDirty = true
     }
 
-    /**
-     * Set the physical half-extents of the overlay quad (meters).
-     * Thread-safe; triggers VBO rebuild on the GL thread next frame.
-     */
     fun updateOverlayExtent(halfW: Float, halfH: Float) {
         overlayRenderer.setExtent(halfW, halfH)
     }
 
     fun updateFlashlight(isOn: Boolean) {
-        // Use CameraManager.setTorchMode() directly rather than the undocumented ARCore
-        // Config.FlashlightMode reflection path, which silently fails on most devices.
         val cameraId = arCameraId ?: return
         try {
             val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE)
@@ -151,9 +119,17 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
+        
+        // This is the critical fix. When the phone rotates, or the app goes to
+        // background, the OpenGL context is completely destroyed by Android. 
+        // We MUST tell the C++ layer to flush all its old GL handles (VBOs/Shaders)
+        // and recompile them in this new context, otherwise everything disappears.
+        slamManager.resetGlContext()
         slamManager.initGl()
+        
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)
+        planeRenderer.createOnGlThread(context)
         isSurfaceCreated = true
 
         sessionLock.withLock {
@@ -174,7 +150,6 @@ class ArRenderer(
             val activeSession = session ?: return
 
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
-
             displayRotationHelper.updateSessionIfNeeded(activeSession)
 
             val frame: Frame = try {
@@ -188,8 +163,6 @@ class ArRenderer(
 
             backgroundRenderer.draw(frame)
 
-            // Phase 1 — GL depth state fix: BackgroundRenderer draws to depth=1.0 and may leave
-            // depth writes disabled. Reset state so subsequent world-space geometry renders correctly.
             GLES30.glDepthMask(true)
             GLES30.glEnable(GLES30.GL_DEPTH_TEST)
             GLES30.glDepthFunc(GLES30.GL_LEQUAL)
@@ -209,21 +182,10 @@ class ArRenderer(
             }
 
             val isTracking = camera.trackingState == TrackingState.TRACKING
-
-            // Phase 3: Compute depth support early so it can be passed to onTrackingUpdated.
             val depthSupported = activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
-
-            // FIX: Call setArCoreTrackingState synchronously here on the GL thread,
-            // BEFORE feeding depth data. The old code sent this via a coroutine channel,
-            // meaning processDepthFrame would check mIsArCoreTracking while it was still
-            // false (the async update hadn't fired yet), silently dropping every depth
-            // frame. Synchronous call guarantees the native tracking flag is set before
-            // any depth for this frame reaches the map thread queue.
+            
             slamManager.setArCoreTrackingState(isTracking)
 
-            // Report tracking + point count + depth support to the ViewModel on a background thread.
-            // In CLOUD_POINTS mode report the accumulated ARCore feature-point count;
-            // in GAUSSIAN_SPLATS mode report the native splat count.
             val currentScanMode = scanMode
             backgroundScope.launch {
                 val count = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
@@ -234,7 +196,6 @@ class ArRenderer(
                 onTrackingUpdated(isTracking, count, depthSupported)
             }
 
-            // Safely consume the flag and acquire the image
             if (captureRequested) {
                 captureRequested = false
                 try {
@@ -242,6 +203,13 @@ class ArRenderer(
                         val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
                         val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                         bitmap.copyPixelsFromBuffer(rgbaBuffer)
+
+                        val displayDegrees = displayRotationHelper.getRotation() * 90
+                        val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
+                        val rotatedBitmap = if (rotationNeeded != 0) {
+                            val matrix = Matrix().apply { postRotate(rotationNeeded.toFloat()) }
+                            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                        } else bitmap
 
                         var depthBuffer: ByteBuffer? = null
                         var depthWidth = 0
@@ -269,7 +237,7 @@ class ArRenderer(
                         )
 
                         onTargetCaptured(
-                            bitmap, depthBuffer,
+                            rotatedBitmap, depthBuffer,
                             depthWidth, depthHeight, depthStride,
                             intrArr, viewMatrix.copyOf()
                         )
@@ -280,117 +248,65 @@ class ArRenderer(
             }
 
             if (frameCount++ % 2 == 0) {
-                var colorFed = false
-                var colorW = 0; var colorH = 0
                 try {
                     frame.acquireCameraImage().use { image ->
                         val planes = image.planes
-                        // Always feed YUV so the reloc/fingerprint pipeline keeps running
-                        // regardless of scan mode.
                         slamManager.feedYuvFrame(
                             planes[0].buffer, planes[1].buffer, planes[2].buffer,
                             image.width, image.height,
                             planes[0].rowStride, planes[1].rowStride, planes[1].pixelStride,
                             frame.timestamp
                         )
-                        colorFed = true
-                        colorW = image.width; colorH = image.height
                     }
                 } catch (e: Exception) {}
 
                 if (currentScanMode == ArScanMode.CLOUD_POINTS) {
-                    // ── Cloud Points mode ─────────────────────────────────────
-                    // Use ARCore's built-in visual feature points (tracked by the
-                    // visual-inertial odometry). No depth API required.
                     try {
                         frame.acquirePointCloud().use { pointCloud ->
                             pointCloudRenderer.update(pointCloud)
                         }
                     } catch (e: Exception) {}
-
-                    diagFrameCount++
-                    if (diagFrameCount % 30 == 0) {
-                        val sb = StringBuilder()
-                        sb.appendLine("=== Frame #$diagFrameCount [CLOUD_POINTS] ===")
-                        sb.appendLine("Tracking: $isTracking")
-                        sb.appendLine("Color fed: $colorFed  ${colorW}x${colorH}")
-                        sb.appendLine("ARCore pts: ${pointCloudRenderer.accumulatedPointCount}")
-                        onDiag(sb.toString().trimEnd())
-                    }
                 } else {
-                    // ── Gaussian Splats mode ──────────────────────────────────
-                    var depthFed = false
-                    lastDepthNotYetAvailable = false
                     if (depthSupported) {
                         try {
                             frame.acquireDepthImage16Bits().use { depthImage ->
                                 val depthPlane = depthImage.planes[0]
-                                val displayDegrees = displayRotationHelper.getRotation() * 90
-                                val cvRotateCode = when ((sensorOrientation - displayDegrees + 360) % 360) {
-                                    90  -> 0  // cv::ROTATE_90_CLOCKWISE
-                                    180 -> 1  // cv::ROTATE_180
-                                    270 -> 2  // cv::ROTATE_90_COUNTERCLOCKWISE
-                                    else -> -1
-                                }
+                                
+                                val intrinsics = camera.imageIntrinsics
+                                val intrArr = floatArrayOf(
+                                    intrinsics.focalLength[0], intrinsics.focalLength[1],
+                                    intrinsics.principalPoint[0], intrinsics.principalPoint[1]
+                                )
+                                val cpuDim = intrinsics.imageDimensions
+
                                 slamManager.feedArCoreDepth(
                                     depthPlane.buffer,
                                     depthImage.width, depthImage.height,
                                     depthPlane.rowStride,
-                                    cvRotateCode
+                                    intrArr, cpuDim[0], cpuDim[1]
                                 )
-                                depthFed = true
-                                lastDepthW = depthImage.width; lastDepthH = depthImage.height
                             }
                         } catch (e: NotYetAvailableException) {
-                            lastDepthNotYetAvailable = true
                         } catch (e: Exception) {}
-                    }
-
-                    diagFrameCount++
-                    if (diagFrameCount % 30 == 0) {
-                        val splatCount = slamManager.getSplatCount()
-                        val sb = StringBuilder()
-                        sb.appendLine("=== Frame #$diagFrameCount [GAUSSIAN_SPLATS] ===")
-                        sb.appendLine("Tracking: $isTracking")
-                        sb.appendLine("DepthAPI: $depthSupported")
-                        sb.appendLine("Color fed: $colorFed  ${colorW}x${colorH}")
-                        sb.appendLine("Depth fed: $depthFed")
-                        if (!depthFed && depthSupported) sb.appendLine("  ↳ NotYetAvailable: $lastDepthNotYetAvailable")
-                        if (depthFed) sb.appendLine("  ↳ ${lastDepthW}x${lastDepthH}")
-                        sb.appendLine("Splats: $splatCount")
-                        val depthTrace = slamManager.getLastDepthTrace().trim()
-                        val splatTrace = slamManager.getLastSplatTrace().trim()
-                        if (depthTrace.isNotEmpty()) {
-                            sb.appendLine("--- DEPTH_PIPE ---")
-                            sb.appendLine(depthTrace)
-                        }
-                        if (splatTrace.isNotEmpty()) {
-                            sb.appendLine("--- SPLAT_PIPE ---")
-                            sb.appendLine(splatTrace)
-                        }
-                        onDiag(sb.toString().trimEnd())
                     }
                 }
             }
 
-            // Render the 3D point cloud
             if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
                 pointCloudRenderer.draw(viewMatrix, projMatrix)
             } else {
                 slamManager.draw()
             }
 
-            // Upload pending overlay bitmap (texture upload must happen on GL thread).
             if (overlayBitmapDirty) {
                 overlayBitmapDirty = false
                 pendingOverlayBitmap?.let { overlayRenderer.updateTexture(it) }
             }
 
-            // Draw artwork quad locked to the AR anchor.
             val anchorMatrix = slamManager.getAnchorTransform()
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
 
-            // Phase 5: Draw orange boundary rectangle when the setting is on.
             if (showAnchorBoundary) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }

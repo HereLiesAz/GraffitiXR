@@ -1,4 +1,3 @@
-// ~~~ FILE: ./core/nativebridge/src/main/cpp/MobileGS.cpp ~~~
 #include "include/MobileGS.h"
 #include <jni.h>
 #include <EGL/egl.h>
@@ -17,17 +16,15 @@
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
 
-// Stores the last splat pipeline trace for in-app diagnostics (extern'd in GraffitiJNI.cpp).
 std::string gLastSplatTrace;
 #define SPLAT_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGI("SPLAT_PIPE: %s", _buf);     gLastSplatTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
-extern JavaVM* gJvm; // Defined in GraffitiJNI.cpp
+extern JavaVM* gJvm; 
 
 static constexpr size_t MAX_SPLATS = 500000;
-static constexpr float VOXEL_SIZE = 0.02f; // 20mm voxels
+static constexpr float VOXEL_SIZE = 0.005f; 
 
-// Helper RAII struct to guarantee JVM attachment for background threads
 struct JniThreadAttacher {
     JNIEnv* env = nullptr;
     bool didAttach = false;
@@ -50,7 +47,7 @@ struct JniThreadAttacher {
     }
 };
 
-// --- SPLAT SHADERS ---
+// --- SPLAT SHADERS (UPGRADED TO DENSE SURFELS) ---
 static const char* kVertexShader =
         "#version 300 es\n"
         "layout(location = 0) in vec3 aPosition;\n"
@@ -60,16 +57,20 @@ static const char* kVertexShader =
         "layout(location = 4) in float aRadius;\n"
         "uniform mat4 uMvp;\n"
         "uniform vec3 uCameraPos;\n"
+        "uniform float uFocalY;\n"
         "out vec4 vColor;\n"
         "out float vNdotV;\n"
+        "out float vConfidence;\n"
         "void main() {\n"
         "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
         "  gl_Position = clip;\n"
         "  vec3 viewDir = normalize(uCameraPos - aPosition);\n"
         "  vNdotV = abs(dot(aNormal, viewDir));\n"
-        "  float sz = (10.0 + 30.0 * aConfidence) * aRadius / clip.w;\n"
-        "  gl_PointSize = clamp(sz, 4.0, 128.0);\n"
+        "  float diameter = (aRadius * 2.0 * 1.414) * uFocalY / clip.w;\n"
+        "  float confScale = 0.5 + (0.5 * aConfidence);\n"
+        "  gl_PointSize = clamp(diameter * confScale, 2.0, 256.0);\n"
         "  vColor = aColor;\n"
+        "  vConfidence = aConfidence;\n"
         "}\n";
 
 static const char* kFragmentShader =
@@ -77,14 +78,15 @@ static const char* kFragmentShader =
         "precision mediump float;\n"
         "in vec4 vColor;\n"
         "in float vNdotV;\n"
+        "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
         "  if (r2 > 1.0) discard;\n"
-        "  float alpha = exp(-4.0 * r2);\n"
-        "  float finalAlpha = alpha * vColor.a * vNdotV * 0.9;\n"
-        "  oColor = vec4(vColor.rgb, finalAlpha);\n"
+        "  float shading = 0.8 + 0.2 * vNdotV;\n"
+        "  oColor = vec4(vColor.rgb * shading, 1.0);\n"
+        "  gl_FragDepth = gl_FragCoord.z + (r2 * 0.001);\n"
         "}\n";
 
 // --- MESH (WIREFRAME) SHADERS ---
@@ -166,9 +168,31 @@ void MobileGS::initialize(int width, int height) {
 
 void MobileGS::initGl() {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mProgram != 0) return;
+    // CRITICAL: We DO NOT return early if mProgram != 0.
+    // When the phone rotates, or the app goes to background and comes back,
+    // Android destroys the old GL context and creates a new one.
+    // We MUST recompile shaders and recreate VBOs in the new context.
+    if (mProgram != 0) {
+        LOGI("MobileGS GL re-initialized. Purging old handles.");
+        mProgram = 0; mPointVbo = 0; mIndexVbo = 0;
+        mMeshProgram = 0; mMeshVbo = 0; mMeshIbo = 0;
+    }
     initShaders();
     LOGI("MobileGS GL initialized");
+}
+
+void MobileGS::resetGlContext() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mProgram = 0;
+    mPointVbo = 0;
+    mIndexVbo = 0;
+    mMeshProgram = 0;
+    mMeshVbo = 0;
+    mMeshIbo = 0;
+    
+    // Force the data to be uploaded to the new VBOs on the next draw call
+    std::lock_guard<std::mutex> glLock(mGlDataMutex);
+    mGlDataDirty = true;
 }
 
 void MobileGS::destroy() {
@@ -196,9 +220,6 @@ void MobileGS::destroy() {
 
     std::lock_guard<std::mutex> lock(mMutex);
 
-    // Only attempt to manually delete OpenGL objects if we are on a thread that actually has an EGL context.
-    // If the Activity is destroyed, the OS reclaims the GL memory automatically. Attempting to call glDeleteProgram
-    // from the main thread will throw a fatal EGL_NO_CONTEXT error.
     if (eglGetCurrentContext() != EGL_NO_CONTEXT) {
         if (mProgram) { glDeleteProgram(mProgram); mProgram = 0; }
         if (mPointVbo) { glDeleteBuffers(1, &mPointVbo); mPointVbo = 0; }
@@ -208,14 +229,12 @@ void MobileGS::destroy() {
         if (mMeshVbo) { glDeleteBuffers(1, &mMeshVbo); mMeshVbo = 0; }
         if (mMeshIbo) { glDeleteBuffers(1, &mMeshIbo); mMeshIbo = 0; }
     } else {
-        // Discard handles since the context is already dead.
         mProgram = 0; mPointVbo = 0; mIndexVbo = 0;
         mMeshProgram = 0; mMeshVbo = 0; mMeshIbo = 0;
     }
 }
 
 void MobileGS::initShaders() {
-    // 1. Splat Shaders
     GLuint vertexShader = compileShader(GL_VERTEX_SHADER, kVertexShader);
     GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
     if (vertexShader && fragmentShader) {
@@ -235,7 +254,6 @@ void MobileGS::initShaders() {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_SPLATS * sizeof(uint32_t), nullptr, GL_DYNAMIC_DRAW);
     }
 
-    // 2. Mesh Shaders
     GLuint meshVs = compileShader(GL_VERTEX_SHADER, kMeshVertexShader);
     GLuint meshFs = compileShader(GL_FRAGMENT_SHADER, kMeshFragmentShader);
     if (meshVs && meshFs) {
@@ -252,6 +270,10 @@ void MobileGS::initShaders() {
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    
+    // We just created fresh buffers, force re-upload
+    std::lock_guard<std::mutex> glLock(mGlDataMutex);
+    mGlDataDirty = true;
 }
 
 void MobileGS::setArCoreTrackingState(bool isTracking) {
@@ -278,10 +300,9 @@ void MobileGS::clearMap() {
     mLastRelocTriggerFrame = 0;
     mLastFingerprintUpdateFrame = 0;
 
-    // FIX (Bug 5): Reset mesh state so stale wireframe geometry does not keep
-    // rendering after a map clear.
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
+        mPendingSplatData.clear();
         mPendingMeshVertices.clear();
         mPendingMeshIndices.clear();
         mGlDataDirty = true;
@@ -302,7 +323,6 @@ void MobileGS::setRelocEnabled(bool enabled) {
 }
 
 cv::Point3f MobileGS::getCameraWorldPosition() const {
-    // Column-major view matrix: camera world pos = -Rᵀ * t
     float r00 = mViewMatrix[0], r10 = mViewMatrix[1], r20 = mViewMatrix[2];
     float r01 = mViewMatrix[4], r11 = mViewMatrix[5], r21 = mViewMatrix[6];
     float r02 = mViewMatrix[8], r12 = mViewMatrix[9], r22 = mViewMatrix[10];
@@ -363,28 +383,12 @@ void MobileGS::sortThreadFunc() {
     }
 }
 
-// FIX (Bug 1): The original code computed R from the column-major view matrix and
-// then did R * (p_cam - t) where t = V[12..14]. This is wrong.
-//
-// A column-major OpenGL view matrix encodes:  p_cam = R * p_world + t
-// So the inverse is:  p_world = Rᵀ * p_cam - Rᵀ * t  =  Rᵀ * p_cam + camWorldPos
-//
-// The old code subtracted the view-space translation *before* rotating, which
-// double-counted the translation and placed every world-space point at the wrong
-// position (especially visible when the camera moves far from the origin).
 static void camToWorld(const float* V, float xc, float yc, float zc,
                        float& xw, float& yw, float& zw) {
-    // Rᵀ from column-major V:
-    //   R col0 = (V[0], V[1], V[2])
-    //   R col1 = (V[4], V[5], V[6])
-    //   R col2 = (V[8], V[9], V[10])
-    // Rᵀ row0 = (V[0], V[1], V[2]), etc.
     float tx = V[12], ty = V[13], tz = V[14];
-    // Camera world position = -Rᵀ * t
     float camX = -(V[0]*tx + V[1]*ty + V[2]*tz);
     float camY = -(V[4]*tx + V[5]*ty + V[6]*tz);
     float camZ = -(V[8]*tx + V[9]*ty + V[10]*tz);
-    // p_world = Rᵀ * p_cam + camWorldPos
     xw = V[0]*xc + V[1]*yc + V[2]*zc + camX;
     yw = V[4]*xc + V[5]*yc + V[6]*zc + camY;
     zw = V[8]*xc + V[9]*yc + V[10]*zc + camZ;
@@ -392,7 +396,6 @@ static void camToWorld(const float* V, float xc, float yc, float zc,
 
 static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
                              float& nxw, float& nyw, float& nzw) {
-    // Normals transform by Rᵀ only (no translation component)
     nxw = V[0]*nxc + V[1]*nyc + V[2]*nzc;
     nyw = V[4]*nxc + V[5]*nyc + V[6]*nzc;
     nzw = V[8]*nxc + V[9]*nyc + V[10]*nzc;
@@ -547,10 +550,6 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         T.at<float>(i, 3) = tvec.at<double>(i, 0);
     }
 
-    // T (from solvePnPRansac) is OpenCV row-major, representing cam_T_obj.
-    // glm::make_mat4 reads column-major, so it interprets the row-major data as T-transposed;
-    // glm::transpose reverses that, giving us cam_T_obj in GLM column-major form.
-    // Then world_T_obj = inv(view) × cam_T_obj (stable world-space anchor, not camera-relative).
     glm::mat4 cam_T_obj  = glm::transpose(glm::make_mat4(T.ptr<float>()));
     glm::mat4 V          = glm::make_mat4(viewMat);
     glm::mat4 world_T_obj = glm::inverse(V) * cam_T_obj;
@@ -567,10 +566,6 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
         mAnchorInterpolating   = true;
     }
 
-    // ── Teleological progress estimation ──────────────────────────────────────
-    // Reuse the already-detected current-frame features (descs) to check how
-    // many of the locked artwork features are now visible on the wall.
-    // This is the "how far along is the mural" measurement.
     if (!artworkDesc.empty() && !descs.empty() && artworkDesc.type() == descs.type()) {
         auto artMatcher = cv::BFMatcher::create(
                 artworkDesc.type() == CV_8U ? cv::NORM_HAMMING : cv::NORM_L2);
@@ -611,8 +606,6 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     };
 
     const float* V = viewMat;
-    // Recover pixel-space intrinsics from the OpenGL projection matrix.
-    // Same derivation as processDepthFrame — must stay in sync.
     const float halfW_fp = depth.cols / 2.0f;
     const float halfH_fp = depth.rows / 2.0f;
     const float fx_fp = projMat[0] * halfW_fp;
@@ -634,7 +627,6 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
         float d = depth.at<float>(v, u);
         if (d <= 0.0f || d > 5.0f) continue;
 
-        // Standard pinhole unproject — identical convention to processDepthFrame.
         float xc = (u - cx_fp) * d / fx_fp;
         float yc = -(v - cy_fp) * d / fy_fp;
         float zc = -d;
@@ -650,10 +642,6 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
 
     std::lock_guard<std::mutex> lock(mMutex);
 
-    // Clear when upgrading from ORB to SuperPoint, or when the descriptor and 3D-point
-    // vectors are misaligned (e.g. setTargetFingerprint was called with empty points3d).
-    // Appending into a misaligned state would cause runPnPMatch to map the wrong 3D
-    // points to the wrong descriptors, producing garbage PnP poses.
     bool misaligned = !mTargetDescriptors.empty() &&
                       (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
     if (misaligned || (usedSP && !mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U)) {
@@ -688,7 +676,6 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
     if (!mMapRunning) return;
     {
         std::lock_guard<std::mutex> lock(mQueueMutex);
-        // Throttle: If queue is already full, replace oldest work to keep it fresh
         if (mFrameQueue.size() >= 2) {
             mFrameQueue.erase(mFrameQueue.begin());
         }
@@ -724,13 +711,12 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     {
         std::lock_guard<std::mutex> lock(mMutex);
         gLastSplatTrace.clear();
-        if (depth.empty()) { SPLAT_TRACE("DROPPED - depth empty"); return; }
-        if (color.empty()) { SPLAT_TRACE("DROPPED - color empty"); return; }
-        SPLAT_TRACE("input depth=%dx%d color=%dx%d isYuv=%d", depth.cols, depth.rows, color.cols, color.rows, (int)isYuv);
-        if (!mCameraReady) { SPLAT_TRACE("DROPPED - camera not ready"); return; }
+        if (depth.empty()) { return; }
+        if (color.empty()) { return; }
+        if (!mCameraReady) { return; }
         isTrackingState = mIsArCoreTracking;
     }
-    if (!isTrackingState) { SPLAT_TRACE("DROPPED - not tracking"); return; }
+    if (!isTrackingState) { return; }
 
     cv::Mat colorRGB;
     if (isYuv) {
@@ -740,21 +726,13 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     }
 
     const float* V = viewMat;
-
-    // ARCore getProjectionMatrix returns a column-major OpenGL projection matrix where:
-    //   projMat[0]  = 2*fx_px / imageWidth    (NOT fx in pixels directly)
-    //   projMat[5]  = 2*fy_px / imageHeight
-    //   projMat[8]  = (2*cx_px / imageWidth)  - 1   (NDC principal point offset)
-    //   projMat[9]  = (2*cy_px / imageHeight) - 1   (negated for Y-down convention)
-    //
-    // We must recover pixel-space intrinsics from these NDC values using the
-    // depth image dimensions (the space in which we are unprojecting).
+    
+    // We must use the true physical intrinsics derived from the camera.
+    // The projection matrix is for the *display* and is cropped/scaled.
+    // By passing the unrotated depth map and the unrotated view matrix,
+    // we bypass the display skew completely.
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
-
-    // fx_px = projMat[0] * halfW,  cx_px = (projMat[8] + 1) * halfW
-    // fy_px = projMat[5] * halfH,  cy_px = (projMat[9] + 1) * halfH
-    // (cy_px sign: ARCore [9] encodes -(2cy/h - 1) so we negate back)
     const float fx_px = projMat[0] * halfW;
     const float fy_px = projMat[5] * halfH;
     const float cx_px = (projMat[8]  + 1.0f) * halfW;
@@ -764,11 +742,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     const float scaleY = (float)colorRGB.rows / depth.rows;
 
     bool mapModified = false;
-    // Optimized step: 8 for high-res, 4 for 640x480
-    int step = (depth.cols > 640) ? 8 : 4;
+    int step = (depth.cols > 320) ? 2 : 1;
 
-    // Standard pinhole unproject: p_cam = [(c - cx) / fx, -(r - cy) / fy, -1] * d
-    // Y is negated because image rows increase downward but camera Y points up.
     auto unproject = [&](int r, int c, float d) {
         return cv::Point3f(
             (c - cx_px) * d / fx_px,
@@ -777,17 +752,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         );
     };
 
-    // --- 1. Generate Splats from Depth Map ---
     std::vector<std::pair<VoxelKey, Splat>> newVoxelUpdates;
     newVoxelUpdates.reserve((depth.rows / step) * (depth.cols / step));
-
-    // Log a sample depth value on every 30th frame to verify values are in range
-    if (mFrameCounter % 30 == 0) {
-        int midR = depth.rows / 2, midC = depth.cols / 2;
-        float sampleD = depth.at<float>(midR, midC);
-        SPLAT_TRACE("sample depth[%d,%d]=%.3fm fx_px=%.1f fy_px=%.1f cx_px=%.1f cy_px=%.1f",
-             midR, midC, sampleD, fx_px, fy_px, cx_px, cy_px);
-    }
 
     for (int r = 0; r < depth.rows - step; r += step) {
         const float* depthRow = depth.ptr<float>(r);
@@ -818,6 +784,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 float nx_w, ny_w, nz_w;
                 camToWorldNormal(V, n_cam.x, n_cam.y, n_cam.z, nx_w, ny_w, nz_w);
 
+                float localRadius = std::max(cv::norm(v1), cv::norm(v2)) * 0.707f;
+                localRadius = std::clamp(localRadius, VOXEL_SIZE * 0.5f, VOXEL_SIZE * 5.0f);
+
                 VoxelKey key{
                         static_cast<int>(std::floor(xw / VOXEL_SIZE)),
                         static_cast<int>(std::floor(yw / VOXEL_SIZE)),
@@ -831,15 +800,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, nx_w, ny_w, nz_w, 1.5f}});
+                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, nx_w, ny_w, nz_w, localRadius}});
                 mapModified = true;
             }
         }
     }
-
-    SPLAT_TRACE("frame processed depth=%dx%d step=%d candidates=%zu projMat[0]=%.4f projMat[5]=%.4f",
-         depth.cols, depth.rows, step, newVoxelUpdates.size(),
-         projMat[0], projMat[5]);
 
     if (mapModified) {
         std::lock_guard<std::mutex> mapLock(mMapMutex);
@@ -870,6 +835,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 float len = std::sqrt(s.nx*s.nx + s.ny*s.ny + s.nz*s.nz);
                 if(len > 0) { s.nx/=len; s.ny/=len; s.nz/=len; }
 
+                s.radius = s.radius * alpha + nu.radius * (1.0f - alpha);
                 s.confidence = std::min(1.0f, s.confidence + 0.05f);
             } else {
                 splatData.push_back(update.second);
@@ -881,10 +847,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
             pruneMap();
         }
         mPointCount = static_cast<int>(splatData.size());
-        SPLAT_TRACE("voxel insert done totalSplats=%d", mPointCount.load());
     }
 
-    // --- 2. Generate Live Surface Mesh (Wireframe) ---
     std::vector<float> meshVertices;
     std::vector<uint32_t> meshIndices;
 
@@ -928,7 +892,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         }
     }
 
-    // --- 3. Double buffer the GL data ---
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
         if (mapModified) {
@@ -940,7 +903,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         mGlDataDirty = true;
     }
 
-    // --- 4. Background Optimization Triggers ---
     if (++mFrameCounter % 30 == 0) {
         continuousOptimize();
         {
@@ -1000,7 +962,6 @@ void MobileGS::continuousOptimize() {
 }
 
 void MobileGS::pruneMap() {
-    // Assumes mMapMutex is already held by caller (processDepthFrame)
     if (splatData.size() < MAX_SPLATS) return;
 
     const size_t evictCount = MAX_SPLATS / 10;
@@ -1039,7 +1000,6 @@ void MobileGS::updateLightLevel(float level) {
     float normalizedLight = std::clamp(level, 0.0f, 1.0f);
     int orbThreshold = (normalizedLight < 0.2f) ? 10 : (normalizedLight > 0.8f ? 45 : 31);
 
-    // Only re-create if the threshold has actually changed to save CPU
     static int lastThreshold = -1;
     if (orbThreshold != lastThreshold) {
         mFeatureDetector = cv::ORB::create(500, 1.2f, 8, orbThreshold);
@@ -1091,7 +1051,6 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
     const float fx = intrinsics4[0], fy = intrinsics4[1];
     const float cx = intrinsics4[2], cy = intrinsics4[3];
 
-    // Scale from image space to depth map space
     const float scaleX = (float)depthW / composite.cols;
     const float scaleY = (float)depthH / composite.rows;
 
@@ -1111,7 +1070,6 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
         float d = depthMm / 1000.0f;
         if (d > 5.0f) continue;
 
-        // Unproject using image-space intrinsics
         float u = kps[i].pt.x;
         float v = kps[i].pt.y;
         float xc = (u - cx) * d / fx;
@@ -1127,8 +1085,6 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
     if (newPts.empty()) return;
 
     std::lock_guard<std::mutex> lock(mMutex);
-    // Append to the existing fingerprint using the same alignment guarantee
-    // (misalignment is re-checked and cleared if necessary).
     bool misaligned = !mTargetDescriptors.empty() &&
                       (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
     if (misaligned) {
@@ -1142,15 +1098,9 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
         cv::vconcat(mTargetDescriptors, newDescs, mTargetDescriptors);
     }
 
-    // Store a clean copy of the artwork features for teleological progress tracking.
-    // This bank is overwritten each time layers are locked so it always reflects
-    // the current "finished mural" goal — independent of the reloc fingerprint.
     mArtworkDescriptors  = newDescs.clone();
     mArtworkKeypoints3D  = newPts;
-    mPaintingProgress.store(0.0f, std::memory_order_relaxed);  // reset: new guide loaded
-
-    LOGI("addLayerFeatures: added %zu new features, total=%d, artwork bank=%d",
-         newPts.size(), mTargetDescriptors.rows, mArtworkDescriptors.rows);
+    mPaintingProgress.store(0.0f, std::memory_order_relaxed);
 }
 
 void MobileGS::saveModel(const std::string& path) {
@@ -1160,7 +1110,7 @@ void MobileGS::saveModel(const std::string& path) {
 
     char magic[4] = {'G','X','R','M'};
     out.write(magic, 4);
-    int version = 3; // Version 3 handles 48-byte anisotropic Splat structs
+    int version = 3; 
     out.write((char*)&version, 4);
     int numSplats = splatData.size();
     out.write((char*)&numSplats, 4);
@@ -1221,12 +1171,11 @@ void MobileGS::loadModel(const std::string& path) {
             mVoxelGrid[key] = i;
         }
     }
-
-    if (mPointVbo != 0 && mPointCount > 0) {
-        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-        glBufferData(GL_ARRAY_BUFFER, splatData.size() * sizeof(Splat), splatData.data(), GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
+    
+    // We just loaded new data, force a re-upload to the GPU
+    std::lock_guard<std::mutex> glLock(mGlDataMutex);
+    mPendingSplatData = splatData;
+    mGlDataDirty = true;
 }
 
 void MobileGS::draw() {
@@ -1249,7 +1198,6 @@ void MobileGS::draw() {
                     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
                     mMeshIndexCount = mPendingMeshIndices.size();
                 } else {
-                    // Empty pending data (e.g. after clearMap) — zero the draw count.
                     mMeshIndexCount = 0;
                 }
             }
@@ -1260,8 +1208,6 @@ void MobileGS::draw() {
     std::lock_guard<std::mutex> lock(mMutex);
     interpolateAnchorStep();
 
-    // FIX (Bug 4): Removed mPointCount == 0 early-exit so the wireframe renders
-    // independently before any splats have accumulated.
     if (!mProgram || !mCameraReady) return;
 
     {
@@ -1274,17 +1220,11 @@ void MobileGS::draw() {
         }
     }
 
-    glEnable(GL_DEPTH_TEST);
-
     glm::mat4 V = glm::make_mat4(mViewMatrix);
     glm::mat4 A = glm::make_mat4(mAnchorMatrix);
     glm::mat4 P = glm::make_mat4(mProjMatrix);
 
-    // Splats are anchored to a tracked pose — include A.
     glm::mat4 mvp = P * V * A;
-
-    // FIX (Bug 0): Wireframe vertices are in world space; applying A collapsed all
-    // lines to the anchor origin. Use P*V only.
     glm::mat4 meshMvp = P * V;
 
     // --- 1. Draw Splats ---
@@ -1297,10 +1237,16 @@ void MobileGS::draw() {
         cv::Point3f camPos = getCameraWorldPosition();
         GLint camLoc = glGetUniformLocation(mProgram, "uCameraPos");
         glUniform3f(camLoc, camPos.x, camPos.y, camPos.z);
+        
+        GLint focalLoc = glGetUniformLocation(mProgram, "uFocalY");
+        float focalY = std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f);
+        glUniform1f(focalLoc, focalY);
 
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE);
+        // CRITICAL FIX: Disable alpha blending, Enable true depth writing.
+        // This makes the splats opaque intersecting scales rather than fuzzy overlapping clouds.
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+        glEnable(GL_DEPTH_TEST);
 
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
 
@@ -1346,10 +1292,11 @@ void MobileGS::draw() {
         glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, glm::value_ptr(meshMvp));
 
         GLint colorLoc = glGetUniformLocation(mMeshProgram, "uColor");
-        glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f); // Cyan, 20% alpha
+        glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f); 
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE); // Wireframes don't need to write depth
 
         glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
         glEnableVertexAttribArray(0);
@@ -1362,6 +1309,7 @@ void MobileGS::draw() {
 
         glDisableVertexAttribArray(0);
         glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);

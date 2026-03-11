@@ -38,6 +38,7 @@ class MobileGS {
 public:
     void initialize(int width, int height);
     void initGl();
+    void resetGlContext(); // Fixes map disappearing on rotate
     void updateCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
@@ -46,39 +47,27 @@ public:
 
     void setArCoreTrackingState(bool isTracking);
 
-    // Teleological SLAM
     void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     void scheduleRelocCheck(const cv::Mat& colorFrame);
 
-    // Read current anchor pose (target-local → world, column-major 4×4)
     void getAnchorTransform(float* outMat16) const;
 
-    // Augment the fingerprint with features extracted from a placed artwork bitmap.
-    // depthData is a DEPTH16 byte array (same format as feedArCoreDepth).
-    // intrinsics = [fx, fy, cx, cy] in pixels for the depth/image space.
-    // viewMat is the column-major 4×4 world-to-camera matrix at capture time.
     void addLayerFeatures(const cv::Mat& composite,
                           const uint8_t* depthData, int depthW, int depthH, int depthStride,
                           const float* intrinsics4,
                           const float* viewMat16);
 
-    // AI feature matching — load SuperPoint ONNX from bytes
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
 
-    // Lifecycle helpers
     void clearMap();
     void setViewportSize(int width, int height);
     void setRelocEnabled(bool enabled);
 
-    // HUD Data
     int getSplatCount() const { return mPointCount; }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
 
-    // Teleological painting progress — fraction [0,1] of artwork guide features
-    // currently visible in the live camera feed.  Updated inside runPnPMatch.
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
 
-    // Project Data I/O
     void saveModel(const std::string& path);
     void loadModel(const std::string& path);
 
@@ -91,10 +80,8 @@ private:
     void continuousOptimize();
     void initShaders();
 
-    // Map data protection
     std::mutex mMapMutex;
 
-    // Background Map Processing Thread
     void mapThreadFunc();
     struct FrameData {
         cv::Mat depth;
@@ -109,18 +96,14 @@ private:
     std::vector<FrameData> mFrameQueue;
     std::atomic<bool> mMapRunning{false};
 
-    // Background Sorter Thread
     void sortThreadFunc();
     cv::Point3f getCameraWorldPosition() const;
 
-    // Smooth anchor interpolation
     void interpolateAnchorStep();
 
-    // Background relocalization thread
     void relocThreadFunc();
     void runPnPMatch(const cv::Mat& frame);
 
-    // Dynamic fingerprint accumulation
     void tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat);
 
     mutable std::mutex mMutex;
@@ -134,8 +117,6 @@ private:
     cv::Mat mTargetDescriptors;
     std::vector<cv::Point3f> mTargetKeypoints3D;
 
-    // Teleological guide: features of the artwork-as-projected (locked layers composite).
-    // Separate from mTargetDescriptors so relocation and progress use independent banks.
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     std::atomic<float> mPaintingProgress{0.0f};
@@ -143,7 +124,6 @@ private:
     std::vector<Splat> splatData;
     std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
 
-    // Depth Sorting Concurrency
     std::thread mSortThread;
     std::mutex mSortMutex;
     std::condition_variable mSortCv;
@@ -152,14 +132,12 @@ private:
     std::vector<uint32_t> mDrawIndices;
     bool mIndicesDirty = false;
 
-    // Smooth anchor interpolation state
     float mTargetAnchorMatrix[16];
     bool  mAnchorInterpolating   = false;
     float mInterpolationProgress = 0.0f;
     static constexpr int   INTERP_FRAMES = 30;
     static constexpr float INTERP_STEP   = 1.0f / 30.0f;
 
-    // Background relocalization thread (loop closure)
     std::thread             mRelocThread;
     std::mutex              mRelocMutex;
     std::condition_variable mRelocCv;
@@ -171,7 +149,6 @@ private:
     static constexpr uint64_t LOOP_CLOSURE_INTERVAL = 60;
     static constexpr float    DRIFT_THRESHOLD_M     = 0.003f;
 
-    // Dynamic fingerprint accumulation
     std::atomic<bool>       mFingerprintRequested{false};
     cv::Mat                 mFingerprintColorFrame;
     cv::Mat                 mFingerprintDepthFrame;
@@ -182,14 +159,12 @@ private:
     static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 300;
     static constexpr size_t   MAX_FINGERPRINT_KEYPOINTS   = 2000;
 
-    // GLES handles - Splats
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
     GLuint mIndexVbo = 0;
     std::atomic<int> mPointCount{0};
-    bool mSplatsVisible{true};  // set false during target capture to show clean camera view
+    bool mSplatsVisible{true};  
 
-    // NEW: GLES handles - Surface Mesh (Wireframe)
     GLuint mMeshProgram = 0;
     GLuint mMeshVbo = 0;
     GLuint mMeshIbo = 0;
@@ -197,14 +172,12 @@ private:
     std::vector<float> mMeshVertices;
     std::vector<uint32_t> mMeshIndices;
 
-    // Double buffering for GL data
     std::mutex mGlDataMutex;
     std::vector<Splat> mPendingSplatData;
     std::vector<float> mPendingMeshVertices;
     std::vector<uint32_t> mPendingMeshIndices;
     bool mGlDataDirty = false;
 
-    // Optimization State
     uint64_t mFrameCounter = 0;
 
     float mViewMatrix[16];
@@ -215,6 +188,3 @@ private:
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
 };
-
-
-

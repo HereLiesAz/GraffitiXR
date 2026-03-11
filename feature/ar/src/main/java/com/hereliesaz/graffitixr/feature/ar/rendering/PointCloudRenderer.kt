@@ -34,8 +34,24 @@ class PointCloudRenderer {
     private val pointIdMap = HashMap<Int, Int>()
 
     fun createOnGlThread(context: Context) {
-        val vertexShaderCode = context.assets.open("shaders/point_cloud.vert").bufferedReader().use { it.readText() }
-        val fragmentShaderCode = context.assets.open("shaders/point_cloud.frag").bufferedReader().use { it.readText() }
+        val vertexShaderCode = """
+            uniform mat4 u_MvpMatrix;
+            uniform float u_PointSize;
+            attribute vec4 a_Position;
+            void main() {
+                gl_Position = u_MvpMatrix * vec4(a_Position.xyz, 1.0);
+                gl_PointSize = u_PointSize;
+            }
+        """.trimIndent()
+
+        val fragmentShaderCode = """
+            precision mediump float;
+            void main() {
+                vec2 pt = gl_PointCoord - vec2(0.5);
+                if(dot(pt, pt) > 0.25) discard;
+                gl_FragColor = vec4(0.0, 1.0, 1.0, 1.0);
+            }
+        """.trimIndent()
 
         val vertexShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_VERTEX_SHADER, vertexShaderCode)
         val fragmentShader = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
@@ -67,9 +83,6 @@ class PointCloudRenderer {
         var hasUpdates = false
 
         for (i in 0 until numPoints) {
-            // Filter points to reduce load if necessary, but here we process all or stride
-            // Assuming simple accumulation logic
-
             val id = ids.get(i)
             val x = points.get(i * 4)
             val y = points.get(i * 4 + 1)
@@ -77,7 +90,6 @@ class PointCloudRenderer {
             val conf = points.get(i * 4 + 3)
 
             if (pointIdMap.containsKey(id)) {
-                // Update existing point
                 val index = pointIdMap[id]!!
                 val offset = index * 4
                 val oldConf = localBuffer[offset + 3]
@@ -89,7 +101,6 @@ class PointCloudRenderer {
                     hasUpdates = true
                 }
             } else if (accumulatedPointCount < maxPoints) {
-                // Add new point
                 val index = accumulatedPointCount
                 pointIdMap[id] = index
                 val offset = index * 4
@@ -116,7 +127,6 @@ class PointCloudRenderer {
     }
 
     fun draw(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
-        // Consume any pending load scheduled from outside the GL thread.
         val loadPath = pendingLoadPath
         if (loadPath != null) {
             pendingLoadPath = null
@@ -127,7 +137,6 @@ class PointCloudRenderer {
 
         GLES20.glUseProgram(program)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
-        // Enable blending for transparency effects if desired
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
@@ -153,11 +162,6 @@ class PointCloudRenderer {
         pointIdMap.clear()
     }
 
-    /**
-     * Persist accumulated cloud points to disk.
-     * Binary format: magic "GXPC" (4 bytes) + version 1 (int) + count (int) + count×4 floats (x,y,z,conf)
-     * Thread-safe: reads [localBuffer] and [accumulatedPointCount] without holding the GL context.
-     */
     fun saveToFile(path: String) {
         val count = accumulatedPointCount
         if (count == 0) return
@@ -165,10 +169,9 @@ class PointCloudRenderer {
             FileOutputStream(File(path)).use { out ->
                 val buf = ByteBuffer.allocate(8 + 4 + 4 + count * 4 * 4)
                     .order(ByteOrder.LITTLE_ENDIAN)
-                // magic
                 buf.put('G'.code.toByte()); buf.put('X'.code.toByte())
                 buf.put('P'.code.toByte()); buf.put('C'.code.toByte())
-                buf.putInt(1) // version
+                buf.putInt(1)
                 buf.putInt(count)
                 for (i in 0 until count * 4) buf.putFloat(localBuffer[i])
                 out.write(buf.array())
@@ -178,10 +181,6 @@ class PointCloudRenderer {
         }
     }
 
-    /**
-     * Load previously saved cloud points from disk.
-     * Must be called from the GL thread (uploads to GPU via [GLES20.glBufferSubData]).
-     */
     fun loadFromFile(path: String) {
         try {
             val file = File(path)
@@ -190,7 +189,6 @@ class PointCloudRenderer {
                 val bytes = inp.readBytes()
                 val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
                 if (buf.remaining() < 12) return
-                // Validate magic
                 val magic = String(byteArrayOf(buf.get(), buf.get(), buf.get(), buf.get()))
                 if (magic != "GXPC") { Timber.w("PointCloudRenderer: bad magic '$magic'"); return }
                 @Suppress("UNUSED_VARIABLE") val version = buf.getInt()
@@ -199,9 +197,8 @@ class PointCloudRenderer {
                 if (buf.remaining() < needed) return
                 for (i in 0 until count * 4) localBuffer[i] = buf.getFloat()
                 accumulatedPointCount = count
-                pointIdMap.clear() // IDs lost; just re-use the point data for display
+                pointIdMap.clear()
 
-                // Upload to GPU
                 GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
                 val gpuBuf = ByteBuffer.allocateDirect(count * 4 * 4).order(ByteOrder.nativeOrder())
                 val fBuf = gpuBuf.asFloatBuffer()

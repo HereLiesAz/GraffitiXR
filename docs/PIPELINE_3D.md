@@ -1,4 +1,4 @@
-# 3D Pipeline Specification: SLAM & Gaussian Splatting
+# 3D Pipeline Specification: SLAM & Dense Surfel Rendering
 
 This document details the environment mapping and 3D visualization subsystems.
 
@@ -7,16 +7,10 @@ This document details the environment mapping and 3D visualization subsystems.
 **Module:** `:feature:ar`
 **Key classes:** `ArViewModel`, `ArRenderer`, `SlamManager`
 
-Unlike full-scale photogrammetry, the pipeline focuses on rapid, sparse voxel accumulation for immediate on-device visualization.
+Unlike full-scale photogrammetry, the pipeline focuses on rapid, highly-dense voxel accumulation for immediate on-device visualization.
 
 ### A. Tracking & Keyframing
 The system uses the ARCore `Session` for visual odometry. We trust `camera.pose` from ARCore; no manual VIO.
-
-**Keyframe Heuristic:**
-A new keyframe is saved when the delta from the last keyframe exceeds:
-* **Translation:** ΔT > 0.1 metres (10cm)
-* **Rotation:** ΔR > 10.0 degrees
-* **Quality:** `camera.trackingState == TRACKING`
 
 ### B. Per-Frame Data Acquisition
 
@@ -25,30 +19,35 @@ Executed inside `ArRenderer.onDrawFrame` each tracking frame:
 1. **Camera pose** — `camera.getViewMatrix/getProjectionMatrix` → `slamManager.updateCamera()`
 
 2. **Color frame** — `frame.acquireCameraImage()` → RGBA → `slamManager.feedColorFrame()`
-   - Used for relocalization / fingerprinting; called when tracking and when not tracking.
-   - The native engine handles internal optical flow as an implementation detail.
+   - Used for relocalization / fingerprinting.
+   - Requires `cvRotateCode` to perfectly match physical display orientation.
 
 3. **Metric depth (Depth API devices)**
    - `frame.acquireDepthImage16Bits()` → DEPTH16 buffer → `slamManager.feedArCoreDepth()`
-   - Native: decode millimetre depth + confidence → `processDepthFrame()` (metric-accurate voxel placement)
+   - Native: decode millimetre depth, apply display rotation via `cvRotateCode`, and unproject using exact CPU intrinsics to prevent perspective skew.
 
 ### C. Voxel Map Accumulation
 `processDepthFrame(depthMap, colorFrame)` in `MobileGS`:
-$$P_{world} = M_{view}^{-1} \times P_{view}$$
-Points quantized to 20mm³ voxels; existing voxels update position (averaging) and confidence (increment). Points beyond `CULL_DISTANCE` (5m) discarded.
+Points quantized to 5mm³ voxels; existing voxels update position (averaging) and confidence (increment). Points beyond `CULL_DISTANCE` (5m) discarded.
 
 ### D. Map Serialization (GXRM format)
-Binary format written by `saveModel(path)` / `saveKeyframe(timestamp, path)`:
+Binary format written by `saveModel(path)`:
 1. Magic header: `"GXRM"`
-2. Splat count + keyframe count
-3. Splat payload: 32 bytes/splat — `x, y, z, r, g, b, a, confidence`
-4. Alignment matrix
+2. Version: `3` (Supports anisotropic 48-byte structs)
+3. Splat count + keyframe count
+4. Payload: 48 bytes/splat — `x, y, z, r, g, b, a, confidence, nx, ny, nz, radius`
+5. Alignment matrix
 
 ---
 
-## 2. Gaussian Splatting Visualization
+## 2. Dense Surfel Visualization
 
-SLAM splats are rendered by `slamManager.draw()` inside `ArRenderer`'s `GLSurfaceView` via OpenGL ES 3.0 `GL_POINTS`. The `BackgroundRenderer` renders the camera feed first, then splats are drawn on top in the same GL context.
+**MANDATE:** We explicitly reject alpha-blended soft splats. To prevent depth-sorting artifacts and achieve a watertight look, we utilize Dense Opaque Surfels.
+
+SLAM surfels are rendered by `slamManager.draw()` inside `ArRenderer`'s `GLSurfaceView` via OpenGL ES 3.0 `GL_POINTS`:
+1. **Sizing:** The vertex shader calculates the exact pixel diameter needed to cover the voxel based on focal length and distance, multiplying by $\sqrt{2}$ so adjacent circles overlap perfectly.
+2. **Opacity:** `glDisable(GL_BLEND)` and `glDepthMask(GL_TRUE)` are strictly enforced. The fragment shader produces hard-edged, 100% opaque fragments.
+3. **Z-Buffering:** The GPU's hardware Z-buffer natively handles foreground/background occlusion, eliminating the need for expensive per-frame CPU depth-sorting.
 
 ---
 

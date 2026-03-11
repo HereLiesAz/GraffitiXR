@@ -11,21 +11,18 @@ import com.google.ar.core.TrackingState
 import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.FloatBuffer
 import kotlin.math.abs
 import kotlin.math.sqrt
 
 class PlaneRenderer {
     private var planeProgram = 0
 
-    // Uniform Locations
     private var planeModelUniform = 0
     private var planeModelViewProjectionUniform = 0
     private var gridControlUniform = 0
     private var planeColorUniform = 0
     private var isOutlineUniform = 0
 
-    // Buffers
     private val vertexBuffer = ByteBuffer.allocateDirect(1000 * 4) // Reusable buffer (Float = 4 bytes)
         .order(ByteOrder.nativeOrder())
         .asFloatBuffer()
@@ -35,8 +32,27 @@ class PlaneRenderer {
     private val modelViewProjectionMatrix = FloatArray(16)
 
     fun createOnGlThread(context: Context) {
-        val vertexShaderCode = context.assets.open("shaders/plane.vert").bufferedReader().use { it.readText() }
-        val fragmentShaderCode = context.assets.open("shaders/plane.frag").bufferedReader().use { it.readText() }
+        val vertexShaderCode = """
+            uniform mat4 u_PlaneModel;
+            uniform mat4 u_PlaneModelViewProjection;
+            attribute vec2 a_PositionXZ;
+            void main() {
+                gl_Position = u_PlaneModelViewProjection * vec4(a_PositionXZ.x, 0.0, a_PositionXZ.y, 1.0);
+            }
+        """.trimIndent()
+
+        val fragmentShaderCode = """
+            precision mediump float;
+            uniform vec4 u_Color;
+            uniform int u_IsOutline;
+            void main() {
+                if (u_IsOutline == 1) {
+                    gl_FragColor = vec4(u_Color.rgb, 1.0);
+                } else {
+                    gl_FragColor = u_Color;
+                }
+            }
+        """.trimIndent()
 
         val vertexShader = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_VERTEX_SHADER, vertexShaderCode)
         val passthroughShader = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_FRAGMENT_SHADER, fragmentShaderCode)
@@ -67,10 +83,10 @@ class PlaneRenderer {
             if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
                 continue
             }
-            
+
             val color = calculatePlaneColor(plane, cameraPose)
             GLES20.glUniform4fv(planeColorUniform, 1, color, 0)
-            
+
             drawPlane(plane, viewMatrix, projectionMatrix)
         }
 
@@ -110,8 +126,6 @@ class PlaneRenderer {
         GLES20.glDisableVertexAttribArray(posAttr)
     }
 
-    // --- Classification Logic ---
-
     enum class PlaneMatchResult {
         MATCH,      // Green: Parallel and close enough
         NO_MATCH,   // Pink: Perpendicular
@@ -120,39 +134,36 @@ class PlaneRenderer {
 
     fun classifyPlane(plane: Plane, cameraPose: Pose): PlaneMatchResult {
         val planeNormal = FloatArray(4)
-        plane.centerPose.getTransformedAxis(1, 1.0f, planeNormal, 0) // Y axis is normal
+        plane.centerPose.getTransformedAxis(1, 1.0f, planeNormal, 0)
 
         val cameraForward = FloatArray(4)
-        cameraPose.getTransformedAxis(2, -1.0f, cameraForward, 0) // -Z axis is forward
+        cameraPose.getTransformedAxis(2, -1.0f, cameraForward, 0)
 
         val dot = planeNormal[0] * cameraForward[0] + planeNormal[1] * cameraForward[1] + planeNormal[2] * cameraForward[2]
         val absDot = abs(dot)
 
-        // Dot product close to 0 means perpendicular (normal perpendicular to view dir)
-        // Dot product close to 1 means parallel (normal parallel to view dir)
-
         if (absDot < 0.3f) {
-            return PlaneMatchResult.NO_MATCH // Perpendicular
+            return PlaneMatchResult.NO_MATCH
         } else if (absDot > 0.95f) {
             val dist = calculateDistance(plane.centerPose, cameraPose)
             return if (dist < 3.0f) {
-                PlaneMatchResult.MATCH // Parallel and Close
+                PlaneMatchResult.MATCH
             } else {
-                PlaneMatchResult.SUBOPTIMAL // Parallel but Far
+                PlaneMatchResult.SUBOPTIMAL
             }
         } else {
-            return PlaneMatchResult.SUBOPTIMAL // Intermediate Angle
+            return PlaneMatchResult.SUBOPTIMAL
         }
     }
 
     fun calculatePlaneColor(plane: Plane, cameraPose: Pose): FloatArray {
         return when (classifyPlane(plane, cameraPose)) {
-            PlaneMatchResult.MATCH -> floatArrayOf(0.0f, 1.0f, 0.0f, 0.3f)       // Green
-            PlaneMatchResult.NO_MATCH -> floatArrayOf(1.0f, 0.4f, 0.7f, 0.3f)    // Pink
-            PlaneMatchResult.SUBOPTIMAL -> floatArrayOf(0.0f, 1.0f, 1.0f, 0.3f)  // Cyan
+            PlaneMatchResult.MATCH -> floatArrayOf(0.0f, 1.0f, 0.0f, 0.3f)
+            PlaneMatchResult.NO_MATCH -> floatArrayOf(1.0f, 0.4f, 0.7f, 0.3f)
+            PlaneMatchResult.SUBOPTIMAL -> floatArrayOf(0.0f, 1.0f, 1.0f, 0.3f)
         }
     }
-    
+
     private fun calculateDistance(p1: Pose, p2: Pose): Float {
         val dx = p1.tx() - p2.tx()
         val dy = p1.ty() - p2.ty()
