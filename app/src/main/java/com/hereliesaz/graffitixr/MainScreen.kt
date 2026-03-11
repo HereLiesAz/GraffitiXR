@@ -40,6 +40,7 @@ import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.coroutineScope
 import android.graphics.Bitmap as AndroidBitmap
+import androidx.core.graphics.createBitmap
 
 /**
  * The main stage where reality is augmented and screen touches are translated into either
@@ -315,7 +316,7 @@ fun MainScreen(
 private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
     val w = layers.firstNotNullOfOrNull { it.bitmap?.width } ?: 1024
     val h = layers.firstNotNullOfOrNull { it.bitmap?.height } ?: 1024
-    val result = AndroidBitmap.createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
+    val result = createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
     val canvas = Canvas(result)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     for (layer in layers) {
