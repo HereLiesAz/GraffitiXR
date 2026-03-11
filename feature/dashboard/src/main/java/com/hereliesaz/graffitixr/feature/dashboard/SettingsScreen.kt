@@ -61,6 +61,8 @@ fun SettingsScreen(
     onDiagOverlayChanged: () -> Unit,
     arScanMode: ArScanMode,
     onArScanModeChanged: (ArScanMode) -> Unit,
+    showAnchorBoundary: Boolean,
+    onAnchorBoundaryChanged: (Boolean) -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
     onClose: () -> Unit
@@ -161,6 +163,11 @@ fun SettingsScreen(
                                 label = "AR Scan Mode",
                                 value = if (arScanMode == ArScanMode.CLOUD_POINTS) "Cloud Points" else "Gaussian Splats",
                                 modifier = Modifier.clickable { onArScanModeChanged(nextMode) }
+                            )
+                            SettingsItem(
+                                label = "Show Anchor Boundary",
+                                value = if (showAnchorBoundary) "On" else "Off",
+                                modifier = Modifier.clickable { onAnchorBoundaryChanged(!showAnchorBoundary) }
                             )
                         }
 

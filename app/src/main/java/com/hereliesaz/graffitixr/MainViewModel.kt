@@ -24,7 +24,9 @@ data class MainUiState(
     val isTouchLocked: Boolean = false,
     val showUnlockInstructions: Boolean = false,
     val isCapturingTarget: Boolean = false,
-    val captureStep: CaptureStep = CaptureStep.NONE
+    val captureStep: CaptureStep = CaptureStep.NONE,
+    // Phase 4: True while the user is in "tap your painted marks" mode.
+    val isWaitingForTap: Boolean = false
 )
 
 @HiltViewModel
@@ -50,7 +52,28 @@ class MainViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isCapturingTarget = true,
-                captureStep = CaptureStep.CAPTURE
+                // Phase 4: Skip the auto-capture step — user taps their painted marks instead.
+                captureStep = CaptureStep.NONE,
+                isWaitingForTap = true
+            )
+        }
+    }
+
+    fun confirmTapCapture() {
+        _uiState.update {
+            it.copy(
+                isWaitingForTap = false,
+                captureStep = CaptureStep.REVIEW
+            )
+        }
+    }
+
+    fun cancelTapMode() {
+        _uiState.update {
+            it.copy(
+                isCapturingTarget = false,
+                captureStep = CaptureStep.NONE,
+                isWaitingForTap = false
             )
         }
     }

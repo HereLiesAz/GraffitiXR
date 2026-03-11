@@ -22,8 +22,16 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -198,6 +206,7 @@ class MainActivity : ComponentActivity() {
                             arUiState = arUiState,
                             isTouchLocked = mainUiState.isTouchLocked,
                             isCameraActive = !showLibrary,
+                            isWaitingForTap = mainUiState.isWaitingForTap,
                             editorViewModel = editorViewModel,
                             arViewModel = arViewModel,
                             slamManager = slamManager,
@@ -253,6 +262,37 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 96.dp)
+                                )
+                            }
+
+                            // Phase 3: Banner when Gaussian Splats mode is active but device
+                            // doesn't support the Depth API — user should switch modes.
+                            val showDepthWarning = editorUiState.editorMode == EditorMode.AR
+                                && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
+                                && !arUiState.isDepthApiSupported
+                                && arUiState.splatCount == 0  // hide once we have live data
+                            if (showDepthWarning && !showLibrary && !showSettings) {
+                                DepthApiUnsupportedBanner(
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 16.dp)
+                                )
+                            }
+
+                            // Phase 4: Tap-target mode — instruction banner + confirm/clear buttons.
+                            if (mainUiState.isWaitingForTap && !showLibrary && !showSettings) {
+                                TapTargetOverlay(
+                                    hasTaps = arUiState.tapHighlightKeypoints.isNotEmpty(),
+                                    onConfirm = { mainViewModel.confirmTapCapture() },
+                                    onClear = {
+                                        arViewModel.clearTapHighlights()
+                                    },
+                                    onCancel = {
+                                        mainViewModel.cancelTapMode()
+                                        arViewModel.clearTapHighlights()
+                                        arViewModel.restoreSplats()
+                                    },
+                                    modifier = Modifier.align(Alignment.BottomCenter)
                                 )
                             }
 
@@ -359,6 +399,8 @@ class MainActivity : ComponentActivity() {
                                     onDiagOverlayChanged = { editorViewModel.toggleDiagOverlay() },
                                     arScanMode = arUiState.arScanMode,
                                     onArScanModeChanged = { arViewModel.setArScanMode(it) },
+                                    showAnchorBoundary = arUiState.showAnchorBoundary,
+                                    onAnchorBoundaryChanged = { arViewModel.setShowAnchorBoundary(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
                                     onClose = { showSettings = false }
@@ -641,6 +683,83 @@ class MainActivity : ComponentActivity() {
         }
 
         azRailItem(id = "lock_trace", text = navStrings.lock) { mainViewModel.setTouchLocked(true) }
+    }
+}
+
+// ─── Phase 3: Depth API unsupported banner ───────────────────────────────────
+
+@Composable
+private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(Color(0xEECC4400), RoundedCornerShape(12.dp))
+            .padding(horizontal = 20.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = "This device doesn't support the Depth API.\nSwitch to Cloud Points mode in Settings.",
+            color = Color.White,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+// ─── Phase 4: Tap-target mode overlay ────────────────────────────────────────
+
+@Composable
+private fun TapTargetOverlay(
+    hasTaps: Boolean,
+    onConfirm: () -> Unit,
+    onClear: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(bottom = 96.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+                .padding(horizontal = 18.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = if (hasTaps) "Tap more marks, or confirm when done"
+                       else "Tap your painted reference marks",
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        if (hasTaps) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = onClear,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
+                    Text("Clear")
+                }
+                Button(
+                    onClick = onConfirm,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00CC44))
+                ) {
+                    Text("Confirm Target")
+                }
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+        OutlinedButton(
+            onClick = onCancel,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+        ) {
+            Text("Cancel", style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 

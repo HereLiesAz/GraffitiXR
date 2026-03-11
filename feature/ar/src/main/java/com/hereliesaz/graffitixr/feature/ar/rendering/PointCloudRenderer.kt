@@ -5,6 +5,10 @@ import android.opengl.GLES20
 import android.opengl.Matrix
 import com.google.ar.core.PointCloud
 import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
+import timber.log.Timber
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.HashMap
@@ -21,6 +25,9 @@ class PointCloudRenderer {
     @Volatile var accumulatedPointCount = 0
         private set
     private var vboId = 0
+
+    /** Set from any thread; consumed on the GL thread at the start of [draw]. */
+    @Volatile var pendingLoadPath: String? = null
 
     // Local buffer to store accumulated points (x, y, z, confidence)
     private val localBuffer = FloatArray(maxPoints * 4)
@@ -109,6 +116,13 @@ class PointCloudRenderer {
     }
 
     fun draw(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
+        // Consume any pending load scheduled from outside the GL thread.
+        val loadPath = pendingLoadPath
+        if (loadPath != null) {
+            pendingLoadPath = null
+            loadFromFile(loadPath)
+        }
+
         if (accumulatedPointCount == 0) return
 
         GLES20.glUseProgram(program)
@@ -137,5 +151,67 @@ class PointCloudRenderer {
     fun clear() {
         accumulatedPointCount = 0
         pointIdMap.clear()
+    }
+
+    /**
+     * Persist accumulated cloud points to disk.
+     * Binary format: magic "GXPC" (4 bytes) + version 1 (int) + count (int) + count×4 floats (x,y,z,conf)
+     * Thread-safe: reads [localBuffer] and [accumulatedPointCount] without holding the GL context.
+     */
+    fun saveToFile(path: String) {
+        val count = accumulatedPointCount
+        if (count == 0) return
+        try {
+            FileOutputStream(File(path)).use { out ->
+                val buf = ByteBuffer.allocate(8 + 4 + 4 + count * 4 * 4)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                // magic
+                buf.put('G'.code.toByte()); buf.put('X'.code.toByte())
+                buf.put('P'.code.toByte()); buf.put('C'.code.toByte())
+                buf.putInt(1) // version
+                buf.putInt(count)
+                for (i in 0 until count * 4) buf.putFloat(localBuffer[i])
+                out.write(buf.array())
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "PointCloudRenderer: saveToFile failed ($path)")
+        }
+    }
+
+    /**
+     * Load previously saved cloud points from disk.
+     * Must be called from the GL thread (uploads to GPU via [GLES20.glBufferSubData]).
+     */
+    fun loadFromFile(path: String) {
+        try {
+            val file = File(path)
+            if (!file.exists()) return
+            FileInputStream(file).use { inp ->
+                val bytes = inp.readBytes()
+                val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+                if (buf.remaining() < 12) return
+                // Validate magic
+                val magic = String(byteArrayOf(buf.get(), buf.get(), buf.get(), buf.get()))
+                if (magic != "GXPC") { Timber.w("PointCloudRenderer: bad magic '$magic'"); return }
+                @Suppress("UNUSED_VARIABLE") val version = buf.getInt()
+                val count = buf.getInt().coerceAtMost(maxPoints)
+                val needed = count * 4 * 4
+                if (buf.remaining() < needed) return
+                for (i in 0 until count * 4) localBuffer[i] = buf.getFloat()
+                accumulatedPointCount = count
+                pointIdMap.clear() // IDs lost; just re-use the point data for display
+
+                // Upload to GPU
+                GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
+                val gpuBuf = ByteBuffer.allocateDirect(count * 4 * 4).order(ByteOrder.nativeOrder())
+                val fBuf = gpuBuf.asFloatBuffer()
+                fBuf.put(localBuffer, 0, count * 4)
+                fBuf.position(0)
+                GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER, 0, count * 4 * 4, gpuBuf)
+                GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "PointCloudRenderer: loadFromFile failed ($path)")
+        }
     }
 }

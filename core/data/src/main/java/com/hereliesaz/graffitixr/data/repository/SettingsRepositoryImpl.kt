@@ -20,6 +20,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private val IS_RIGHT_HANDED = booleanPreferencesKey("is_right_handed")
     private val AR_SCAN_MODE = stringPreferencesKey("ar_scan_mode")
+    private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
 
     override val isRightHanded: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
@@ -43,6 +44,15 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setArScanMode(mode: ArScanMode) {
         context.dataStore.edit { preferences ->
             preferences[AR_SCAN_MODE] = mode.name
+        }
+    }
+
+    override val showAnchorBoundary: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[SHOW_ANCHOR_BOUNDARY] ?: false }
+
+    override suspend fun setShowAnchorBoundary(show: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SHOW_ANCHOR_BOUNDARY] = show
         }
     }
 }

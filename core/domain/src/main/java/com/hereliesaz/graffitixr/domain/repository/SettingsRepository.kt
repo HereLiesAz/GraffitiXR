@@ -24,4 +24,9 @@ interface SettingsRepository {
     val arScanMode: Flow<ArScanMode>
 
     suspend fun setArScanMode(mode: ArScanMode)
+
+    /** Whether to draw an orange boundary rectangle around the AR overlay quad when anchor is active. */
+    val showAnchorBoundary: Flow<Boolean>
+
+    suspend fun setShowAnchorBoundary(show: Boolean)
 }

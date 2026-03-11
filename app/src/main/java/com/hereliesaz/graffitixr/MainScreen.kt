@@ -47,6 +47,7 @@ fun MainScreen(
     arUiState: ArUiState,
     isTouchLocked: Boolean,
     isCameraActive: Boolean,
+    isWaitingForTap: Boolean,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     slamManager: SlamManager,
@@ -132,8 +133,8 @@ fun MainScreen(
                                         )
                                     }
                                 },
-                                onTrackingUpdated = { isTracking, splatCount ->
-                                    arViewModel.setTrackingState(isTracking, splatCount)
+                                onTrackingUpdated = { isTracking, splatCount, isDepthSupported ->
+                                    arViewModel.setTrackingState(isTracking, splatCount, isDepthSupported)
                                 },
                                 onLightUpdated = { level ->
                                     arViewModel.updateLightLevel(level)
@@ -159,8 +160,42 @@ fun MainScreen(
                         update = { view ->
                             rendererRef.value?.captureRequested = arUiState.isCaptureRequested
                         },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(isWaitingForTap) {
+                                // Phase 4: In tap-target mode, forward normalized taps to ArViewModel
+                                // so the app can capture a frame and run ORB detection on the mark.
+                                if (isWaitingForTap) {
+                                    detectTapGestures { offset ->
+                                        val nx = offset.x / size.width
+                                        val ny = offset.y / size.height
+                                        arViewModel.onScreenTap(nx, ny)
+                                    }
+                                }
+                            }
                     )
+
+                    // Phase 4: Green-highlighted annotated bitmap overlay.
+                    // Shown over the camera feed while in tap mode so the artist can see
+                    // which features on their painted mark the app has recognized.
+                    val annotated = arUiState.annotatedCaptureBitmap
+                    if (isWaitingForTap && annotated != null) {
+                        Image(
+                            bitmap = annotated.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    // Green tint to signal "recognized" — overlaid semi-transparently
+                                    alpha = 0.65f
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
+                                        Color(0x8800CC44),
+                                        androidx.compose.ui.graphics.BlendMode.SrcAtop
+                                    )
+                                },
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                 }
 
                 EditorMode.OVERLAY -> {

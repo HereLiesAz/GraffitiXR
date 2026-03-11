@@ -61,7 +61,17 @@ data class ArUiState(
     val targetPhysicalExtent: Pair<Float, Float>? = null,
 
     // Which 3-D mapping mode is active. Defaults to CLOUD_POINTS (more reliable).
-    val arScanMode: ArScanMode = ArScanMode.CLOUD_POINTS
+    val arScanMode: ArScanMode = ArScanMode.CLOUD_POINTS,
+
+    // Phase 3 — True once the renderer has confirmed ARCore Depth API is available on this device.
+    val isDepthApiSupported: Boolean = false,
+
+    // Phase 4 — Tap-to-target: list of normalized screen coords (0..1) where the user has tapped
+    // their painted reference marks. Displayed as cyan circles on the live camera view.
+    val tapHighlightKeypoints: List<Pair<Float, Float>> = emptyList(),
+
+    // Phase 5 — When true, OverlayRenderer draws an orange line-loop around the anchor quad boundary.
+    val showAnchorBoundary: Boolean = false
 )
 
 enum class Tool {

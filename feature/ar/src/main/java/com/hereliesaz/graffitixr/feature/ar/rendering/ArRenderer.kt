@@ -31,7 +31,8 @@ class ArRenderer(
     private val slamManager: SlamManager,
     // (bitmap, depthBuf, depthBufW, depthBufH, depthBufStride, intrinsics, viewMatrix)
     private val onTargetCaptured: (Bitmap?, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int) -> Unit,
+    // (isTracking, pointCount, isDepthApiSupported)
+    private val onTrackingUpdated: (Boolean, Int, Boolean) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
 ) : GLSurfaceView.Renderer {
@@ -49,6 +50,25 @@ class ArRenderer(
 
     /** Updated from ArViewModel whenever the user changes the setting. */
     @Volatile var scanMode: ArScanMode = ArScanMode.CLOUD_POINTS
+
+    /** Phase 5: When true, the orange anchor boundary rectangle is drawn each frame. */
+    @Volatile var showAnchorBoundary: Boolean = false
+
+    /**
+     * Phase 2: Save accumulated cloud points to disk (any thread).
+     * No-op in GAUSSIAN_SPLATS mode — that pipeline uses slamManager.saveModel().
+     */
+    fun saveCloudPoints(path: String) {
+        pointCloudRenderer.saveToFile(path)
+    }
+
+    /**
+     * Phase 2: Schedule a cloud-points load on the GL thread (sets a flag that draw() picks up).
+     * The actual GL buffer upload happens in the next [onDrawFrame] call via [PointCloudRenderer.pendingLoadPath].
+     */
+    fun scheduleCloudPointsLoad(path: String) {
+        pointCloudRenderer.pendingLoadPath = path
+    }
 
     // Pending overlay bitmap — set from any thread, consumed on GL thread in onDrawFrame.
     @Volatile private var pendingOverlayBitmap: Bitmap? = null
@@ -167,6 +187,13 @@ class ArRenderer(
             }
 
             backgroundRenderer.draw(frame)
+
+            // Phase 1 — GL depth state fix: BackgroundRenderer draws to depth=1.0 and may leave
+            // depth writes disabled. Reset state so subsequent world-space geometry renders correctly.
+            GLES30.glDepthMask(true)
+            GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+            GLES30.glDepthFunc(GLES30.GL_LEQUAL)
+
             val camera = frame.camera
 
             val viewMatrix = FloatArray(16)
@@ -183,6 +210,9 @@ class ArRenderer(
 
             val isTracking = camera.trackingState == TrackingState.TRACKING
 
+            // Phase 3: Compute depth support early so it can be passed to onTrackingUpdated.
+            val depthSupported = activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+
             // FIX: Call setArCoreTrackingState synchronously here on the GL thread,
             // BEFORE feeding depth data. The old code sent this via a coroutine channel,
             // meaning processDepthFrame would check mIsArCoreTracking while it was still
@@ -191,7 +221,7 @@ class ArRenderer(
             // any depth for this frame reaches the map thread queue.
             slamManager.setArCoreTrackingState(isTracking)
 
-            // Report tracking + point count to the ViewModel on a background thread.
+            // Report tracking + point count + depth support to the ViewModel on a background thread.
             // In CLOUD_POINTS mode report the accumulated ARCore feature-point count;
             // in GAUSSIAN_SPLATS mode report the native splat count.
             val currentScanMode = scanMode
@@ -201,7 +231,7 @@ class ArRenderer(
                 } else {
                     slamManager.getSplatCount()
                 }
-                onTrackingUpdated(isTracking, count)
+                onTrackingUpdated(isTracking, count, depthSupported)
             }
 
             // Safely consume the flag and acquire the image
@@ -248,8 +278,6 @@ class ArRenderer(
                     Timber.e(e, "Failed to capture target frame")
                 }
             }
-
-            val depthSupported = activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
 
             if (frameCount++ % 2 == 0) {
                 var colorFed = false
@@ -361,6 +389,11 @@ class ArRenderer(
             // Draw artwork quad locked to the AR anchor.
             val anchorMatrix = slamManager.getAnchorTransform()
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
+
+            // Phase 5: Draw orange boundary rectangle when the setting is on.
+            if (showAnchorBoundary) {
+                overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
+            }
         }
     }
 

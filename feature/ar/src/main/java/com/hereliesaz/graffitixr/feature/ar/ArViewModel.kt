@@ -66,6 +66,9 @@ class ArViewModel @Inject constructor(
     private var lastSavedSplatCount = 0
     private var autoSaveJob: kotlinx.coroutines.Job? = null
 
+    // Phase 4: tap position stored here; consumed when the next onTargetCaptured fires.
+    @Volatile private var pendingTapPosition: Pair<Float, Float>? = null
+
     init {
         // isAnchorEstablished tracks whether the current project has a saved fingerprint.
         viewModelScope.launch {
@@ -78,6 +81,13 @@ class ArViewModel @Inject constructor(
             settingsRepository.arScanMode.collect { mode ->
                 _uiState.update { it.copy(arScanMode = mode) }
                 renderer?.scanMode = mode
+            }
+        }
+        // Phase 5: propagate showAnchorBoundary to renderer.
+        viewModelScope.launch {
+            settingsRepository.showAnchorBoundary.collect { show ->
+                _uiState.update { it.copy(showAnchorBoundary = show) }
+                renderer?.showAnchorBoundary = show
             }
         }
     }
@@ -183,6 +193,7 @@ class ArViewModel @Inject constructor(
             slamManager.setRelocEnabled(true)
             renderer?.attachSession(s)
             loadMapIfExists()
+            loadCloudPointsIfExists()
             loadFingerprintIfExists()
             startAutoSave()
         } catch (e: CameraNotAvailableException) {
@@ -205,7 +216,8 @@ class ArViewModel @Inject constructor(
             e.printStackTrace()
         }
         stopAutoSave()
-        saveMapNow()  // persist on every background/screen-off
+        saveMapNow()           // persist SLAM splats on every background/screen-off
+        saveCloudPointsNow()   // Phase 2: persist ARCore feature points
     }
 
     private suspend fun performFullCleanupLocked() {
@@ -261,6 +273,32 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // ── Cloud points persistence (Phase 2) ───────────────────────────────────
+
+    private fun cloudPointsPath(projectId: String): String {
+        val root = java.io.File(appContext.filesDir, "projects/$projectId")
+        if (!root.exists()) root.mkdirs()
+        return java.io.File(root, "cloud_points.bin").absolutePath
+    }
+
+    private fun saveCloudPointsNow() {
+        val project = projectRepository.currentProject.value ?: return
+        val r = renderer ?: return
+        if (_uiState.value.arScanMode != com.hereliesaz.graffitixr.common.model.ArScanMode.CLOUD_POINTS) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try { r.saveCloudPoints(cloudPointsPath(project.id)) } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
+
+    private fun loadCloudPointsIfExists() {
+        val project = projectRepository.currentProject.value ?: return
+        if (_uiState.value.arScanMode != com.hereliesaz.graffitixr.common.model.ArScanMode.CLOUD_POINTS) return
+        val path = cloudPointsPath(project.id)
+        if (java.io.File(path).exists()) {
+            renderer?.scheduleCloudPointsLoad(path)
+        }
+    }
+
     /** Load map.bin into native if the in-memory map is empty and a save exists. */
     private fun loadMapIfExists() {
         val project = projectRepository.currentProject.value ?: return
@@ -313,17 +351,19 @@ class ArViewModel @Inject constructor(
         this.renderer = arRenderer
         if (arRenderer != null) {
             arRenderer.scanMode = _uiState.value.arScanMode
+            arRenderer.showAnchorBoundary = _uiState.value.showAnchorBoundary
             if (session != null && isSessionResumed) {
                 arRenderer.attachSession(session)
             }
         }
     }
 
-    fun setTrackingState(isTracking: Boolean, splatCount: Int) {
+    fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean) {
         _uiState.update {
             it.copy(
                 isScanning = isTracking,
                 splatCount = splatCount,
+                isDepthApiSupported = isDepthApiSupported,
                 scanHint = computeScanHint(
                     isTracking = isTracking,
                     splatCount = splatCount,
@@ -341,6 +381,38 @@ class ArViewModel @Inject constructor(
         intrinsics: FloatArray?,
         viewMatrix: FloatArray
     ) {
+        val tapPos = pendingTapPosition
+        if (tapPos != null) {
+            // Phase 4 — Tap capture: accumulate the tap point and run ORB detection so the user
+            // sees green-highlighted features proving the app recognizes the painted mark.
+            pendingTapPosition = null
+            _uiState.update {
+                it.copy(
+                    tempCaptureBitmap = bitmap,
+                    annotatedCaptureBitmap = null,
+                    tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
+                    // Store depth/intrinsics for the eventual fingerprint generation.
+                    targetDepthBuffer = depthBuffer,
+                    targetDepthWidth = colorW,
+                    targetDepthHeight = colorH,
+                    targetDepthBufferWidth = depthBufW,
+                    targetDepthBufferHeight = depthBufH,
+                    targetDepthStride = depthBufStride,
+                    targetIntrinsics = intrinsics,
+                    targetCaptureViewMatrix = viewMatrix,
+                    targetPhysicalExtent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics)
+                )
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                // Annotated bitmap has ORB feature circles drawn on it; displayed green-tinted
+                // in the AR viewport so the user sees that the painted marks were recognized.
+                val annotated = slamManager.annotateKeypoints(bitmap)
+                _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
+            }
+            return
+        }
+
+        // Normal (non-tap) capture flow.
         val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics)
         extent?.let { (halfW, halfH) -> renderer?.updateOverlayExtent(halfW, halfH) }
 
@@ -363,6 +435,35 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val annotated = slamManager.annotateKeypoints(bitmap)
             _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
+        }
+    }
+
+    /**
+     * Phase 4: Called when the user taps a painted reference mark in the live camera view.
+     * Triggers an immediate frame capture; when it arrives via [onTargetCaptured], the position
+     * is added to [ArUiState.tapHighlightKeypoints] and ORB detection runs to show green highlights.
+     */
+    fun onScreenTap(nx: Float, ny: Float) {
+        pendingTapPosition = Pair(nx, ny)
+        renderer?.captureRequested = true
+    }
+
+    /** Phase 4: Clear all accumulated tap highlight positions (called by "Retake" / "Clear"). */
+    fun clearTapHighlights() {
+        pendingTapPosition = null
+        _uiState.update {
+            it.copy(
+                tapHighlightKeypoints = emptyList(),
+                annotatedCaptureBitmap = null,
+                tempCaptureBitmap = null
+            )
+        }
+    }
+
+    /** Phase 5: Toggle the anchor boundary overlay. */
+    fun setShowAnchorBoundary(show: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setShowAnchorBoundary(show)
         }
     }
 

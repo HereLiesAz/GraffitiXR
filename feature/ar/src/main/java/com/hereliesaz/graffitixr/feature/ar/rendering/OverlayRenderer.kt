@@ -27,6 +27,12 @@ class OverlayRenderer(private val context: Context) {
     private var mvpMatrixHandle = 0
     private var textureHandle = 0
 
+    // Border (line-loop) program — separate from the textured-quad program
+    private var borderProgram = 0
+    private var borderPositionHandle = 0
+    private var borderMvpMatrixHandle = 0
+    private var borderVboId = 0
+
     private val textureIds = IntArray(1)
     private var hasTexture = false
 
@@ -62,11 +68,26 @@ class OverlayRenderer(private val context: Context) {
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
 
-        // Allocate VBO
+        // Allocate textured-quad VBO
         val buf = IntArray(1)
         GLES30.glGenBuffers(1, buf, 0)
         vboId = buf[0]
         buildQuad()
+
+        // Set up border line-loop program
+        val borderVs = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_VERTEX_SHADER, BORDER_VERTEX_SHADER)
+        val borderFs = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_FRAGMENT_SHADER, BORDER_FRAGMENT_SHADER)
+        borderProgram = GLES30.glCreateProgram().also {
+            GLES30.glAttachShader(it, borderVs)
+            GLES30.glAttachShader(it, borderFs)
+            GLES30.glLinkProgram(it)
+        }
+        borderPositionHandle = GLES30.glGetAttribLocation(borderProgram, "a_Position")
+        borderMvpMatrixHandle = GLES30.glGetUniformLocation(borderProgram, "u_MvpMatrix")
+        val borderBuf = IntArray(1)
+        GLES30.glGenBuffers(1, borderBuf, 0)
+        borderVboId = borderBuf[0]
+        buildBorderQuad()
     }
 
     /** Upload a new overlay composite bitmap. Must be called from the GL thread. */
@@ -88,6 +109,36 @@ class OverlayRenderer(private val context: Context) {
     }
 
     /**
+     * Draw an orange line-loop border around the anchor quad boundary.
+     * Renders even when no texture is loaded, so the artist can see the anchor
+     * placement before the artwork overlay is ready.
+     * Must be called from the GL thread.
+     */
+    fun drawAnchorBorder(viewMatrix: FloatArray, projMatrix: FloatArray, anchorMatrix: FloatArray) {
+        if (borderProgram == 0 || borderVboId == 0) return
+        // Note: quadDirty is already cleared by draw() which runs first each frame.
+
+        Matrix.multiplyMM(mvpMatrix, 0, viewMatrix, 0, anchorMatrix, 0)
+        Matrix.multiplyMM(mvpMatrix, 0, projMatrix, 0, mvpMatrix, 0)
+
+        GLES30.glUseProgram(borderProgram)
+        GLES30.glUniformMatrix4fv(borderMvpMatrixHandle, 1, false, mvpMatrix, 0)
+
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, borderVboId)
+        GLES30.glEnableVertexAttribArray(borderPositionHandle)
+        GLES30.glVertexAttribPointer(borderPositionHandle, 3, GLES30.GL_FLOAT, false, 12, 0)
+
+        GLES30.glEnable(GLES30.GL_BLEND)
+        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+        GLES30.glLineWidth(4.0f)
+        GLES30.glDrawArrays(GLES30.GL_LINE_LOOP, 0, 4)
+        GLES30.glDisable(GLES30.GL_BLEND)
+
+        GLES30.glDisableVertexAttribArray(borderPositionHandle)
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
+    }
+
+    /**
      * Draw the overlay quad.  Must be called from the GL thread.
      * No-op until [updateTexture] has been called at least once.
      */
@@ -96,6 +147,7 @@ class OverlayRenderer(private val context: Context) {
 
         if (quadDirty) {
             buildQuad()
+            buildBorderQuad()  // keep border in sync whenever extent changes
             quadDirty = false
         }
 
@@ -150,8 +202,48 @@ class OverlayRenderer(private val context: Context) {
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
     }
 
+    // Must be called from the GL thread.
+    // Border VBO: 4 vertices in CCW order for GL_LINE_LOOP (BL, BR, TR, TL).
+    // Each vertex: x, y, z (3 floats, stride = 12).
+    private fun buildBorderQuad() {
+        val w = halfW
+        val h = halfH
+        val data = floatArrayOf(
+            -w, -h, 0f,   // BL
+             w, -h, 0f,   // BR
+             w,  h, 0f,   // TR
+            -w,  h, 0f,   // TL
+        )
+        val buf = ByteBuffer.allocateDirect(data.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+            .also { it.put(data); it.position(0) }
+
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, borderVboId)
+        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, data.size * 4, buf, GLES30.GL_DYNAMIC_DRAW)
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
+    }
+
     companion object {
         private const val TAG = "OverlayRenderer"
+
+        // Colored-line shader for the anchor boundary rectangle.
+        private const val BORDER_VERTEX_SHADER = """#version 300 es
+            uniform mat4 u_MvpMatrix;
+            in vec3 a_Position;
+            void main() {
+                gl_Position = u_MvpMatrix * vec4(a_Position, 1.0);
+            }
+        """
+
+        private const val BORDER_FRAGMENT_SHADER = """#version 300 es
+            precision mediump float;
+            out vec4 FragColor;
+            void main() {
+                // Orange with 85% alpha — "chalk line" feel
+                FragColor = vec4(1.0, 0.55, 0.0, 0.85);
+            }
+        """
 
         private const val VERTEX_SHADER = """#version 300 es
             uniform mat4 u_MvpMatrix;
