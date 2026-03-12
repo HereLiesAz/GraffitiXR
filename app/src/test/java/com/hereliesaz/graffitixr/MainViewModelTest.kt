@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr
 
+import android.content.Context
 import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.mockk
@@ -22,11 +24,13 @@ class MainViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
+    private val projectManager: ProjectManager = mockk(relaxed = true)
+    private val context: Context = mockk(relaxed = true)
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = MainViewModel(projectRepository, slamManager)
+        viewModel = MainViewModel(projectRepository, slamManager, projectManager, context)
     }
 
     @After

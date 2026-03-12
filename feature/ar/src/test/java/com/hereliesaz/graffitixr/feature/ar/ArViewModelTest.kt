@@ -3,14 +3,19 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
+import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Session
+import kotlinx.coroutines.cancel
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
+import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,6 +47,11 @@ class ArViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        val fakeBitmap = mockk<Bitmap>(relaxed = true)
+        every { fakeBitmap.width } returns 100
+        every { fakeBitmap.height } returns 100
+        mockkStatic("com.hereliesaz.graffitixr.common.util.ImageExtKt")
+        every { any<Bitmap>().isolateMarkings() } returns fakeBitmap
         every { settingsRepository.arScanMode } returns flowOf(ArScanMode.CLOUD_POINTS)
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
@@ -52,7 +62,9 @@ class ArViewModelTest {
 
     @After
     fun tearDown() {
+        viewModel.viewModelScope.cancel()
         Dispatchers.resetMain()
+        unmockkStatic("com.hereliesaz.graffitixr.common.util.ImageExtKt")
     }
 
     @Test
@@ -175,13 +187,15 @@ class ArViewModelTest {
         assertTrue(viewModel.uiState.value.isCaptureRequested)
 
         // Simulate frame arrival for a tap (non-null depth buffer to trigger logic)
+        val bmp = mockk<Bitmap>(relaxed = true).also { every { it.width } returns 100; every { it.height } returns 100 }
         viewModel.onTargetCaptured(
-            bitmap = mockk(relaxed = true),
+            bitmap = bmp,
             depthBuffer = java.nio.ByteBuffer.allocate(10),
             colorW = 100, colorH = 100,
             depthBufW = 100, depthBufH = 100, depthBufStride = 200,
             intrinsics = null,
-            viewMatrix = FloatArray(16)
+            viewMatrix = FloatArray(16),
+            displayRotation = 0
         )
 
         assertFalse(viewModel.uiState.value.isCaptureRequested)

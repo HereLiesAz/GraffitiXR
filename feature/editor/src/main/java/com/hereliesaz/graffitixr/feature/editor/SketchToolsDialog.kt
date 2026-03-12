@@ -19,6 +19,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 
+private val COLOR_GRID = listOf(
+    // Whites / grays / blacks
+    Color.White, Color(0xFFE0E0E0), Color(0xFFBDBDBD), Color(0xFF9E9E9E),
+    Color(0xFF757575), Color(0xFF424242), Color(0xFF212121), Color.Black,
+    // Reds / pinks
+    Color(0xFFFFCDD2), Color(0xFFEF9A9A), Color(0xFFE57373), Color(0xFFEF5350),
+    Color(0xFFF44336), Color(0xFFE53935), Color(0xFFB71C1C), Color(0xFF880E4F),
+    // Oranges / yellows
+    Color(0xFFFFE0B2), Color(0xFFFFCC80), Color(0xFFFFA726), Color(0xFFFF9800),
+    Color(0xFFFFF176), Color(0xFFFFEE58), Color(0xFFFFD600), Color(0xFFF57F17),
+    // Greens
+    Color(0xFFC8E6C9), Color(0xFF81C784), Color(0xFF4CAF50), Color(0xFF2E7D32),
+    Color(0xFFB2DFDB), Color(0xFF4DB6AC), Color(0xFF00897B), Color(0xFF004D40),
+    // Blues / purples
+    Color(0xFFBBDEFB), Color(0xFF64B5F6), Color(0xFF1565C0), Color(0xFF0D47A1),
+    Color(0xFFE1BEE7), Color(0xFFCE93D8), Color(0xFF8E24AA), Color(0xFF4A148C),
+    // Browns / skin tones
+    Color(0xFFD7CCC8), Color(0xFFA1887F), Color(0xFF6D4C41), Color(0xFF3E2723),
+    Color(0xFFFFDDB4), Color(0xFFFFBD8A), Color(0xFFE8965C), Color(0xFFC26B3E),
+)
+
 @Composable
 fun ColorPickerDialog(
     currentColor: Color,
@@ -26,47 +47,74 @@ fun ColorPickerDialog(
     onSelectColor: (Color) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var r by remember { mutableFloatStateOf(currentColor.red) }
-    var g by remember { mutableFloatStateOf(currentColor.green) }
-    var b by remember { mutableFloatStateOf(currentColor.blue) }
+    var selected by remember { mutableStateOf(currentColor) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
-            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Select Color", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(16.dp))
+            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
 
-                Box(Modifier.size(60.dp).background(Color(r, g, b), CircleShape).border(2.dp, Color.White, CircleShape))
+                // Current color preview
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .background(selected, CircleShape)
+                        .border(2.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                )
 
-                Spacer(Modifier.height(16.dp))
-                Slider(value = r, onValueChange = { r = it }, colors = SliderDefaults.colors(activeTrackColor = Color.Red))
-                Slider(value = g, onValueChange = { g = it }, colors = SliderDefaults.colors(activeTrackColor = Color.Green))
-                Slider(value = b, onValueChange = { b = it }, colors = SliderDefaults.colors(activeTrackColor = Color.Blue))
+                Spacer(Modifier.height(12.dp))
 
+                // Main color grid
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(8),
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                    contentPadding = PaddingValues(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(COLOR_GRID) { color ->
+                        val isSelected = color == selected
+                        Box(
+                            modifier = Modifier
+                                .aspectRatio(1f)
+                                .clip(CircleShape)
+                                .background(color, CircleShape)
+                                .border(
+                                    if (isSelected) 2.dp else 0.5.dp,
+                                    if (isSelected) Color.White else Color.Gray.copy(alpha = 0.4f),
+                                    CircleShape
+                                )
+                                .clickable { selected = color }
+                        )
+                    }
+                }
+
+                // Recent colors row (if any)
                 if (history.isNotEmpty()) {
-                    Text("Recent", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
-                    LazyVerticalGrid(columns = GridCells.Fixed(6), modifier = Modifier.fillMaxWidth().height(80.dp)) {
-                        items(history) { color ->
+                    Spacer(Modifier.height(8.dp))
+                    Text("Recent", style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.align(Alignment.Start))
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        history.take(8).forEach { color ->
                             Box(
                                 modifier = Modifier
-                                    .padding(4.dp)
-                                    .size(30.dp)
+                                    .size(28.dp)
+                                    .clip(CircleShape)
                                     .background(color, CircleShape)
-                                    .border(1.dp, Color.Gray, CircleShape)
-                                    .clickable {
-                                        r = color.red; g = color.green; b = color.blue
-                                    }
+                                    .border(0.5.dp, Color.Gray.copy(alpha = 0.4f), CircleShape)
+                                    .clickable { selected = color }
                             )
                         }
                     }
                 }
 
+                Spacer(Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(onClick = { onSelectColor(Color(r, g, b)); onDismiss() }) { Text("Apply") }
+                    Button(onClick = { onSelectColor(selected); onDismiss() }) { Text("Apply") }
                 }
             }
         }

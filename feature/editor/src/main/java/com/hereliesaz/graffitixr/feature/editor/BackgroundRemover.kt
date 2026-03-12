@@ -20,43 +20,49 @@ class BackgroundRemover @Inject constructor() {
 
     suspend fun removeBackground(bitmap: Bitmap): Result<Bitmap> = withContext(Dispatchers.Default) {
         try {
-            val imgMat = Mat()
-            Utils.bitmapToMat(bitmap, imgMat)
+            // Convert Android ARGB bitmap → RGBA Mat → BGR Mat (GrabCut requires 3-channel BGR)
+            val rgbaMat = Mat()
+            Utils.bitmapToMat(bitmap, rgbaMat)
+
+            val bgrMat = Mat()
+            Imgproc.cvtColor(rgbaMat, bgrMat, Imgproc.COLOR_RGBA2BGR)
 
             val bgdModel = Mat()
             val fgdModel = Mat()
-            val mask = Mat(imgMat.size(), CvType.CV_8UC1, Scalar(Imgproc.GC_BGD.toDouble()))
+            val mask = Mat(bgrMat.size(), CvType.CV_8UC1, Scalar(Imgproc.GC_BGD.toDouble()))
 
-            val marginX = (imgMat.cols() * 0.1).toInt()
-            val marginY = (imgMat.rows() * 0.1).toInt()
-            val rect = Rect(marginX, marginY, imgMat.cols() - marginX * 2, imgMat.rows() - marginY * 2)
+            val marginX = (bgrMat.cols() * 0.1).toInt()
+            val marginY = (bgrMat.rows() * 0.1).toInt()
+            val rect = Rect(marginX, marginY, bgrMat.cols() - marginX * 2, bgrMat.rows() - marginY * 2)
 
-            Imgproc.grabCut(imgMat, mask, rect, bgdModel, fgdModel, 5, Imgproc.GC_INIT_WITH_RECT)
+            Imgproc.grabCut(bgrMat, mask, rect, bgdModel, fgdModel, 5, Imgproc.GC_INIT_WITH_RECT)
 
-            val source = Mat(1, 1, CvType.CV_8U, Scalar(Imgproc.GC_PR_FGD.toDouble()))
-            val bgSource = Mat(1, 1, CvType.CV_8U, Scalar(Imgproc.GC_FGD.toDouble()))
+            val prFgd = Mat(1, 1, CvType.CV_8U, Scalar(Imgproc.GC_PR_FGD.toDouble()))
+            val fgd   = Mat(1, 1, CvType.CV_8U, Scalar(Imgproc.GC_FGD.toDouble()))
 
             val finalMask = Mat()
-            org.opencv.core.Core.compare(mask, source, finalMask, org.opencv.core.Core.CMP_EQ)
-
+            org.opencv.core.Core.compare(mask, prFgd, finalMask, org.opencv.core.Core.CMP_EQ)
             val fgMask2 = Mat()
-            org.opencv.core.Core.compare(mask, bgSource, fgMask2, org.opencv.core.Core.CMP_EQ)
+            org.opencv.core.Core.compare(mask, fgd, fgMask2, org.opencv.core.Core.CMP_EQ)
             org.opencv.core.Core.bitwise_or(finalMask, fgMask2, finalMask)
 
-            val outputMat = Mat(imgMat.size(), CvType.CV_8UC4, Scalar(0.0, 0.0, 0.0, 0.0))
-            imgMat.copyTo(outputMat, finalMask)
+            // Apply mask to the original RGBA image to preserve transparency
+            val outputMat = Mat(rgbaMat.size(), CvType.CV_8UC4, Scalar(0.0, 0.0, 0.0, 0.0))
+            rgbaMat.copyTo(outputMat, finalMask)
 
             val outputBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
             Utils.matToBitmap(outputMat, outputBitmap)
 
-            imgMat.release()
+            rgbaMat.release()
+            bgrMat.release()
             bgdModel.release()
             fgdModel.release()
             mask.release()
             finalMask.release()
             fgMask2.release()
-            source.release()
-            bgSource.release()
+            prFgd.release()
+            fgd.release()
+            outputMat.release()
 
             Result.success(outputBitmap)
         } catch (e: Exception) {

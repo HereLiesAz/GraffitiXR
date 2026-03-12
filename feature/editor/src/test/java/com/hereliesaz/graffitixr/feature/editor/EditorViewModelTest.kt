@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -52,11 +53,16 @@ class EditorViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        // Emit a test project so projectId is non-null, enabling onAddLayer to work
+        val testProject = com.hereliesaz.graffitixr.common.model.GraffitiProject(id = "test-project")
+        currentProjectFlow.value = testProject
         every { projectRepository.currentProject } returns currentProjectFlow
         
-        // Mock static methods for Bitmap and Uri
+        // Mock static methods for Bitmap, Uri, and Toast
         mockkStatic(BitmapFactory::class)
         mockkStatic(Uri::class)
+        mockkStatic(Toast::class)
+        every { Toast.makeText(any(), any<String>(), any()) } returns mockk(relaxed = true)
         mockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
 
         val mockBitmap = mockk<Bitmap>(relaxed = true)
@@ -98,6 +104,7 @@ class EditorViewModelTest {
         Dispatchers.resetMain()
         unmockkStatic(BitmapFactory::class)
         unmockkStatic(Uri::class)
+        unmockkStatic(Toast::class)
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
     }
 

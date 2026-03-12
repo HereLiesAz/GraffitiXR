@@ -573,10 +573,9 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        val isArOrOverlay = editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY
-        val hasSufficientSplats = arUiState.splatCount >= 50000
+        val isArMode = editorUiState.editorMode == EditorMode.AR
 
-        if (isArOrOverlay) {
+        if (isArMode) {
             azRailHostItem(id = "target_host", text = navStrings.grid)
 
             azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, shape = AzButtonShape.NONE) {
@@ -589,7 +588,14 @@ class MainActivity : ComponentActivity() {
             azDivider()
         }
 
-        val canEdit = if (isArOrOverlay) arUiState.isScanning && hasSufficientSplats else true
+        // Design tools unlock in AR when either:
+        //   - the scan is complete (30k+ points), OR
+        //   - a target is already established (fingerprint exists) — this also covers the
+        //     PlaneConfirmOverlay moment: user needs art to know if it's on the right surface.
+        // All other modes are always editable immediately.
+        val canEdit = if (isArMode)
+            arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished
+        else true
 
         if (canEdit) {
             azRailHostItem(id = "design_host", text = navStrings.design)
@@ -714,6 +720,20 @@ class MainActivity : ComponentActivity() {
                                 toggleOffText = "Liquify",
                                 onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
                             )
+                            azRailToggle(
+                                id = "dodge_${layer.id}",
+                                isChecked = activeTool == Tool.DODGE,
+                                toggleOnText = "Dodge",
+                                toggleOffText = "Dodge",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
+                            )
+                            azRailToggle(
+                                id = "burn_${layer.id}",
+                                isChecked = activeTool == Tool.BURN,
+                                toggleOnText = "Burn",
+                                toggleOffText = "Burn",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) }
+                            )
                             azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
 
                             addSizeItem()
@@ -745,23 +765,12 @@ class MainActivity : ComponentActivity() {
                                             },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .background(liveState.activeColor, CircleShape)
-                                                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                                            )
-                                            Text(
-                                                text = "Color",
-                                                color = Color.White,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .background(liveState.activeColor, CircleShape)
+                                                .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                        )
                                     }
                                 }
                             )
@@ -790,6 +799,20 @@ class MainActivity : ComponentActivity() {
                                 toggleOnText = "Liquify",
                                 toggleOffText = "Liquify",
                                 onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                            )
+                            azRailToggle(
+                                id = "dodge_${layer.id}",
+                                isChecked = activeTool == Tool.DODGE,
+                                toggleOnText = "Dodge",
+                                toggleOffText = "Dodge",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
+                            )
+                            azRailToggle(
+                                id = "burn_${layer.id}",
+                                isChecked = activeTool == Tool.BURN,
+                                toggleOnText = "Burn",
+                                toggleOffText = "Burn",
+                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) }
                             )
                             azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
 

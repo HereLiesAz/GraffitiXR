@@ -489,29 +489,28 @@ class ArViewModel @Inject constructor(
             } else bitmap
 
             pendingTapPosition = null
-
+            // Clear the capture-request flag synchronously so the renderer doesn't re-capture.
+            _uiState.update {
+                it.copy(
+                    tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
+                    targetRawBitmap = bitmap,
+                    targetDisplayRotation = displayRotation,
+                    targetDepthBuffer = depthBuffer,
+                    targetDepthWidth = colorW,
+                    targetDepthHeight = colorH,
+                    targetDepthBufferWidth = depthBufW,
+                    targetDepthBufferHeight = depthBufH,
+                    targetDepthStride = depthBufStride,
+                    targetIntrinsics = intrinsics,
+                    targetCaptureViewMatrix = viewMatrix,
+                    targetPhysicalExtent = extent,
+                    isCaptureRequested = false
+                )
+            }
+            // Run the expensive pixel-crunching on a background thread.
             viewModelScope.launch(Dispatchers.Default) {
                 val maskedBmp = rotatedBmp.isolateMarkings()
-
-                _uiState.update {
-                    it.copy(
-                        tempCaptureBitmap = maskedBmp,
-                        annotatedCaptureBitmap = null,
-                        tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
-                        targetRawBitmap = bitmap,
-                        targetDisplayRotation = displayRotation,
-                        targetDepthBuffer = depthBuffer,
-                        targetDepthWidth = colorW,
-                        targetDepthHeight = colorH,
-                        targetDepthBufferWidth = depthBufW,
-                        targetDepthBufferHeight = depthBufH,
-                        targetDepthStride = depthBufStride,
-                        targetIntrinsics = intrinsics,
-                        targetCaptureViewMatrix = viewMatrix,
-                        targetPhysicalExtent = extent,
-                        isCaptureRequested = false
-                    )
-                }
+                _uiState.update { it.copy(tempCaptureBitmap = maskedBmp, annotatedCaptureBitmap = null) }
             }
             return
         }
@@ -639,9 +638,13 @@ class ArViewModel @Inject constructor(
 
         var flatViewMat = originalViewMat
 
+        // Default anchor model matrix: inverse of capture view (places anchor at camera pose).
+        // Overwritten with the wall-surface position if a plane is detected.
+        var anchorModelMatrix = FloatArray(16)
+        android.opengl.Matrix.invertM(anchorModelMatrix, 0, originalViewMat, 0)
+
         session?.let { s ->
             try {
-                // Interrogate the mesh for its most prominent vertical plane
                 val planes = s.getAllTrackables(com.google.ar.core.Plane::class.java)
 
                 val cameraPose = FloatArray(16)
@@ -649,7 +652,6 @@ class ArViewModel @Inject constructor(
                 val camX = cameraPose[12]
                 val camY = cameraPose[13]
                 val camZ = cameraPose[14]
-
                 val fwdX = -cameraPose[8]
                 val fwdY = -cameraPose[9]
                 val fwdZ = -cameraPose[10]
@@ -660,82 +662,75 @@ class ArViewModel @Inject constructor(
                 for (plane in planes) {
                     if (plane.trackingState == com.google.ar.core.TrackingState.TRACKING &&
                         plane.type == com.google.ar.core.Plane.Type.VERTICAL) {
-
                         val pose = plane.centerPose
                         val dx = pose.tx() - camX
                         val dy = pose.ty() - camY
                         val dz = pose.tz() - camZ
-
                         val len = Math.sqrt((dx*dx + dy*dy + dz*dz).toDouble()).toFloat()
                         if (len > 0.01f) {
                             val dot = (dx * fwdX + dy * fwdY + dz * fwdZ) / len
-                            if (dot > maxDot) {
-                                maxDot = dot
-                                bestPlane = plane
-                            }
+                            if (dot > maxDot) { maxDot = dot; bestPlane = plane }
                         }
                     }
                 }
 
                 bestPlane?.let { plane ->
-                    // Extract the absolute normal of the plane we're staring at.
                     val planePoseMatrix = FloatArray(16)
                     plane.centerPose.toMatrix(planePoseMatrix, 0)
 
+                    // Wall surface normal (Y axis of ARCore vertical plane pose).
                     val normalX = planePoseMatrix[4]
                     val normalY = planePoseMatrix[5]
                     val normalZ = planePoseMatrix[6]
 
-                    // We forcefully align the camera's Z axis to perfectly oppose the plane's normal,
-                    // guaranteeing the 2D image lays flush against physical reality.
-                    val zx = normalX
-                    val zy = normalY
-                    val zz = normalZ
-
-                    val ux = 0f
-                    val uy = 1f
-                    val uz = 0f
-
-                    var xx = uy * zz - uz * zy
-                    var xy = uz * zx - ux * zz
-                    var xz = ux * zy - uy * zx
-
+                    // Build orthonormal basis: Z = wall normal, X = horizontal, Y = vertical.
+                    val zx = normalX; val zy = normalY; val zz = normalZ
+                    var xx = 1f * zz - 0f * zy   // cross(world_up, Z)
+                    var xy = 0f * zx - 0f * zz
+                    var xz = 0f * zy - 1f * zx
                     val xLen = Math.sqrt((xx*xx + xy*xy + xz*xz).toDouble()).toFloat()
                     if (xLen > 0.0001f) {
-                        xx /= xLen
-                        xy /= xLen
-                        xz /= xLen
-
+                        xx /= xLen; xy /= xLen; xz /= xLen
                         val yx = zy * xz - zz * xy
                         val yy = zz * xx - zx * xz
                         val yz = zx * xy - zy * xx
 
+                        // Refined view matrix for feature matching: camera at camera position,
+                        // orientation snapped to wall normal.
                         val newCamPose = FloatArray(16)
                         android.opengl.Matrix.setIdentityM(newCamPose, 0)
-                        newCamPose[0] = xx
-                        newCamPose[1] = xy
-                        newCamPose[2] = xz
-
-                        newCamPose[4] = yx
-                        newCamPose[5] = yy
-                        newCamPose[6] = yz
-
-                        newCamPose[8] = zx
-                        newCamPose[9] = zy
-                        newCamPose[10] = zz
-
-                        newCamPose[12] = camX
-                        newCamPose[13] = camY
-                        newCamPose[14] = camZ
-
+                        newCamPose[0] = xx; newCamPose[1] = xy; newCamPose[2] = xz
+                        newCamPose[4] = yx; newCamPose[5] = yy; newCamPose[6] = yz
+                        newCamPose[8] = zx; newCamPose[9] = zy; newCamPose[10] = zz
+                        newCamPose[12] = camX; newCamPose[13] = camY; newCamPose[14] = camZ
                         val newViewMat = FloatArray(16)
                         android.opengl.Matrix.invertM(newViewMat, 0, newCamPose, 0)
                         flatViewMat = newViewMat
+
+                        // Anchor model matrix (object-to-world): same orientation but positioned
+                        // ON the wall surface, not at the camera. This is what the overlay renders at.
+                        val wallX = planePoseMatrix[12]
+                        val wallY = planePoseMatrix[13]
+                        val wallZ = planePoseMatrix[14]
+                        anchorModelMatrix = FloatArray(16)
+                        android.opengl.Matrix.setIdentityM(anchorModelMatrix, 0)
+                        anchorModelMatrix[0] = xx; anchorModelMatrix[1] = xy; anchorModelMatrix[2] = xz
+                        anchorModelMatrix[4] = yx; anchorModelMatrix[5] = yy; anchorModelMatrix[6] = yz
+                        anchorModelMatrix[8] = zx; anchorModelMatrix[9] = zy; anchorModelMatrix[10] = zz
+                        anchorModelMatrix[12] = wallX; anchorModelMatrix[13] = wallY; anchorModelMatrix[14] = wallZ
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+
+        // Push the anchor into the native engine so the overlay actually renders at the wall.
+        slamManager.updateAnchorTransform(anchorModelMatrix)
+
+        // Always sync the overlay extent to the renderer here, covering both tap and regular paths.
+        _uiState.value.targetPhysicalExtent?.let { (halfW, halfH) ->
+            renderer?.updateOverlayExtent(halfW, halfH)
         }
 
         _uiState.update {
