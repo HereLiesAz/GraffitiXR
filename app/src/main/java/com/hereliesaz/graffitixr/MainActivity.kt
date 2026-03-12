@@ -74,6 +74,7 @@ import com.hereliesaz.graffitixr.design.components.InfoDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
+import com.hereliesaz.graffitixr.design.theme.HotPink
 import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
@@ -419,7 +420,7 @@ class MainActivity : ComponentActivity() {
                                     ) {
                                         Text(
                                             text = "Drag over marks to remove them.",
-                                            color = Color.White,
+                                            color = HotPink,
                                             modifier = Modifier
                                                 .align(Alignment.TopCenter)
                                                 .padding(top = 100.dp)
@@ -436,12 +437,12 @@ class MainActivity : ComponentActivity() {
                                             OutlinedButton(
                                                 onClick = { arViewModel.undoErase() },
                                                 enabled = arUiState.canUndoErase,
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = HotPink)
                                             ) { Text("Undo") }
                                             OutlinedButton(
                                                 onClick = { arViewModel.redoErase() },
                                                 enabled = arUiState.canRedoErase,
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = HotPink)
                                             ) { Text("Redo") }
                                         }
                                     }
@@ -684,7 +685,7 @@ class MainActivity : ComponentActivity() {
                                         Box(
                                             modifier = Modifier
                                                 .size(displayDp)
-                                                .background(Color.White, CircleShape)
+                                                .background(Color.Cyan, CircleShape)
                                         )
                                     }
                                 }
@@ -692,48 +693,13 @@ class MainActivity : ComponentActivity() {
                         }
 
                         if (layer.isSketch) {
-                            azRailToggle(
-                                id = "brush_${layer.id}",
-                                isChecked = activeTool == Tool.BRUSH,
-                                toggleOnText = "Brush",
-                                toggleOffText = "Brush",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BRUSH) }
-                            )
-                            azRailToggle(
-                                id = "eraser_${layer.id}",
-                                isChecked = activeTool == Tool.ERASER,
-                                toggleOnText = "Eraser",
-                                toggleOffText = "Eraser",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                            )
-                            azRailToggle(
-                                id = "blur_${layer.id}",
-                                isChecked = activeTool == Tool.BLUR,
-                                toggleOnText = "Blur",
-                                toggleOffText = "Blur",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                            )
-                            azRailToggle(
-                                id = "liquify_${layer.id}",
-                                isChecked = activeTool == Tool.LIQUIFY,
-                                toggleOnText = "Liquify",
-                                toggleOffText = "Liquify",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                            )
-                            azRailToggle(
-                                id = "dodge_${layer.id}",
-                                isChecked = activeTool == Tool.DODGE,
-                                toggleOnText = "Dodge",
-                                toggleOffText = "Dodge",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                            )
-                            azRailToggle(
-                                id = "burn_${layer.id}",
-                                isChecked = activeTool == Tool.BURN,
-                                toggleOnText = "Burn",
-                                toggleOffText = "Burn",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-                            )
+                            // (id, isChecked, toggleOnText, toggleOffText, <5th label param>)
+                            azRailToggle("brush_${layer.id}", activeTool == Tool.BRUSH, "Brush", "Brush", "Brush", onClick = { activate(); editorViewModel.setActiveTool(Tool.BRUSH) })
+                            azRailToggle("eraser_${layer.id}", activeTool == Tool.ERASER, "Eraser", "Eraser", "Eraser", onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
+                            azRailToggle("blur_${layer.id}", activeTool == Tool.BLUR, "Blur", "Blur", "Blur", onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
+                            azRailToggle("liquify_${layer.id}", activeTool == Tool.LIQUIFY, "Liquify", "Liquify", "Liquify", onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
+                            azRailToggle("dodge_${layer.id}", activeTool == Tool.DODGE, "Dodge", "Dodge", "Dodge", onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
+                            azRailToggle("burn_${layer.id}", activeTool == Tool.BURN, "Burn", "Burn", "Burn", onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
                             azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
 
                             addSizeItem()
@@ -754,7 +720,7 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .background(
-                                                if (isActive) Color.White.copy(alpha = 0.15f)
+                                                if (isActive) Color.Cyan.copy(alpha = 0.15f)
                                                 else Color.Transparent
                                             )
                                             .pointerInput(Unit) {
@@ -769,7 +735,7 @@ class MainActivity : ComponentActivity() {
                                             modifier = Modifier
                                                 .size(28.dp)
                                                 .background(liveState.activeColor, CircleShape)
-                                                .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                                .border(1.dp, Color.Cyan.copy(alpha = 0.5f), CircleShape)
                                         )
                                     }
                                 }
@@ -779,41 +745,12 @@ class MainActivity : ComponentActivity() {
                             azRailItem(id = "iso_${layer.id}", text = "Isolate", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
                             azRailItem(id = "line_${layer.id}", text = "Outline", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onLineDrawingClicked() })
                             azRailItem(id = "adj_${layer.id}", text = "Adjust", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onAdjustClicked() })
-                            azRailToggle(
-                                id = "eraser_${layer.id}",
-                                isChecked = activeTool == Tool.ERASER,
-                                toggleOnText = "Eraser",
-                                toggleOffText = "Eraser",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                            )
-                            azRailToggle(
-                                id = "blur_${layer.id}",
-                                isChecked = activeTool == Tool.BLUR,
-                                toggleOnText = "Blur",
-                                toggleOffText = "Blur",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                            )
-                            azRailToggle(
-                                id = "liquify_${layer.id}",
-                                isChecked = activeTool == Tool.LIQUIFY,
-                                toggleOnText = "Liquify",
-                                toggleOffText = "Liquify",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                            )
-                            azRailToggle(
-                                id = "dodge_${layer.id}",
-                                isChecked = activeTool == Tool.DODGE,
-                                toggleOnText = "Dodge",
-                                toggleOffText = "Dodge",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                            )
-                            azRailToggle(
-                                id = "burn_${layer.id}",
-                                isChecked = activeTool == Tool.BURN,
-                                toggleOnText = "Burn",
-                                toggleOffText = "Burn",
-                                onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-                            )
+                            // (id, isChecked, toggleOnText, toggleOffText, <5th label param>)
+                            azRailToggle("eraser_${layer.id}", activeTool == Tool.ERASER, "Eraser", "Eraser", "Eraser", onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
+                            azRailToggle("blur_${layer.id}", activeTool == Tool.BLUR, "Blur", "Blur", "Blur", onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
+                            azRailToggle("liquify_${layer.id}", activeTool == Tool.LIQUIFY, "Liquify", "Liquify", "Liquify", onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
+                            azRailToggle("dodge_${layer.id}", activeTool == Tool.DODGE, "Dodge", "Dodge", "Dodge", onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
+                            azRailToggle("burn_${layer.id}", activeTool == Tool.BURN, "Burn", "Burn", "Burn", onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
                             azRailItem(id = "blend_${layer.id}", text = "Blend", shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
 
                             addSizeItem()
@@ -850,7 +787,7 @@ private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
     ) {
         Text(
             text = "This device doesn't support the Depth API.\nSwitch to Cloud Points mode in Settings.",
-            color = Color.White,
+            color = HotPink,
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center
         )

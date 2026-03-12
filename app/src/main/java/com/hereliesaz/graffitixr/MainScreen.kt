@@ -290,9 +290,14 @@ fun MainScreen(
     }
 }
 
+// Fixed canvas size for the AR overlay composite. Large enough that layers can be freely
+// positioned and scaled without hitting canvas edges. Matches the physical quad size so
+// the pixel density is ~1mm/px at a typical arm's-reach capture distance.
+private const val COMPOSITE_CANVAS_SIZE = 2048
+
 private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
-    val w = layers.firstNotNullOfOrNull { it.bitmap?.width } ?: 1024
-    val h = layers.firstNotNullOfOrNull { it.bitmap?.height } ?: 1024
+    val w = COMPOSITE_CANVAS_SIZE
+    val h = COMPOSITE_CANVAS_SIZE
     val result = AndroidBitmap.createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
     val canvas = Canvas(result)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)

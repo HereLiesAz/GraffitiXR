@@ -102,7 +102,10 @@ class ArRenderer(
     }
 
     fun updateOverlayExtent(halfW: Float, halfH: Float) {
-        overlayRenderer.setExtent(halfW, halfH)
+        // Border = capture-derived reference indicator only.
+        overlayRenderer.setBorderExtent(halfW, halfH)
+        // Textured quad is always large so images are never confined by the border box.
+        overlayRenderer.setExtent(OverlayRenderer.QUAD_HALF_EXTENT, OverlayRenderer.QUAD_HALF_EXTENT)
     }
 
     fun updateFlashlight(isOn: Boolean) {

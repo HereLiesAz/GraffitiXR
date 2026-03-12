@@ -38,9 +38,14 @@ class OverlayRenderer(private val context: Context) {
 
     private var vboId = 0
 
-    @Volatile private var halfW = 0.5f
-    @Volatile private var halfH = 0.5f
+    @Volatile private var halfW = QUAD_HALF_EXTENT
+    @Volatile private var halfH = QUAD_HALF_EXTENT
     @Volatile private var quadDirty = false
+
+    // Border is a separate visual indicator — decoupled from the textured quad size.
+    @Volatile private var borderHalfW = 0.5f
+    @Volatile private var borderHalfH = 0.5f
+    @Volatile private var borderDirty = false
 
     private val mvpMatrix = FloatArray(16)
 
@@ -109,6 +114,18 @@ class OverlayRenderer(private val context: Context) {
     }
 
     /**
+     * Set the physical half-extents of the anchor border indicator (meters).
+     * The border is purely decorative — it shows where the anchor plane is, but does NOT
+     * constrain the textured quad or images in any way.
+     * Thread-safe; actual VBO rebuild happens at the start of the next [drawAnchorBorder] call.
+     */
+    fun setBorderExtent(halfW: Float, halfH: Float) {
+        this.borderHalfW = halfW
+        this.borderHalfH = halfH
+        borderDirty = true
+    }
+
+    /**
      * Draw an orange line-loop border around the anchor quad boundary.
      * Renders even when no texture is loaded, so the artist can see the anchor
      * placement before the artwork overlay is ready.
@@ -116,7 +133,10 @@ class OverlayRenderer(private val context: Context) {
      */
     fun drawAnchorBorder(viewMatrix: FloatArray, projMatrix: FloatArray, anchorMatrix: FloatArray) {
         if (borderProgram == 0 || borderVboId == 0) return
-        // Note: quadDirty is already cleared by draw() which runs first each frame.
+        if (borderDirty) {
+            buildBorderQuad()
+            borderDirty = false
+        }
 
         Matrix.multiplyMM(mvpMatrix, 0, viewMatrix, 0, anchorMatrix, 0)
         Matrix.multiplyMM(mvpMatrix, 0, projMatrix, 0, mvpMatrix, 0)
@@ -147,7 +167,6 @@ class OverlayRenderer(private val context: Context) {
 
         if (quadDirty) {
             buildQuad()
-            buildBorderQuad()  // keep border in sync whenever extent changes
             quadDirty = false
         }
 
@@ -206,8 +225,8 @@ class OverlayRenderer(private val context: Context) {
     // Border VBO: 4 vertices in CCW order for GL_LINE_LOOP (BL, BR, TR, TL).
     // Each vertex: x, y, z (3 floats, stride = 12).
     private fun buildBorderQuad() {
-        val w = halfW
-        val h = halfH
+        val w = borderHalfW
+        val h = borderHalfH
         val data = floatArrayOf(
             -w, -h, 0f,   // BL
              w, -h, 0f,   // BR
@@ -226,6 +245,13 @@ class OverlayRenderer(private val context: Context) {
 
     companion object {
         private const val TAG = "OverlayRenderer"
+
+        /**
+         * Fixed half-extent (meters) for the textured overlay quad.
+         * Larger than any expected capture viewport so images are never visually confined.
+         * Border indicator uses the capture-derived extent separately via [setBorderExtent].
+         */
+        const val QUAD_HALF_EXTENT = 2.0f
 
         // Colored-line shader for the anchor boundary rectangle.
         private const val BORDER_VERTEX_SHADER = """#version 300 es

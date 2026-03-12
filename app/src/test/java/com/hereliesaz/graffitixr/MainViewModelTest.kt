@@ -51,7 +51,8 @@ class MainViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(true, state.isCapturingTarget)
-        assertEquals(CaptureStep.CAPTURE, state.captureStep)
+        assertEquals(true, state.isWaitingForTap)
+        assertEquals(CaptureStep.NONE, state.captureStep)
     }
 
     @Test
