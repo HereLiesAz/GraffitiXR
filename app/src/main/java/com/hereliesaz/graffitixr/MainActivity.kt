@@ -835,7 +835,7 @@ class MainActivity : ComponentActivity() {
                                     shape = AzButtonShape.RECTANGLE,
                                     content = AzComposableContent { isEnabled ->
                                         val liveState by editorViewModel.uiState.collectAsState()
-                                        val currentSizeDp = liveState.layers.find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
+                                        val displaySize = liveState.layers.find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
@@ -843,14 +843,15 @@ class MainActivity : ComponentActivity() {
                                                     if (!isEnabled) return@pointerInput
                                                     detectDragGestures { change, dragAmount ->
                                                         change.consume()
-                                                        val newSize = (currentSizeDp - dragAmount.y * 0.5f).coerceIn(8f, 300f)
-                                                        editorViewModel.onTextSizeChanged(layer.id, newSize)
+                                                        val current = editorViewModel.uiState.value.layers
+                                                            .find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
+                                                        editorViewModel.onTextSizeChanged(layer.id, (current - dragAmount.y * 0.5f).coerceIn(8f, 300f))
                                                     }
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = "${currentSizeDp.toInt()}pt",
+                                                text = "${displaySize.toInt()}pt",
                                                 color = Color.White,
                                                 fontSize = 28.sp,
                                                 fontWeight = FontWeight.Bold
@@ -900,7 +901,7 @@ class MainActivity : ComponentActivity() {
                                     shape = AzButtonShape.RECTANGLE,
                                     content = AzComposableContent { isEnabled ->
                                         val liveState by editorViewModel.uiState.collectAsState()
-                                        val currentKern = liveState.layers.find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
+                                        val displayKern = liveState.layers.find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
@@ -908,14 +909,15 @@ class MainActivity : ComponentActivity() {
                                                     if (!isEnabled) return@pointerInput
                                                     detectDragGestures { change, dragAmount ->
                                                         change.consume()
-                                                        val newKern = (currentKern + dragAmount.x * 0.002f).coerceIn(-0.2f, 1f)
-                                                        editorViewModel.onTextKerningChanged(layer.id, newKern)
+                                                        val current = editorViewModel.uiState.value.layers
+                                                            .find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
+                                                        editorViewModel.onTextKerningChanged(layer.id, (current + dragAmount.x * 0.003f).coerceIn(-0.2f, 1f))
                                                     }
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = String.format("%.2f", currentKern),
+                                                text = String.format("%.2f", displayKern),
                                                 color = Color.White,
                                                 fontSize = 28.sp,
                                                 fontWeight = FontWeight.Bold
