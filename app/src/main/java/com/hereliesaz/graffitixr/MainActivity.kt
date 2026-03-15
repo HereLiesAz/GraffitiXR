@@ -207,10 +207,10 @@ class MainActivity : ComponentActivity() {
                     uri?.let { editorViewModel.setBackgroundImage(it) }
                 }
 
-                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
-                    val navStrings = remember { NavStrings() }
+                val navStrings = remember { NavStrings() }
 
-                    // UNCONDITIONAL CONFIG: These must run every recomposition to maintain the Rail's internal state
+                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
+
                     azTheme(
                         activeColor = Cyan,
                         defaultShape = AzButtonShape.RECTANGLE,
@@ -222,7 +222,6 @@ class MainActivity : ComponentActivity() {
                     )
                     azAdvanced(helpEnabled = true)
 
-                    // CONDITIONAL ITEMS: The items are hidden, but the rail framework stays intact
                     if (isRailVisible) {
                         configureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
@@ -237,6 +236,7 @@ class MainActivity : ComponentActivity() {
                             isTouchLocked = mainUiState.isTouchLocked,
                             isCameraActive = !showLibrary,
                             isWaitingForTap = mainUiState.isWaitingForTap,
+                            mainUiState = mainUiState,
                             editorViewModel = editorViewModel,
                             arViewModel = arViewModel,
                             slamManager = slamManager,

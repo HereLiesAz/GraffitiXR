@@ -42,11 +42,6 @@ import kotlinx.coroutines.coroutineScope
 import android.graphics.Bitmap as AndroidBitmap
 import androidx.core.graphics.createBitmap
 
-/**
- * The main stage where reality is augmented and screen touches are translated into either
- * teleological AR tracking actions or 2D canvas manipulations, depending on which illusion
- * the user is currently buying into.
- */
 @Composable
 fun MainScreen(
     uiState: EditorUiState,
@@ -54,6 +49,7 @@ fun MainScreen(
     isTouchLocked: Boolean,
     isCameraActive: Boolean,
     isWaitingForTap: Boolean,
+    mainUiState: MainUiState,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     slamManager: SlamManager,
@@ -68,6 +64,20 @@ fun MainScreen(
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> arViewModel.onActivityResumed()
+                    Lifecycle.Event.ON_PAUSE -> arViewModel.onActivityPaused()
+                    else -> {}
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
             when (uiState.editorMode) {
@@ -85,14 +95,8 @@ fun MainScreen(
                         if (glView == null) return@DisposableEffect onDispose {}
                         val observer = LifecycleEventObserver { _, event ->
                             when (event) {
-                                Lifecycle.Event.ON_RESUME -> {
-                                    arViewModel.onActivityResumed()
-                                    glView?.onResume()
-                                }
-                                Lifecycle.Event.ON_PAUSE -> {
-                                    glView?.onPause()
-                                    arViewModel.onActivityPaused()
-                                }
+                                Lifecycle.Event.ON_RESUME -> glView?.onResume()
+                                Lifecycle.Event.ON_PAUSE -> glView?.onPause()
                                 else -> {}
                             }
                         }
@@ -102,22 +106,64 @@ fun MainScreen(
                         }
                     }
 
-                    // ADDED rendererRef.value to key to catch late initialization
                     LaunchedEffect(arUiState.isFlashlightOn, rendererRef.value) {
                         rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
                     }
 
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
-                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
-                        if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
+                    val showPlaneConfirm = mainUiState.planeConfirmationPending
+
+                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, showPlaneConfirm) {
+                        if (!arUiState.isAnchorEstablished) {
                             rendererRef.value?.updateOverlayBitmap(null)
                             return@LaunchedEffect
                         }
-                        val composite = withContext(Dispatchers.Default) {
-                            compositeLayersForAr(visibleLayers)
+
+                        if (showPlaneConfirm || visibleLayers.isEmpty()) {
+                            val w = COMPOSITE_CANVAS_SIZE
+                            val h = COMPOSITE_CANVAS_SIZE
+                            val orangeBmp = createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
+                            val canvas = Canvas(orangeBmp)
+
+                            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = android.graphics.Color.rgb(255, 102, 0)
+                                alpha = 180
+                                style = Paint.Style.FILL
+                            }
+                            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = android.graphics.Color.WHITE
+                                strokeWidth = 16f
+                                style = Paint.Style.STROKE
+                            }
+                            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = android.graphics.Color.WHITE
+                                textSize = 160f
+                                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                textAlign = Paint.Align.CENTER
+                            }
+
+                            val center = w / 2f
+                            val size = 800f // 1600x1600 square to clearly show the orientation frame
+
+                            canvas.drawRect(center - size, center - size, center + size, center + size, paint)
+                            canvas.drawRect(center - size, center - size, center + size, center + size, strokePaint)
+
+                            // Crosshairs for exact alignment verification
+                            canvas.drawLine(center - size, center, center + size, center, strokePaint)
+                            canvas.drawLine(center, center - size, center, center + size, strokePaint)
+
+                            // Prove the Z-axis orientation didn't flip
+                            canvas.drawText("TOP", center, center - size + 200f, textPaint)
+
+                            rendererRef.value?.updateOverlayBitmap(orangeBmp)
+                            arViewModel.updatePaintingGuide(orangeBmp)
+                        } else {
+                            val composite = withContext(Dispatchers.Default) {
+                                compositeLayersForAr(visibleLayers)
+                            }
+                            rendererRef.value?.updateOverlayBitmap(composite)
+                            arViewModel.updatePaintingGuide(composite)
                         }
-                        rendererRef.value?.updateOverlayBitmap(composite)
-                        arViewModel.updatePaintingGuide(composite)
                     }
 
                     AndroidView(
@@ -127,8 +173,6 @@ fun MainScreen(
                                 slamManager = slamManager,
                                 onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, _ ->
                                     bmp?.let { rawBmp ->
-                                        // The camera sensor provides horizontal raw data natively.
-                                        // A 90-degree clockwise turn is structurally demanded for portrait orientation.
                                         val correctedRotation = if (rawBmp.width > rawBmp.height) 90 else 0
                                         arViewModel.onTargetCaptured(
                                             rawBmp, depth,
@@ -292,9 +336,6 @@ fun MainScreen(
     }
 }
 
-// Fixed canvas size for the AR overlay composite. Large enough that layers can be freely
-// positioned and scaled without hitting canvas edges. Matches the physical quad size so
-// the pixel density is ~1mm/px at a typical arm's-reach capture distance.
 private const val COMPOSITE_CANVAS_SIZE = 2048
 
 private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {

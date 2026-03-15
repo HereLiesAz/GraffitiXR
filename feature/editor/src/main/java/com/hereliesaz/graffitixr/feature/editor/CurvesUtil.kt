@@ -20,7 +20,10 @@ object CurvesUtil {
 
         val x = points.map { it.x }.toFloatArray()
         val a = points.map { it.y }.toFloatArray()
-        val h = FloatArray(n - 1) { i -> x[i + 1] - x[i] }
+        val h = FloatArray(n - 1) { i ->
+            val diff = x[i + 1] - x[i]
+            if (diff <= 0f) 1e-5f else diff
+        }
         val alpha = FloatArray(n - 1) { i ->
             if (i == 0) 0f else (3f / h[i]) * (a[i + 1] - a[i]) - (3f / h[i - 1]) * (a[i] - a[i - 1])
         }

@@ -1,3 +1,4 @@
+// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/export/ExportManager.kt
 package com.hereliesaz.graffitixr.feature.editor.export
 
 import android.graphics.Bitmap
@@ -9,8 +10,10 @@ import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.common.model.Layer
 import javax.inject.Inject
 
+/**
+ * Handles compositing and exporting of project layers.
+ */
 class ExportManager @Inject constructor() {
-
     fun compositeLayers(layers: List<Layer>, screenWidth: Int, screenHeight: Int): Bitmap {
         val result = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
@@ -19,9 +22,7 @@ class ExportManager @Inject constructor() {
             layer.bitmap?.let { b ->
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                        blendMode = layer.blendMode.toNativeBlendMode()
-                    }
+                    blendMode = layer.blendMode.toNativeBlendMode()
                 }
 
                 val matrix = Matrix()
@@ -55,7 +56,6 @@ class ExportManager @Inject constructor() {
                 canvas.drawBitmap(b, matrix, paint)
             }
         }
-
         return result
     }
 

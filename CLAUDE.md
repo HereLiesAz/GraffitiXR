@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build Commands
 
-```bash
+~~~bash
 # One-time setup: download OpenCV and GLM native dependencies
 ./setup_libs.sh
 
@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Lint
 ./gradlew lintDebug
-```
+~~~
 
 **Prerequisites:** NDK 25.x+, `local.properties` pointing to Android SDK, `app/google-services.json` (use `app/google-services.json.template` with dummy values for local builds).
 
@@ -29,16 +29,16 @@ GraffitiXR is a **multi-module Android app** (Kotlin + C++17) for AR-assisted mu
 
 ### Module Dependency Graph
 
-```
+~~~
 :app  →  :feature:ar, :feature:editor, :feature:dashboard
 :feature:ar       →  :core:nativebridge, :core:design, :core:domain
-:feature:editor   →  :core:design, :core:domain, :core:common
+:feature:editor   →  :core:design, :core:domain, :core:common, :core:data, :core:nativebridge
 :feature:dashboard→  :core:design, :core:data
 :core:nativebridge→  :core:domain, :opencv
 :core:data        →  :core:domain, :core:common
 :core:design      →  :core:common
 :core:domain      →  :core:common
-```
+~~~
 
 **Feature modules must not depend on other feature modules.** Cross-feature communication goes through `:app` or `:core` interfaces.
 

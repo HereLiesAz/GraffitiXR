@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/MainViewModel.kt
 package com.hereliesaz.graffitixr
 
 import android.content.Context
@@ -104,8 +105,28 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val currentProject = projectRepository.currentProject.value ?: return@launch
 
+            // CRITICAL FIX: The ARCore camera sensor is natively landscape.
+            // The UI passed us a portrait bitmap (rotated 90 degrees for display).
+            // If we extract features on the portrait image, the SLAM map will be rotated 90 degrees
+            // out of phase with the live camera feed, rendering all splats sideways.
+            // We MUST un-rotate the bitmap back to the sensor's native orientation.
+            val isRotatedForUi = bitmap.height > bitmap.width
+            val sensorBmp = if (isRotatedForUi) {
+                val matrix = android.graphics.Matrix().apply { postRotate(-90f) }
+                Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            } else {
+                bitmap
+            }
+
+            val sensorMask = if (isRotatedForUi && selectionMask != null) {
+                val matrix = android.graphics.Matrix().apply { postRotate(-90f) }
+                Bitmap.createBitmap(selectionMask, 0, 0, selectionMask.width, selectionMask.height, matrix, true)
+            } else {
+                selectionMask
+            }
+
             // Use masked detection if the user refined the selection, otherwise detect everywhere.
-            val fp = slamManager.generateFingerprintMasked(bitmap, selectionMask)
+            val fp = slamManager.generateFingerprintMasked(sensorBmp, sensorMask)
 
             // If the user pointed at a blank wall with no texture, ORB will fail to find points.
             if (fp == null) {
@@ -126,6 +147,7 @@ class MainViewModel @Inject constructor(
             projectManager.saveProject(
                 context = context,
                 projectData = currentProject.copy(fingerprint = fp),
+                // Keep the portrait version for the UI library thumbnail
                 targetImages = listOf(bitmap)
             )
 
