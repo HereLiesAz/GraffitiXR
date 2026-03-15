@@ -47,7 +47,7 @@ class ArViewModel @Inject constructor(
     private val stereoProvider: StereoDepthProvider,
     private val projectRepository: ProjectRepository,
     private val settingsRepository: SettingsRepository,
-    @ApplicationContext private val appContext: Context
+    @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
@@ -603,7 +603,7 @@ class ArViewModel @Inject constructor(
         colorW: Int, colorH: Int,
         intrinsics: FloatArray?
     ): Pair<Float, Float>? {
-        return Pair(0.2f, 0.2f)
+        return Pair(0.5f, 0.5f)
     }
 
     fun setTempCapture(bitmap: Bitmap?) {
@@ -761,9 +761,9 @@ class ArViewModel @Inject constructor(
         val state = _uiState.value
         val viewMat = state.targetCaptureViewMatrix ?: return
         val depthBuffer = state.targetDepthBuffer ?: ByteBuffer.allocateDirect(0)
-        val depthW = state.targetDepthBufferWidth ?: 0
-        val depthH = state.targetDepthBufferHeight ?: 0
-        val depthStride = state.targetDepthStride ?: 0
+        val depthW = state.targetDepthBufferWidth
+        val depthH = state.targetDepthBufferHeight
+        val depthStride = state.targetDepthStride
         val intrinsics = state.targetIntrinsics ?: FloatArray(0)
 
         viewModelScope.launch(Dispatchers.IO) {

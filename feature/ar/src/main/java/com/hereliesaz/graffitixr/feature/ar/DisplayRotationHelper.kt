@@ -25,6 +25,7 @@ class DisplayRotationHelper(context: Context) : DisplayListener {
     init {
         displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        @Suppress("DEPRECATION")
         display = windowManager.defaultDisplay
     }
 
