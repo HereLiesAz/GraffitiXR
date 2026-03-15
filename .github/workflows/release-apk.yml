@@ -79,44 +79,67 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Extract Version
-        id: get_version
-        run: |
-          VERSION_MAJOR=$(grep 'versionMajor' version.properties | cut -d '=' -f2 | tr -d '\r ')
-          VERSION_MINOR=$(grep 'versionMinor' version.properties | cut -d '=' -f2 | tr -d '\r ')
-          BUILD_NUMBER=$(git rev-list --count HEAD)
-          echo "VERSION=${VERSION_MAJOR}.${VERSION_MINOR}" >> $GITHUB_ENV
-          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
-
       - name: Build Release APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          export BUILD_NUMBER=$(git rev-list --count HEAD)
           ./gradlew assembleRelease -PversionBuild=$BUILD_NUMBER \
             -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
             -Pandroid.injected.signing.key.password=$KEY_PASSWORD
 
-      - name: Rename APK
+      - name: Prepare Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          export BUILD_NUMBER=$(git rev-list --count HEAD)
+
+          MAJOR=$(grep 'versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          MINOR=$(grep 'versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+
+          # Calculate patch from commits since last minor bump
+          MINOR_COMMIT=$(git blame -L '/versionMinor=/',+1 version.properties | awk '{print $1}' | tr -d '^')
+          if [ -n "$MINOR_COMMIT" ]; then
+            PATCH=$(git rev-list --count $MINOR_COMMIT..HEAD)
+          else
+            PATCH=$(grep 'versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          fi
+
+          VERSION_NAME="${MAJOR}.${MINOR}.${PATCH}.${BUILD_NUMBER}"
+          TAG_NAME="latest-release-v${MAJOR}.${MINOR}"
+
+          # Locate built APK
           APK_ORIGINAL=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
           if [ -z "$APK_ORIGINAL" ]; then
             echo "Error: No APK found in app/build/outputs/apk/release/"
             find app/build/outputs/ -name "*.apk"
             exit 1
           fi
-          mv "$APK_ORIGINAL" GraffitiXR-release-v${{ env.VERSION }}.apk
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ env.VERSION }}
-          name: Latest Release v${{ env.VERSION }}
-          draft: false
-          prerelease: false
-          files: ./GraffitiXR-release-v${{ env.VERSION }}.apk
+          TARGET_NAME="GraffitiXR-${VERSION_NAME}-release.apk"
+          mv "$APK_ORIGINAL" "$TARGET_NAME"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Force update tag to current commit
+          git tag -fa "$TAG_NAME" -m "Latest Release Build"
+          git push origin "$TAG_NAME" --force
+
+          # Create or update release
+          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
+            echo "Updating existing release..."
+            gh release edit "$TAG_NAME" \
+              --title "Latest Release v${MAJOR}.${MINOR} (${VERSION_NAME})" \
+              --notes "Release build from commit $GITHUB_SHA"
+            gh release upload "$TAG_NAME" "$TARGET_NAME" --clobber
+          else
+            echo "Creating new release..."
+            gh release create "$TAG_NAME" "$TARGET_NAME" \
+              --title "Latest Release v${MAJOR}.${MINOR} (${VERSION_NAME})" \
+              --notes "Release build from commit $GITHUB_SHA"
+          fi
