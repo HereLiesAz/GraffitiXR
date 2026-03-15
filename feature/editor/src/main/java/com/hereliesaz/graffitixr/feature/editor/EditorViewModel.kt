@@ -3,10 +3,17 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -30,6 +37,7 @@ import java.util.UUID
 import javax.inject.Inject
 import androidx.core.net.toUri
 import androidx.core.graphics.createBitmap
+import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
 
 data class StrokeCommand(
     val path: List<Offset>,
@@ -69,6 +77,17 @@ class EditorViewModel @Inject constructor(
     private var pendingSaveJob: kotlinx.coroutines.Job? = null
 
     private var copiedLayerState: Layer? = null
+    private var anchorHalfExtentMeters: Pair<Float, Float>? = null
+
+    // Real-time stroke state — valid only between onStrokeStart and onStrokeEnd.
+    private var strokeWorkingBitmap: Bitmap? = null
+    private var strokeWorkingCanvas: Canvas? = null
+    private var strokePaint: Paint? = null
+    private var strokePrevBitmapPoint: Offset? = null
+    private var strokeCollectedPoints: MutableList<Offset> = mutableListOf()
+    private var strokeLayerId: String? = null
+    private var strokeCanvasW: Int = 0
+    private var strokeCanvasH: Int = 0
 
     init {
         viewModelScope.launch(dispatchers.main) {
@@ -573,7 +592,32 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    override fun onMagicClicked() { pushHistory(); updateActiveLayer { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }; saveProject() }
+    fun setAnchorExtent(halfW: Float, halfH: Float) {
+        anchorHalfExtentMeters = Pair(halfW, halfH)
+    }
+
+    private fun fitActiveLayerToAnchor(halfW: Float, halfH: Float) {
+        val state = _uiState.value
+        val layer = state.layers.find { it.id == state.activeLayerId } ?: return
+        val bmp = layer.bitmap ?: return
+        // QUAD_HALF_EXTENT = 5.0f (matches OverlayRenderer.QUAD_HALF_EXTENT)
+        // The composite canvas is 2048×2048. Scale to fill 80% of the anchor extent.
+        val scaleW = halfW * 0.8f * 2048f / (bmp.width * 5.0f)
+        val scaleH = halfH * 0.8f * 2048f / (bmp.height * 5.0f)
+        val scale = minOf(scaleW, scaleH).coerceIn(0.05f, 20f)
+        updateActiveLayer { it.copy(scale = scale, offset = Offset.Zero, rotationX = 0f, rotationY = 0f, rotationZ = 0f) }
+    }
+
+    override fun onMagicClicked() {
+        pushHistory()
+        val extent = anchorHalfExtentMeters
+        if (extent != null) {
+            fitActiveLayerToAnchor(extent.first, extent.second)
+        } else {
+            updateActiveLayer { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }
+        }
+        saveProject()
+    }
     override fun onAdjustClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST) } }
     fun onBalanceClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR) } }
     override fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
@@ -706,9 +750,179 @@ class EditorViewModel @Inject constructor(
     override fun onDoubleTapHintDismissed() {}
     override fun onOnboardingComplete(mode: Any) {}
 
-    override fun onDrawingPathFinished(path: List<Offset>, canvasSize: IntSize) {
-        applyStrokeToActiveLayer(path, canvasSize)
+    // Kept for interface compliance; no longer called (DrawingCanvas now uses the three-phase API).
+    override fun onDrawingPathFinished(path: List<Offset>, canvasSize: IntSize) {}
+
+    /** Called when the user first touches the canvas. Prepares a mutable working bitmap for
+     *  incremental real-time rendering (all tools except Liquify). */
+    fun onStrokeStart(startPoint: Offset, canvasSize: IntSize) {
+        val state = _uiState.value
+        if (state.activeTool == Tool.NONE) return
+        val layerId = state.activeLayerId ?: return
+        val layer = state.layers.find { it.id == layerId } ?: return
+        val originalBitmap = layer.bitmap ?: return
+
+        strokeCollectedPoints = mutableListOf(startPoint)
+        strokeLayerId = layerId
+        strokeCanvasW = canvasSize.width
+        strokeCanvasH = canvasSize.height
+
+        if (state.activeTool == Tool.LIQUIFY) return  // Liquify finalizes in onStrokeEnd
+
+        val tool = state.activeTool
+        val argb = state.activeColor.toArgb()
+        val brushSize = state.brushSize
+        val feathering = state.brushFeathering
+
+        // Copy the bitmap on a background thread (can be ~10-50 ms for large images).
+        viewModelScope.launch(dispatchers.default) {
+            val workBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+            val workCanvas = Canvas(workBitmap)
+            val paint = buildStrokePaint(tool, argb, brushSize, feathering)
+
+            val mapped = ImageProcessor.mapScreenToBitmap(
+                listOf(startPoint), canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height
+            ).first()
+            workCanvas.drawPoint(mapped.x, mapped.y, paint)
+
+            withContext(dispatchers.main) {
+                strokeWorkingBitmap = workBitmap
+                strokeWorkingCanvas = workCanvas
+                strokePaint = paint
+                strokePrevBitmapPoint = mapped
+                _uiState.update { it.copy(
+                    liveStrokeLayerId = layerId,
+                    liveStrokeBitmap = workBitmap,
+                    liveStrokeVersion = it.liveStrokeVersion + 1
+                )}
+            }
+        }
     }
+
+    /** Called for every drag update. Draws only the new segment onto the working bitmap. */
+    fun onStrokePoint(currentPoint: Offset) {
+        strokeCollectedPoints.add(currentPoint)
+
+        val canvas = strokeWorkingCanvas ?: return
+        val paint = strokePaint ?: return
+        val prev = strokePrevBitmapPoint ?: return
+        val workBitmap = strokeWorkingBitmap ?: return
+
+        val mapped = ImageProcessor.mapScreenToBitmap(
+            listOf(currentPoint), strokeCanvasW, strokeCanvasH, workBitmap.width, workBitmap.height
+        ).first()
+
+        val seg = Path()
+        seg.moveTo(prev.x, prev.y)
+        seg.lineTo(mapped.x, mapped.y)
+        canvas.drawPath(seg, paint)
+        strokePrevBitmapPoint = mapped
+
+        _uiState.update { it.copy(liveStrokeVersion = it.liveStrokeVersion + 1) }
+    }
+
+    /** Called when the user lifts their finger. Finalizes the stroke into the layer and undo history. */
+    fun onStrokeEnd() {
+        val state = _uiState.value
+        val layerId = strokeLayerId ?: return
+        val layer = state.layers.find { it.id == layerId } ?: return
+        val points = strokeCollectedPoints.toList()
+        val canvasW = strokeCanvasW
+        val canvasH = strokeCanvasH
+
+        if (state.activeTool == Tool.LIQUIFY || strokeWorkingBitmap == null) {
+            // Liquify (or a stroke so fast the background copy hadn't finished):
+            // fall back to the full whole-stroke approach.
+            val bitmap = layer.bitmap ?: return
+            val command = StrokeCommand(
+                path = points,
+                canvasSize = IntSize(canvasW, canvasH),
+                tool = state.activeTool,
+                brushSize = state.brushSize,
+                brushColor = state.activeColor.toArgb(),
+                intensity = 0.5f,
+                feathering = state.brushFeathering
+            )
+            processNewStroke(layerId, bitmap, command, layer)
+        } else {
+            // Real-time path: the working bitmap already contains the complete stroke.
+            val workBitmap = strokeWorkingBitmap!!
+            val command = StrokeCommand(
+                path = points,
+                canvasSize = IntSize(canvasW, canvasH),
+                tool = state.activeTool,
+                brushSize = state.brushSize,
+                brushColor = state.activeColor.toArgb(),
+                intensity = 0.5f,
+                feathering = state.brushFeathering
+            )
+
+            // Add stroke to history for undo/redo replay.
+            val currentStrokes = layerStrokes[layerId] ?: mutableListOf()
+            currentStrokes.add(command)
+            layerStrokes[layerId] = currentStrokes
+            undoStack.addLast(EditCommand.Draw(layerId, command))
+            if (undoStack.size > maxStackSize) undoStack.removeFirst()
+            redoStack.clear()
+            updateHistoryCounts()
+
+            // Commit: working bitmap becomes the displayed layer bitmap.
+            _uiState.update { s ->
+                s.copy(
+                    layers = s.layers.map { if (it.id == layerId) it.copy(bitmap = workBitmap) else it },
+                    liveStrokeLayerId = null,
+                    liveStrokeBitmap = null
+                )
+            }
+            scheduleDiskSave(layerId, workBitmap, layer.uri)
+        }
+
+        // Clear stroke working state.
+        strokeWorkingBitmap = null
+        strokeWorkingCanvas = null
+        strokePaint = null
+        strokePrevBitmapPoint = null
+        strokeCollectedPoints = mutableListOf()
+        strokeLayerId = null
+    }
+
+    private fun buildStrokePaint(tool: Tool, argbColor: Int, brushSize: Float, feathering: Float): Paint =
+        Paint().apply {
+            strokeWidth = brushSize
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            isAntiAlias = true
+            when (tool) {
+                Tool.BRUSH -> {
+                    color = argbColor
+                    if (feathering > 0f) maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
+                }
+                Tool.ERASER -> {
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+                    if (feathering > 0f) maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
+                }
+                Tool.BLUR -> {
+                    maskFilter = BlurMaskFilter(brushSize * 0.5f, BlurMaskFilter.Blur.NORMAL)
+                    alpha = 150
+                }
+                Tool.BURN -> {
+                    color = android.graphics.Color.BLACK
+                    alpha = (255 * 0.3f).toInt().coerceIn(0, 255)
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DARKEN)
+                }
+                Tool.DODGE -> {
+                    color = android.graphics.Color.WHITE
+                    alpha = (255 * 0.3f).toInt().coerceIn(0, 255)
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
+                }
+                Tool.HEAL -> {
+                    color = argbColor
+                    alpha = 128
+                }
+                else -> {}
+            }
+        }
 
     override fun onColorClicked() {
         _uiState.update { it.copy(showColorPicker = true) }

@@ -90,5 +90,12 @@ data class EditorUiState(
     val brushFeathering: Float = 0f,
     val activeColor: Color = Color.White,
     val showColorPicker: Boolean = false,
-    val showDiagOverlay: Boolean = false
+    val showDiagOverlay: Boolean = false,
+
+    // Real-time stroke rendering: the mutable bitmap being actively drawn into.
+    // Non-null only while a brush stroke is in progress (non-Liquify tools).
+    val liveStrokeLayerId: String? = null,
+    val liveStrokeBitmap: Bitmap? = null,
+    // Incremented after each stroke segment so Compose re-reads the modified pixels.
+    val liveStrokeVersion: Int = 0
 )

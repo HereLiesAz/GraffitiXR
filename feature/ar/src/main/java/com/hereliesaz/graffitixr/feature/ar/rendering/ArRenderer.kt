@@ -108,8 +108,10 @@ class ArRenderer(
     }
 
     fun updateOverlayExtent(halfW: Float, halfH: Float) {
+        // Border marks the detected anchor region (small, derived from depth).
         overlayRenderer.setBorderExtent(halfW, halfH)
-        overlayRenderer.setExtent(halfW, halfH)
+        // Image quad is always large so artwork is never spatially confined.
+        overlayRenderer.setExtent(OverlayRenderer.QUAD_HALF_EXTENT, OverlayRenderer.QUAD_HALF_EXTENT)
     }
 
     fun updateFlashlight(isOn: Boolean) {
@@ -353,7 +355,8 @@ class ArRenderer(
 
             if (overlayBitmapDirty) {
                 overlayBitmapDirty = false
-                pendingOverlayBitmap?.let { overlayRenderer.updateTexture(it) }
+                val bmp = pendingOverlayBitmap
+                if (bmp != null) overlayRenderer.updateTexture(bmp) else overlayRenderer.clearTexture()
             }
 
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)

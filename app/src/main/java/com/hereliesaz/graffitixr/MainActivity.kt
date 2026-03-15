@@ -343,6 +343,12 @@ class MainActivity : ComponentActivity() {
                                 arViewModel.setPlaneConfirmationBorder(mainUiState.planeConfirmationPending)
                             }
 
+                            LaunchedEffect(arUiState.targetPhysicalExtent) {
+                                arUiState.targetPhysicalExtent?.let { (w, h) ->
+                                    editorViewModel.setAnchorExtent(w, h)
+                                }
+                            }
+
                             val showPlaneConfirm = mainUiState.planeConfirmationPending
                                     && !mainUiState.isInPlaneRealignment
                                     && arUiState.isAnchorEstablished
@@ -652,9 +658,6 @@ class MainActivity : ComponentActivity() {
                 if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
             }
 
-            azRailSubItem(id = "key", hostId = "target_host", text = "Keyframe", color = Color.White, shape = AzButtonShape.NONE, info = navStrings.keyframeInfo) {
-                arViewModel.captureKeyframe()
-            }
             azDivider()
         }
 
@@ -786,15 +789,8 @@ class MainActivity : ComponentActivity() {
                         }
 
                         if (layer.isSketch) {
-                            azRailItem(id = "brush_${layer.id}", text = "Brush", color = if (activeTool == Tool.BRUSH) Cyan else Color.White, info = navStrings.brushInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BRUSH) })
-                            azRailItem(id = "eraser_${layer.id}", text = "Eraser", color = if (activeTool == Tool.ERASER) Cyan else Color.White, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
-                            azRailItem(id = "blur_${layer.id}", text = "Blur", color = if (activeTool == Tool.BLUR) Cyan else Color.White, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
-                            azRailItem(id = "liquify_${layer.id}", text = "Liquify", color = if (activeTool == Tool.LIQUIFY) Cyan else Color.White, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
-                            azRailItem(id = "dodge_${layer.id}", text = "Dodge", color = if (activeTool == Tool.DODGE) Cyan else Color.White, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
-                            azRailItem(id = "burn_${layer.id}", text = "Burn", color = if (activeTool == Tool.BURN) Cyan else Color.White, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
                             azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
-
-                            addSizeItem()
+                            azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
 
                             azRailItem(
                                 id = "color_${layer.id}",
@@ -820,9 +816,6 @@ class MainActivity : ComponentActivity() {
                                             .pointerInput(Unit) {
                                                 detectDragGestures { change, dragAmount ->
                                                     change.consume()
-                                                    // Vertical: up = lighter, down = darker
-                                                    // Horizontal: right = more saturated, left = less
-                                                    // Both axes apply simultaneously for diagonal drags
                                                     editorViewModel.adjustColorHSV(
                                                         lightnessDelta = -dragAmount.y * 0.002f,
                                                         saturationDelta = dragAmount.x * 0.002f
@@ -840,21 +833,28 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             )
-                            azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
-                        } else {
-                            azRailItem(id = "iso_${layer.id}", text = "Isolate", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
-                            azRailItem(id = "line_${layer.id}", text = "Outline", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onLineDrawingClicked() })
-                            azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                            // --- Brush tools at bottom ---
+                            azRailItem(id = "brush_${layer.id}", text = "Brush", color = if (activeTool == Tool.BRUSH) Cyan else Color.White, info = navStrings.brushInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BRUSH) })
                             azRailItem(id = "eraser_${layer.id}", text = "Eraser", color = if (activeTool == Tool.ERASER) Cyan else Color.White, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
                             azRailItem(id = "blur_${layer.id}", text = "Blur", color = if (activeTool == Tool.BLUR) Cyan else Color.White, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
                             azRailItem(id = "liquify_${layer.id}", text = "Liquify", color = if (activeTool == Tool.LIQUIFY) Cyan else Color.White, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
                             azRailItem(id = "dodge_${layer.id}", text = "Dodge", color = if (activeTool == Tool.DODGE) Cyan else Color.White, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
                             azRailItem(id = "burn_${layer.id}", text = "Burn", color = if (activeTool == Tool.BURN) Cyan else Color.White, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
+                            addSizeItem()
+                        } else {
+                            azRailItem(id = "iso_${layer.id}", text = "Isolate", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
+                            azRailItem(id = "line_${layer.id}", text = "Outline", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onLineDrawingClicked() })
+                            azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                            azRailItem(id = "balance_${layer.id}", text = "Balance", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
                             azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
 
+                            // --- Brush tools at bottom ---
+                            azRailItem(id = "eraser_${layer.id}", text = "Eraser", color = if (activeTool == Tool.ERASER) Cyan else Color.White, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
+                            azRailItem(id = "blur_${layer.id}", text = "Blur", color = if (activeTool == Tool.BLUR) Cyan else Color.White, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
+                            azRailItem(id = "liquify_${layer.id}", text = "Liquify", color = if (activeTool == Tool.LIQUIFY) Cyan else Color.White, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
+                            azRailItem(id = "dodge_${layer.id}", text = "Dodge", color = if (activeTool == Tool.DODGE) Cyan else Color.White, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
+                            azRailItem(id = "burn_${layer.id}", text = "Burn", color = if (activeTool == Tool.BURN) Cyan else Color.White, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
                             addSizeItem()
-
-                            azRailItem(id = "balance_${layer.id}", text = "Balance", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
                         }
                     }
                 ) {

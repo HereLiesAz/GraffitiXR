@@ -20,7 +20,7 @@ interface SettingsRepository {
      */
     suspend fun setRightHanded(isRight: Boolean)
 
-    /** Which AR depth/mapping mode the user has selected. Defaults to [ArScanMode.CLOUD_POINTS]. */
+    /** Which AR depth/mapping mode the user has selected. Defaults to [ArScanMode.GAUSSIAN_SPLATS]. */
     val arScanMode: Flow<ArScanMode>
 
     suspend fun setArScanMode(mode: ArScanMode)

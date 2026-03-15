@@ -748,10 +748,6 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isCaptureRequested = true) }
     }
 
-    fun captureKeyframe() {
-        requestCapture()
-    }
-
     fun onCaptureRequestHandled() {
         _uiState.update { it.copy(isCaptureRequested = false) }
     }

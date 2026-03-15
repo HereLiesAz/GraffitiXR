@@ -65,8 +65,8 @@ data class ArUiState(
     // OverlayRenderer sizes its textured quad to (halfW*2) × (halfH*2) meters.
     val targetPhysicalExtent: Pair<Float, Float>? = null,
 
-    // Which 3-D mapping mode is active. Defaults to CLOUD_POINTS (more reliable).
-    val arScanMode: ArScanMode = ArScanMode.CLOUD_POINTS,
+    // Which 3-D mapping mode is active. Defaults to GAUSSIAN_SPLATS (richer depth data).
+    val arScanMode: ArScanMode = ArScanMode.GAUSSIAN_SPLATS,
 
     // Phase 3 — True once the renderer has confirmed ARCore Depth API is available on this device.
     val isDepthApiSupported: Boolean = false,

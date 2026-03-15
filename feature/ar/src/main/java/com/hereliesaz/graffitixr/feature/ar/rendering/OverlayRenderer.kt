@@ -39,8 +39,8 @@ class OverlayRenderer(private val context: Context) {
 
     private var vboId = 0
 
-    @Volatile private var halfW = 0.5f
-    @Volatile private var halfH = 0.5f
+    @Volatile private var halfW = QUAD_HALF_EXTENT
+    @Volatile private var halfH = QUAD_HALF_EXTENT
     @Volatile private var quadDirty = false
 
     // Border is a separate visual indicator — decoupled from the textured quad size.
@@ -94,6 +94,11 @@ class OverlayRenderer(private val context: Context) {
         GLES30.glGenBuffers(1, borderBuf, 0)
         borderVboId = borderBuf[0]
         buildBorderQuad()
+    }
+
+    /** Clear the overlay texture so nothing is rendered until a new bitmap is uploaded. Must be called from the GL thread. */
+    fun clearTexture() {
+        hasTexture = false
     }
 
     /** Upload a new overlay composite bitmap. Must be called from the GL thread. */
@@ -248,11 +253,11 @@ class OverlayRenderer(private val context: Context) {
         private const val TAG = "OverlayRenderer"
 
         /**
-         * Fixed half-extent (meters) for the textured overlay quad.
-         * Larger than any expected capture viewport so images are never visually confined.
-         * Border indicator uses the capture-derived extent separately via [setBorderExtent].
+         * Fixed half-extent (meters) for the textured overlay quad — 10 m × 10 m total.
+         * Large enough that mural-scale artwork is never spatially clipped by the quad boundary.
+         * The anchor border indicator uses a separate, smaller extent set via [setBorderExtent].
          */
-        const val QUAD_HALF_EXTENT = 2.0f
+        const val QUAD_HALF_EXTENT = 5.0f
 
         // Colored-line shader for the anchor boundary rectangle.
         private const val BORDER_VERTEX_SHADER = """#version 300 es

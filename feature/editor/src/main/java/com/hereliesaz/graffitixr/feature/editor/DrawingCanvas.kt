@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -22,28 +21,25 @@ fun DrawingCanvas(
     activeTool: Tool,
     brushSize: Float,
     activeColor: Color,
-    // Identity of the current layer bitmap. When this changes, the committed
-    // preview path is cleared because the bitmap has been updated.
     layerBitmapKey: Any?,
     modifier: Modifier = Modifier,
-    onPathFinished: (List<Offset>, Tool, IntSize) -> Unit
+    onStrokeStart: (Offset, IntSize) -> Unit,
+    onStrokePoint: (Offset) -> Unit,
+    onStrokeEnd: () -> Unit,
 ) {
-    // Live path being drawn right now
-    var currentPoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
-    // Path that was committed but bitmap hasn't updated yet — kept visible to prevent flicker
-    var pendingPath by remember { mutableStateOf<List<Offset>>(emptyList()) }
+    // For Liquify only: collect points and show a fake preview since it can't render incrementally.
+    var liquifyPoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
+    var liquifyPending by remember { mutableStateOf<List<Offset>>(emptyList()) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
-    // Once the layer bitmap updates (new object identity), the bitmap already
-    // contains the stroke — clear the overlay path.
+    // When the layer bitmap updates (stroke committed), clear Liquify pending path.
     LaunchedEffect(layerBitmapKey) {
-        pendingPath = emptyList()
+        liquifyPending = emptyList()
     }
 
-    // Also clear pending when tool changes so stale previews don't linger
     LaunchedEffect(activeTool) {
-        pendingPath = emptyList()
-        currentPoints = emptyList()
+        liquifyPoints = emptyList()
+        liquifyPending = emptyList()
     }
 
     Canvas(
@@ -54,79 +50,44 @@ fun DrawingCanvas(
 
                 detectDragGestures(
                     onDragStart = { offset ->
-                        currentPoints = listOf(offset)
+                        if (activeTool == Tool.LIQUIFY) {
+                            liquifyPoints = listOf(offset)
+                            liquifyPending = emptyList()
+                        }
+                        onStrokeStart(offset, canvasSize)
                     },
                     onDrag = { change, _ ->
-                        currentPoints = currentPoints + change.position
+                        if (activeTool == Tool.LIQUIFY) {
+                            liquifyPoints = liquifyPoints + change.position
+                        }
+                        onStrokePoint(change.position)
                     },
                     onDragEnd = {
-                        if (currentPoints.isNotEmpty()) {
-                            // Keep the path visible until the bitmap catches up
-                            pendingPath = currentPoints
-                            onPathFinished(currentPoints, activeTool, canvasSize)
+                        if (activeTool == Tool.LIQUIFY && liquifyPoints.isNotEmpty()) {
+                            liquifyPending = liquifyPoints
+                            liquifyPoints = emptyList()
                         }
-                        currentPoints = emptyList()
+                        onStrokeEnd()
                     }
                 )
             }
     ) {
-        // Show live path while drawing; fall back to committed path while bitmap processes
-        val displayPath = if (currentPoints.isNotEmpty()) currentPoints else pendingPath
-        if (displayPath.isEmpty()) return@Canvas
+        // Only render a fake preview for Liquify — all other tools render directly into the layer bitmap.
+        val displayPath = when {
+            activeTool == Tool.LIQUIFY && liquifyPoints.isNotEmpty() -> liquifyPoints
+            activeTool == Tool.LIQUIFY && liquifyPending.isNotEmpty() -> liquifyPending
+            else -> return@Canvas
+        }
 
         val path = Path().apply {
             moveTo(displayPath.first().x, displayPath.first().y)
-            for (i in 1 until displayPath.size) {
-                lineTo(displayPath[i].x, displayPath[i].y)
-            }
+            for (i in 1 until displayPath.size) lineTo(displayPath[i].x, displayPath[i].y)
         }
-
-        val stroke = Stroke(width = brushSize, cap = StrokeCap.Round, join = StrokeJoin.Round)
-
-        when (activeTool) {
-            Tool.BRUSH -> drawPath(
-                path = path,
-                color = activeColor,
-                style = stroke,
-                blendMode = BlendMode.SrcOver
-            )
-            Tool.ERASER -> drawPath(
-                path = path,
-                color = Color.White.copy(alpha = 0.35f),
-                style = stroke,
-                blendMode = BlendMode.SrcOver
-            )
-            Tool.BLUR -> drawPath(
-                path = path,
-                color = Color.Gray.copy(alpha = 0.30f),
-                style = stroke,
-                blendMode = BlendMode.SrcOver
-            )
-            Tool.DODGE -> drawPath(
-                path = path,
-                color = Color.White.copy(alpha = 0.30f),
-                style = stroke,
-                blendMode = BlendMode.SrcOver
-            )
-            Tool.BURN -> drawPath(
-                path = path,
-                color = Color.Black.copy(alpha = 0.30f),
-                style = stroke,
-                blendMode = BlendMode.SrcOver
-            )
-            Tool.HEAL -> drawPath(
-                path = path,
-                color = Color.Cyan.copy(alpha = 0.30f),
-                style = stroke,
-                blendMode = BlendMode.SrcOver
-            )
-            Tool.LIQUIFY -> drawPath(
-                path = path,
-                color = Color.Magenta.copy(alpha = 0.25f),
-                style = stroke,
-                blendMode = BlendMode.SrcOver
-            )
-            else -> {}
-        }
+        drawPath(
+            path = path,
+            color = Color.Magenta.copy(alpha = 0.25f),
+            style = Stroke(width = brushSize, cap = StrokeCap.Round, join = StrokeJoin.Round),
+            blendMode = BlendMode.SrcOver
+        )
     }
 }

@@ -120,56 +120,19 @@ fun MainScreen(
                     val showPlaneConfirm = mainUiState.planeConfirmationPending
 
                     LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, showPlaneConfirm) {
-                        if (!arUiState.isAnchorEstablished) {
+                        if (!arUiState.isAnchorEstablished || showPlaneConfirm || visibleLayers.isEmpty()) {
+                            // No anchor, plane awaiting confirmation, or no layers to show.
+                            // Clear the image quad — the orange border line-loop is the only
+                            // anchor indicator needed. The quad renders nothing when cleared.
                             rendererRef.value?.updateOverlayBitmap(null)
                             return@LaunchedEffect
                         }
 
-                        if (showPlaneConfirm || visibleLayers.isEmpty()) {
-                            val w = COMPOSITE_CANVAS_SIZE
-                            val h = COMPOSITE_CANVAS_SIZE
-                            val orangeBmp = createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
-                            val canvas = Canvas(orangeBmp)
-
-                            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                color = android.graphics.Color.rgb(255, 102, 0)
-                                alpha = 180
-                                style = Paint.Style.FILL
-                            }
-                            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                color = android.graphics.Color.WHITE
-                                strokeWidth = 16f
-                                style = Paint.Style.STROKE
-                            }
-                            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                color = android.graphics.Color.WHITE
-                                textSize = 160f
-                                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                                textAlign = Paint.Align.CENTER
-                            }
-
-                            val center = w / 2f
-                            val size = 800f // 1600x1600 square to clearly show the orientation frame
-
-                            canvas.drawRect(center - size, center - size, center + size, center + size, paint)
-                            canvas.drawRect(center - size, center - size, center + size, center + size, strokePaint)
-
-                            // Crosshairs for exact alignment verification
-                            canvas.drawLine(center - size, center, center + size, center, strokePaint)
-                            canvas.drawLine(center, center - size, center, center + size, strokePaint)
-
-                            // Prove the Z-axis orientation didn't flip
-                            canvas.drawText("TOP", center, center - size + 200f, textPaint)
-
-                            rendererRef.value?.updateOverlayBitmap(orangeBmp)
-                            arViewModel.updatePaintingGuide(orangeBmp)
-                        } else {
-                            val composite = withContext(Dispatchers.Default) {
-                                compositeLayersForAr(visibleLayers)
-                            }
-                            rendererRef.value?.updateOverlayBitmap(composite)
-                            arViewModel.updatePaintingGuide(composite)
+                        val composite = withContext(Dispatchers.Default) {
+                            compositeLayersForAr(visibleLayers)
                         }
+                        rendererRef.value?.updateOverlayBitmap(composite)
+                        arViewModel.updatePaintingGuide(composite)
                     }
 
                     AndroidView(
@@ -285,9 +248,21 @@ fun MainScreen(
             ) {
                 if (uiState.editorMode != EditorMode.AR) {
                     uiState.layers.filter { it.isVisible }.forEach { layer ->
-                        layer.bitmap?.let { bmp ->
+                        // During an active stroke the working bitmap is tracked separately so
+                        // Compose can re-render it every time a new segment is drawn.
+                        val isLive = layer.id == uiState.liveStrokeLayerId
+                        val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
+                        bmp?.let { displayBmp ->
+                            // For the live layer, re-wrap on every version tick so Compose sees a
+                            // new ImageBitmap reference and re-reads the modified pixel data.
+                            val imageBitmap = if (isLive) {
+                                val version = uiState.liveStrokeVersion
+                                remember(version) { displayBmp.asImageBitmap() }
+                            } else {
+                                remember(displayBmp) { displayBmp.asImageBitmap() }
+                            }
                             Image(
-                                bitmap = bmp.asImageBitmap(),
+                                bitmap = imageBitmap,
                                 contentDescription = null,
                                 colorFilter = ColorFilter.colorMatrix(
                                     createColorMatrix(
@@ -342,9 +317,9 @@ fun MainScreen(
                             rotationZ = activeLayer.rotationZ
                             transformOrigin = TransformOrigin.Center
                         },
-                    onPathFinished = { path, _, size ->
-                        editorViewModel.onDrawingPathFinished(path, size)
-                    }
+                    onStrokeStart = { offset, size -> editorViewModel.onStrokeStart(offset, size) },
+                    onStrokePoint = { offset -> editorViewModel.onStrokePoint(offset) },
+                    onStrokeEnd = { editorViewModel.onStrokeEnd() }
                 )
             }
         }

@@ -37,8 +37,8 @@ class SettingsRepositoryImpl @Inject constructor(
     override val arScanMode: Flow<ArScanMode> = context.dataStore.data
         .map { preferences ->
             when (preferences[AR_SCAN_MODE]) {
-                ArScanMode.GAUSSIAN_SPLATS.name -> ArScanMode.GAUSSIAN_SPLATS
-                else -> ArScanMode.CLOUD_POINTS  // default
+                ArScanMode.CLOUD_POINTS.name -> ArScanMode.CLOUD_POINTS
+                else -> ArScanMode.GAUSSIAN_SPLATS  // default
             }
         }
 
