@@ -1,4 +1,5 @@
 // FILE: build.gradle.kts
+import org.gradle.api.plugins.quality.CheckstyleExtension
 buildscript {
     val commonForcedDependencies = listOf(
         "commons-beanutils:commons-beanutils:1.11.0",
@@ -41,7 +42,6 @@ buildscript {
     }
 }
 
-import org.gradle.api.plugins.quality.CheckstyleExtension
 
         plugins {
             alias(libs.plugins.android.application) apply false
