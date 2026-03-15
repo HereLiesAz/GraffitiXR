@@ -835,7 +835,7 @@ class MainActivity : ComponentActivity() {
                                     shape = AzButtonShape.RECTANGLE,
                                     content = AzComposableContent { isEnabled ->
                                         val liveState by editorViewModel.uiState.collectAsState()
-                                        val currentSizeDp = liveState.layers.find { it.id == layer.id }?.textParams?.fontSizeDp ?: 64f
+                                        val currentSizeDp = liveState.layers.find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
@@ -850,9 +850,10 @@ class MainActivity : ComponentActivity() {
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = "${currentSizeDp.toInt()}",
+                                                text = "${currentSizeDp.toInt()}pt",
                                                 color = Color.White,
-                                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall
+                                                fontSize = 28.sp,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
@@ -916,7 +917,8 @@ class MainActivity : ComponentActivity() {
                                             Text(
                                                 text = String.format("%.2f", currentKern),
                                                 color = Color.White,
-                                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall
+                                                fontSize = 28.sp,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
@@ -1063,21 +1065,21 @@ private fun TapTargetOverlay(
     ) {
         Box(
             modifier = Modifier
-                .background(Color(0xEE000000), RoundedCornerShape(16.dp))
+                .background(Color(0xEEFFFFFF), RoundedCornerShape(16.dp))
                 .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
                 .padding(20.dp)
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "TARGET CREATION",
-                    color = Color.Cyan,
+                    color = Color(0xFF007788),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = "Tap directly on your painted reference marks on the screen. The app will immediately isolate them.",
-                    color = Color.White,
+                    color = Color(0xFF222222),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Start
                 )

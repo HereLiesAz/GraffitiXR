@@ -11,7 +11,7 @@ import java.util.UUID
 data class TextLayerParams(
     val text: String = "",
     val fontName: String = "Roboto",
-    val fontSizeDp: Float = 64f,
+    val fontSizeDp: Float = 150f,
     val colorArgb: Int = 0xFFFFFFFF.toInt(),
     val letterSpacingEm: Float = 0f,
     val isBold: Boolean = false,
