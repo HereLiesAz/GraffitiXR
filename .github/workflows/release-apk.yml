@@ -102,7 +102,13 @@ jobs:
 
       - name: Rename APK
         run: |
-          mv app/build/outputs/apk/release/app-release.apk GraffitiXR-release-v${{ env.VERSION }}.apk
+          APK_ORIGINAL=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_ORIGINAL" ]; then
+            echo "Error: No APK found in app/build/outputs/apk/release/"
+            find app/build/outputs/ -name "*.apk"
+            exit 1
+          fi
+          mv "$APK_ORIGINAL" GraffitiXR-release-v${{ env.VERSION }}.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
