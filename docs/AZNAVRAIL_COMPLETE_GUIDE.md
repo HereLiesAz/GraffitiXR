@@ -342,7 +342,7 @@ AzForm(
 ```
 
 ### AzRoller
-Slot-machine style selector.
+Slot-machine style selector (reorderable/draggable items).
 
 ```kotlin
 AzRoller(
@@ -351,6 +351,19 @@ AzRoller(
     onOptionSelected = { it -> }
 )
 ```
+
+### AzLoad
+Standalone loading screens.
+
+```kotlin
+AzLoad(
+    text = "Loading project...",
+    progress = 0.5f // Optional progress indicator
+)
+```
+
+### System Overlay Features
+AzNavRail supports System Overlay features for advanced drawing and composition over the top level.
 
 ### AzButton / AzToggle / AzCycler
 Standalone versions of rail components for general UI use.

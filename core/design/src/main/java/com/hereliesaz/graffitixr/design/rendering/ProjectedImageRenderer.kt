@@ -54,7 +54,7 @@ class ProjectedImageRenderer {
         rz: Float,
         s: Float
     ) {
-        // JNI call to update Vulkan/OpenGL transformation constants
+        // JNI call to update OpenGL transformation constants
     }
 
     private fun applyNativeBlendMode(mode: BlendMode) {

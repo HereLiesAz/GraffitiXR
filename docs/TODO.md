@@ -20,7 +20,6 @@
 - [x] **Light Estimation:** Realistic lighting for virtual projections.
 
 ## Phase 4: Final Polishing & Optimization `[DONE]`
-- [x] **Vulkan Backend:** Scaffolded for high-density splat rasterization (Lifecycle refined).
 - [x] **Multi-Lens Depth:** Support for dual-camera depth sensing.
 - [x] **3D Imports:** .glb/.gltf support (Stub improved).
 - [x] **Photogrammetry:** Keyframe capture pipeline fully implemented (OpenCV + Pose metadata).

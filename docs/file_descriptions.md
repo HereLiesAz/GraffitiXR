@@ -35,7 +35,6 @@ This document lists key files in the repository and their purposes.
 *   `src/main/cpp/GraffitiJNI.cpp`: JNI implementation. Contains `computeOpticalFlowDepth` (Lucas-Kanade optical flow, dynamic `kScale = gFocalLengthPx × gTranslationM`), `nativeSetCameraMotion`, `nativeFeedMonocularData`, `nativeFeedArCoreDepth`.
 *   `src/main/cpp/MobileGS.cpp` / `MobileGS.h`: Sparse voxel hash map, `processDepthFrame`, `draw`, `saveModel/loadModel`.
 *   `src/main/cpp/StereoProcessor.cpp`: Stereo disparity → depth pipeline.
-*   `src/main/cpp/VulkanBackend.cpp` / `VulkanBackend.h`: Vulkan instance/device/swapchain, descriptor sets, push constants, overlay texture.
 
 ## Feature Modules
 
