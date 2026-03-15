@@ -270,7 +270,9 @@ class ArRenderer(
                                     depthHeight = depthImage.height
                                     depthStride = plane.rowStride
                                 }
-                            } catch (e: Exception) {}
+                            } catch (e: Exception) {
+                                Timber.w(e, "Failed to acquire depth for capture")
+                            }
                         }
 
                         val intrArr = floatArrayOf(
@@ -302,14 +304,18 @@ class ArRenderer(
                             frame.timestamp
                         )
                     }
-                } catch (e: Exception) {}
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to feed YUV frame")
+                }
 
                 if (currentScanMode == ArScanMode.CLOUD_POINTS) {
                     try {
                         frame.acquirePointCloud().use { pointCloud ->
                             pointCloudRenderer.update(pointCloud)
                         }
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) {
+                        Timber.w(e, "Failed to acquire point cloud")
+                    }
                 } else {
                     if (depthSupported) {
                         try {
@@ -330,7 +336,10 @@ class ArRenderer(
                                 )
                             }
                         } catch (e: NotYetAvailableException) {
-                        } catch (e: Exception) {}
+                            // Normal on first frames; no action needed
+                        } catch (e: Exception) {
+                            Timber.w(e, "Failed to feed depth frame")
+                        }
                     }
                 }
             }

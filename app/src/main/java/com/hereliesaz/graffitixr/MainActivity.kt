@@ -204,7 +204,6 @@ class MainActivity : ComponentActivity() {
                 BackHandler(enabled = mainUiState.isCapturingTarget) {
                     mainViewModel.cancelTapMode()
                     arViewModel.clearTapHighlights()
-                    arViewModel.restoreSplats()
                 }
                 BackHandler(enabled = mainUiState.isTouchLocked) {
                     mainViewModel.setTouchLocked(false)
@@ -335,7 +334,6 @@ class MainActivity : ComponentActivity() {
                                     onCancel = {
                                         mainViewModel.cancelTapMode()
                                         arViewModel.clearTapHighlights()
-                                        arViewModel.restoreSplats()
                                     },
                                     modifier = Modifier.align(Alignment.BottomCenter)
                                 )
@@ -417,20 +415,17 @@ class MainActivity : ComponentActivity() {
                                     onConfirm = { _, mask ->
                                         arViewModel.setInitialAnchorFromCapture()
                                         mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap, mask)
-                                        arViewModel.restoreSplats()
                                     },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()
                                         if (mainUiState.captureOriginatedFromTap) {
                                             arViewModel.clearTapHighlights()
                                         } else {
-                                            arViewModel.restoreSplats()
                                             arViewModel.requestCapture()
                                         }
                                     },
                                     onCancel = {
                                         mainViewModel.onCancelCaptureClicked()
-                                        arViewModel.restoreSplats()
                                     },
                                     onUnwarpConfirm = { points ->
                                         val currentBitmap = arUiState.tempCaptureBitmap
@@ -1009,7 +1004,7 @@ private fun DiagPopup(
                     modifier = Modifier
                         .padding(start = 12.dp)
                         .pointerInput(Unit) {
-                            detectTapGestures { visible = false }
+                            detectTapGestures { _ -> visible = false }
                         }
                 )
             }

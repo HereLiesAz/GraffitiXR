@@ -39,6 +39,8 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.EnumSet
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -66,7 +68,7 @@ class ArViewModel @Inject constructor(
     private val sessionMutex = Mutex()
 
     private val isSaving = AtomicBoolean(false)
-    private var lastSavedSplatCount = 0
+    private val lastSavedSplatCount = AtomicInteger(0)
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
 
@@ -282,9 +284,9 @@ class ArViewModel @Inject constructor(
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
-                lastSavedSplatCount = slamManager.getSplatCount()
+                lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) { Timber.e(e, "Failed to save map") }
         }
     }
 
@@ -308,7 +310,7 @@ class ArViewModel @Inject constructor(
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
-                lastSavedSplatCount = slamManager.getSplatCount()
+                lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -371,7 +373,7 @@ class ArViewModel @Inject constructor(
             val mapFile = File(root, "map.bin")
             if (mapFile.exists()) {
                 slamManager.loadModel(mapFile.absolutePath)
-                lastSavedSplatCount = slamManager.getSplatCount()
+                lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
             }
         }
@@ -383,7 +385,7 @@ class ArViewModel @Inject constructor(
             while (true) {
                 delay(10_000)
                 val current = slamManager.getSplatCount()
-                if (current > 0 && current != lastSavedSplatCount) {
+                if (current > 0 && current != lastSavedSplatCount.get()) {
                     saveMapNow()
                 }
             }
@@ -468,7 +470,7 @@ class ArViewModel @Inject constructor(
         displayRotation: Int
     ) {
         val tapPos = pendingTapPosition
-        val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics)
+        val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride)
 
         if (tapPos != null) {
             val rotatedBmp = if (displayRotation != 0) {
@@ -601,9 +603,33 @@ class ArViewModel @Inject constructor(
         depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int,
         colorW: Int, colorH: Int,
-        intrinsics: FloatArray?
+        intrinsics: FloatArray?,
+        depthStride: Int = 0
     ): Pair<Float, Float>? {
-        return Pair(0.5f, 0.5f)
+        if (depthBuffer == null || depthBuffer.capacity() == 0
+            || intrinsics == null || intrinsics.size < 2
+            || depthW <= 0 || depthH <= 0 || colorW <= 0 || colorH <= 0) {
+            return Pair(0.5f, 0.5f)
+        }
+        val stride = if (depthStride > 0) depthStride else depthW * 2
+        val cx = depthW / 2
+        val cy = depthH / 2
+        val byteOffset = cy * stride + cx * 2
+        if (byteOffset + 2 > depthBuffer.capacity()) return Pair(0.5f, 0.5f)
+
+        val raw = depthBuffer.getShort(byteOffset).toInt() and 0xFFFF
+        val depthMm = raw and 0x1FFF  // lower 13 bits = millimetres (ARCore DEPTH16)
+        if (depthMm < 100) return Pair(0.5f, 0.5f)  // <10 cm — invalid reading
+
+        val depthM = depthMm / 1000f
+        // Scale colour-camera focal lengths into depth-image pixel space.
+        val fx = intrinsics[0] * (depthW.toFloat() / colorW)
+        val fy = intrinsics[1] * (depthH.toFloat() / colorH)
+        // Physical half-extents covering 40 % of the frame at the measured depth —
+        // a sensible starting size; the artist can scale from there.
+        val halfW = (depthW * 0.2f / fx * depthM).coerceIn(0.2f, 3f)
+        val halfH = (depthH * 0.2f / fy * depthM).coerceIn(0.2f, 3f)
+        return Pair(halfW, halfH)
     }
 
     fun setTempCapture(bitmap: Bitmap?) {
@@ -623,6 +649,8 @@ class ArViewModel @Inject constructor(
 
         var anchorModelMatrix = FloatArray(16)
         android.opengl.Matrix.invertM(anchorModelMatrix, 0, originalViewMat, 0)
+        // Preserve the camera-pose fallback; only overwrite if plane detection succeeds.
+        val fallbackMatrix = anchorModelMatrix.copyOf()
 
         session?.let { s ->
             try {
@@ -696,7 +724,8 @@ class ArViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Timber.e(e, "Plane detection failed; using camera-pose fallback")
+                anchorModelMatrix = fallbackMatrix
             }
         }
 
@@ -727,8 +756,6 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isCaptureRequested = false) }
     }
 
-    fun restoreSplats() {}
-
     fun setUnwarpPoints(points: List<Offset>) {
         _uiState.update { it.copy(unwarpPoints = points) }
     }
@@ -754,13 +781,21 @@ class ArViewModel @Inject constructor(
     }
 
     fun appendDiag(text: String) {
-        _uiState.update { it.copy(diagLog = text) }
+        _uiState.update { state ->
+            val existing = state.diagLog?.lines() ?: emptyList()
+            val updated = (existing + text).takeLast(20).joinToString("\n")
+            state.copy(diagLog = updated)
+        }
     }
 
     private fun addLayerFeaturesToSLAM(bitmap: Bitmap) {
         val state = _uiState.value
         val viewMat = state.targetCaptureViewMatrix ?: return
-        val depthBuffer = state.targetDepthBuffer ?: ByteBuffer.allocateDirect(0)
+        val depthBuffer = state.targetDepthBuffer
+        if (depthBuffer == null || depthBuffer.capacity() == 0) {
+            Timber.w("addLayerFeaturesToSLAM: no depth data available; skipping feature baking")
+            return
+        }
         val depthW = state.targetDepthBufferWidth
         val depthH = state.targetDepthBufferHeight
         val depthStride = state.targetDepthStride
