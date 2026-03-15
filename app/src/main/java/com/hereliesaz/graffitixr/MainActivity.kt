@@ -716,7 +716,7 @@ class MainActivity : ComponentActivity() {
                     text = layer.name,
                     color = Color.White,
                     info = navStrings.layerInfo,
-                    nestedRailAlignment = AzNestedRailAlignment.HORIZONTAL,
+                    nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
                     keepNestedRailOpen = true,
                     onClick = {
                         editorViewModel.onLayerActivated(layer.id)
