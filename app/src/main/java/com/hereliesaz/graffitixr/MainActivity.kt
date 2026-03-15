@@ -232,6 +232,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val navStrings = remember { NavStrings() }
+                var showHelp by remember { mutableStateOf(false) }
 
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
 
@@ -244,7 +245,10 @@ class MainActivity : ComponentActivity() {
                         packButtons = true,
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
                     )
-                    azAdvanced(helpEnabled = true)
+                    azAdvanced(
+                        helpEnabled = showHelp,
+                        onDismissHelp = { showHelp = false }
+                    )
 
                     if (isRailVisible) {
                         configureRailItems(
@@ -731,7 +735,7 @@ class MainActivity : ComponentActivity() {
                                 color = Color.White,
                                 shape = AzButtonShape.RECTANGLE,
                                 info = navStrings.sizeInfo,
-                                content = AzComposableContent {
+                                content = AzComposableContent { isEnabled ->
                                     val liveState by editorViewModel.uiState.collectAsState()
                                     var itemRadiusPx by remember { mutableFloatStateOf(100f) }
                                     val density = LocalDensity.current
@@ -739,7 +743,8 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .onSizeChanged { size -> itemRadiusPx = size.width / 2f }
-                                            .pointerInput(Unit) {
+                                            .pointerInput(isEnabled) {
+                                                if (!isEnabled) return@pointerInput
                                                 detectDragGestures { change, dragAmount ->
                                                     change.consume()
                                                     // Vertical drag → size, horizontal drag → feathering
@@ -803,7 +808,7 @@ class MainActivity : ComponentActivity() {
                                     editorViewModel.setActiveTool(Tool.COLOR)
                                     editorViewModel.onColorClicked()
                                 },
-                                content = AzComposableContent {
+                                content = AzComposableContent { isEnabled ->
                                     val liveState by editorViewModel.uiState.collectAsState()
                                     val isActive = liveState.activeTool == Tool.COLOR
                                     Box(
@@ -813,7 +818,8 @@ class MainActivity : ComponentActivity() {
                                                 if (isActive) Cyan.copy(alpha = 0.15f)
                                                 else Color.Transparent
                                             )
-                                            .pointerInput(Unit) {
+                                            .pointerInput(isEnabled) {
+                                                if (!isEnabled) return@pointerInput
                                                 detectDragGestures { change, dragAmount ->
                                                     change.consume()
                                                     editorViewModel.adjustColorHSV(

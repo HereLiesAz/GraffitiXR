@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,8 +31,8 @@ fun OnboardingDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = title) },
-        text = { Text(text = description) },
+        title = { Text(text = title, style = MaterialTheme.typography.headlineMedium) },
+        text = { Text(text = description, style = MaterialTheme.typography.bodyLarge) },
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text("Got it")

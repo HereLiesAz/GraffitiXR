@@ -23,8 +23,8 @@ fun OnboardingScreen(onDismiss: () -> Unit) {
         .padding(16.dp)
         .padding(top = 100.dp)
 
-    val headlineStyle = MaterialTheme.typography.headlineMedium
-    val bodyStyle = MaterialTheme.typography.bodyLarge
+    val headlineStyle = MaterialTheme.typography.displaySmall
+    val bodyStyle = MaterialTheme.typography.headlineSmall
 
     androidx.compose.foundation.layout.Column(
         modifier = columnModifier,
