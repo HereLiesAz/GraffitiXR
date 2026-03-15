@@ -37,7 +37,8 @@
       "Bash(curl -s \"https://raw.githubusercontent.com/HereLiesAz/AzNavRail/main/SampleApp/app/src/main/java/com/example/sampleapp/MainApp.kt\")",
       "Bash(curl -s \"https://api.github.com/repos/HereLiesAz/AzNavRail/branches\" | python3 -c \"import sys,json; [print\\(b['name']\\) for b in json.load\\(sys.stdin\\)]\")",
       "Bash(curl -s \"https://api.github.com/repos/HereLiesAz/AzNavRail/git/trees/main?recursive=1\" | python3 -c \"import sys,json; [print\\(f['path']\\) for f in json.load\\(sys.stdin\\).get\\('tree',[]\\) if 'SampleApp' in f['path'] or f['path'].endswith\\('.kt'\\)]\" 2>/dev/null | head -60)",
-      "Bash(curl -s \"https://raw.githubusercontent.com/HereLiesAz/AzNavRail/main/SampleApp/src/main/java/com/example/sampleapp/MainApp.kt\")"
+      "Bash(curl -s \"https://raw.githubusercontent.com/HereLiesAz/AzNavRail/main/SampleApp/src/main/java/com/example/sampleapp/MainApp.kt\")",
+      "Bash(git -C /home/az/StudioProjects/GraffitiXR status --short)"
     ]
   }
 }
