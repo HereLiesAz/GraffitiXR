@@ -109,7 +109,7 @@ class ArRenderer(
 
     fun updateOverlayExtent(halfW: Float, halfH: Float) {
         overlayRenderer.setBorderExtent(halfW, halfH)
-        overlayRenderer.setExtent(OverlayRenderer.QUAD_HALF_EXTENT, OverlayRenderer.QUAD_HALF_EXTENT)
+        overlayRenderer.setExtent(halfW, halfH)
     }
 
     fun updateFlashlight(isOn: Boolean) {
@@ -349,7 +349,9 @@ class ArRenderer(
 
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
 
-            if ((showAnchorBoundary || showBorderForConfirmation) && anchorEstablished) {
+            val showBorder = anchorEstablished &&
+                (showAnchorBoundary || (showBorderForConfirmation && !overlayRenderer.hasTexture))
+            if (showBorder) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
         }

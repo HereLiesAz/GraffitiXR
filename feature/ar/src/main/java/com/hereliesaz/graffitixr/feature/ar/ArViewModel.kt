@@ -603,7 +603,7 @@ class ArViewModel @Inject constructor(
         colorW: Int, colorH: Int,
         intrinsics: FloatArray?
     ): Pair<Float, Float>? {
-        return Pair(0.2f, 0.2f)
+        return Pair(0.5f, 0.5f)
     }
 
     fun setTempCapture(bitmap: Bitmap?) {

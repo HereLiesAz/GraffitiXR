@@ -35,7 +35,7 @@ class DefaultUriProvider @Inject constructor() : UriProvider {
 
 @Singleton
 class ProjectManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val uriProvider: UriProvider
 ) {
 
