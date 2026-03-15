@@ -120,6 +120,7 @@ dependencies {
 
     implementation(libs.az.nav.rail)
     implementation(libs.coil.compose)
+    implementation(libs.compose.ui.text.google.fonts)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

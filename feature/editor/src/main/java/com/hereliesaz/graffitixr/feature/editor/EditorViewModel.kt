@@ -1002,4 +1002,121 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(layers = layers) }
         saveProject()
     }
+
+    override fun onAddTextLayer() {
+        pushHistory()
+        val projectId = _uiState.value.projectId ?: return
+        val textCount = _uiState.value.layers.count { it.textParams != null }
+        val defaultParams = TextLayerParams(text = "Text ${textCount + 1}")
+        viewModelScope.launch(dispatchers.io) {
+            val metrics = context.resources.displayMetrics
+            val widthPx = metrics.widthPixels.takeIf { it > 0 } ?: 1080
+            val heightPx = metrics.heightPixels.takeIf { it > 0 } ?: 1920
+            val density = metrics.density
+
+            val typeface = GoogleFontCache.getTypeface(context, defaultParams.fontName, defaultParams.isBold, defaultParams.isItalic)
+            val bitmap = TextRasterizer.rasterize(defaultParams, widthPx, heightPx, density, typeface)
+
+            val filename = "text_layer_${UUID.randomUUID()}.png"
+            val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
+            val localUri = "file://$path".toUri()
+
+            val newLayer = Layer(
+                id = UUID.randomUUID().toString(),
+                name = "Text${textCount + 1}",
+                uri = localUri,
+                bitmap = bitmap,
+                isVisible = true,
+                textParams = defaultParams
+            )
+            baseBitmaps[newLayer.id] = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+            layerStrokes[newLayer.id] = mutableListOf()
+
+            withContext(dispatchers.main) {
+                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE) }
+                saveProject()
+            }
+        }
+    }
+
+    private fun rerasterizeTextLayer(layerId: String, params: TextLayerParams) {
+        viewModelScope.launch(dispatchers.io) {
+            val metrics = context.resources.displayMetrics
+            val widthPx = metrics.widthPixels.takeIf { it > 0 } ?: 1080
+            val heightPx = metrics.heightPixels.takeIf { it > 0 } ?: 1920
+            val density = metrics.density
+
+            val typeface = GoogleFontCache.getTypeface(context, params.fontName, params.isBold, params.isItalic)
+            val bitmap = TextRasterizer.rasterize(params, widthPx, heightPx, density, typeface)
+
+            val layer = _uiState.value.layers.find { it.id == layerId } ?: return@launch
+            val uri = layer.uri
+            if (uri != null) {
+                try {
+                    val file = java.io.File(uri.path ?: return@launch)
+                    java.io.FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+                } catch (_: Exception) {}
+            }
+
+            baseBitmaps[layerId] = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+
+            withContext(dispatchers.main) {
+                _uiState.update { state ->
+                    state.copy(layers = state.layers.map {
+                        if (it.id == layerId) it.copy(bitmap = bitmap, textParams = params) else it
+                    })
+                }
+            }
+        }
+    }
+
+    override fun onTextContentChanged(layerId: String, text: String) {
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        val params = layer.textParams ?: return
+        pushHistory()
+        val updated = params.copy(text = text)
+        rerasterizeTextLayer(layerId, updated)
+        viewModelScope.launch(dispatchers.main) { saveProject() }
+    }
+
+    override fun onTextFontChanged(layerId: String, fontName: String) {
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        val params = layer.textParams ?: return
+        pushHistory()
+        val updated = params.copy(fontName = fontName)
+        rerasterizeTextLayer(layerId, updated)
+        viewModelScope.launch(dispatchers.main) { saveProject() }
+    }
+
+    override fun onTextSizeChanged(layerId: String, sizeDp: Float) {
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        val params = layer.textParams ?: return
+        val updated = params.copy(fontSizeDp = sizeDp.coerceIn(8f, 300f))
+        rerasterizeTextLayer(layerId, updated)
+    }
+
+    override fun onTextColorChanged(layerId: String, colorArgb: Int) {
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        val params = layer.textParams ?: return
+        pushHistory()
+        val updated = params.copy(colorArgb = colorArgb)
+        rerasterizeTextLayer(layerId, updated)
+        viewModelScope.launch(dispatchers.main) { saveProject() }
+    }
+
+    override fun onTextKerningChanged(layerId: String, letterSpacingEm: Float) {
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        val params = layer.textParams ?: return
+        val updated = params.copy(letterSpacingEm = letterSpacingEm.coerceIn(-0.2f, 1f))
+        rerasterizeTextLayer(layerId, updated)
+    }
+
+    override fun onTextStyleChanged(layerId: String, isBold: Boolean, isItalic: Boolean, hasOutline: Boolean, hasDropShadow: Boolean) {
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        val params = layer.textParams ?: return
+        pushHistory()
+        val updated = params.copy(isBold = isBold, isItalic = isItalic, hasOutline = hasOutline, hasDropShadow = hasDropShadow)
+        rerasterizeTextLayer(layerId, updated)
+        viewModelScope.launch(dispatchers.main) { saveProject() }
+    }
 }
